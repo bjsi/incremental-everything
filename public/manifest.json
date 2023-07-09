@@ -1,22 +1,22 @@
 {
   "manifestVersion": 1,
-  "id": "plugin_template",
-  "name": "Plugin Template",
-  "author": "remnote",
-  "repoUrl": "",
+  "id": "incremental-everything",
+  "name": "Incremental Everything",
+  "author": "Jamesb",
+  "repoUrl": "https://github.com/bjsi/incremental-everything",
   "version": {
     "major": 0,
     "minor": 0,
     "patch": 1
   },
   "theme": [],
-  "enableOnMobile": false,
+  "enableOnMobile": true,
   "description": "",
   "requestNative": false,
   "requiredScopes": [
     {
       "type": "All",
-      "level": "Read"
+      "level": "ReadCreateModifyDelete"
     }
   ]
 }
