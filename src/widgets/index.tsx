@@ -78,7 +78,10 @@ async function onActivate(plugin: ReactRNPlugin) {
     async (infoAboutCurrentQueue) => {
       const num_random_swaps = sortingRandomness * allIncrementalRem.length;
       const interval = Math.round(1 / ratioBetweenCardsAndIncrementalRem);
-      if (interval % infoAboutCurrentQueue.cardsPracticed === 0) {
+      if (
+        interval % infoAboutCurrentQueue.cardsPracticed === 0 ||
+        infoAboutCurrentQueue.numRemainingCards === 0
+      ) {
         const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
           infoAboutCurrentQueue.mode === 'practice-all' ? true : Date.now() >= x.nextRepDate
         );
@@ -97,6 +100,36 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
     }
   );
+
+  await plugin.scheduler.registerCustomScheduler('Incremental Everything Scheduler', [
+    {
+      id: 'initial-interval',
+      title: 'Initial Interval',
+      description: 'Sets the number of days until the first repetition.',
+      type: 'number',
+      defaultValue: 1,
+      validators: [
+        {
+          type: 'min',
+          arg: 0,
+        },
+      ],
+    },
+    {
+      id: 'multiplier',
+      title: 'Multiplier',
+      description:
+        'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
+      type: 'number',
+      defaultValue: 2,
+      validators: [
+        {
+          type: 'min',
+          arg: 0,
+        },
+      ],
+    },
+  ]);
 
   plugin.app.registerCallback<SpecialPluginCallback.SRSScheduleCard>(
     SpecialPluginCallback.SRSScheduleCard,
