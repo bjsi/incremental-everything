@@ -1,5 +1,7 @@
 import {
+  AppEvents,
   declareIndexPlugin,
+  PluginCommandMenuLocation,
   ReactRNPlugin,
   Rem,
   SpecialPluginCallback,
@@ -8,16 +10,16 @@ import {
 import '../style.css';
 import '../App.css';
 import {
+  initialIntervalId,
+  multiplierId,
   nextRepDateSlotCode,
   powerupCode,
   prioritySlotCode,
   repHistorySlotCode,
 } from '../lib/consts';
 import * as _ from 'remeda';
-
-interface IncrementalRep {
-  date: number;
-}
+import { sleep, tryParseJson } from '../lib/utils';
+import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
 
 async function onActivate(plugin: ReactRNPlugin) {
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
@@ -37,24 +39,16 @@ async function onActivate(plugin: ReactRNPlugin) {
     ],
   });
 
-  let allIncrementalRem: { rem: Rem; nextRepDate: number; priority: number; history: any[] }[];
-
-  const tryParseJson = (x: any) => {
-    try {
-      return JSON.parse(x);
-    } catch (e) {
-      return undefined;
-    }
-  };
-
   plugin.track(async (rp) => {
     const powerup = await rp.powerup.getPowerupByCode(powerupCode);
     const taggedRem = (await powerup?.taggedRem()) || [];
-    allIncrementalRem = (
+    // wait for the powerup slots to be populated
+    await sleep(1000);
+    const allIncrementalRem = (
       await Promise.all(
         taggedRem.map(async (r) => {
           return {
-            rem: r,
+            remId: r._id,
             nextRepDate: tryParseJson(
               await r.getPowerupProperty(powerupCode, nextRepDateSlotCode)
             ) as number,
@@ -68,86 +62,100 @@ async function onActivate(plugin: ReactRNPlugin) {
         })
       )
     ).filter((x) => x.nextRepDate != null && x.priority != null);
+
+    plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
+      SpecialPluginCallback.GetNextCard,
+      async (infoAboutCurrentQueue) => {
+        const sortingRandomness = await getSortingRandomness(plugin);
+        const ratioBetweenCardsAndIncrementalRem = await getRatioBetweenCardsAndIncrementalRem(
+          plugin
+        );
+
+        const num_random_swaps = sortingRandomness * allIncrementalRem.length;
+        const interval = Math.round(1 / ratioBetweenCardsAndIncrementalRem);
+        if (
+          interval % infoAboutCurrentQueue.cardsPracticed === 0 ||
+          infoAboutCurrentQueue.numCardsRemaining === 0
+        ) {
+          const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
+            infoAboutCurrentQueue.mode === 'practice-all' ? true : Date.now() >= x.nextRepDate
+          );
+          // do n random swaps
+          for (let i = 0; i < num_random_swaps; i++) {
+            const idx1 = Math.floor(Math.random() * sorted.length);
+            const idx2 = Math.floor(Math.random() * sorted.length);
+            const temp = sorted[idx1];
+            sorted[idx1] = sorted[idx2];
+            sorted[idx2] = temp;
+          }
+
+          if (sorted.length === 0) {
+            return null;
+          } else {
+            const first = sorted[0];
+            return {
+              remId: first.remId,
+              pluginId: 'incremental-everything',
+            };
+          }
+        } else {
+          return null;
+        }
+      }
+    );
   });
 
-  let sortingRandomness: number = 0;
-  let ratioBetweenCardsAndIncrementalRem: number = 0.25; // 1 incremental rem for every 4
-
-  plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
-    SpecialPluginCallback.GetNextCard,
-    async (infoAboutCurrentQueue) => {
-      const num_random_swaps = sortingRandomness * allIncrementalRem.length;
-      const interval = Math.round(1 / ratioBetweenCardsAndIncrementalRem);
-      if (
-        interval % infoAboutCurrentQueue.cardsPracticed === 0 ||
-        infoAboutCurrentQueue.numRemainingCards === 0
-      ) {
-        const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
-          infoAboutCurrentQueue.mode === 'practice-all' ? true : Date.now() >= x.nextRepDate
-        );
-        if (sorted.length === 0) {
-          return null;
-        } else {
-          const first = sorted[0];
-          return {
-            remId: first.rem._id,
-            pluginId: 'incremental-everything',
-            alwaysRenderAnswer: true,
-          };
-        }
-      } else {
-        return null;
+  plugin.app.registerCommand({
+    id: 'incremental-everything',
+    name: 'Incremental Everything',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        return;
       }
-    }
-  );
-
-  await plugin.scheduler.registerCustomScheduler('Incremental Everything Scheduler', [
-    {
-      id: 'initial-interval',
-      title: 'Initial Interval',
-      description: 'Sets the number of days until the first repetition.',
-      type: 'number',
-      defaultValue: 1,
-      validators: [
-        {
-          type: 'min',
-          arg: 0,
-        },
-      ],
+      const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
+      const initialIntervalInMs = initialInterval * 24 * 60 * 60 * 1000;
+      await rem.addPowerup(powerupCode);
+      await rem.setPowerupProperty(powerupCode, prioritySlotCode, ['10']);
+      await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, [
+        (Date.now() + initialIntervalInMs).toString(),
+      ]);
     },
-    {
-      id: 'multiplier',
-      title: 'Multiplier',
-      description:
-        'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
-      type: 'number',
-      defaultValue: 2,
-      validators: [
-        {
-          type: 'min',
-          arg: 0,
-        },
-      ],
-    },
-  ]);
+  });
 
-  plugin.app.registerCallback<SpecialPluginCallback.SRSScheduleCard>(
-    SpecialPluginCallback.SRSScheduleCard,
-    async (args) => {
-      const rem = await plugin.rem.findOne(args.remId);
-      const history = tryParseJson(await rem?.getPowerupProperty(powerupCode, repHistorySlotCode));
-      const prevRep = _.last(history) as IncrementalRep;
-      const interval = prevRep ? (Date.now() - prevRep.date) / (1000 * 60 * 60 * 24) : 1;
-      const newInterval = Math.round(interval * 2);
-      const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
-      const newHistory = [...(history || []), { date: Date.now() }];
-      await rem?.setPowerupProperty(powerupCode, nextRepDateSlotCode, [newNextRepDate.toString()]);
-      await rem?.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(newHistory)]);
-      return { nextDate: newNextRepDate, dontSave: true };
-    }
-  );
+  plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerMenuItem({
+    id: 'sorting_criteria_menuitem',
+    location: PluginCommandMenuLocation.QueueMenu,
+    name: 'Sorting Criteria',
+    action: async () => {
+      await plugin.widget.openPopup('sorting_criteria');
+    },
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: initialIntervalId,
+    title: 'Initial Interval',
+    description: 'Sets the number of days until the first repetition.',
+    defaultValue: 0,
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: multiplierId,
+    title: 'Multiplier',
+    description:
+      'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
+    defaultValue: 2,
+  });
 
   plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
+    powerupFilter: powerupCode,
     dimensions: {
       width: '100%',
       height: 'auto',
