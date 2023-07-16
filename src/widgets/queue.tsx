@@ -65,14 +65,31 @@ export function QueueComponent() {
       if (rem) {
         if (
           (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) ||
-          (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) ||
-          ((await rem.hasPowerup(BuiltInPowerupCodes.Link)) &&
-            (await rem.getPowerupProperty(
-              BuiltInPowerupCodes.Link,
-              PowerupSlotCodeMap[BuiltInPowerupCodes.Link].URL
-            )))
+          (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile))
         ) {
           return { rem, type: 'pdf' };
+        } else if (
+          (await rem.hasPowerup(BuiltInPowerupCodes.Link)) &&
+          (await rem.getPowerupProperty(
+            BuiltInPowerupCodes.Link,
+            PowerupSlotCodeMap[BuiltInPowerupCodes.Link].URL
+          ))
+        ) {
+          const url = await rem.getPowerupProperty(
+            BuiltInPowerupCodes.Link,
+            PowerupSlotCodeMap[BuiltInPowerupCodes.Link].URL
+          );
+          if (url.includes('youtube')) {
+            return {
+              type: 'youtube',
+              rem,
+            };
+          } else {
+            return {
+              type: 'web',
+              rem,
+            };
+          }
         } else {
           return { rem, type: 'rem' };
         }
@@ -80,6 +97,21 @@ export function QueueComponent() {
     },
     [ctx?.remId]
   );
+
+  /**
+   * If the rem is a rem type, then we should render the rem editor
+   * if there are no other plugin widgets at this location
+   */
+  const shouldRenderEditorForRemType = useRunAsync(async () => {
+    if (remAndType?.type !== 'rem') {
+      return false;
+    } else {
+      const widgetsAtLocation = (
+        await plugin.widget.getWidgetsAtLocation(WidgetLocation.Flashcard, remAndType.rem._id)
+      ).filter((w) => w.pluginId !== 'incremental-everything');
+      return widgetsAtLocation.length === 0;
+    }
+  }, [remAndType?.type, remAndType?.rem._id]);
 
   return (
     <div
@@ -98,7 +130,11 @@ export function QueueComponent() {
             return null;
           } else if (remAndType.type === 'pdf') {
             return null;
-          } else if (remAndType.type === 'rem') {
+          } else if (remAndType.type === 'web') {
+            return null;
+          } else if (remAndType.type === 'youtube') {
+          } else if (remAndType.type === 'rem' && shouldRenderEditorForRemType) {
+            // TODO: how to make sure the bottom bar always gets rendered at the bottom if other plugins are also rendering widgets?
             return (
               <div className="flex flex-col gap-2">
                 <RemRichTextEditor remId={remAndType.rem._id} width={'100%'} />
