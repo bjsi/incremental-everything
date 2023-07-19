@@ -9,7 +9,7 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 - **Incremental Writing**: Write your essays and blog posts incrementally.
 - **Incremental Tasks**: Clear out your tasklist between flashcard reviews.
 - **Incremental Exercises**: Spread out textbook exercises over time.
-- Plugin support! Any plugin widget can easily integrate with Incremental Everything. See the guitar, mathematics and AI Gratitude Journal examples.
+- Plugin support! Any plugin widget can easily integrate with Incremental Everything. See the guitar, mathematics and AI examples.
 
 ### Installation
 
@@ -48,6 +48,16 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 #### AI Gratitude Journal
 
 - Prompts you to reflect and expand upon things you've written about in your daily document reflections and gratitude journal sections.
+
+#### AI "K-Probes"
+
+- Prompts you to refine your ideas over time by randomly picking paragraphs from articles you have written and critiques them.
+- Uses metadata from the articles to pick a relevant persona.
+
+#### AI Edit Later
+
+- Tag Edit Later Rem with.
+- Get card refactoring suggestions from GPT.
 
 ### Development Details
 

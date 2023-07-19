@@ -1,5 +1,4 @@
 import {
-  AppEvents,
   declareIndexPlugin,
   PluginCommandMenuLocation,
   ReactRNPlugin,
@@ -105,6 +104,16 @@ async function onActivate(plugin: ReactRNPlugin) {
     );
   });
 
+  async function initIncrementalRem(rem: Rem) {
+    const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
+    const initialIntervalInMs = initialInterval * 24 * 60 * 60 * 1000;
+    await rem.addPowerup(powerupCode);
+    await rem.setPowerupProperty(powerupCode, prioritySlotCode, ['10']);
+    await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, [
+      (Date.now() + initialIntervalInMs).toString(),
+    ]);
+  }
+
   plugin.app.registerCommand({
     id: 'incremental-everything',
     name: 'Incremental Everything',
@@ -113,13 +122,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       if (!rem) {
         return;
       }
-      const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
-      const initialIntervalInMs = initialInterval * 24 * 60 * 60 * 1000;
-      await rem.addPowerup(powerupCode);
-      await rem.setPowerupProperty(powerupCode, prioritySlotCode, ['10']);
-      await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, [
-        (Date.now() + initialIntervalInMs).toString(),
-      ]);
+      await initIncrementalRem(rem);
     },
   });
 
@@ -136,6 +139,19 @@ async function onActivate(plugin: ReactRNPlugin) {
     name: 'Sorting Criteria',
     action: async () => {
       await plugin.widget.openPopup('sorting_criteria');
+    },
+  });
+
+  plugin.app.registerMenuItem({
+    id: 'tag_rem_menuitem',
+    location: 'ReaderMenu',
+    name: 'Tag as Incremental Rem',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) {
+        return;
+      }
+      await initIncrementalRem(rem);
     },
   });
 

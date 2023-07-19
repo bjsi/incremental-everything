@@ -1,11 +1,9 @@
 import { Rem, renderWidget } from '@remnote/plugin-sdk';
 
-interface VideoProps {
+interface VideoViewerProps {
   rem: Rem;
 }
 
-export function Video(props: VideoProps) {
-  return null;
+export function VideoViewer(props: VideoViewerProps) {
+  return <div>Video</div>;
 }
-
-renderWidget(Video);

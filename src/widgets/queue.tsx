@@ -1,5 +1,6 @@
 import {
   BuiltInPowerupCodes,
+  PDFWebReader,
   PowerupSlotCodeMap,
   Rem,
   RemHierarchyEditorTree,
@@ -10,6 +11,7 @@ import {
   useTracker,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
+import { VideoViewer } from '../components/video';
 import { scheduleRem } from '../lib/scheduler';
 
 const BOTTOM_BAR_HEIGHT = 50;
@@ -70,14 +72,11 @@ export function QueueComponent() {
           return { rem, type: 'pdf' };
         } else if (
           (await rem.hasPowerup(BuiltInPowerupCodes.Link)) &&
-          (await rem.getPowerupProperty(
-            BuiltInPowerupCodes.Link,
-            PowerupSlotCodeMap[BuiltInPowerupCodes.Link].URL
-          ))
+          (await rem.getPowerupProperty<BuiltInPowerupCodes.Link>(BuiltInPowerupCodes.Link, 'URL'))
         ) {
-          const url = await rem.getPowerupProperty(
+          const url = await rem.getPowerupProperty<BuiltInPowerupCodes.Link>(
             BuiltInPowerupCodes.Link,
-            PowerupSlotCodeMap[BuiltInPowerupCodes.Link].URL
+            'URL'
           );
           if (url.includes('youtube')) {
             return {
@@ -129,10 +128,11 @@ export function QueueComponent() {
           if (!remAndType) {
             return null;
           } else if (remAndType.type === 'pdf') {
-            return null;
+            return <PDFWebReader remId={remAndType.rem._id} />;
           } else if (remAndType.type === 'web') {
-            return null;
+            return <PDFWebReader remId={remAndType.rem._id} height={'100%'} width="100%" />;
           } else if (remAndType.type === 'youtube') {
+            return <VideoViewer rem={remAndType.rem} />;
           } else if (remAndType.type === 'rem' && shouldRenderEditorForRemType) {
             // TODO: how to make sure the bottom bar always gets rendered at the bottom if other plugins are also rendering widgets?
             return (
