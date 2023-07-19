@@ -5,9 +5,11 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 ### Features
 
 - **Incremental Reading**: Read and review your notes, books and websites.
-- **Incremental Video Watching**: Watch and take notes on YouTube videos.
-- **Incremental Writing**: Write your essays and blog posts incrementally over time.
-- Plugin support! Any plugin widget can easily integrate with Incremental Everything. See the guitar and mathematics examples.
+- **Incremental Video**: Watch and take notes on YouTube videos.
+- **Incremental Writing**: Write your essays and blog posts incrementally.
+- **Incremental Tasks**: Clear out your tasklist between flashcard reviews.
+- **Incremental Exercises**: Spread out textbook exercises over time.
+- Plugin support! Any plugin widget can easily integrate with Incremental Everything. See the guitar, mathematics and AI Gratitude Journal examples.
 
 ### Installation
 
@@ -20,17 +22,32 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 - The plugin will automatically add incremental Rem to your queue and show them to you when you review flashcards.
 - Inside the queue, you can control how many incremental Rem you want to see and how they are sorted using the Sorting Criteria menu button.
 
+### Scheduling
+
+- By default the plugin uses an extremely simple scheduling algorithm.
+- You can tune the scheduling to your preferences by...
+- You can assign different schedulers by...
+
 ### Plugin Interoperability
+
+- The coolest part about RemNote is how open-ended and extensible it is. Making this plugin integrate cleanly with other plugins was trivial. Here are a few examples I have been toying around with.
 
 #### Incremental Guitar
 
-- TODO
+- 3 months or so ago I picked up guitar again after a long break.
+- I've been learning a few songs.
+- Left to my own devices I tend to 
+- I wrote a scheduling algorithm that shows me parts of the song I can't play fast more often than those I can play at or close to full speed. This ensures that I don't waste time (this is assuming that your goal is to play the full song, there's no such thing as wasting time if you are having fun :) )
 
 #### Incremental Mathematics
 
-- TODO
+- Schedules
+- The Lean theorem prover integration is 
+- Future ideas: scheduling LeetCode problems, ... etc over time.
 
-### Scheduling
+#### AI Gratitude Journal
+
+- Prompts you to reflect and expand upon things you've written about in your daily document reflections and gratitude journal sections.
 
 ### Development Details
 
