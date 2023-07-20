@@ -126,6 +126,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
   plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {
     dimensions: {
       width: '100%',
@@ -144,7 +151,8 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.app.registerMenuItem({
     id: 'tag_rem_menuitem',
-    location: 'ReaderMenu',
+    // TODO: change this to DocumentMenu?
+    location: PluginCommandMenuLocation.ReaderMenu,
     name: 'Tag as Incremental Rem',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
