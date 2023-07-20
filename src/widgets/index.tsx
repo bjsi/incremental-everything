@@ -1,8 +1,10 @@
 import {
+  AppEvents,
   declareIndexPlugin,
   PluginCommandMenuLocation,
   ReactRNPlugin,
   Rem,
+  RemId,
   SpecialPluginCallback,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
@@ -38,12 +40,19 @@ async function onActivate(plugin: ReactRNPlugin) {
     ],
   });
 
+  let allIncrementalRem: {
+    remId: string;
+    nextRepDate: number;
+    priority: number;
+    history: any[];
+  }[] = [];
+
   plugin.track(async (rp) => {
     const powerup = await rp.powerup.getPowerupByCode(powerupCode);
     const taggedRem = (await powerup?.taggedRem()) || [];
     // wait for the powerup slots to be populated
     await sleep(1000);
-    const allIncrementalRem = (
+    allIncrementalRem = (
       await Promise.all(
         taggedRem.map(async (r) => {
           return {
@@ -61,48 +70,61 @@ async function onActivate(plugin: ReactRNPlugin) {
         })
       )
     ).filter((x) => x.nextRepDate != null && x.priority != null);
-
-    plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
-      SpecialPluginCallback.GetNextCard,
-      async (infoAboutCurrentQueue) => {
-        const sortingRandomness = await getSortingRandomness(plugin);
-        const ratioBetweenCardsAndIncrementalRem = await getRatioBetweenCardsAndIncrementalRem(
-          plugin
-        );
-
-        const num_random_swaps = sortingRandomness * allIncrementalRem.length;
-        const interval = Math.round(1 / ratioBetweenCardsAndIncrementalRem);
-        if (
-          interval % infoAboutCurrentQueue.cardsPracticed === 0 ||
-          infoAboutCurrentQueue.numCardsRemaining === 0
-        ) {
-          const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
-            infoAboutCurrentQueue.mode === 'practice-all' ? true : Date.now() >= x.nextRepDate
-          );
-          // do n random swaps
-          for (let i = 0; i < num_random_swaps; i++) {
-            const idx1 = Math.floor(Math.random() * sorted.length);
-            const idx2 = Math.floor(Math.random() * sorted.length);
-            const temp = sorted[idx1];
-            sorted[idx1] = sorted[idx2];
-            sorted[idx2] = temp;
-          }
-
-          if (sorted.length === 0) {
-            return null;
-          } else {
-            const first = sorted[0];
-            return {
-              remId: first.remId,
-              pluginId: 'incremental-everything',
-            };
-          }
-        } else {
-          return null;
-        }
-      }
-    );
   });
+
+  // TODO: some handling to include extracts created in current queue in the queue?
+  // or unnecessary due to init interval? could append to this list
+
+  let allRemInFolderQueue: Set<RemId> = new Set<RemId>();
+  plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
+    if (subQueueId) {
+      const subQueueRem = await plugin.rem.findOne(subQueueId);
+      allRemInFolderQueue = new Set<RemId>((await subQueueRem?.allRemIdsInQueue()) || []);
+    }
+  });
+
+  plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
+    SpecialPluginCallback.GetNextCard,
+    async (infoAboutCurrentQueue) => {
+      const sortingRandomness = await getSortingRandomness(plugin);
+      const ratioBetweenCardsAndIncrementalRem = await getRatioBetweenCardsAndIncrementalRem(
+        plugin
+      );
+
+      const num_random_swaps = sortingRandomness * allIncrementalRem.length;
+      const interval = Math.round(1 / ratioBetweenCardsAndIncrementalRem);
+      if (
+        interval % infoAboutCurrentQueue.cardsPracticed === 0 ||
+        infoAboutCurrentQueue.numCardsRemaining === 0
+      ) {
+        const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
+          infoAboutCurrentQueue.mode === 'practice-all'
+            ? allRemInFolderQueue.has(x.remId)
+            : Date.now() >= x.nextRepDate
+        );
+        // do n random swaps
+        for (let i = 0; i < num_random_swaps; i++) {
+          const idx1 = Math.floor(Math.random() * sorted.length);
+          const idx2 = Math.floor(Math.random() * sorted.length);
+          const temp = sorted[idx1];
+          sorted[idx1] = sorted[idx2];
+          sorted[idx2] = temp;
+        }
+
+        if (sorted.length === 0) {
+          return null;
+        } else {
+          const first = sorted[0];
+          return {
+            remId: first.remId,
+            pluginId: 'incremental-everything',
+          };
+        }
+      } else {
+        return null;
+      }
+    }
+  );
 
   async function initIncrementalRem(rem: Rem) {
     const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
@@ -123,6 +145,13 @@ async function onActivate(plugin: ReactRNPlugin) {
         return;
       }
       await initIncrementalRem(rem);
+    },
+  });
+
+  plugin.app.registerWidget('highlight_popup_btn', WidgetLocation.PDFHighlightPopupLocation, {
+    dimensions: {
+      width: '20px',
+      height: 'auto',
     },
   });
 
