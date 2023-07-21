@@ -136,6 +136,31 @@ async function onActivate(plugin: ReactRNPlugin) {
     ]);
   }
 
+  plugin.app.registerWidget('priority', WidgetLocation.Popup, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'set-priority',
+    name: 'Set Priority',
+    keyboardShortcut: 'opt+p',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        return;
+      }
+      if (!(await rem.hasPowerup(powerupCode))) {
+        await initIncrementalRem(rem);
+      }
+      await plugin.widget.openPopup('priority', {
+        remId: rem._id,
+      });
+    },
+  });
+
   plugin.app.registerCommand({
     id: 'incremental-everything',
     name: 'Incremental Everything',
@@ -145,13 +170,6 @@ async function onActivate(plugin: ReactRNPlugin) {
         return;
       }
       await initIncrementalRem(rem);
-    },
-  });
-
-  plugin.app.registerWidget('highlight_popup_btn', WidgetLocation.PDFHighlightPopupLocation, {
-    dimensions: {
-      width: '20px',
-      height: 'auto',
     },
   });
 
@@ -180,7 +198,7 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.app.registerMenuItem({
     id: 'tag_rem_menuitem',
-    // TODO: change this to DocumentMenu?
+    // TODO: change to DocumentMenu?
     location: PluginCommandMenuLocation.ReaderMenu,
     name: 'Tag as Incremental Rem',
     action: async (args: { remId: string }) => {
