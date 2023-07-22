@@ -23,22 +23,6 @@ import { sleep, tryParseJson } from '../lib/utils';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
 
 async function onActivate(plugin: ReactRNPlugin) {
-  await plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
-    powerupFilter: powerupCode,
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
-
-  await plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
-    powerupFilter: powerupCode,
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
-
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
     slots: [
       {
@@ -54,6 +38,21 @@ async function onActivate(plugin: ReactRNPlugin) {
         name: 'rep history',
       },
     ],
+  });
+  await plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
+    powerupFilter: powerupCode,
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
+  await plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
+    powerupFilter: powerupCode,
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
   });
 
   let allIncrementalRem: {
@@ -92,8 +91,10 @@ async function onActivate(plugin: ReactRNPlugin) {
   // or unnecessary due to init interval? could append to this list
 
   let allRemInFolderQueue: Set<RemId> | undefined = undefined;
+  let seenRem: Set<RemId> = new Set<RemId>();
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
     allRemInFolderQueue = undefined;
+    seenRem = new Set<RemId>();
   });
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
@@ -116,10 +117,12 @@ async function onActivate(plugin: ReactRNPlugin) {
       ) {
         const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
           infoAboutCurrentQueue.mode === 'practice-all'
-            ? allRemInFolderQueue?.has(x.remId)
+            ? allRemInFolderQueue?.has(x.remId) &&
+              // prevent continuous repetitions in practice-all mode
+              (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
             : Date.now() >= x.nextRepDate
         );
-        console.log('sorted', sorted);
+
         // do n random swaps
         for (let i = 0; i < num_random_swaps; i++) {
           const idx1 = Math.floor(Math.random() * sorted.length);
@@ -133,6 +136,7 @@ async function onActivate(plugin: ReactRNPlugin) {
           return null;
         } else {
           const first = sorted[0];
+          seenRem.add(first.remId);
           return {
             remId: first.remId,
             pluginId: 'incremental-everything',
