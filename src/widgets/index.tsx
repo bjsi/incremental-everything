@@ -23,6 +23,22 @@ import { sleep, tryParseJson } from '../lib/utils';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
 
 async function onActivate(plugin: ReactRNPlugin) {
+  await plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
+    powerupFilter: powerupCode,
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
+  await plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
+    powerupFilter: powerupCode,
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
     slots: [
       {
@@ -75,17 +91,18 @@ async function onActivate(plugin: ReactRNPlugin) {
   // TODO: some handling to include extracts created in current queue in the queue?
   // or unnecessary due to init interval? could append to this list
 
-  let allRemInFolderQueue: Set<RemId> = new Set<RemId>();
-  plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
-    if (subQueueId) {
-      const subQueueRem = await plugin.rem.findOne(subQueueId);
-      allRemInFolderQueue = new Set<RemId>((await subQueueRem?.allRemIdsInQueue()) || []);
-    }
+  let allRemInFolderQueue: Set<RemId> | undefined = undefined;
+  plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
+    allRemInFolderQueue = undefined;
   });
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
     async (infoAboutCurrentQueue) => {
+      if (infoAboutCurrentQueue.subQueueId && allRemInFolderQueue === undefined) {
+        const subQueueRem = await plugin.rem.findOne(infoAboutCurrentQueue.subQueueId);
+        allRemInFolderQueue = new Set<RemId>((await subQueueRem?.allRemIdsInQueue()) || []);
+      }
       const sortingRandomness = await getSortingRandomness(plugin);
       const ratioBetweenCardsAndIncrementalRem = await getRatioBetweenCardsAndIncrementalRem(
         plugin
@@ -99,9 +116,10 @@ async function onActivate(plugin: ReactRNPlugin) {
       ) {
         const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
           infoAboutCurrentQueue.mode === 'practice-all'
-            ? allRemInFolderQueue.has(x.remId)
+            ? allRemInFolderQueue?.has(x.remId)
             : Date.now() >= x.nextRepDate
         );
+        console.log('sorted', sorted);
         // do n random swaps
         for (let i = 0; i < num_random_swaps; i++) {
           const idx1 = Math.floor(Math.random() * sorted.length);
@@ -173,13 +191,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
-
   plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {
     dimensions: {
       width: '100%',
@@ -237,14 +248,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     description:
       'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
     defaultValue: 2,
-  });
-
-  plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
-    powerupFilter: powerupCode,
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
   });
 }
 

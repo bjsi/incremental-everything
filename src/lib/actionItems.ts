@@ -1,4 +1,10 @@
-import { RNPlugin, Rem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import {
+  RNPlugin,
+  Rem,
+  BuiltInPowerupCodes,
+  RichTextElementInterface,
+  RichTextElementRemInterface,
+} from '@remnote/plugin-sdk';
 import { RemAndType } from './types';
 
 export const remToActionItemType = async (
@@ -6,10 +12,14 @@ export const remToActionItemType = async (
   rem: Rem
 ): Promise<RemAndType | null> => {
   if (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) {
-    const pdfId = await rem.getPowerupProperty<BuiltInPowerupCodes.PDFHighlight>(
-      BuiltInPowerupCodes.PDFHighlight,
-      'PdfId'
-    );
+    const pdfId = (
+      (
+        await rem.getPowerupPropertyAsRichText<BuiltInPowerupCodes.PDFHighlight>(
+          BuiltInPowerupCodes.PDFHighlight,
+          'PdfId'
+        )
+      )[0] as RichTextElementRemInterface
+    )?._id;
     const pdf = await plugin.rem.findOne(pdfId);
     if (!pdf) {
       await plugin.app.toast('PDF not found for extract. Skipping.');
@@ -18,10 +28,14 @@ export const remToActionItemType = async (
       return { extract: rem, type: 'pdf-highlight', rem: pdf };
     }
   } else if (await rem.hasPowerup(BuiltInPowerupCodes.HTMLHighlight)) {
-    const html = await rem.getPowerupProperty<BuiltInPowerupCodes.HTMLHighlight>(
-      BuiltInPowerupCodes.HTMLHighlight,
-      'HTMLId'
-    );
+    const html = (
+      (
+        await rem.getPowerupPropertyAsRichText<BuiltInPowerupCodes.HTMLHighlight>(
+          BuiltInPowerupCodes.HTMLHighlight,
+          'HTMLId'
+        )
+      )[0] as RichTextElementRemInterface
+    )?._id;
     const htmlRem = await plugin.rem.findOne(html);
     if (!htmlRem) {
       await plugin.app.toast('HTML not found for extract. Skipping.');
