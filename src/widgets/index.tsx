@@ -210,6 +210,20 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerMenuItem({
+    id: 'tag_highlight',
+    location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
+    name: 'Tag as Incremental Rem',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) {
+        return;
+      }
+      await initIncrementalRem(rem);
+    },
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
+  });
+
   plugin.settings.registerNumberSetting({
     id: initialIntervalId,
     title: 'Initial Interval',

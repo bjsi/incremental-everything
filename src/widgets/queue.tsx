@@ -5,12 +5,16 @@ import {
   RemHierarchyEditorTree,
   RemRichTextEditor,
   renderWidget,
+  RNPlugin,
   usePlugin,
   useRunAsync,
   useTracker,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
-import { VideoViewer } from '../components/video';
+import React from 'react';
+import { Reader } from '../components/Reader';
+import { VideoViewer } from '../components/Video';
+import { remToActionItemType } from '../lib/actionItems';
 
 export function QueueComponent() {
   const plugin = usePlugin();
@@ -21,38 +25,19 @@ export function QueueComponent() {
   const remAndType = useTracker(
     async (rp) => {
       const rem = await rp.rem.findOne(ctx?.remId);
-      if (rem) {
-        if (
-          (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) ||
-          (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile))
-        ) {
-          return { rem, type: 'pdf' };
-        } else if (
-          (await rem.hasPowerup(BuiltInPowerupCodes.Link)) &&
-          (await rem.getPowerupProperty<BuiltInPowerupCodes.Link>(BuiltInPowerupCodes.Link, 'URL'))
-        ) {
-          const url = await rem.getPowerupProperty<BuiltInPowerupCodes.Link>(
-            BuiltInPowerupCodes.Link,
-            'URL'
-          );
-          if (url.includes('youtube')) {
-            return {
-              type: 'youtube',
-              rem,
-            };
-          } else {
-            return {
-              type: 'web',
-              rem,
-            };
-          }
-        } else {
-          return { rem, type: 'rem' };
-        }
+      if (!rem) {
+        return undefined;
       }
+      return await remToActionItemType(plugin, rem);
     },
     [ctx?.remId]
   );
+
+  React.useEffect(() => {
+    if (remAndType === null) {
+      plugin.queue.removeCurrentCardFromQueue(false);
+    }
+  }, [remAndType]);
 
   /**
    * If the rem is a rem type, then we should render the rem editor
@@ -81,38 +66,24 @@ export function QueueComponent() {
           height: `100%`,
         }}
       >
-        {(() => {
-          if (!remAndType) {
-            return null;
-          } else if (remAndType.type === 'pdf') {
-            return <PDFWebReader remId={remAndType.rem._id} initOnlyShowReader={true} />;
-          } else if (remAndType.type === 'web') {
-            return (
-              <PDFWebReader
-                remId={remAndType.rem._id}
-                height={'100%'}
-                width="100%"
-                initOnlyShowReader={true}
-              />
-            );
-          } else if (remAndType.type === 'youtube') {
-            return <VideoViewer rem={remAndType.rem} />;
-          } else if (remAndType.type === 'rem' && shouldRenderEditorForRemType) {
-            // TODO: how to make sure the bottom bar always gets rendered at the bottom if other plugins are also rendering widgets?
-            return (
-              <div className="flex flex-col gap-2">
-                <RemRichTextEditor remId={remAndType.rem._id} width={'100%'} />
-                <RemHierarchyEditorTree
-                  width={'100%'}
-                  height={`calc(100%)`}
-                  maxHeight={`calc(100%)`}
-                  remId={remAndType.rem._id}
-                ></RemHierarchyEditorTree>
-              </div>
-            );
-          }
-          return null;
-        })()}
+        {!remAndType ? null : remAndType.type === 'pdf' ||
+          remAndType.type === 'html' ||
+          remAndType.type === 'pdf-highlight' ||
+          remAndType.type === 'html-highlight' ? (
+          <Reader actionItem={remAndType} />
+        ) : remAndType.type === 'youtube' ? (
+          <VideoViewer rem={remAndType.rem} />
+        ) : remAndType.type === 'rem' && shouldRenderEditorForRemType ? (
+          <div className="flex flex-col gap-2">
+            <RemRichTextEditor remId={remAndType.rem._id} width={'100%'} />
+            <RemHierarchyEditorTree
+              width={'100%'}
+              height={`calc(100%)`}
+              maxHeight={`calc(100%)`}
+              remId={remAndType.rem._id}
+            ></RemHierarchyEditorTree>
+          </div>
+        ) : null}
       </div>
     </div>
   );
