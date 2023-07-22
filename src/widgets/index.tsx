@@ -21,6 +21,10 @@ import {
 import * as _ from 'remeda';
 import { sleep, tryParseJson } from '../lib/utils';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
+import { IncrementalRem } from '../lib/types';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
@@ -55,36 +59,34 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
-  let allIncrementalRem: {
-    remId: string;
-    nextRepDate: number;
-    priority: number;
-    history: any[];
-  }[] = [];
+  await plugin.storage.setSession('allIncrementalRem', []);
 
   plugin.track(async (rp) => {
     const powerup = await rp.powerup.getPowerupByCode(powerupCode);
     const taggedRem = (await powerup?.taggedRem()) || [];
     // wait for the powerup slots to be populated
-    await sleep(1000);
-    allIncrementalRem = (
-      await Promise.all(
-        taggedRem.map(async (r) => {
-          return {
-            remId: r._id,
-            nextRepDate: tryParseJson(
-              await r.getPowerupProperty(powerupCode, nextRepDateSlotCode)
-            ) as number,
-            priority: tryParseJson(
-              await r.getPowerupProperty(powerupCode, prioritySlotCode)
-            ) as number,
-            history: tryParseJson(
-              await r.getPowerupProperty(powerupCode, repHistorySlotCode)
-            ) as any[],
-          };
-        })
-      )
-    ).filter((x) => x.nextRepDate != null && x.priority != null);
+    await sleep(100);
+    await plugin.storage.setSession(
+      'allIncrementalRem',
+      (
+        await Promise.all(
+          taggedRem.map(async (r) => {
+            return {
+              remId: r._id,
+              nextRepDate: tryParseJson(
+                await r.getPowerupProperty(powerupCode, nextRepDateSlotCode)
+              ) as number,
+              priority: tryParseJson(
+                await r.getPowerupProperty(powerupCode, prioritySlotCode)
+              ) as number,
+              history: tryParseJson(
+                await r.getPowerupProperty(powerupCode, repHistorySlotCode)
+              ) as any[],
+            };
+          })
+        )
+      ).filter((x) => x.nextRepDate != null && x.priority != null)
+    );
   });
 
   // TODO: some handling to include extracts created in current queue in the queue?
@@ -96,13 +98,25 @@ async function onActivate(plugin: ReactRNPlugin) {
     allRemInFolderQueue = undefined;
     seenRem = new Set<RemId>();
   });
+  plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
+    allRemInFolderQueue = undefined;
+    seenRem = new Set<RemId>();
+  });
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
-    async (infoAboutCurrentQueue) => {
-      if (infoAboutCurrentQueue.subQueueId && allRemInFolderQueue === undefined) {
-        const subQueueRem = await plugin.rem.findOne(infoAboutCurrentQueue.subQueueId);
-        allRemInFolderQueue = new Set<RemId>((await subQueueRem?.allRemIdsInQueue()) || []);
+    async (queueInfo) => {
+      console.log('queueInfo', queueInfo);
+      const allIncrementalRem: IncrementalRem[] =
+        (await plugin.storage.getSession('allIncrementalRem')) || [];
+      if (queueInfo.subQueueId && allRemInFolderQueue === undefined) {
+        const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
+        allRemInFolderQueue = new Set<RemId>(
+          ((await subQueueRem?.allRemIdsInQueue()) || [])
+            // not included in allRemInFolderQueue for some reason...
+            .concat(((await subQueueRem?.getSources()) || []).map((x) => x._id))
+            .concat(queueInfo.subQueueId)
+        );
       }
       const sortingRandomness = await getSortingRandomness(plugin);
       const ratioBetweenCardsAndIncrementalRem = await getRatioBetweenCardsAndIncrementalRem(
@@ -111,16 +125,14 @@ async function onActivate(plugin: ReactRNPlugin) {
 
       const num_random_swaps = sortingRandomness * allIncrementalRem.length;
       const interval = Math.round(1 / ratioBetweenCardsAndIncrementalRem);
-      if (
-        interval % infoAboutCurrentQueue.cardsPracticed === 0 ||
-        infoAboutCurrentQueue.numCardsRemaining === 0
-      ) {
+      if (interval % queueInfo.cardsPracticed === 0 || queueInfo.numCardsRemaining === 0) {
         const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
-          infoAboutCurrentQueue.mode === 'practice-all'
-            ? allRemInFolderQueue?.has(x.remId) &&
+          queueInfo.mode === 'practice-all'
+            ? (!queueInfo.subQueueId || allRemInFolderQueue?.has(x.remId)) &&
               // prevent continuous repetitions in practice-all mode
               (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
-            : Date.now() >= x.nextRepDate
+            : (!queueInfo.subQueueId || allRemInFolderQueue?.has(x.remId)) &&
+              Date.now() >= x.nextRepDate
         );
 
         // do n random swaps
@@ -137,6 +149,7 @@ async function onActivate(plugin: ReactRNPlugin) {
         } else {
           const first = sorted[0];
           seenRem.add(first.remId);
+          console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
           return {
             remId: first.remId,
             pluginId: 'incremental-everything',

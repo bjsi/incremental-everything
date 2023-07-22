@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@remnote/plugin-sdk": "^0.0.28",
+    "dayjs": "^1.11.9",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "remeda": "^1.23.0",

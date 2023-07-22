@@ -24,3 +24,10 @@ export type RemAndType =
   | RemActionItem
   | PDFHighlightActionItem
   | HTMLHighlightActionItem;
+
+export type IncrementalRem = {
+  remId: string;
+  nextRepDate: number;
+  priority: number;
+  history: any[];
+};

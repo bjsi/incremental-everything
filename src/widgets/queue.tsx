@@ -28,7 +28,9 @@ export function QueueComponent() {
       if (!rem) {
         return undefined;
       }
-      return await remToActionItemType(plugin, rem);
+      const ret = await remToActionItemType(plugin, rem);
+      console.log('remAndType', ret);
+      return ret;
     },
     [ctx?.remId]
   );

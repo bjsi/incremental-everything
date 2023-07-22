@@ -53,7 +53,7 @@ export function Reader(props: ReaderProps) {
     if (actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight') {
       actionItem.extract.scrollToReaderHighlight();
     }
-  }, [actionItem.rem._id]);
+  }, [actionItem]);
 
   return <PDFWebReader remId={actionItem.rem._id} {...sharedProps} />;
 }

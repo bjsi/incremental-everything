@@ -1,5 +1,6 @@
 import { renderWidget, usePlugin, useTracker, WidgetLocation } from '@remnote/plugin-sdk';
-import { scheduleRem } from '../lib/scheduler';
+import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
+import { IncrementalRem } from '../lib/types';
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -33,7 +34,28 @@ export function AnswerButtons() {
       <Button
         onClick={async () => {
           if (rem) {
-            await scheduleRem(plugin, rem._id);
+            // get next rep date pure
+            const { newHistory, newNextRepDate } = await getNextSpacingDateForRem(plugin, rem._id);
+            // update allIncrementalRem in storage to get around reactivity issues
+            const oldAllRem: IncrementalRem[] =
+              (await plugin.storage.getSession('allIncrementalRem')) || [];
+            const oldRem = oldAllRem.find((r) => r.remId === rem._id);
+            if (!oldRem) {
+              return;
+            }
+            await plugin.storage.setSession(
+              'allIncrementalRem',
+              oldAllRem
+                .filter((r) => r.remId !== rem._id)
+                .concat({
+                  ...oldRem,
+                  nextRepDate: newNextRepDate,
+                  history: newHistory,
+                })
+            );
+            // actually update the rem
+            await updateSRSDataForRem(plugin, rem._id, newNextRepDate, newHistory);
+            // move to next card
             await plugin.queue.removeCurrentCardFromQueue();
           }
         }}
