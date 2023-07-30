@@ -126,10 +126,13 @@ async function onActivate(plugin: ReactRNPlugin) {
       const num_random_swaps = sortingRandomness * allIncrementalRem.length;
       const interval = Math.round(1 / ratioBetweenCardsAndIncrementalRem);
       if (interval % queueInfo.cardsPracticed === 0 || queueInfo.numCardsRemaining === 0) {
-        const sorted = _.sortBy(allIncrementalRem, (x) => x.priority).filter((x) =>
-          queueInfo.mode === 'practice-all'
+        const sorted =
+          queueInfo.mode === 'in-order'
+            ? allIncrementalRem
+            : _.sortBy(allIncrementalRem, (x) => x.priority);
+        const filtered = sorted.filter((x) =>
+          queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
             ? (!queueInfo.subQueueId || allRemInFolderQueue?.has(x.remId)) &&
-              // prevent continuous repetitions in practice-all mode
               (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
             : (!queueInfo.subQueueId || allRemInFolderQueue?.has(x.remId)) &&
               Date.now() >= x.nextRepDate
@@ -147,7 +150,7 @@ async function onActivate(plugin: ReactRNPlugin) {
         if (sorted.length === 0) {
           return null;
         } else {
-          const first = sorted[0];
+          const first = filtered[0];
           seenRem.add(first.remId);
           console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
           return {
