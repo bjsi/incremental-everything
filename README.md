@@ -2,6 +2,8 @@
 
 A RemNote plugin which allows you to interleave flashcard reviews with other information like notes, books, websites, videos and more!
 
+Still a work in progress, but almost there!
+
 ### Features
 
 - **Incremental Reading**: Read and review your notes, books and websites.
