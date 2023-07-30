@@ -19,7 +19,7 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 
 - Tag a Rem with the `Incremental` tag using the `/Incremental Everything` command to turn it into an incremental Rem.
 - Change an incremental Rem's priority using the `/Prioritize` command.
-- The plugin will automatically add incremental Rem to your queue and show them to you when you review flashcards.
+- The plugin will automatically add incremental Rem to your regular flashcard queue and show them to you when you review flashcards.
 - Inside the queue, you can control how many incremental Rem you want to see and how they are sorted using the Sorting Criteria menu button.
 
 ### Scheduling
@@ -34,15 +34,11 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 
 #### Incremental Guitar
 
-- 3 months or so ago I picked up guitar again after a long break.
-- I've been learning a few songs.
-- Left to my own devices I tend to 
-- I wrote a scheduling algorithm that shows me parts of the song I can't play fast more often than those I can play at or close to full speed. This ensures that I don't waste time (this is assuming that your goal is to play the full song, there's no such thing as wasting time if you are having fun :) )
+- TODO
 
 #### Incremental Mathematics
 
-- Schedules
-- The Lean theorem prover integration is 
+- Integrates with my [Lean theorem prover plugin](https://github.com/bjsi/remnote-lean) to schedule proofs over time.
 - Future ideas: scheduling LeetCode problems, ... etc over time.
 
 #### AI Gratitude Journal
@@ -56,8 +52,7 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 
 #### AI Edit Later
 
-- Tag Edit Later Rem with.
-- Get card refactoring suggestions from GPT.
+- Get card refactoring suggestions for your Edit Later cards from GPT.
 
 ### Development Details
 
