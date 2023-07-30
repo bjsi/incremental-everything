@@ -1,7 +1,15 @@
 import { Rem } from '@remnote/plugin-sdk';
 
 export interface IncrementalRep {
+  /**
+   * Date of the repetition
+   */
   date: number;
+  /**
+   * The scheduled time of the repetition
+   * This is the time when the repetition should have happened
+   */
+  scheduled: number;
 }
 
 export type ActionItemType =
@@ -28,6 +36,7 @@ export type RemAndType =
 export type IncrementalRem = {
   remId: string;
   nextRepDate: number;
+  scheduled: number;
   priority: number;
-  history: any[];
+  history: IncrementalRep[];
 };
