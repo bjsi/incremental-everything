@@ -15,9 +15,11 @@ import React from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { remToActionItemType } from '../lib/actionItems';
+import { useQueueCSS } from '../lib/hooks';
 
 export function QueueComponent() {
   const plugin = usePlugin();
+  useQueueCSS();
   const ctx = useRunAsync(
     async () => await plugin.widget.getWidgetContext<WidgetLocation.Flashcard>(),
     []
