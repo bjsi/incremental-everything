@@ -24,6 +24,7 @@ import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../
 import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -68,24 +69,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     await sleep(100);
     await plugin.storage.setSession(
       'allIncrementalRem',
-      (
-        await Promise.all(
-          taggedRem.map(async (r) => {
-            return {
-              remId: r._id,
-              nextRepDate: tryParseJson(
-                await r.getPowerupProperty(powerupCode, nextRepDateSlotCode)
-              ) as number,
-              priority: tryParseJson(
-                await r.getPowerupProperty(powerupCode, prioritySlotCode)
-              ) as number,
-              history: tryParseJson(
-                await r.getPowerupProperty(powerupCode, repHistorySlotCode)
-              ) as any[],
-            };
-          })
-        )
-      ).filter((x) => x.nextRepDate != null && x.priority != null)
+      (await Promise.all(taggedRem.map(getIncrementalRemInfo))).filter((x) => !!x)
     );
   });
 
@@ -112,7 +96,8 @@ async function onActivate(plugin: ReactRNPlugin) {
       if (queueInfo.subQueueId && allRemInFolderQueue === undefined) {
         const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
         allRemInFolderQueue = new Set<RemId>(
-          ((await subQueueRem?.allRemIdsInQueue()) || [])
+          ((await subQueueRem?.allRemInFolderQueue()) || [])
+            .map((x) => x._id)
             // not included in allRemInFolderQueue for some reason...
             .concat(((await subQueueRem?.getSources()) || []).map((x) => x._id))
             .concat(queueInfo.subQueueId)
@@ -208,6 +193,31 @@ async function onActivate(plugin: ReactRNPlugin) {
         return;
       }
       await initIncrementalRem(rem);
+    },
+  });
+
+  plugin.app.registerWidget('debug', WidgetLocation.Popup, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'debug-incremental-everything',
+    name: 'Debug Incremental Everything',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        return;
+      }
+      debugger;
+      if (!(await rem.hasPowerup(powerupCode))) {
+        return;
+      }
+      await plugin.widget.openPopup('debug', {
+        remId: rem._id,
+      });
     },
   });
 

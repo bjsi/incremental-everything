@@ -1,16 +1,19 @@
 import { Rem } from '@remnote/plugin-sdk';
+import { z } from 'zod';
 
-export interface IncrementalRep {
+export const IncrementalRep = z.object({
   /**
    * Date of the repetition
    */
-  date: number;
+  date: z.number(),
   /**
    * The scheduled time of the repetition
    * This is the time when the repetition should have happened
    */
-  scheduled: number;
-}
+  scheduled: z.number(),
+});
+
+export type IncrementalRep = z.infer<typeof IncrementalRep>;
 
 export type ActionItemType =
   | 'pdf'
@@ -33,10 +36,11 @@ export type RemAndType =
   | PDFHighlightActionItem
   | HTMLHighlightActionItem;
 
-export type IncrementalRem = {
-  remId: string;
-  nextRepDate: number;
-  scheduled: number;
-  priority: number;
-  history: IncrementalRep[];
-};
+export const IncrementalRem = z.object({
+  remId: z.string(),
+  nextRepDate: z.number(),
+  priority: z.number().min(0).max(100),
+  history: z.array(IncrementalRep).optional(),
+});
+
+export type IncrementalRem = z.infer<typeof IncrementalRem>;
