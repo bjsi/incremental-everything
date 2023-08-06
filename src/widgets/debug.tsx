@@ -29,14 +29,17 @@ function Debug() {
     []
   );
   const remId = ctx?.contextData?.remId;
-  const rem = useTracker(async (rp) => await rp.rem.findOne(remId), [remId]);
-  const incrementalRem = useRunAsync(async () => {
-    if (!rem) {
-      return null;
-    }
-    const incrementalRem = await getIncrementalRemInfo(rem);
-    return incrementalRem;
-  }, [remId, rem]);
+  const incrementalRem = useTracker(
+    async (rp) => {
+      const rem = await rp.rem.findOne(remId);
+      if (!rem) {
+        return null;
+      }
+      const incrementalRem = await getIncrementalRemInfo(rem);
+      return incrementalRem;
+    },
+    [remId]
+  );
 
   return (
     <div className="incremental-everything-debug p-3">

@@ -60,6 +60,7 @@ export function QueueComponent() {
 
   return (
     <div
+      className="incremental-everything-element"
       style={{
         height: '100%',
       }}

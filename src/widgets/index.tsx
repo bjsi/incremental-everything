@@ -211,7 +211,6 @@ async function onActivate(plugin: ReactRNPlugin) {
       if (!rem) {
         return;
       }
-      debugger;
       if (!(await rem.hasPowerup(powerupCode))) {
         return;
       }

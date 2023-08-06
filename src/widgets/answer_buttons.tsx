@@ -5,12 +5,15 @@ import { IncrementalRem } from '../lib/types';
 interface ButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
+  className?: string;
 }
 
 function Button(props: ButtonProps) {
   return (
     <button
-      className="bg-blue-50 hover:bg-blue-70 text-white font-bold py-2 px-4 rounded"
+      className={
+        'bg-blue-50 hover:bg-blue-70 text-white font-bold py-2 px-4 rounded ' + props.className
+      }
       style={{
         height: '40px',
       }}
@@ -30,12 +33,17 @@ export function AnswerButtons() {
   const rem = useTracker(async (rp) => await rp.rem.findOne(ctx?.remId), [ctx?.remId]);
 
   return (
-    <div className="flex flex-row justify-center items-center gap-4">
+    <div className="flex flex-row justify-center items-center gap-4 incremental-everything-answer-buttons">
       <Button
+        className="incremental-everthing-next-button"
         onClick={async () => {
           if (rem) {
             // get next rep date pure
-            const { newHistory, newNextRepDate } = await getNextSpacingDateForRem(plugin, rem._id);
+            const data = await getNextSpacingDateForRem(plugin, rem._id);
+            if (!data) {
+              return;
+            }
+            const { newHistory, newNextRepDate } = data;
             // update allIncrementalRem in storage to get around reactivity issues
             const oldAllRem: IncrementalRem[] =
               (await plugin.storage.getSession('allIncrementalRem')) || [];
