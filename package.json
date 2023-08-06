@@ -11,8 +11,10 @@
   "dependencies": {
     "@remnote/plugin-sdk": "^0.0.30",
     "dayjs": "^1.11.9",
+    "re-resizable": "^6.9.9",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
+    "react-player": "^2.12.0",
     "remeda": "^1.23.0",
     "zod": "^3.21.4"
   },

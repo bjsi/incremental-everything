@@ -24,7 +24,7 @@ export type ActionItemType =
   | 'html-highlight';
 export type PDFActionItem = { type: 'pdf'; rem: Rem };
 export type HTMLActionItem = { type: 'html'; rem: Rem };
-export type YoutubeActionItem = { type: 'youtube'; rem: Rem };
+export type YoutubeActionItem = { type: 'youtube'; rem: Rem; url: string };
 export type RemActionItem = { type: 'rem'; rem: Rem };
 export type PDFHighlightActionItem = { type: 'pdf-highlight'; rem: Rem; extract: Rem };
 export type HTMLHighlightActionItem = { type: 'html-highlight'; rem: Rem; extract: Rem };

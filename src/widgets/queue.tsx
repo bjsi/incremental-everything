@@ -77,7 +77,7 @@ export function QueueComponent() {
           remAndType.type === 'html-highlight' ? (
           <Reader actionItem={remAndType} />
         ) : remAndType.type === 'youtube' ? (
-          <VideoViewer rem={remAndType.rem} />
+          <VideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' && shouldRenderEditorForRemType ? (
           <div className="flex flex-col gap-2">
             <RemRichTextEditor remId={remAndType.rem._id} width={'100%'} />

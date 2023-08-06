@@ -2,7 +2,6 @@ import {
   RNPlugin,
   Rem,
   BuiltInPowerupCodes,
-  RichTextElementInterface,
   RichTextElementRemInterface,
 } from '@remnote/plugin-sdk';
 import { RemAndType } from './types';
@@ -56,6 +55,7 @@ export const remToActionItemType = async (
     if (url.includes('youtube')) {
       return {
         type: 'youtube',
+        url,
         rem,
       };
     } else {
@@ -64,6 +64,23 @@ export const remToActionItemType = async (
         rem,
       };
     }
+  } else if ((await rem.getSources()).length === 1) {
+    const source = (await rem.getSources())[0];
+    const isLink = await source.hasPowerup(BuiltInPowerupCodes.Link);
+    const url = await source.getPowerupProperty<BuiltInPowerupCodes.Link>(
+      BuiltInPowerupCodes.Link,
+      'URL'
+    );
+    if (isLink && url && url.includes('youtube')) {
+      const data = await remToActionItemType(plugin, source);
+      if (data) {
+        return {
+          ...data,
+          rem,
+        };
+      }
+    }
+    return { rem, type: 'rem' };
   } else {
     return { rem, type: 'rem' };
   }
