@@ -11,6 +11,7 @@ import {
 import '../style.css';
 import '../App.css';
 import {
+  allIncrementalRemKey,
   initialIntervalId,
   multiplierId,
   nextRepDateSlotCode,
@@ -19,7 +20,6 @@ import {
   repHistorySlotCode,
 } from '../lib/consts';
 import * as _ from 'remeda';
-import { sleep, tryParseJson } from '../lib/utils';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
 import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
@@ -60,17 +60,15 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
-  await plugin.storage.setSession('allIncrementalRem', []);
-
+  // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
+  // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
     const powerup = await rp.powerup.getPowerupByCode(powerupCode);
     const taggedRem = (await powerup?.taggedRem()) || [];
-    // wait for the powerup slots to be populated
-    await sleep(100);
-    await plugin.storage.setSession(
-      'allIncrementalRem',
-      (await Promise.all(taggedRem.map(getIncrementalRemInfo))).filter((x) => !!x)
+    const updatedAllRem = (await Promise.all(taggedRem.map(getIncrementalRemInfo))).filter(
+      (x) => !!x
     );
+    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
   });
 
   // TODO: some handling to include extracts created in current queue in the queue?
@@ -92,7 +90,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     async (queueInfo) => {
       console.log('queueInfo', queueInfo);
       const allIncrementalRem: IncrementalRem[] =
-        (await plugin.storage.getSession('allIncrementalRem')) || [];
+        (await plugin.storage.getSession(allIncrementalRemKey)) || [];
       if (queueInfo.subQueueId && allRemInFolderQueue === undefined) {
         const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
         allRemInFolderQueue = new Set<RemId>(
@@ -103,14 +101,15 @@ async function onActivate(plugin: ReactRNPlugin) {
             .concat(queueInfo.subQueueId)
         );
       }
-      const sortingRandomness = await getSortingRandomness(plugin);
-      const ratioBetweenCardsAndIncrementalRem = await getRatioBetweenCardsAndIncrementalRem(
-        plugin
+      const intervalBetweenIncRem = Math.round(
+        1 / (await getRatioBetweenCardsAndIncrementalRem(plugin))
       );
 
-      const num_random_swaps = sortingRandomness * allIncrementalRem.length;
-      const interval = Math.round(1 / ratioBetweenCardsAndIncrementalRem);
-      if (interval % queueInfo.cardsPracticed === 0 || queueInfo.numCardsRemaining === 0) {
+      const totalElementsSeen = queueInfo.cardsPracticed + seenRem.keys.length;
+      if (
+        (totalElementsSeen > 0 && totalElementsSeen % intervalBetweenIncRem === 0) ||
+        queueInfo.numCardsRemaining === 0
+      ) {
         const sorted =
           queueInfo.mode === 'in-order'
             ? allIncrementalRem
@@ -124,15 +123,17 @@ async function onActivate(plugin: ReactRNPlugin) {
         );
 
         // do n random swaps
+        const sortingRandomness = await getSortingRandomness(plugin);
+        const num_random_swaps = sortingRandomness * allIncrementalRem.length;
         for (let i = 0; i < num_random_swaps; i++) {
-          const idx1 = Math.floor(Math.random() * sorted.length);
-          const idx2 = Math.floor(Math.random() * sorted.length);
-          const temp = sorted[idx1];
-          sorted[idx1] = sorted[idx2];
-          sorted[idx2] = temp;
+          const idx1 = Math.floor(Math.random() * filtered.length);
+          const idx2 = Math.floor(Math.random() * filtered.length);
+          const temp = filtered[idx1];
+          filtered[idx1] = filtered[idx2];
+          filtered[idx2] = temp;
         }
 
-        if (sorted.length === 0) {
+        if (filtered.length === 0) {
           return null;
         } else {
           const first = filtered[0];
@@ -152,11 +153,24 @@ async function onActivate(plugin: ReactRNPlugin) {
   async function initIncrementalRem(rem: Rem) {
     const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
     const initialIntervalInMs = initialInterval * 24 * 60 * 60 * 1000;
+
     await rem.addPowerup(powerupCode);
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, ['10']);
     await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, [
       (Date.now() + initialIntervalInMs).toString(),
     ]);
+
+    const newIncRem = await getIncrementalRemInfo(rem);
+    if (!newIncRem) {
+      return;
+    }
+
+    const allIncrementalRem: IncrementalRem[] =
+      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+    const updatedAllRem = allIncrementalRem
+      .filter((x) => x.remId !== newIncRem.remId)
+      .concat(newIncRem);
+    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
   }
 
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {

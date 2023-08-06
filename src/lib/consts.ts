@@ -7,3 +7,6 @@ export const repHistorySlotCode = 'repHist';
 // settings
 export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';
+
+// storage keys
+export const allIncrementalRemKey = 'all-incremental-rem';

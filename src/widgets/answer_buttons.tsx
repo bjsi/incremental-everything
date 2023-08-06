@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useTracker, WidgetLocation } from '@remnote/plugin-sdk';
+import { allIncrementalRemKey } from '../lib/consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { IncrementalRem } from '../lib/types';
 
@@ -46,13 +47,13 @@ export function AnswerButtons() {
             const { newHistory, newNextRepDate } = data;
             // update allIncrementalRem in storage to get around reactivity issues
             const oldAllRem: IncrementalRem[] =
-              (await plugin.storage.getSession('allIncrementalRem')) || [];
+              (await plugin.storage.getSession(allIncrementalRemKey)) || [];
             const oldRem = oldAllRem.find((r) => r.remId === rem._id);
             if (!oldRem) {
               return;
             }
             await plugin.storage.setSession(
-              'allIncrementalRem',
+              allIncrementalRemKey,
               oldAllRem
                 .filter((r) => r.remId !== rem._id)
                 .concat({

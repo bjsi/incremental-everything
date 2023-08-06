@@ -6,7 +6,10 @@ import {
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React from 'react';
-import { powerupCode, prioritySlotCode } from '../lib/consts';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { IncrementalRem } from '../lib/types';
+import { tryParseJson } from '../lib/utils';
 
 interface PrioritySliderProps {
   onChange: (value: number) => void;
@@ -14,24 +17,33 @@ interface PrioritySliderProps {
 }
 
 const PrioritySlider: React.FC<PrioritySliderProps> = ({ onChange, value }) => {
-  const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseInt(event.target.value, 10);
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = parseInt(event.target.value);
     onChange(newValue);
   };
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="rn-clr-content-secondary">Higher = more important</div>
+      <div className="rn-clr-content-secondary priority-label">Lower = more important</div>
       <input
         type="range"
-        id="priority-slider"
-        name="priority-slider"
+        className="priority-slider"
         min={0}
         max={100}
         value={value}
-        onChange={handleSliderChange}
+        onChange={handleChange}
       />
-      <div className="rn-clr-content-secondary">Priority Value: {value}</div>
+      <div className="rn-clr-content-secondary">
+        Priority Value:{' '}
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={value}
+          onChange={handleChange}
+          className="priority-input"
+        ></input>
+      </div>
     </div>
   );
 };
@@ -47,11 +59,13 @@ export function Priority() {
       if (!rem) {
         return null;
       }
-      const priority = JSON.parse(await rem?.getPowerupProperty(powerupCode, prioritySlotCode));
-      if (priority == null) {
+      const parsed = IncrementalRem.shape.priority.safeParse(
+        tryParseJson(await rem?.getPowerupProperty(powerupCode, prioritySlotCode))
+      );
+      if (!parsed.success) {
         return null;
       }
-      return { rem, priority };
+      return { rem, priority: parsed.data };
     },
     [ctx?.contextData?.remId]
   );
@@ -63,14 +77,32 @@ export function Priority() {
   const { rem, priority } = prioritizedRem;
 
   return (
-    <div className="flex flex-col p-4 gap-4">
+    <div className="flex flex-col p-4 gap-4 priority-popup">
       <div className="text-2xl font-bold">Priority</div>
       <div className="flex flex-col gap-2 ">
         <PrioritySlider
           value={priority}
-          onChange={(value) =>
-            rem?.setPowerupProperty(powerupCode, prioritySlotCode, [value.toString()])
-          }
+          onChange={async (value) => {
+            const parsed = IncrementalRem.shape.priority.safeParse(value);
+            if (!parsed.success) {
+              return;
+            }
+
+            await rem?.setPowerupProperty(powerupCode, prioritySlotCode, [parsed.data.toString()]);
+
+            // update allIncrementalRem in storage
+            const newIncRem = await getIncrementalRemInfo(rem);
+            if (!newIncRem) {
+              return;
+            }
+
+            const allIncrementalRem: IncrementalRem[] =
+              (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+            const updatedAllRem = allIncrementalRem
+              .filter((x) => x.remId !== newIncRem.remId)
+              .concat(newIncRem);
+            await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+          }}
         />
       </div>
     </div>
