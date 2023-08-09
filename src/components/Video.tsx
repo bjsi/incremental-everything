@@ -1,28 +1,13 @@
-import {
-  BuiltInPowerupCodes,
-  PowerupSlotCodeMap,
-  Rem,
-  RemHierarchyEditorTree,
-  renderWidget,
-  usePlugin,
-  useRunAsync,
-} from '@remnote/plugin-sdk';
+import { RemHierarchyEditorTree, usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import ReactPlayer from 'react-player/youtube';
 import { Resizable } from 're-resizable';
 import { useSyncedStorageState } from '@remnote/plugin-sdk';
 import { YoutubeActionItem } from '../lib/types';
 
-// Only loads the YouTube player
-
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
 }
-
-type VideoState = {
-  position: number; // current position in the video
-  speed: number; // playback speed
-};
 
 const getBoundedWidth = (width: number, minWidth: number, maxWidth: number) =>
   Math.min(Math.max(width, minWidth), maxWidth);
@@ -37,13 +22,16 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
     setWidthInner(getBoundedWidth(width, minWidth, maxWidth));
   };
 
-  const [videoState, setVideoState] = useSyncedStorageState<VideoState>(props.actionItem.url, {
-    position: 0,
-    speed: 1,
-  });
-
-  const plugin = usePlugin();
+  const playbackRateStorageKey = `${props.actionItem.url}-playbackRate`;
+  const [position, setPosition] = useSyncedStorageState<number>(playbackRateStorageKey, 0);
+  const [playbackRate, setPlaybackRate] = useSyncedStorageState<number>(playbackRateStorageKey, 1);
   const player = React.useRef<ReactPlayer>(null);
+
+  React.useEffect(() => {
+    if (player.current) {
+      player.current.seekTo(position);
+    }
+  }, [player?.current]);
 
   return (
     <div>
@@ -105,12 +93,17 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
           </Resizable>
         )}
         <ReactPlayer
+          playbackRate={playbackRate}
           ref={player}
           url={props.actionItem.url}
           width="100%"
           height="100%"
-          onProgress={(state) => {}}
-          onPlaybackRateChange={() => {}}
+          onProgress={(state) => {
+            setPosition(state.playedSeconds);
+          }}
+          onPlaybackRateChange={(speed: any) => {
+            setPlaybackRate(parseFloat(speed));
+          }}
         />
       </div>
     </div>

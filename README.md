@@ -2,8 +2,6 @@
 
 A RemNote plugin which allows you to interleave flashcard reviews with other information like notes, books, websites, videos and more!
 
-Still a work in progress, but almost there!
-
 ### Features
 
 - **Incremental Reading**: Read and review your notes, books and websites.
@@ -11,13 +9,13 @@ Still a work in progress, but almost there!
 - **Incremental Writing**: Write your essays and blog posts incrementally.
 - **Incremental Tasks**: Clear out your tasklist between flashcard reviews.
 - **Incremental Exercises**: Spread out textbook exercises over time.
-- Plugin support! Any plugin widget can easily integrate with Incremental Everything. See the guitar, mathematics and AI examples.
+- Plugin support! Plugin widgets can easily integrate with Incremental Everything.
 
 ### Installation
 
 - Open the [RemNote plugin store](https://www.remnote.com/plugins), search for "Incremental Everything" and install the plugin. It works on all devices.
 
-### Usage
+### Usage Summary
 
 - Tag a Rem with the `Incremental` tag using the `/Incremental Everything` command to turn it into an incremental Rem.
 - Change an incremental Rem's priority using the `/Prioritize` command.
@@ -26,35 +24,36 @@ Still a work in progress, but almost there!
 
 ### Scheduling
 
-- By default the plugin uses an extremely simple scheduling algorithm.
-- You can tune the scheduling to your preferences by...
-- You can assign different schedulers by...
+- The plugin uses an extremely simple scheduling algorithm which just doubles the interval at each repetition.
 
-### Plugin Interoperability
+### Prioritization
 
-- The coolest part about RemNote is how open-ended and extensible it is. Making this plugin integrate cleanly with other plugins was trivial. Here are a few examples I have been toying around with.
+- You can use the `/Prioritize` command to change the priority of an incremental Rem.
+- The plugin will prioritize Rem with a higher priority over Rem with a lower priority.
+- You can set the balance between priority sorting and randomness using the Sorting Criteria menu button in the queue.
 
-#### Incremental Guitar
+### Examples
 
-- TODO
+#### Incremental Reading
+
+- You can tag PDFs, websites and highlights with the `Incremental` tag to read them incrementally.
+- The plugin will render the PDF or website in the queue.
+
+#### Incremental Writing
+
+- You can tag any normal Rem with the `Incremental` tag to turn it into an incremental Rem.
+- The plugin will render it as a normal Rem in the document view in the queue.
+
+#### Incremental Video
+
+- You can tag YouTube videos with the `Incremental` tag to watch them incrementally.
+- The plugin will automatically save your progress.
+- You can open the notes section to take notes while you watch.
 
 #### Incremental Mathematics
 
-- Integrates with my [Lean theorem prover plugin](https://github.com/bjsi/remnote-lean) to schedule proofs over time.
-- Future ideas: scheduling LeetCode problems, ... etc over time.
-
-#### AI Gratitude Journal
-
-- Prompts you to reflect and expand upon things you've written about in your daily document reflections and gratitude journal sections.
-
-#### AI "K-Probes"
-
-- Prompts you to refine your ideas over time by randomly picking paragraphs from articles you have written and critiques them.
-- Uses metadata from the articles to pick a relevant persona.
-
-#### AI Edit Later
-
-- Get card refactoring suggestions for your Edit Later cards from GPT.
+- A quick example of plugin interoperability.
+- Integrates with my [Lean theorem prover plugin](https://github.com/bjsi/remnote-lean) to schedule math proof problem sets over time.
 
 ### Development Details
 
