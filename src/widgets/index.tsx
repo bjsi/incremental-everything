@@ -2,6 +2,7 @@ import {
   AppEvents,
   declareIndexPlugin,
   PluginCommandMenuLocation,
+  PropertyType,
   ReactRNPlugin,
   Rem,
   RemId,
@@ -33,6 +34,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       {
         code: prioritySlotCode,
         name: 'priority',
+        propertyType: PropertyType.NUMBER,
       },
       {
         code: nextRepDateSlotCode,
@@ -65,9 +67,9 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     const powerup = await rp.powerup.getPowerupByCode(powerupCode);
     const taggedRem = (await powerup?.taggedRem()) || [];
-    const updatedAllRem = (await Promise.all(taggedRem.map(getIncrementalRemInfo))).filter(
-      (x) => !!x
-    );
+    const updatedAllRem = (
+      await Promise.all(taggedRem.map((rem) => getIncrementalRemInfo(plugin, rem)))
+    ).filter((x) => !!x);
     await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
   });
 
@@ -160,7 +162,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       (Date.now() + initialIntervalInMs).toString(),
     ]);
 
-    const newIncRem = await getIncrementalRemInfo(rem);
+    const newIncRem = await getIncrementalRemInfo(plugin, rem);
     if (!newIncRem) {
       return;
     }

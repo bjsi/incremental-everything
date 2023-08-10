@@ -91,7 +91,7 @@ export function Priority() {
             await rem?.setPowerupProperty(powerupCode, prioritySlotCode, [parsed.data.toString()]);
 
             // update allIncrementalRem in storage
-            const newIncRem = await getIncrementalRemInfo(rem);
+            const newIncRem = await getIncrementalRemInfo(plugin, rem);
             if (!newIncRem) {
               return;
             }

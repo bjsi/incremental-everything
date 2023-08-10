@@ -46,7 +46,7 @@ export async function getNextSpacingDateForRem(plugin: RNPlugin, remId: string) 
   if (!rem) {
     return;
   }
-  const incrementalRemInfo = await getIncrementalRemInfo(rem);
+  const incrementalRemInfo = await getIncrementalRemInfo(plugin, rem);
   if (!incrementalRemInfo) {
     return;
   }
@@ -73,6 +73,13 @@ export async function updateSRSDataForRem(
   const rem = await plugin.rem.findOne(remId);
   console.log('updating srs data for rem', remId, newNextRepDate, newHistory);
   console.log('next rep due in ', dayjs(newNextRepDate).fromNow());
-  await rem?.setPowerupProperty(powerupCode, nextRepDateSlotCode, [newNextRepDate.toString()]);
+  const date = new Date(newNextRepDate);
+  const dailyDoc = await plugin.date.getDailyDoc(date);
+  if (!dailyDoc) {
+    console.log('failed to create daily doc for date', date);
+    return;
+  }
+  const dateReference = await plugin.richText.rem(dailyDoc).value();
+  await rem?.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateReference);
   await rem?.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(newHistory)]);
 }

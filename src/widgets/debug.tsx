@@ -35,7 +35,7 @@ function Debug() {
       if (!rem) {
         return null;
       }
-      const incrementalRem = await getIncrementalRemInfo(rem);
+      const incrementalRem = await getIncrementalRemInfo(plugin, rem);
       return incrementalRem;
     },
     [remId]
