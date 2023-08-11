@@ -82,7 +82,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   // TODO: some handling to include extracts created in current queue in the queue?
   // or unnecessary due to init interval? could append to this list
 
-  let allRemInFolderQueue: Set<RemId> | undefined = undefined;
+  let allRemInFolderQueue: RemId[] | undefined = undefined;
   let seenRem: Set<RemId> = new Set<RemId>();
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
     allRemInFolderQueue = undefined;
@@ -101,13 +101,11 @@ async function onActivate(plugin: ReactRNPlugin) {
         (await plugin.storage.getSession(allIncrementalRemKey)) || [];
       if (queueInfo.subQueueId && allRemInFolderQueue === undefined) {
         const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
-        allRemInFolderQueue = new Set<RemId>(
-          ((await subQueueRem?.allRemInFolderQueue()) || [])
-            .map((x) => x._id)
-            // not included in allRemInFolderQueue for some reason...
-            .concat(((await subQueueRem?.getSources()) || []).map((x) => x._id))
-            .concat(queueInfo.subQueueId)
-        );
+        allRemInFolderQueue = ((await subQueueRem?.allRemInFolderQueue()) || [])
+          .map((x) => x._id)
+          // not included in allRemInFolderQueue for some reason...
+          .concat(((await subQueueRem?.getSources()) || []).map((x) => x._id))
+          .concat(queueInfo.subQueueId);
       }
       const intervalBetweenIncRem = Math.round(
         1 / (await getRatioBetweenCardsAndIncrementalRem(plugin))
@@ -118,15 +116,19 @@ async function onActivate(plugin: ReactRNPlugin) {
         (totalElementsSeen > 0 && totalElementsSeen % intervalBetweenIncRem === 0) ||
         queueInfo.numCardsRemaining === 0
       ) {
-        const sorted =
-          queueInfo.mode === 'in-order'
-            ? allIncrementalRem
-            : _.sortBy(allIncrementalRem, (x) => x.priority);
+        const sorted = _.sortBy(allIncrementalRem, (incRem) => {
+          if (queueInfo.mode === 'in-order') {
+            return allRemInFolderQueue!.indexOf(incRem.remId);
+          } else {
+            return incRem.priority;
+          }
+        });
+        console.log('sorted', sorted);
         const filtered = sorted.filter((x) =>
           queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
-            ? (!queueInfo.subQueueId || allRemInFolderQueue?.has(x.remId)) &&
+            ? (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
               (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
-            : (!queueInfo.subQueueId || allRemInFolderQueue?.has(x.remId)) &&
+            : (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
               Date.now() >= x.nextRepDate
         );
 

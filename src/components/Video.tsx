@@ -22,9 +22,16 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
     setWidthInner(getBoundedWidth(width, minWidth, maxWidth));
   };
 
+  const [playing, setPlaying] = React.useState(true);
+
   const playbackRateStorageKey = `${props.actionItem.url}-playbackRate`;
-  const [position, setPosition] = useSyncedStorageState<number>(playbackRateStorageKey, 0);
-  const [playbackRate, setPlaybackRate] = useSyncedStorageState<number>(playbackRateStorageKey, 1);
+  const positionStorageKey = `${props.actionItem.url}-position`;
+  const [position, setPosition] = useSyncedStorageState<number>(positionStorageKey, 0);
+  const [playbackRate, setPlaybackRate] = useSyncedStorageState<number>(
+    playbackRateStorageKey,
+    1.0
+  );
+
   const player = React.useRef<ReactPlayer>(null);
 
   React.useEffect(() => {
@@ -35,7 +42,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
 
   return (
     <div>
-      <div className="top-bar p-1">
+      <div className="top-bar">
         <button
           onClick={() => {
             if (width === 0) {
@@ -85,6 +92,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
             }}
           >
             <RemHierarchyEditorTree
+              className="px-2 box-border"
               width={'100%'}
               height={`calc(100%)`}
               maxHeight={`calc(100%)`}
@@ -93,6 +101,8 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
           </Resizable>
         )}
         <ReactPlayer
+          controls
+          playing={playing}
           playbackRate={playbackRate}
           ref={player}
           url={props.actionItem.url}

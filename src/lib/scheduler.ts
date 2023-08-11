@@ -47,7 +47,20 @@ export const getMultiplier = async (plugin: RNPlugin) => {
   return multiplier;
 };
 
-export async function getNextSpacingDateForRem(plugin: RNPlugin, remId: string) {
+export const removeLastInteractionFromRepHistory = (
+  history: IncrementalRep[]
+): IncrementalRep[] => {
+  if (history.length === 0) {
+    return history;
+  }
+  return history.slice(0, -1);
+};
+
+export async function getNextSpacingDateForRem(
+  plugin: RNPlugin,
+  remId: string,
+  inLookbackMode: boolean
+) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) {
     return;
@@ -57,7 +70,14 @@ export async function getNextSpacingDateForRem(plugin: RNPlugin, remId: string) 
     return;
   }
   const multiplier = await getMultiplier(plugin);
-  const cleansedHistory = removeResponsesBeforeEarlyResponses(incrementalRemInfo.history || []);
+  const cleansedHistory = _.pipe(
+    incrementalRemInfo.history || [],
+    removeResponsesBeforeEarlyResponses,
+    // remove the last repetition if we're in lookback mode
+    inLookbackMode ? removeLastInteractionFromRepHistory : _.identity
+  );
+
+  // NOTE: if you change to use nextRepDate, you'll need to handle lookback mode
   // simple exponential, but shouldn't explode if you do a bunch of practice-all
   const newInterval = multiplier ** Math.max(cleansedHistory.length, 1);
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;

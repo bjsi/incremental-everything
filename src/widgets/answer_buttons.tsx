@@ -1,4 +1,10 @@
-import { renderWidget, usePlugin, useTracker, WidgetLocation } from '@remnote/plugin-sdk';
+import {
+  renderWidget,
+  usePlugin,
+  useRunAsync,
+  useTracker,
+  WidgetLocation,
+} from '@remnote/plugin-sdk';
 import { NextRepTime } from '../components/NextRepTime';
 import { allIncrementalRemKey } from '../lib/consts';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
@@ -18,7 +24,7 @@ function Button(props: ButtonProps) {
         'bg-blue-50 hover:bg-blue-70 text-white font-bold py-2 px-4 rounded ' + props.className
       }
       style={{
-        height: '40px',
+        height: '45px',
       }}
       onClick={props.onClick}
     >
@@ -40,6 +46,7 @@ export function AnswerButtons() {
     },
     [ctx?.remId]
   );
+  const inLookbackMode = !!useRunAsync(async () => await plugin.queue.inLookbackMode(), []);
 
   return (
     <div className="flex flex-row justify-center items-center gap-4 incremental-everything-answer-buttons">
@@ -47,8 +54,8 @@ export function AnswerButtons() {
         className="incremental-everthing-next-button"
         onClick={async () => {
           if (incRem) {
-            // get next rep date pure
-            const data = await getNextSpacingDateForRem(plugin, incRem.remId);
+            // get next rep date
+            const data = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
             if (!data) {
               return;
             }
@@ -77,9 +84,11 @@ export function AnswerButtons() {
           }
         }}
       >
-        <div className="flex flex-col gap-1 items-center justify-center">
+        <div className="flex flex-col items-center justify-center">
           <div>Next</div>
-          <div>{incRem && <NextRepTime rem={incRem} />}</div>
+          <div className="text-xs">
+            {incRem && <NextRepTime rem={incRem} inLookbackMode={inLookbackMode} />}
+          </div>
         </div>
       </Button>
     </div>

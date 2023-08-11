@@ -18,9 +18,12 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 ### Usage Summary
 
 - Tag a Rem with the `Incremental` tag using the `/Incremental Everything` command to turn it into an incremental Rem.
-- Change an incremental Rem's priority using the `/Prioritize` command.
+- You can change an incremental Rem's priority using the `/Prioritize` command, or edit the date using RemNote's tables and properties features.
+- You can manually set the next repetition date using RemNote's tables and properties features.
 - The plugin will automatically add incremental Rem to your regular flashcard queue and show them to you when you review flashcards.
 - Inside the queue, you can control how many incremental Rem you want to see and how they are sorted using the Sorting Criteria menu button.
+- All of RemNote's practice modes ("Practice with SRS", "Practice All" and "Practice in Order") should work.
+- You can do subset reviews by creating a table from the `Incremental` tag.
 
 ### Scheduling
 
@@ -28,7 +31,7 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 
 ### Prioritization
 
-- You can use the `/Prioritize` command to change the priority of an incremental Rem.
+- You can use the `/Prioritize` command to change the priority of an incremental Rem or change it using RemNote's tables and properties features.
 - The plugin will prioritize Rem with a higher priority over Rem with a lower priority.
 - You can set the balance between priority sorting and randomness using the Sorting Criteria menu button in the queue.
 
@@ -37,6 +40,7 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 #### Incremental Reading
 
 - You can tag PDFs, websites and highlights with the `Incremental` tag to read them incrementally.
+- It will work if you tag the PDF/website itself, or a Rem with the PDF/website as a source.
 - The plugin will render the PDF or website in the queue.
 
 #### Incremental Writing
@@ -47,8 +51,9 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 #### Incremental Video
 
 - You can tag YouTube videos with the `Incremental` tag to watch them incrementally.
-- The plugin will automatically save your progress.
-- You can open the notes section to take notes while you watch.
+- It will work if you tag the link Rem itself, or a Rem with the YouTube link as a source.
+- The plugin will automatically save your progress and playback rate.
+- You can open the resizable notes section to take notes while you watch.
 
 #### Incremental Mathematics
 
@@ -57,4 +62,4 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 
 ### Development Details
 
-- The plugin stores repetition data as hidden slots on the Rem. So these aren't "normal" RemNote flashcards. All of the scheduling is managed by the plugin.
+- The plugin stores repetition data as powerup properties on the Rem. So these aren't "normal" RemNote flashcards. All of the scheduling is managed internally by the plugin.

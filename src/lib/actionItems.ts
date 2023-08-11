@@ -79,6 +79,12 @@ export const remToActionItemType = async (
           rem,
         };
       }
+    } else {
+      // handles PDF/HTML sources
+      const data = await remToActionItemType(plugin, source);
+      if (data) {
+        return data;
+      }
     }
     return { rem, type: 'rem' };
   } else {
