@@ -6,6 +6,9 @@ import {
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+dayjs.extend(relativeTime);
 
 interface InfoProps {
   className: string;
@@ -41,15 +44,25 @@ function Debug() {
     [remId]
   );
 
+  if (!incrementalRem) {
+    return null;
+  }
+  const { nextRepDate, priority, history } = incrementalRem;
+
   return (
-    <div className="incremental-everything-debug p-3">
+    <div className="incremental-everything-debug p-3 w-[100%]">
       <Info className="rem-id" label="Rem ID" data={remId} />
-      <Info className="next-rep-date" label="Next Rep Date" data={incrementalRem?.nextRepDate} />
-      <Info className="priority" label="Priority" data={incrementalRem?.priority} />
+      <Info className="next-rep-date" label="Next Rep" data={nextRepDate} />
+      <Info
+        className="human-date"
+        label="Next Rep"
+        data={`${dayjs(nextRepDate).format('MMMM D, YYYY')} (${dayjs(nextRepDate).fromNow()})`}
+      />
+      <Info className="priority" label="Priority" data={priority} />
       <Info
         className="history"
         label="History"
-        data={incrementalRem?.history ? JSON.stringify(incrementalRem?.history, null, 2) : '[]'}
+        data={incrementalRem?.history ? JSON.stringify(history, null, 2) : '[]'}
       />
     </div>
   );

@@ -1,6 +1,5 @@
 import {
   BuiltInPowerupCodes,
-  PowerupSlotCodeMap,
   Rem,
   RichTextElementRemInterface,
   RNPlugin,
@@ -27,9 +26,9 @@ export const getIncrementalRemInfo = async (
     return null;
   }
 
-  const yyyymmdd = await nextRepDateDoc.getPowerupProperty(
+  const yyyymmdd = await nextRepDateDoc.getPowerupProperty<BuiltInPowerupCodes.DailyDocument>(
     BuiltInPowerupCodes.DailyDocument,
-    PowerupSlotCodeMap[BuiltInPowerupCodes.DailyDocument].Date
+    'Date'
   );
 
   if (!yyyymmdd) {

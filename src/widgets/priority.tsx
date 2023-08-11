@@ -22,10 +22,19 @@ const PrioritySlider: React.FC<PrioritySliderProps> = ({ onChange, value }) => {
     onChange(newValue);
   };
 
+  const sliderRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (!sliderRef?.current) {
+      return;
+    }
+    sliderRef.current.focus();
+  }, [sliderRef?.current]);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="rn-clr-content-secondary priority-label">Lower = more important</div>
       <input
+        ref={sliderRef}
         type="range"
         className="priority-slider"
         min={0}

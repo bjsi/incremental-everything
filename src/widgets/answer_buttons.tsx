@@ -1,5 +1,7 @@
 import { renderWidget, usePlugin, useTracker, WidgetLocation } from '@remnote/plugin-sdk';
+import { NextRepTime } from '../components/NextRepTime';
 import { allIncrementalRemKey } from '../lib/consts';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { IncrementalRem } from '../lib/types';
 
@@ -31,16 +33,22 @@ export function AnswerButtons() {
     async (rp) => await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>(),
     []
   );
-  const rem = useTracker(async (rp) => await rp.rem.findOne(ctx?.remId), [ctx?.remId]);
+  const incRem = useTracker(
+    async (rp) => {
+      const rem = await rp.rem.findOne(ctx?.remId);
+      return rem ? await getIncrementalRemInfo(plugin, rem) : undefined;
+    },
+    [ctx?.remId]
+  );
 
   return (
     <div className="flex flex-row justify-center items-center gap-4 incremental-everything-answer-buttons">
       <Button
         className="incremental-everthing-next-button"
         onClick={async () => {
-          if (rem) {
+          if (incRem) {
             // get next rep date pure
-            const data = await getNextSpacingDateForRem(plugin, rem._id);
+            const data = await getNextSpacingDateForRem(plugin, incRem.remId);
             if (!data) {
               return;
             }
@@ -48,14 +56,14 @@ export function AnswerButtons() {
             // update allIncrementalRem in storage to get around reactivity issues
             const oldAllRem: IncrementalRem[] =
               (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-            const oldRem = oldAllRem.find((r) => r.remId === rem._id);
+            const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
             if (!oldRem) {
               return;
             }
             await plugin.storage.setSession(
               allIncrementalRemKey,
               oldAllRem
-                .filter((r) => r.remId !== rem._id)
+                .filter((r) => r.remId !== incRem.remId)
                 .concat({
                   ...oldRem,
                   nextRepDate: newNextRepDate,
@@ -63,13 +71,16 @@ export function AnswerButtons() {
                 })
             );
             // actually update the rem
-            await updateSRSDataForRem(plugin, rem._id, newNextRepDate, newHistory);
+            await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
             // move to next card
             await plugin.queue.removeCurrentCardFromQueue();
           }
         }}
       >
-        Next
+        <div className="flex flex-col gap-1 items-center justify-center">
+          <div>Next</div>
+          <div>{incRem && <NextRepTime rem={incRem} />}</div>
+        </div>
       </Button>
     </div>
   );

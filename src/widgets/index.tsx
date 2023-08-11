@@ -2,6 +2,7 @@ import {
   AppEvents,
   declareIndexPlugin,
   PluginCommandMenuLocation,
+  PropertyLocation,
   PropertyType,
   ReactRNPlugin,
   Rem,
@@ -26,6 +27,7 @@ import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getDailyDocReferenceForDate } from '../lib/date';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -33,16 +35,20 @@ async function onActivate(plugin: ReactRNPlugin) {
     slots: [
       {
         code: prioritySlotCode,
-        name: 'priority',
+        name: 'Priority',
         propertyType: PropertyType.NUMBER,
+        propertyLocation: PropertyLocation.RIGHT,
       },
       {
         code: nextRepDateSlotCode,
-        name: 'next rep date',
+        name: 'Next Rep Date',
+        propertyType: PropertyType.DATE,
+        propertyLocation: PropertyLocation.RIGHT,
       },
       {
         code: repHistorySlotCode,
-        name: 'rep history',
+        name: 'History',
+        hidden: true,
       },
     ],
   });
@@ -157,10 +163,15 @@ async function onActivate(plugin: ReactRNPlugin) {
     const initialIntervalInMs = initialInterval * 24 * 60 * 60 * 1000;
 
     await rem.addPowerup(powerupCode);
+
+    const nextRepDate = new Date(Date.now() + initialIntervalInMs);
+    const dateRef = await getDailyDocReferenceForDate(plugin, nextRepDate);
+    if (!dateRef) {
+      return;
+    }
+
+    await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, ['10']);
-    await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, [
-      (Date.now() + initialIntervalInMs).toString(),
-    ]);
 
     const newIncRem = await getIncrementalRemInfo(plugin, rem);
     if (!newIncRem) {
@@ -214,7 +225,7 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('debug', WidgetLocation.Popup, {
     dimensions: {
-      width: '100%',
+      width: '350px',
       height: 'auto',
     },
   });
@@ -254,8 +265,7 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.app.registerMenuItem({
     id: 'tag_rem_menuitem',
-    // TODO: change to DocumentMenu?
-    location: PluginCommandMenuLocation.ReaderMenu,
+    location: PluginCommandMenuLocation.DocumentMenu,
     name: 'Tag as Incremental Rem',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);

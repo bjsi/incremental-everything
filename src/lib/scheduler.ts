@@ -1,10 +1,11 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
-import { nextRepDateSlotCode, powerupCode, repHistorySlotCode } from './consts';
+import { multiplierId, nextRepDateSlotCode, powerupCode, repHistorySlotCode } from './consts';
 import { IncrementalRep } from './types';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo } from './incremental_rem';
+import { getDailyDocReferenceForDate } from './date';
 dayjs.extend(relativeTime);
 
 function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
@@ -41,6 +42,11 @@ export function timeWhenCardAppearsInQueueFromScheduled(
   return useRealScheduledTime ? new Date(scheduled) : dayjs(scheduled).startOf('day').toDate();
 }
 
+export const getMultiplier = async (plugin: RNPlugin) => {
+  const multiplier = (await plugin.settings.getSetting<number>(multiplierId)) || 2;
+  return multiplier;
+};
+
 export async function getNextSpacingDateForRem(plugin: RNPlugin, remId: string) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) {
@@ -50,8 +56,10 @@ export async function getNextSpacingDateForRem(plugin: RNPlugin, remId: string) 
   if (!incrementalRemInfo) {
     return;
   }
+  const multiplier = await getMultiplier(plugin);
   const cleansedHistory = removeResponsesBeforeEarlyResponses(incrementalRemInfo.history || []);
-  const newInterval = 2 ** Math.max(cleansedHistory.length, 1);
+  // simple exponential, but shouldn't explode if you do a bunch of practice-all
+  const newInterval = multiplier ** Math.max(cleansedHistory.length, 1);
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
   const newHistory: IncrementalRep[] = [
     ...(incrementalRemInfo.history || []),
@@ -74,12 +82,11 @@ export async function updateSRSDataForRem(
   console.log('updating srs data for rem', remId, newNextRepDate, newHistory);
   console.log('next rep due in ', dayjs(newNextRepDate).fromNow());
   const date = new Date(newNextRepDate);
-  const dailyDoc = await plugin.date.getDailyDoc(date);
-  if (!dailyDoc) {
-    console.log('failed to create daily doc for date', date);
+  const dateReference = await getDailyDocReferenceForDate(plugin, date);
+  if (!dateReference) {
+    console.log('failed to create date reference for date', date);
     return;
   }
-  const dateReference = await plugin.richText.rem(dailyDoc).value();
   await rem?.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateReference);
   await rem?.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(newHistory)]);
 }
