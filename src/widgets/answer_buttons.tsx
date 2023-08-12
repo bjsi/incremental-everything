@@ -46,8 +46,6 @@ export function AnswerButtons() {
     },
     [ctx?.remId]
   );
-  const inLookbackMode = !!useRunAsync(async () => await plugin.queue.inLookbackMode(), []);
-
   return (
     <div className="flex flex-row justify-center items-center gap-4 incremental-everything-answer-buttons">
       <Button
@@ -55,6 +53,7 @@ export function AnswerButtons() {
         onClick={async () => {
           if (incRem) {
             // get next rep date
+            const inLookbackMode = !!(await plugin.queue.inLookbackMode());
             const data = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
             if (!data) {
               return;
@@ -86,9 +85,7 @@ export function AnswerButtons() {
       >
         <div className="flex flex-col items-center justify-center">
           <div>Next</div>
-          <div className="text-xs">
-            {incRem && <NextRepTime rem={incRem} inLookbackMode={inLookbackMode} />}
-          </div>
+          <div className="text-xs">{incRem && <NextRepTime rem={incRem} />}</div>
         </div>
       </Button>
     </div>

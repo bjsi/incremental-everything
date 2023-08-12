@@ -8,7 +8,6 @@ dayjs.extend(duration);
 
 export interface NextRepTimeProps {
   rem: IncrementalRem;
-  inLookbackMode: boolean;
 }
 
 export function durationToHumanReadable(duration: any) {
@@ -34,7 +33,8 @@ export function NextRepTime(props: NextRepTimeProps): React.ReactElement {
   const plugin = usePlugin();
   React.useEffect(() => {
     const effect = async () => {
-      const nt = await getNextSpacingDateForRem(plugin, props.rem.remId, props.inLookbackMode);
+      const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+      const nt = await getNextSpacingDateForRem(plugin, props.rem.remId, inLookbackMode);
       if (nt) {
         setNextTime(nt.newNextRepDate);
       }

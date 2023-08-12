@@ -20,6 +20,7 @@ import {
   powerupCode,
   prioritySlotCode,
   repHistorySlotCode,
+  collapseQueueTopBar,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
@@ -52,6 +53,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       },
     ],
   });
+
   await plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
     powerupFilter: powerupCode,
     dimensions: {
@@ -305,6 +307,14 @@ async function onActivate(plugin: ReactRNPlugin) {
     description:
       'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
     defaultValue: 2,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: collapseQueueTopBar,
+    title: 'Collapse Queue Top Bar',
+    description:
+      'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
+    defaultValue: true,
   });
 }
 

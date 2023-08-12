@@ -47,9 +47,7 @@ export const getMultiplier = async (plugin: RNPlugin) => {
   return multiplier;
 };
 
-export const removeLastInteractionFromRepHistory = (
-  history: IncrementalRep[]
-): IncrementalRep[] => {
+export const removeLastInteraction = (history: IncrementalRep[]): IncrementalRep[] => {
   if (history.length === 0) {
     return history;
   }
@@ -70,11 +68,13 @@ export async function getNextSpacingDateForRem(
     return;
   }
   const multiplier = await getMultiplier(plugin);
+
+  const rawHistory = incrementalRemInfo.history || [];
   const cleansedHistory = _.pipe(
-    incrementalRemInfo.history || [],
+    rawHistory,
     removeResponsesBeforeEarlyResponses,
     // remove the last repetition if we're in lookback mode
-    inLookbackMode ? removeLastInteractionFromRepHistory : _.identity
+    inLookbackMode ? removeLastInteraction : _.identity
   );
 
   // NOTE: if you change to use nextRepDate, you'll need to handle lookback mode
@@ -82,7 +82,9 @@ export async function getNextSpacingDateForRem(
   const newInterval = multiplier ** Math.max(cleansedHistory.length, 1);
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
   const newHistory: IncrementalRep[] = [
-    ...(incrementalRemInfo.history || []),
+    // if we're in lookback mode, remove the last interaction
+    // but keep responsesBeforeEarlyResponses
+    ...(inLookbackMode ? removeLastInteraction(rawHistory) : rawHistory),
     { date: Date.now(), scheduled: incrementalRemInfo.nextRepDate },
   ];
   return {

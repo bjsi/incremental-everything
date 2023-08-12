@@ -1,6 +1,7 @@
-import { usePlugin } from '@remnote/plugin-sdk';
+import { usePlugin, useTracker } from '@remnote/plugin-sdk';
 import React from 'react';
 import { useEffect, useRef } from 'react';
+import { collapseQueueTopBar as collapseQueueTopBarId } from './consts';
 
 export const useIsMounted = () => {
   const isMounted = useRef(false);
@@ -15,12 +16,7 @@ export const useIsMounted = () => {
   return isMounted.current;
 };
 
-export const useQueueCSS = () => {
-  const plugin = usePlugin();
-  React.useEffect(() => {
-    plugin.app.registerCSS(
-      'incremental-everything-queue',
-      `
+const COLLAPSE_TOP_BAR_CSS = `
 .spacedRepetitionContent {
     height: 100%;
     box-sizing: border-box;
@@ -36,9 +32,17 @@ export const useQueueCSS = () => {
 /* Expand on hover */
 .queue__title:hover {
   max-height: 999px;
-}
-`.trim()
-    );
-    return () => void plugin.app.registerCSS('reader', '');
-  }, []);
+}`.trim();
+
+export const useQueueCSS = () => {
+  const plugin = usePlugin();
+  const shouldCollapse = useTracker(() => plugin.settings.getSetting(collapseQueueTopBarId), []);
+  React.useEffect(() => {
+    if (!shouldCollapse) {
+      plugin.app.registerCSS('collapse-top-bar', '/* empty */');
+    } else {
+      plugin.app.registerCSS('incremental-everything-queue', COLLAPSE_TOP_BAR_CSS);
+    }
+    return () => void plugin.app.registerCSS('collapse-top-bar', '/* empty */');
+  }, [shouldCollapse]);
 };
