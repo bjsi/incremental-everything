@@ -91,13 +91,13 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
               );
             }}
           >
-            <RemHierarchyEditorTree
-              className="px-2 box-border"
-              width={'100%'}
-              height={`calc(100%)`}
-              maxHeight={`calc(100%)`}
-              remId={props.actionItem.rem._id}
-            ></RemHierarchyEditorTree>
+            <div className="max-h-[100%] overflow-y-auto">
+              <RemHierarchyEditorTree
+                className="px-2 box-border"
+                width={'100%'}
+                remId={props.actionItem.rem._id}
+              ></RemHierarchyEditorTree>
+            </div>
           </Resizable>
         )}
         <ReactPlayer

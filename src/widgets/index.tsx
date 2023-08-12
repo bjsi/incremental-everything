@@ -277,6 +277,7 @@ async function onActivate(plugin: ReactRNPlugin) {
         return;
       }
       await initIncrementalRem(rem);
+      await plugin.app.toast('Tagged as Incremental Rem');
     },
   });
 
@@ -290,6 +291,7 @@ async function onActivate(plugin: ReactRNPlugin) {
         return;
       }
       await initIncrementalRem(rem);
+      await plugin.app.toast('Tagged as Incremental Rem');
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
   });
