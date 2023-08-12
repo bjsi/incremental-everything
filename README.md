@@ -52,7 +52,7 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 - The plugin will automatically save your progress and playback rate.
 - You can open the resizable notes section on the left to take notes while you watch.
 
-![Incremental Video](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-vid.gif)
+![Incremental Video](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-vid.png)
 
 #### Incremental Mathematics
 
