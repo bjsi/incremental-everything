@@ -1,6 +1,7 @@
 import { PDFWebReader, PluginCommandMenuLocation, usePlugin } from '@remnote/plugin-sdk';
 import plugin from 'dayjs/plugin/relativeTime';
 import React from 'react';
+import { scrollToHighlightId } from '../lib/consts';
 import {
   HTMLActionItem,
   HTMLHighlightActionItem,
@@ -38,9 +39,6 @@ export function Reader(props: ReaderProps) {
         },
       });
     }
-    return () => {
-      plugin.app.unregisterMenuItem('scroll-to-highlight');
-    };
   }, [actionItem]);
 
   return <PDFWebReader remId={actionItem.rem._id} {...sharedProps} />;

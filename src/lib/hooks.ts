@@ -1,7 +1,7 @@
 import { usePlugin, useTracker } from '@remnote/plugin-sdk';
 import React from 'react';
 import { useEffect, useRef } from 'react';
-import { collapseQueueTopBar as collapseQueueTopBarId } from './consts';
+import { collapseQueueTopBar as collapseQueueTopBarId, collapseTopBarId } from './consts';
 
 export const useIsMounted = () => {
   const isMounted = useRef(false);
@@ -39,10 +39,10 @@ export const useQueueCSS = () => {
   const shouldCollapse = useTracker(() => plugin.settings.getSetting(collapseQueueTopBarId), []);
   React.useEffect(() => {
     if (!shouldCollapse) {
-      plugin.app.registerCSS('collapse-top-bar', '/* empty */');
+      plugin.app.registerCSS(collapseTopBarId, '/* empty */');
     } else {
-      plugin.app.registerCSS('incremental-everything-queue', COLLAPSE_TOP_BAR_CSS);
+      plugin.app.registerCSS(collapseTopBarId, COLLAPSE_TOP_BAR_CSS);
     }
-    return () => void plugin.app.registerCSS('collapse-top-bar', '/* empty */');
+    return () => void plugin.app.registerCSS(collapseTopBarId, '/* empty */');
   }, [shouldCollapse]);
 };

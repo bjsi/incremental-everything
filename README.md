@@ -1,47 +1,44 @@
-## Incremental Everything
+# Incremental Everything
 
-A RemNote plugin which allows you to interleave flashcard reviews with other information like notes, books, websites, videos and more!
+A RemNote plugin which allows you to interleave your flashcard reviews with notes, paragraphs from books, websites, video snippets and more! Heavily inspired by SuperMemo's [Incremental Reading](https://supermemo.guru/wiki/Incremental_reading) mode.
 
-### Features
+## Features
 
-- **Incremental Reading**: Read and review your notes, books and websites.
-- **Incremental Video**: Watch and take notes on YouTube videos.
-- **Incremental Writing**: Write your essays and blog posts incrementally.
+- **Incremental Reading**: Read and review 1000s of notes, books and websites in parallel.
+- **Incremental Video**: Watch and take notes on your YouTube video backlog.
+- **Incremental Writing**: Write your essays and blog posts incrementally to maximize creativity.
 - **Incremental Tasks**: Clear out your tasklist between flashcard reviews.
 - **Incremental Exercises**: Spread out textbook exercises over time.
-- Plugin support! Plugin widgets can easily integrate with Incremental Everything.
+- Plugin support: Any RemNote plugin widget can easily integrate with Incremental Everything!
 
-### Installation
+## Installation
 
-- Open the [RemNote plugin store](https://www.remnote.com/plugins), search for "Incremental Everything" and install the plugin. It works on all devices.
+- Open the [RemNote plugin store](https://www.remnote.com/plugins), search for "Incremental Everything" and install the plugin.
 
-### Usage Summary
+## Usage
 
-- Tag a Rem with the `Incremental` tag using the `/Incremental Everything` command to turn it into an incremental Rem.
-- You can change an incremental Rem's priority using the `/Prioritize` command, or edit the date using RemNote's tables and properties features.
-- You can manually set the next repetition date using RemNote's tables and properties features.
-- The plugin will automatically add incremental Rem to your regular flashcard queue and show them to you when you review flashcards.
-- Inside the queue, you can control how many incremental Rem you want to see and how they are sorted using the Sorting Criteria menu button.
-- All of RemNote's practice modes ("Practice with SRS", "Practice All" and "Practice in Order") should work.
-- You can do subset reviews by creating a table from the `Incremental` tag.
+### Create Incremental Rem
 
-### Scheduling
+- Tag a Rem with the `Incremental` tag using the `/Incremental Everything` command.
+  ![Tagging](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/tag-inc-rem.gif)
+- Turn a PDF/website highlight into an incremental Rem by clicking on the highlight and clicking the puzzle piece icon.
+  ![Highlight](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
+- You can also create a new row in a table created from the `Incremental` tag.
 
-- The plugin uses an extremely simple scheduling algorithm which just doubles the interval at each repetition.
+### Review
 
-### Prioritization
-
-- You can use the `/Prioritize` command to change the priority of an incremental Rem or change it using RemNote's tables and properties features.
-- The plugin will prioritize Rem with a higher priority over Rem with a lower priority.
-- You can set the balance between priority sorting and randomness using the Sorting Criteria menu button in the queue.
-
-### Examples
+- The plugin automatically interleaves incremental Rem between your regular flashcard reviews.
+- All of RemNote's practice modes ("Practice with SRS", "Practice All" and "Practice in Order") should work as expected.
+- Inside the queue, you can control how many incremental Rem you want to see and how they are sorted using the Sorting Criteria button in the queue menu.
 
 #### Incremental Reading
 
-- You can tag PDFs, websites and highlights with the `Incremental` tag to read them incrementally.
-- It will work if you tag the PDF/website itself, or a Rem with the PDF/website as a source.
-- The plugin will render the PDF or website in the queue.
+- You can tag PDFs, websites and highlights with the `Incremental` tag to do classic SuperMemo-style incremental reading.
+- It will work if you tag the PDF or website itself, or a Rem with a single PDF or website as a source.
+- The plugin will render the PDF or website reader view inside the queue.
+- If you want to turn a highlight into an incremental Rem, click on the highlight and click the puzzle piece icon (I need to add proper shortcuts still!)
+
+![Incremental Reading](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-read.gif)
 
 #### Incremental Writing
 
@@ -53,13 +50,41 @@ A RemNote plugin which allows you to interleave flashcard reviews with other inf
 - You can tag YouTube videos with the `Incremental` tag to watch them incrementally.
 - It will work if you tag the link Rem itself, or a Rem with the YouTube link as a source.
 - The plugin will automatically save your progress and playback rate.
-- You can open the resizable notes section to take notes while you watch.
+- You can open the resizable notes section on the left to take notes while you watch.
+
+![Incremental Video](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-vid.gif)
 
 #### Incremental Mathematics
 
 - A quick example of plugin interoperability.
 - Integrates with my [Lean theorem prover plugin](https://github.com/bjsi/remnote-lean) to schedule math proof problem sets over time.
+- I hope other devs can build similar integrations with their plugins!
 
-### Development Details
+#### Subset Review
+
+- You can do basic subset reviews by studying a particular document. Only Rem from that document will be shown to you.
+- You can also create a table from the `Incremental` tag and filter it down to a sorted subset using the table filter and sort features.
+- You can review the rows of a table in order by sorting the table and using the "Practice in Order" practice mode.
+
+There are lots of ways you can filter the table to create a subset of Rem to review. Here are some examples:
+
+- Only extracts
+
+![Only Extracts Filter](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/only-extracts.png)
+
+### Prioritization
+
+- You can use the `/Prioritize` command to set the priority of an incremental Rem or change it using RemNote's tables and properties features.
+- The plugin will prioritize Rem with a lower priority over Rem with a higher priority. So 0 is for your most important material and 100 is for the least important.
+- You can set the balance between priority sorting and randomness using the Sorting Criteria menu button in the queue.
+
+### Scheduling
+
+- The plugin uses an extremely simple scheduling algorithm which just doubles the interval at each repetition.
+- We can add custom scheduling algorithms in the future if there is demand for it.
+- Note that you can manually set the next repetition date using RemNote's tables and properties features.
+
+## Development Details
 
 - The plugin stores repetition data as powerup properties on the Rem. So these aren't "normal" RemNote flashcards. All of the scheduling is managed internally by the plugin.
+- Let me know if you want to help develop the plugin! Join the [RemNote Discord](http://bit.ly/RemNoteDiscord) and message me (Jamesb)!

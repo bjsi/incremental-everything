@@ -21,6 +21,8 @@ import {
   prioritySlotCode,
   repHistorySlotCode,
   collapseQueueTopBar,
+  scrollToHighlightId,
+  collapseTopBarId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
@@ -249,6 +251,11 @@ async function onActivate(plugin: ReactRNPlugin) {
         remId: rem._id,
       });
     },
+  });
+
+  plugin.event.addListener(AppEvents.QueueExit, undefined, () => {
+    plugin.app.unregisterMenuItem(scrollToHighlightId);
+    plugin.app.registerCSS(collapseTopBarId, '');
   });
 
   plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {
