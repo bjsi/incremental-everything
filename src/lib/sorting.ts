@@ -22,3 +22,8 @@ export const setRatioBetweenCardsAndIncrementalRem = async (plugin: RNPlugin, ra
   ratio = Math.min(1, Math.max(0, ratio));
   await plugin.storage.setSynced('ratioBetweenCardsAndIncrementalRem', ratio);
 };
+
+export const getNumCardsPerIncRem = async (plugin: RNPlugin) => {
+  const ratio = await getRatioBetweenCardsAndIncrementalRem(plugin);
+  return ratio == null ? DEFAULT_RATIO : ratio === 0 ? 0 : Math.round(1 / ratio);
+};

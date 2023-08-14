@@ -40,13 +40,13 @@ async function onActivate(plugin: ReactRNPlugin) {
         code: prioritySlotCode,
         name: 'Priority',
         propertyType: PropertyType.NUMBER,
-        propertyLocation: PropertyLocation.RIGHT,
+        propertyLocation: PropertyLocation.BELOW,
       },
       {
         code: nextRepDateSlotCode,
         name: 'Next Rep Date',
         propertyType: PropertyType.DATE,
-        propertyLocation: PropertyLocation.RIGHT,
+        propertyLocation: PropertyLocation.BELOW,
       },
       {
         code: repHistorySlotCode,

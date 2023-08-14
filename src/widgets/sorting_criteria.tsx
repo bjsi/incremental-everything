@@ -1,4 +1,4 @@
-import { renderWidget, usePlugin, useTracker } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useRunAsync, useTracker } from '@remnote/plugin-sdk';
 import {
   getSortingRandomness,
   getRatioBetweenCardsAndIncrementalRem,
@@ -6,15 +6,19 @@ import {
   DEFAULT_RANDOMNESS,
   DEFAULT_RATIO,
   setRatioBetweenCardsAndIncrementalRem,
+  getNumCardsPerIncRem,
 } from '../lib/sorting';
 
 export function SortingCriteria() {
   const plugin = usePlugin();
   const sortingRandomness = useTracker(async (rp) => await getSortingRandomness(rp), []);
-  const ratioBetweenCardsAndIncrementalRem = useTracker(
+  const ratioCardsAndIncRem = useTracker(
     async (rp) => await getRatioBetweenCardsAndIncrementalRem(rp),
     []
   );
+  const cardsPerIncRem = useRunAsync(async () => {
+    return await getNumCardsPerIncRem(plugin);
+  }, [ratioCardsAndIncRem]);
   return (
     <div className="flex flex-col p-4 gap-4">
       <div className="text-2xl font-bold">Sorting Criteria</div>
@@ -27,7 +31,7 @@ export function SortingCriteria() {
         <div className="rn-clr-content-secondary">Higher = ignores priority more</div>
         <input
           min={0}
-          step={0.05}
+          step={0.1}
           max={1}
           onChange={(e) => {
             setSortingRandomness(plugin, Number(e.target.value));
@@ -44,24 +48,20 @@ export function SortingCriteria() {
             Flashcard Ratio
           </label>
         </div>
-        <div className="rn-clr-content-secondary">
-          {Math.round(
-            1 /
-              (ratioBetweenCardsAndIncrementalRem != null
-                ? ratioBetweenCardsAndIncrementalRem
-                : DEFAULT_RATIO)
-          )}{' '}
-          cards for every incremental rem
-        </div>
+        {cardsPerIncRem != null && (
+          <div className="rn-clr-content-secondary">
+            {cardsPerIncRem} cards for every incremental rem
+          </div>
+        )}
         <input
           min={0}
           max={1}
-          step={0.05}
+          step={0.1}
           onChange={(e) => setRatioBetweenCardsAndIncrementalRem(plugin, Number(e.target.value))}
           type="range"
           id="ratio"
           name="ratio"
-          value={ratioBetweenCardsAndIncrementalRem || DEFAULT_RATIO}
+          value={ratioCardsAndIncRem || DEFAULT_RATIO}
         />
       </div>
     </div>
