@@ -30,6 +30,7 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 - The plugin automatically interleaves incremental Rem between your regular flashcard reviews.
 - All of RemNote's practice modes ("Practice with SRS", "Practice All" and "Practice in Order") should work as expected.
   - Note that "Practice in Order" won't order the incremental Rem with flashcards. The flashcards and incremental Rem will get interleaved together.
+- In "Practice with SRS" and "Practice All" modes Rem are sorted by priority. In "Practice in Order" mode they are sorted by their order in the document.
 - Inside the queue, you can control how many incremental Rem you want to see and how they are sorted using the Sorting Criteria button in the queue menu.
 
 #### Incremental Reading
