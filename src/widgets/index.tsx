@@ -7,6 +7,7 @@ import {
   ReactRNPlugin,
   Rem,
   RemId,
+  SelectionType,
   SpecialPluginCallback,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
@@ -196,6 +197,55 @@ async function onActivate(plugin: ReactRNPlugin) {
     dimensions: {
       width: '100%',
       height: 'auto',
+    },
+  });
+
+  const createExtract = async () => {
+    const selection = await plugin.editor.getSelection();
+    if (!selection) {
+      return;
+    }
+    // TODO: extract within extract support
+    if (selection.type === SelectionType.Rem || selection.type === SelectionType.Text) {
+      const focused = await plugin.focus.getFocusedRem();
+      if (!focused) {
+        return;
+      }
+      await initIncrementalRem(focused);
+      return focused;
+    } else {
+      const highlight = await plugin.reader.addHighlight();
+      if (!highlight) {
+        return;
+      }
+      await initIncrementalRem(highlight);
+      return highlight;
+    }
+  };
+
+  await plugin.app.registerCommand({
+    id: 'extract',
+    name: 'Extract',
+    keyboardShortcut: 'opt+x',
+    action: async () => {
+      console.log('createExtract');
+      await createExtract();
+    },
+  });
+
+  await plugin.app.registerCommand({
+    id: 'extract-with-priority',
+    name: 'Extract with Priority',
+    keyboardShortcut: 'opt+shift+x',
+    action: async () => {
+      console.log('createExtract with priority');
+      const rem = await createExtract();
+      if (!rem) {
+        return;
+      }
+      await plugin.widget.openPopup('priority', {
+        remId: rem._id,
+      });
     },
   });
 
