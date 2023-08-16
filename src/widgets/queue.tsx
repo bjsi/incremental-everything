@@ -1,4 +1,5 @@
 import {
+  DocumentViewer,
   RemHierarchyEditorTree,
   RemRichTextEditor,
   renderWidget,
@@ -75,15 +76,7 @@ export function QueueComponent() {
         ) : remAndType.type === 'youtube' ? (
           <VideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' && shouldRenderEditorForRemType ? (
-          <div className="flex flex-col gap-2">
-            <RemRichTextEditor remId={remAndType.rem._id} width={'100%'} />
-            <RemHierarchyEditorTree
-              width={'100%'}
-              height={`calc(100%)`}
-              maxHeight={`calc(100%)`}
-              remId={remAndType.rem._id}
-            ></RemHierarchyEditorTree>
-          </div>
+          <DocumentViewer width={'100%'} height={'100%'} documentId={remAndType.rem._id} />
         ) : null}
       </div>
     </div>
