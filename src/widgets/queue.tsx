@@ -1,7 +1,5 @@
 import {
   DocumentViewer,
-  RemHierarchyEditorTree,
-  RemRichTextEditor,
   renderWidget,
   usePlugin,
   useRunAsync,
@@ -28,7 +26,6 @@ export function QueueComponent() {
         return undefined;
       }
       const ret = await remToActionItemType(plugin, rem);
-      console.log('remAndType', ret);
       return ret;
     },
     [ctx?.remId]
