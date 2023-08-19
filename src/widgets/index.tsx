@@ -365,7 +365,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     title: 'Multiplier',
     description:
       'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
-    defaultValue: 2,
+    defaultValue: 1.5,
   });
 
   plugin.settings.registerBooleanSetting({

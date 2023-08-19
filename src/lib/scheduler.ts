@@ -43,7 +43,7 @@ export function timeWhenCardAppearsInQueueFromScheduled(
 }
 
 export const getMultiplier = async (plugin: RNPlugin) => {
-  const multiplier = (await plugin.settings.getSetting<number>(multiplierId)) || 2;
+  const multiplier = (await plugin.settings.getSetting<number>(multiplierId)) || 1.5;
   return multiplier;
 };
 
@@ -79,7 +79,7 @@ export async function getNextSpacingDateForRem(
 
   // NOTE: if you change to use nextRepDate, you'll need to handle lookback mode
   // it's a simple exponential, but shouldn't explode if you do a bunch of practice-all
-  const newInterval = multiplier ** Math.max(cleansedHistory.length, 1);
+  const newInterval = Math.ceil(multiplier ** Math.max(cleansedHistory.length, 1));
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
   const newHistory: IncrementalRep[] = [
     // if lookback mode, remove the last interaction but keep responsesBeforeEarlyResponses

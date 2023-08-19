@@ -82,7 +82,7 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
 
 ### Scheduling
 
-- The plugin uses an extremely simple scheduling algorithm which just doubles the interval at each repetition.
+- The plugin uses an extremely simple scheduling algorithm: `const newInterval = Math.ceil(multiplier ** Math.max(repHistory.length, 1));` where the multiplier is 1.5 by default.
 - We can add custom scheduling algorithms in the future if there is demand for it.
 - Note that you can manually set the next repetition date using RemNote's tables and properties features.
 
