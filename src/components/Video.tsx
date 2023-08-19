@@ -34,11 +34,13 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
 
   const player = React.useRef<ReactPlayer>(null);
 
+  const didInitialSeek = React.useRef(false);
   React.useEffect(() => {
-    if (player.current) {
-      player.current.seekTo(position);
+    if (player.current && position && !didInitialSeek.current) {
+      didInitialSeek.current = true;
+      player.current.seekTo(position, 'seconds');
     }
-  }, [player?.current]);
+  }, [player?.current, position]);
 
   return (
     <div>
