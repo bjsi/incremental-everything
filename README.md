@@ -24,6 +24,8 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 - Turn a PDF/website highlight into an incremental Rem by clicking on the highlight and clicking the puzzle piece icon.
   ![Highlight](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
 - You can also create a new row in a table created from the `Incremental` tag.
+- You can use the shortcut `alt/opt+x` to create an incremental Rem.
+- You can use the shortcut `alt/opt+shift+x` to create an incremental Rem and open the priority menu.
 
 ### Review
 
