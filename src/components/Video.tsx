@@ -1,4 +1,4 @@
-import { RemHierarchyEditorTree, usePlugin } from '@remnote/plugin-sdk';
+import { DocumentViewer, RemHierarchyEditorTree, usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import ReactPlayer from 'react-player/youtube';
 import { Resizable } from 're-resizable';
@@ -93,13 +93,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
               );
             }}
           >
-            <div className="max-h-[100%] overflow-y-auto">
-              <RemHierarchyEditorTree
-                className="px-2 box-border"
-                width={'100%'}
-                remId={props.actionItem.rem._id}
-              ></RemHierarchyEditorTree>
-            </div>
+            <DocumentViewer width={'100%'} height={'100%'} documentId={props.actionItem.rem._id} />
           </Resizable>
         )}
         <ReactPlayer

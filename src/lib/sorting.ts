@@ -13,9 +13,16 @@ export const getSortingRandomness = async (plugin: RNPlugin) => {
   return val == null ? DEFAULT_RANDOMNESS : val;
 };
 
-export const getRatioBetweenCardsAndIncrementalRem = async (plugin: RNPlugin) => {
-  const val = (await plugin.storage.getSynced('ratioBetweenCardsAndIncrementalRem')) as number;
-  return val == null ? DEFAULT_RATIO : val;
+export type Ratio = 'no-rem' | 'no-cards' | number;
+
+export const getRatioBetweenCardsAndIncrementalRem = async (plugin: RNPlugin): Promise<Ratio> => {
+  let ratio = (await plugin.storage.getSynced('ratioBetweenCardsAndIncrementalRem')) as Ratio;
+  if (ratio === 1) {
+    ratio = 'no-rem';
+  } else if (ratio === 0) {
+    ratio = 'no-cards';
+  }
+  return ratio == null ? DEFAULT_RATIO : ratio;
 };
 
 export const setRatioBetweenCardsAndIncrementalRem = async (plugin: RNPlugin, ratio: number) => {
@@ -23,7 +30,11 @@ export const setRatioBetweenCardsAndIncrementalRem = async (plugin: RNPlugin, ra
   await plugin.storage.setSynced('ratioBetweenCardsAndIncrementalRem', ratio);
 };
 
-export const getNumCardsPerIncRem = async (plugin: RNPlugin) => {
+export const getNumCardsPerIncRem = async (plugin: RNPlugin): Promise<number | string> => {
   const ratio = await getRatioBetweenCardsAndIncrementalRem(plugin);
-  return ratio == null ? DEFAULT_RATIO : ratio === 0 ? 0 : Math.round(1 / ratio);
+  return typeof ratio === 'number'
+    ? Math.round(1 / ratio)
+    : ratio === 'no-cards'
+    ? 'No Flashcards'
+    : 'No Incremental Rem';
 };

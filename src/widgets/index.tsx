@@ -24,6 +24,8 @@ import {
   collapseQueueTopBar,
   scrollToHighlightId,
   collapseTopBarId,
+  queueCounterId,
+  hideIncEverythingId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
@@ -129,30 +131,54 @@ async function onActivate(plugin: ReactRNPlugin) {
           .concat(referencedRemIds)
           .concat(queueInfo.subQueueId);
       }
-      const intervalBetweenIncRem = Math.round(
-        1 / (await getRatioBetweenCardsAndIncrementalRem(plugin))
+      let ratio: number | 'no-rem' | 'no-cards' = await getRatioBetweenCardsAndIncrementalRem(
+        plugin
       );
 
-      const totalElementsSeen = queueInfo.cardsPracticed + seenRem.keys.length;
-      if (
-        (totalElementsSeen > 0 && totalElementsSeen % intervalBetweenIncRem === 0) ||
-        queueInfo.numCardsRemaining === 0
-      ) {
-        const sorted = _.sortBy(allIncrementalRem, (incRem) => {
-          if (queueInfo.mode === 'in-order') {
-            return allRemInFolderQueue!.indexOf(incRem.remId);
-          } else {
-            return incRem.priority;
-          }
-        });
-        const filtered = sorted.filter((x) =>
-          queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
-            ? (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
-              (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
-            : (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
-              Date.now() >= x.nextRepDate
-        );
+      const intervalBetweenIncRem = typeof ratio === 'string' ? ratio : Math.round(1 / ratio);
 
+      const totalElementsSeen = queueInfo.cardsPracticed + seenRem.keys.length;
+
+      const sorted = _.sortBy(allIncrementalRem, (incRem) => {
+        if (queueInfo.mode === 'in-order') {
+          return allRemInFolderQueue!.indexOf(incRem.remId);
+        } else {
+          return incRem.priority;
+        }
+      });
+      const filtered = sorted.filter((x) =>
+        queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
+          ? (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
+            (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
+          : (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
+            Date.now() >= x.nextRepDate
+      );
+
+      plugin.app.registerCSS(
+        queueCounterId,
+        `
+  .rn-queue__card-counter {
+    visibility: hidden;
+  }
+
+  .rn-queue__card-counter:after {
+    content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
+    visibility: visible;
+    background-color: #f0f0f0;
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+  }`
+      );
+
+      if (
+        (totalElementsSeen > 0 &&
+          typeof intervalBetweenIncRem === 'number' &&
+          totalElementsSeen % intervalBetweenIncRem === 0) ||
+        queueInfo.numCardsRemaining === 0 ||
+        intervalBetweenIncRem === 'no-cards'
+      ) {
         // do n random swaps
         const sortingRandomness = await getSortingRandomness(plugin);
         const num_random_swaps = sortingRandomness * allIncrementalRem.length;
@@ -322,6 +348,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.event.addListener(AppEvents.QueueExit, undefined, () => {
     plugin.app.unregisterMenuItem(scrollToHighlightId);
     plugin.app.registerCSS(collapseTopBarId, '');
+    plugin.app.registerCSS(queueCounterId, '');
+    plugin.app.registerCSS(hideIncEverythingId, '');
   });
 
   plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {

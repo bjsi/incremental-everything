@@ -36,7 +36,7 @@ export function SortingCriteria() {
           onChange={(e) => {
             setSortingRandomness(plugin, Number(e.target.value));
           }}
-          value={sortingRandomness || DEFAULT_RANDOMNESS}
+          value={sortingRandomness == null ? DEFAULT_RANDOMNESS : sortingRandomness}
           type="range"
           id="randomness"
           name="randomness"
@@ -50,7 +50,9 @@ export function SortingCriteria() {
         </div>
         {cardsPerIncRem != null && (
           <div className="rn-clr-content-secondary">
-            {cardsPerIncRem} cards for every incremental rem
+            {typeof cardsPerIncRem === 'string'
+              ? cardsPerIncRem
+              : `${cardsPerIncRem} cards for every incremental rem`}
           </div>
         )}
         <input
@@ -61,7 +63,15 @@ export function SortingCriteria() {
           type="range"
           id="ratio"
           name="ratio"
-          value={ratioCardsAndIncRem || DEFAULT_RATIO}
+          value={
+            ratioCardsAndIncRem == null
+              ? DEFAULT_RATIO
+              : ratioCardsAndIncRem === 'no-cards'
+              ? 0
+              : ratioCardsAndIncRem === 'no-rem'
+              ? 1
+              : ratioCardsAndIncRem
+          }
         />
       </div>
     </div>
