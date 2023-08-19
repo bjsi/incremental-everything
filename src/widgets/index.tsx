@@ -98,6 +98,11 @@ async function onActivate(plugin: ReactRNPlugin) {
     seenRem = new Set<RemId>();
   });
 
+  const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+    powerupCode,
+    nextRepDateSlotCode
+  );
+
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
     async (queueInfo) => {
@@ -106,10 +111,22 @@ async function onActivate(plugin: ReactRNPlugin) {
         (await plugin.storage.getSession(allIncrementalRemKey)) || [];
       if (queueInfo.subQueueId && allRemInFolderQueue === undefined) {
         const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
+        // special handling for studying a daily doc because
+        // the referenced rem are nextRepDate slots not the incRem
+        const referencedRemIds = _.compact(
+          ((await subQueueRem?.remsReferencingThis()) || []).map((rem) => {
+            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+              return rem.parent;
+            } else {
+              return rem._id;
+            }
+          })
+        );
         allRemInFolderQueue = ((await subQueueRem?.allRemInFolderQueue()) || [])
           .map((x) => x._id)
           // not included in allRemInFolderQueue for some reason...
           .concat(((await subQueueRem?.getSources()) || []).map((x) => x._id))
+          .concat(referencedRemIds)
           .concat(queueInfo.subQueueId);
       }
       const intervalBetweenIncRem = Math.round(
@@ -128,7 +145,6 @@ async function onActivate(plugin: ReactRNPlugin) {
             return incRem.priority;
           }
         });
-        console.log('sorted', sorted);
         const filtered = sorted.filter((x) =>
           queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
             ? (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
