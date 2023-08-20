@@ -27,6 +27,10 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 - You can use the shortcut `alt/opt+x` to create an incremental Rem.
 - You can use the shortcut `alt/opt+shift+x` to create an incremental Rem and open the priority menu.
 
+#### Disable Incremental Rem
+
+- If you are done reviewing an incremental Rem and do not wish to see it anymore, you can disable it by removing the `Incremental` tag.
+
 ### Review
 
 - The plugin automatically interleaves incremental Rem between your regular flashcard reviews.
