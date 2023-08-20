@@ -11,8 +11,11 @@ import { tryParseJson } from './utils';
 
 export const getIncrementalRemInfo = async (
   plugin: RNPlugin,
-  r: Rem
+  r: Rem | undefined
 ): Promise<IncrementalRem | null> => {
+  if (!r) {
+    return null;
+  }
   const nextRepDateRichText = (await r.getPowerupPropertyAsRichText(
     powerupCode,
     nextRepDateSlotCode

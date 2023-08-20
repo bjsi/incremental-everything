@@ -23,10 +23,11 @@ export function QueueComponent() {
   const remAndType = useTracker(
     async (rp) => {
       const rem = await rp.rem.findOne(ctx?.remId);
+      console.log('refetching rem', rem);
       if (!rem) {
-        return undefined;
+        return null;
       }
-      const ret = await remToActionItemType(plugin, rem);
+      const ret = await remToActionItemType(rp, rem);
       return ret;
     },
     [ctx?.remId]

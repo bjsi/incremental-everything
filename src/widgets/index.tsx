@@ -193,7 +193,16 @@ async function onActivate(plugin: ReactRNPlugin) {
         if (filtered.length === 0) {
           return null;
         } else {
-          const first = filtered[0];
+          // make sure we don't show a rem that has been deleted
+          let first = filtered[0];
+          while (!(await getIncrementalRemInfo(plugin, await plugin.rem.findOne(first.remId)))) {
+            filtered.shift();
+            if (filtered.length === 0) {
+              return null;
+            } else {
+              first = filtered[0];
+            }
+          }
           seenRem.add(first.remId);
           console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
           return {
