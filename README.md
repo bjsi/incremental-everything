@@ -80,6 +80,10 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
 
 ![Only Extracts Filter](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/only-extracts.png)
 
+- Only YouTube videos
+
+![Only YouTube videos Filter](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-vid-filter.png)
+
 ### Prioritization
 
 - You can use the `/Prioritize` command to set the priority of an incremental Rem or change it using RemNote's tables and properties features.
