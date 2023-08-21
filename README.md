@@ -96,3 +96,16 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
 
 - The plugin stores repetition data as powerup properties on the Rem. So these aren't "normal" RemNote flashcards. All of the scheduling is managed internally by the plugin.
 - Let me know if you want to help develop the plugin! Join the [RemNote Discord](http://bit.ly/RemNoteDiscord) and message me (Jamesb)!
+
+### How to Develop
+
+Run the following commands:
+
+```sh
+git clone https://github.com/bjsi/incremental-everything
+cd incremental-everything
+npm i
+npm run dev
+```
+
+Then follow [this part of the quick start guide](https://github.com/bjsi/incremental-everything) to get the plugin running in RemNote.
