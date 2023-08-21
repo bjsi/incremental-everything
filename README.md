@@ -4,9 +4,9 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 
 ## Features
 
-- **Incremental Reading**: Read and review 1000s of notes, books and websites in parallel.
+- **Incremental Reading**: Read and review 1000s of notes, books and websites in parallel. [Learn more](https://www.youtube.com/watch?v=oNCLLNZEtz0).
+- **Incremental Writing**: Write your essays and blog posts incrementally to maximize creativity. [Learn more](https://www.youtube.com/watch?v=LLS_8Y744lk).
 - **Incremental Video**: Watch and take notes on your YouTube video backlog.
-- **Incremental Writing**: Write your essays and blog posts incrementally to maximize creativity.
 - **Incremental Tasks**: Clear out your tasklist between flashcard reviews.
 - **Incremental Exercises**: Spread out textbook exercises over time.
 - Plugin support: Any RemNote plugin widget can easily integrate with Incremental Everything!
