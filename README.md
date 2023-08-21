@@ -66,7 +66,10 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 
 - A quick example of plugin interoperability.
 - Integrates with my [Lean theorem prover plugin](https://github.com/bjsi/remnote-lean) to schedule math proof problem sets over time.
+- The Lean plugin provides the queue widget and the Incremental Everything plugin provides the scheduling.
 - I hope other devs can build similar integrations with their plugins!
+
+![Incremental Mathematics](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/lean.png)
 
 #### Subset Review
 
