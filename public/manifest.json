@@ -7,9 +7,9 @@
   "version": {
     "major": 0,
     "minor": 0,
-    "patch": 1
+    "patch": 2
   },
-  "unlisted": true,
+  "unlisted": false,
   "theme": [],
   "enableOnMobile": true,
   "description": "",
