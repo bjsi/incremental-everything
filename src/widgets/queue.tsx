@@ -22,8 +22,10 @@ export function QueueComponent() {
   );
   const remAndType = useTracker(
     async (rp) => {
+      if (!ctx) {
+        return undefined;
+      }
       const rem = await rp.rem.findOne(ctx?.remId);
-      console.log('refetching rem', rem);
       if (!rem) {
         return null;
       }
