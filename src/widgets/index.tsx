@@ -34,6 +34,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { getDailyDocReferenceForDate } from '../lib/date';
+import { unregisterQueueCSS } from '../lib/hooks';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -189,6 +190,7 @@ async function onActivate(plugin: ReactRNPlugin) {
         }
 
         if (filtered.length === 0) {
+          unregisterQueueCSS(plugin);
           return null;
         } else {
           // make sure we don't show a rem that has been deleted
@@ -209,6 +211,7 @@ async function onActivate(plugin: ReactRNPlugin) {
           };
         }
       } else {
+        unregisterQueueCSS(plugin);
         return null;
       }
     }
@@ -280,7 +283,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     name: 'Extract',
     keyboardShortcut: 'opt+x',
     action: async () => {
-      console.log('createExtract');
       await createExtract();
     },
   });
