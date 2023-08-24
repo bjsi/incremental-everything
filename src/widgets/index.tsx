@@ -136,9 +136,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       );
 
       const intervalBetweenIncRem = typeof ratio === 'string' ? ratio : Math.round(1 / ratio);
-
-      const totalElementsSeen = queueInfo.cardsPracticed + [...seenRem.keys()].length;
-
+      const totalElementsSeen = queueInfo.cardsPracticed + seenRem.size;
       const sorted = _.sortBy(allIncrementalRem, (incRem) => {
         if (queueInfo.mode === 'in-order') {
           return allRemInFolderQueue!.indexOf(incRem.remId);
@@ -257,13 +255,16 @@ async function onActivate(plugin: ReactRNPlugin) {
       return;
     }
     // TODO: extract within extract support
-    if (selection.type === SelectionType.Rem || selection.type === SelectionType.Text) {
+    if (selection.type === SelectionType.Text) {
       const focused = await plugin.focus.getFocusedRem();
       if (!focused) {
         return;
       }
       await initIncrementalRem(focused);
       return focused;
+    } else if (selection.type === SelectionType.Rem) {
+      const rems = (await plugin.rem.findMany(selection.remIds)) || [];
+      await Promise.all(rems.map(initIncrementalRem));
     } else {
       const highlight = await plugin.reader.addHighlight();
       if (!highlight) {
