@@ -137,7 +137,7 @@ async function onActivate(plugin: ReactRNPlugin) {
 
       const intervalBetweenIncRem = typeof ratio === 'string' ? ratio : Math.round(1 / ratio);
 
-      const totalElementsSeen = queueInfo.cardsPracticed + seenRem.keys.length;
+      const totalElementsSeen = queueInfo.cardsPracticed + [...seenRem.keys()].length;
 
       const sorted = _.sortBy(allIncrementalRem, (incRem) => {
         if (queueInfo.mode === 'in-order') {
