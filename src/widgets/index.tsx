@@ -357,11 +357,14 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.event.addListener(AppEvents.QueueExit, undefined, () => {
-    plugin.app.unregisterMenuItem(scrollToHighlightId);
-    plugin.app.registerCSS(collapseTopBarId, '');
-    plugin.app.registerCSS(queueCounterId, '');
-    plugin.app.registerCSS(hideIncEverythingId, '');
+  plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
+    const url = await plugin.window.getURL();
+    if (!url.includes('/flashcards')) {
+      plugin.app.unregisterMenuItem(scrollToHighlightId);
+      plugin.app.registerCSS(collapseTopBarId, '');
+      plugin.app.registerCSS(queueCounterId, '');
+      plugin.app.registerCSS(hideIncEverythingId, '');
+    }
   });
 
   plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {

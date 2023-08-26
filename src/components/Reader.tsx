@@ -1,5 +1,6 @@
 import { PDFWebReader, PluginCommandMenuLocation, usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
+import { scrollToHighlightId } from '../lib/consts';
 import {
   HTMLActionItem,
   HTMLHighlightActionItem,
@@ -35,7 +36,7 @@ export function Reader(props: ReaderProps) {
 
       // register a menu item to scroll to the highlight
       plugin.app.registerMenuItem({
-        id: 'scroll-to-highlight',
+        id: scrollToHighlightId,
         name: 'Scroll to Highlight',
         location: PluginCommandMenuLocation.ReaderMenu,
         action: async () => {
