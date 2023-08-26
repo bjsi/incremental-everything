@@ -1,7 +1,5 @@
 import { PDFWebReader, PluginCommandMenuLocation, usePlugin } from '@remnote/plugin-sdk';
-import plugin from 'dayjs/plugin/relativeTime';
 import React from 'react';
-import { scrollToHighlightId } from '../lib/consts';
 import {
   HTMLActionItem,
   HTMLHighlightActionItem,
@@ -22,11 +20,17 @@ const sharedProps = {
 export function Reader(props: ReaderProps) {
   const { actionItem } = props;
   const plugin = usePlugin();
+
+  const hasScrolled = React.useRef(false);
+
   /**
    * Scroll to the highlight in the PDF/HTML reader
    */
   React.useEffect(() => {
-    if (actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight') {
+    if (
+      (actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight') &&
+      !hasScrolled.current
+    ) {
       actionItem.extract.scrollToReaderHighlight();
 
       // register a menu item to scroll to the highlight
@@ -38,6 +42,8 @@ export function Reader(props: ReaderProps) {
           actionItem.extract.scrollToReaderHighlight();
         },
       });
+
+      hasScrolled.current = true;
     }
   }, [actionItem]);
 
