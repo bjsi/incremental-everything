@@ -17,39 +17,53 @@ interface PrioritySliderProps {
 }
 
 const PrioritySlider: React.FC<PrioritySliderProps> = ({ onChange, value }) => {
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseInt(event.target.value);
-    onChange(newValue);
-  };
-
-  const sliderRef = React.useRef<HTMLInputElement>(null);
+  // can be undefined
+  const [val, setVal] = React.useState(value);
   React.useEffect(() => {
-    if (!sliderRef?.current) {
-      return;
+    if (val != null) {
+      onChange(val);
     }
-    sliderRef.current.focus();
-  }, [sliderRef?.current]);
+  }, [val]);
+
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [inputRef.current]);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      onKeyDown={(e) => {
+        if (e.key === 'PageUp') {
+          setVal(val + 10);
+        } else if (e.key === 'PageDown') {
+          setVal(val - 10);
+        }
+      }}
+      className="flex flex-col gap-2"
+    >
       <div className="rn-clr-content-secondary priority-label">Lower = more important</div>
       <input
-        ref={sliderRef}
         type="range"
         className="priority-slider"
         min={0}
         max={100}
-        value={value}
-        onChange={handleChange}
+        value={val}
+        onChange={(e) => setVal(parseInt(e.target.value))}
       />
       <div className="rn-clr-content-secondary">
         Priority Value:{' '}
         <input
+          ref={inputRef}
+          autoFocus
           type="number"
           min={0}
           max={100}
-          value={value}
-          onChange={handleChange}
+          value={val}
+          onChange={(e) => setVal(parseInt(e.target.value))}
           className="priority-input"
         ></input>
       </div>
