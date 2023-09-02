@@ -26,6 +26,7 @@ import {
   collapseTopBarId,
   queueCounterId,
   hideIncEverythingId,
+  nextRepCommandId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
@@ -35,6 +36,8 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { unregisterQueueCSS } from '../lib/hooks';
+import { currentRemAndType, getCurrentRemAndType, setCurrentRemAndType } from './queue';
+import { handleHextRepetitionClick } from './answer_buttons';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -105,6 +108,20 @@ async function onActivate(plugin: ReactRNPlugin) {
     powerupCode,
     nextRepDateSlotCode
   );
+
+  plugin.app.registerCommand({
+    id: nextRepCommandId,
+    name: 'Next Repetition',
+    action: async () => {
+      const remAndType = getCurrentRemAndType();
+      const url = await plugin.window.getURL();
+      if (!remAndType || !url.includes('/flashcards')) {
+        return;
+      }
+      const incRem = await getIncrementalRemInfo(plugin, remAndType.rem);
+      await handleHextRepetitionClick(plugin, incRem);
+    },
+  });
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
@@ -364,6 +381,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       plugin.app.registerCSS(collapseTopBarId, '');
       plugin.app.registerCSS(queueCounterId, '');
       plugin.app.registerCSS(hideIncEverythingId, '');
+      setCurrentRemAndType(undefined);
     }
   });
 

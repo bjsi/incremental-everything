@@ -1,5 +1,6 @@
 import {
   renderWidget,
+  RNPlugin,
   usePlugin,
   useRunAsync,
   useTracker,
@@ -33,6 +34,42 @@ function Button(props: ButtonProps) {
   );
 }
 
+export async function handleHextRepetitionClick(
+  plugin: RNPlugin,
+  incRem: IncrementalRem | null | undefined
+) {
+  if (incRem) {
+    // get next rep date
+    const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+    const data = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
+    if (!data) {
+      return;
+    }
+    const { newHistory, newNextRepDate } = data;
+    // update allIncrementalRem in storage to get around reactivity issues
+    const oldAllRem: IncrementalRem[] =
+      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+    const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
+    if (!oldRem) {
+      return;
+    }
+    await plugin.storage.setSession(
+      allIncrementalRemKey,
+      oldAllRem
+        .filter((r) => r.remId !== incRem.remId)
+        .concat({
+          ...oldRem,
+          nextRepDate: newNextRepDate,
+          history: newHistory,
+        })
+    );
+    // actually update the rem
+    await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
+    // move to next card
+    await plugin.queue.removeCurrentCardFromQueue();
+  }
+}
+
 export function AnswerButtons() {
   const plugin = usePlugin();
   const ctx = useTracker(
@@ -51,36 +88,7 @@ export function AnswerButtons() {
       <Button
         className="incremental-everthing-next-button"
         onClick={async () => {
-          if (incRem) {
-            // get next rep date
-            const inLookbackMode = !!(await plugin.queue.inLookbackMode());
-            const data = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
-            if (!data) {
-              return;
-            }
-            const { newHistory, newNextRepDate } = data;
-            // update allIncrementalRem in storage to get around reactivity issues
-            const oldAllRem: IncrementalRem[] =
-              (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-            const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
-            if (!oldRem) {
-              return;
-            }
-            await plugin.storage.setSession(
-              allIncrementalRemKey,
-              oldAllRem
-                .filter((r) => r.remId !== incRem.remId)
-                .concat({
-                  ...oldRem,
-                  nextRepDate: newNextRepDate,
-                  history: newHistory,
-                })
-            );
-            // actually update the rem
-            await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
-            // move to next card
-            await plugin.queue.removeCurrentCardFromQueue();
-          }
+          handleHextRepetitionClick(plugin, incRem);
         }}
       >
         <div className="flex flex-col items-center justify-center">
