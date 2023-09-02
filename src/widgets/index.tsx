@@ -426,14 +426,20 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.app.registerMenuItem({
     id: 'tag_rem_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
-    name: 'Tag as Incremental Rem',
+    name: 'Toggle tag as Incremental Rem',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) {
         return;
       }
-      await initIncrementalRem(rem);
-      await plugin.app.toast('Tagged as Incremental Rem');
+      const isIncremental = await rem.hasPowerup(powerupCode);
+      if (isIncremental) {
+        await rem.removePowerup(powerupCode);
+      } else {
+        await initIncrementalRem(rem);
+      }
+      const msg = isIncremental ? 'Untagged as Incremental Rem' : 'Tagged as Incremental Rem';
+      await plugin.app.toast(msg);
     },
   });
 
