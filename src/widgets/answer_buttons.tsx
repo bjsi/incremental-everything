@@ -7,8 +7,8 @@ import {
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import { NextRepTime } from '../components/NextRepTime';
-import { allIncrementalRemKey } from '../lib/consts';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { allIncrementalRemKey, powerupCode } from '../lib/consts';
+import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { IncrementalRem } from '../lib/types';
 
@@ -34,42 +34,6 @@ function Button(props: ButtonProps) {
   );
 }
 
-export async function handleHextRepetitionClick(
-  plugin: RNPlugin,
-  incRem: IncrementalRem | null | undefined
-) {
-  if (incRem) {
-    // get next rep date
-    const inLookbackMode = !!(await plugin.queue.inLookbackMode());
-    const data = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
-    if (!data) {
-      return;
-    }
-    const { newHistory, newNextRepDate } = data;
-    // update allIncrementalRem in storage to get around reactivity issues
-    const oldAllRem: IncrementalRem[] =
-      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-    const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
-    if (!oldRem) {
-      return;
-    }
-    await plugin.storage.setSession(
-      allIncrementalRemKey,
-      oldAllRem
-        .filter((r) => r.remId !== incRem.remId)
-        .concat({
-          ...oldRem,
-          nextRepDate: newNextRepDate,
-          history: newHistory,
-        })
-    );
-    // actually update the rem
-    await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
-    // move to next card
-    await plugin.queue.removeCurrentCardFromQueue();
-  }
-}
-
 export function AnswerButtons() {
   const plugin = usePlugin();
   const ctx = useTracker(
@@ -84,7 +48,7 @@ export function AnswerButtons() {
     [ctx?.remId]
   );
   return (
-    <div className="flex flex-row justify-center items-center gap-4 incremental-everything-answer-buttons">
+    <div className="flex flex-row justify-center items-center gap-6 incremental-everything-answer-buttons">
       <Button
         className="incremental-everthing-next-button"
         onClick={async () => {
@@ -94,6 +58,26 @@ export function AnswerButtons() {
         <div className="flex flex-col items-center justify-center">
           <div>Next</div>
           <div className="text-xs">{incRem && <NextRepTime rem={incRem} />}</div>
+        </div>
+      </Button>
+      <Button
+        className="incremental-everthing-done-button"
+        onClick={async () => {
+          const rem = await plugin.rem.findOne(incRem?.remId);
+          if (!rem) {
+            return;
+          }
+          const updatedAllRem: IncrementalRem[] = (
+            ((await plugin.storage.getSession(allIncrementalRemKey)) || []) as IncrementalRem[]
+          ).filter((r) => r.remId !== rem._id);
+          await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+          await plugin.queue.removeCurrentCardFromQueue(true);
+          await rem.removePowerup(powerupCode);
+        }}
+      >
+        <div className="flex flex-col items-center justify-center">
+          <div>Done</div>
+          <div className="text-xs">Untag this Rem</div>
         </div>
       </Button>
     </div>

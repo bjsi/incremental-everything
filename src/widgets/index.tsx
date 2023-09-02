@@ -33,11 +33,10 @@ import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../
 import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { unregisterQueueCSS } from '../lib/hooks';
-import { currentRemAndType, getCurrentRemAndType, setCurrentRemAndType } from './queue';
-import { handleHextRepetitionClick } from './answer_buttons';
+import { getCurrentRemAndType, setCurrentRemAndType } from '../lib/currentRep';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -61,6 +60,29 @@ async function onActivate(plugin: ReactRNPlugin) {
         hidden: true,
       },
     ],
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: initialIntervalId,
+    title: 'Initial Interval',
+    description: 'Sets the number of days until the first repetition.',
+    defaultValue: 0,
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: multiplierId,
+    title: 'Multiplier',
+    description:
+      'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
+    defaultValue: 1.5,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: collapseQueueTopBar,
+    title: 'Collapse Queue Top Bar',
+    description:
+      'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
+    defaultValue: true,
   });
 
   await plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
@@ -428,29 +450,6 @@ async function onActivate(plugin: ReactRNPlugin) {
       await plugin.app.toast('Tagged as Incremental Rem');
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
-  });
-
-  plugin.settings.registerNumberSetting({
-    id: initialIntervalId,
-    title: 'Initial Interval',
-    description: 'Sets the number of days until the first repetition.',
-    defaultValue: 0,
-  });
-
-  plugin.settings.registerNumberSetting({
-    id: multiplierId,
-    title: 'Multiplier',
-    description:
-      'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
-    defaultValue: 1.5,
-  });
-
-  plugin.settings.registerBooleanSetting({
-    id: collapseQueueTopBar,
-    title: 'Collapse Queue Top Bar',
-    description:
-      'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
-    defaultValue: true,
   });
 }
 

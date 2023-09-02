@@ -40,7 +40,11 @@ const COLLAPSE_TOP_BAR_CSS = `
 
 export const useQueueCSS = () => {
   const plugin = usePlugin();
-  const shouldCollapse = useTracker(() => plugin.settings.getSetting(collapseQueueTopBarId), []);
+  console.log('useQueueCSS');
+  const shouldCollapse = useTracker(
+    () => plugin.settings.getSetting<boolean>(collapseQueueTopBarId),
+    []
+  );
   React.useEffect(() => {
     if (!shouldCollapse) {
       unregisterQueueCSS(plugin);

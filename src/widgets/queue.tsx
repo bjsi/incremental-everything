@@ -11,14 +11,9 @@ import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { remToActionItemType } from '../lib/actionItems';
 import { hideIncEverythingId } from '../lib/consts';
+import { setCurrentRemAndType } from '../lib/currentRep';
 import { useQueueCSS } from '../lib/hooks';
 import { RemAndType } from '../lib/types';
-
-let currentRemAndType: RemAndType | null | undefined = undefined;
-export const getCurrentRemAndType = () => currentRemAndType;
-export const setCurrentRemAndType = (remAndType: RemAndType | null | undefined) => {
-  currentRemAndType = remAndType;
-};
 
 export function QueueComponent() {
   const plugin = usePlugin();
