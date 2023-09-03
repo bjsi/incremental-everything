@@ -318,20 +318,10 @@ async function onActivate(plugin: ReactRNPlugin) {
   };
 
   await plugin.app.registerCommand({
-    id: 'extract',
-    name: 'Extract',
-    keyboardShortcut: 'opt+x',
-    action: async () => {
-      await createExtract();
-    },
-  });
-
-  await plugin.app.registerCommand({
     id: 'extract-with-priority',
     name: 'Extract with Priority',
     keyboardShortcut: 'opt+shift+x',
     action: async () => {
-      console.log('createExtract with priority');
       const rem = await createExtract();
       if (!rem) {
         return;
@@ -362,13 +352,10 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.app.registerCommand({
     id: 'incremental-everything',
+    keyboardShortcut: 'opt+x',
     name: 'Incremental Everything',
     action: async () => {
-      const rem = await plugin.focus.getFocusedRem();
-      if (!rem) {
-        return;
-      }
-      await initIncrementalRem(rem);
+      createExtract();
     },
   });
 
