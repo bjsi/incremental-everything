@@ -36,7 +36,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { unregisterQueueCSS } from '../lib/hooks';
-import { getCurrentRemAndType, setCurrentRemAndType } from '../lib/currentRep';
+import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -135,12 +135,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     id: nextRepCommandId,
     name: 'Next Repetition',
     action: async () => {
-      const remAndType = getCurrentRemAndType();
+      const rem = await getCurrentIncrementalRem(plugin);
       const url = await plugin.window.getURL();
-      if (!remAndType || !url.includes('/flashcards')) {
+      debugger;
+      if (!rem || !url.includes('/flashcards')) {
         return;
       }
-      const incRem = await getIncrementalRemInfo(plugin, remAndType.rem);
+      const incRem = await getIncrementalRemInfo(plugin, rem);
       await handleHextRepetitionClick(plugin, incRem);
     },
   });
@@ -390,7 +391,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       plugin.app.registerCSS(collapseTopBarId, '');
       plugin.app.registerCSS(queueCounterId, '');
       plugin.app.registerCSS(hideIncEverythingId, '');
-      setCurrentRemAndType(undefined);
+      setCurrentIncrementalRem(plugin, undefined);
     }
   });
 

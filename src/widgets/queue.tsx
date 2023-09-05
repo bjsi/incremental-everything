@@ -11,9 +11,8 @@ import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { remToActionItemType } from '../lib/actionItems';
 import { hideIncEverythingId } from '../lib/consts';
-import { setCurrentRemAndType } from '../lib/currentRep';
+import { setCurrentIncrementalRem } from '../lib/currentRem';
 import { useQueueCSS } from '../lib/hooks';
-import { RemAndType } from '../lib/types';
 
 export function QueueComponent() {
   const plugin = usePlugin();
@@ -38,16 +37,10 @@ export function QueueComponent() {
   );
 
   React.useEffect(() => {
+    setCurrentIncrementalRem(plugin, remAndType?.rem?._id);
     if (remAndType === null) {
       plugin.queue.removeCurrentCardFromQueue(false);
     }
-  }, [remAndType]);
-
-  React.useEffect(() => {
-    setCurrentRemAndType(remAndType);
-    return () => {
-      setCurrentRemAndType(undefined);
-    };
   }, [remAndType]);
 
   /**

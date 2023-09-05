@@ -11,6 +11,7 @@ export const collapseQueueTopBar = 'collapse-queue-top-bar';
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
+export const currentIncRemKey = 'current-inc-rem';
 
 // widgets
 export const scrollToHighlightId = 'scroll-to-highlight';
