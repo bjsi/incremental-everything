@@ -58,7 +58,7 @@ export function SortingCriteria() {
         <input
           min={0}
           max={1}
-          step={0.1}
+          step={0.01}
           onChange={(e) => setRatioBetweenCardsAndIncrementalRem(plugin, Number(e.target.value))}
           type="range"
           id="ratio"
@@ -67,9 +67,9 @@ export function SortingCriteria() {
             ratioCardsAndIncRem == null
               ? DEFAULT_RATIO
               : ratioCardsAndIncRem === 'no-cards'
-              ? 0
-              : ratioCardsAndIncRem === 'no-rem'
               ? 1
+              : ratioCardsAndIncRem === 'no-rem'
+              ? 0
               : ratioCardsAndIncRem
           }
         />
