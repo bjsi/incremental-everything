@@ -1,7 +1,7 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 
 export const DEFAULT_RANDOMNESS = 0;
-export const DEFAULT_RATIO = 0.1;
+export const DEFAULT_RATIO = 0.25;
 
 export const setSortingRandomness = async (plugin: RNPlugin, randomness: number) => {
   randomness = Math.min(1, Math.max(0, randomness));
@@ -35,6 +35,6 @@ export const getNumCardsPerIncRem = async (plugin: RNPlugin): Promise<number | s
   return typeof ratio === 'number'
     ? Math.round(1 / ratio)
     : ratio === 'no-cards'
-    ? 'No Flashcards'
-    : 'No Incremental Rem';
+    ? 'Only Incremental Rem'
+    : 'Only Flashcards';
 };

@@ -52,7 +52,9 @@ export function SortingCriteria() {
           <div className="rn-clr-content-secondary">
             {typeof cardsPerIncRem === 'string'
               ? cardsPerIncRem
-              : `${cardsPerIncRem} cards for every incremental rem`}
+              : `${cardsPerIncRem} card${
+                  cardsPerIncRem !== 1 ? 's' : ''
+                } for every incremental rem`}
           </div>
         )}
         <input
@@ -67,9 +69,9 @@ export function SortingCriteria() {
             ratioCardsAndIncRem == null
               ? DEFAULT_RATIO
               : ratioCardsAndIncRem === 'no-cards'
-              ? 1
-              : ratioCardsAndIncRem === 'no-rem'
               ? 0
+              : ratioCardsAndIncRem === 'no-rem'
+              ? 1
               : ratioCardsAndIncRem
           }
         />
