@@ -52,13 +52,15 @@ export function SortingCriteria() {
           <div className="rn-clr-content-secondary">
             {typeof cardsPerIncRem === 'string'
               ? cardsPerIncRem
-              : `${cardsPerIncRem} cards for every incremental rem`}
+              : `${cardsPerIncRem} card${
+                  cardsPerIncRem !== 1 ? 's' : ''
+                } for every incremental rem`}
           </div>
         )}
         <input
           min={0}
           max={1}
-          step={0.1}
+          step={0.01}
           onChange={(e) => setRatioBetweenCardsAndIncrementalRem(plugin, Number(e.target.value))}
           type="range"
           id="ratio"

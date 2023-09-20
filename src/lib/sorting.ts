@@ -35,6 +35,6 @@ export const getNumCardsPerIncRem = async (plugin: RNPlugin): Promise<number | s
   return typeof ratio === 'number'
     ? Math.round(1 / ratio)
     : ratio === 'no-cards'
-    ? 'No Flashcards'
-    : 'No Incremental Rem';
+    ? 'Only Incremental Rem'
+    : 'Only Flashcards';
 };
