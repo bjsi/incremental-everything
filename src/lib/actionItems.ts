@@ -52,7 +52,7 @@ export const remToActionItemType = async (
       BuiltInPowerupCodes.Link,
       'URL'
     );
-    if (url.includes('youtube')) {
+    if (['youtube', 'youtu.be'].some((x) => url.includes(x))) {
       return {
         type: 'youtube',
         url,
