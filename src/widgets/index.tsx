@@ -85,22 +85,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     defaultValue: true,
   });
 
-  await plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
-    powerupFilter: powerupCode,
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
-
-  await plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
-    powerupFilter: powerupCode,
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
-
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
@@ -408,11 +392,30 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
     const url = await plugin.window.getURL();
     if (!url.includes('/flashcards')) {
+      // otherwise it breaks the preview popup
+      plugin.app.unregisterWidget('queue', WidgetLocation.Flashcard);
+      plugin.app.unregisterWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons);
       plugin.app.unregisterMenuItem(scrollToHighlightId);
       plugin.app.registerCSS(collapseTopBarId, '');
       plugin.app.registerCSS(queueCounterId, '');
       plugin.app.registerCSS(hideIncEverythingId, '');
       setCurrentIncrementalRem(plugin, undefined);
+    } else {
+      // otherwise it breaks the preview popup
+      plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
+        powerupFilter: powerupCode,
+        dimensions: {
+          width: '100%',
+          height: 'auto',
+        },
+      });
+      plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
+        powerupFilter: powerupCode,
+        dimensions: {
+          width: '100%',
+          height: 'auto',
+        },
+      });
     }
   });
 
