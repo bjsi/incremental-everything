@@ -4,6 +4,7 @@ import {
   PluginCommandMenuLocation,
   PropertyLocation,
   PropertyType,
+  QueueItemType,
   ReactRNPlugin,
   Rem,
   RemId,
@@ -392,31 +393,30 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
     const url = await plugin.window.getURL();
     if (!url.includes('/flashcards')) {
-      // otherwise it breaks the preview popup
-      plugin.app.unregisterWidget('queue', WidgetLocation.Flashcard);
-      plugin.app.unregisterWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons);
       plugin.app.unregisterMenuItem(scrollToHighlightId);
       plugin.app.registerCSS(collapseTopBarId, '');
       plugin.app.registerCSS(queueCounterId, '');
       plugin.app.registerCSS(hideIncEverythingId, '');
       setCurrentIncrementalRem(plugin, undefined);
     } else {
-      // otherwise it breaks the preview popup
-      plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
-        powerupFilter: powerupCode,
-        dimensions: {
-          width: '100%',
-          height: 'auto',
-        },
-      });
-      plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
-        powerupFilter: powerupCode,
-        dimensions: {
-          width: '100%',
-          height: 'auto',
-        },
-      });
     }
+  });
+
+  plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
+    powerupFilter: powerupCode,
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    queueItemTypeFilter: QueueItemType.Plugin,
+  });
+  plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
+    powerupFilter: powerupCode,
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    queueItemTypeFilter: QueueItemType.Plugin,
   });
 
   plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {
