@@ -203,7 +203,12 @@ async function onActivate(plugin: ReactRNPlugin) {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     border-radius: 0.25rem;
+<<<<<<< HEAD
   }`
+=======
+  }
+  `
+>>>>>>> f04e465383750e13c9cc0c7ea0413c7dba203e32
       );
 
       if (
