@@ -181,19 +181,30 @@ async function onActivate(plugin: ReactRNPlugin) {
       plugin.app.registerCSS(
         queueCounterId,
         `
-  .rn-queue__card-counter {
-    visibility: hidden;
-  }
+.rn-queue__card-counter {
+  visibility: hidden;
+}
 
-  .rn-queue__card-counter:after {
-    content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
-    visibility: visible;
-    background-color: #f0f0f0;
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    border-radius: 0.25rem;
-  }`
+.light .rn-queue__card-counter:after {
+  content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
+  visibility: visible;
+  background-color: #f0f0f0;
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 0.25rem;
+}
+
+.dark .rn-queue__card-counter:after {
+  content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
+  visibility: visible;
+  background-color: #34343c;
+  font-color: #d4d4d0;
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 0.25rem;
+}`.trim()
       );
 
       if (

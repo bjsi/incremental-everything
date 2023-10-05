@@ -115,4 +115,4 @@ npm i
 npm run dev
 ```
 
-Then follow [this part of the quick start guide](https://github.com/bjsi/incremental-everything) to get the plugin running in RemNote.
+Then follow [this part of the quick start guide](https://plugins.remnote.com/getting-started/quick_start_guide#run-the-plugin-template-inside-remnote) to get the plugin running in RemNote.
