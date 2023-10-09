@@ -427,8 +427,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       width: '100%',
       height: 'auto',
     },
-    // TODO: broken until remnote update
-    // queueItemTypeFilter: QueueItemType.Plugin,
+    queueItemTypeFilter: QueueItemType.Plugin,
   });
 
   plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {
