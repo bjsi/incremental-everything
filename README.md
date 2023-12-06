@@ -14,6 +14,7 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 ## Installation
 
 - Open the [RemNote plugin store](https://www.remnote.com/plugins), search for "Incremental Everything" and install the plugin.
+- Note that the plugin is temporarily disabled on mobile until I have time to fix some bugs.
 
 ## Usage
 
