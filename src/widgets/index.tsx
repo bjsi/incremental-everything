@@ -41,6 +41,20 @@ import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/curre
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
+  plugin.app.registerCSS(
+    'queue-container',
+    `
+    .rn-queue__content {
+      height: 100vh !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    .rn-queue__content > div {
+      flex: 1 !important;
+      min-height: 0 !important;
+    }
+    `
+  );
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
     slots: [
       {
