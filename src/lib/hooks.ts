@@ -3,6 +3,10 @@ import React from 'react';
 import { useEffect, useRef } from 'react';
 import { collapseQueueTopBar as collapseQueueTopBarId, collapseTopBarId, collapseTopBarKey } from './consts';
 
+export const unregisterQueueCSS = async (plugin: RNPlugin) => {
+  await plugin.app.registerCSS(collapseTopBarId, '');
+};
+
 export const useIsMounted = () => {
   const isMounted = useRef(false);
 
