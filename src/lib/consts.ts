@@ -18,7 +18,10 @@ export const scrollToHighlightId = 'scroll-to-highlight';
 
 // css
 export const collapseTopBarId = 'collapse-top-bar';
+export const collapseTopBarKey = 'collapseTopBarState';
+
 export const queueCounterId = 'queue-counter';
+
 export const hideIncEverythingId = 'hide-inc-everything';
 export const shouldHideEditorKey = 'shouldHideEditor';
 

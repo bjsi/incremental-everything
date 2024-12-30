@@ -30,6 +30,7 @@ import {
   hideIncEverythingId,
   nextRepCommandId,
   shouldHideEditorKey,
+  collapseTopBarKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
@@ -38,7 +39,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { getDailyDocReferenceForDate } from '../lib/date';
-import { unregisterQueueCSS } from '../lib/hooks';
+import { COLLAPSE_TOP_BAR_CSS, unregisterQueueCSS } from '../lib/hooks';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 dayjs.extend(relativeTime);
 
@@ -119,6 +120,16 @@ async function onActivate(plugin: ReactRNPlugin) {
     defaultValue: true,
   });
 
+  plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
+    if (collapseTopBarKey in changes) {
+      const shouldCollapse = await plugin.storage.getSession(collapseTopBarKey);
+      plugin.app.registerCSS(
+        collapseTopBarId,
+        shouldCollapse ? COLLAPSE_TOP_BAR_CSS : ''
+      );
+    }
+  });
+  
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {

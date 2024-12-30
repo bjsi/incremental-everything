@@ -1,11 +1,7 @@
 import { RNPlugin, usePlugin, useTracker } from '@remnote/plugin-sdk';
 import React from 'react';
 import { useEffect, useRef } from 'react';
-import { collapseQueueTopBar as collapseQueueTopBarId, collapseTopBarId } from './consts';
-
-export const unregisterQueueCSS = async (plugin: RNPlugin) => {
-  await plugin.app.registerCSS(collapseTopBarId, '');
-};
+import { collapseQueueTopBar as collapseQueueTopBarId, collapseTopBarId, collapseTopBarKey } from './consts';
 
 export const useIsMounted = () => {
   const isMounted = useRef(false);
@@ -20,7 +16,7 @@ export const useIsMounted = () => {
   return isMounted.current;
 };
 
-const COLLAPSE_TOP_BAR_CSS = `
+export const COLLAPSE_TOP_BAR_CSS = `
 .spacedRepetitionContent {
     height: 100%;
     box-sizing: border-box;
@@ -45,14 +41,12 @@ export const useQueueCSS = () => {
     () => plugin.settings.getSetting<boolean>(collapseQueueTopBarId),
     []
   );
+  
   React.useEffect(() => {
-    if (!shouldCollapse) {
-      unregisterQueueCSS(plugin);
-    } else {
-      plugin.app.registerCSS(collapseTopBarId, COLLAPSE_TOP_BAR_CSS);
-    }
+    plugin.storage.setSession(collapseTopBarKey, shouldCollapse);
+    
     return () => {
-      unregisterQueueCSS(plugin);
+      plugin.storage.setSession(collapseTopBarKey, false);
     };
   }, [shouldCollapse]);
 };
