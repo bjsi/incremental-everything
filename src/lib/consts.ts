@@ -20,6 +20,7 @@ export const scrollToHighlightId = 'scroll-to-highlight';
 export const collapseTopBarId = 'collapse-top-bar';
 export const queueCounterId = 'queue-counter';
 export const hideIncEverythingId = 'hide-inc-everything';
+export const shouldHideEditorKey = 'shouldHideEditor';
 
 // commands
 export const nextRepCommandId = 'next-rep-cmd';

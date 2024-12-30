@@ -10,7 +10,7 @@ import React from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { remToActionItemType } from '../lib/actionItems';
-import { hideIncEverythingId } from '../lib/consts';
+import { hideIncEverythingId, shouldHideEditorKey } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/currentRem';
 import { useQueueCSS } from '../lib/hooks';
 
@@ -59,18 +59,11 @@ export function QueueComponent() {
   }, [remAndType?.type, remAndType?.rem._id]);
 
   React.useEffect(() => {
-    if (remAndType?.type === 'rem' && !shouldRenderEditorForRemType) {
-      plugin.app.registerCSS(
-        hideIncEverythingId,
-        `
-div.rn-queue__content > div:has(> div > iframe[data-plugin-id="incremental-everything"]) {
-  display: none;
-}
-`.trim()
-      );
-    }
+    const shouldHide = remAndType?.type === 'rem' && !shouldRenderEditorForRemType
+    plugin.storage.setSession(shouldHideEditorKey, shouldHide);
+
     return () => {
-      plugin.app.registerCSS(hideIncEverythingId, '');
+      plugin.storage.setSession(shouldHideEditorKey, false);
     };
   }, [remAndType?.type, shouldRenderEditorForRemType]);
 

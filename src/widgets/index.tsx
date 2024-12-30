@@ -10,6 +10,7 @@ import {
   RemId,
   SelectionType,
   SpecialPluginCallback,
+  StorageEvents,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import '../style.css';
@@ -28,6 +29,7 @@ import {
   queueCounterId,
   hideIncEverythingId,
   nextRepCommandId,
+  shouldHideEditorKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
@@ -55,6 +57,23 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
     `
   );
+
+  plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
+    if (shouldHideEditorKey in changes) {
+      const shouldHide = await plugin.storage.getSession(shouldHideEditorKey);
+      plugin.app.registerCSS(
+        hideIncEverythingId,
+        shouldHide 
+          ? `
+              div.rn-queue__content > div:has(> div > iframe[data-plugin-id="incremental-everything"]) {
+                display: none;
+              }
+            `.trim()
+          : ''
+      );
+    }
+  });
+
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
     slots: [
       {
