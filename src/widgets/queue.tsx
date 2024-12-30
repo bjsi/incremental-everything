@@ -10,7 +10,7 @@ import React from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { remToActionItemType } from '../lib/actionItems';
-import { hideIncEverythingId, shouldHideEditorKey } from '../lib/consts';
+import { shouldHideEditorKey } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/currentRem';
 import { useQueueCSS } from '../lib/hooks';
 
