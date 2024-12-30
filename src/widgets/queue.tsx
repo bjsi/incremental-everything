@@ -10,7 +10,7 @@ import React from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { remToActionItemType } from '../lib/actionItems';
-import { shouldHideEditorKey } from '../lib/consts';
+import { shouldHideIncEverythingKey } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/currentRem';
 import { useQueueCSS } from '../lib/hooks';
 
@@ -60,10 +60,10 @@ export function QueueComponent() {
 
   React.useEffect(() => {
     const shouldHide = remAndType?.type === 'rem' && !shouldRenderEditorForRemType
-    plugin.storage.setSession(shouldHideEditorKey, shouldHide);
+    plugin.storage.setSession(shouldHideIncEverythingKey, shouldHide);
 
     return () => {
-      plugin.storage.setSession(shouldHideEditorKey, false);
+      plugin.storage.setSession(shouldHideIncEverythingKey, false);
     };
   }, [remAndType?.type, shouldRenderEditorForRemType]);
 

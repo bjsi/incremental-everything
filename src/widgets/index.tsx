@@ -30,7 +30,7 @@ import {
   queueCounterId,
   hideIncEverythingId,
   nextRepCommandId,
-  shouldHideEditorKey,
+  shouldHideIncEverythingKey,
   collapseTopBarKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
@@ -60,8 +60,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   );
 
   plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
-    if (shouldHideEditorKey in changes) {
-      const shouldHide = await plugin.storage.getSession(shouldHideEditorKey);
+    if (shouldHideIncEverythingKey in changes) {
+      const shouldHide = await plugin.storage.getSession(shouldHideIncEverythingKey);
       plugin.app.registerCSS(
         hideIncEverythingId,
         shouldHide 
