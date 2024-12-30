@@ -8,6 +8,7 @@ import {
   ReactRNPlugin,
   Rem,
   RemId,
+  RNPlugin,
   SelectionType,
   SpecialPluginCallback,
   StorageEvents,
@@ -39,7 +40,6 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { getDailyDocReferenceForDate } from '../lib/date';
-import { COLLAPSE_TOP_BAR_CSS, unregisterQueueCSS } from '../lib/hooks';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 dayjs.extend(relativeTime);
 
@@ -121,6 +121,26 @@ async function onActivate(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
+    const COLLAPSE_TOP_BAR_CSS = `
+      .spacedRepetitionContent {
+          height: 100%;
+          box-sizing: border-box;
+      }
+
+      /* Set initial state to collapsed */
+      .queue__title {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+      }
+
+      /* Expand on hover */
+      .queue__title:hover {
+        max-height: 999px;
+      }
+    `.trim();
+    
+    
     if (collapseTopBarKey in changes) {
       const shouldCollapse = await plugin.storage.getSession(collapseTopBarKey);
       plugin.app.registerCSS(
@@ -174,6 +194,10 @@ async function onActivate(plugin: ReactRNPlugin) {
       await handleHextRepetitionClick(plugin, incRem);
     },
   });
+
+  const unregisterQueueCSS = async (plugin: RNPlugin) => {
+    await plugin.app.registerCSS(collapseTopBarId, '');
+  };
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
