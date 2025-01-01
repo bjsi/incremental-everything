@@ -1,9 +1,9 @@
 {
   "manifestVersion": 1,
-  "id": "onehr-incremental-everything",
-  "name": "onehr-Incremental Everything",
-  "author": "onehr",
-  "repoUrl": "https://github.com/onehr/incremental-everything",
+  "id": "incremental-everything",
+  "name": "Incremental Everything",
+  "author": "Jamesb",
+  "repoUrl": "https://github.com/bjsi/incremental-everything",
   "version": {
     "major": 0,
     "minor": 0,
