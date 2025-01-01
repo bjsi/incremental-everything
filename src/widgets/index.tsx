@@ -8,8 +8,10 @@ import {
   ReactRNPlugin,
   Rem,
   RemId,
+  RNPlugin,
   SelectionType,
   SpecialPluginCallback,
+  StorageEvents,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import '../style.css';
@@ -28,6 +30,8 @@ import {
   queueCounterId,
   hideIncEverythingId,
   nextRepCommandId,
+  shouldHideIncEverythingKey,
+  collapseTopBarKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
@@ -36,11 +40,41 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { getDailyDocReferenceForDate } from '../lib/date';
-import { unregisterQueueCSS } from '../lib/hooks';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
+  plugin.app.registerCSS(
+    'queue-container',
+    `
+    .rn-queue__content {
+      height: 100vh !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    .rn-queue__content > div {
+      flex: 1 !important;
+      min-height: 0 !important;
+    }
+    `
+  );
+
+  plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
+    if (shouldHideIncEverythingKey in changes) {
+      const shouldHide = await plugin.storage.getSession(shouldHideIncEverythingKey);
+      plugin.app.registerCSS(
+        hideIncEverythingId,
+        shouldHide 
+          ? `
+              div.rn-queue__content > div:has(> div > iframe[data-plugin-id="incremental-everything"]) {
+                display: none;
+              }
+            `.trim()
+          : ''
+      );
+    }
+  });
+
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
     slots: [
       {
@@ -86,6 +120,36 @@ async function onActivate(plugin: ReactRNPlugin) {
     defaultValue: true,
   });
 
+  plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
+    const COLLAPSE_TOP_BAR_CSS = `
+      .spacedRepetitionContent {
+          height: 100%;
+          box-sizing: border-box;
+      }
+
+      /* Set initial state to collapsed */
+      .queue__title {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+      }
+
+      /* Expand on hover */
+      .queue__title:hover {
+        max-height: 999px;
+      }
+    `.trim();
+    
+    
+    if (collapseTopBarKey in changes) {
+      const shouldCollapse = await plugin.storage.getSession(collapseTopBarKey);
+      plugin.app.registerCSS(
+        collapseTopBarId,
+        shouldCollapse ? COLLAPSE_TOP_BAR_CSS : ''
+      );
+    }
+  });
+  
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
@@ -130,6 +194,10 @@ async function onActivate(plugin: ReactRNPlugin) {
       await handleHextRepetitionClick(plugin, incRem);
     },
   });
+
+  const unregisterQueueCSS = async (plugin: RNPlugin) => {
+    await plugin.app.registerCSS(collapseTopBarId, '');
+  };
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
