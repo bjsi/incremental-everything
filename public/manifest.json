@@ -7,11 +7,11 @@
   "version": {
     "major": 0,
     "minor": 0,
-    "patch": 19
+    "patch": 20
   },
   "unlisted": false,
   "theme": [],
-  "enableOnMobile": false,
+  "enableOnMobile": true,
   "description": "Review notes, PDFs and web articles incrementally alongside your flashcards.",
   "requestNative": false,
   "requiredScopes": [
