@@ -574,14 +574,14 @@ async function onActivate(plugin: ReactRNPlugin) {
       if (isIncremental) {
         // If it's already incremental, just remove the powerup.
         await rem.removePowerup(powerupCode);
+        await plugin.app.toast('Untagged as Incremental Rem');
       } else {
-        // If it's not incremental, initialize it.
+        // If it's not incremental, initialize it and open the priority popup.
         await initIncrementalRem(rem);
+        await plugin.widget.openPopup('priority', {
+          remId: rem._id,
+        });
       }
-
-      // Provide clear feedback to the user.
-      const msg = isIncremental ? 'Untagged as Incremental Rem' : 'Tagged as Incremental Rem';
-      await plugin.app.toast(msg);
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
   });
