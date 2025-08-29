@@ -559,17 +559,29 @@ async function onActivate(plugin: ReactRNPlugin) {
   });
 
 
-    plugin.app.registerMenuItem({
+  plugin.app.registerMenuItem({
     id: 'tag_highlight',
     location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
-    name: 'Tag as Incremental Rem',
+    name: 'Toggle Incremental Rem',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) {
         return;
       }
-      await initIncrementalRem(rem);
-      await plugin.app.toast('Tagged as Incremental Rem');
+
+      const isIncremental = await rem.hasPowerup(powerupCode);
+
+      if (isIncremental) {
+        // If it's already incremental, just remove the powerup.
+        await rem.removePowerup(powerupCode);
+      } else {
+        // If it's not incremental, initialize it.
+        await initIncrementalRem(rem);
+      }
+
+      // Provide clear feedback to the user.
+      const msg = isIncremental ? 'Untagged as Incremental Rem' : 'Tagged as Incremental Rem';
+      await plugin.app.toast(msg);
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
   });
