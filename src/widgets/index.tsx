@@ -59,9 +59,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     .rn-queue__content > .box-border > .fade-in-first-load {
       flex-grow: 1 !important;
     }
-    .rn-queue__content {
-      max-height: none !important;
-    }
     .rn-flashcard-insights {
       display: none !important;
     }
@@ -80,22 +77,8 @@ async function onActivate(plugin: ReactRNPlugin) {
       const isActive = await plugin.storage.getSession(incrementalQueueActiveKey);
       await plugin.app.registerCSS(queueLayoutFixId, isActive ? QUEUE_LAYOUT_FIX_CSS : '');
     }
-
-    // For hiding the widget when another is active
-    if (shouldHideIncEverythingKey in changes) {
-      const shouldHide = await plugin.storage.getSession(shouldHideIncEverythingKey);
-      plugin.app.registerCSS(
-        hideIncEverythingId,
-        shouldHide ? `div.rn-queue__content > div:has(> div > iframe[data-plugin-id="incremental-everything"]) { display: none; }`.trim() : ''
-      );
-    }
-    
-    // For the "Collapse Top Bar" feature
-    if (collapseTopBarKey in changes) {
-      const shouldCollapse = await plugin.storage.getSession(collapseTopBarKey);
-      plugin.app.registerCSS(collapseTopBarId, shouldCollapse ? COLLAPSE_TOP_BAR_CSS : '');
-    }
   });
+
 
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
     slots: [
@@ -307,7 +290,7 @@ async function onActivate(plugin: ReactRNPlugin) {
         }
 
         if (filtered.length === 0) {
-          unregisterQueueCSS(plugin);
+          await plugin.app.registerCSS(queueLayoutFixId, '');
           return null;
         } else {
           // make sure we don't show a rem that has been deleted
@@ -320,6 +303,7 @@ async function onActivate(plugin: ReactRNPlugin) {
               first = filtered[0];
             }
           }
+          await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
           seenRem.add(first.remId);
           console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
           return {
@@ -328,7 +312,7 @@ async function onActivate(plugin: ReactRNPlugin) {
           };
         }
       } else {
-        unregisterQueueCSS(plugin);
+        await plugin.app.registerCSS(queueLayoutFixId, '');
         return null;
       }
     }
