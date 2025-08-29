@@ -120,15 +120,17 @@ Then follow [this part of the quick start guide](https://plugins.remnote.com/get
 
 ## v. 0.0.22 - New Features & Refinements & Bug Fixes
 
-- "Scroll to Highlight" Button: Added a button to the answer bar that appears only for highlight cards, allowing you to instantly jump back to the highlight's position in the PDF.
+- **"Scroll to Highlight" Button:** Added a button to the answer bar that appears only for highlight cards, allowing you to instantly jump back to the highlight's position in the PDF.
 
-- "Change Priority" Button: Added a button to the answer bar to quickly change a Rem's priority directly from the queue, using the original priority popup.
+- **"Change Priority" Button:** Added a button to the answer bar to quickly change a Rem's priority directly from the queue, using the original priority popup.
 
-- "Press 'P' to Edit" Hint: Added an idle button that appears for regular Rem and PDF cards, informing users of the native shortcut to open the editor (as trying to edit directly in the Document Viewer triggers keyboard shortcut conflicts and is not recommended).
+- **"Press 'P' to Edit" Hint:** Added an idle button that appears for regular Rem and PDF cards, informing users of the native shortcut to open the editor (as trying to edit directly in the Document Viewer triggers keyboard shortcut conflicts and is not recommended).
 
-- Customizable Default Priority: Added a new option in the plugin settings for users to set their own default priority for new incremental Rem.
+- **Customizable Default Priority:** Added a new option in the plugin settings for users to set their own default priority for new incremental Rem.
 
-- "Enter" Key in Popup: The priority popup can now be closed by pressing the "Enter" key after typing a value, improving workflow speed.
+- **"Enter" Key in Popup:** The priority popup can now be closed by pressing the "Enter" key after typing a value, improving workflow speed.
+
+- **PDF Highlight menu item toggle** now also triggers the *priority popup*, so that, when making PDF extracts, the user can instantly set the extract priority or press enter to use the default priority.
 
 ## Known Issues
 
