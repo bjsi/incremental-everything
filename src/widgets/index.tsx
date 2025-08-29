@@ -558,7 +558,8 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerMenuItem({
+
+    plugin.app.registerMenuItem({
     id: 'tag_highlight',
     location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
     name: 'Tag as Incremental Rem',
@@ -572,6 +573,8 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
   });
+
+  
 }
 
 async function onDeactivate(_: ReactRNPlugin) {}

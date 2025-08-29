@@ -117,3 +117,20 @@ npm run dev
 ```
 
 Then follow [this part of the quick start guide](https://plugins.remnote.com/getting-started/quick_start_guide#run-the-plugin-template-inside-remnote) to get the plugin running in RemNote.
+
+## v. 0.0.22 - New Features & Refinements & Bug Fixes
+
+- "Scroll to Highlight" Button: Added a button to the answer bar that appears only for highlight cards, allowing you to instantly jump back to the highlight's position in the PDF.
+
+- "Change Priority" Button: Added a button to the answer bar to quickly change a Rem's priority directly from the queue, using the original priority popup.
+
+- "Press 'P' to Edit" Hint: Added an idle button that appears for regular Rem and PDF cards, informing users of the native shortcut to open the editor (as trying to edit directly in the Document Viewer triggers keyboard shortcut conflicts and is not recommended).
+
+- Customizable Default Priority: Added a new option in the plugin settings for users to set their own default priority for new incremental Rem.
+
+- "Enter" Key in Popup: The priority popup can now be closed by pressing the "Enter" key after typing a value, improving workflow speed.
+
+## Known Issues
+
+- Queue Layout: We were unable to inject CSS (flex-grow: 1 !important;) needed, so that content only take up the top half of the screen (height does not surpass 500px), leaving a large empty space at the bottom.
+- Keyboard Shortcut Conflict: When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts (e.g., pressing 1, 2, 3, 4 to grade a card; "i"; "b") will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround.
