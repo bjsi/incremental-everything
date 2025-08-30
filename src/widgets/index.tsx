@@ -59,7 +59,10 @@ async function onActivate(plugin: ReactRNPlugin) {
     .rn-queue__content > .box-border > .fade-in-first-load {
       flex-grow: 1 !important;
     }
-    .rn-flashcard-insights {
+    /* Hide unwanted UI elements during incremental rem review */
+    .rn-flashcard-insights,
+    div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
+    div:has(> iframe[data-plugin-id="flashcard-repetition-history"]) {
       display: none !important;
     }
   `;
