@@ -134,7 +134,8 @@ async function onActivate(plugin: ReactRNPlugin) {
       ...
     }
     `
-  );```
+  );
+```
 
 Our improvements implement a more intelligent and compatible approach:
 
