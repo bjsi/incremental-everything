@@ -118,7 +118,33 @@ npm run dev
 
 Then follow [this part of the quick start guide](https://plugins.remnote.com/getting-started/quick_start_guide#run-the-plugin-template-inside-remnote) to get the plugin running in RemNote.
 
-## v. 0.0.22 - New Features & Refinements & Bug Fixes
+## v. 0.0.21 - New Features & Refinements & Bug Fixes
+
+### Enhanced Queue Layout & Plugin Compatibility
+
+The original plugin applied a single, permanent CSS rule that modified the entire flashcard queue, which could unintentionally affect the layout of regular flashcards.
+
+```// Original implementation
+async function onActivate(plugin: ReactRNPlugin) {
+  plugin.app.registerCSS(
+    'queue-container',
+    `
+    .rn-queue__content {
+      height: 100vh !important;
+      ...
+    }
+    `
+  );```
+
+Our improvements implement a more intelligent and compatible approach:
+
+- **Conditional Styling:** The layout-fixing styles are now dynamically applied only when an incremental rem is being reviewed. The styles are immediately removed for standard flashcards, preserving the native RemNote queue experience.
+
+- **Plugin Compatibility:** A fix has been added to automatically hide the Flashcard Repetition History plugin widget during incremental reviews. This resolves layout conflicts and allows both plugins to be used together seamlessly.
+
+- **Queue Layout:** We were unable to inject CSS (flex-grow: 1 !important;) needed, so that content only take up the top half of the screen (height does not surpass 500px), leaving a large empty space at the bottom.
+
+### Other improvements
 
 - **"Scroll to Highlight" Button:** Added a button to the answer bar that appears only for highlight cards, allowing you to instantly jump back to the highlight's position in the PDF.
 
@@ -134,5 +160,4 @@ Then follow [this part of the quick start guide](https://plugins.remnote.com/get
 
 ## Known Issues
 
-- Queue Layout: We were unable to inject CSS (flex-grow: 1 !important;) needed, so that content only take up the top half of the screen (height does not surpass 500px), leaving a large empty space at the bottom.
 - Keyboard Shortcut Conflict: When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts (e.g., pressing 1, 2, 3, 4 to grade a card; "i"; "b") will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround.
