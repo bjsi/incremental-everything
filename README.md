@@ -120,7 +120,7 @@ Then follow [this part of the quick start guide](https://plugins.remnote.com/get
 
 ## Known Issues
 
-- Keyboard Shortcut Conflict: When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround.
+- **Keyboard Shortcut Conflict:** When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround.
 
 ## Changelog
 
