@@ -118,9 +118,15 @@ npm run dev
 
 Then follow [this part of the quick start guide](https://plugins.remnote.com/getting-started/quick_start_guide#run-the-plugin-template-inside-remnote) to get the plugin running in RemNote.
 
-## v. 0.0.21 - New Features & Refinements & Bug Fixes
+## Known Issues
 
-### Enhanced Queue Layout & Plugin Compatibility
+- Keyboard Shortcut Conflict: When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround.
+
+## Changelog
+
+### v. 0.0.21 (Sept 2025) - New Features & Refinements & Bug Fixes
+
+#### Enhanced Queue Layout & Plugin Compatibility
 
 The previous plugin version applied a single, permanent CSS rule that modified the entire flashcard queue, which could unintentionally affect the layout of regular flashcards.
 
@@ -144,7 +150,7 @@ We now implemented a more intelligent and compatible approach:
 - **Plugin Compatibility:** A fix has been added to automatically hide the Flashcard Repetition History plugin widget during incremental reviews. This resolves layout conflicts and allows both plugins to be used together seamlessly.
 
 
-### Other improvements
+#### Other improvements
 
 - **"Scroll to Highlight" Button:** Added a button to the answer bar that appears only for highlight cards, allowing you to instantly jump back to the highlight's position in the PDF.
 
@@ -158,6 +164,4 @@ We now implemented a more intelligent and compatible approach:
 
 - **PDF Highlight menu item toggle** now also triggers the *priority popup*, so that, when making PDF extracts, the user can instantly set the extract priority or press enter to use the default priority.
 
-## Known Issues
 
-- Keyboard Shortcut Conflict: When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts (e.g., pressing 1, 2, 3, 4 to grade a card; "i"; "b") will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround.
