@@ -122,7 +122,7 @@ Then follow [this part of the quick start guide](https://plugins.remnote.com/get
 
 ### Enhanced Queue Layout & Plugin Compatibility
 
-The original plugin applied a single, permanent CSS rule that modified the entire flashcard queue, which could unintentionally affect the layout of regular flashcards.
+The previous plugin version applied a single, permanent CSS rule that modified the entire flashcard queue, which could unintentionally affect the layout of regular flashcards.
 
 ```// Original implementation
 async function onActivate(plugin: ReactRNPlugin) {
@@ -137,13 +137,12 @@ async function onActivate(plugin: ReactRNPlugin) {
   );
 ```
 
-Our improvements implement a more intelligent and compatible approach:
+We now implemented a more intelligent and compatible approach:
 
 - **Conditional Styling:** The layout-fixing styles are now dynamically applied only when an incremental rem is being reviewed. The styles are immediately removed for standard flashcards, preserving the native RemNote queue experience.
 
 - **Plugin Compatibility:** A fix has been added to automatically hide the Flashcard Repetition History plugin widget during incremental reviews. This resolves layout conflicts and allows both plugins to be used together seamlessly.
 
-- **Queue Layout:** We were unable to inject CSS (flex-grow: 1 !important;) needed, so that content only take up the top half of the screen (height does not surpass 500px), leaving a large empty space at the bottom.
 
 ### Other improvements
 
