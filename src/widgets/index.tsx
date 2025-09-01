@@ -38,7 +38,7 @@ import {
   defaultPriorityId,
 } from '../lib/consts';
 import * as _ from 'remeda';
-import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
+import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
 import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -48,6 +48,8 @@ import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/curre
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
+  let sessionItemCounter = 0;
+
   const QUEUE_LAYOUT_FIX_CSS = `
     .rn-queue {
       height: 100% !important;
@@ -72,15 +74,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     .queue__title { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
     .queue__title:hover { max-height: 999px; }
   `.trim();
-
-  // Consolidated Event Listener
-  plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
-    // For the queue vertical layout fix
-    if (incrementalQueueActiveKey in changes) {
-      const isActive = await plugin.storage.getSession(incrementalQueueActiveKey);
-      await plugin.app.registerCSS(queueLayoutFixId, isActive ? QUEUE_LAYOUT_FIX_CSS : '');
-    }
-  });
 
 
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
@@ -168,10 +161,12 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
     allRemInFolderQueue = undefined;
     seenRem = new Set<RemId>();
+    sessionItemCounter = 0;
   });
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     allRemInFolderQueue = undefined;
     seenRem = new Set<RemId>();
+    sessionItemCounter = 0;
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
@@ -224,12 +219,11 @@ async function onActivate(plugin: ReactRNPlugin) {
           .concat(referencedRemIds)
           .concat(queueInfo.subQueueId);
       }
-      let ratio: number | 'no-rem' | 'no-cards' = await getRatioBetweenCardsAndIncrementalRem(
-        plugin
-      );
 
-      const intervalBetweenIncRem = typeof ratio === 'string' ? ratio : Math.round(1 / ratio);
-      const totalElementsSeen = queueInfo.cardsPracticed + seenRem.size;
+      const cardsPerRem = await getCardsPerRem(plugin);
+      const intervalBetweenIncRem = 
+        typeof cardsPerRem === 'number' ? cardsPerRem + 1 : cardsPerRem;
+      
       const sorted = _.sortBy(allIncrementalRem, (incRem) => {
         if (queueInfo.mode === 'in-order') {
           return allRemInFolderQueue!.indexOf(incRem.remId);
@@ -275,9 +269,8 @@ async function onActivate(plugin: ReactRNPlugin) {
               );
 
       if (
-        (totalElementsSeen > 0 &&
-          typeof intervalBetweenIncRem === 'number' &&
-          totalElementsSeen % intervalBetweenIncRem === 0) ||
+        (typeof intervalBetweenIncRem === 'number' &&
+          (sessionItemCounter + 1) % intervalBetweenIncRem === 0) || // <-- This line is corrected
         queueInfo.numCardsRemaining === 0 ||
         intervalBetweenIncRem === 'no-cards'
       ) {
@@ -309,12 +302,14 @@ async function onActivate(plugin: ReactRNPlugin) {
           await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
           seenRem.add(first.remId);
           console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
+          sessionItemCounter++;
           return {
             remId: first.remId,
             pluginId: 'incremental-everything',
           };
         }
       } else {
+        sessionItemCounter++;
         await plugin.app.registerCSS(queueLayoutFixId, '');
         return null;
       }
