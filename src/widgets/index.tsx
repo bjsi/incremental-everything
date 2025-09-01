@@ -459,22 +459,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
-  await plugin.app.registerCommand({
-    id: 'reschedule-rep-cmd',
-    name: 'Reschedule Repetition',
-    keyboardShortcut: 'ctrl+j',
-    action: async () => {
-      // Get the current Rem using the session state
-      const rem = await getCurrentIncrementalRem(plugin);
-      const url = await plugin.window.getURL();
-      if (!rem || !url.includes('/flashcards')) {
-        return; // Context check is still good practice
-      }
-      await plugin.widget.openPopup('reschedule', {
-        remId: rem._id,
-      });
-    },
-  });
 
   plugin.app.registerWidget('debug', WidgetLocation.Popup, {
     dimensions: {

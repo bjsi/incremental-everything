@@ -6,21 +6,27 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef } from 'react';
-import { getIncrementalRemInfo, processRepetition } from '../lib/incremental_rem';
-import { getNextSpacingDateForRem } from '../lib/scheduler'; // Import the scheduler function
-import { IncrementalRep } from '../lib/types';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
+import { IncrementalRem, IncrementalRep } from '../lib/types';
 import dayjs from 'dayjs';
 
-// This is the core logic for rescheduling with a custom interval.
-async function handleManualReschedule(plugin: RNPlugin, remId: string, intervalDays: number) {
+async function handleRescheduleAndPriorityUpdate(
+  plugin: RNPlugin,
+  remId: string,
+  intervalDays: number,
+  newPriority: number
+) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) return;
 
   const incRem = await getIncrementalRemInfo(plugin, rem);
   if (!incRem) return;
 
-  const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
+  await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
 
+  const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
   const newHistory: IncrementalRep[] = [
     ...(incRem.history || []),
     {
@@ -28,75 +34,150 @@ async function handleManualReschedule(plugin: RNPlugin, remId: string, intervalD
       scheduled: incRem.nextRepDate,
     },
   ];
+  await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
 
-  await processRepetition(plugin, incRem, newNextRepDate, newHistory);
+  const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+  if (updatedIncRem) {
+    const allRem: IncrementalRem[] =
+      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+    const updatedAllRem = allRem
+      .filter((r) => r.remId !== updatedIncRem.remId)
+      .concat(updatedIncRem);
+    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+  }
+
+  await plugin.queue.removeCurrentCardFromQueue();
   await plugin.widget.closePopup();
 }
 
-// --- INNER COMPONENT ---
-const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin, remId }) => {
-  // Start with a null state to indicate loading
-  const [days, setDays] = useState<number | null>(null);
-  const [futureDate, setFutureDate] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+const PrioritySlider: React.FC<{
+  onChange: (value: number) => void;
+  value: number;
+  onSubmit: (e: React.KeyboardEvent) => void;
+}> = ({ onChange, value, onSubmit }) => {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="rn-clr-content-secondary priority-label">Lower = more important</div>
+      <input
+        type="range"
+        className="priority-slider"
+        min={0}
+        max={100}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value))}
+        tabIndex={-1}
+      />
+      <div className="rn-clr-content-secondary">
+        Priority Value:{' '}
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={value}
+          onChange={(e) => {
+            const num = parseInt(e.target.value);
+            if (!isNaN(num)) {
+              onChange(Math.min(100, Math.max(0, num)));
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              onSubmit(e);
+            }
+          }}
+          className="priority-input"
+        />
+      </div>
+    </div>
+  );
+};
 
-  // Fetch the recommended interval when the component mounts
+const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin, remId }) => {
+  const [days, setDays] = useState<string | null>(null);
+  const [priority, setPriority] = useState<number | null>(null);
+  const [futureDate, setFutureDate] = useState('');
+  const intervalInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    const fetchDefaultInterval = async () => {
+    const fetchInitialData = async () => {
       const inLookbackMode = !!(await plugin.queue.inLookbackMode());
-      const data = await getNextSpacingDateForRem(plugin, remId, inLookbackMode);
-      if (data?.newInterval) {
-        setDays(data.newInterval);
-      } else {
-        setDays(1); // Fallback to 1 if something fails
-      }
+      const scheduleData = await getNextSpacingDateForRem(plugin, remId, inLookbackMode);
+      const incRemData = await getIncrementalRemInfo(plugin, await plugin.rem.findOne(remId));
+
+      setDays(String(scheduleData?.newInterval || 1));
+      setPriority(incRemData?.priority ?? 10);
     };
-    fetchDefaultInterval();
+    fetchInitialData();
   }, [plugin, remId]);
 
-  // Update the date feedback and focus the input once the value is loaded
   useEffect(() => {
     if (days !== null) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-      const date = dayjs().add(days, 'day').format('MMMM D, YY');
-      setFutureDate(`Next review: ${date}`);
+      setTimeout(() => {
+        intervalInputRef.current?.focus();
+        intervalInputRef.current?.select();
+      }, 0);
+    }
+  }, [days === null]);
+
+  useEffect(() => {
+    if (days !== null) {
+      const numDays = parseInt(days);
+      if (!isNaN(numDays)) {
+        const date = dayjs().add(numDays, 'day').format('MMMM D, YY');
+        setFutureDate(`Next review: ${date}`);
+      } else {
+        setFutureDate('Invalid number of days.');
+      }
     } else {
       setFutureDate('Calculating...');
     }
   }, [days]);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const numDays = parseInt(days || '');
+    if (!isNaN(numDays) && priority !== null) {
+      await handleRescheduleAndPriorityUpdate(plugin, remId, numDays, priority);
+    }
+  };
+
+  if (days === null || priority === null) {
+    return <div className="p-4">Loading...</div>;
+  }
+
   return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor="interval-days" className="font-semibold">
-        Next repetition in (days):
-      </label>
-      <input
-        ref={inputRef}
-        id="interval-days"
-        type="number"
-        min="0"
-        disabled={days === null} // Disable input while loading default value
-        value={days === null ? '' : days} // Show empty string while loading
-        onChange={(e) => {
-          const num = parseInt(e.target.value);
-          if (!isNaN(num)) {
-            setDays(num);
-          }
-        }}
-        onKeyDown={async (e) => {
-          if (e.key === 'Enter' && days !== null) {
-            await handleManualReschedule(plugin, remId, days);
-          }
-        }}
-        className="priority-input"
-      />
-      <div className="rn-clr-content-secondary h-4">{futureDate}</div>
-    </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <label htmlFor="interval-days" className="font-semibold">
+          Next repetition in (days):
+        </label>
+        <input
+          ref={intervalInputRef}
+          id="interval-days"
+          type="number"
+          min="0"
+          value={days}
+          onChange={(e) => setDays(e.target.value)}
+          // --- THIS IS THE FIX ---
+          // This ensures "Enter" submits the form from the "days" input field.
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSubmit(e);
+            }
+          }}
+          className="priority-input"
+        />
+        <div className="rn-clr-content-secondary h-4">{futureDate}</div>
+      </div>
+      <hr />
+      <div>
+        <label className="font-semibold">Priority</label>
+        <PrioritySlider value={priority} onChange={setPriority} onSubmit={handleSubmit} />
+      </div>
+    </form>
   );
 };
 
-// --- MAIN WIDGET COMPONENT (Unchanged) ---
 export function Reschedule() {
   const plugin = usePlugin();
   const ctx = useRunAsync(
@@ -112,7 +193,7 @@ export function Reschedule() {
 
   return (
     <div className="flex flex-col p-4 gap-4 reschedule-popup">
-      <div className="text-2xl font-bold">Reschedule</div>
+      <div className="text-2xl font-bold">Reschedule & Set Priority</div>
       <RescheduleInput plugin={plugin} remId={remId} />
     </div>
   );
