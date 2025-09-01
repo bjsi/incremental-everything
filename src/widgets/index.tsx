@@ -66,6 +66,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
     div:has(> iframe[data-plugin-id="flashcard-repetition-history"]) {
       display: none !important;
+
     }
   `;
 
