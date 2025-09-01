@@ -85,6 +85,23 @@ export function AnswerButtons() {
         </div>
       </Button>
 
+      {/* --- NEW "RESCHEDULE" BUTTON --- */}
+      <Button
+        className="bg-gray-500 hover:bg-gray-700"
+        onClick={async () => {
+          if (ctx?.remId) {
+            await plugin.widget.openPopup('reschedule', {
+              remId: ctx.remId,
+            });
+          }
+        }}
+      >
+        <div className="flex flex-col items-center justify-center">
+          <div>Reschedule</div>
+          <div className="text-xs">Set custom interval</div>
+        </div>
+      </Button>
+      
       <Button
         className="incremental-everthing-done-button"
         onClick={async () => {
@@ -106,12 +123,10 @@ export function AnswerButtons() {
         </div>
       </Button>
 
-      {/* --- NEW "CHANGE PRIORITY" BUTTON --- */}
       <Button
         className="bg-gray-500 hover:bg-gray-700"
         onClick={async () => {
           if (ctx?.remId) {
-            // This triggers the original, simple priority popup.
             await plugin.widget.openPopup('priority', {
               remId: ctx.remId,
             });
@@ -121,14 +136,10 @@ export function AnswerButtons() {
         <div className="flex flex-col items-center justify-center">
           <div>Change Priority</div>
           <div className="text-xs">
-            {/* Display current priority, with a fallback while loading */}
             Current: {incRem ? incRem.priority : '...'}
           </div>
         </div>
       </Button>
-
-
-      {/* --- Existing conditional buttons --- */}
             
       {activeHighlightId && (
         <Button

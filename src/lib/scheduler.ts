@@ -95,6 +95,7 @@ export async function getNextSpacingDateForRem(
     newNextRepDate,
     newHistory,
     remId,
+    newInterval,
   };
 }
 

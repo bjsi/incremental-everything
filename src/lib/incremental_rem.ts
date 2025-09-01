@@ -13,9 +13,44 @@ import {
   allIncrementalRemKey,
 } from './consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from './scheduler';
-import { IncrementalRem } from './types';
+import { IncrementalRem, IncrementalRep } from './types'; // Import IncrementalRep
 import { tryParseJson } from './utils';
 
+// --- NEW SHARED HELPER FUNCTION ---
+// This function contains the logic common to both "Next" and the new "Reschedule" button.
+export async function processRepetition(
+  plugin: RNPlugin,
+  incRem: IncrementalRem,
+  newNextRepDate: number,
+  newHistory: IncrementalRep[]
+) {
+  // 1. Update the session cache with the new date and history
+  const oldAllRem: IncrementalRem[] =
+    (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+  const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
+  if (!oldRem) {
+    return;
+  }
+  await plugin.storage.setSession(
+    allIncrementalRemKey,
+    oldAllRem
+      .filter((r) => r.remId !== incRem.remId)
+      .concat({
+        ...oldRem,
+        nextRepDate: newNextRepDate,
+        history: newHistory,
+      })
+  );
+
+  // 2. Update the Rem's powerup properties in RemNote
+  await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
+
+  // 3. Remove the current card from the queue
+  await plugin.queue.removeCurrentCardFromQueue();
+}
+
+// --- REFACTORED ORIGINAL FUNCTION ---
+// Now simplified to just calculate the date and then call the shared function.
 export async function handleHextRepetitionClick(
   plugin: RNPlugin,
   incRem: IncrementalRem | null | undefined
@@ -27,24 +62,8 @@ export async function handleHextRepetitionClick(
       return;
     }
     const { newHistory, newNextRepDate } = data;
-    const oldAllRem: IncrementalRem[] =
-      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-    const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
-    if (!oldRem) {
-      return;
-    }
-    await plugin.storage.setSession(
-      allIncrementalRemKey,
-      oldAllRem
-        .filter((r) => r.remId !== incRem.remId)
-        .concat({
-          ...oldRem,
-          nextRepDate: newNextRepDate,
-          history: newHistory,
-        })
-    );
-    await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
-    await plugin.queue.removeCurrentCardFromQueue();
+    // Call the shared processing logic
+    await processRepetition(plugin, incRem, newNextRepDate, newHistory);
   }
 }
 
