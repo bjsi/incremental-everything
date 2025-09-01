@@ -156,6 +156,8 @@ We now implemented a more intelligent and compatible approach:
 
 - **"Change Priority" Button:** Added a button to the answer bar to quickly change a Rem's priority directly from the queue, using the original priority popup.
 
+- **Reschedule button:** Added a button to the answer bar that opens a popup for manually setting the next review interval in days. This popup intelligently defaults to the same interval the 'Next' button would have calculated, provides a live preview of the resulting date, and performs a full repetition when submitted.
+
 - **"Press 'P' to Edit" Hint:** Added an idle button that appears for regular Rem and PDF cards, informing users of the native shortcut to open the editor (as trying to edit directly in the Document Viewer triggers keyboard shortcut conflicts and is not recommended).
 
 - **Customizable Default Priority:** Added a new option in the plugin settings for users to set their own default priority for new incremental Rem.

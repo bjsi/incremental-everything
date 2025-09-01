@@ -363,6 +363,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerWidget('reschedule', WidgetLocation.Popup, {
+    dimensions: {
+    width: '100%',
+    height: 'auto',
+    },
+  });
+
   const createExtract = async () => {
     const selection = await plugin.editor.getSelection();
     if (!selection) {
@@ -451,6 +458,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
     },
   });
+
 
   plugin.app.registerWidget('debug', WidgetLocation.Popup, {
     dimensions: {
