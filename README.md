@@ -164,4 +164,6 @@ We now implemented a more intelligent and compatible approach:
 
 - **PDF Highlight menu item toggle** now also triggers the *priority popup*, so that, when making PDF extracts, the user can instantly set the extract priority or press enter to use the default priority.
 
+- **Sorting Criteria - New Flashcard Ratio selector and logic:** The Flashcard Ratio slider has been completely overhauled to be linear and intuitive, directly controlling the number of cards. This fixes persistent bugs in the queuing logic, ensuring the selected card sequence is now reliable and accurate.
+
 
