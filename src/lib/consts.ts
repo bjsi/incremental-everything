@@ -8,6 +8,7 @@ export const repHistorySlotCode = 'repHist';
 export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';
 export const collapseQueueTopBar = 'collapse-queue-top-bar';
+export const defaultPriorityId = 'default-priority'; //New
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
@@ -27,3 +28,10 @@ export const shouldHideIncEverythingKey = 'shouldHideIncEverything';
 
 // commands
 export const nextRepCommandId = 'next-rep-cmd';
+
+// --- Keys for our successful fixes ---
+export const queueLayoutFixId = 'incremental-everything-queue-layout-fix';
+export const incrementalQueueActiveKey = 'incremental-queue-active';
+export const activeHighlightIdKey = 'active-highlight-id-key';
+export const currentIncrementalRemTypeKey = 'current-incremental-rem-type-key';
+

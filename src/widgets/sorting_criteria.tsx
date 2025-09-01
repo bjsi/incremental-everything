@@ -1,27 +1,68 @@
-import { renderWidget, usePlugin, useRunAsync, useTracker } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTracker } from '@remnote/plugin-sdk';
 import {
   getSortingRandomness,
-  getRatioBetweenCardsAndIncrementalRem,
   setSortingRandomness,
   DEFAULT_RANDOMNESS,
-  DEFAULT_RATIO,
-  setRatioBetweenCardsAndIncrementalRem,
-  getNumCardsPerIncRem,
+  getCardsPerRem,
+  setCardsPerRem,
+  CardsPerRem,
 } from '../lib/sorting';
+import { useState, useEffect } from 'react';
+
+const MAX_CARDS = 25;
+const ONLY_INC_VALUE = 0;
+const ONLY_FLASHCARDS_VALUE = MAX_CARDS + 1;
+
+// Convert the stored value (number or string) to a slider position
+const cardsToSliderValue = (cards: CardsPerRem): number => {
+  if (cards === 'no-cards') return ONLY_INC_VALUE;
+  if (cards === 'no-rem') return ONLY_FLASHCARDS_VALUE;
+  if (typeof cards === 'number') return cards;
+  return 4; // Default
+};
+
+// Convert the slider position back to a value for storage
+const sliderValueToCards = (value: number): CardsPerRem => {
+  if (value === ONLY_INC_VALUE) return 'no-cards';
+  if (value === ONLY_FLASHCARDS_VALUE) return 'no-rem';
+  return value;
+};
+
+// Generate the display text
+const sliderValueToLabel = (value: number): string => {
+  if (value === ONLY_INC_VALUE) return 'Only Incremental Rem';
+  if (value === ONLY_FLASHCARDS_VALUE) return 'Only Flashcards';
+  return `${value} card${value !== 1 ? 's' : ''} for every incremental rem`;
+};
+
 
 export function SortingCriteria() {
   const plugin = usePlugin();
+
   const sortingRandomness = useTracker(async (rp) => await getSortingRandomness(rp), []);
-  const ratioCardsAndIncRem = useTracker(
-    async (rp) => await getRatioBetweenCardsAndIncrementalRem(rp),
-    []
-  );
-  const cardsPerIncRem = useRunAsync(async () => {
-    return await getNumCardsPerIncRem(plugin);
-  }, [ratioCardsAndIncRem]);
+  const storedCards = useTracker(async (rp) => await getCardsPerRem(rp), []);
+  const [sliderValue, setSliderValue] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (storedCards !== undefined) {
+      setSliderValue(cardsToSliderValue(storedCards));
+    }
+  }, [storedCards]);
+
+  const handleSliderChange = (value: number) => {
+    setSliderValue(value);
+    setCardsPerRem(plugin, sliderValueToCards(value));
+  };
+
+  if (sliderValue === undefined) {
+    return null; 
+  }
+
   return (
     <div className="flex flex-col p-4 gap-4">
       <div className="text-2xl font-bold">Sorting Criteria</div>
+      
+      {/* Randomness slider is unchanged */}
       <div className="flex flex-col gap-2 ">
         <div>
           <label htmlFor="randomness" className="font-semibold">
@@ -42,38 +83,26 @@ export function SortingCriteria() {
           name="randomness"
         />
       </div>
+
+      {/* Simplified Flashcard Ratio Section */}
       <div className="flex flex-col gap-2 ">
         <div>
           <label htmlFor="ratio" className="font-semibold">
             Flashcard Ratio
           </label>
         </div>
-        {cardsPerIncRem != null && (
-          <div className="rn-clr-content-secondary">
-            {typeof cardsPerIncRem === 'string'
-              ? cardsPerIncRem
-              : `${cardsPerIncRem} card${
-                  cardsPerIncRem !== 1 ? 's' : ''
-                } for every incremental rem`}
-          </div>
-        )}
+        <div className="rn-clr-content-secondary">
+          {sliderValueToLabel(sliderValue)}
+        </div>
         <input
-          min={0}
-          max={1}
-          step={0.01}
-          onChange={(e) => setRatioBetweenCardsAndIncrementalRem(plugin, Number(e.target.value))}
+          min={ONLY_INC_VALUE}
+          max={ONLY_FLASHCARDS_VALUE}
+          step={1}
+          onChange={(e) => handleSliderChange(Number(e.target.value))}
           type="range"
           id="ratio"
           name="ratio"
-          value={
-            ratioCardsAndIncRem == null
-              ? DEFAULT_RATIO
-              : ratioCardsAndIncRem === 'no-cards'
-              ? 0
-              : ratioCardsAndIncRem === 'no-rem'
-              ? 1
-              : ratioCardsAndIncRem
-          }
+          value={sliderValue}
         />
       </div>
     </div>

@@ -21,14 +21,12 @@ export async function handleHextRepetitionClick(
   incRem: IncrementalRem | null | undefined
 ) {
   if (incRem) {
-    // get next rep date
     const inLookbackMode = !!(await plugin.queue.inLookbackMode());
     const data = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
     if (!data) {
       return;
     }
     const { newHistory, newNextRepDate } = data;
-    // update allIncrementalRem in storage to get around reactivity issues
     const oldAllRem: IncrementalRem[] =
       (await plugin.storage.getSession(allIncrementalRemKey)) || [];
     const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
@@ -45,9 +43,7 @@ export async function handleHextRepetitionClick(
           history: newHistory,
         })
     );
-    // actually update the rem
     await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
-    // move to next card
     await plugin.queue.removeCurrentCardFromQueue();
   }
 }
@@ -63,7 +59,7 @@ export const getIncrementalRemInfo = async (
     powerupCode,
     nextRepDateSlotCode
   )) as RichTextElementRemInterface[];
-  if (!nextRepDateRichText || nextRepDateRichText.length === 0 || !nextRepDateRichText[0]._id) {
+  if (!nextRepDateRichText || nextRepDateRichText.length === 0 || !nextRepDateRichText[0]?._id) {
     return null;
   }
 
@@ -83,21 +79,32 @@ export const getIncrementalRemInfo = async (
 
   const date = dayjs(yyyymmdd, 'YYYY-MM-DD');
 
+  const priorityRichText = await r.getPowerupPropertyAsRichText(powerupCode, prioritySlotCode);
+  let priority = 10;
+  if (priorityRichText && priorityRichText.length > 0) {
+    const priorityString = await plugin.richText.toString(priorityRichText);
+    const parsedPriority = parseInt(priorityString, 10);
+    if (!isNaN(parsedPriority)) {
+      priority = parsedPriority;
+    }
+  }
+
   const rawData = {
     remId: r._id,
     nextRepDate: date.valueOf(),
-    priority: tryParseJson(await r.getPowerupProperty(powerupCode, prioritySlotCode)),
+    priority: priority,
     history: tryParseJson(await r.getPowerupProperty(powerupCode, repHistorySlotCode)),
   };
+
   const parsed = IncrementalRem.safeParse(rawData);
   if (parsed.success) {
     return parsed.data;
   } else {
-    console.log(
+    console.error(
       'Failed to parse incremental rem info for Rem with id: ' +
         r._id +
-        'with error: ' +
-        parsed.error
+        'with error: ',
+      parsed.error
     );
     return null;
   }

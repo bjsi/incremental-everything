@@ -1,6 +1,10 @@
-import { PDFWebReader, PluginCommandMenuLocation, usePlugin } from '@remnote/plugin-sdk';
+// components/Reader.tsx
+import {
+  PDFWebReader,
+  usePlugin,
+} from '@remnote/plugin-sdk';
 import React from 'react';
-import { scrollToHighlightId } from '../lib/consts';
+import { activeHighlightIdKey } from '../lib/consts';
 import {
   HTMLActionItem,
   HTMLHighlightActionItem,
@@ -21,32 +25,24 @@ const sharedProps = {
 export function Reader(props: ReaderProps) {
   const { actionItem } = props;
   const plugin = usePlugin();
-
   const hasScrolled = React.useRef(false);
 
-  /**
-   * Scroll to the highlight in the PDF/HTML reader
-   */
   React.useEffect(() => {
-    if (
-      (actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight') &&
-      !hasScrolled.current
-    ) {
+    const isHighlight =
+      actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight';
+
+    if (isHighlight && !hasScrolled.current) {
       actionItem.extract.scrollToReaderHighlight();
-
-      // register a menu item to scroll to the highlight
-      plugin.app.registerMenuItem({
-        id: scrollToHighlightId,
-        name: 'Scroll to Highlight',
-        location: PluginCommandMenuLocation.ReaderMenu,
-        action: async () => {
-          actionItem.extract.scrollToReaderHighlight();
-        },
-      });
-
       hasScrolled.current = true;
     }
-  }, [actionItem]);
+
+    const extractId = isHighlight ? actionItem.extract._id : null;
+    plugin.storage.setSession(activeHighlightIdKey, extractId);
+
+    return () => {
+      plugin.storage.setSession(activeHighlightIdKey, null);
+    };
+  }, [actionItem, plugin]);
 
   return <PDFWebReader remId={actionItem.rem._id} {...sharedProps} />;
 }
