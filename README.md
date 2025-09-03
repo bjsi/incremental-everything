@@ -97,36 +97,11 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
 ### Scheduling
 
 - The plugin uses an extremely simple scheduling algorithm: `const newInterval = Math.ceil(multiplier ** Math.max(repHistory.length, 1));` where the multiplier is 1.5 by default.
-- We can add custom scheduling algorithms in the future if there is demand for it.
 - Note that you can manually set the next repetition date using RemNote's tables and properties features.
 
-## Development Details
+## Improvements of this Plus version in relation to the original Incremental Everything plugin
 
-- The plugin stores repetition data as powerup properties on the Rem. So these aren't "normal" RemNote flashcards. All of the scheduling is managed internally by the plugin.
-- Let me know if you want to help develop the plugin! Join the [RemNote Discord](http://bit.ly/RemNoteDiscord) and message me (Jamesb)!
-
-### How to Develop
-
-Run the following commands:
-
-```sh
-git clone https://github.com/bjsi/incremental-everything
-cd incremental-everything
-npm i
-npm run dev
-```
-
-Then follow [this part of the quick start guide](https://plugins.remnote.com/getting-started/quick_start_guide#run-the-plugin-template-inside-remnote) to get the plugin running in RemNote.
-
-## Known Issues
-
-- **Keyboard Shortcut Conflict:** When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround.
-
-## Changelog
-
-### v. 0.0.21 (Sept 2025) - New Features & Refinements & Bug Fixes
-
-#### Enhanced Queue Layout & Plugin Compatibility
+### Enhanced Queue Layout & Plugin Compatibility
 
 The previous plugin version applied a single, permanent CSS rule that modified the entire flashcard queue, which could unintentionally affect the layout of regular flashcards.
 
@@ -150,11 +125,15 @@ We now implemented a more intelligent and compatible approach:
 - **Plugin Compatibility:** A fix has been added to automatically hide the Flashcard Repetition History plugin widget during incremental reviews. This resolves layout conflicts and allows both plugins to be used together seamlessly.
 
 
-#### Other improvements
+### Other improvements
 
 - **"Scroll to Highlight" Button:** Added a button to the answer bar that appears only for highlight cards, allowing you to instantly jump back to the highlight's position in the PDF.
 
 - **"Change Priority" Button:** Added a button to the answer bar to quickly change a Rem's priority directly from the queue, using the original priority popup.
+
+- **At-a-Glance Priority Assessment:** The "Change Priority" button now displays not only its set (absolute) priority, but also the Rem's relative rank within the Knowledge Base (`% of KB`) and current document (`% of Doc`). The label's background is also color-coded — from red (high priority) to blue (low priority) — for instant visual feedback.
+
+- **Interactive Priority Popup:** The "Set Priority" popup has been redesigned for a more intuitive workflow. It now features a new "Relative Priority" slider with a full-color gradient, allowing you to set a Rem's priority by either typing an absolute value or visually selecting its desired percentile rank.
 
 - **Reschedule button:** Added a button to the answer bar that opens a popup for manually setting the next review interval in days. This popup intelligently defaults to the same interval the 'Next' button would have calculated, provides a live preview of the resulting date, and performs a full repetition when submitted.
 
@@ -167,5 +146,29 @@ We now implemented a more intelligent and compatible approach:
 - **PDF Highlight menu item toggle** now also triggers the *priority popup*, so that, when making PDF extracts, the user can instantly set the extract priority or press enter to use the default priority.
 
 - **Sorting Criteria - New Flashcard Ratio selector and logic:** The Flashcard Ratio slider has been completely overhauled to be linear and intuitive, directly controlling the number of cards. This fixes persistent bugs in the queuing logic, ensuring the selected card sequence is now reliable and accurate.
+
+## Development Details
+
+- The plugin stores repetition data as powerup properties on the Rem. So these aren't "normal" RemNote flashcards. All of the scheduling is managed internally by the plugin.
+- Let me know if you want to help develop the plugin! Join the [RemNote Discord](http://bit.ly/RemNoteDiscord) and message me (Jamesb)!
+
+### How to Develop
+
+Run the following commands:
+
+```sh
+git clone https://github.com/bjsi/incremental-everything
+cd incremental-everything
+npm i
+npm run dev
+```
+
+Then follow [this part of the quick start guide](https://plugins.remnote.com/getting-started/quick_start_guide#run-the-plugin-template-inside-remnote) to get the plugin running in RemNote.
+
+## Known Issues
+
+- **Keyboard Shortcut Conflict:** When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround.
+
+
 
 
