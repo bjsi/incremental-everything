@@ -103,7 +103,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     id: initialIntervalId,
     title: 'Initial Interval',
     description: 'Sets the number of days until the first repetition.',
-    defaultValue: 0,
+    defaultValue: 1,
   });
 
   plugin.settings.registerNumberSetting({
