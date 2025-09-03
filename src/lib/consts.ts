@@ -34,4 +34,5 @@ export const queueLayoutFixId = 'incremental-everything-queue-layout-fix';
 export const incrementalQueueActiveKey = 'incremental-queue-active';
 export const activeHighlightIdKey = 'active-highlight-id-key';
 export const currentIncrementalRemTypeKey = 'current-incremental-rem-type-key';
+export const currentScopeRemIdsKey = 'current-scope-rem-ids-key';
 

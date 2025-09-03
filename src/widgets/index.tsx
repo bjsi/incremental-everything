@@ -35,6 +35,7 @@ import {
   queueLayoutFixId,
   incrementalQueueActiveKey,
   activeHighlightIdKey,
+  currentScopeRemIdsKey,
   defaultPriorityId,
 } from '../lib/consts';
 import * as _ from 'remeda';
@@ -124,25 +125,25 @@ async function onActivate(plugin: ReactRNPlugin) {
   
   // Register the new setting as a number input, as sliders are not supported.
   plugin.settings.registerNumberSetting({
-  id: defaultPriorityId,
-  title: 'Default Priority',
-  description: 'Sets the default priority for new incremental rem (0-100, Lower = more important). Default: 10',
-  defaultValue: 10,
-  // Use validators to enforce the range and type.
-  validators: [
-    {
-      type: "int" as const // Ensures the input is a whole number
-    },
-    {
-      type: "gte" as const, // "Greater than or equal to"
-      arg: 0,
-    },
-    {
-      type: "lte" as const, // "Less than or equal to"
-      arg: 100,
-    },
-  ]
-});
+    id: defaultPriorityId,
+    title: 'Default Priority',
+    description: 'Sets the default priority for new incremental rem (0-100, Lower = more important). Default: 10',
+    defaultValue: 10,
+    // Use validators to enforce the range and type.
+    validators: [
+      {
+        type: "int" as const // Ensures the input is a whole number
+      },
+      {
+        type: "gte" as const, // "Greater than or equal to"
+        arg: 0,
+      },
+      {
+        type: "lte" as const, // "Less than or equal to"
+        arg: 100,
+      },
+    ]
+  });
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
@@ -157,17 +158,16 @@ async function onActivate(plugin: ReactRNPlugin) {
   // TODO: some handling to include extracts created in current queue in the queue?
   // or unnecessary due to init interval? could append to this list
 
-  let allRemInFolderQueue: RemId[] | undefined = undefined;
   let seenRem: Set<RemId> = new Set<RemId>();
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
-    allRemInFolderQueue = undefined;
     seenRem = new Set<RemId>();
     sessionItemCounter = 0;
+    await plugin.storage.setSession(currentScopeRemIdsKey, null);
   });
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
-    allRemInFolderQueue = undefined;
     seenRem = new Set<RemId>();
     sessionItemCounter = 0;
+    await plugin.storage.setSession(currentScopeRemIdsKey, null);
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
@@ -200,10 +200,15 @@ async function onActivate(plugin: ReactRNPlugin) {
       console.log('queueInfo', queueInfo);
       const allIncrementalRem: IncrementalRem[] =
         (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-      if (queueInfo.subQueueId && allRemInFolderQueue === undefined) {
+
+      // --- REFACTORED LOGIC START ---
+      // Read the scope directly from session storage, making it the single source of truth.
+      let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
+
+      // If we are in a document queue but the scope hasn't been calculated yet for this session (it's null)...
+      if (queueInfo.subQueueId && docScopeRemIds === null) {
         const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
-        // special handling for studying a daily doc because
-        // the referenced rem are nextRepDate slots not the incRem
+        // Special handling for studying a daily doc.
         const referencedRemIds = _.compact(
           ((await subQueueRem?.remsReferencingThis()) || []).map((rem) => {
             if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
@@ -213,32 +218,42 @@ async function onActivate(plugin: ReactRNPlugin) {
             }
           })
         );
-        allRemInFolderQueue = ((await subQueueRem?.allRemInFolderQueue()) || [])
+        
+        // Calculate the new scope.
+        const newScope = ((await subQueueRem?.allRemInFolderQueue()) || [])
           .map((x) => x._id)
-          // not included in allRemInFolderQueue for some reason...
           .concat(((await subQueueRem?.getSources()) || []).map((x) => x._id))
           .concat(referencedRemIds)
           .concat(queueInfo.subQueueId);
+        
+        // Update our variable for this run AND save to storage for other parts of the plugin.
+        docScopeRemIds = newScope;
+        await plugin.storage.setSession(currentScopeRemIdsKey, docScopeRemIds);
       }
+      // --- REFACTORED LOGIC END ---
 
       const cardsPerRem = await getCardsPerRem(plugin);
       const intervalBetweenIncRem = 
         typeof cardsPerRem === 'number' ? cardsPerRem + 1 : cardsPerRem;
       
       const sorted = _.sortBy(allIncrementalRem, (incRem) => {
-        if (queueInfo.mode === 'in-order') {
-          return allRemInFolderQueue!.indexOf(incRem.remId);
+        if (queueInfo.mode === 'in-order' && docScopeRemIds) {
+          // Use the fetched scope for in-order sorting.
+          return docScopeRemIds.indexOf(incRem.remId);
         } else {
           return incRem.priority;
         }
       });
+      
+      // Use the fetched scope for filtering.
       const filtered = sorted.filter((x) =>
         queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
-          ? (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
+          ? (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
             (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
-          : (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
+          : (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
             Date.now() >= x.nextRepDate
       );
+
 
       plugin.app.registerCSS(
         queueCounterId,

@@ -10,9 +10,11 @@ import {
   allIncrementalRemKey, 
   powerupCode, 
   activeHighlightIdKey, 
-  currentIncrementalRemTypeKey 
+  currentIncrementalRemTypeKey,
+  currentScopeRemIdsKey,
 } from '../lib/consts';
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
+import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 
 interface ButtonProps {
@@ -51,6 +53,40 @@ export function AnswerButtons() {
     },
     [ctx?.remId]
   );
+
+    // --- NEW: Fetch all data needed for calculations ---
+  const allIncrementalRems = useTracker(
+    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+    []
+  );
+  const currentScopeRemIds = useTracker(
+    (rp) => rp.storage.getSession<string[] | null>(currentScopeRemIdsKey),
+    []
+  );
+
+  // --- NEW: Calculate percentiles and build the label ---
+  let relativePriorityLabel = `Current: ${incRem?.priority || '...'}`;
+  if (incRem && allIncrementalRems) {
+    const kbPercentile = calculateRelativePriority(allIncrementalRems, incRem.remId);
+    let docPercentile: number | null = null;
+    
+    if (currentScopeRemIds && currentScopeRemIds.length > 0) {
+      const scopedRems = allIncrementalRems.filter(rem => currentScopeRemIds.includes(rem.remId));
+      docPercentile = calculateRelativePriority(scopedRems, incRem.remId);
+    }
+    
+    const parts = [];
+    if (kbPercentile !== null) {
+      parts.push(`${kbPercentile}% of KB`);
+    }
+    if (docPercentile !== null) {
+      parts.push(`${docPercentile}% of Doc`);
+    }
+    
+    if (parts.length > 0) {
+      relativePriorityLabel = `Current: ${incRem.priority} (${parts.join('; ')})`;
+    }
+  }
 
 
   const activeHighlightId = useTracker(
@@ -136,7 +172,7 @@ export function AnswerButtons() {
         <div className="flex flex-col items-center justify-center">
           <div>Change Priority</div>
           <div className="text-xs">
-            Current: {incRem ? incRem.priority : '...'}
+            {relativePriorityLabel}
           </div>
         </div>
       </Button>
@@ -165,8 +201,8 @@ export function AnswerButtons() {
           }}
         >
           <div className="flex flex-col items-center justify-center">
-            <div>Press 'P' to Edit</div>
-            <div className="text-xs">in Previewer</div>
+            <div>Press 'P' to</div>
+            <div className="text-xs">Edit in Previewer</div>
           </div>
         </button>
       )}
