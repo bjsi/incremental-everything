@@ -7,9 +7,9 @@
   "version": {
     "major": 0,
     "minor": 0,
-    "patch": 2
+    "patch": 3
   },
-  "unlisted": true,
+  "unlisted": false,
   "theme": [],
   "enableOnMobile": true,
   "description": "Review notes, PDFs, Youtube videos and web articles incrementally alongside your flashcards.",
