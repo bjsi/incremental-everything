@@ -10,63 +10,46 @@ import {
   nextRepDateSlotCode,
   prioritySlotCode,
   repHistorySlotCode,
-  allIncrementalRemKey,
 } from './consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from './scheduler';
-import { IncrementalRem, IncrementalRep } from './types'; // Import IncrementalRep
+import { IncrementalRem } from './types';
 import { tryParseJson } from './utils';
 
-// --- NEW SHARED HELPER FUNCTION ---
-// This function contains the logic common to both "Next" and the new "Reschedule" button.
-export async function processRepetition(
-  plugin: RNPlugin,
-  incRem: IncrementalRem,
-  newNextRepDate: number,
-  newHistory: IncrementalRep[]
-) {
-  // 1. Update the session cache with the new date and history
-  const oldAllRem: IncrementalRem[] =
-    (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-  const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
-  if (!oldRem) {
-    return;
+// --- NEW CORE FUNCTION ---
+/**
+ * This is the new, fundamental function that only handles reviewing/rescheduling.
+ * It does NOT advance the queue, making it reusable for different buttons.
+ */
+export async function reviewRem(plugin: RNPlugin, incRem: IncrementalRem | undefined) {
+  if (!incRem) {
+    return null;
   }
-  await plugin.storage.setSession(
-    allIncrementalRemKey,
-    oldAllRem
-      .filter((r) => r.remId !== incRem.remId)
-      .concat({
-        ...oldRem,
-        nextRepDate: newNextRepDate,
-        history: newHistory,
-      })
-  );
-
-  // 2. Update the Rem's powerup properties in RemNote
-  await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
-
-  // 3. Remove the current card from the queue
-  await plugin.queue.removeCurrentCardFromQueue();
+  const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+  const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
+  if (!nextSpacing) {
+    return null;
+  }
+  await updateSRSDataForRem(plugin, incRem.remId, nextSpacing.newNextRepDate, nextSpacing.newHistory);
+  return nextSpacing;
 }
 
 // --- REFACTORED ORIGINAL FUNCTION ---
-// Now simplified to just calculate the date and then call the shared function.
-export async function handleHextRepetitionClick(
-  plugin: RNPlugin,
-  incRem: IncrementalRem | null | undefined
-) {
-  if (incRem) {
-    const inLookbackMode = !!(await plugin.queue.inLookbackMode());
-    const data = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
-    if (!data) {
-      return;
-    }
-    const { newHistory, newNextRepDate } = data;
-    // Call the shared processing logic
-    await processRepetition(plugin, incRem, newNextRepDate, newHistory);
-  }
+/**
+ * This function now uses the core `reviewRem` function and then performs
+ * the specific action for the "Next" button: advancing the queue.
+ */
+export async function handleHextRepetitionClick(plugin: RNPlugin, incRem: IncrementalRem | undefined) {
+  // Step 1: Call the core review logic
+  await reviewRem(plugin, incRem);
+  // Step 2: Perform the action specific to the "Next" button
+  await plugin.queue.removeCurrentCardFromQueue();
 }
 
+// --- UNCHANGED ORIGINAL FUNCTION ---
+/**
+ * This function is essential and remains unchanged. It reads the raw
+ * powerup data from a Rem and converts it into a structured object.
+ */
 export const getIncrementalRemInfo = async (
   plugin: RNPlugin,
   r: Rem | undefined

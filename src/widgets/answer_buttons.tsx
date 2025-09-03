@@ -3,6 +3,8 @@ import {
   usePlugin,
   useTracker,
   WidgetLocation,
+  RNPlugin,
+  Rem, // Import the Rem type
 } from '@remnote/plugin-sdk';
 import React from 'react';
 import { NextRepTime } from '../components/NextRepTime';
@@ -13,10 +15,23 @@ import {
   currentIncrementalRemTypeKey,
   currentScopeRemIdsKey,
 } from '../lib/consts';
-import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
+
+// vvv THIS FUNCTION IS NOW UPDATED vvv
+const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined) => {
+  if (!rem) return;
+  // We no longer need the 'incRem' object here, just the original Rem.
+  // First, get the incremental info to pass to the review function.
+  const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+
+  // Step 1: Perform the repetition ONLY, without advancing the queue.
+  await reviewRem(plugin, incRemInfo);
+  // Step 2: Open the Rem in the main editor by passing the full Rem object.
+  await plugin.window.openRem(rem);
+};
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -28,10 +43,10 @@ function Button(props: ButtonProps) {
   return (
     <button
       className={
-        'bg-blue-50 hover:bg-blue-70 text-white font-bold py-2 px-4 rounded ' + props.className
+        'bg-blue-50 hover:bg-blue-70 text-white font-bold py-1 px-2 rounded ' + props.className
       }
       style={{
-        height: '45px',
+        height: '45px', // Adjusted height
       }}
       onClick={props.onClick}
     >
@@ -46,13 +61,17 @@ export function AnswerButtons() {
     async (rp) => await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>(),
     []
   );
+
+  // vvv THIS IS NOW SIMPLIFIED vvv
+  // We get the full Rem object here and use it everywhere.
+  const rem = useTracker(
+    (rp) => rp.rem.findOne(ctx?.remId),
+    [ctx?.remId]
+  );
   
   const incRem = useTracker(
-    async (rp) => {
-      const rem = await rp.rem.findOne(ctx?.remId);
-      return rem ? await getIncrementalRemInfo(plugin, rem) : undefined;
-    },
-    [ctx?.remId]
+    async () => rem ? await getIncrementalRemInfo(plugin, rem) : undefined,
+    [rem]
   );
 
   const allIncrementalRems = useTracker(
@@ -64,7 +83,6 @@ export function AnswerButtons() {
     []
   );
 
-  // --- Single, unified calculation block ---
   let kbPercentile: number | null = null;
   let docPercentile: number | null = null;
   let relativePriorityLabel = `${incRem?.priority || '...'}`;
@@ -73,7 +91,7 @@ export function AnswerButtons() {
     kbPercentile = calculateRelativePriority(allIncrementalRems, incRem.remId);
     
     if (currentScopeRemIds && currentScopeRemIds.length > 0) {
-      const scopedRems = allIncrementalRems.filter(rem => currentScopeRemIds.includes(rem.remId));
+      const scopedRems = allIncrementalRems.filter(r => currentScopeRemIds.includes(r.remId));
       docPercentile = calculateRelativePriority(scopedRems, incRem.remId);
     }
     
@@ -114,7 +132,6 @@ export function AnswerButtons() {
 
   return (
     <div style={containerStyle} className="incremental-everything-answer-buttons">
-      {/* ... Other buttons ... */}
       <Button
         className="incremental-everthing-next-button"
         onClick={() => handleHextRepetitionClick(plugin, incRem)}
@@ -131,14 +148,13 @@ export function AnswerButtons() {
       >
         <div className="flex flex-col items-center justify-center">
           <div>Reschedule</div>
-          <div className="text-xs">Set custom interval</div>
+          <div className="text-xs">Set interval</div>
         </div>
       </Button>
       
       <Button
         className="incremental-everthing-done-button"
         onClick={async () => {
-          const rem = await plugin.rem.findOne(incRem?.remId);
           if (!rem) { return; }
           const updatedAllRem = ((await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || []).filter((r) => r.remId !== rem._id);
           await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
@@ -148,7 +164,7 @@ export function AnswerButtons() {
       >
         <div className="flex flex-col items-center justify-center">
           <div>Done</div>
-          <div className="text-xs">Untag this Rem</div>
+          <div className="text-xs">Untag Rem</div>
         </div>
       </Button>
 
@@ -170,7 +186,17 @@ export function AnswerButtons() {
 
       </Button>
             
-      {/* ... Other buttons ... */}
+      <Button
+        className="bg-gray-500 hover:bg-gray-700"
+        // vvv PASSING THE FULL REM OBJECT NOW vvv
+        onClick={() => handleReviewAndOpenRem(plugin, rem)}
+      >
+        <div className="flex flex-col items-center justify-center">
+          <div>Review & Open</div>
+          <div className="text-xs">Go to Editor</div>
+        </div>
+      </Button>
+
       {activeHighlightId && (
         <Button
           className="incremental-everything-scroll-button"
@@ -188,12 +214,12 @@ export function AnswerButtons() {
 
       {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
         <button
-          className="bg-gray-600 text-gray-100 font-bold py-2 px-4 rounded"
+          className="bg-gray-600 text-gray-100 font-bold py-2 px-2 rounded"
           style={{ height: '45px', cursor: 'default' }}
         >
           <div className="flex flex-col items-center justify-center">
-            <div>Press 'P' to Edit</div>
-            <div className="text-xs">in Previewer</div>
+            <div>Press 'P' to</div>
+            <div className="text-xs">Edit in Previewer</div>
           </div>
         </button>
       )}
