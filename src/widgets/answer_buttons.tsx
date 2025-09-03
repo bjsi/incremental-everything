@@ -16,6 +16,7 @@ import {
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
+import { percentileToHslColor } from '../lib/color';
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -54,7 +55,6 @@ export function AnswerButtons() {
     [ctx?.remId]
   );
 
-    // --- NEW: Fetch all data needed for calculations ---
   const allIncrementalRems = useTracker(
     (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
     []
@@ -64,11 +64,13 @@ export function AnswerButtons() {
     []
   );
 
-  // --- NEW: Calculate percentiles and build the label ---
-  let relativePriorityLabel = `Current: ${incRem?.priority || '...'}`;
+  // --- Single, unified calculation block ---
+  let kbPercentile: number | null = null;
+  let docPercentile: number | null = null;
+  let relativePriorityLabel = `${incRem?.priority || '...'}`;
+
   if (incRem && allIncrementalRems) {
-    const kbPercentile = calculateRelativePriority(allIncrementalRems, incRem.remId);
-    let docPercentile: number | null = null;
+    kbPercentile = calculateRelativePriority(allIncrementalRems, incRem.remId);
     
     if (currentScopeRemIds && currentScopeRemIds.length > 0) {
       const scopedRems = allIncrementalRems.filter(rem => currentScopeRemIds.includes(rem.remId));
@@ -85,9 +87,12 @@ export function AnswerButtons() {
     
     if (parts.length > 0) {
       relativePriorityLabel = `${incRem.priority} (${parts.join('; ')})`;
+    } else {
+      relativePriorityLabel = `${incRem.priority}`;
     }
   }
 
+  const priorityColor = kbPercentile ? percentileToHslColor(kbPercentile) : 'transparent';
 
   const activeHighlightId = useTracker(
     (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey),
@@ -109,11 +114,10 @@ export function AnswerButtons() {
 
   return (
     <div style={containerStyle} className="incremental-everything-answer-buttons">
+      {/* ... Other buttons ... */}
       <Button
         className="incremental-everthing-next-button"
-        onClick={async () => {
-          handleHextRepetitionClick(plugin, incRem);
-        }}
+        onClick={() => handleHextRepetitionClick(plugin, incRem)}
       >
         <div className="flex flex-col items-center justify-center">
           <div>Next</div>
@@ -121,16 +125,9 @@ export function AnswerButtons() {
         </div>
       </Button>
 
-      {/* --- NEW "RESCHEDULE" BUTTON --- */}
       <Button
         className="bg-gray-500 hover:bg-gray-700"
-        onClick={async () => {
-          if (ctx?.remId) {
-            await plugin.widget.openPopup('reschedule', {
-              remId: ctx.remId,
-            });
-          }
-        }}
+        onClick={async () => { if (ctx?.remId) await plugin.widget.openPopup('reschedule', { remId: ctx.remId }); }}
       >
         <div className="flex flex-col items-center justify-center">
           <div>Reschedule</div>
@@ -142,12 +139,8 @@ export function AnswerButtons() {
         className="incremental-everthing-done-button"
         onClick={async () => {
           const rem = await plugin.rem.findOne(incRem?.remId);
-          if (!rem) {
-            return;
-          }
-          const updatedAllRem: IncrementalRem[] = (
-            ((await plugin.storage.getSession(allIncrementalRemKey)) || []) as IncrementalRem[]
-          ).filter((r) => r.remId !== rem._id);
+          if (!rem) { return; }
+          const updatedAllRem = ((await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || []).filter((r) => r.remId !== rem._id);
           await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
           await plugin.queue.removeCurrentCardFromQueue(true);
           await rem.removePowerup(powerupCode);
@@ -161,22 +154,23 @@ export function AnswerButtons() {
 
       <Button
         className="bg-gray-500 hover:bg-gray-700"
-        onClick={async () => {
-          if (ctx?.remId) {
-            await plugin.widget.openPopup('priority', {
-              remId: ctx.remId,
-            });
-          }
-        }}
+        onClick={async () => { if (ctx?.remId) await plugin.widget.openPopup('priority', { remId: ctx.remId }); }}
       >
-        <div className="flex flex-col items-center justify-center">
-          <div>Change Priority</div>
-          <div className="text-xs">
-            {relativePriorityLabel}
+          <div className="flex flex-col items-center justify-center">
+            <div>Change Priority</div>
+            <div 
+              className="text-xs"
+              style={{ 
+                backgroundColor: priorityColor,
+              }}
+              >
+              {relativePriorityLabel}
+            </div>
           </div>
-        </div>
+
       </Button>
             
+      {/* ... Other buttons ... */}
       {activeHighlightId && (
         <Button
           className="incremental-everything-scroll-button"
@@ -195,14 +189,11 @@ export function AnswerButtons() {
       {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
         <button
           className="bg-gray-600 text-gray-100 font-bold py-2 px-4 rounded"
-          style={{ 
-            height: '45px', 
-            cursor: 'default',
-          }}
+          style={{ height: '45px', cursor: 'default' }}
         >
           <div className="flex flex-col items-center justify-center">
             <div>Press 'P' to Edit</div>
-            <div className="text-xs">Edit in Previewer</div>
+            <div className="text-xs">in Previewer</div>
           </div>
         </button>
       )}

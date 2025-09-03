@@ -43,40 +43,30 @@ export function Priority() {
     return incRem?.priority ?? 10;
   }, [remId]);
 
-  // State for the absolute priority (0-100)
   const [absPriority, setAbsPriority] = useState(initialPriority);
-  // State for the relative priority percentile (1-100)
   const [relPriority, setRelPriority] = useState(50);
 
-  // Update the absolute priority when the initial value loads
   useEffect(() => {
     setAbsPriority(initialPriority);
   }, [initialPriority]);
 
-  // EFFECT 1: Update RELATIVE priority when ABSOLUTE priority changes
   useEffect(() => {
     if (!remId || !allIncrementalRems) return;
-
-    // Create a hypothetical list with the updated priority for the current rem
     const hypotheticalRems =
       allIncrementalRems.map((r) =>
         r.remId === remId ? { ...r, priority: absPriority } : r
       );
-
     const newRelPriority = calculateRelativePriority(hypotheticalRems, remId);
     if (newRelPriority !== null) {
       setRelPriority(newRelPriority);
     }
   }, [absPriority, allIncrementalRems, remId]);
 
-  // EFFECT 2: Save the debounced absolute priority to RemNote
   useDebouncedEffect(() => {
     const savePriority = async () => {
       if (!remId) return;
       const rem = await plugin.rem.findOne(remId);
       await rem?.setPowerupProperty(powerupCode, prioritySlotCode, [absPriority.toString()]);
-
-      // Update the master list in session storage for instant feedback elsewhere
       const newIncRem = await getIncrementalRemInfo(plugin, rem);
       if (newIncRem && allIncrementalRems) {
         const updatedAllRem = allIncrementalRems
@@ -86,26 +76,17 @@ export function Priority() {
       }
     };
     savePriority();
-  }, [absPriority, remId], 250); // 250ms debounce delay
+  }, [absPriority, remId], 250);
 
-  // HANDLER: Update ABSOLUTE priority when RELATIVE slider changes
   const handleRelativeSliderChange = (newRelPriority: number) => {
     setRelPriority(newRelPriority);
-    if (!remId || !allIncrementalRems || allIncrementalRems.length < 2) {
-      return;
-    }
-
-    // Get all other rems, sorted by their priority
+    if (!remId || !allIncrementalRems || allIncrementalRems.length < 2) return;
     const otherRems = _.sortBy(
       allIncrementalRems.filter((r) => r.remId !== remId),
       (x) => x.priority
     );
-
-    // Calculate the target index based on the desired percentile
     const targetIndex = Math.floor(((newRelPriority - 1) / 100) * otherRems.length);
     const clampedIndex = Math.max(0, Math.min(otherRems.length - 1, targetIndex));
-
-    // Set the absolute priority to match the priority of the rem at that target position
     const targetAbsPriority = otherRems[clampedIndex]?.priority;
     if (targetAbsPriority !== undefined) {
       setAbsPriority(targetAbsPriority);
@@ -113,16 +94,12 @@ export function Priority() {
   };
 
   const inputRef = React.useRef<HTMLInputElement>(null);
-
-  // --- THIS IS THE FIX ---
-  // This effect now waits for `remId` to be loaded before trying to set the focus.
-  // The setTimeout ensures the browser has finished rendering the input before we try to focus it.
   useEffect(() => {
     if (remId) {
       setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
-      }, 50); // 50ms delay for robustness
+      }, 50);
     }
   }, [remId]);
 
@@ -131,22 +108,21 @@ export function Priority() {
   }
   
   return (
-    <div className="flex flex-col p-4 gap-4 priority-popup">
+    // vvv THE EVENT LISTENER IS NOW HERE vvv
+    <div 
+      className="flex flex-col p-4 gap-4 priority-popup z-50"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          plugin.widget.closePopup();
+        }
+      }}
+    >
       <div className="text-2xl font-bold">Set Priority</div>
 
-      {/* --- Absolute Priority Input --- */}
       <div className="flex flex-col gap-2">
-        <label className="font-semibold">Priority Value (0-100)</label>
-        <div className="rn-clr-content-secondary">Lower is more important.</div>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={absPriority}
-            onChange={(e) => setAbsPriority(parseInt(e.target.value))}
-            className="flex-grow"
-          />
+        <div className="flex justify-between items-center">
+          <label className="font-semibold">Priority Value (0-100)</label>
           <input
             ref={inputRef}
             type="number"
@@ -155,31 +131,51 @@ export function Priority() {
             value={absPriority}
             onChange={(e) => setAbsPriority(parseInt(e.target.value))}
             className="w-20 text-center"
-            onKeyDown={(e) => e.key === 'Enter' && plugin.widget.closePopup()}
+            // The onKeyDown handler is removed from here
+          />
+        </div>
+        <div className="rn-clr-content-secondary">Lower is more important.</div>
+        <div className="relative h-5 flex items-center">
+          <div className="absolute w-full h-2 rounded-md bg-gray-200 dark:bg-gray-700"></div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={absPriority}
+            onChange={(e) => setAbsPriority(parseInt(e.target.value))}
+            className="absolute w-full custom-transparent-slider"
           />
         </div>
       </div>
 
       <hr />
-
-      {/* --- Relative Priority Slider --- */}
+      
       <div className="flex flex-col gap-2">
-        <label className="font-semibold">Relative Priority (in entire KB)</label>
+        <div className="flex justify-between items-center min-h-[2.5rem] gap-4">
+          <label className="font-semibold">Relative Priority (in entire KB):</label>
+          <div className="font-bold flex-shrink-0">{relPriority}%</div>
+        </div>
         <div className="rn-clr-content-secondary">
           Position this Rem among all other incremental items.
         </div>
-        <div className="flex items-center gap-4">
+        <div className="relative h-5 flex items-center">
+          <div
+            className="absolute w-full h-3 rounded-md"
+            style={{
+              background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))`,
+            }}
+          ></div>
           <input
             type="range"
             min={1}
             max={100}
             value={relPriority}
             onChange={(e) => handleRelativeSliderChange(parseInt(e.target.value))}
-            className="flex-grow"
+            className="absolute w-full custom-transparent-slider"
           />
-          <div className="w-20 text-center font-bold">{relPriority}%</div>
         </div>
       </div>
+      
     </div>
   );
 }
