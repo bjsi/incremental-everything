@@ -84,7 +84,7 @@ export function AnswerButtons() {
     }
     
     if (parts.length > 0) {
-      relativePriorityLabel = `Current: ${incRem.priority} (${parts.join('; ')})`;
+      relativePriorityLabel = `${incRem.priority} (${parts.join('; ')})`;
     }
   }
 
@@ -201,7 +201,7 @@ export function AnswerButtons() {
           }}
         >
           <div className="flex flex-col items-center justify-center">
-            <div>Press 'P' to</div>
+            <div>Press 'P' to Edit</div>
             <div className="text-xs">Edit in Previewer</div>
           </div>
         </button>

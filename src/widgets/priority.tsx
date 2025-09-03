@@ -4,160 +4,181 @@ import {
   useRunAsync,
   useTracker,
   WidgetLocation,
-  RNPlugin, // Import RNPlugin for type safety
 } from '@remnote/plugin-sdk';
-import React from 'react';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode, defaultPriorityId } from '../lib/consts';
+import React, { useState, useEffect } from 'react';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
+import * as _ from 'remeda';
 
-// The props for the slider now include the plugin instance
-interface PrioritySliderProps {
-  onChange: (value: number) => void;
-  value: number;
-  plugin: RNPlugin; // Add this line
+// Debounce function to prevent too many writes while sliding
+function useDebouncedEffect(effect: () => void, deps: React.DependencyList, delay: number) {
+  useEffect(() => {
+    const handler = setTimeout(() => effect(), delay);
+    return () => clearTimeout(handler);
+  }, [...deps, delay]);
 }
-
-const PrioritySlider: React.FC<PrioritySliderProps> = ({ onChange, value, plugin }) => {
-  const [val, setVal] = React.useState(value);
-  React.useEffect(() => {
-    if (val != null) {
-      onChange(val);
-    }
-  }, [val]);
-
-  const inputRef = React.useRef<HTMLInputElement>(null);
-
-  React.useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [inputRef.current]);
-
-  return (
-    <div
-      onKeyDown={(e) => {
-        if (e.key === 'PageUp') {
-          setVal(Math.min(val + 10, 100));
-        } else if (e.key === 'PageDown') {
-          setVal(Math.max(val - 10, 0));
-        } else if (e.key === 'Enter') {
-            // Also allow pressing Enter on the slider to close
-            plugin.widget.closePopup();
-        }
-      }}
-      className="flex flex-col gap-2"
-    >
-      <div className="rn-clr-content-secondary priority-label">Lower = more important</div>
-      <input
-        type="range"
-        className="priority-slider"
-        min={0}
-        max={100}
-        value={val}
-        onChange={(e) => setVal(parseInt(e.target.value))}
-      />
-      <div className="rn-clr-content-secondary">
-        Priority Value:{' '}
-        <input
-          ref={inputRef}
-          autoFocus
-          type="number"
-          min={0}
-          max={100}
-          value={val}
-          onChange={(e) => {
-            const num = parseInt(e.target.value);
-            if (!isNaN(num)) {
-              setVal(Math.min(100, Math.max(0, num)));
-            }
-          }}
-          // --- START OF CHANGE ---
-          // This onKeyDown handler closes the popup when "Enter" is pressed.
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              plugin.widget.closePopup();
-            }
-          }}
-          // --- END OF CHANGE ---
-          className="priority-input"
-        ></input>
-      </div>
-    </div>
-  );
-};
 
 export function Priority() {
   const plugin = usePlugin();
-  const ctx = useRunAsync(async () => {
-    return await plugin.widget.getWidgetContext<WidgetLocation.Popup>();
-  }, []);
   
-  const defaultPriority = useTracker(
-    async (rp) => {
-        const settingValue = (await rp.settings.getSetting<number>(defaultPriorityId)) || 10;
-        return Math.min(100, Math.max(0, settingValue));
-    },
+  const ctx = useRunAsync(
+    async () => await plugin.widget.getWidgetContext<WidgetLocation.Popup>(),
     []
   );
 
-  const prioritizedRem = useTracker(
-    async (rp) => {
-      const rem = await rp.rem.findOne(ctx?.contextData?.remId);
-      if (!rem) {
-        return null;
-      }
-      
-      const priorityRichText = await rem.getPowerupPropertyAsRichText(powerupCode, prioritySlotCode);
-      let priority = defaultPriority;
-      if (priorityRichText && priorityRichText.length > 0) {
-        const priorityString = await rp.richText.toString(priorityRichText);
-        const parsedPriority = parseInt(priorityString, 10);
-        if (!isNaN(parsedPriority)) {
-          priority = parsedPriority;
-        }
-      }
-      
-      return { rem, priority };
-    },
-    [ctx?.contextData?.remId, defaultPriority]
+  const remId = ctx?.contextData?.remId;
+
+  const allIncrementalRems = useTracker(
+    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+    []
   );
 
-  if (!prioritizedRem) {
+  const initialPriority = useTracker(async (rp) => {
+    if (!remId) return 10;
+    const rem = await rp.rem.findOne(remId);
+    if (!rem) return 10;
+    const incRem = await getIncrementalRemInfo(plugin, rem);
+    return incRem?.priority ?? 10;
+  }, [remId]);
+
+  // State for the absolute priority (0-100)
+  const [absPriority, setAbsPriority] = useState(initialPriority);
+  // State for the relative priority percentile (1-100)
+  const [relPriority, setRelPriority] = useState(50);
+
+  // Update the absolute priority when the initial value loads
+  useEffect(() => {
+    setAbsPriority(initialPriority);
+  }, [initialPriority]);
+
+  // EFFECT 1: Update RELATIVE priority when ABSOLUTE priority changes
+  useEffect(() => {
+    if (!remId || !allIncrementalRems) return;
+
+    // Create a hypothetical list with the updated priority for the current rem
+    const hypotheticalRems =
+      allIncrementalRems.map((r) =>
+        r.remId === remId ? { ...r, priority: absPriority } : r
+      );
+
+    const newRelPriority = calculateRelativePriority(hypotheticalRems, remId);
+    if (newRelPriority !== null) {
+      setRelPriority(newRelPriority);
+    }
+  }, [absPriority, allIncrementalRems, remId]);
+
+  // EFFECT 2: Save the debounced absolute priority to RemNote
+  useDebouncedEffect(() => {
+    const savePriority = async () => {
+      if (!remId) return;
+      const rem = await plugin.rem.findOne(remId);
+      await rem?.setPowerupProperty(powerupCode, prioritySlotCode, [absPriority.toString()]);
+
+      // Update the master list in session storage for instant feedback elsewhere
+      const newIncRem = await getIncrementalRemInfo(plugin, rem);
+      if (newIncRem && allIncrementalRems) {
+        const updatedAllRem = allIncrementalRems
+          .filter((x) => x.remId !== newIncRem.remId)
+          .concat(newIncRem);
+        await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+      }
+    };
+    savePriority();
+  }, [absPriority, remId], 250); // 250ms debounce delay
+
+  // HANDLER: Update ABSOLUTE priority when RELATIVE slider changes
+  const handleRelativeSliderChange = (newRelPriority: number) => {
+    setRelPriority(newRelPriority);
+    if (!remId || !allIncrementalRems || allIncrementalRems.length < 2) {
+      return;
+    }
+
+    // Get all other rems, sorted by their priority
+    const otherRems = _.sortBy(
+      allIncrementalRems.filter((r) => r.remId !== remId),
+      (x) => x.priority
+    );
+
+    // Calculate the target index based on the desired percentile
+    const targetIndex = Math.floor(((newRelPriority - 1) / 100) * otherRems.length);
+    const clampedIndex = Math.max(0, Math.min(otherRems.length - 1, targetIndex));
+
+    // Set the absolute priority to match the priority of the rem at that target position
+    const targetAbsPriority = otherRems[clampedIndex]?.priority;
+    if (targetAbsPriority !== undefined) {
+      setAbsPriority(targetAbsPriority);
+    }
+  };
+
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // --- THIS IS THE FIX ---
+  // This effect now waits for `remId` to be loaded before trying to set the focus.
+  // The setTimeout ensures the browser has finished rendering the input before we try to focus it.
+  useEffect(() => {
+    if (remId) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 50); // 50ms delay for robustness
+    }
+  }, [remId]);
+
+  if (!remId) {
     return null;
   }
-
-  const { rem, priority } = prioritizedRem;
-
+  
   return (
     <div className="flex flex-col p-4 gap-4 priority-popup">
-      <div className="text-2xl font-bold">Priority</div>
-      <div className="flex flex-col gap-2 ">
-        <PrioritySlider
-          value={priority}
-          plugin={plugin} // Pass the plugin instance to the slider component
-          onChange={async (value) => {
-            const parsed = IncrementalRem.shape.priority.safeParse(value);
-            if (!parsed.success) {
-              return;
-            }
+      <div className="text-2xl font-bold">Set Priority</div>
 
-            await rem?.setPowerupProperty(powerupCode, prioritySlotCode, [parsed.data.toString()]);
+      {/* --- Absolute Priority Input --- */}
+      <div className="flex flex-col gap-2">
+        <label className="font-semibold">Priority Value (0-100)</label>
+        <div className="rn-clr-content-secondary">Lower is more important.</div>
+        <div className="flex items-center gap-4">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={absPriority}
+            onChange={(e) => setAbsPriority(parseInt(e.target.value))}
+            className="flex-grow"
+          />
+          <input
+            ref={inputRef}
+            type="number"
+            min={0}
+            max={100}
+            value={absPriority}
+            onChange={(e) => setAbsPriority(parseInt(e.target.value))}
+            className="w-20 text-center"
+            onKeyDown={(e) => e.key === 'Enter' && plugin.widget.closePopup()}
+          />
+        </div>
+      </div>
 
-            const newIncRem = await getIncrementalRemInfo(plugin, rem);
-            if (!newIncRem) {
-              return;
-            }
+      <hr />
 
-            const allIncrementalRem: IncrementalRem[] =
-              (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-            const updatedAllRem = allIncrementalRem
-              .filter((x) => x.remId !== newIncRem.remId)
-              .concat(newIncRem);
-            await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
-          }}
-        />
+      {/* --- Relative Priority Slider --- */}
+      <div className="flex flex-col gap-2">
+        <label className="font-semibold">Relative Priority (in entire KB)</label>
+        <div className="rn-clr-content-secondary">
+          Position this Rem among all other incremental items.
+        </div>
+        <div className="flex items-center gap-4">
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={relPriority}
+            onChange={(e) => handleRelativeSliderChange(parseInt(e.target.value))}
+            className="flex-grow"
+          />
+          <div className="w-20 text-center font-bold">{relPriority}%</div>
+        </div>
       </div>
     </div>
   );
