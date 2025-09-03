@@ -1,8 +1,8 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 
 export const DEFAULT_RANDOMNESS = 0;
-// Default is now the number of cards, e.g., 4 cards per incremental rem.
-export const DEFAULT_CARDS_PER_REM = 4; 
+// Default is now the number of cards, e.g., 6 cards per incremental rem.
+export const DEFAULT_CARDS_PER_REM = 6; 
 
 export const setSortingRandomness = async (plugin: RNPlugin, randomness: number) => {
   randomness = Math.min(1, Math.max(0, randomness));

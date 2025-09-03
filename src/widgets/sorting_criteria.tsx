@@ -6,6 +6,7 @@ import {
   getCardsPerRem,
   setCardsPerRem,
   CardsPerRem,
+  DEFAULT_CARDS_PER_REM,
 } from '../lib/sorting';
 import { useState, useEffect } from 'react';
 
@@ -18,7 +19,7 @@ const cardsToSliderValue = (cards: CardsPerRem): number => {
   if (cards === 'no-cards') return ONLY_INC_VALUE;
   if (cards === 'no-rem') return ONLY_FLASHCARDS_VALUE;
   if (typeof cards === 'number') return cards;
-  return 4; // Default
+  return DEFAULT_CARDS_PER_REM; 
 };
 
 // Convert the slider position back to a value for storage
