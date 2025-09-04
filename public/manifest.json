@@ -1,13 +1,13 @@
 {
   "manifestVersion": 1,
   "id": "incremental-everything",
-  "name": "Incremental Everything Plus",
+  "name": "Incremental Everything",
   "author": "Jamesb (original) and Hugomarins",
   "repoUrl": "https://github.com/bjsi/incremental-everything",
   "version": {
     "major": 0,
     "minor": 0,
-    "patch": 3
+    "patch": 4
   },
   "unlisted": false,
   "theme": [],
