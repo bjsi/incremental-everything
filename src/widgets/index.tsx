@@ -32,9 +32,14 @@ import {
   nextRepCommandId,
   shouldHideIncEverythingKey,
   collapseTopBarKey,
+  queueLayoutFixId,
+  incrementalQueueActiveKey,
+  activeHighlightIdKey,
+  currentScopeRemIdsKey,
+  defaultPriorityId,
 } from '../lib/consts';
 import * as _ from 'remeda';
-import { getSortingRandomness, getRatioBetweenCardsAndIncrementalRem } from '../lib/sorting';
+import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
 import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -44,36 +49,34 @@ import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/curre
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
-  plugin.app.registerCSS(
-    'queue-container',
-    `
-    .rn-queue__content {
-      height: 100vh !important;
-      display: flex !important;
-      flex-direction: column !important;
-    }
-    .rn-queue__content > div {
-      flex: 1 !important;
-      min-height: 0 !important;
-    }
-    `
-  );
+  let sessionItemCounter = 0;
 
-  plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
-    if (shouldHideIncEverythingKey in changes) {
-      const shouldHide = await plugin.storage.getSession(shouldHideIncEverythingKey);
-      plugin.app.registerCSS(
-        hideIncEverythingId,
-        shouldHide 
-          ? `
-              div.rn-queue__content > div:has(> div > iframe[data-plugin-id="incremental-everything"]) {
-                display: none;
-              }
-            `.trim()
-          : ''
-      );
+  const QUEUE_LAYOUT_FIX_CSS = `
+    .rn-queue {
+      height: 100% !important;
     }
-  });
+    .rn-queue__content,
+    .rn-queue__content .rn-flashcard,
+    .rn-queue__content .rn-flashcard__content,
+    .rn-queue__content > .box-border,
+    .rn-queue__content > .box-border > .fade-in-first-load {
+      flex-grow: 1 !important;
+    }
+    /* Hide unwanted UI elements during incremental rem review */
+    .rn-flashcard-insights,
+    div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
+    div:has(> iframe[data-plugin-id="flashcard-repetition-history"]) {
+      display: none !important;
+
+    }
+  `;
+
+  const COLLAPSE_TOP_BAR_CSS = `
+    .spacedRepetitionContent { height: 100%; box-sizing: border-box; }
+    .queue__title { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .queue__title:hover { max-height: 999px; }
+  `.trim();
+
 
   await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
     slots: [
@@ -101,7 +104,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     id: initialIntervalId,
     title: 'Initial Interval',
     description: 'Sets the number of days until the first repetition.',
-    defaultValue: 0,
+    defaultValue: 1,
   });
 
   plugin.settings.registerNumberSetting({
@@ -119,37 +122,28 @@ async function onActivate(plugin: ReactRNPlugin) {
       'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
     defaultValue: true,
   });
-
-  plugin.app.registerCallback(StorageEvents.StorageSessionChange, async (changes) => {
-    const COLLAPSE_TOP_BAR_CSS = `
-      .spacedRepetitionContent {
-          height: 100%;
-          box-sizing: border-box;
-      }
-
-      /* Set initial state to collapsed */
-      .queue__title {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease;
-      }
-
-      /* Expand on hover */
-      .queue__title:hover {
-        max-height: 999px;
-      }
-    `.trim();
-    
-    
-    if (collapseTopBarKey in changes) {
-      const shouldCollapse = await plugin.storage.getSession(collapseTopBarKey);
-      plugin.app.registerCSS(
-        collapseTopBarId,
-        shouldCollapse ? COLLAPSE_TOP_BAR_CSS : ''
-      );
-    }
-  });
   
+  // Register the new setting as a number input, as sliders are not supported.
+  plugin.settings.registerNumberSetting({
+    id: defaultPriorityId,
+    title: 'Default Priority',
+    description: 'Sets the default priority for new incremental rem (0-100, Lower = more important). Default: 10',
+    defaultValue: 10,
+    // Use validators to enforce the range and type.
+    validators: [
+      {
+        type: "int" as const // Ensures the input is a whole number
+      },
+      {
+        type: "gte" as const, // "Greater than or equal to"
+        arg: 0,
+      },
+      {
+        type: "lte" as const, // "Less than or equal to"
+        arg: 100,
+      },
+    ]
+  });
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
@@ -157,22 +151,23 @@ async function onActivate(plugin: ReactRNPlugin) {
     const taggedRem = (await powerup?.taggedRem()) || [];
     const updatedAllRem = (
       await Promise.all(taggedRem.map((rem) => getIncrementalRemInfo(plugin, rem)))
-    ).filter((x) => !!x);
+    ).filter(Boolean) as IncrementalRem[];
     await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
   });
 
   // TODO: some handling to include extracts created in current queue in the queue?
   // or unnecessary due to init interval? could append to this list
 
-  let allRemInFolderQueue: RemId[] | undefined = undefined;
   let seenRem: Set<RemId> = new Set<RemId>();
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
-    allRemInFolderQueue = undefined;
     seenRem = new Set<RemId>();
+    sessionItemCounter = 0;
+    await plugin.storage.setSession(currentScopeRemIdsKey, null);
   });
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
-    allRemInFolderQueue = undefined;
     seenRem = new Set<RemId>();
+    sessionItemCounter = 0;
+    await plugin.storage.setSession(currentScopeRemIdsKey, null);
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
@@ -205,10 +200,15 @@ async function onActivate(plugin: ReactRNPlugin) {
       console.log('queueInfo', queueInfo);
       const allIncrementalRem: IncrementalRem[] =
         (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-      if (queueInfo.subQueueId && allRemInFolderQueue === undefined) {
+
+      // --- REFACTORED LOGIC START ---
+      // Read the scope directly from session storage, making it the single source of truth.
+      let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
+
+      // If we are in a document queue but the scope hasn't been calculated yet for this session (it's null)...
+      if (queueInfo.subQueueId && docScopeRemIds === null) {
         const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
-        // special handling for studying a daily doc because
-        // the referenced rem are nextRepDate slots not the incRem
+        // Special handling for studying a daily doc.
         const referencedRemIds = _.compact(
           ((await subQueueRem?.remsReferencingThis()) || []).map((rem) => {
             if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
@@ -218,67 +218,75 @@ async function onActivate(plugin: ReactRNPlugin) {
             }
           })
         );
-        allRemInFolderQueue = ((await subQueueRem?.allRemInFolderQueue()) || [])
+        
+        // Calculate the new scope.
+        const newScope = ((await subQueueRem?.allRemInFolderQueue()) || [])
           .map((x) => x._id)
-          // not included in allRemInFolderQueue for some reason...
           .concat(((await subQueueRem?.getSources()) || []).map((x) => x._id))
           .concat(referencedRemIds)
           .concat(queueInfo.subQueueId);
+        
+        // Update our variable for this run AND save to storage for other parts of the plugin.
+        docScopeRemIds = newScope;
+        await plugin.storage.setSession(currentScopeRemIdsKey, docScopeRemIds);
       }
-      let ratio: number | 'no-rem' | 'no-cards' = await getRatioBetweenCardsAndIncrementalRem(
-        plugin
-      );
+      // --- REFACTORED LOGIC END ---
 
-      const intervalBetweenIncRem = typeof ratio === 'string' ? ratio : Math.round(1 / ratio);
-      const totalElementsSeen = queueInfo.cardsPracticed + seenRem.size;
+      const cardsPerRem = await getCardsPerRem(plugin);
+      const intervalBetweenIncRem = 
+        typeof cardsPerRem === 'number' ? cardsPerRem + 1 : cardsPerRem;
+      
       const sorted = _.sortBy(allIncrementalRem, (incRem) => {
-        if (queueInfo.mode === 'in-order') {
-          return allRemInFolderQueue!.indexOf(incRem.remId);
+        if (queueInfo.mode === 'in-order' && docScopeRemIds) {
+          // Use the fetched scope for in-order sorting.
+          return docScopeRemIds.indexOf(incRem.remId);
         } else {
           return incRem.priority;
         }
       });
+      
+      // Use the fetched scope for filtering.
       const filtered = sorted.filter((x) =>
         queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
-          ? (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
+          ? (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
             (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
-          : (!queueInfo.subQueueId || allRemInFolderQueue?.includes(x.remId)) &&
+          : (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
             Date.now() >= x.nextRepDate
       );
+
 
       plugin.app.registerCSS(
         queueCounterId,
         `
-.rn-queue__card-counter {
-  visibility: hidden;
-}
+        .rn-queue__card-counter {
+          visibility: hidden;
+        }
 
-.light .rn-queue__card-counter:after {
-  content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
-  visibility: visible;
-  background-color: #f0f0f0;
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  border-radius: 0.25rem;
-}
+        .light .rn-queue__card-counter:after {
+          content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
+          visibility: visible;
+          background-color: #f0f0f0;
+          display: inline-block;
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+          border-radius: 0.25rem;
+        }
 
-.dark .rn-queue__card-counter:after {
-  content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
-  visibility: visible;
-  background-color: #34343c;
-  font-color: #d4d4d0;
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  border-radius: 0.25rem;
-}`.trim()
-      );
+        .dark .rn-queue__card-counter:after {
+          content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
+          visibility: visible;
+          background-color: #34343c;
+          font-color: #d4d4d0;
+          display: inline-block;
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+          border-radius: 0.25rem;
+        }`.trim()
+              );
 
       if (
-        (totalElementsSeen > 0 &&
-          typeof intervalBetweenIncRem === 'number' &&
-          totalElementsSeen % intervalBetweenIncRem === 0) ||
+        (typeof intervalBetweenIncRem === 'number' &&
+          (sessionItemCounter + 1) % intervalBetweenIncRem === 0) || // <-- This line is corrected
         queueInfo.numCardsRemaining === 0 ||
         intervalBetweenIncRem === 'no-cards'
       ) {
@@ -294,7 +302,7 @@ async function onActivate(plugin: ReactRNPlugin) {
         }
 
         if (filtered.length === 0) {
-          unregisterQueueCSS(plugin);
+          await plugin.app.registerCSS(queueLayoutFixId, '');
           return null;
         } else {
           // make sure we don't show a rem that has been deleted
@@ -307,52 +315,73 @@ async function onActivate(plugin: ReactRNPlugin) {
               first = filtered[0];
             }
           }
+          await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
           seenRem.add(first.remId);
           console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
+          sessionItemCounter++;
           return {
             remId: first.remId,
             pluginId: 'incremental-everything',
           };
         }
       } else {
-        unregisterQueueCSS(plugin);
+        sessionItemCounter++;
+        await plugin.app.registerCSS(queueLayoutFixId, '');
         return null;
       }
     }
   );
 
   async function initIncrementalRem(rem: Rem) {
-    const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
-    const initialIntervalInMs = initialInterval * 24 * 60 * 60 * 1000;
+    // First, check if the Rem has already been initialized.
+    const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
 
-    await rem.addPowerup(powerupCode);
+    // Only set the default values if it's a new incremental Rem.
+    if (!isAlreadyIncremental) {
+      const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
+      
+      // Get and constrain the default priority from settings.
+      const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
+      const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
 
-    const nextRepDate = new Date(Date.now() + initialIntervalInMs);
-    const dateRef = await getDailyDocReferenceForDate(plugin, nextRepDate);
-    if (!dateRef) {
-      return;
+      await rem.addPowerup(powerupCode);
+
+      const nextRepDate = new Date(Date.now() + (initialInterval * 24 * 60 * 60 * 1000));
+      const dateRef = await getDailyDocReferenceForDate(plugin, nextRepDate);
+      if (!dateRef) {
+        return;
+      }
+
+      await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
+      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [defaultPriority.toString()]);
+
+      const newIncRem = await getIncrementalRemInfo(plugin, rem);
+      if (!newIncRem) {
+        return;
+      }
+
+      const allIncrementalRem: IncrementalRem[] =
+        (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+      const updatedAllRem = allIncrementalRem
+        .filter((x) => x.remId !== newIncRem.remId)
+        .concat(newIncRem);
+      await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
     }
-
-    await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
-    await rem.setPowerupProperty(powerupCode, prioritySlotCode, ['10']);
-
-    const newIncRem = await getIncrementalRemInfo(plugin, rem);
-    if (!newIncRem) {
-      return;
-    }
-
-    const allIncrementalRem: IncrementalRem[] =
-      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-    const updatedAllRem = allIncrementalRem
-      .filter((x) => x.remId !== newIncRem.remId)
-      .concat(newIncRem);
-    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
-  }
+    // If the Rem is already incremental, this function will now do nothing,
+    // leaving the existing priority intact for the popup to read correctly.
+  } 
 
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {
     dimensions: {
       width: '100%',
       height: 'auto',
+    },
+  });
+
+  plugin.app.registerWidget('reschedule', WidgetLocation.Popup, {
+    dimensions: {
+    width: '100%',
+    height: 'auto',
     },
   });
 
@@ -445,6 +474,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+
   plugin.app.registerWidget('debug', WidgetLocation.Popup, {
     dimensions: {
       width: '350px',
@@ -534,20 +564,35 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+
   plugin.app.registerMenuItem({
     id: 'tag_highlight',
     location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
-    name: 'Tag as Incremental Rem',
+    name: 'Toggle Incremental Rem',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) {
         return;
       }
-      await initIncrementalRem(rem);
-      await plugin.app.toast('Tagged as Incremental Rem');
+
+      const isIncremental = await rem.hasPowerup(powerupCode);
+
+      if (isIncremental) {
+        // If it's already incremental, just remove the powerup.
+        await rem.removePowerup(powerupCode);
+        await plugin.app.toast('Untagged as Incremental Rem');
+      } else {
+        // If it's not incremental, initialize it and open the priority popup.
+        await initIncrementalRem(rem);
+        await plugin.widget.openPopup('priority', {
+          remId: rem._id,
+        });
+      }
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
   });
+
+  
 }
 
 async function onDeactivate(_: ReactRNPlugin) {}

@@ -10,48 +10,46 @@ import {
   nextRepDateSlotCode,
   prioritySlotCode,
   repHistorySlotCode,
-  allIncrementalRemKey,
 } from './consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from './scheduler';
 import { IncrementalRem } from './types';
 import { tryParseJson } from './utils';
 
-export async function handleHextRepetitionClick(
-  plugin: RNPlugin,
-  incRem: IncrementalRem | null | undefined
-) {
-  if (incRem) {
-    // get next rep date
-    const inLookbackMode = !!(await plugin.queue.inLookbackMode());
-    const data = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
-    if (!data) {
-      return;
-    }
-    const { newHistory, newNextRepDate } = data;
-    // update allIncrementalRem in storage to get around reactivity issues
-    const oldAllRem: IncrementalRem[] =
-      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-    const oldRem = oldAllRem.find((r) => r.remId === incRem.remId);
-    if (!oldRem) {
-      return;
-    }
-    await plugin.storage.setSession(
-      allIncrementalRemKey,
-      oldAllRem
-        .filter((r) => r.remId !== incRem.remId)
-        .concat({
-          ...oldRem,
-          nextRepDate: newNextRepDate,
-          history: newHistory,
-        })
-    );
-    // actually update the rem
-    await updateSRSDataForRem(plugin, incRem.remId, newNextRepDate, newHistory);
-    // move to next card
-    await plugin.queue.removeCurrentCardFromQueue();
+// --- NEW CORE FUNCTION ---
+/**
+ * This is the new, fundamental function that only handles reviewing/rescheduling.
+ * It does NOT advance the queue, making it reusable for different buttons.
+ */
+export async function reviewRem(plugin: RNPlugin, incRem: IncrementalRem | undefined) {
+  if (!incRem) {
+    return null;
   }
+  const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+  const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
+  if (!nextSpacing) {
+    return null;
+  }
+  await updateSRSDataForRem(plugin, incRem.remId, nextSpacing.newNextRepDate, nextSpacing.newHistory);
+  return nextSpacing;
 }
 
+// --- REFACTORED ORIGINAL FUNCTION ---
+/**
+ * This function now uses the core `reviewRem` function and then performs
+ * the specific action for the "Next" button: advancing the queue.
+ */
+export async function handleHextRepetitionClick(plugin: RNPlugin, incRem: IncrementalRem | undefined) {
+  // Step 1: Call the core review logic
+  await reviewRem(plugin, incRem);
+  // Step 2: Perform the action specific to the "Next" button
+  await plugin.queue.removeCurrentCardFromQueue();
+}
+
+// --- UNCHANGED ORIGINAL FUNCTION ---
+/**
+ * This function is essential and remains unchanged. It reads the raw
+ * powerup data from a Rem and converts it into a structured object.
+ */
 export const getIncrementalRemInfo = async (
   plugin: RNPlugin,
   r: Rem | undefined
@@ -63,7 +61,7 @@ export const getIncrementalRemInfo = async (
     powerupCode,
     nextRepDateSlotCode
   )) as RichTextElementRemInterface[];
-  if (!nextRepDateRichText || nextRepDateRichText.length === 0 || !nextRepDateRichText[0]._id) {
+  if (!nextRepDateRichText || nextRepDateRichText.length === 0 || !nextRepDateRichText[0]?._id) {
     return null;
   }
 
@@ -83,21 +81,32 @@ export const getIncrementalRemInfo = async (
 
   const date = dayjs(yyyymmdd, 'YYYY-MM-DD');
 
+  const priorityRichText = await r.getPowerupPropertyAsRichText(powerupCode, prioritySlotCode);
+  let priority = 10;
+  if (priorityRichText && priorityRichText.length > 0) {
+    const priorityString = await plugin.richText.toString(priorityRichText);
+    const parsedPriority = parseInt(priorityString, 10);
+    if (!isNaN(parsedPriority)) {
+      priority = parsedPriority;
+    }
+  }
+
   const rawData = {
     remId: r._id,
     nextRepDate: date.valueOf(),
-    priority: tryParseJson(await r.getPowerupProperty(powerupCode, prioritySlotCode)),
+    priority: priority,
     history: tryParseJson(await r.getPowerupProperty(powerupCode, repHistorySlotCode)),
   };
+
   const parsed = IncrementalRem.safeParse(rawData);
   if (parsed.success) {
     return parsed.data;
   } else {
-    console.log(
+    console.error(
       'Failed to parse incremental rem info for Rem with id: ' +
         r._id +
-        'with error: ' +
-        parsed.error
+        'with error: ',
+      parsed.error
     );
     return null;
   }

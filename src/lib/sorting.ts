@@ -1,7 +1,8 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 
 export const DEFAULT_RANDOMNESS = 0;
-export const DEFAULT_RATIO = 0.25;
+// Default is now the number of cards, e.g., 6 cards per incremental rem.
+export const DEFAULT_CARDS_PER_REM = 6; 
 
 export const setSortingRandomness = async (plugin: RNPlugin, randomness: number) => {
   randomness = Math.min(1, Math.max(0, randomness));
@@ -13,28 +14,16 @@ export const getSortingRandomness = async (plugin: RNPlugin) => {
   return val == null ? DEFAULT_RANDOMNESS : val;
 };
 
-export type Ratio = 'no-rem' | 'no-cards' | number;
+export type CardsPerRem = 'no-rem' | 'no-cards' | number;
 
-export const getRatioBetweenCardsAndIncrementalRem = async (plugin: RNPlugin): Promise<Ratio> => {
-  let ratio = (await plugin.storage.getSynced('ratioBetweenCardsAndIncrementalRem')) as Ratio;
-  if (ratio === 1) {
-    ratio = 'no-rem';
-  } else if (ratio === 0) {
-    ratio = 'no-cards';
-  }
-  return ratio == null ? DEFAULT_RATIO : ratio;
-};
+export const getCardsPerRem = async (plugin: RNPlugin): Promise<CardsPerRem> => {
+	const val = await plugin.storage.getSynced('cardsPerRem');
+	if (val === 'no-rem' || val === 'no-cards' || typeof val === 'number') {
+		return val;
+	}
+	return DEFAULT_CARDS_PER_REM;
+}
 
-export const setRatioBetweenCardsAndIncrementalRem = async (plugin: RNPlugin, ratio: number) => {
-  ratio = Math.min(1, Math.max(0, ratio));
-  await plugin.storage.setSynced('ratioBetweenCardsAndIncrementalRem', ratio);
-};
-
-export const getNumCardsPerIncRem = async (plugin: RNPlugin): Promise<number | string> => {
-  const ratio = await getRatioBetweenCardsAndIncrementalRem(plugin);
-  return typeof ratio === 'number'
-    ? Math.round(1 / ratio)
-    : ratio === 'no-cards'
-    ? 'Only Incremental Rem'
-    : 'Only Flashcards';
-};
+export const setCardsPerRem = async (plugin: RNPlugin, value: CardsPerRem) => {
+	await plugin.storage.setSynced('cardsPerRem', value);
+}

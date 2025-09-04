@@ -1,4 +1,4 @@
-# Incremental Everything
+# Incremental Everything Plus
 
 A RemNote plugin which allows you to interleave your flashcard reviews with notes, paragraphs from books, websites, video snippets and more! Heavily inspired by SuperMemo's [Incremental Reading](https://supermemo.guru/wiki/Incremental_reading) mode.
 
@@ -97,8 +97,82 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
 ### Scheduling
 
 - The plugin uses an extremely simple scheduling algorithm: `const newInterval = Math.ceil(multiplier ** Math.max(repHistory.length, 1));` where the multiplier is 1.5 by default.
-- We can add custom scheduling algorithms in the future if there is demand for it.
 - Note that you can manually set the next repetition date using RemNote's tables and properties features.
+
+## Improvements of this Plus version in relation to the original Incremental Everything plugin
+
+
+###  Priotitization & Sorting System improvements
+
+- **"Change Priority" Button:** Added a button to the answer bar to quickly change a Rem's priority directly from the queue, using the original priority popup.
+
+- **At-a-Glance Priority Assessment:** The "Change Priority" button now displays not only its set (absolute) priority, but also the Rem's relative rank within the Knowledge Base (`% of KB`) and current document (`% of Doc`). The label's background is also color-coded — from red (high priority) to blue (low priority) — for instant visual feedback.
+
+- **Interactive Priority Popup:** The "Set Priority" popup has been redesigned for a more intuitive workflow. It now features a new "Relative Priority" slider with a full-color gradient, allowing you to set a Rem's priority by either typing an absolute value or visually selecting its desired percentile rank.
+
+- **Customizable Default Priority:** Added a new option in the plugin settings for users to set their own default priority for new incremental Rem.
+
+- **Sorting Criteria - New Flashcard Ratio selector and logic:** The Flashcard Ratio slider has been completely overhauled to be linear and intuitive, directly controlling the number of cards. This fixes persistent bugs in the queuing logic, ensuring the selected card sequence is now reliable and accurate.
+
+
+### Review & Open in Editor
+
+For moments when the queue's embedded view is too limited, a **"Review & Open"** button is available on the answer bar. This button first registers your review of the item (rescheduling it for the future, just like the "Next" button) and then instantly navigates you to the full RemNote editor for that item. This is ideal for detailed note-taking, using other plugins like AI tools, or performing complex edits without losing your review progress.
+
+
+### Other improvements
+
+- **"Scroll to Highlight" Button:** Added a button to the answer bar that appears only for highlight cards, allowing you to instantly jump back to the highlight's position in the PDF.
+
+- **Reschedule button:** Added a button to the answer bar that opens a popup for manually setting the next review interval in days. This popup intelligently defaults to the same interval the 'Next' button would have calculated, provides a live preview of the resulting date, and performs a full repetition when submitted.
+
+- **"Press 'P' to Edit" Hint:** Added an idle button that appears for regular Rem and PDF cards, informing users of the native shortcut to open the editor (as trying to edit directly in the Document Viewer triggers keyboard shortcut conflicts and is not recommended).
+
+- **"Enter" Key in Popup:** The priority popup can now be closed by pressing the "Enter" key after typing a value, improving workflow speed.
+
+- **PDF Highlight menu item toggle** now also triggers the *priority popup*, so that, when making PDF extracts, the user can instantly set the extract priority or press enter to use the default priority.
+
+
+### Enhanced Queue Layout & Plugin Compatibility
+
+The previous plugin version applied a single, permanent CSS rule that modified the entire flashcard queue, which could unintentionally affect the layout of regular flashcards.
+
+```// Original implementation
+async function onActivate(plugin: ReactRNPlugin) {
+  plugin.app.registerCSS(
+    'queue-container',
+    `
+    .rn-queue__content {
+      height: 100vh !important;
+      ...
+    }
+    `
+  );
+```
+
+We now implemented a more intelligent and compatible approach:
+
+- **Conditional Styling:** The layout-fixing styles are now dynamically applied only when an incremental rem is being reviewed. The styles are immediately removed for standard flashcards, preserving the native RemNote queue experience.
+
+- **Plugin Compatibility:** A fix has been added to automatically hide the Flashcard Repetition History plugin widget during incremental reviews. This resolves layout conflicts and allows both plugins to be used together seamlessly.
+
+
+## Known Issues
+
+### Incremental PDF Reading Position
+
+When reading a large PDF (like a book) as a regular incremental Rem, the plugin may not reliably return you to your last incremental reading spot.
+
+  * **The Problem**: If you open and scroll the same PDF in another window or tab, your incremental reading position will be lost. RemNote's native PDF viewer only remembers the single most recent position for a document, which overwrites the position from your incremental reading session. This also means you cannot have multiple incremental Rems for different chapters of the same PDF file, as they would all share the same scroll position.
+  * **The Cause**: This is due to a limitation in the current RemNote Plugin SDK. The plugin lacks the necessary tools to programmatically save and restore a specific scroll position for a PDF and must rely on RemNote's default behavior.
+  * **How You Can Help**: To fix this, we need the RemNote developers to expand the capabilities of their Plugin API. We have submitted a Feature Request asking for these tools. Please help us by upvoting the request on the RemNote feedback platform. More upvotes will increase its priority.
+
+➡️ **[Upvote the Feature Request on the RemNote Feedback Site](https://feedback.remnote.com/p/feature-request-programmatic-control-over-pdf-scroll-position-for-plugins?b=Plugin-Requests)**
+
+### Keyboard Shortcut Conflict:
+
+When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround. You can also use the newly created button "Review & Open".
+
 
 ## Development Details
 
@@ -117,3 +191,9 @@ npm run dev
 ```
 
 Then follow [this part of the quick start guide](https://plugins.remnote.com/getting-started/quick_start_guide#run-the-plugin-template-inside-remnote) to get the plugin running in RemNote.
+
+
+
+
+
+

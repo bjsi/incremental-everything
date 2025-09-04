@@ -43,3 +43,45 @@ body,
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+
+/* relative-priority-slider styles  */
+
+.custom-transparent-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  background: transparent; /* Make element background transparent */
+  cursor: pointer;
+}
+
+/* Make the track transparent */
+.custom-transparent-slider::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 16px; /* Make track clickable area taller */
+}
+
+.custom-transparent-slider::-moz-range-track {
+  background: transparent;
+  height: 16px;
+}
+
+/* Optional: Style the thumb to look good on the gradient */
+.custom-transparent-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  background-color: #fff;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+  margin-top: 0px; /* Adjust vertical centering of thumb if needed */
+}
+
+.custom-transparent-slider::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  background-color: #fff;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+}
