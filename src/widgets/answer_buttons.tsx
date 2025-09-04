@@ -127,7 +127,9 @@ export function AnswerButtons() {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: '1.5rem',
+    gap: '1rem', // Slightly reduced gap for mobile
+    flexWrap: 'wrap', // <-- Allows buttons to wrap to the next line
+    marginBottom: '0.5rem', // Adds space below the button rows
   };
 
   return (
@@ -214,7 +216,7 @@ export function AnswerButtons() {
 
       {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
         <button
-          className="bg-gray-600 text-gray-100 font-bold py-2 px-2 rounded"
+          className="bg-gray-600 text-gray-100 font-bold py-2 px-2 rounded desktop-only-hint"
           style={{ height: '45px', cursor: 'default' }}
         >
           <div className="flex flex-col items-center justify-center">

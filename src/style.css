@@ -85,3 +85,10 @@ body,
   border-radius: 50%;
   border: 1px solid #ccc;
 }
+
+/* This rule applies only to screens with a max-width of 600px (typical for mobile phones) */
+@media (max-width: 600px) {
+  .desktop-only-hint {
+    display: none !important;
+  }
+}
