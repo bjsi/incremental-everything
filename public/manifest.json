@@ -1,15 +1,15 @@
 {
   "manifestVersion": 1,
-  "id": "incremental-everything-plus",
-  "name": "Incremental Everything Plus",
+  "id": "incremental-everything",
+  "name": "Incremental Everything",
   "author": "Jamesb (original) and Hugomarins",
-  "repoUrl": "https://github.com/hugomarins/incremental-everything",
+  "repoUrl": "https://github.com/bjsi/incremental-everything",
   "version": {
     "major": 0,
-    "minor": 0,
+    "minor": 1,
     "patch": 5
   },
-  "unlisted": true,
+  "unlisted": false,
   "theme": [],
   "enableOnMobile": true,
   "description": "Review notes, PDFs, Youtube videos and web articles incrementally alongside your flashcards.",
