@@ -97,7 +97,7 @@ function PriorityShieldGraph() {
         </LineChart>
       </ResponsiveContainer>
       <p className="mt-4 text-sm rn-clr-content-secondary text-justify">
-        <b>Priority Shield:</b> your processing capacity for high priority Incremental Rems on a given day. If your graph oscillates around priority of 3%, you will know that only top 3% of your learning material is guaranteed a timely repetition. You can increase that number by doing more work, reducing inflow of new material, deprioritizing less important Incremental Rems, or reducing the randomization degree for the due Incremental Rems queue in the Sorting Criteria.
+        <b>Priority Shield:</b> your processing capacity for high priority Incremental Rems on a given day. <b>Absolute Priority</b> refers to the number set in the Incremental Rem priority property. <b>Relative Priority</b> <i>percentile</i> is the Rem's relative rank within the Knowledge Base (% of KB); this last index gives you a clearer metric for managing your learning load. The higher the percentile of your Relative Priority shield, the more the your top priority material is safeguarded. If your graph oscillates around priority of 4%, you will know that only top 4% of your learning material is guaranteed a timely repetition. You can increase that number by doing more work, reducing inflow of new material, deprioritizing less important Incremental Rems, or reducing the randomization degree for the due Incremental Rems queue in the Sorting Criteria.
       </p>
     </div>
   );
