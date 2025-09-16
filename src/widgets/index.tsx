@@ -40,6 +40,7 @@ import {
   seenRemInSessionKey,
   displayPriorityShieldId,
   priorityShieldHistoryKey,
+  priorityShieldHistoryMenuItemId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -584,6 +585,22 @@ async function onActivate(plugin: ReactRNPlugin) {
     name: 'Sorting Criteria',
     action: async () => {
       await plugin.widget.openPopup('sorting_criteria');
+    },
+  });
+
+  plugin.app.registerWidget('priority_shield_graph', WidgetLocation.Popup, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerMenuItem({
+    id: priorityShieldHistoryMenuItemId,
+    name: 'Priority Shield History',
+    location: PluginCommandMenuLocation.QueueMenu,
+    action: async () => {
+      await plugin.widget.openPopup('priority_shield_graph');
     },
   });
 
