@@ -38,6 +38,7 @@ import {
   currentScopeRemIdsKey,
   defaultPriorityId,
   seenRemInSessionKey,
+  displayPriorityShieldId
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -145,6 +146,14 @@ async function onActivate(plugin: ReactRNPlugin) {
       },
     ]
   });
+
+  plugin.settings.registerBooleanSetting({
+    id: displayPriorityShieldId,
+    title: 'Display Priority Shield in Queue',
+    description: 'If enabled, shows a real-time status of your highest-priority due items in the queue top bar.',
+    defaultValue: true,
+  });
+
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
