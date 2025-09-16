@@ -18,7 +18,7 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 ## More Information (Full Documentation)
 
 - Stay tunned and see the latest changes in the [Changelog](https://github.com/bjsi/incremental-everything/wiki/Changelog).
-- For more information, please see the [User's Manual in the project wiki] (https://github.com/bjsi/incremental-everything/wiki).
+- For more information, please see the [User's Manual in the project wiki](https://github.com/bjsi/incremental-everything/wiki).
 
 
 ## Usage
