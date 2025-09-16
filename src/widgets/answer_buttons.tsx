@@ -85,12 +85,18 @@ export function AnswerButtons() {
 
   const shieldStatus = useTracker(
     async (rp) => {
+      // These lines ensure the tracker re-runs when the queue state changes.
       await rp.storage.getSession(allIncrementalRemKey);
       await rp.storage.getSession(seenRemInSessionKey);
       await rp.storage.getSession(currentScopeRemIdsKey);
-      return await calculatePriorityShield(plugin);
+      
+      // Get the ID of the current Rem from the widget's context.
+      const currentRemId = ctx?.remId;
+      
+      // Pass the ID to our calculation function.
+      return await calculatePriorityShield(plugin, currentRemId);
     },
-    [plugin]
+    [plugin, ctx?.remId] // Add ctx.remId to the dependency array.
   );
 
   let kbPercentile: number | null = null;

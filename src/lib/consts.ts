@@ -39,3 +39,4 @@ export const currentScopeRemIdsKey = 'current-scope-rem-ids-key';
 // --- Keys for the Priority Protection ---
 export const seenRemInSessionKey = 'seen-rem-in-session-key';
 export const displayPriorityShieldId = 'display-priority-shield';
+export const priorityShieldHistoryKey = 'priority-shield-history-key';

@@ -38,7 +38,8 @@ import {
   currentScopeRemIdsKey,
   defaultPriorityId,
   seenRemInSessionKey,
-  displayPriorityShieldId
+  displayPriorityShieldId,
+  priorityShieldHistoryKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -46,6 +47,7 @@ import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
+import { calculateRelativePriority } from '../lib/priority';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 dayjs.extend(relativeTime);
@@ -169,10 +171,41 @@ async function onActivate(plugin: ReactRNPlugin) {
   // or unnecessary due to init interval? could append to this list
 
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
-    await plugin.storage.setSession(seenRemInSessionKey, []);
-    sessionItemCounter = 0;
-    await plugin.storage.setSession(currentScopeRemIdsKey, null);
-  });
+  // --- Start of new history-saving logic ---
+  const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+
+  if (allRems.length > 0) {
+    // Find all outstanding due Rems for the entire KB, regardless of session progress.
+    const unreviewedDueRems = allRems.filter(
+      (rem) => Date.now() >= rem.nextRepDate
+    );
+
+    let finalStatus = {
+      absolute: null,
+      percentile: 100, // A perfect score if no due Rems are left.
+    };
+
+    if (unreviewedDueRems.length > 0) {
+      const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
+      if (topMissedInKb) {
+        finalStatus.absolute = topMissedInKb.priority;
+        finalStatus.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
+      }
+    }
+    
+    // Save the final status for the current day.
+    const today = dayjs().format('YYYY-MM-DD');
+    const history = (await plugin.storage.getSynced(priorityShieldHistoryKey)) || {};
+    history[today] = finalStatus;
+    await plugin.storage.setSynced(priorityShieldHistoryKey, history);
+  }
+  // --- End of new history-saving logic ---
+
+  // Reset session-specific state.
+  await plugin.storage.setSession(seenRemInSessionKey, []);
+  sessionItemCounter = 0;
+  await plugin.storage.setSession(currentScopeRemIdsKey, null);
+});
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     await plugin.storage.setSession(seenRemInSessionKey, []);
     sessionItemCounter = 0;
