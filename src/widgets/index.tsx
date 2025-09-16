@@ -37,6 +37,7 @@ import {
   activeHighlightIdKey,
   currentScopeRemIdsKey,
   defaultPriorityId,
+  seenRemInSessionKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -158,14 +159,13 @@ async function onActivate(plugin: ReactRNPlugin) {
   // TODO: some handling to include extracts created in current queue in the queue?
   // or unnecessary due to init interval? could append to this list
 
-  let seenRem: Set<RemId> = new Set<RemId>();
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
-    seenRem = new Set<RemId>();
+    await plugin.storage.setSession(seenRemInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
   });
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
-    seenRem = new Set<RemId>();
+    await plugin.storage.setSession(seenRemInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
   });
@@ -246,10 +246,11 @@ async function onActivate(plugin: ReactRNPlugin) {
       });
       
       // Use the fetched scope for filtering.
+      const seenRemIds = (await plugin.storage.getSession<RemId[]>(seenRemInSessionKey)) || [];
       const filtered = sorted.filter((x) =>
         queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
           ? (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
-            (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
+            (!seenRemIds.includes(x.remId) || Date.now() >= x.nextRepDate)
           : (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
             Date.now() >= x.nextRepDate
       );
@@ -316,7 +317,7 @@ async function onActivate(plugin: ReactRNPlugin) {
             }
           }
           await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
-          seenRem.add(first.remId);
+          await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
           console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
           sessionItemCounter++;
           return {
