@@ -206,14 +206,12 @@ async function onActivate(plugin: ReactRNPlugin) {
   await plugin.storage.setSession(seenRemInSessionKey, []);
   sessionItemCounter = 0;
   await plugin.storage.setSession(currentScopeRemIdsKey, null);
-  await plugin.storage.setSession(currentSubQueueIdKey, null);
 });
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     await plugin.storage.setSession(seenRemInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
-    await plugin.storage.setSession(currentSubQueueIdKey, subQueueId); // <-- ADD THIS
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
