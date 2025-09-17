@@ -41,4 +41,3 @@ export const seenRemInSessionKey = 'seen-rem-in-session-key';
 export const displayPriorityShieldId = 'display-priority-shield';
 export const priorityShieldHistoryKey = 'priority-shield-history-key';
 export const priorityShieldHistoryMenuItemId = 'priority-shield-history-menu-item-id';
-export const currentSubQueueIdKey = 'current-sub-queue-id-key';
