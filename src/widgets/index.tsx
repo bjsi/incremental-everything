@@ -206,11 +206,14 @@ async function onActivate(plugin: ReactRNPlugin) {
   await plugin.storage.setSession(seenRemInSessionKey, []);
   sessionItemCounter = 0;
   await plugin.storage.setSession(currentScopeRemIdsKey, null);
+  await plugin.storage.setSession(currentSubQueueIdKey, null);
 });
+
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     await plugin.storage.setSession(seenRemInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    await plugin.storage.setSession(currentSubQueueIdKey, subQueueId); // <-- ADD THIS
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
@@ -590,8 +593,8 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('priority_shield_graph', WidgetLocation.Popup, {
     dimensions: {
-      width: 'auto',
-      height: 'auto',
+      width: 800,
+      height: 800,
     },
   });
 

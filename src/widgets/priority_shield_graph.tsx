@@ -79,25 +79,21 @@ function PriorityShieldGraph() {
             yAxisId="left"
             type="monotone"
             dataKey="absolute"
-            // vvv CHANGED: Updated label vvv
             name="Absolute Priority (Higher is Better)"
-            // ^^^ CHANGED ^^^
             stroke="#8884d8"
-            activeDot={{ r: 8 }}
           />
           <Line
             yAxisId="right"
             type="monotone"
-            // vvv CHANGED: Updated dataKey and label vvv
             dataKey="relative"
             name="Relative Priority (%) (Higher is Better)"
-            // ^^^ CHANGED ^^^
             stroke="#82ca9d"
+            activeDot={{ r: 8 }}
           />
         </LineChart>
       </ResponsiveContainer>
       <p className="mt-4 text-sm rn-clr-content-secondary text-justify">
-        <b>Priority Shield:</b> your processing capacity for high priority Incremental Rems on a given day. <b>Absolute Priority</b> refers to the number set in the Incremental Rem priority property. <b>Relative Priority</b> <i>percentile</i> is the Rem's relative rank within the Knowledge Base (% of KB); this last index gives you a clearer metric for managing your learning load. The higher the percentile of your Relative Priority shield, the more your top priority material is safeguarded and processed. If your graph oscillates around priority of 4%, you will know that only top 4% of your learning material is guaranteed a timely repetition. You can increase that number by doing more work, reducing inflow of new material, deprioritizing less important Incremental Rems, or reducing the randomization degree for the due Incremental Rems queue in the <b>Sorting Criteria</b> queue menu (the three-dot icon).
+        <b>Priority Shield:</b> your processing capacity for high priority Incremental Rems on a given day. <br></br><b>Absolute Priority</b> refers to the number set in the Incremental Rem priority property. <br></br><b>Relative Priority</b> <i>percentile</i> is the Rem's relative rank within the Knowledge Base (% of KB); this last index gives you a clearer metric for managing your learning load. The higher the percentile of your Relative Priority shield, the more your top priority material is safeguarded and processed. If your graph oscillates around priority of 4%, you will know that only top 4% of your learning material is guaranteed a timely repetition. You can increase that number by doing more work, reducing inflow of new material, deprioritizing less important Incremental Rems, or reducing the randomization degree for the due Incremental Rems queue in the <b>Sorting Criteria</b> queue menu (the three-dot icon).
       </p>
     </div>
   );
