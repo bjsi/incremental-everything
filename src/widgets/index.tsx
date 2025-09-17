@@ -41,6 +41,8 @@ import {
   displayPriorityShieldId,
   priorityShieldHistoryKey,
   priorityShieldHistoryMenuItemId,
+  documentPriorityShieldHistoryKey,
+  currentSubQueueIdKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -172,46 +174,102 @@ async function onActivate(plugin: ReactRNPlugin) {
   // or unnecessary due to init interval? could append to this list
 
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
-  // --- Start of new history-saving logic ---
-  const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    console.log('QueueExit triggered, subQueueId:', subQueueId);
+    
+    // IMPORTANT: Get the scope BEFORE clearing it
+    const docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
+    console.log('Document scope RemIds at exit:', docScopeRemIds);
+    
+    const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
 
-  if (allRems.length > 0) {
-    // Find all outstanding due Rems for the entire KB, regardless of session progress.
-    const unreviewedDueRems = allRems.filter(
-      (rem) => Date.now() >= rem.nextRepDate
-    );
+    if (allRems.length > 0) {
+      const today = dayjs().format('YYYY-MM-DD');
+      
+      // Save KB-level priority shield
+      const unreviewedDueRems = allRems.filter(
+        (rem) => Date.now() >= rem.nextRepDate
+      );
 
-    let finalStatus = {
-      absolute: null,
-      percentile: 100, // A perfect score if no due Rems are left.
-    };
+      let kbFinalStatus = {
+        absolute: null as number | null,
+        percentile: 100,
+      };
 
-    if (unreviewedDueRems.length > 0) {
-      const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
-      if (topMissedInKb) {
-        finalStatus.absolute = topMissedInKb.priority;
-        finalStatus.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
+      if (unreviewedDueRems.length > 0) {
+        const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
+        if (topMissedInKb) {
+          kbFinalStatus.absolute = topMissedInKb.priority;
+          kbFinalStatus.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
+        }
+      }
+      
+      // Save KB history
+      const kbHistory = (await plugin.storage.getSynced(priorityShieldHistoryKey)) || {};
+      kbHistory[today] = kbFinalStatus;
+      await plugin.storage.setSynced(priorityShieldHistoryKey, kbHistory);
+      console.log('Saved KB history:', kbFinalStatus);
+      
+      // Save Document-level priority shield if we have scope data
+      // Note: We check docScopeRemIds (which we got BEFORE clearing) instead of subQueueId
+      if (docScopeRemIds && docScopeRemIds.length > 0) {
+        console.log('Processing document-level shield with', docScopeRemIds.length, 'scoped rems');
+        
+        const scopedRems = allRems.filter((rem) => docScopeRemIds.includes(rem.remId));
+        console.log('Found', scopedRems.length, 'incremental rems in document scope');
+        
+        const unreviewedDueInScope = scopedRems.filter(
+          (rem) => Date.now() >= rem.nextRepDate
+        );
+        console.log('Found', unreviewedDueInScope.length, 'due rems in document scope');
+        
+        let docFinalStatus = {
+          absolute: null as number | null,
+          percentile: 100,
+        };
+        
+        if (unreviewedDueInScope.length > 0) {
+          const topMissedInDoc = _.minBy(unreviewedDueInScope, (rem) => rem.priority);
+          if (topMissedInDoc) {
+            docFinalStatus.absolute = topMissedInDoc.priority;
+            docFinalStatus.percentile = calculateRelativePriority(scopedRems, topMissedInDoc.remId);
+          }
+        }
+        
+        // Get the stored subQueueId since the parameter might not always be passed
+        const storedSubQueueId = subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
+        
+        if (storedSubQueueId) {
+          // Save document history with subQueueId as key
+          const docHistory = (await plugin.storage.getSynced(documentPriorityShieldHistoryKey)) || {};
+          if (!docHistory[storedSubQueueId]) {
+            docHistory[storedSubQueueId] = {};
+          }
+          docHistory[storedSubQueueId][today] = docFinalStatus;
+          await plugin.storage.setSynced(documentPriorityShieldHistoryKey, docHistory);
+          console.log('Saved document history for', storedSubQueueId, ':', docFinalStatus);
+        } else {
+          console.log('Warning: No subQueueId available for saving document history');
+        }
+      } else {
+        console.log('No document scope RemIds found or empty - skipping document history save');
       }
     }
-    
-    // Save the final status for the current day.
-    const today = dayjs().format('YYYY-MM-DD');
-    const history = (await plugin.storage.getSynced(priorityShieldHistoryKey)) || {};
-    history[today] = finalStatus;
-    await plugin.storage.setSynced(priorityShieldHistoryKey, history);
-  }
-  // --- End of new history-saving logic ---
 
-  // Reset session-specific state.
-  await plugin.storage.setSession(seenRemInSessionKey, []);
-  sessionItemCounter = 0;
-  await plugin.storage.setSession(currentScopeRemIdsKey, null);
-});
+    // Reset session-specific state AFTER we've used the data
+    await plugin.storage.setSession(seenRemInSessionKey, []);
+    sessionItemCounter = 0;
+    await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    await plugin.storage.setSession(currentSubQueueIdKey, null);
+    console.log('Session state reset complete');
+  });
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     await plugin.storage.setSession(seenRemInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    // Store the current subQueueId
+    await plugin.storage.setSession(currentSubQueueIdKey, subQueueId || null);
+    console.log('QueueEnter - storing subQueueId:', subQueueId);
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
@@ -591,17 +649,24 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('priority_shield_graph', WidgetLocation.Popup, {
     dimensions: {
-      width: 800,
-      height: 800,
+      width: 1000,
+      height: 1050,
     },
   });
+
 
   plugin.app.registerMenuItem({
     id: priorityShieldHistoryMenuItemId,
     name: 'Priority Shield History',
     location: PluginCommandMenuLocation.QueueMenu,
     action: async () => {
-      await plugin.widget.openPopup('priority_shield_graph');
+      // Get the stored subQueueId from session
+      const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
+      console.log('Opening Priority Shield Graph with subQueueId:', subQueueId);
+      
+      await plugin.widget.openPopup('priority_shield_graph', {
+        subQueueId: subQueueId
+      });
     },
   });
 
