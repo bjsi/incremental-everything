@@ -16,6 +16,7 @@ import {
   currentScopeRemIdsKey,
   displayPriorityShieldId,
   seenRemInSessionKey,
+  remnoteEnvironmentId,
 } from '../lib/consts';
 import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
@@ -234,7 +235,58 @@ export function AnswerButtons() {
           </div>
         </button>
       )}
+      {(remType === 'pdf' || remType === 'pdf-highlight') && (
+        <Button
+          className="bg-blue-600 hover:bg-blue-700"
+          onClick={async () => {
+            if (rem) {
+              try {
+                console.log('Rem ID to open:', rem._id);
 
+                // Get the user's preferred environment from settings
+                const environment = await plugin.settings.getSetting<string>(remnoteEnvironmentId) || 'beta';
+                console.log('User preferred environment:', environment);
+                
+                // Construct the domain based on user preference
+                let remnoteDomain = '';
+                if (environment === 'beta') {
+                  remnoteDomain = 'https://beta.remnote.com';
+                } else {
+                  remnoteDomain = 'https://www.remnote.com';
+                }
+                
+                // Construct the document URL
+                const newUrl = `${remnoteDomain}/document/${rem._id}`;
+                console.log('Opening document URL:', newUrl);
+                
+                // Open in new tab
+                const newWindow = window.open(newUrl, '_blank');
+                
+                // If blocked by popup blocker, try link method
+                if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+                  console.log('Popup might be blocked, trying link method');
+                  const link = document.createElement('a');
+                  link.href = newUrl;
+                  link.target = '_blank';
+                  link.rel = 'noopener noreferrer';
+                  document.body.appendChild(link);
+                  link.click();
+                  setTimeout(() => document.body.removeChild(link), 100);
+                }
+                
+              } catch (error) {
+                console.error('Error opening document:', error);
+                plugin.app.toast('Error opening document - check console for details');
+              }
+            }
+          }}
+        >
+          <div className="flex flex-col items-center justify-center">
+            <div>Open Editor</div>
+            <div className="text-xs">New Tab</div>
+          </div>
+        </Button>
+      )}
       {/* vvv CHANGED: THE DISPLAY LOGIC IS NOW UPDATED FOR THE NEW FORMAT vvv */}
       {shouldDisplayShield && shieldStatus && (
         <div

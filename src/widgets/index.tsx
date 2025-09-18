@@ -43,6 +43,7 @@ import {
   priorityShieldHistoryMenuItemId,
   documentPriorityShieldHistoryKey,
   currentSubQueueIdKey,
+  remnoteEnvironmentId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -157,6 +158,25 @@ async function onActivate(plugin: ReactRNPlugin) {
     title: 'Display Priority Shield in Queue',
     description: 'If enabled, shows a real-time status of your highest-priority due items in the queue top bar.',
     defaultValue: true,
+  });
+
+  plugin.settings.registerDropdownSetting({
+    id: remnoteEnvironmentId,
+    title: 'RemNote Environment',
+    description: 'Choose which RemNote environment to open documents in (beta.remnote.com or www.remnote.com)',
+    defaultValue: 'www',
+    options: [
+      { 
+        key: 'beta', 
+        label: 'Beta (beta.remnote.com)',
+        value: 'beta'
+      },
+      { 
+        key: 'www', 
+        label: 'Regular (www.remnote.com)',
+        value: 'www'
+      }
+    ]
   });
 
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
