@@ -54,6 +54,7 @@ import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/increme
 import { calculateRelativePriority } from '../lib/priority';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
+import { getInitialPriority } from '../lib/priority_inheritance';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -463,9 +464,12 @@ async function onActivate(plugin: ReactRNPlugin) {
     if (!isAlreadyIncremental) {
       const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
       
-      // Get and constrain the default priority from settings.
+      // Get the default priority from settings
       const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
       const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
+      
+      // Try to inherit priority from closest incremental ancestor
+      const initialPriority = await getInitialPriority(plugin, rem, defaultPriority);
 
       await rem.addPowerup(powerupCode);
 
@@ -476,7 +480,11 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
 
       await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
-      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [defaultPriority.toString()]);
+      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]);
+
+      // Initialize the history property to prevent validation errors.
+      await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify([])]);
+
 
       const newIncRem = await getIncrementalRemInfo(plugin, rem);
       if (!newIncRem) {
@@ -490,8 +498,6 @@ async function onActivate(plugin: ReactRNPlugin) {
         .concat(newIncRem);
       await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
     }
-    // If the Rem is already incremental, this function will now do nothing,
-    // leaving the existing priority intact for the popup to read correctly.
   } 
 
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {

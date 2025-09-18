@@ -6,9 +6,10 @@ import {
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode, defaultPriorityId } from '../lib/consts';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
+import { findClosestIncrementalAncestor, getInitialPriority } from '../lib/priority_inheritance';
 import { IncrementalRem } from '../lib/types';
 import * as _ from 'remeda';
 
@@ -35,12 +36,30 @@ export function Priority() {
     []
   );
 
+  // Get ancestor info
+  const ancestorInfo = useRunAsync(async () => {
+    if (!remId) return null;
+    const rem = await plugin.rem.findOne(remId);
+    return await findClosestIncrementalAncestor(plugin, rem);
+  }, [remId]);
+
   const initialPriority = useTracker(async (rp) => {
     if (!remId) return 10;
     const rem = await rp.rem.findOne(remId);
     if (!rem) return 10;
-    const incRem = await getIncrementalRemInfo(plugin, rem);
-    return incRem?.priority ?? 10;
+    
+    // Check if the rem already has a priority set
+    const hasIncrementalPowerup = await rem.hasPowerup(powerupCode);
+    if (hasIncrementalPowerup) {
+      // Rem is already incremental, use its existing priority
+      const incRem = await getIncrementalRemInfo(plugin, rem);
+      return incRem?.priority ?? 10;
+    } else {
+      // Rem is not yet incremental, determine initial priority
+      const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
+      const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
+      return await getInitialPriority(plugin, rem, defaultPriority);
+    }
   }, [remId]);
 
   const [absPriority, setAbsPriority] = useState(initialPriority);
@@ -66,6 +85,13 @@ export function Priority() {
     const savePriority = async () => {
       if (!remId) return;
       const rem = await plugin.rem.findOne(remId);
+      
+      // Ensure the rem has the powerup before setting priority
+      const hasIncrementalPowerup = await rem?.hasPowerup(powerupCode);
+      if (!hasIncrementalPowerup) {
+        await rem?.addPowerup(powerupCode);
+      }
+      
       await rem?.setPowerupProperty(powerupCode, prioritySlotCode, [absPriority.toString()]);
       const newIncRem = await getIncrementalRemInfo(plugin, rem);
       if (newIncRem && allIncrementalRems) {
@@ -108,7 +134,6 @@ export function Priority() {
   }
   
   return (
-    // vvv THE EVENT LISTENER IS NOW HERE vvv
     <div 
       className="flex flex-col p-4 gap-4 priority-popup z-50"
       onKeyDown={(e) => {
@@ -119,6 +144,18 @@ export function Priority() {
       }}
     >
       <div className="text-2xl font-bold">Set Priority</div>
+
+      {/* Show ancestor info if available */}
+      {ancestorInfo && (
+        <div className="p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+            Closest Ancestor Priority: {ancestorInfo.priority}
+          </div>
+          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+            {ancestorInfo.ancestorName}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <div className="flex justify-between items-center">
@@ -131,7 +168,6 @@ export function Priority() {
             value={absPriority}
             onChange={(e) => setAbsPriority(parseInt(e.target.value))}
             className="w-20 text-center"
-            // The onKeyDown handler is removed from here
           />
         </div>
         <div className="rn-clr-content-secondary">Lower is more important.</div>
