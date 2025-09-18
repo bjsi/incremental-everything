@@ -117,6 +117,8 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
 
 - **Customizable Default Priority:** Added a new option in the plugin settings for users to set their own default priority for new incremental Rem.
 
+- **Priority Inheritance:** New incremental rems now automatically inherit the priority from their closest parent or ancestor that is also an incremental rem. This streamlines workflow by making priority management more intuitive and hierarchical, falling back to the default priority only if no ancestor is found.
+
 - **Sorting Criteria - New Flashcard Ratio selector and logic:** The Flashcard Ratio slider has been completely overhauled to be linear and intuitive, directly controlling the number of cards. This fixes persistent bugs in the queuing logic, ensuring the selected card sequence is now reliable and accurate.
 
 - **Priority Shield (= Priority Protection):** To give you a clear, actionable metric for managing your learning load, a new "Priority Shield" has been added.
@@ -126,9 +128,11 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
     -   The real-time display can be toggled on or off in the plugin's settings.
 
 
-### Review & Open in Editor
+### Easier switch between Queue and Editor with new buttons
 
-For moments when the queue's embedded view is too limited, a **"Review & Open"** button is available on the answer bar. This button first registers your review of the item (rescheduling it for the future, just like the "Next" button) and then instantly navigates you to the full RemNote editor for that item. This is ideal for detailed note-taking, using other plugins like AI tools, or performing complex edits without losing your review progress.
+- **Review & Open in Editor:** For moments when the queue's embedded view is too limited, a **"Review & Open"** button is available on the answer bar. This button first registers your review of the item (rescheduling it for the future, just like the "Next" button) and then instantly navigates you to the full RemNote editor for that item. This is ideal for detailed note-taking, using other plugins like AI tools, or performing complex edits without losing your review progress.
+
+- **"Open Editor in New Tab" (for PDFs):** As a workaround for recent RemNote changes that prevent opening an editor pane within the PDF viewer in the queue, a new button has been added for PDF rems. This allows users to quickly open the source document in a new browser tab to see the full context without exiting their review session.
 
 
 ### Other improvements
