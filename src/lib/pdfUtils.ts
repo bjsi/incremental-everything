@@ -167,7 +167,28 @@ export const findPDFinRem = async (plugin: RNPlugin, rem: Rem): Promise<Rem | nu
 const getKnownPdfRemsKey = (pdfRemId: string) => `known_pdf_rems_${pdfRemId}`;
 
 /**
+ * Get descendants up to a specified depth
+ */
+const getDescendantsToDepth = async (rem: Rem, maxDepth: number): Promise<Rem[]> => {
+  const result: Rem[] = [];
+  
+  const collectDescendants = async (currentRem: Rem, currentDepth: number) => {
+    if (currentDepth >= maxDepth) return;
+    
+    const children = await currentRem.getChildrenRem();
+    for (const child of children) {
+      result.push(child);
+      await collectDescendants(child, currentDepth + 1);
+    }
+  };
+  
+  await collectDescendants(rem, 0);
+  return result;
+};
+
+/**
  * Get all rems (incremental and non-incremental) that use a specific PDF
+ * This function is called from the page-range popup widget
  */
 export const getAllIncrementsForPDF = async (
   plugin: RNPlugin,
@@ -196,21 +217,55 @@ export const getAllIncrementsForPDF = async (
     
     console.log('Searching for rems using PDF:', pdfRemId);
     
-    // Get the list of already known related Rem IDs from persistent storage
-    const knownRemsKey = getKnownPdfRemsKey(pdfRemId);
-    let knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
-    console.log(`Found ${knownRemIds.length} known related rems in storage.`);
+    // Get the context - the incremental rem that opened the popup
+    const contextData = await plugin.storage.getSession('pageRangeContext');
+    const incrementalRemId = contextData?.incrementalRemId;
     
-    // Method 1: Add all previously known rems first (includes formerly incremental rems)
-    for (const remId of knownRemIds) {
-      if (processedRemIds.has(remId)) continue;
+    if (!incrementalRemId) {
+      console.log('No context incremental rem found, returning empty results');
+      return result;
+    }
+    
+    // Get the incremental rem that has the PDF as source (e.g., Chapter 9)
+    const incrementalRem = await plugin.rem.findOne(incrementalRemId);
+    if (!incrementalRem) {
+      console.log('Incremental rem not found');
+      return result;
+    }
+    
+    // Get the parent of this incremental rem (e.g., BTM folder)
+    let searchRoot: Rem | null = null;
+    if (incrementalRem.parent) {
+      searchRoot = await plugin.rem.findOne(incrementalRem.parent);
+    }
+    
+    // If no parent, use the incremental rem itself as the search root
+    if (!searchRoot) {
+      searchRoot = incrementalRem;
+    }
+    
+    console.log(`Search root: "${await plugin.richText.toString(searchRoot.text || [])}" (${searchRoot._id})`);
+    
+    // Collect the search root and its descendants (up to 3 levels)
+    const remsToCheck: Rem[] = [searchRoot];
+    const descendants = await getDescendantsToDepth(searchRoot, 3);
+    remsToCheck.push(...descendants);
+    
+    console.log(`Checking ${remsToCheck.length} rems (parent + descendants)`);
+    
+    // Check each rem to see if it has the target PDF as a source
+    for (const rem of remsToCheck) {
+      if (processedRemIds.has(rem._id)) continue;
+      processedRemIds.add(rem._id);
       
-      const rem = await plugin.rem.findOne(remId);
-      if (rem) {
+      // Use findPDFinRem to check if this rem has access to a PDF
+      const foundPDF = await findPDFinRem(plugin, rem);
+      
+      // Only include if the found PDF matches our target PDF
+      if (foundPDF && foundPDF._id === pdfRemId) {
         const isIncremental = await rem.hasPowerup(powerupCode);
         const remText = rem.text ? await plugin.richText.toString(rem.text) : 'Untitled';
         
-        // Check if it still has page range data (even if no longer incremental)
         const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
         const currentPage = isIncremental ? 
           await getIncrementalReadingPosition(plugin, rem._id, pdfRemId) : null;
@@ -222,138 +277,47 @@ export const getAllIncrementsForPDF = async (
           currentPage,
           isIncremental
         });
-        processedRemIds.add(rem._id);
-        console.log('Found known rem:', remText, 'Incremental:', isIncremental, 'Has range:', !!range);
+        
+        console.log(`Found rem with PDF: "${remText}" (Incremental: ${isIncremental})`);
       }
     }
     
-    // Method 2: Search through ALL rems with the incremental powerup
-    const powerup = await plugin.powerup.getPowerupByCode(powerupCode);
-    const allIncrementalRems = (await powerup?.taggedRem()) || [];
-    console.log('Found', allIncrementalRems.length, 'incremental rems');
+    // Also check known rems from storage (for formerly incremental rems)
+    const knownRemsKey = getKnownPdfRemsKey(pdfRemId);
+    let knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
     
-    for (const rem of allIncrementalRems) {
-      if (processedRemIds.has(rem._id)) continue;
+    for (const remId of knownRemIds) {
+      if (processedRemIds.has(remId)) continue;
       
-      // Check if this incremental rem or its descendants contain/reference the PDF
-      const descendants = await rem.getDescendants();
-      const sources = await rem.getSources();
-      
-      const containsPDF = rem._id === pdfRemId || 
-                          descendants.some(d => d._id === pdfRemId) ||
-                          sources.some(s => s._id === pdfRemId);
-      
-      if (containsPDF) {
+      const rem = await plugin.rem.findOne(remId);
+      if (rem) {
+        const isIncremental = await rem.hasPowerup(powerupCode);
         const remText = rem.text ? await plugin.richText.toString(rem.text) : 'Untitled';
-        const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
-        const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
         
-        result.push({
-          remId: rem._id,
-          name: remText,
-          range,
-          currentPage,
-          isIncremental: true
-        });
-        processedRemIds.add(rem._id);
-        
-        // Add to known rems for future reference
-        if (!knownRemIds.includes(rem._id)) {
-          knownRemIds.push(rem._id);
-        }
-        
-        console.log('Found incremental rem using PDF:', remText);
-      }
-    }
-    
-    // Method 3: Check all siblings and descendants in the document structure
-    if (pdfRem.parent) {
-      try {
-        const parentRem = await plugin.rem.findOne(pdfRem.parent);
-        if (parentRem) {
-          // Get all siblings (children of the same parent)
-          const siblings = await parentRem.getChildrenRem();
-          console.log('Found', siblings.length, 'siblings of the PDF');
+        // Verify it still has the PDF as source
+        const foundPDF = await findPDFinRem(plugin, rem);
+        if (foundPDF && foundPDF._id === pdfRemId) {
+          const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
+          const currentPage = isIncremental ? 
+            await getIncrementalReadingPosition(plugin, rem._id, pdfRemId) : null;
           
-          for (const sibling of siblings) {
-            if (processedRemIds.has(sibling._id)) continue;
-            if (sibling._id === pdfRemId) continue; // Skip the PDF itself
-            
-            // Check if this sibling references the PDF as a source
-            const sources = await sibling.getSources();
-            const referencesPDF = sources.some(s => s._id === pdfRemId);
-            
-            // Also check if the sibling contains the PDF in its descendants
-            const siblingDescendants = await sibling.getDescendants();
-            const containsPDF = siblingDescendants.some(d => d._id === pdfRemId);
-            
-            if (referencesPDF || containsPDF) {
-              const isIncremental = await sibling.hasPowerup(powerupCode);
-              const siblingText = sibling.text ? 
-                await plugin.richText.toString(sibling.text) : 'Untitled';
-              
-              const range = await getIncrementalPageRange(plugin, sibling._id, pdfRemId);
-              const currentPage = isIncremental ? 
-                await getIncrementalReadingPosition(plugin, sibling._id, pdfRemId) : null;
-              
-              result.push({
-                remId: sibling._id,
-                name: siblingText,
-                range,
-                currentPage,
-                isIncremental
-              });
-              processedRemIds.add(sibling._id);
-              
-              // Add to known rems for future reference
-              if (!knownRemIds.includes(sibling._id)) {
-                knownRemIds.push(sibling._id);
-              }
-              
-              console.log('Found sibling rem using PDF:', siblingText, 'Incremental:', isIncremental);
-            }
-            
-            // Check descendants of siblings
-            for (const desc of siblingDescendants) {
-              if (processedRemIds.has(desc._id)) continue;
-              
-              const descSources = await desc.getSources();
-              if (descSources.some(s => s._id === pdfRemId)) {
-                const isIncremental = await desc.hasPowerup(powerupCode);
-                const descText = desc.text ? 
-                  await plugin.richText.toString(desc.text) : 'Untitled';
-                
-                const range = await getIncrementalPageRange(plugin, desc._id, pdfRemId);
-                const currentPage = isIncremental ? 
-                  await getIncrementalReadingPosition(plugin, desc._id, pdfRemId) : null;
-                
-                result.push({
-                  remId: desc._id,
-                  name: descText,
-                  range,
-                  currentPage,
-                  isIncremental
-                });
-                processedRemIds.add(desc._id);
-                
-                // Add to known rems for future reference
-                if (!knownRemIds.includes(desc._id)) {
-                  knownRemIds.push(desc._id);
-                }
-                
-                console.log('Found descendant using PDF:', descText, 'Incremental:', isIncremental);
-              }
-            }
-          }
+          result.push({
+            remId: rem._id,
+            name: remText,
+            range,
+            currentPage,
+            isIncremental
+          });
+          processedRemIds.add(rem._id);
+          
+          console.log(`Found known rem: "${remText}" (Incremental: ${isIncremental})`);
         }
-      } catch (error) {
-        console.error('Error checking siblings:', error);
       }
     }
     
-    // Save the updated list of known rems for future use
-    await plugin.storage.setSynced(knownRemsKey, knownRemIds);
-    console.log('Saved', knownRemIds.length, 'known rems for future reference');
+    // Update the known rems list for future use
+    const allFoundRemIds = Array.from(processedRemIds);
+    await plugin.storage.setSynced(knownRemsKey, allFoundRemIds);
     
     // Sort results: incremental rems first, then by name
     result.sort((a, b) => {
@@ -363,7 +327,7 @@ export const getAllIncrementsForPDF = async (
       return a.name.localeCompare(b.name);
     });
     
-    console.log('Total rems found using PDF:', result.length);
+    console.log(`Total rems found using PDF: ${result.length}`);
     return result;
   } catch (error) {
     console.error('Error getting rems for PDF:', error);
