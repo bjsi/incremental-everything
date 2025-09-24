@@ -224,19 +224,7 @@ export function AnswerButtons() {
           </div>
         </Button>
       )}
-      {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
-        <button
-          className="bg-gray-600 text-gray-100 font-bold py-2 px-2 rounded desktop-only-hint"
-          style={{ height: '45px', cursor: 'default' }}
-        >
-          <div className="flex flex-col items-center justify-center">
-            <div>Press 'P' to</div>
-            <div className="text-xs">Edit in Previewer</div>
-          </div>
-        </button>
-      )}
-      {(remType === 'pdf' || remType === 'pdf-highlight') && (
-        <Button
+      <Button
           className="bg-blue-600 hover:bg-blue-700"
           onClick={async () => {
             if (rem) {
@@ -285,7 +273,17 @@ export function AnswerButtons() {
             <div>Open Editor</div>
             <div className="text-xs">New Tab</div>
           </div>
-        </Button>
+      </Button>
+            {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
+        <button
+          className="bg-gray-600 text-gray-100 font-bold py-2 px-2 rounded desktop-only-hint"
+          style={{ height: '45px', cursor: 'default' }}
+        >
+          <div className="flex flex-col items-center justify-center">
+            <div>Press 'P' to</div>
+            <div className="text-xs">Edit in Previewer</div>
+          </div>
+        </button>
       )}
       {/* vvv CHANGED: THE DISPLAY LOGIC IS NOW UPDATED FOR THE NEW FORMAT vvv */}
       {shouldDisplayShield && shieldStatus && (

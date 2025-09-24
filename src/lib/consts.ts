@@ -16,6 +16,7 @@ export const currentIncRemKey = 'current-inc-rem';
 
 // widgets
 export const scrollToHighlightId = 'scroll-to-highlight';
+export const pageRangeWidgetId = 'page-range';
 
 // css
 export const collapseTopBarId = 'collapse-top-bar';

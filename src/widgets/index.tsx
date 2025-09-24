@@ -44,6 +44,7 @@ import {
   documentPriorityShieldHistoryKey,
   currentSubQueueIdKey,
   remnoteEnvironmentId,
+  pageRangeWidgetId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -55,6 +56,7 @@ import { calculateRelativePriority } from '../lib/priority';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 import { getInitialPriority } from '../lib/priority_inheritance';
+import { findPDFinRem } from '../lib/pdfUtils';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -370,13 +372,23 @@ async function onActivate(plugin: ReactRNPlugin) {
       
       // Use the fetched scope for filtering.
       const seenRemIds = (await plugin.storage.getSession<RemId[]>(seenRemInSessionKey)) || [];
-      const filtered = sorted.filter((x) =>
-        queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
-          ? (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
-            (!seenRemIds.includes(x.remId) || Date.now() >= x.nextRepDate)
-          : (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
-            Date.now() >= x.nextRepDate
-      );
+      const filtered = sorted.filter((x) => {
+        const isDue = Date.now() >= x.nextRepDate;
+        const hasBeenSeen = seenRemIds.includes(x.remId);
+        const isInScope = !queueInfo.subQueueId || docScopeRemIds?.includes(x.remId);
+        
+        if (!isInScope) {
+          return false;
+        }
+
+        switch (queueInfo.mode) {
+          case 'practice-all':
+          case 'in-order':
+            return !hasBeenSeen;
+          default: // SRS mode
+            return isDue && !hasBeenSeen;
+        }
+      });
 
 
       plugin.app.registerCSS(
@@ -514,6 +526,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerWidget(pageRangeWidgetId, WidgetLocation.Popup, {
+    dimensions: {
+      width: 600, 
+      height: 800,
+    },
+  });
+
   const createExtract = async () => {
     const selection = await plugin.editor.getSelection();
     if (!selection) {
@@ -569,6 +588,48 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
       await plugin.widget.openPopup('priority', {
         remId: rem._id,
+      });
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'set-page-range',
+    name: 'Set PDF page range',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        return;
+      }
+
+      // 1. Find the associated PDF Rem within the focused Rem or its descendants
+      const pdfRem = await findPDFinRem(plugin, rem);
+
+      // 2. If no PDF is found, inform the user and stop.
+      if (!pdfRem) {
+        await plugin.app.toast('No PDF found in the focused Rem or its children.');
+        return;
+      }
+
+      // 3. Ensure the focused Rem is an incremental Rem, initializing it if necessary.
+      if (!(await rem.hasPowerup(powerupCode))) {
+        await initIncrementalRem(rem);
+      }
+
+      // 4. Prepare the context for the popup widget, similar to how the Reader does it.
+      //    This context tells the popup which incremental Rem and which PDF to work with.
+      const context = {
+        incrementalRemId: rem._id,
+        pdfRemId: pdfRem._id,
+        totalPages: undefined, // Not available in the editor context
+        currentPage: undefined, // Not available in the editor context
+      };
+
+      // 5. Store the context in session storage so the popup can access it.
+      await plugin.storage.setSession('pageRangeContext', context);
+
+      // 6. Open the popup widget.
+      await plugin.widget.openPopup(pageRangeWidgetId, {
+        remId: rem._id, // Pass remId for consistency, though the widget relies on session context.
       });
     },
   });
