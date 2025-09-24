@@ -142,7 +142,7 @@ function PageRangeWidget() {
   return (
     <div 
       className="flex flex-col p-4 gap-4"
-      style={{ minWidth: '450px', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}
+      style={{ minWidth: '450px', maxWidth: '600px', maxHeight: '95vh', overflowY: 'auto' }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
         if (e.key === 'Escape') { e.preventDefault(); handleClose(); }
@@ -270,7 +270,7 @@ function PageRangeWidget() {
       {relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="font-semibold">Other Rems Using This PDF ({relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length})</div>
-          <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
+          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
             {relatedRems
               .filter(item => item.remId !== contextData?.incrementalRemId)
               .map((item) => (
