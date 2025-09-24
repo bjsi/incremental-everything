@@ -150,7 +150,7 @@ function PageRangeWidget() {
     >
       <div className="text-2xl font-bold">📄 Set Page Range</div>
       
-      <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="text-sm rn-clr-content-secondary">
         Configure page restrictions for: 
         <span className="font-semibold"> {currentRemName || '...'}</span>
         {isCurrentRemIncremental && <span className="ml-2" title="Incremental Rem">⚡</span>}
@@ -185,14 +185,88 @@ function PageRangeWidget() {
           <div className="font-semibold text-blue-700 dark:text-blue-300">Range: Pages {pageRangeStart}-{pageRangeEnd || '∞'}</div>
         </div>
       ) : (
-        <div className="p-3 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rn-clr-content-secondary">
-          No restrictions - all pages available
+        <div className="p-3 rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
+          <div className="text-gray-700 dark:text-gray-300">No restrictions - all pages available</div>
         </div>
       )}
 
+      {/* Unassigned Ranges Display */}
+      {(() => {
+        // Calculate unassigned page ranges
+        const assignedRanges = relatedRems
+          .filter(item => item.isIncremental && item.range && item.remId !== contextData?.incrementalRemId)
+          .map(item => item.range)
+          .filter(Boolean)
+          .sort((a, b) => a.start - b.start);
+
+        if (assignedRanges.length === 0) {
+          return (
+            <div className="p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="text-sm text-green-700 dark:text-green-300">
+                ✓ All pages are available for assignment
+              </div>
+            </div>
+          );
+        }
+
+        // Find gaps in assigned ranges
+        const unassignedRanges = [];
+        let lastEnd = 0;
+        
+        for (const range of assignedRanges) {
+          if (range.start > lastEnd + 1) {
+            unassignedRanges.push({
+              start: lastEnd + 1,
+              end: range.start - 1
+            });
+          }
+          lastEnd = Math.max(lastEnd, range.end || range.start);
+        }
+        
+        // Add final range if there's a gap at the end
+        if (contextData?.totalPages && lastEnd < contextData.totalPages) {
+          unassignedRanges.push({
+            start: lastEnd + 1,
+            end: contextData.totalPages
+          });
+        } else if (!contextData?.totalPages) {
+          // If we don't know total pages, show open-ended range
+          unassignedRanges.push({
+            start: lastEnd + 1,
+            end: null
+          });
+        }
+
+        if (unassignedRanges.length > 0) {
+          return (
+            <div className="p-2 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+              <div className="text-sm text-yellow-700 dark:text-yellow-300">
+                <div className="font-semibold mb-1">Available page ranges:</div>
+                <div className="text-xs">
+                  {unassignedRanges.map((range, idx) => (
+                    <span key={idx}>
+                      {range.start}-{range.end || '∞'}
+                      {idx < unassignedRanges.length - 1 && ', '}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        } else {
+          return (
+            <div className="p-2 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <div className="text-sm text-red-700 dark:text-red-300">
+                ⚠ All pages have been assigned to other incremental rems
+              </div>
+            </div>
+          );
+        }
+      })()}
+
       <hr className="dark:border-gray-700" />
 
-      {/* Related Rems */}
+      {/* Related Rems - FIXED STYLING HERE */}
       {relatedRems.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="font-semibold">Other Rems Using This PDF ({relatedRems.length})</div>
@@ -201,19 +275,19 @@ function PageRangeWidget() {
               <div key={item.remId} className={`p-2 rounded text-sm ${
                   item.isIncremental 
                     ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
-                    : 'bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600'
+                    : 'bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600'
                 }`}>
                 <div className="flex items-center gap-2">
                   {item.isIncremental && <span title="Incremental Rem">⚡</span>}
-                  <div className="font-medium flex-1">{item.name}</div>
+                  <div className={`font-medium flex-1 ${!item.isIncremental ? 'text-gray-700 dark:text-gray-300' : ''}`}>{item.name}</div>
                 </div>
                 {item.range ? (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
                     Pages: {item.range.start} - {item.range.end || '∞'}
                     {item.isIncremental && item.currentPage && ` • At: ${item.currentPage}`}
                   </div>
                 ) : (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">No page range set</div>
+                  <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>No page range set</div>
                 )}
               </div>
             ))}
@@ -244,6 +318,11 @@ function PageRangeWidget() {
                   </div>
                 ))}
               </div>
+              {pageHistory.length > 20 && (
+                <div className="text-xs text-center mt-2 rn-clr-content-secondary">
+                  Showing last 20 entries of {pageHistory.length} total
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -289,11 +368,12 @@ function PageRangeWidget() {
           Cancel
         </button>
       </div>
+
+      <div className="text-xs rn-clr-content-secondary text-center">
+        Press Enter to save, Escape to cancel
+      </div>
     </div>
   );
 }
 
 renderWidget(PageRangeWidget);
-
-
-
