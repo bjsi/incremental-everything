@@ -267,11 +267,13 @@ function PageRangeWidget() {
       <hr className="dark:border-gray-700" />
 
       {/* Related Rems - FIXED STYLING HERE */}
-      {relatedRems.length > 0 && (
+      {relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="font-semibold">Other Rems Using This PDF ({relatedRems.length})</div>
+          <div className="font-semibold">Other Rems Using This PDF ({relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length})</div>
           <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-            {relatedRems.map((item) => (
+            {relatedRems
+              .filter(item => item.remId !== contextData?.incrementalRemId)
+              .map((item) => (
               <div key={item.remId} className={`p-2 rounded text-sm ${
                   item.isIncremental 
                     ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
