@@ -31,76 +31,6 @@ const sharedProps = {
   initOnlyShowReader: false,
 };
 
-// Function to extract page number from DOM
-function detectCurrentPageFromDOM(): number | null {
-  try {
-    // Look for RemNote's page indicator elements
-    const pageElements = document.querySelectorAll('[id*="img_p"], [class*="page"], [data-page]');
-    
-    for (const elem of pageElements) {
-      // Check ID attribute for page number (e.g., "img_p30_1")
-      if (elem.id) {
-        const match = elem.id.match(/img_p(\d+)/);
-        if (match) {
-          console.log('Detected page from ID:', match[1]);
-          return parseInt(match[1]);
-        }
-      }
-      
-      // Check data attributes
-      const dataPage = elem.getAttribute('data-page');
-      if (dataPage) {
-        const pageNum = parseInt(dataPage);
-        if (!isNaN(pageNum)) {
-          console.log('Detected page from data-page:', pageNum);
-          return pageNum;
-        }
-      }
-      
-      // Check class names
-      const classes = elem.className;
-      if (typeof classes === 'string') {
-        const match = classes.match(/page[-_](\d+)/);
-        if (match) {
-          console.log('Detected page from class:', match[1]);
-          return parseInt(match[1]);
-        }
-      }
-    }
-    
-    // Also check for visible page number in text content
-    const pageIndicators = document.querySelectorAll('[class*="page-num"], [class*="pageNum"], .rn-pdf-page-number');
-    for (const indicator of pageIndicators) {
-      const text = indicator.textContent?.trim();
-      if (text) {
-        const match = text.match(/(\d+)/);
-        if (match) {
-          console.log('Detected page from text:', match[1]);
-          return parseInt(match[1]);
-        }
-      }
-    }
-    
-    // Check the PDF viewer's URL if available
-    const pdfFrame = document.querySelector('iframe[src*="pdf"]');
-    if (pdfFrame) {
-      const src = pdfFrame.getAttribute('src');
-      if (src) {
-        const match = src.match(/[#&]page=(\d+)/);
-        if (match) {
-          console.log('Detected page from iframe URL:', match[1]);
-          return parseInt(match[1]);
-        }
-      }
-    }
-    
-  } catch (error) {
-    console.error('Error detecting page from DOM:', error);
-  }
-  
-  return null;
-}
-
 export function Reader(props: ReaderProps) {
   const { actionItem } = props;
   const plugin = usePlugin();
@@ -112,7 +42,7 @@ export function Reader(props: ReaderProps) {
   const [pageInputValue, setPageInputValue] = React.useState<string>('1');
   const [pageRangeStart, setPageRangeStart] = React.useState<number>(1);
   const [pageRangeEnd, setPageRangeEnd] = React.useState<number>(0);
-  const [lastDetectedPage, setLastDetectedPage] = React.useState<number | null>(null);
+  const [isInputFocused, setIsInputFocused] = React.useState<boolean>(false);
 
   const remData = useTracker(async (rp) => {
     try {
@@ -258,14 +188,13 @@ export function Reader(props: ReaderProps) {
     }
   }, [actionItem.rem?._id, actionItem.rem?.parent]);
 
-  // Save current page when it changes (without adding to history)
+  // Save current page when it changes
   const saveCurrentPage = React.useCallback(async (page: number) => {
     if (!remData?.incrementalRemId) return;
     
     const pageKey = `incremental_current_page_${remData.incrementalRemId}_${actionItem.rem._id}`;
     await plugin.storage.setSynced(pageKey, page);
     console.log(`Saved current page ${page} for incremental rem ${remData.incrementalRemId}`);
-    // Note: We don't add to history here anymore - that happens when leaving the card
   }, [remData?.incrementalRemId, actionItem.rem._id, plugin]);
 
   // Save final page to history when unmounting (leaving the card)
@@ -285,58 +214,6 @@ export function Reader(props: ReaderProps) {
       }
     };
   }, [remData?.incrementalRemId, actionItem.rem._id, currentPage, plugin]);
-
-  // Auto-detect page from DOM
-  React.useEffect(() => {
-    if (!isReaderReady || !remData?.incrementalRemId) return;
-    
-    const detectPage = () => {
-      const detectedPage = detectCurrentPageFromDOM();
-      if (detectedPage && detectedPage !== lastDetectedPage) {
-        console.log('Auto-detected page change:', detectedPage);
-        setLastDetectedPage(detectedPage);
-        
-        // Only update if within range and different from current
-        if (detectedPage !== currentPage) {
-          const minPage = Math.max(1, pageRangeStart);
-          const maxPage = pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || Infinity);
-          
-          if (detectedPage >= minPage && detectedPage <= maxPage) {
-            setCurrentPage(detectedPage);
-            setPageInputValue(detectedPage.toString());
-            saveCurrentPage(detectedPage);
-          }
-        }
-      }
-    };
-    
-    // Initial detection
-    setTimeout(detectPage, 500);
-    
-    // Set up mutation observer for DOM changes
-    const observer = new MutationObserver(() => {
-      detectPage();
-    });
-    
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['id', 'class', 'data-page']
-    });
-    
-    // Also detect on scroll
-    const handleScroll = () => {
-      detectPage();
-    };
-    
-    document.addEventListener('scroll', handleScroll, true);
-    
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('scroll', handleScroll, true);
-    };
-  }, [isReaderReady, remData?.incrementalRemId, currentPage, pageRangeStart, pageRangeEnd, totalPages, lastDetectedPage, saveCurrentPage]);
 
   // Handle page navigation
   const incrementPage = React.useCallback(() => {
@@ -362,19 +239,37 @@ export function Reader(props: ReaderProps) {
   }, [currentPage, pageRangeStart, saveCurrentPage]);
 
   const handlePageInputChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setPageInputValue(e.target.value);
-  }, []);
-
-  const handlePageInputSubmit = React.useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const page = parseInt(pageInputValue);
+    const value = e.target.value;
+    setPageInputValue(value);
     
+    // Immediately update page if value is valid
+    const page = parseInt(value);
     if (!isNaN(page) && page >= 1) {
       const minPage = Math.max(1, pageRangeStart);
       const maxPage = pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || Infinity);
       
+      if (page >= minPage && page <= maxPage) {
+        setCurrentPage(page);
+        saveCurrentPage(page);
+        console.log(`Updated page to ${page} via input`);
+      }
+    }
+  }, [pageRangeStart, pageRangeEnd, totalPages, saveCurrentPage]);
+
+  const handlePageInputBlur = React.useCallback(() => {
+    setIsInputFocused(false);
+    // Validate and correct input on blur
+    const page = parseInt(pageInputValue);
+    
+    if (isNaN(page) || page < 1) {
+      // Reset to current valid page
+      setPageInputValue(currentPage.toString());
+    } else {
+      const minPage = Math.max(1, pageRangeStart);
+      const maxPage = pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || Infinity);
+      
       if (page < minPage || page > maxPage) {
-        // Show error message using the plugin's toast API instead
+        // Show error message
         const message = pageRangeEnd > 0 
           ? `Page must be between ${minPage} and ${maxPage}` 
           : `Page must be ${minPage} or higher`;
@@ -383,17 +278,21 @@ export function Reader(props: ReaderProps) {
         
         // Reset to previous valid value
         setPageInputValue(currentPage.toString());
-      } else {
-        // Valid page number
+      } else if (page !== currentPage) {
+        // Valid page number that's different from current
         setCurrentPage(page);
-        setPageInputValue(page.toString());
         saveCurrentPage(page);
-        console.log(`Manually set page to ${page}`);
+        console.log(`Set page to ${page} on blur`);
       }
-    } else {
-      setPageInputValue(currentPage.toString());
     }
-  }, [pageInputValue, currentPage, totalPages, pageRangeStart, pageRangeEnd, saveCurrentPage, plugin]);
+  }, [pageInputValue, currentPage, pageRangeStart, pageRangeEnd, totalPages, saveCurrentPage, plugin]);
+
+  const handlePageInputKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      (e.target as HTMLInputElement).blur();
+    }
+  }, []);
 
   const handleSetPageRange = React.useCallback(async () => {
     if (!remData?.incrementalRemId || !remData?.pdfRemId) {
@@ -422,8 +321,6 @@ export function Reader(props: ReaderProps) {
 
   // Listen for popup close and reload settings
   React.useEffect(() => {
-    let lastCheckTime = Date.now();
-    
     const checkForChanges = async () => {
       if (!remData?.incrementalRemId) return;
       
@@ -439,29 +336,36 @@ export function Reader(props: ReaderProps) {
           setPageRangeStart(range.start);
           setPageRangeEnd(range.end);
           console.log(`Page range updated: ${range.start}-${range.end}`);
+          
+          // Ensure current page is within new range
+          const minPage = Math.max(1, range.start);
+          const maxPage = range.end > 0 ? Math.min(range.end, totalPages || Infinity) : (totalPages || Infinity);
+          
+          if (currentPage < minPage) {
+            setCurrentPage(minPage);
+            setPageInputValue(minPage.toString());
+            saveCurrentPage(minPage);
+          } else if (currentPage > maxPage) {
+            setCurrentPage(maxPage);
+            setPageInputValue(maxPage.toString());
+            saveCurrentPage(maxPage);
+          }
         }
       } else if (pageRangeStart !== 1 || pageRangeEnd !== 0) {
         setPageRangeStart(1);
         setPageRangeEnd(0);
         console.log('Page range cleared');
       }
-      
-      // Check if popup was recently opened
-      const popupOpen = await plugin.storage.getSession('pageRangePopupOpen');
-      if (popupOpen) {
-        lastCheckTime = Date.now();
-        await plugin.storage.setSession('pageRangePopupOpen', false);
-      }
     };
     
-    // Check every 2 seconds, more frequently after popup interaction
+    // Check every 2 seconds
     const interval = setInterval(checkForChanges, 2000);
     
     // Also check immediately when this effect runs
     checkForChanges();
     
     return () => clearInterval(interval);
-  }, [remData?.incrementalRemId, actionItem.rem._id, plugin, pageRangeStart, pageRangeEnd]);
+  }, [remData?.incrementalRemId, actionItem.rem._id, plugin, pageRangeStart, pageRangeEnd, currentPage, totalPages, saveCurrentPage]);
 
   const handleClearPageRange = React.useCallback(async () => {
     if (!remData?.incrementalRemId) return;
@@ -512,7 +416,6 @@ export function Reader(props: ReaderProps) {
     };
     
     loadSavedSettings();
-    // No polling - only load once
   }, [remData?.incrementalRemId, actionItem.rem._id, plugin]);
 
   // Handle highlights
@@ -641,7 +544,7 @@ export function Reader(props: ReaderProps) {
                       ←
                     </button>
                     
-                    <form onSubmit={handlePageInputSubmit} className="flex items-center gap-1">
+                    <div className="flex items-center gap-1">
                       <span className="text-xs">Page</span>
                       <input
                         type="number"
@@ -649,16 +552,13 @@ export function Reader(props: ReaderProps) {
                         max={pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || undefined)}
                         value={pageInputValue}
                         onChange={handlePageInputChange}
-                        onBlur={handlePageInputSubmit}
+                        onBlur={handlePageInputBlur}
+                        onFocus={() => setIsInputFocused(true)}
+                        onKeyDown={handlePageInputKeyDown}
                         className="w-12 px-1 py-1 text-xs border rounded text-center dark:bg-gray-800 dark:border-gray-600"
                       />
                       {totalPages > 0 && <span className="text-xs">of {totalPages}</span>}
-                      {lastDetectedPage && lastDetectedPage !== currentPage && (
-                        <span className="text-xs text-orange-600" title="Auto-detected page differs from saved position">
-                          (auto: {lastDetectedPage})
-                        </span>
-                      )}
-                    </form>
+                    </div>
                     
                     <button 
                       onClick={incrementPage}
