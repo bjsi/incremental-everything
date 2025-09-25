@@ -9,11 +9,16 @@ import React, { useState, useEffect } from 'react';
 import { 
   getPageRangeKey, 
   getPageHistory,
-  getAllIncrementsForPDF 
+  getAllIncrementsForPDF,
+  getIncrementalPageRange
 } from '../lib/pdfUtils';
-import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, defaultPriorityId } from '../lib/consts';
+import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, defaultPriorityId, allIncrementalRemKey } from '../lib/consts';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getInitialPriority } from '../lib/priority_inheritance';
+import { percentileToHslColor } from '../lib/color';
+import { calculateRelativePriority } from '../lib/priority';
+import { IncrementalRem } from '../lib/types';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
@@ -24,6 +29,11 @@ function PageRangeWidget() {
       console.log('PageRange: Context data from session:', data);
       return data;
     },
+    []
+  );
+
+  const allIncrementalRems = useTracker(
+    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
     []
   );
 
@@ -39,6 +49,9 @@ function PageRangeWidget() {
   const [expandedRems, setExpandedRems] = useState<Set<string>>(new Set());
   const [editingRemId, setEditingRemId] = useState<string | null>(null);
   const [editingRanges, setEditingRanges] = useState<Record<string, {start: number, end: number}>>({});
+  const [remPriorities, setRemPriorities] = useState<Record<string, {absolute: number, percentile: number | null}>>({});
+  const [editingPriorityRemId, setEditingPriorityRemId] = useState<string | null>(null);
+  const [editingPriorities, setEditingPriorities] = useState<Record<string, number>>({});
 
   // Initialize an incremental rem
   const initIncrementalRem = async (remId: string) => {
@@ -71,18 +84,91 @@ function PageRangeWidget() {
         // Initialize history
         await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify([])]);
         
-        // Open priority popup for fine-tuning
-        await plugin.widget.openPopup('priority', { remId });
+        // Update the all incremental rems list
+        const newIncRem = await getIncrementalRemInfo(plugin, rem);
+        if (newIncRem) {
+          const currentAllRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+          const updatedAllRems = [...currentAllRems, newIncRem];
+          await plugin.storage.setSession(allIncrementalRemKey, updatedAllRems);
+        }
         
         // Reload the related rems list
         await reloadRelatedRems();
         
-        await plugin.app.toast(`Made "${rem.text ? await plugin.richText.toString(rem.text) : 'Rem'}" incremental with priority ${initialPriority}`);
+        const remName = rem.text ? await plugin.richText.toString(rem.text) : 'Rem';
+        await plugin.app.toast(`Made "${remName}" incremental with priority ${initialPriority}`);
       }
     } catch (error) {
       console.error('Error initializing incremental rem:', error);
       await plugin.app.toast('Error making rem incremental');
     }
+  };
+
+  // Start editing priority inline
+  const startEditingPriority = async (remId: string) => {
+    const rem = await plugin.rem.findOne(remId);
+    if (rem) {
+      const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+      if (incRemInfo) {
+        setEditingPriorityRemId(remId);
+        setEditingPriorities({
+          ...editingPriorities,
+          [remId]: incRemInfo.priority
+        });
+      }
+    }
+  };
+
+  // Save priority inline
+  const savePriority = async (remId: string) => {
+    const priority = editingPriorities[remId];
+    if (priority !== undefined) {
+      const rem = await plugin.rem.findOne(remId);
+      if (rem) {
+        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+        
+        // Update the incremental rem list
+        const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+        if (incRemInfo) {
+          const currentAllRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+          const updatedAllRems = currentAllRems
+            .filter((x) => x.remId !== remId)
+            .concat(incRemInfo);
+          await plugin.storage.setSession(allIncrementalRemKey, updatedAllRems);
+        }
+        
+        setEditingPriorityRemId(null);
+        await reloadRelatedRems();
+        await plugin.app.toast(`Priority updated to ${priority}`);
+      }
+    }
+  };
+
+  // Calculate priority info for each incremental rem
+  const calculatePriorities = async (rems: any[], allRems?: IncrementalRem[]) => {
+    const priorities: Record<string, {absolute: number, percentile: number | null}> = {};
+    
+    // Use passed allRems or fetch from storage
+    const remsForCalculation = allRems || (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    
+    for (const rem of rems) {
+      if (rem.isIncremental) {
+        const remObj = await plugin.rem.findOne(rem.remId);
+        if (remObj) {
+          const incRemInfo = await getIncrementalRemInfo(plugin, remObj);
+          if (incRemInfo) {
+            const percentile = remsForCalculation.length > 0 ? 
+              calculateRelativePriority(remsForCalculation, rem.remId) : null;
+            priorities[rem.remId] = {
+              absolute: incRemInfo.priority,
+              percentile
+            };
+          }
+        }
+      }
+    }
+    
+    setRemPriorities(priorities);
   };
 
   // Reload the related rems list
@@ -91,6 +177,12 @@ function PageRangeWidget() {
     
     const related = await getAllIncrementsForPDF(plugin, contextData.pdfRemId);
     setRelatedRems(related);
+    
+    // Ensure we have the latest all incremental rems data
+    const allRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+    
+    // Calculate priorities with the fetched data
+    await calculatePriorities(related, allRems);
     
     // Fetch reading histories for each related rem
     const histories: Record<string, Array<{page: number, timestamp: number}>> = {};
@@ -123,8 +215,8 @@ function PageRangeWidget() {
     setEditingRemId(remId);
     
     // Load existing range for this rem
-    const savedRange = await plugin.storage.getSynced(getPageRangeKey(remId, contextData.pdfRemId));
-    if (savedRange && typeof savedRange === 'object') {
+    const savedRange = await getIncrementalPageRange(plugin, remId, contextData.pdfRemId);
+    if (savedRange) {
       setEditingRanges({
         ...editingRanges,
         [remId]: { start: savedRange.start || 1, end: savedRange.end || 0 }
@@ -180,8 +272,8 @@ function PageRangeWidget() {
         }
         
         // Load page range for current rem
-        const savedRange = await plugin.storage.getSynced(getPageRangeKey(incrementalRemId, pdfRemId));
-        if (savedRange && typeof savedRange === 'object') {
+        const savedRange = await getIncrementalPageRange(plugin, incrementalRemId, pdfRemId);
+        if (savedRange) {
           setPageRangeStart(savedRange.start || 1);
           setPageRangeEnd(savedRange.end || 0);
         } else {
@@ -189,7 +281,7 @@ function PageRangeWidget() {
           setPageRangeEnd(0);
         }
         
-        // Load related rems
+        // Load related rems with priorities
         await reloadRelatedRems();
         
         // Load history for current rem
@@ -261,10 +353,10 @@ function PageRangeWidget() {
     );
   }
   
-  // Calculate unassigned ranges
+  // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
     const assignedRanges = relatedRems
-      .filter(item => item.isIncremental && item.range && item.remId !== contextData?.incrementalRemId)
+      .filter(item => item.isIncremental && item.range)
       .map(item => item.range)
       .filter(Boolean)
       .sort((a, b) => a.start - b.start);
@@ -292,13 +384,45 @@ function PageRangeWidget() {
     return unassignedRanges;
   };
   
+  // Sort related rems: current first, then by page range, then alphabetically
+  const sortedRelatedRems = [...relatedRems].sort((a, b) => {
+    // Current rem always first
+    if (a.remId === contextData?.incrementalRemId) return -1;
+    if (b.remId === contextData?.incrementalRemId) return 1;
+    
+    // Incremental rems before non-incremental
+    if (a.isIncremental !== b.isIncremental) {
+      return a.isIncremental ? -1 : 1;
+    }
+    
+    // Both have page ranges: sort by start page
+    if (a.range && b.range) {
+      return a.range.start - b.range.start;
+    }
+    
+    // Only a has page range: a comes first
+    if (a.range && !b.range) return -1;
+    
+    // Only b has page range: b comes first
+    if (!a.range && b.range) return 1;
+    
+    // Neither has page range: sort alphabetically
+    return a.name.localeCompare(b.name);
+  });
+  
   return (
     <div 
       className="flex flex-col p-4 gap-4"
       style={{ minWidth: '550px', maxWidth: '700px', maxHeight: '95vh', overflowY: 'auto' }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !editingRemId) { e.preventDefault(); handleSave(); }
-        if (e.key === 'Escape' && !editingRemId) { e.preventDefault(); handleClose(); }
+        if (e.key === 'Enter' && !editingRemId && !editingPriorityRemId) { 
+          e.preventDefault(); 
+          handleSave(); 
+        }
+        if (e.key === 'Escape' && !editingRemId && !editingPriorityRemId) { 
+          e.preventDefault(); 
+          handleClose(); 
+        }
       }}
     >
       <div className="text-2xl font-bold">📄 PDF Control Panel</div>
@@ -311,7 +435,7 @@ function PageRangeWidget() {
 
       {/* Current Rem Settings */}
       <div className="p-3 border rounded dark:border-gray-600">
-        <div className="font-semibold mb-2">Current Rem Page Range</div>
+        <div className="font-semibold mb-2">Quick Edit - Current Rem Page Range</div>
         <div className="flex flex-col gap-2">
           <div className="flex gap-4">
             <div className="flex items-center gap-2">
@@ -372,19 +496,24 @@ function PageRangeWidget() {
 
       <hr className="dark:border-gray-700" />
 
-      {/* Enhanced Control Panel for Other Rems */}
-      {relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="font-semibold">All Rems Using This PDF ({relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length})</div>
-          <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
-            {relatedRems
-              .filter(item => item.remId !== contextData?.incrementalRemId)
-              .map((item) => (
+      {/* All Rems Using This PDF (including current) */}
+      <div className="flex flex-col gap-2">
+        <div className="font-semibold">All Rems Using This PDF ({sortedRelatedRems.length})</div>
+        <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+          {sortedRelatedRems.map((item) => {
+            const isCurrentRem = item.remId === contextData?.incrementalRemId;
+            const priorityInfo = remPriorities[item.remId];
+            const priorityColor = priorityInfo?.percentile ? 
+              percentileToHslColor(priorityInfo.percentile) : 'transparent';
+            
+            return (
               <div key={item.remId} className={`rounded ${
-                  item.isIncremental 
+                isCurrentRem 
+                  ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700'
+                  : item.isIncremental 
                     ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
                     : 'bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                }`}>
+              }`}>
                 {/* Main Rem Info - Clickable */}
                 <div 
                   className="p-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
@@ -395,7 +524,18 @@ function PageRangeWidget() {
                     {item.isIncremental && <span title="Incremental Rem">⚡</span>}
                     <div className={`font-medium flex-1 text-sm ${!item.isIncremental ? 'text-gray-700 dark:text-gray-300' : ''}`}>
                       {item.name}
+                      {isCurrentRem && <span className="ml-2 text-xs text-green-600 dark:text-green-400">(current)</span>}
                     </div>
+                    {/* Priority Badge with Color */}
+                    {item.isIncremental && priorityInfo && (
+                      <div 
+                        className="px-2 py-0.5 rounded text-xs font-semibold text-white"
+                        style={{ backgroundColor: priorityColor }}
+                        title={`Priority: ${priorityInfo.absolute} (${priorityInfo.percentile}% of KB)`}
+                      >
+                        P:{priorityInfo.absolute} ({priorityInfo.percentile}%)
+                      </div>
+                    )}
                   </div>
                   {item.range ? (
                     <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
@@ -433,7 +573,7 @@ function PageRangeWidget() {
                 {expandedRems.has(item.remId) && (
                   <div className="border-t border-gray-300 dark:border-gray-600 p-2">
                     {/* Action Buttons */}
-                    <div className="flex gap-2 mb-2">
+                    <div className="flex gap-2 mb-2 flex-wrap">
                       {!item.isIncremental ? (
                         <button
                           onClick={() => initIncrementalRem(item.remId)}
@@ -445,20 +585,120 @@ function PageRangeWidget() {
                         >
                           Make Incremental
                         </button>
-                      ) : editingRemId === item.remId ? (
+                      ) : (
                         <>
+                          {editingRemId === item.remId ? (
+                            <>
+                              <button
+                                onClick={() => saveRemRange(item.remId)}
+                                className="px-3 py-1 text-xs rounded"
+                                style={{
+                                  backgroundColor: '#3B82F6',
+                                  color: 'white',
+                                }}
+                              >
+                                Save Range
+                              </button>
+                              <button
+                                onClick={() => setEditingRemId(null)}
+                                className="px-3 py-1 text-xs rounded"
+                                style={{
+                                  backgroundColor: '#6B7280',
+                                  color: 'white',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : editingPriorityRemId === item.remId ? (
+                            <button
+                              onClick={() => setEditingPriorityRemId(null)}
+                              className="px-3 py-1 text-xs rounded"
+                              style={{
+                                backgroundColor: '#6B7280',
+                                color: 'white',
+                              }}
+                            >
+                              Cancel Priority Edit
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => startEditingRem(item.remId)}
+                                className="px-3 py-1 text-xs rounded"
+                                style={{
+                                  backgroundColor: '#3B82F6',
+                                  color: 'white',
+                                }}
+                              >
+                                Edit Page Range
+                              </button>
+                              <button
+                                onClick={() => startEditingPriority(item.remId)}
+                                className="px-3 py-1 text-xs rounded"
+                                style={{
+                                  backgroundColor: '#8B5CF6',
+                                  color: 'white',
+                                }}
+                              >
+                                Edit Priority
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Inline Priority Editor */}
+                    {editingPriorityRemId === item.remId && (
+                      <div className="flex flex-col gap-2 mb-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-semibold">Priority:</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={editingPriorities[item.remId]}
+                            onChange={(e) => setEditingPriorities({
+                              ...editingPriorities,
+                              [item.remId]: Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                            })}
+                            className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                          />
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={editingPriorities[item.remId]}
+                            onChange={(e) => setEditingPriorities({
+                              ...editingPriorities,
+                              [item.remId]: parseInt(e.target.value)
+                            })}
+                            className="flex-1"
+                            style={{ accentColor: percentileToHslColor(
+                              calculateRelativePriority(
+                                allIncrementalRems || [], 
+                                item.remId
+                              ) || 50
+                            )}}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          Lower values = higher priority (0 is highest, 100 is lowest)
+                        </div>
+                        <div className="flex gap-2">
                           <button
-                            onClick={() => saveRemRange(item.remId)}
+                            onClick={() => savePriority(item.remId)}
                             className="px-3 py-1 text-xs rounded"
                             style={{
-                              backgroundColor: '#3B82F6',
+                              backgroundColor: '#8B5CF6',
                               color: 'white',
                             }}
                           >
-                            Save Range
+                            Save Priority
                           </button>
                           <button
-                            onClick={() => setEditingRemId(null)}
+                            onClick={() => setEditingPriorityRemId(null)}
                             className="px-3 py-1 text-xs rounded"
                             style={{
                               backgroundColor: '#6B7280',
@@ -467,20 +707,9 @@ function PageRangeWidget() {
                           >
                             Cancel
                           </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => startEditingRem(item.remId)}
-                          className="px-3 py-1 text-xs rounded"
-                          style={{
-                            backgroundColor: '#3B82F6',
-                            color: 'white',
-                          }}
-                        >
-                          Edit Page Range
-                        </button>
-                      )}
-                    </div>
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Page Range Editor */}
                     {editingRemId === item.remId && editingRanges[item.remId] && (
@@ -542,38 +771,12 @@ function PageRangeWidget() {
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      )}
+      </div>
 
       <hr className="dark:border-gray-700" />
-
-      {/* Current Rem's History */}
-      {pageHistory.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center">
-            <div className="font-semibold text-sm">Current Rem Reading History</div>
-            <button onClick={() => setShowHistory(!showHistory)} className="text-xs px-2 py-1 border rounded dark:border-gray-600">
-              {showHistory ? 'Hide' : 'Show'}
-            </button>
-          </div>
-          {showHistory && (
-            <div className="max-h-32 overflow-y-auto">
-              <div className="grid grid-cols-3 gap-1 text-xs">
-                {pageHistory.slice(-15).reverse().map((entry, idx) => (
-                  <div key={idx} className="p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                    <div className="font-semibold">Page {entry.page}</div>
-                    <div className="text-blue-600 dark:text-blue-400">
-                      {new Date(entry.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Actions */}
       <div className="flex gap-2 pt-2">

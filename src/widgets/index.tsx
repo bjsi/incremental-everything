@@ -529,7 +529,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.app.registerWidget(pageRangeWidgetId, WidgetLocation.Popup, {
     dimensions: {
       width: 600, 
-      height: 950,
+      height: 900,
     },
   });
 
