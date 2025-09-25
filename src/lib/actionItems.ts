@@ -10,6 +10,25 @@ export const remToActionItemType = async (
   plugin: RNPlugin,
   rem: Rem
 ): Promise<RemAndType | null> => {
+  // Check if this rem has a tag reference to "extractviewer"
+  // This allows chapters with PDF sources to be viewed as extracts
+  try {
+    // Get all tags for this rem
+    const tags = await rem.getTagRems();
+    
+    for (const tagRem of tags) {
+      const tagText = await plugin.richText.toString(tagRem.text);
+      console.log(`Checking tag: "${tagText}" for rem: "${await plugin.richText.toString(rem.text)}"`);
+      
+      if (tagText.toLowerCase() === 'extractviewer' || 
+          tagText.toLowerCase() === 'extract viewer') {
+        console.log('Found extractviewer tag! Opening in ExtractViewer');
+        return { rem, type: 'rem' };
+      }
+    }
+  } catch (error) {
+    console.log('Error checking for extractviewer tag:', error);
+  }
   if (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) {
     const pdfId = (
       (
