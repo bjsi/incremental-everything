@@ -33,6 +33,7 @@ function PageRangeWidget() {
   const [showHistory, setShowHistory] = useState(false);
   const [currentRemName, setCurrentRemName] = useState<string>('');
   const [isCurrentRemIncremental, setIsCurrentRemIncremental] = useState<boolean>(false);
+  const [remHistories, setRemHistories] = useState<Record<string, Array<{page: number, timestamp: number}>>>({});
 
   // This effect loads all the necessary data when the popup opens.
   useEffect(() => {
@@ -68,6 +69,18 @@ function PageRangeWidget() {
         // Fetch the master list of related Rems using our definitive logic.
         const related = await getAllIncrementsForPDF(plugin, pdfRemId);
         setRelatedRems(related);
+        
+        // Fetch reading histories for each related rem that has a current page
+        const histories: Record<string, Array<{page: number, timestamp: number}>> = {};
+        for (const item of related) {
+          if (item.currentPage) {
+            const history = await getPageHistory(plugin, item.remId, pdfRemId);
+            if (history.length > 0) {
+              histories[item.remId] = history;
+            }
+          }
+        }
+        setRemHistories(histories);
         
         // Fetch the reading history for the current Rem.
         const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
@@ -266,7 +279,7 @@ function PageRangeWidget() {
 
       <hr className="dark:border-gray-700" />
 
-      {/* Related Rems - FIXED STYLING HERE */}
+      {/* Related Rems - WITH LAST REVIEW TIMESTAMP */}
       {relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="font-semibold">Other Rems Using This PDF ({relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length})</div>
@@ -286,7 +299,27 @@ function PageRangeWidget() {
                 {item.range ? (
                   <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
                     Pages: {item.range.start} - {item.range.end || '∞'}
-                    {item.isIncremental && item.currentPage && ` • At: ${item.currentPage}`}
+                    {item.isIncremental && item.currentPage && (
+                      <>
+                        {` • At: ${item.currentPage}`}
+                        {remHistories[item.remId] && (() => {
+                          const lastEntry = remHistories[item.remId][remHistories[item.remId].length - 1];
+                          if (lastEntry && lastEntry.timestamp) {
+                            const date = new Date(lastEntry.timestamp);
+                            return ` (${date.toLocaleDateString('en-US', { 
+                              month: 'numeric', 
+                              day: 'numeric', 
+                              year: '2-digit' 
+                            })}, ${date.toLocaleTimeString('en-US', { 
+                              hour: 'numeric', 
+                              minute: '2-digit',
+                              hour12: true 
+                            })})`;
+                          }
+                          return '';
+                        })()}
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>No page range set</div>
