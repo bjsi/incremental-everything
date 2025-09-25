@@ -11,13 +11,15 @@ import {
   getPageHistory,
   getAllIncrementsForPDF 
 } from '../lib/pdfUtils';
+import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, defaultPriorityId } from '../lib/consts';
+import { getDailyDocReferenceForDate } from '../lib/date';
+import { getInitialPriority } from '../lib/priority_inheritance';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
   
   const contextData = useTracker(
     async (rp) => {
-      // Fetches the context (remId, pdfRemId) passed when the popup was opened.
       const data = await rp.storage.getSession('pageRangeContext');
       console.log('PageRange: Context data from session:', data);
       return data;
@@ -34,8 +36,129 @@ function PageRangeWidget() {
   const [currentRemName, setCurrentRemName] = useState<string>('');
   const [isCurrentRemIncremental, setIsCurrentRemIncremental] = useState<boolean>(false);
   const [remHistories, setRemHistories] = useState<Record<string, Array<{page: number, timestamp: number}>>>({});
+  const [expandedRems, setExpandedRems] = useState<Set<string>>(new Set());
+  const [editingRemId, setEditingRemId] = useState<string | null>(null);
+  const [editingRanges, setEditingRanges] = useState<Record<string, {start: number, end: number}>>({});
 
-  // This effect loads all the necessary data when the popup opens.
+  // Initialize an incremental rem
+  const initIncrementalRem = async (remId: string) => {
+    try {
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) return;
+      
+      const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
+      if (!isAlreadyIncremental) {
+        // Get default priority from settings
+        const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
+        const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
+        
+        // Try to inherit priority from closest incremental ancestor
+        const initialPriority = await getInitialPriority(plugin, rem, defaultPriority);
+        
+        // Add powerup
+        await rem.addPowerup(powerupCode);
+        
+        // Set initial interval (using 1 day as default)
+        const nextRepDate = new Date(Date.now() + (1 * 24 * 60 * 60 * 1000));
+        const dateRef = await getDailyDocReferenceForDate(plugin, nextRepDate);
+        if (dateRef) {
+          await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
+        }
+        
+        // Set priority
+        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]);
+        
+        // Initialize history
+        await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify([])]);
+        
+        // Open priority popup for fine-tuning
+        await plugin.widget.openPopup('priority', { remId });
+        
+        // Reload the related rems list
+        await reloadRelatedRems();
+        
+        await plugin.app.toast(`Made "${rem.text ? await plugin.richText.toString(rem.text) : 'Rem'}" incremental with priority ${initialPriority}`);
+      }
+    } catch (error) {
+      console.error('Error initializing incremental rem:', error);
+      await plugin.app.toast('Error making rem incremental');
+    }
+  };
+
+  // Reload the related rems list
+  const reloadRelatedRems = async () => {
+    if (!contextData?.pdfRemId) return;
+    
+    const related = await getAllIncrementsForPDF(plugin, contextData.pdfRemId);
+    setRelatedRems(related);
+    
+    // Fetch reading histories for each related rem
+    const histories: Record<string, Array<{page: number, timestamp: number}>> = {};
+    for (const item of related) {
+      if (item.currentPage) {
+        const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
+        if (history.length > 0) {
+          histories[item.remId] = history;
+        }
+      }
+    }
+    setRemHistories(histories);
+  };
+
+  // Toggle expanded state for a rem
+  const toggleExpanded = (remId: string) => {
+    const newExpanded = new Set(expandedRems);
+    if (newExpanded.has(remId)) {
+      newExpanded.delete(remId);
+    } else {
+      newExpanded.add(remId);
+    }
+    setExpandedRems(newExpanded);
+  };
+
+  // Start editing page range for a specific rem
+  const startEditingRem = async (remId: string) => {
+    if (!contextData?.pdfRemId) return;
+    
+    setEditingRemId(remId);
+    
+    // Load existing range for this rem
+    const savedRange = await plugin.storage.getSynced(getPageRangeKey(remId, contextData.pdfRemId));
+    if (savedRange && typeof savedRange === 'object') {
+      setEditingRanges({
+        ...editingRanges,
+        [remId]: { start: savedRange.start || 1, end: savedRange.end || 0 }
+      });
+    } else {
+      setEditingRanges({
+        ...editingRanges,
+        [remId]: { start: 1, end: 0 }
+      });
+    }
+  };
+
+  // Save page range for a specific rem
+  const saveRemRange = async (remId: string) => {
+    if (!contextData?.pdfRemId) return;
+    
+    const range = editingRanges[remId];
+    if (!range) return;
+    
+    const rangeKey = getPageRangeKey(remId, contextData.pdfRemId);
+    
+    if (range.start > 1 || range.end > 0) {
+      await plugin.storage.setSynced(rangeKey, range);
+      await plugin.app.toast(`Saved page range: ${range.start}-${range.end || '∞'}`);
+    } else {
+      await plugin.storage.setSynced(rangeKey, null);
+      await plugin.app.toast('Cleared page range');
+    }
+    
+    setEditingRemId(null);
+    await reloadRelatedRems();
+  };
+
+  // Load data effect
   useEffect(() => {
     const loadData = async () => {
       if (!contextData?.incrementalRemId || !contextData?.pdfRemId) {
@@ -47,7 +170,7 @@ function PageRangeWidget() {
         setIsLoading(true);
         const { incrementalRemId, pdfRemId } = contextData;
         
-        // Fetch details for the Rem the popup was opened for.
+        // Fetch current rem details
         const currentRem = await plugin.rem.findOne(incrementalRemId);
         if (currentRem) {
           const remText = currentRem.text ? await plugin.richText.toString(currentRem.text) : 'Untitled';
@@ -56,7 +179,7 @@ function PageRangeWidget() {
           setIsCurrentRemIncremental(isIncremental);
         }
         
-        // Load the page range for the current Rem.
+        // Load page range for current rem
         const savedRange = await plugin.storage.getSynced(getPageRangeKey(incrementalRemId, pdfRemId));
         if (savedRange && typeof savedRange === 'object') {
           setPageRangeStart(savedRange.start || 1);
@@ -66,23 +189,10 @@ function PageRangeWidget() {
           setPageRangeEnd(0);
         }
         
-        // Fetch the master list of related Rems using our definitive logic.
-        const related = await getAllIncrementsForPDF(plugin, pdfRemId);
-        setRelatedRems(related);
+        // Load related rems
+        await reloadRelatedRems();
         
-        // Fetch reading histories for each related rem that has a current page
-        const histories: Record<string, Array<{page: number, timestamp: number}>> = {};
-        for (const item of related) {
-          if (item.currentPage) {
-            const history = await getPageHistory(plugin, item.remId, pdfRemId);
-            if (history.length > 0) {
-              histories[item.remId] = history;
-            }
-          }
-        }
-        setRemHistories(histories);
-        
-        // Fetch the reading history for the current Rem.
+        // Load history for current rem
         const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
         setPageHistory(history || []);
         
@@ -129,7 +239,6 @@ function PageRangeWidget() {
 
   const inputStartRef = React.useRef<HTMLInputElement>(null);
   
-  // Focus the first input field once data is loaded.
   useEffect(() => {
     if (!isLoading && contextData) {
       setTimeout(() => {
@@ -152,177 +261,285 @@ function PageRangeWidget() {
     );
   }
   
+  // Calculate unassigned ranges
+  const getUnassignedRanges = () => {
+    const assignedRanges = relatedRems
+      .filter(item => item.isIncremental && item.range && item.remId !== contextData?.incrementalRemId)
+      .map(item => item.range)
+      .filter(Boolean)
+      .sort((a, b) => a.start - b.start);
+
+    const unassignedRanges = [];
+    let lastEnd = 0;
+    
+    for (const range of assignedRanges) {
+      if (range.start > lastEnd + 1) {
+        unassignedRanges.push({
+          start: lastEnd + 1,
+          end: range.start - 1
+        });
+      }
+      lastEnd = Math.max(lastEnd, range.end || range.start);
+    }
+    
+    if (!contextData?.totalPages || lastEnd < 1000) {
+      unassignedRanges.push({
+        start: lastEnd + 1,
+        end: null
+      });
+    }
+    
+    return unassignedRanges;
+  };
+  
   return (
     <div 
       className="flex flex-col p-4 gap-4"
-      style={{ minWidth: '450px', maxWidth: '600px', maxHeight: '95vh', overflowY: 'auto' }}
+      style={{ minWidth: '550px', maxWidth: '700px', maxHeight: '95vh', overflowY: 'auto' }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
-        if (e.key === 'Escape') { e.preventDefault(); handleClose(); }
+        if (e.key === 'Enter' && !editingRemId) { e.preventDefault(); handleSave(); }
+        if (e.key === 'Escape' && !editingRemId) { e.preventDefault(); handleClose(); }
       }}
     >
-      <div className="text-2xl font-bold">📄 Set Page Range</div>
+      <div className="text-2xl font-bold">📄 PDF Control Panel</div>
       
       <div className="text-sm rn-clr-content-secondary">
-        Configure page restrictions for: 
+        Current rem: 
         <span className="font-semibold"> {currentRemName || '...'}</span>
         {isCurrentRemIncremental && <span className="ml-2" title="Incremental Rem">⚡</span>}
       </div>
 
-      {/* Inputs */}
-      <div className="flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <label className="font-semibold">Start Page</label>
-          <input
-            ref={inputStartRef} type="number" min="1"
-            value={pageRangeStart}
-            onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
-            className="w-20 text-center p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
-          />
-        </div>
-        <div className="flex justify-between items-center">
-          <label className="font-semibold">End Page (optional)</label>
-          <input
-            type="number" min={pageRangeStart}
-            value={pageRangeEnd || ''}
-            onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
-            placeholder="No limit"
-            className="w-20 text-center p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
-          />
+      {/* Current Rem Settings */}
+      <div className="p-3 border rounded dark:border-gray-600">
+        <div className="font-semibold mb-2">Current Rem Page Range</div>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-4">
+            <div className="flex items-center gap-2">
+              <label>Start:</label>
+              <input
+                ref={inputStartRef} type="number" min="1"
+                value={pageRangeStart}
+                onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
+                className="w-20 text-center p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label>End:</label>
+              <input
+                type="number" min={pageRangeStart}
+                value={pageRangeEnd || ''}
+                onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
+                placeholder="No limit"
+                className="w-20 text-center p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+              />
+            </div>
+          </div>
+          {pageRangeStart > 1 || pageRangeEnd > 0 ? (
+            <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+              Range: Pages {pageRangeStart}-{pageRangeEnd || '∞'}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-700 dark:text-gray-300">No restrictions</div>
+          )}
         </div>
       </div>
 
-      {/* Range Display */}
-      {pageRangeStart > 1 || pageRangeEnd > 0 ? (
-        <div className="p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-          <div className="font-semibold text-blue-700 dark:text-blue-300">Range: Pages {pageRangeStart}-{pageRangeEnd || '∞'}</div>
-        </div>
-      ) : (
-        <div className="p-3 rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
-          <div className="text-gray-700 dark:text-gray-300">No restrictions - all pages available</div>
-        </div>
-      )}
-
-      {/* Unassigned Ranges Display */}
+      {/* Available Ranges */}
       {(() => {
-        // Calculate unassigned page ranges
-        const assignedRanges = relatedRems
-          .filter(item => item.isIncremental && item.range && item.remId !== contextData?.incrementalRemId)
-          .map(item => item.range)
-          .filter(Boolean)
-          .sort((a, b) => a.start - b.start);
-
-        if (assignedRanges.length === 0) {
-          return (
-            <div className="p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <div className="text-sm text-green-700 dark:text-green-300">
-                ✓ All pages are available for assignment
+        const unassignedRanges = getUnassignedRanges();
+        return unassignedRanges.length > 0 ? (
+          <div className="p-2 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+            <div className="text-sm text-yellow-700 dark:text-yellow-300">
+              <div className="font-semibold">Available page ranges:</div>
+              <div className="text-xs mt-1">
+                {unassignedRanges.map((range, idx) => (
+                  <span key={idx}>
+                    {range.start}-{range.end || '∞'}
+                    {idx < unassignedRanges.length - 1 && ', '}
+                  </span>
+                ))}
               </div>
             </div>
-          );
-        }
-
-        // Find gaps in assigned ranges
-        const unassignedRanges = [];
-        let lastEnd = 0;
-        
-        for (const range of assignedRanges) {
-          if (range.start > lastEnd + 1) {
-            unassignedRanges.push({
-              start: lastEnd + 1,
-              end: range.start - 1
-            });
-          }
-          lastEnd = Math.max(lastEnd, range.end || range.start);
-        }
-        
-        // Add final range if there's a gap at the end
-        if (contextData?.totalPages && lastEnd < contextData.totalPages) {
-          unassignedRanges.push({
-            start: lastEnd + 1,
-            end: contextData.totalPages
-          });
-        } else if (!contextData?.totalPages) {
-          // If we don't know total pages, show open-ended range
-          unassignedRanges.push({
-            start: lastEnd + 1,
-            end: null
-          });
-        }
-
-        if (unassignedRanges.length > 0) {
-          return (
-            <div className="p-2 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-              <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                <div className="font-semibold mb-1">Available page ranges:</div>
-                <div className="text-xs">
-                  {unassignedRanges.map((range, idx) => (
-                    <span key={idx}>
-                      {range.start}-{range.end || '∞'}
-                      {idx < unassignedRanges.length - 1 && ', '}
-                    </span>
-                  ))}
-                </div>
-              </div>
+          </div>
+        ) : (
+          <div className="p-2 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+            <div className="text-sm text-red-700 dark:text-red-300">
+              ⚠ All pages have been assigned
             </div>
-          );
-        } else {
-          return (
-            <div className="p-2 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <div className="text-sm text-red-700 dark:text-red-300">
-                ⚠ All pages have been assigned to other incremental rems
-              </div>
-            </div>
-          );
-        }
+          </div>
+        );
       })()}
 
       <hr className="dark:border-gray-700" />
 
-      {/* Related Rems - WITH LAST REVIEW TIMESTAMP */}
+      {/* Enhanced Control Panel for Other Rems */}
       {relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="font-semibold">Other Rems Using This PDF ({relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length})</div>
-          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+          <div className="font-semibold">All Rems Using This PDF ({relatedRems.filter(item => item.remId !== contextData?.incrementalRemId).length})</div>
+          <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
             {relatedRems
               .filter(item => item.remId !== contextData?.incrementalRemId)
               .map((item) => (
-              <div key={item.remId} className={`p-2 rounded text-sm ${
+              <div key={item.remId} className={`rounded ${
                   item.isIncremental 
                     ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
                     : 'bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600'
                 }`}>
-                <div className="flex items-center gap-2">
-                  {item.isIncremental && <span title="Incremental Rem">⚡</span>}
-                  <div className={`font-medium flex-1 ${!item.isIncremental ? 'text-gray-700 dark:text-gray-300' : ''}`}>{item.name}</div>
+                {/* Main Rem Info - Clickable */}
+                <div 
+                  className="p-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                  onClick={() => toggleExpanded(item.remId)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">{expandedRems.has(item.remId) ? '▼' : '▶'}</span>
+                    {item.isIncremental && <span title="Incremental Rem">⚡</span>}
+                    <div className={`font-medium flex-1 text-sm ${!item.isIncremental ? 'text-gray-700 dark:text-gray-300' : ''}`}>
+                      {item.name}
+                    </div>
+                  </div>
+                  {item.range ? (
+                    <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                      Pages: {item.range.start} - {item.range.end || '∞'}
+                      {item.isIncremental && item.currentPage && (
+                        <>
+                          {` • At: ${item.currentPage}`}
+                          {remHistories[item.remId] && (() => {
+                            const lastEntry = remHistories[item.remId][remHistories[item.remId].length - 1];
+                            if (lastEntry && lastEntry.timestamp) {
+                              const date = new Date(lastEntry.timestamp);
+                              return ` (${date.toLocaleDateString('en-US', { 
+                                month: 'numeric', 
+                                day: 'numeric', 
+                                year: '2-digit' 
+                              })}, ${date.toLocaleTimeString('en-US', { 
+                                hour: 'numeric', 
+                                minute: '2-digit',
+                                hour12: true 
+                              })})`;
+                            }
+                            return '';
+                          })()}
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                      No page range set
+                    </div>
+                  )}
                 </div>
-                {item.range ? (
-                  <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                    Pages: {item.range.start} - {item.range.end || '∞'}
-                    {item.isIncremental && item.currentPage && (
-                      <>
-                        {` • At: ${item.currentPage}`}
-                        {remHistories[item.remId] && (() => {
-                          const lastEntry = remHistories[item.remId][remHistories[item.remId].length - 1];
-                          if (lastEntry && lastEntry.timestamp) {
-                            const date = new Date(lastEntry.timestamp);
-                            return ` (${date.toLocaleDateString('en-US', { 
-                              month: 'numeric', 
-                              day: 'numeric', 
-                              year: '2-digit' 
-                            })}, ${date.toLocaleTimeString('en-US', { 
-                              hour: 'numeric', 
-                              minute: '2-digit',
-                              hour12: true 
-                            })})`;
-                          }
-                          return '';
-                        })()}
-                      </>
+                
+                {/* Expanded Content */}
+                {expandedRems.has(item.remId) && (
+                  <div className="border-t border-gray-300 dark:border-gray-600 p-2">
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 mb-2">
+                      {!item.isIncremental ? (
+                        <button
+                          onClick={() => initIncrementalRem(item.remId)}
+                          className="px-3 py-1 text-xs rounded"
+                          style={{
+                            backgroundColor: '#10B981',
+                            color: 'white',
+                          }}
+                        >
+                          Make Incremental
+                        </button>
+                      ) : editingRemId === item.remId ? (
+                        <>
+                          <button
+                            onClick={() => saveRemRange(item.remId)}
+                            className="px-3 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: '#3B82F6',
+                              color: 'white',
+                            }}
+                          >
+                            Save Range
+                          </button>
+                          <button
+                            onClick={() => setEditingRemId(null)}
+                            className="px-3 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: '#6B7280',
+                              color: 'white',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => startEditingRem(item.remId)}
+                          className="px-3 py-1 text-xs rounded"
+                          style={{
+                            backgroundColor: '#3B82F6',
+                            color: 'white',
+                          }}
+                        >
+                          Edit Page Range
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Page Range Editor */}
+                    {editingRemId === item.remId && editingRanges[item.remId] && (
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={editingRanges[item.remId].start}
+                          onChange={(e) => setEditingRanges({
+                            ...editingRanges,
+                            [item.remId]: {
+                              ...editingRanges[item.remId],
+                              start: parseInt(e.target.value) || 1
+                            }
+                          })}
+                          className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                          placeholder="Start"
+                        />
+                        <span className="text-xs self-center">to</span>
+                        <input
+                          type="number"
+                          min={editingRanges[item.remId].start}
+                          value={editingRanges[item.remId].end || ''}
+                          onChange={(e) => setEditingRanges({
+                            ...editingRanges,
+                            [item.remId]: {
+                              ...editingRanges[item.remId],
+                              end: parseInt(e.target.value) || 0
+                            }
+                          })}
+                          className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                          placeholder="End"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Reading History */}
+                    {remHistories[item.remId] && remHistories[item.remId].length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-xs font-semibold mb-1">Reading History</div>
+                        <div className="grid grid-cols-3 gap-1 max-h-32 overflow-y-auto">
+                          {remHistories[item.remId].slice(-12).reverse().map((entry, idx) => (
+                            <div key={idx} className="p-1 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                              <div className="text-xs font-semibold">Page {entry.page}</div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(entry.timestamp).toLocaleDateString([], { 
+                                  month: 'numeric',
+                                  day: 'numeric'
+                                })} {new Date(entry.timestamp).toLocaleTimeString([], {
+                                  hour: 'numeric',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>No page range set</div>
                 )}
               </div>
             ))}
@@ -332,32 +549,27 @@ function PageRangeWidget() {
 
       <hr className="dark:border-gray-700" />
 
-      {/* History */}
+      {/* Current Rem's History */}
       {pageHistory.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="flex justify-between items-center">
-            <div className="font-semibold">Reading History</div>
-            <button onClick={() => setShowHistory(!showHistory)} className="text-sm px-2 py-1 border rounded dark:border-gray-600">
+            <div className="font-semibold text-sm">Current Rem Reading History</div>
+            <button onClick={() => setShowHistory(!showHistory)} className="text-xs px-2 py-1 border rounded dark:border-gray-600">
               {showHistory ? 'Hide' : 'Show'}
             </button>
           </div>
           {showHistory && (
-            <div className="max-h-40 overflow-y-auto">
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {pageHistory.slice(-20).reverse().map((entry, idx) => (
-                  <div key={idx} className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+            <div className="max-h-32 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-1 text-xs">
+                {pageHistory.slice(-15).reverse().map((entry, idx) => (
+                  <div key={idx} className="p-1 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                     <div className="font-semibold">Page {entry.page}</div>
-                    <div className="text-blue-600 dark:text-blue-400 mt-1">
+                    <div className="text-blue-600 dark:text-blue-400">
                       {new Date(entry.timestamp).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                     </div>
                   </div>
                 ))}
               </div>
-              {pageHistory.length > 20 && (
-                <div className="text-xs text-center mt-2 rn-clr-content-secondary">
-                  Showing last 20 entries of {pageHistory.length} total
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -374,7 +586,7 @@ function PageRangeWidget() {
             border: 'none',
           }}
         >
-          Save
+          Save Current Rem
         </button>
         
         {(pageRangeStart > 1 || pageRangeEnd > 0) && (
@@ -400,12 +612,12 @@ function PageRangeWidget() {
             border: 'none',
           }}
         >
-          Cancel
+          Close
         </button>
       </div>
 
       <div className="text-xs rn-clr-content-secondary text-center">
-        Press Enter to save, Escape to cancel
+        Press Enter to save current rem, Escape to close
       </div>
     </div>
   );

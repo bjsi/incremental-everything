@@ -529,7 +529,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.app.registerWidget(pageRangeWidgetId, WidgetLocation.Popup, {
     dimensions: {
       width: 600, 
-      height: 850,
+      height: 950,
     },
   });
 
@@ -593,8 +593,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerCommand({
-    id: 'set-page-range',
-    name: 'Set PDF page range',
+    id: 'pdf-control-panel',
+    name: 'PDF Control Panel',
     action: async () => {
       const rem = await plugin.focus.getFocusedRem();
       if (!rem) {
