@@ -16,6 +16,7 @@ export const currentIncRemKey = 'current-inc-rem';
 
 // widgets
 export const scrollToHighlightId = 'scroll-to-highlight';
+export const pageRangeWidgetId = 'page-range';
 
 // css
 export const collapseTopBarId = 'collapse-top-bar';
@@ -36,3 +37,13 @@ export const activeHighlightIdKey = 'active-highlight-id-key';
 export const currentIncrementalRemTypeKey = 'current-incremental-rem-type-key';
 export const currentScopeRemIdsKey = 'current-scope-rem-ids-key';
 
+// --- Keys for the Priority Protection ---
+export const seenRemInSessionKey = 'seen-rem-in-session-key';
+export const displayPriorityShieldId = 'display-priority-shield';
+export const priorityShieldHistoryKey = 'priority-shield-history-key';
+export const priorityShieldHistoryMenuItemId = 'priority-shield-history-menu-item-id';
+export const documentPriorityShieldHistoryKey = 'document-priority-shield-history-key';
+export const currentSubQueueIdKey = 'current-sub-queue-id-key';
+
+// --- Keys for Open Editor in a new tab/window (PDFs) ---
+export const remnoteEnvironmentId = 'remnote-environment';

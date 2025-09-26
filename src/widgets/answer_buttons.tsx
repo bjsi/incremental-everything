@@ -4,41 +4,38 @@ import {
   useTracker,
   WidgetLocation,
   RNPlugin,
-  Rem, // Import the Rem type
+  Rem,
 } from '@remnote/plugin-sdk';
 import React from 'react';
 import { NextRepTime } from '../components/NextRepTime';
-import { 
-  allIncrementalRemKey, 
-  powerupCode, 
-  activeHighlightIdKey, 
+import {
+  allIncrementalRemKey,
+  powerupCode,
+  activeHighlightIdKey,
   currentIncrementalRemTypeKey,
   currentScopeRemIdsKey,
+  displayPriorityShieldId,
+  seenRemInSessionKey,
+  remnoteEnvironmentId,
 } from '../lib/consts';
 import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
+import { calculatePriorityShield } from '../lib/priority_shield';
 
-// vvv THIS FUNCTION IS NOW UPDATED vvv
+// ... (handleReviewAndOpenRem, Button component are unchanged)
 const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined) => {
   if (!rem) return;
-  // We no longer need the 'incRem' object here, just the original Rem.
-  // First, get the incremental info to pass to the review function.
   const incRemInfo = await getIncrementalRemInfo(plugin, rem);
-
-  // Step 1: Perform the repetition ONLY, without advancing the queue.
   await reviewRem(plugin, incRemInfo);
-  // Step 2: Open the Rem in the main editor by passing the full Rem object.
   await plugin.window.openRem(rem);
 };
-
 interface ButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
   className?: string;
 }
-
 function Button(props: ButtonProps) {
   return (
     <button
@@ -46,7 +43,7 @@ function Button(props: ButtonProps) {
         'bg-blue-50 hover:bg-blue-70 text-white font-bold py-1 px-2 rounded ' + props.className
       }
       style={{
-        height: '45px', // Adjusted height
+        height: '45px',
       }}
       onClick={props.onClick}
     >
@@ -55,6 +52,7 @@ function Button(props: ButtonProps) {
   );
 }
 
+
 export function AnswerButtons() {
   const plugin = usePlugin();
   const ctx = useTracker(
@@ -62,13 +60,11 @@ export function AnswerButtons() {
     []
   );
 
-  // vvv THIS IS NOW SIMPLIFIED vvv
-  // We get the full Rem object here and use it everywhere.
   const rem = useTracker(
     (rp) => rp.rem.findOne(ctx?.remId),
     [ctx?.remId]
   );
-  
+
   const incRem = useTracker(
     async () => rem ? await getIncrementalRemInfo(plugin, rem) : undefined,
     [rem]
@@ -83,18 +79,39 @@ export function AnswerButtons() {
     []
   );
 
+  const shouldDisplayShield = useTracker(
+    (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
+    []
+  );
+
+  const shieldStatus = useTracker(
+    async (rp) => {
+      // These lines ensure the tracker re-runs when the queue state changes.
+      await rp.storage.getSession(allIncrementalRemKey);
+      await rp.storage.getSession(seenRemInSessionKey);
+      await rp.storage.getSession(currentScopeRemIdsKey);
+      
+      // Get the ID of the current Rem from the widget's context.
+      const currentRemId = ctx?.remId;
+      
+      // Pass the ID to our calculation function.
+      return await calculatePriorityShield(plugin, currentRemId);
+    },
+    [plugin, ctx?.remId] // Add ctx.remId to the dependency array.
+  );
+
   let kbPercentile: number | null = null;
   let docPercentile: number | null = null;
   let relativePriorityLabel = `${incRem?.priority || '...'}`;
 
   if (incRem && allIncrementalRems) {
     kbPercentile = calculateRelativePriority(allIncrementalRems, incRem.remId);
-    
+
     if (currentScopeRemIds && currentScopeRemIds.length > 0) {
       const scopedRems = allIncrementalRems.filter(r => currentScopeRemIds.includes(r.remId));
       docPercentile = calculateRelativePriority(scopedRems, incRem.remId);
     }
-    
+
     const parts = [];
     if (kbPercentile !== null) {
       parts.push(`${kbPercentile}% of KB`);
@@ -102,7 +119,7 @@ export function AnswerButtons() {
     if (docPercentile !== null) {
       parts.push(`${docPercentile}% of Doc`);
     }
-    
+
     if (parts.length > 0) {
       relativePriorityLabel = `${incRem.priority} (${parts.join('; ')})`;
     } else {
@@ -116,7 +133,7 @@ export function AnswerButtons() {
     (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey),
     []
   );
-  
+
   const remType = useTracker(
     (rp) => rp.storage.getSession<string | null>(currentIncrementalRemTypeKey),
     []
@@ -127,13 +144,14 @@ export function AnswerButtons() {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: '1rem', // Slightly reduced gap for mobile
-    flexWrap: 'wrap', // <-- Allows buttons to wrap to the next line
-    marginBottom: '0.5rem', // Adds space below the button rows
+    gap: '1rem',
+    flexWrap: 'wrap',
+    marginBottom: '0.5rem',
   };
 
   return (
     <div style={containerStyle} className="incremental-everything-answer-buttons">
+      {/* --- All the existing buttons are unchanged --- */}
       <Button
         className="incremental-everthing-next-button"
         onClick={() => handleHextRepetitionClick(plugin, incRem)}
@@ -143,7 +161,6 @@ export function AnswerButtons() {
           <div className="text-xs">{incRem && <NextRepTime rem={incRem} />}</div>
         </div>
       </Button>
-
       <Button
         className="bg-gray-500 hover:bg-gray-700"
         onClick={async () => { if (ctx?.remId) await plugin.widget.openPopup('reschedule', { remId: ctx.remId }); }}
@@ -153,7 +170,6 @@ export function AnswerButtons() {
           <div className="text-xs">Set interval</div>
         </div>
       </Button>
-      
       <Button
         className="incremental-everthing-done-button"
         onClick={async () => {
@@ -169,28 +185,24 @@ export function AnswerButtons() {
           <div className="text-xs">Untag Rem</div>
         </div>
       </Button>
-
       <Button
         className="bg-gray-500 hover:bg-gray-700"
         onClick={async () => { if (ctx?.remId) await plugin.widget.openPopup('priority', { remId: ctx.remId }); }}
       >
           <div className="flex flex-col items-center justify-center">
             <div>Change Priority</div>
-            <div 
+            <div
               className="text-xs"
-              style={{ 
+              style={{
                 backgroundColor: priorityColor,
               }}
               >
               {relativePriorityLabel}
             </div>
           </div>
-
       </Button>
-            
       <Button
         className="bg-gray-500 hover:bg-gray-700"
-        // vvv PASSING THE FULL REM OBJECT NOW vvv
         onClick={() => handleReviewAndOpenRem(plugin, rem)}
       >
         <div className="flex flex-col items-center justify-center">
@@ -198,7 +210,6 @@ export function AnswerButtons() {
           <div className="text-xs">Go to Editor</div>
         </div>
       </Button>
-
       {activeHighlightId && (
         <Button
           className="incremental-everything-scroll-button"
@@ -213,8 +224,57 @@ export function AnswerButtons() {
           </div>
         </Button>
       )}
+      <Button
+          className="bg-blue-600 hover:bg-blue-700"
+          onClick={async () => {
+            if (rem) {
+              try {
+                console.log('Rem ID to open:', rem._id);
 
-      {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
+                // Get the user's preferred environment from settings
+                const environment = await plugin.settings.getSetting<string>(remnoteEnvironmentId) || 'beta';
+                console.log('User preferred environment:', environment);
+                
+                // Construct the domain based on user preference
+                let remnoteDomain = '';
+                if (environment === 'beta') {
+                  remnoteDomain = 'https://beta.remnote.com';
+                } else {
+                  remnoteDomain = 'https://www.remnote.com';
+                }
+                
+                // Construct the document URL
+                const newUrl = `${remnoteDomain}/document/${rem._id}`;
+                console.log('Opening document URL:', newUrl);
+                
+                // Open in new tab
+                const newWindow = window.open(newUrl, '_blank');
+                
+                // If blocked by popup blocker, try link method
+                if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+                  console.log('Popup might be blocked, trying link method');
+                  const link = document.createElement('a');
+                  link.href = newUrl;
+                  link.target = '_blank';
+                  link.rel = 'noopener noreferrer';
+                  document.body.appendChild(link);
+                  link.click();
+                  setTimeout(() => document.body.removeChild(link), 100);
+                }
+                
+              } catch (error) {
+                console.error('Error opening document:', error);
+                plugin.app.toast('Error opening document - check console for details');
+              }
+            }
+          }}
+        >
+          <div className="flex flex-col items-center justify-center">
+            <div>Open Editor</div>
+            <div className="text-xs">New Tab</div>
+          </div>
+      </Button>
+            {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
         <button
           className="bg-gray-600 text-gray-100 font-bold py-2 px-2 rounded desktop-only-hint"
           style={{ height: '45px', cursor: 'default' }}
@@ -225,6 +285,27 @@ export function AnswerButtons() {
           </div>
         </button>
       )}
+      {/* vvv CHANGED: THE DISPLAY LOGIC IS NOW UPDATED FOR THE NEW FORMAT vvv */}
+      {shouldDisplayShield && shieldStatus && (
+        <div
+          className="text-sm rn-clr-content-secondary whitespace-nowrap w-full text-center"
+          style={{ marginTop: '0.5rem' }}
+        >
+          {'🛡️ Priority Shield'}
+          {shieldStatus.kb.absolute !== null ? (
+            `   --   of KB: ${shieldStatus.kb.absolute} (${shieldStatus.kb.percentile}%)`
+          ) : (
+            `   --   KB: 100%`
+          )}
+          {shieldStatus.doc.absolute !== null ? (
+            `   --   of this Document: ${shieldStatus.doc.absolute} (${shieldStatus.doc.percentile}%)`
+          ) : (
+            // Only show Doc status if there's a document scope active.
+            currentScopeRemIds && '   --   Doc: 100%'
+          )}
+        </div>
+      )}
+      {/* ^^^ CHANGED ^^^ */}
     </div>
   );
 }

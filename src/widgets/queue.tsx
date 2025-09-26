@@ -9,6 +9,7 @@ import {
 import React, { useEffect, useRef } from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
+import { ExtractViewer } from '../components/ExtractViewer';
 import { remToActionItemType } from '../lib/actionItems';
 import {
   collapseQueueTopBar,
@@ -98,7 +99,7 @@ export function QueueComponent() {
         ) : remAndType.type === 'youtube' ? (
           <VideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' ? (
-          <DocumentViewer width={'100%'} height={'100%'} documentId={remAndType.rem._id} />
+          <ExtractViewer rem={remAndType.rem} plugin={plugin} />
         ) : null}
       </div>
     </div>

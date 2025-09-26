@@ -11,6 +11,7 @@ import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler'
 import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
 import { IncrementalRem, IncrementalRep } from '../lib/types';
 import dayjs from 'dayjs';
+import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 
 async function handleRescheduleAndPriorityUpdate(
   plugin: RNPlugin,
@@ -96,6 +97,7 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
   const [days, setDays] = useState<string | null>(null);
   const [priority, setPriority] = useState<number | null>(null);
   const [futureDate, setFutureDate] = useState('');
+  const [ancestorInfo, setAncestorInfo] = useState<any>(null);
   const intervalInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -106,6 +108,11 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
 
       setDays(String(scheduleData?.newInterval || 1));
       setPriority(incRemData?.priority ?? 10);
+      
+      // Fetch ancestor info
+      const rem = await plugin.rem.findOne(remId);
+      const ancestor = await findClosestIncrementalAncestor(plugin, rem);
+      setAncestorInfo(ancestor);
     };
     fetchInitialData();
   }, [plugin, remId]);
@@ -158,8 +165,6 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
           min="0"
           value={days}
           onChange={(e) => setDays(e.target.value)}
-          // --- THIS IS THE FIX ---
-          // This ensures "Enter" submits the form from the "days" input field.
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               handleSubmit(e);
@@ -173,6 +178,31 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
       <div>
         <label className="font-semibold">Priority</label>
         <PrioritySlider value={priority} onChange={setPriority} onSubmit={handleSubmit} />
+      </div>
+      {/* Show ancestor info if available */}
+      {ancestorInfo && (
+        <div className="p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+            Closest Ancestor Priority: {ancestorInfo.priority}
+          </div>
+          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+            {ancestorInfo.ancestorName}
+          </div>
+        </div>
+      )}
+      {/* --- ACCEPT BUTTON --- */}
+      <div className="flex justify-end mt-2">
+        <button
+          type="submit"
+          className="px-4 py-2 font-semibold rounded" // Using basic layout classes
+          style={{
+            backgroundColor: '#3B82F6', // Equivalent to Tailwind's 'bg-blue-500'
+            color: 'white',
+            border: 'none',
+          }}
+        >
+          Accept
+        </button>
       </div>
     </form>
   );

@@ -37,6 +37,14 @@ import {
   activeHighlightIdKey,
   currentScopeRemIdsKey,
   defaultPriorityId,
+  seenRemInSessionKey,
+  displayPriorityShieldId,
+  priorityShieldHistoryKey,
+  priorityShieldHistoryMenuItemId,
+  documentPriorityShieldHistoryKey,
+  currentSubQueueIdKey,
+  remnoteEnvironmentId,
+  pageRangeWidgetId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -44,8 +52,11 @@ import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
+import { calculateRelativePriority } from '../lib/priority';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
+import { getInitialPriority } from '../lib/priority_inheritance';
+import { findPDFinRem } from '../lib/pdfUtils';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -144,6 +155,33 @@ async function onActivate(plugin: ReactRNPlugin) {
       },
     ]
   });
+
+  plugin.settings.registerBooleanSetting({
+    id: displayPriorityShieldId,
+    title: 'Display Priority Shield in Queue',
+    description: 'If enabled, shows a real-time status of your highest-priority due items in the queue top bar.',
+    defaultValue: true,
+  });
+
+  plugin.settings.registerDropdownSetting({
+    id: remnoteEnvironmentId,
+    title: 'RemNote Environment',
+    description: 'Choose which RemNote environment to open documents in (beta.remnote.com or www.remnote.com)',
+    defaultValue: 'www',
+    options: [
+      { 
+        key: 'beta', 
+        label: 'Beta (beta.remnote.com)',
+        value: 'beta'
+      },
+      { 
+        key: 'www', 
+        label: 'Regular (www.remnote.com)',
+        value: 'www'
+      }
+    ]
+  });
+
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
@@ -158,16 +196,103 @@ async function onActivate(plugin: ReactRNPlugin) {
   // TODO: some handling to include extracts created in current queue in the queue?
   // or unnecessary due to init interval? could append to this list
 
-  let seenRem: Set<RemId> = new Set<RemId>();
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
-    seenRem = new Set<RemId>();
+    console.log('QueueExit triggered, subQueueId:', subQueueId);
+    
+    // IMPORTANT: Get the scope BEFORE clearing it
+    const docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
+    console.log('Document scope RemIds at exit:', docScopeRemIds);
+    
+    const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+
+    if (allRems.length > 0) {
+      const today = dayjs().format('YYYY-MM-DD');
+      
+      // Save KB-level priority shield
+      const unreviewedDueRems = allRems.filter(
+        (rem) => Date.now() >= rem.nextRepDate
+      );
+
+      let kbFinalStatus = {
+        absolute: null as number | null,
+        percentile: 100,
+      };
+
+      if (unreviewedDueRems.length > 0) {
+        const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
+        if (topMissedInKb) {
+          kbFinalStatus.absolute = topMissedInKb.priority;
+          kbFinalStatus.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
+        }
+      }
+      
+      // Save KB history
+      const kbHistory = (await plugin.storage.getSynced(priorityShieldHistoryKey)) || {};
+      kbHistory[today] = kbFinalStatus;
+      await plugin.storage.setSynced(priorityShieldHistoryKey, kbHistory);
+      console.log('Saved KB history:', kbFinalStatus);
+      
+      // Save Document-level priority shield if we have scope data
+      // Note: We check docScopeRemIds (which we got BEFORE clearing) instead of subQueueId
+      if (docScopeRemIds && docScopeRemIds.length > 0) {
+        console.log('Processing document-level shield with', docScopeRemIds.length, 'scoped rems');
+        
+        const scopedRems = allRems.filter((rem) => docScopeRemIds.includes(rem.remId));
+        console.log('Found', scopedRems.length, 'incremental rems in document scope');
+        
+        const unreviewedDueInScope = scopedRems.filter(
+          (rem) => Date.now() >= rem.nextRepDate
+        );
+        console.log('Found', unreviewedDueInScope.length, 'due rems in document scope');
+        
+        let docFinalStatus = {
+          absolute: null as number | null,
+          percentile: 100,
+        };
+        
+        if (unreviewedDueInScope.length > 0) {
+          const topMissedInDoc = _.minBy(unreviewedDueInScope, (rem) => rem.priority);
+          if (topMissedInDoc) {
+            docFinalStatus.absolute = topMissedInDoc.priority;
+            docFinalStatus.percentile = calculateRelativePriority(scopedRems, topMissedInDoc.remId);
+          }
+        }
+        
+        // Get the stored subQueueId since the parameter might not always be passed
+        const storedSubQueueId = subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
+        
+        if (storedSubQueueId) {
+          // Save document history with subQueueId as key
+          const docHistory = (await plugin.storage.getSynced(documentPriorityShieldHistoryKey)) || {};
+          if (!docHistory[storedSubQueueId]) {
+            docHistory[storedSubQueueId] = {};
+          }
+          docHistory[storedSubQueueId][today] = docFinalStatus;
+          await plugin.storage.setSynced(documentPriorityShieldHistoryKey, docHistory);
+          console.log('Saved document history for', storedSubQueueId, ':', docFinalStatus);
+        } else {
+          console.log('Warning: No subQueueId available for saving document history');
+        }
+      } else {
+        console.log('No document scope RemIds found or empty - skipping document history save');
+      }
+    }
+
+    // Reset session-specific state AFTER we've used the data
+    await plugin.storage.setSession(seenRemInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    await plugin.storage.setSession(currentSubQueueIdKey, null);
+    console.log('Session state reset complete');
   });
+
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
-    seenRem = new Set<RemId>();
+    await plugin.storage.setSession(seenRemInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    // Store the current subQueueId
+    await plugin.storage.setSession(currentSubQueueIdKey, subQueueId || null);
+    console.log('QueueEnter - storing subQueueId:', subQueueId);
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
@@ -246,13 +371,24 @@ async function onActivate(plugin: ReactRNPlugin) {
       });
       
       // Use the fetched scope for filtering.
-      const filtered = sorted.filter((x) =>
-        queueInfo.mode === 'practice-all' || queueInfo.mode === 'in-order'
-          ? (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
-            (!seenRem.has(x.remId) || Date.now() >= x.nextRepDate)
-          : (!queueInfo.subQueueId || docScopeRemIds?.includes(x.remId)) &&
-            Date.now() >= x.nextRepDate
-      );
+      const seenRemIds = (await plugin.storage.getSession<RemId[]>(seenRemInSessionKey)) || [];
+      const filtered = sorted.filter((x) => {
+        const isDue = Date.now() >= x.nextRepDate;
+        const hasBeenSeen = seenRemIds.includes(x.remId);
+        const isInScope = !queueInfo.subQueueId || docScopeRemIds?.includes(x.remId);
+        
+        if (!isInScope) {
+          return false;
+        }
+
+        switch (queueInfo.mode) {
+          case 'practice-all':
+          case 'in-order':
+            return !hasBeenSeen;
+          default: // SRS mode
+            return isDue && !hasBeenSeen;
+        }
+      });
 
 
       plugin.app.registerCSS(
@@ -316,7 +452,7 @@ async function onActivate(plugin: ReactRNPlugin) {
             }
           }
           await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
-          seenRem.add(first.remId);
+          await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
           console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
           sessionItemCounter++;
           return {
@@ -340,9 +476,12 @@ async function onActivate(plugin: ReactRNPlugin) {
     if (!isAlreadyIncremental) {
       const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
       
-      // Get and constrain the default priority from settings.
+      // Get the default priority from settings
       const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
       const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
+      
+      // Try to inherit priority from closest incremental ancestor
+      const initialPriority = await getInitialPriority(plugin, rem, defaultPriority);
 
       await rem.addPowerup(powerupCode);
 
@@ -353,7 +492,11 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
 
       await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
-      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [defaultPriority.toString()]);
+      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]);
+
+      // Initialize the history property to prevent validation errors.
+      await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify([])]);
+
 
       const newIncRem = await getIncrementalRemInfo(plugin, rem);
       if (!newIncRem) {
@@ -367,8 +510,6 @@ async function onActivate(plugin: ReactRNPlugin) {
         .concat(newIncRem);
       await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
     }
-    // If the Rem is already incremental, this function will now do nothing,
-    // leaving the existing priority intact for the popup to read correctly.
   } 
 
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {
@@ -382,6 +523,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     dimensions: {
     width: '100%',
     height: 'auto',
+    },
+  });
+
+  plugin.app.registerWidget(pageRangeWidgetId, WidgetLocation.Popup, {
+    dimensions: {
+      width: 600, 
+      height: 900,
     },
   });
 
@@ -440,6 +588,48 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
       await plugin.widget.openPopup('priority', {
         remId: rem._id,
+      });
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'pdf-control-panel',
+    name: 'PDF Control Panel',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        return;
+      }
+
+      // 1. Find the associated PDF Rem within the focused Rem or its descendants
+      const pdfRem = await findPDFinRem(plugin, rem);
+
+      // 2. If no PDF is found, inform the user and stop.
+      if (!pdfRem) {
+        await plugin.app.toast('No PDF found in the focused Rem or its children.');
+        return;
+      }
+
+      // 3. Ensure the focused Rem is an incremental Rem, initializing it if necessary.
+      if (!(await rem.hasPowerup(powerupCode))) {
+        await initIncrementalRem(rem);
+      }
+
+      // 4. Prepare the context for the popup widget, similar to how the Reader does it.
+      //    This context tells the popup which incremental Rem and which PDF to work with.
+      const context = {
+        incrementalRemId: rem._id,
+        pdfRemId: pdfRem._id,
+        totalPages: undefined, // Not available in the editor context
+        currentPage: undefined, // Not available in the editor context
+      };
+
+      // 5. Store the context in session storage so the popup can access it.
+      await plugin.storage.setSession('pageRangeContext', context);
+
+      // 6. Open the popup widget.
+      await plugin.widget.openPopup(pageRangeWidgetId, {
+        remId: rem._id, // Pass remId for consistency, though the widget relies on session context.
       });
     },
   });
@@ -541,6 +731,29 @@ async function onActivate(plugin: ReactRNPlugin) {
     name: 'Sorting Criteria',
     action: async () => {
       await plugin.widget.openPopup('sorting_criteria');
+    },
+  });
+
+  plugin.app.registerWidget('priority_shield_graph', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1000,
+      height: 1050,
+    },
+  });
+
+
+  plugin.app.registerMenuItem({
+    id: priorityShieldHistoryMenuItemId,
+    name: 'Priority Shield History',
+    location: PluginCommandMenuLocation.QueueMenu,
+    action: async () => {
+      // Get the stored subQueueId from session
+      const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
+      console.log('Opening Priority Shield Graph with subQueueId:', subQueueId);
+      
+      await plugin.widget.openPopup('priority_shield_graph', {
+        subQueueId: subQueueId
+      });
     },
   });
 

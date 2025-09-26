@@ -73,7 +73,7 @@ export function SortingCriteria() {
         <div className="rn-clr-content-secondary">Higher = ignores priority more</div>
         <input
           min={0}
-          step={0.1}
+          step={0.01}
           max={1}
           onChange={(e) => {
             setSortingRandomness(plugin, Number(e.target.value));
