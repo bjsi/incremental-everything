@@ -24,34 +24,99 @@ import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
 import { calculatePriorityShield } from '../lib/priority_shield';
 
-// ... (handleReviewAndOpenRem, Button component are unchanged)
 const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined) => {
   if (!rem) return;
   const incRemInfo = await getIncrementalRemInfo(plugin, rem);
   await reviewRem(plugin, incRemInfo);
   await plugin.window.openRem(rem);
 };
+
+// Enhanced button styles
+const buttonStyles = {
+  base: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    border: 'none',
+    fontSize: '13px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    gap: '2px',
+    minWidth: '90px',
+    height: '44px',
+    backgroundColor: 'white',
+    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+  },
+  primary: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    minWidth: '110px',
+  },
+  secondary: {
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: '1px solid #e5e7eb',
+  },
+  danger: {
+    backgroundColor: '#fee2e2',
+    color: '#dc2626',
+    border: '1px solid #fecaca',
+  },
+  label: {
+    fontSize: '12px',
+    fontWeight: 600,
+    lineHeight: '1.2',
+  },
+  sublabel: {
+    fontSize: '10px',
+    opacity: 0.9,
+    fontWeight: 400,
+  }
+};
+
 interface ButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
-  className?: string;
+  variant?: 'primary' | 'secondary' | 'danger';
+  style?: React.CSSProperties;
+  disabled?: boolean;
 }
-function Button(props: ButtonProps) {
+
+function Button({ children, onClick, variant = 'secondary', style, disabled }: ButtonProps) {
+  const variantStyles = variant === 'primary' ? buttonStyles.primary : 
+                        variant === 'danger' ? buttonStyles.danger : 
+                        buttonStyles.secondary;
+  
   return (
     <button
-      className={
-        'bg-blue-50 hover:bg-blue-70 text-white font-bold py-1 px-2 rounded ' + props.className
-      }
+      onClick={onClick}
+      disabled={disabled}
       style={{
-        height: '45px',
+        ...buttonStyles.base,
+        ...variantStyles,
+        ...style,
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
       }}
-      onClick={props.onClick}
+      onMouseEnter={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.transform = 'translateY(-1px)';
+          e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+      }}
     >
-      {props.children}
+      {children}
     </button>
   );
 }
-
 
 export function AnswerButtons() {
   const plugin = usePlugin();
@@ -74,6 +139,7 @@ export function AnswerButtons() {
     (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
     []
   );
+  
   const currentScopeRemIds = useTracker(
     (rp) => rp.storage.getSession<string[] | null>(currentScopeRemIdsKey),
     []
@@ -86,48 +152,15 @@ export function AnswerButtons() {
 
   const shieldStatus = useTracker(
     async (rp) => {
-      // These lines ensure the tracker re-runs when the queue state changes.
       await rp.storage.getSession(allIncrementalRemKey);
       await rp.storage.getSession(seenRemInSessionKey);
       await rp.storage.getSession(currentScopeRemIdsKey);
       
-      // Get the ID of the current Rem from the widget's context.
       const currentRemId = ctx?.remId;
-      
-      // Pass the ID to our calculation function.
       return await calculatePriorityShield(plugin, currentRemId);
     },
-    [plugin, ctx?.remId] // Add ctx.remId to the dependency array.
+    [plugin, ctx?.remId]
   );
-
-  let kbPercentile: number | null = null;
-  let docPercentile: number | null = null;
-  let relativePriorityLabel = `${incRem?.priority || '...'}`;
-
-  if (incRem && allIncrementalRems) {
-    kbPercentile = calculateRelativePriority(allIncrementalRems, incRem.remId);
-
-    if (currentScopeRemIds && currentScopeRemIds.length > 0) {
-      const scopedRems = allIncrementalRems.filter(r => currentScopeRemIds.includes(r.remId));
-      docPercentile = calculateRelativePriority(scopedRems, incRem.remId);
-    }
-
-    const parts = [];
-    if (kbPercentile !== null) {
-      parts.push(`${kbPercentile}% of KB`);
-    }
-    if (docPercentile !== null) {
-      parts.push(`${docPercentile}% of Doc`);
-    }
-
-    if (parts.length > 0) {
-      relativePriorityLabel = `${incRem.priority} (${parts.join('; ')})`;
-    } else {
-      relativePriorityLabel = `${incRem.priority}`;
-    }
-  }
-
-  const priorityColor = kbPercentile ? percentileToHslColor(kbPercentile) : 'transparent';
 
   const activeHighlightId = useTracker(
     (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey),
@@ -139,120 +172,134 @@ export function AnswerButtons() {
     []
   );
 
+  // Calculate priority percentiles
+  let kbPercentile: number | null = null;
+  let docPercentile: number | null = null;
+  
+  if (incRem && allIncrementalRems) {
+    kbPercentile = calculateRelativePriority(allIncrementalRems, incRem.remId);
+
+    if (currentScopeRemIds && currentScopeRemIds.length > 0) {
+      const scopedRems = allIncrementalRems.filter(r => currentScopeRemIds.includes(r.remId));
+      docPercentile = calculateRelativePriority(scopedRems, incRem.remId);
+    }
+  }
+
+  const priorityColor = kbPercentile ? percentileToHslColor(kbPercentile) : '#6b7280';
+
+  // Container styles
   const containerStyle: React.CSSProperties = {
     display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: 'column',
+    gap: '6px',
+    padding: '2px 6px 6px 6px', // Reduced top padding from 6px to 2px
+  };
+
+  const buttonRowStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '6px',
     alignItems: 'center',
-    gap: '1rem',
+    justifyContent: 'center',
     flexWrap: 'wrap',
-    marginBottom: '0.5rem',
+  };
+
+  const dividerStyle: React.CSSProperties = {
+    width: '1px',
+    height: '36px',
+    backgroundColor: '#e5e7eb',
+    margin: '0 4px',
+  };
+
+  const priorityBadgeStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '4px 10px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: 'white',
+    backgroundColor: priorityColor,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+  };
+
+  const infoBarStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    padding: '6px 12px',
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    borderRadius: '6px',
+    fontSize: '12px',
+    color: '#1e40af',
+    borderLeft: `3px solid ${priorityColor}`,
   };
 
   return (
     <div style={containerStyle} className="incremental-everything-answer-buttons">
-      {/* --- All the existing buttons are unchanged --- */}
-      <Button
-        className="incremental-everthing-next-button"
-        onClick={() => handleHextRepetitionClick(plugin, incRem)}
-      >
-        <div className="flex flex-col items-center justify-center">
-          <div>Next</div>
-          <div className="text-xs">{incRem && <NextRepTime rem={incRem} />}</div>
-        </div>
-      </Button>
-      <Button
-        className="bg-gray-500 hover:bg-gray-700"
-        onClick={async () => { if (ctx?.remId) await plugin.widget.openPopup('reschedule', { remId: ctx.remId }); }}
-      >
-        <div className="flex flex-col items-center justify-center">
-          <div>Reschedule</div>
-          <div className="text-xs">Set interval</div>
-        </div>
-      </Button>
-      <Button
-        className="incremental-everthing-done-button"
-        onClick={async () => {
-          if (!rem) { return; }
-          const updatedAllRem = ((await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || []).filter((r) => r.remId !== rem._id);
-          await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
-          await plugin.queue.removeCurrentCardFromQueue(true);
-          await rem.removePowerup(powerupCode);
-        }}
-      >
-        <div className="flex flex-col items-center justify-center">
-          <div>Done</div>
-          <div className="text-xs">Untag Rem</div>
-        </div>
-      </Button>
-      <Button
-        className="bg-gray-500 hover:bg-gray-700"
-        onClick={async () => { if (ctx?.remId) await plugin.widget.openPopup('priority', { remId: ctx.remId }); }}
-      >
-          <div className="flex flex-col items-center justify-center">
-            <div>Change Priority</div>
-            <div
-              className="text-xs"
-              style={{
-                backgroundColor: priorityColor,
-              }}
-              >
-              {relativePriorityLabel}
-            </div>
-          </div>
-      </Button>
-      <Button
-        className="bg-gray-500 hover:bg-gray-700"
-        onClick={() => handleReviewAndOpenRem(plugin, rem)}
-      >
-        <div className="flex flex-col items-center justify-center">
-          <div>Review & Open</div>
-          <div className="text-xs">Go to Editor</div>
-        </div>
-      </Button>
-      {activeHighlightId && (
+      {/* Single row of buttons */}
+      <div style={buttonRowStyle}>
+        {/* Primary Actions Group */}
+        <Button variant="primary" onClick={() => handleHextRepetitionClick(plugin, incRem)}>
+          <div style={buttonStyles.label}>Next</div>
+          <div style={buttonStyles.sublabel}>{incRem && <NextRepTime rem={incRem} />}</div>
+        </Button>
+
         <Button
-          className="incremental-everything-scroll-button"
-          onClick={async () => {
-            const highlightRem = await plugin.rem.findOne(activeHighlightId);
-            await highlightRem?.scrollToReaderHighlight();
+          variant="secondary"
+          onClick={async () => { 
+            if (ctx?.remId) await plugin.widget.openPopup('reschedule', { remId: ctx.remId }); 
           }}
         >
-          <div className="flex flex-col items-center justify-center">
-            <div>Scroll to</div>
-            <div className="text-xs">Highlight</div>
-          </div>
+          <div style={buttonStyles.label}>Reschedule</div>
+          <div style={buttonStyles.sublabel}>Set interval</div>
         </Button>
-      )}
-      <Button
-          className="bg-blue-600 hover:bg-blue-700"
+
+        <Button
+          variant="danger"
+          onClick={async () => {
+            if (!rem) return;
+            const updatedAllRem = ((await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [])
+              .filter((r) => r.remId !== rem._id);
+            await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+            await plugin.queue.removeCurrentCardFromQueue(true);
+            await rem.removePowerup(powerupCode);
+          }}
+        >
+          <div style={buttonStyles.label}>Done</div>
+          <div style={buttonStyles.sublabel}>Untag</div>
+        </Button>
+
+        {/* Divider */}
+        <div style={dividerStyle} />
+
+        {/* Secondary Actions Group */}
+        <Button
+          onClick={async () => { 
+            if (ctx?.remId) await plugin.widget.openPopup('priority', { remId: ctx.remId }); 
+          }}
+        >
+          <div style={buttonStyles.label}>Change Priority</div>
+        </Button>
+
+        <Button
+          onClick={() => handleReviewAndOpenRem(plugin, rem)}
+        >
+          <div style={buttonStyles.label}>Review & Open</div>
+          <div style={buttonStyles.sublabel}>Go to Editor</div>
+        </Button>
+
+        <Button
           onClick={async () => {
             if (rem) {
               try {
-                console.log('Rem ID to open:', rem._id);
-
-                // Get the user's preferred environment from settings
                 const environment = await plugin.settings.getSetting<string>(remnoteEnvironmentId) || 'beta';
-                console.log('User preferred environment:', environment);
-                
-                // Construct the domain based on user preference
-                let remnoteDomain = '';
-                if (environment === 'beta') {
-                  remnoteDomain = 'https://beta.remnote.com';
-                } else {
-                  remnoteDomain = 'https://www.remnote.com';
-                }
-                
-                // Construct the document URL
+                const remnoteDomain = environment === 'beta' ? 'https://beta.remnote.com' : 'https://www.remnote.com';
                 const newUrl = `${remnoteDomain}/document/${rem._id}`;
-                console.log('Opening document URL:', newUrl);
-                
-                // Open in new tab
                 const newWindow = window.open(newUrl, '_blank');
                 
-                // If blocked by popup blocker, try link method
-                if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-                  console.log('Popup might be blocked, trying link method');
+                if (!newWindow || newWindow.closed) {
                   const link = document.createElement('a');
                   link.href = newUrl;
                   link.target = '_blank';
@@ -261,51 +308,118 @@ export function AnswerButtons() {
                   link.click();
                   setTimeout(() => document.body.removeChild(link), 100);
                 }
-                
               } catch (error) {
                 console.error('Error opening document:', error);
-                plugin.app.toast('Error opening document - check console for details');
+                plugin.app.toast('Error opening document');
               }
             }
           }}
+          style={{ minWidth: '100px' }}
         >
-          <div className="flex flex-col items-center justify-center">
-            <div>Open Editor</div>
-            <div className="text-xs">New Tab</div>
-          </div>
-      </Button>
-            {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
-        <button
-          className="bg-gray-600 text-gray-100 font-bold py-2 px-2 rounded desktop-only-hint"
-          style={{ height: '45px', cursor: 'default' }}
-        >
-          <div className="flex flex-col items-center justify-center">
-            <div>Press 'P' to</div>
-            <div className="text-xs">Edit in Previewer</div>
-          </div>
-        </button>
-      )}
-      {/* vvv CHANGED: THE DISPLAY LOGIC IS NOW UPDATED FOR THE NEW FORMAT vvv */}
-      {shouldDisplayShield && shieldStatus && (
-        <div
-          className="text-sm rn-clr-content-secondary whitespace-nowrap w-full text-center"
-          style={{ marginTop: '0.5rem' }}
-        >
-          {'🛡️ Priority Shield'}
-          {shieldStatus.kb.absolute !== null ? (
-            `   --   of KB: ${shieldStatus.kb.absolute} (${shieldStatus.kb.percentile}%)`
-          ) : (
-            `   --   KB: 100%`
+          <div style={buttonStyles.label}>Open Editor</div>
+          <div style={buttonStyles.sublabel}>New Tab</div>
+        </Button>
+
+        {activeHighlightId && (
+          <>
+            <div style={dividerStyle} />
+            <Button
+              onClick={async () => {
+                const highlightRem = await plugin.rem.findOne(activeHighlightId);
+                await highlightRem?.scrollToReaderHighlight();
+              }}
+              style={{
+                backgroundColor: '#fbbf24',
+                color: '#78350f',
+                border: '2px solid #f59e0b',
+                animation: 'highlightPulse 2s ease-in-out 3',
+                fontWeight: 600,
+              }}
+            >
+              <div style={buttonStyles.label}>📍 Scroll to</div>
+              <div style={buttonStyles.sublabel}>Highlight</div>
+            </Button>
+            <style>{`
+              @keyframes highlightPulse {
+                0%, 100% {
+                  transform: translateY(0) scale(1);
+                  box-shadow: 0 2px 4px rgba(251, 191, 36, 0.3);
+                }
+                50% {
+                  transform: translateY(-2px) scale(1.05);
+                  box-shadow: 0 6px 12px rgba(251, 191, 36, 0.5);
+                }
+              }
+            `}</style>
+          </>
+        )}
+
+        {/* Desktop-only hint */}
+        {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
+          <>
+            <div style={dividerStyle} />
+            <Button
+              style={{ 
+                backgroundColor: '#f3f4f6',
+                cursor: 'default',
+                pointerEvents: 'none'
+              }}
+              className="desktop-only-hint"
+            >
+              <div style={buttonStyles.label}>Press 'P' to</div>
+              <div style={buttonStyles.sublabel}>Edit in Previewer</div>
+            </Button>
+          </>
+        )}
+      </div>
+
+      {/* Priority and Shield Info Bar */}
+      {(incRem || (shouldDisplayShield && shieldStatus)) && (
+        <div style={infoBarStyle}>
+          {/* Priority Display */}
+          {incRem && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontWeight: 500 }}>Priority:</span>
+              <div style={priorityBadgeStyle}>
+                <span>{incRem.priority}</span>
+                {kbPercentile !== null && (
+                  <span style={{ opacity: 0.9, fontSize: '11px' }}>
+                    ({kbPercentile}% of KB{docPercentile !== null && `, ${docPercentile}% of Doc`})
+                  </span>
+                )}
+              </div>
+            </div>
           )}
-          {shieldStatus.doc.absolute !== null ? (
-            `   --   of this Document: ${shieldStatus.doc.absolute} (${shieldStatus.doc.percentile}%)`
-          ) : (
-            // Only show Doc status if there's a document scope active.
-            currentScopeRemIds && '   --   Doc: 100%'
+
+          {/* Shield Display */}
+          {shouldDisplayShield && shieldStatus && incRem && (
+            <>
+              <span style={{ color: '#9ca3af' }}>|</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: 600 }}>🛡️ Priority Shield</span>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  {shieldStatus.kb.absolute !== null ? (
+                    <span>
+                      KB: <strong>{shieldStatus.kb.absolute}</strong> ({shieldStatus.kb.percentile}%)
+                    </span>
+                  ) : (
+                    <span>KB: 100%</span>
+                  )}
+                  {currentScopeRemIds && (
+                    shieldStatus.doc.absolute !== null ? (
+                      <span>
+                        Doc: <strong>{shieldStatus.doc.absolute}</strong> ({shieldStatus.doc.percentile}%)
+                      </span>
+                    ) : (
+                      <span>Doc: 100%</span>
+                    )
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}
-      {/* ^^^ CHANGED ^^^ */}
     </div>
   );
 }

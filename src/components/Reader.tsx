@@ -188,32 +188,36 @@ export function Reader(props: ReaderProps) {
     }
   }, [actionItem.rem?._id, actionItem.rem?.parent]);
 
-  // Save current page when it changes
+  // Save current page position (but NOT to history)
   const saveCurrentPage = React.useCallback(async (page: number) => {
     if (!remData?.incrementalRemId) return;
     
     const pageKey = `incremental_current_page_${remData.incrementalRemId}_${actionItem.rem._id}`;
     await plugin.storage.setSynced(pageKey, page);
     console.log(`Saved current page ${page} for incremental rem ${remData.incrementalRemId}`);
+    // Note: We do NOT add to history here - only save the position
   }, [remData?.incrementalRemId, actionItem.rem._id, plugin]);
 
-  // Save final page to history when unmounting (leaving the card)
+  // Save to history only once when leaving the card
   React.useEffect(() => {
+    // Track the page when component mounts
+    const startPage = currentPage;
+    
     return () => {
-      // Cleanup function runs when component unmounts
+      // Cleanup function runs when component unmounts (leaving the card)
       if (remData?.incrementalRemId && currentPage) {
-        // Add to history only when leaving
+        // Add to history only once when leaving
         addPageToHistory(
           plugin,
           remData.incrementalRemId,
           actionItem.rem._id,
           currentPage
         ).then(() => {
-          console.log(`Added page ${currentPage} to history when leaving card`);
+          console.log(`Added final page ${currentPage} to history when leaving card`);
         });
       }
     };
-  }, [remData?.incrementalRemId, actionItem.rem._id, currentPage, plugin]);
+  }, [remData?.incrementalRemId, actionItem.rem._id, plugin]); // Remove currentPage from dependencies
 
   // Handle page navigation
   const incrementPage = React.useCallback(() => {
@@ -463,7 +467,7 @@ export function Reader(props: ReaderProps) {
             key={actionItem.rem._id}
           />
         </div>
-        <div className="metadata-section px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <div className="metadata-section px-4 py-2 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="text-xs text-gray-500 dark:text-gray-400">
             <div className="flex items-center justify-between">
               <span>Loading metadata...</span>
@@ -487,12 +491,123 @@ export function Reader(props: ReaderProps) {
     incrementalRemId
   } = remData;
 
+  // Improved compact metadata bar styles
+  const metadataBarStyles = {
+    container: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '4px 12px',
+      borderTop: '1px solid',
+      borderColor: 'var(--border-color, #e5e7eb)',
+      backgroundColor: 'var(--bg-secondary, #fafafa)',
+      minHeight: '28px',
+      gap: '12px',
+      flexWrap: 'nowrap' as const,
+      overflow: 'hidden'
+    },
+    leftSection: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      minWidth: 0,
+      flex: '0 1 auto'
+    },
+    title: {
+      fontSize: '12px',
+      fontWeight: 600,
+      color: 'var(--text-primary, #111827)',
+      whiteSpace: 'nowrap' as const,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '300px'
+    },
+    statsGroup: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '16px',
+      fontSize: '11px',
+      color: 'var(--text-secondary, #6b7280)',
+      flex: '1 1 auto',
+      justifyContent: 'center'
+    },
+    statItem: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      whiteSpace: 'nowrap' as const
+    },
+    statNumber: {
+      fontWeight: 600,
+      color: 'var(--text-primary, #374151)'
+    },
+    pageControls: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      flex: '0 0 auto'
+    },
+    pageButton: {
+      padding: '2px 6px',
+      fontSize: '11px',
+      borderRadius: '4px',
+      border: '1px solid var(--border-color, #e5e7eb)',
+      backgroundColor: 'white',
+      cursor: 'pointer',
+      transition: 'all 0.15s ease',
+      fontWeight: 500
+    },
+    pageInput: {
+      width: '40px',
+      padding: '2px 4px',
+      fontSize: '11px',
+      borderRadius: '4px',
+      border: '1px solid var(--border-color, #e5e7eb)',
+      textAlign: 'center' as const,
+      backgroundColor: 'white'
+    },
+    rangeButton: {
+      padding: '2px 8px',
+      fontSize: '11px',
+      borderRadius: '4px',
+      border: '1px solid var(--border-color, #e5e7eb)',
+      backgroundColor: 'white',
+      cursor: 'pointer',
+      transition: 'all 0.15s ease',
+      fontWeight: 500,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    },
+    clearButton: {
+      padding: '2px 6px',
+      fontSize: '11px',
+      color: '#dc2626',
+      cursor: 'pointer',
+      transition: 'opacity 0.15s ease',
+      opacity: 0.7,
+      border: 'none',
+      background: 'none'
+    }
+  };
+
   return (
     <div className="pdf-reader-viewer" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Breadcrumb Section */}
       {ancestors.length > 0 && (
-        <div className="breadcrumb-section px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="breadcrumb-section" style={{
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--border-color, #e5e7eb)',
+          backgroundColor: 'var(--bg-tertiary, #f9fafb)',
+          flexShrink: 0
+        }}>
+          <div style={{
+            fontSize: '11px',
+            color: 'var(--text-secondary, #6b7280)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
             {ancestors.map((ancestor, index) => (
               <span key={ancestor.id}>
                 {ancestor.text}
@@ -513,82 +628,120 @@ export function Reader(props: ReaderProps) {
         />
       </div>
       
-      {/* Metadata Section */}
-      <div className="metadata-section px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          <div className="flex items-center justify-between">
-            <span>
-              {remDisplayName} • Incremental Rem
-            </span>
-            <div className="flex items-center gap-4">
-              <span>
-                {childrenCount} direct {childrenCount === 1 ? 'child' : 'children'} ({incrementalChildrenCount} incremental)
-              </span>                
-              <span>
-                {descendantsCount} {descendantsCount === 1 ? 'descendant' : 'descendants'} ({incrementalDescendantsCount} incremental)
-              </span>
-              <span>
-                {flashcardCount} {flashcardCount === 1 ? 'flashcard' : 'flashcards'}
-              </span>
-              <span>
-                {pdfHighlightCount} {pdfHighlightCount === 1 ? 'highlight' : 'highlights'}
-              </span>
-              {incrementalRemId && (
-                <div className="flex items-center gap-4">
-                  <span className="flex items-center gap-2">
-                    <button 
-                      onClick={decrementPage}
-                      className="px-2 py-1 text-xs border rounded hover:bg-gray-100 dark:hover:bg-gray-800 dark:border-gray-600"
-                      disabled={currentPage <= Math.max(1, pageRangeStart)}
-                    >
-                      ←
-                    </button>
-                    
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs">Page</span>
-                      <input
-                        type="number"
-                        min={Math.max(1, pageRangeStart)}
-                        max={pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || undefined)}
-                        value={pageInputValue}
-                        onChange={handlePageInputChange}
-                        onBlur={handlePageInputBlur}
-                        onFocus={() => setIsInputFocused(true)}
-                        onKeyDown={handlePageInputKeyDown}
-                        className="w-12 px-1 py-1 text-xs border rounded text-center dark:bg-gray-800 dark:border-gray-600"
-                      />
-                      {totalPages > 0 && <span className="text-xs">of {totalPages}</span>}
-                    </div>
-                    
-                    <button 
-                      onClick={incrementPage}
-                      className="px-2 py-1 text-xs border rounded hover:bg-gray-100 dark:hover:bg-gray-800 dark:border-gray-600"
-                      disabled={totalPages > 0 && currentPage >= Math.min(pageRangeEnd > 0 ? pageRangeEnd : Infinity, totalPages)}
-                    >
-                      →
-                    </button>
-                  </span>
-                  
-                  <button
-                    onClick={handleSetPageRange}
-                    className="px-2 py-1 text-xs border rounded hover:bg-gray-100 dark:hover:bg-gray-800 dark:border-gray-600"
-                    title={pageRangeStart > 1 || pageRangeEnd > 0 ? `Range: ${pageRangeStart}-${pageRangeEnd || '∞'}` : "Set page range for this incremental rem"}
-                  >
-                    {pageRangeStart > 1 || pageRangeEnd > 0 ? `📄 ${pageRangeStart}-${pageRangeEnd || '∞'}` : '📄 Range'}
-                  </button>
-                  
-                  <button
-                    onClick={handleClearPageRange}
-                    className="px-1 py-1 text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                    title="Clear all page data"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-            </div>
+      {/* Improved Metadata Section */}
+      <div className="metadata-section" style={metadataBarStyles.container}>
+        {/* Left: Title */}
+        <div style={metadataBarStyles.leftSection}>
+          <span style={metadataBarStyles.title} title={remDisplayName}>
+            {remDisplayName}
+          </span>
+        </div>
+
+        {/* Center: Stats */}
+        <div style={metadataBarStyles.statsGroup}>
+          <div style={metadataBarStyles.statItem}>
+            <span style={metadataBarStyles.statNumber}>{childrenCount}</span>
+            <span>direct children</span>
+            {incrementalChildrenCount > 0 && (
+              <span style={{ color: '#3b82f6' }}>({incrementalChildrenCount} inc)</span>
+            )}
+          </div>
+          
+          <div style={metadataBarStyles.statItem}>
+            <span style={metadataBarStyles.statNumber}>{descendantsCount}</span>
+            <span>descendants</span>
+            {incrementalDescendantsCount > 0 && (
+              <span style={{ color: '#3b82f6' }}>({incrementalDescendantsCount} inc)</span>
+            )}
+          </div>
+          
+          <div style={metadataBarStyles.statItem}>
+            <span style={metadataBarStyles.statNumber}>{flashcardCount}</span>
+            <span>cards</span>
+          </div>
+          
+          <div style={metadataBarStyles.statItem}>
+            <span style={metadataBarStyles.statNumber}>{pdfHighlightCount}</span>
+            <span>highlights</span>
           </div>
         </div>
+
+        {/* Right: Page Controls */}
+        {incrementalRemId && (
+          <div style={metadataBarStyles.pageControls}>
+            <button 
+              onClick={decrementPage}
+              style={{
+                ...metadataBarStyles.pageButton,
+                opacity: currentPage <= Math.max(1, pageRangeStart) ? 0.4 : 1,
+                cursor: currentPage <= Math.max(1, pageRangeStart) ? 'not-allowed' : 'pointer'
+              }}
+              disabled={currentPage <= Math.max(1, pageRangeStart)}
+            >
+              ←
+            </button>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary, #6b7280)' }}>Page</span>
+              <input
+                type="number"
+                min={Math.max(1, pageRangeStart)}
+                max={pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || undefined)}
+                value={pageInputValue}
+                onChange={handlePageInputChange}
+                onBlur={handlePageInputBlur}
+                onFocus={() => setIsInputFocused(true)}
+                onKeyDown={handlePageInputKeyDown}
+                style={metadataBarStyles.pageInput}
+              />
+              {totalPages > 0 && (
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary, #6b7280)' }}>
+                  / {totalPages}
+                </span>
+              )}
+            </div>
+            
+            <button 
+              onClick={incrementPage}
+              style={{
+                ...metadataBarStyles.pageButton,
+                opacity: (totalPages > 0 && currentPage >= Math.min(pageRangeEnd > 0 ? pageRangeEnd : Infinity, totalPages)) ? 0.4 : 1,
+                cursor: (totalPages > 0 && currentPage >= Math.min(pageRangeEnd > 0 ? pageRangeEnd : Infinity, totalPages)) ? 'not-allowed' : 'pointer'
+              }}
+              disabled={totalPages > 0 && currentPage >= Math.min(pageRangeEnd > 0 ? pageRangeEnd : Infinity, totalPages)}
+            >
+              →
+            </button>
+            
+            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color, #e5e7eb)', margin: '0 4px' }} />
+            
+            <button
+              onClick={handleSetPageRange}
+              style={{
+                ...metadataBarStyles.rangeButton,
+                backgroundColor: (pageRangeStart > 1 || pageRangeEnd > 0) ? '#eff6ff' : 'white',
+                borderColor: (pageRangeStart > 1 || pageRangeEnd > 0) ? '#3b82f6' : 'var(--border-color, #e5e7eb)',
+                color: (pageRangeStart > 1 || pageRangeEnd > 0) ? '#3b82f6' : 'inherit'
+              }}
+              title={pageRangeStart > 1 || pageRangeEnd > 0 ? `Current range: ${pageRangeStart}-${pageRangeEnd || '∞'}` : "Set page range"}
+            >
+              <span>📄</span>
+              <span>{pageRangeStart > 1 || pageRangeEnd > 0 ? `${pageRangeStart}-${pageRangeEnd || '∞'}` : 'Range'}</span>
+            </button>
+            
+            {(pageRangeStart > 1 || pageRangeEnd > 0) && (
+              <button
+                onClick={handleClearPageRange}
+                style={metadataBarStyles.clearButton}
+                title="Clear page range"
+                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+                onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
