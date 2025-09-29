@@ -90,7 +90,7 @@ export function QueueComponent() {
 
   return (
     <div className="incremental-everything-element" style={{ height: '100%' }}>
-      <div className="box-border p-2" style={{ height: `100%` }}>
+      <div className="box-border p-2" style={{ height: `100vh` }}>
         {!remAndType ? null : remAndType.type === 'pdf' ||
           remAndType.type === 'html' ||
           remAndType.type === 'pdf-highlight' ||

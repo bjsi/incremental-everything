@@ -92,7 +92,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   } = remData;
   
   return (
-    <div className="extract-viewer" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="extract-viewer" style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}>
       {/* Breadcrumb Section */}
       {ancestors.length > 0 && (
         <div className="breadcrumb-section px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -108,7 +108,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
       )}
       
       {/* DocumentViewer Section */}
-      <div className="document-viewer-section flex-1 overflow-hidden">
+      <div className="document-viewer-section overflow-hidden">
         <DocumentViewer width={'100%'} height={'100%'} documentId={rem._id} />
       </div>
       

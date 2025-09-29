@@ -25,11 +25,14 @@ interface ReaderProps {
   actionItem: PDFActionItem | PDFHighlightActionItem | HTMLActionItem | HTMLHighlightActionItem;
 }
 
+const isIOS = /iPhone|iPod/.test(navigator.userAgent) && !/iPad/.test(navigator.userAgent);
+
 const sharedProps = {
-  height: '100%',
+  height: isIOS ? '100vh' : '100%',
   width: '100%',
   initOnlyShowReader: false,
 };
+
 
 export function Reader(props: ReaderProps) {
   const { actionItem } = props;
@@ -187,6 +190,24 @@ export function Reader(props: ReaderProps) {
       return null;
     }
   }, [actionItem.rem?._id, actionItem.rem?.parent]);
+
+  // --- NEW: Add state to control PDF rendering on iOS ---
+  const [canRenderPdf, setCanRenderPdf] = React.useState(
+    !(isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight'))
+  );
+
+  // --- NEW: Add an effect to enable rendering after a short delay ---
+  React.useEffect(() => {
+    // Log the value of isIOS every time this effect runs
+    console.log('Reader.tsx: Checking for iOS...', { isIOS });
+    if (isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight')) {
+      const timer = setTimeout(() => {
+        setCanRenderPdf(true);
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [actionItem.type]);
+
 
   // Save current page position (but NOT to history)
   const saveCurrentPage = React.useCallback(async (page: number) => {
@@ -459,7 +480,7 @@ export function Reader(props: ReaderProps) {
 
   if (!remData) {
     return (
-      <div className="pdf-reader-viewer" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div className="pdf-reader-viewer" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div className="pdf-reader-section flex-1 overflow-hidden">
           <PDFWebReader 
             remId={actionItem.rem._id} 
@@ -592,7 +613,7 @@ export function Reader(props: ReaderProps) {
   };
 
   return (
-    <div className="pdf-reader-viewer" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="pdf-reader-viewer" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Breadcrumb Section */}
       {ancestors.length > 0 && (
         <div className="breadcrumb-section" style={{
@@ -620,12 +641,17 @@ export function Reader(props: ReaderProps) {
       
       {/* PDF Reader Section */}
       <div className="pdf-reader-section flex-1 overflow-hidden">
-        <PDFWebReader 
-          ref={pdfReaderRef}
-          remId={actionItem.rem._id} 
-          {...sharedProps}
-          key={actionItem.rem._id}
-        />
+        {/* --- UPDATE: Conditionally render the PDFWebReader based on the new state --- */}
+        {canRenderPdf ? (
+          <PDFWebReader 
+            ref={pdfReaderRef}
+            remId={actionItem.rem._id} 
+            {...sharedProps}
+            key={actionItem.rem._id}
+          />
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center' }}>Loading PDF for iOS...</div>
+        )}
       </div>
       
       {/* Improved Metadata Section */}
