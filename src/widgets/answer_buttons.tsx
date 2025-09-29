@@ -259,9 +259,8 @@ export function AnswerButtons() {
         <Button
           variant="danger"
           onClick={async () => {
-            if (!rem) return;
-            const updatedAllRem = ((await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [])
-              .filter((r) => r.remId !== rem._id);
+            if (!rem || !incRem) return;
+            const updatedAllRem = ((await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || []).filter((r) => r.remId !== rem._id);
             await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
             await plugin.queue.removeCurrentCardFromQueue(true);
             await rem.removePowerup(powerupCode);
