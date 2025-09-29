@@ -597,7 +597,7 @@ useEffect(() => {
   // Styles using hard-coded colors like page-range.tsx
   const styles = {
     container: {
-      height: '880px',
+      height: '950px',
       overflowY: 'auto' as const,
       backgroundColor: 'white',
       color: '#111827'
@@ -1025,7 +1025,7 @@ useEffect(() => {
           </div>
           
           {/* Table Body */}
-          <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
+          <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
             {filteredRems.map((remData) => {
               if (!isNodeVisible(remData)) return null;
               
