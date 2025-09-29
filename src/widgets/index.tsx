@@ -395,28 +395,28 @@ async function onActivate(plugin: ReactRNPlugin) {
         queueCounterId,
         `
         .rn-queue__card-counter {
-          visibility: hidden;
+          /*visibility: hidden;*/
         }
 
         .light .rn-queue__card-counter:after {
-          content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
-          visibility: visible;
+          content: ' + ${filtered.length}';
+          /* visibility: visible;
           background-color: #f0f0f0;
           display: inline-block;
           padding: 0.5rem 1rem;
           font-size: 0.875rem;
-          border-radius: 0.25rem;
+          border-radius: 0.25rem; */
         }
 
         .dark .rn-queue__card-counter:after {
-          content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
-          visibility: visible;
+          content: ' + ${filtered.length}';
+          /* visibility: visible;
           background-color: #34343c;
           font-color: #d4d4d0;
           display: inline-block;
           padding: 0.5rem 1rem;
           font-size: 0.875rem;
-          border-radius: 0.25rem;
+          border-radius: 0.25rem; */
         }`.trim()
               );
 
@@ -519,6 +519,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerWidget('batch_priority', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1000,
+      height: 950,
+    },
+  });
+
   plugin.app.registerWidget('reschedule', WidgetLocation.Popup, {
     dimensions: {
     width: '100%',
@@ -591,6 +598,28 @@ async function onActivate(plugin: ReactRNPlugin) {
       });
     },
   });
+
+  plugin.app.registerCommand({
+    id: 'batch-priority-change',
+    name: 'Batch Priority Change',
+    keyboardShortcut: 'opt+shift+p',
+    action: async () => {
+      const focusedRem = await plugin.focus.getFocusedRem();
+      if (!focusedRem) {
+        await plugin.app.toast('Please focus on a rem to perform batch priority changes');
+        return;
+      }
+      
+      // Store the focused rem ID in session for the popup to access
+      await plugin.storage.setSession('batchPriorityFocusedRem', focusedRem._id);
+      
+      // Open the popup
+      await plugin.widget.openPopup('batch_priority', {
+        remId: focusedRem._id,
+      });
+    },
+  });
+    
 
   plugin.app.registerCommand({
     id: 'pdf-control-panel',
@@ -803,6 +832,27 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
+  });
+
+  plugin.app.registerMenuItem({
+    id: 'batch_priority_menuitem',
+    location: PluginCommandMenuLocation.DocumentMenu,
+    name: 'Batch Priority Change',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) {
+        return;
+      }
+      
+      // Store the rem ID in session for the popup to access
+      await plugin.storage.setSession('batchPriorityFocusedRem', args.remId);
+      
+      // Open the popup
+      await plugin.widget.openPopup('batch_priority', {
+        remId: args.remId,
+      });
+    },
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2040/2040651.png', // Priority icon
   });
 
   
