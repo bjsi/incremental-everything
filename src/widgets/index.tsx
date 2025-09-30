@@ -45,6 +45,9 @@ import {
   currentSubQueueIdKey,
   remnoteEnvironmentId,
   pageRangeWidgetId,
+  noIncRemTimerKey,
+  noIncRemMenuItemId,
+  noIncRemTimerWidgetId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -323,6 +326,28 @@ async function onActivate(plugin: ReactRNPlugin) {
     SpecialPluginCallback.GetNextCard,
     async (queueInfo) => {
       console.log('queueInfo', queueInfo);
+
+      // Check if "No Inc Rem" timer is active (using SYNCED storage)
+      const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
+      const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > Date.now();
+      
+      if (isTimerActive) {
+        const remainingSeconds = Math.ceil((noIncRemTimerEnd - Date.now()) / 1000);
+        console.log('No Inc Rem timer active. Time remaining:', remainingSeconds, 'seconds');
+        
+        // Clear any incremental rem UI elements
+        await plugin.app.registerCSS(queueLayoutFixId, '');
+        await plugin.app.registerCSS(queueCounterId, '');
+        
+        // Return null to let regular flashcards take over
+        return null;
+      } else if (noIncRemTimerEnd && noIncRemTimerEnd <= Date.now()) {
+        // Timer has expired, clean it up
+        await plugin.storage.setSynced(noIncRemTimerKey, null);
+        console.log('No Inc Rem timer expired and cleared');
+      }
+
+
       const allIncrementalRem: IncrementalRem[] =
         (await plugin.storage.getSession(allIncrementalRemKey)) || [];
 
@@ -853,6 +878,58 @@ async function onActivate(plugin: ReactRNPlugin) {
       });
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2040/2040651.png', // Priority icon
+  });
+
+  // No Inc Rem Timer
+
+  // Register the timer indicator widget (add this with other widget registrations)
+  plugin.app.registerWidget('no_inc_timer_indicator', WidgetLocation.QueueToolbar, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
+
+  // Update the menu item registration to use synced storage
+  plugin.app.registerMenuItem({
+    id: noIncRemMenuItemId,
+    name: 'No Inc Rem for 15 min',
+    location: PluginCommandMenuLocation.QueueMenu,
+    action: async () => {
+      // Check if timer is already active
+      const currentTimer = await plugin.storage.getSynced<number>(noIncRemTimerKey);
+      if (currentTimer && currentTimer > Date.now()) {
+        const remainingMinutes = Math.ceil((currentTimer - Date.now()) / 60000);
+        await plugin.app.toast(`Timer already active: ${remainingMinutes} minutes remaining`);
+        return;
+      }
+      
+      // Set timer for 15 minutes from now using SYNCED storage
+      const endTime = Date.now() + (15 * 60 * 1000);
+      await plugin.storage.setSynced(noIncRemTimerKey, endTime);
+      
+      await plugin.app.toast('Incremental rems disabled for 15 minutes. Only flashcards will be shown.');
+      
+      // Force queue refresh
+      await plugin.storage.setSynced('queue-refresh-trigger', Date.now());
+    },
+  });
+
+  // Update the cancel command to use synced storage
+  plugin.app.registerCommand({
+    id: 'cancel-no-inc-rem-timer',
+    name: 'Cancel No Inc Rem Timer',
+    action: async () => {
+      const timerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
+      if (timerEnd && timerEnd > Date.now()) {
+        await plugin.storage.setSynced(noIncRemTimerKey, null);
+        await plugin.app.toast('Incremental rem timer cancelled. Normal queue behavior resumed.');
+        // Force queue refresh
+        await plugin.storage.setSynced('queue-refresh-trigger', Date.now());
+      } else {
+        await plugin.app.toast('No active timer to cancel.');
+      }
+    },
   });
 
   

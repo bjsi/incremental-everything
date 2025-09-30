@@ -9,6 +9,7 @@ import {
   DEFAULT_CARDS_PER_REM,
 } from '../lib/sorting';
 import { useState, useEffect } from 'react';
+import { noIncRemTimerKey } from '../lib/consts';
 
 const MAX_CARDS = 25;
 const ONLY_INC_VALUE = 0;
@@ -44,6 +45,23 @@ export function SortingCriteria() {
   const storedCards = useTracker(async (rp) => await getCardsPerRem(rp), []);
   const [sliderValue, setSliderValue] = useState<number | undefined>(undefined);
 
+    //No Inc Rem timer
+  const noIncRemTimerEnd = useTracker(
+    async (rp) => await rp.storage.getSynced<number>(noIncRemTimerKey),
+    []
+  );
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Add timer update effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (storedCards !== undefined) {
       setSliderValue(cardsToSliderValue(storedCards));
@@ -59,10 +77,56 @@ export function SortingCriteria() {
     return null; 
   }
 
+
+  const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > currentTime;
+  const timeRemainingMs = isTimerActive ? noIncRemTimerEnd - currentTime : 0;
+  const minutes = Math.floor(timeRemainingMs / 60000);
+  const seconds = Math.floor((timeRemainingMs % 60000) / 1000);
+
   return (
     <div className="flex flex-col p-4 gap-4">
-      <div className="text-2xl font-bold">Sorting Criteria</div>
+        {/* Timer notification if active */}
+        {isTimerActive && (
+          <div style={{
+            padding: '12px',
+            marginBottom: '4px',
+            backgroundColor: '#fef3c7',
+            borderRadius: '6px',
+            border: '2px solid #f59e0b',
+          }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>
+              ⏱️ No Inc Rem Timer Active
+            </div>
+            <div style={{ fontSize: '13px', color: '#78350f', marginBottom: '8px' }}>
+              Only flashcards are being shown. Time remaining: {minutes}:{seconds.toString().padStart(2, '0')}
+            </div>
+            <div style={{ fontSize: '11px', color: '#92400e', fontStyle: 'italic' }}>
+              Note: The settings below are temporarily overridden while this timer is active.
+            </div>
+            <button
+              onClick={async () => {
+                await plugin.storage.setSynced(noIncRemTimerKey, null);
+                await plugin.app.toast('Timer cancelled - Incremental rems re-enabled');
+              }}
+              style={{
+                marginTop: '8px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                backgroundColor: '#dc2626',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 500
+              }}
+            >
+              Cancel Timer & Re-enable Inc Rems
+            </button>
+          </div>
+        )}
       
+      <div className="text-2xl font-bold">Sorting Criteria</div>
+
       {/* Randomness slider is unchanged */}
       <div className="flex flex-col gap-2 ">
         <div>
