@@ -1,4 +1,4 @@
-import { renderWidget, usePlugin, useTracker } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import {
   getSortingRandomness,
   setSortingRandomness,
@@ -41,12 +41,12 @@ const sliderValueToLabel = (value: number): string => {
 export function SortingCriteria() {
   const plugin = usePlugin();
 
-  const sortingRandomness = useTracker(async (rp) => await getSortingRandomness(rp), []);
-  const storedCards = useTracker(async (rp) => await getCardsPerRem(rp), []);
+  const sortingRandomness = useTrackerPlugin(async (rp) => await getSortingRandomness(rp), []);
+  const storedCards = useTrackerPlugin(async (rp) => await getCardsPerRem(rp), []);
   const [sliderValue, setSliderValue] = useState<number | undefined>(undefined);
 
     //No Inc Rem timer
-  const noIncRemTimerEnd = useTracker(
+  const noIncRemTimerEnd = useTrackerPlugin(
     async (rp) => await rp.storage.getSynced<number>(noIncRemTimerKey),
     []
   );

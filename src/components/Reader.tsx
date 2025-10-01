@@ -2,7 +2,7 @@
 import {
   PDFWebReader,
   usePlugin,
-  useTracker,
+  useTrackerPlugin,
   BuiltInPowerupCodes,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
@@ -47,7 +47,7 @@ export function Reader(props: ReaderProps) {
   const [pageRangeEnd, setPageRangeEnd] = React.useState<number>(0);
   const [isInputFocused, setIsInputFocused] = React.useState<boolean>(false);
 
-  const remData = useTracker(async (rp) => {
+  const remData = useTrackerPlugin(async (rp) => {
     try {
       const pdfRem = actionItem.rem;
       if (!pdfRem) return null;

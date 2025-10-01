@@ -2,7 +2,7 @@
 import {
   renderWidget,
   usePlugin,
-  useTracker,
+  useTrackerPlugin,
   Rem,
   RNPlugin,
   BuiltInPowerupCodes,
@@ -46,7 +46,7 @@ function BatchPriority() {
   const plugin = usePlugin();
   
   // Get the focused rem from session storage
-  const focusedRemId = useTracker(
+  const focusedRemId = useTrackerPlugin(
     async (rp) => {
       const id = await rp.storage.getSession<string>('batchPriorityFocusedRem');
       console.log('📌 BatchPriority: Focused rem ID from session:', id);
@@ -80,7 +80,7 @@ function BatchPriority() {
   const [previousStates, setPreviousStates] = useState<IncrementalRemData[][]>([]);
 
   // Get all incremental rems from storage
-  const allIncrementalRems = useTracker(
+  const allIncrementalRems = useTrackerPlugin(
     (rp) => {
       console.log('📊 BatchPriority: Fetching all incremental rems from storage');
       return rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);

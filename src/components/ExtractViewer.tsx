@@ -1,5 +1,5 @@
 import React from 'react';
-import { Rem, RNPlugin, useTracker, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { Rem, RNPlugin, useTrackerPlugin, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode } from '../lib/consts';
 
 interface ExtractViewerProps {
@@ -8,7 +8,7 @@ interface ExtractViewerProps {
 }
 
 export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
-  const remData = useTracker(async (rp) => {
+  const remData = useTrackerPlugin(async (rp) => {
     if (!rem) return null;
 
     const remText = rem.text ? await plugin.richText.toString(rem.text) : '';

@@ -62,7 +62,18 @@ import { getInitialPriority } from '../lib/priority_inheritance';
 import { findPDFinRem } from '../lib/pdfUtils';
 dayjs.extend(relativeTime);
 
+//Debug
+console.log('🚀 INCREMENTAL EVERYTHING PLUGIN LOADED - VERSION CHECK');
+
+
 async function onActivate(plugin: ReactRNPlugin) {
+  //Debug
+  console.log('🚀 INCREMENTAL EVERYTHING onActivate CALLED');
+  console.log('Plugin type:', typeof plugin);
+  console.log('Plugin methods:', Object.keys(plugin));
+  console.log('Plugin.app methods:', Object.keys(plugin.app));
+  console.log('Plugin.storage methods:', Object.keys(plugin.storage));
+
   let sessionItemCounter = 0;
 
   const QUEUE_LAYOUT_FIX_CSS = `
@@ -92,26 +103,33 @@ async function onActivate(plugin: ReactRNPlugin) {
   `.trim();
 
 
-  await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
-    slots: [
-      {
-        code: prioritySlotCode,
-        name: 'Priority',
-        propertyType: PropertyType.NUMBER,
-        propertyLocation: PropertyLocation.BELOW,
-      },
-      {
-        code: nextRepDateSlotCode,
-        name: 'Next Rep Date',
-        propertyType: PropertyType.DATE,
-        propertyLocation: PropertyLocation.BELOW,
-      },
-      {
-        code: repHistorySlotCode,
-        name: 'History',
-        hidden: true,
-      },
-    ],
+  // New, corrected registerPowerup format with a single object (since plugin-sdk@0.0.39)
+  // `slots` is nested inside `options`
+  await plugin.app.registerPowerup({
+    name: 'Incremental',
+    code: powerupCode,
+    description: 'Incremental Everything Powerup',
+    options: {
+      slots: [
+        {
+          code: prioritySlotCode,
+          name: 'Priority',
+          propertyType: PropertyType.NUMBER,
+          propertyLocation: PropertyLocation.BELOW,
+        },
+        {
+          code: nextRepDateSlotCode,
+          name: 'Next Rep Date',
+          propertyType: PropertyType.DATE,
+          propertyLocation: PropertyLocation.BELOW,
+        },
+        {
+          code: repHistorySlotCode,
+          name: 'History',
+          hidden: true,
+        },
+      ],
+    },
   });
 
   plugin.settings.registerNumberSetting({

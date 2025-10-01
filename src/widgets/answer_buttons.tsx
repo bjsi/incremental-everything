@@ -1,7 +1,7 @@
 import {
   renderWidget,
   usePlugin,
-  useTracker,
+  useTrackerPlugin,
   WidgetLocation,
   RNPlugin,
   Rem,
@@ -120,37 +120,37 @@ function Button({ children, onClick, variant = 'secondary', style, disabled }: B
 
 export function AnswerButtons() {
   const plugin = usePlugin();
-  const ctx = useTracker(
+  const ctx = useTrackerPlugin(
     async (rp) => await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>(),
     []
   );
 
-  const rem = useTracker(
+  const rem = useTrackerPlugin(
     (rp) => rp.rem.findOne(ctx?.remId),
     [ctx?.remId]
   );
 
-  const incRem = useTracker(
+  const incRem = useTrackerPlugin(
     async () => rem ? await getIncrementalRemInfo(plugin, rem) : undefined,
     [rem]
   );
 
-  const allIncrementalRems = useTracker(
+  const allIncrementalRems = useTrackerPlugin(
     (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
     []
   );
   
-  const currentScopeRemIds = useTracker(
+  const currentScopeRemIds = useTrackerPlugin(
     (rp) => rp.storage.getSession<string[] | null>(currentScopeRemIdsKey),
     []
   );
 
-  const shouldDisplayShield = useTracker(
+  const shouldDisplayShield = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
     []
   );
 
-  const shieldStatus = useTracker(
+  const shieldStatus = useTrackerPlugin(
     async (rp) => {
       await rp.storage.getSession(allIncrementalRemKey);
       await rp.storage.getSession(seenRemInSessionKey);
@@ -162,12 +162,12 @@ export function AnswerButtons() {
     [plugin, ctx?.remId]
   );
 
-  const activeHighlightId = useTracker(
+  const activeHighlightId = useTrackerPlugin(
     (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey),
     []
   );
 
-  const remType = useTracker(
+  const remType = useTrackerPlugin(
     (rp) => rp.storage.getSession<string | null>(currentIncrementalRemTypeKey),
     []
   );

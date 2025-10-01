@@ -1,7 +1,7 @@
 import {
   renderWidget,
   usePlugin,
-  useTracker,
+  useTrackerPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useState } from 'react';
 import { noIncRemTimerKey } from '../lib/consts';
@@ -11,7 +11,7 @@ function NoIncTimerIndicator() {
   const [currentTime, setCurrentTime] = useState(Date.now());
   
   // Use synced storage instead of session storage
-  const noIncRemTimerEnd = useTracker(
+  const noIncRemTimerEnd = useTrackerPlugin(
     async (rp) => {
       const value = await rp.storage.getSynced<number>(noIncRemTimerKey);
       console.log('NoIncTimerIndicator: Timer end value:', value);

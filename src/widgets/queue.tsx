@@ -3,7 +3,7 @@ import {
   renderWidget,
   usePlugin,
   useRunAsync,
-  useTracker,
+  useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useRef } from 'react';
@@ -29,7 +29,7 @@ export function QueueComponent() {
     []
   );
 
-  const remAndType = useTracker(
+  const remAndType = useTrackerPlugin(
     async (rp) => {
       if (!ctx) return undefined;
       const rem = await rp.rem.findOne(ctx?.remId);
@@ -39,7 +39,7 @@ export function QueueComponent() {
     [ctx?.remId]
   );
 
-  const shouldCollapseTopBar = useTracker(
+  const shouldCollapseTopBar = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(collapseQueueTopBar),
     []
   );

@@ -1,4 +1,4 @@
-import { renderWidget, usePlugin, useRunAsync, useTracker } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import {
   LineChart,
@@ -28,7 +28,7 @@ function PriorityShieldGraph() {
   const plugin = usePlugin();
   
   // Get the context to check if we're in a document queue
-  const ctx = useTracker(
+  const ctx = useTrackerPlugin(
     async (rp) => await rp.widget.getWidgetContext<any>(),
     []
   );

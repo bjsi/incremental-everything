@@ -2,7 +2,7 @@ import {
   renderWidget,
   usePlugin,
   useRunAsync,
-  useTracker,
+  useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
@@ -32,7 +32,7 @@ function Debug() {
     []
   );
   const remId = ctx?.contextData?.remId;
-  const incrementalRem = useTracker(
+  const incrementalRem = useTrackerPlugin(
     async (rp) => {
       const rem = await rp.rem.findOne(remId);
       if (!rem) {
