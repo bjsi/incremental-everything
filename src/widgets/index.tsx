@@ -132,6 +132,36 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  // Create Separate Flashcard Priority Powerup
+
+  await plugin.app.registerPowerup({
+    name: 'CardPriority',
+    code: 'cardPriority',
+    description: 'Priority system for flashcards',
+    options: {
+      slots: [
+        {
+          code: 'priority',
+          name: 'Priority',
+          propertyType: PropertyType.NUMBER,
+          propertyLocation: PropertyLocation.BELOW,
+        },
+        {
+          code: 'prioritySource',
+          name: 'Priority Source',
+          propertyType: PropertyType.TEXT,
+          propertyLocation: PropertyLocation.HIDDEN,  // Hidden from UI
+        },
+        {
+          code: 'lastUpdated',
+          name: 'Last Updated',
+          propertyType: PropertyType.NUMBER,  // Timestamp
+          propertyLocation: PropertyLocation.HIDDEN,
+        }
+      ],
+    },
+  });
+
   plugin.settings.registerNumberSetting({
     id: initialIntervalId,
     title: 'Initial Interval',
@@ -174,6 +204,18 @@ async function onActivate(plugin: ReactRNPlugin) {
         type: "lte" as const, // "Less than or equal to"
         arg: 100,
       },
+    ]
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: 'defaultCardPriority',
+    title: 'Default Card Priority',
+    description: 'Default priority for flashcards without inherited priority (0-100, Lower = more important).  Default: 50',
+    defaultValue: 50,
+    validators: [
+      { type: "int" as const },
+      { type: "gte" as const, arg: 0 },
+      { type: "lte" as const, arg: 100 },
     ]
   });
 
@@ -947,6 +989,80 @@ async function onActivate(plugin: ReactRNPlugin) {
       } else {
         await plugin.app.toast('No active timer to cancel.');
       }
+    },
+  });
+
+  // Register command to create priority review document
+  plugin.app.registerCommand({
+    id: 'create-priority-review',
+    name: 'Create Priority Review Document',
+    keyboardShortcut: 'opt+shift+r',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      
+      await plugin.storage.setSession('reviewDocContext', {
+        scopeRemId: focused?._id || null,
+        scopeName: focused ? await plugin.richText.toString(focused.text) : 'Full KB'
+      });
+      
+      await plugin.widget.openPopup('review_document_creator');
+    }
+  });
+
+  // Register the review document creator widget
+  plugin.app.registerWidget('review_document_creator', WidgetLocation.Popup, {
+    dimensions: {
+      width: 500,
+      height: 'auto',
+    },
+  });
+
+  // Add menu item for quick access
+  plugin.app.registerMenuItem({
+    id: 'create_priority_review_menuitem',
+    location: PluginCommandMenuLocation.DocumentMenu,
+    name: 'Create Priority Review Document',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) return;
+      
+      const remName = await plugin.richText.toString(rem.text);
+      
+      await plugin.storage.setSession('reviewDocContext', {
+        scopeRemId: rem._id,
+        scopeName: remName
+      });
+      
+      await plugin.widget.openPopup('review_document_creator');
+    },
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1828/1828640.png', // Document icon
+  });
+
+  // Also add to Queue Menu for easy access while in queue
+  plugin.app.registerMenuItem({
+    id: 'create_priority_review_queue_menuitem',
+    location: PluginCommandMenuLocation.QueueMenu,
+    name: 'Create Priority Review Document',
+    action: async () => {
+      // When called from queue menu, use current queue scope if available
+      const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
+      
+      if (subQueueId) {
+        const rem = await plugin.rem.findOne(subQueueId);
+        const remName = rem ? await plugin.richText.toString(rem.text) : 'Queue Scope';
+        
+        await plugin.storage.setSession('reviewDocContext', {
+          scopeRemId: subQueueId,
+          scopeName: remName
+        });
+      } else {
+        await plugin.storage.setSession('reviewDocContext', {
+          scopeRemId: null,
+          scopeName: 'Full KB'
+        });
+      }
+      
+      await plugin.widget.openPopup('review_document_creator');
     },
   });
 
