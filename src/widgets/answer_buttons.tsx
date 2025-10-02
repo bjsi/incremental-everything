@@ -23,6 +23,7 @@ import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
 import { calculatePriorityShield } from '../lib/priority_shield';
+import { addPageToHistory, findPDFinRem, getCurrentPageKey } from '../lib/pdfUtils'; // Import helpers
 
 const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined) => {
   if (!rem) return;
@@ -135,6 +136,32 @@ export function AnswerButtons() {
     [rem]
   );
 
+    // --- New Logic to handle the "Next" button click ---
+  const handleNextClick = async () => {
+    if (!rem || !incRem) return;
+
+    // Check if the current view is a PDF
+    const remType = await plugin.storage.getSession<string | null>(currentIncrementalRemTypeKey);
+    if (remType === 'pdf') {
+      // Find the associated PDF Rem
+      const pdfRem = await findPDFinRem(plugin, rem);
+      if (pdfRem) {
+        // Get the last known page number from storage (the Reader keeps this updated)
+        const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
+        const currentPage = await plugin.storage.getSynced<number>(pageKey);
+        
+        if (currentPage) {
+          // Manually add the current page to the history before rescheduling
+          await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
+          console.log(`Manually logged page ${currentPage} for ${rem._id} on 'Next' click.`);
+        }
+      }
+    }
+
+    // Proceed with the original "Next" button logic
+    await handleHextRepetitionClick(plugin, incRem);
+  };
+
   const allIncrementalRems = useTrackerPlugin(
     (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
     []
@@ -240,8 +267,8 @@ export function AnswerButtons() {
     <div style={containerStyle} className="incremental-everything-answer-buttons">
       {/* Single row of buttons */}
       <div style={buttonRowStyle}>
-        {/* Primary Actions Group */}
-        <Button variant="primary" onClick={() => handleHextRepetitionClick(plugin, incRem)}>
+        {/* MODIFIED: Use the new handler for the "Next" button */}
+        <Button variant="primary" onClick={handleNextClick}>
           <div style={buttonStyles.label}>Next</div>
           <div style={buttonStyles.sublabel}>{incRem && <NextRepTime rem={incRem} />}</div>
         </Button>

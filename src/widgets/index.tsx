@@ -48,6 +48,7 @@ import {
   noIncRemTimerKey,
   noIncRemMenuItemId,
   noIncRemTimerWidgetId,
+  currentIncRemKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -60,6 +61,7 @@ import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 import { getInitialPriority } from '../lib/priority_inheritance';
 import { findPDFinRem } from '../lib/pdfUtils';
+import { autoAssignCardPriority, getCardPriority } from '../lib/cardPriority';
 dayjs.extend(relativeTime);
 
 //Debug
@@ -597,10 +599,19 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   } 
 
+  // Priority widget registration to handle both IncRem and Cards
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {
     dimensions: {
-      width: '100%',
+      width: '500px',
       height: 'auto',
+    },
+  });
+
+  // Register the priority editor widget for the right side of editor
+  plugin.app.registerWidget('priority_editor', WidgetLocation.RightSideOfEditor, {
+    dimensions: {
+      height: 'auto',
+      width: 'auto',
     },
   });
 
@@ -671,15 +682,47 @@ async function onActivate(plugin: ReactRNPlugin) {
     name: 'Set Priority',
     keyboardShortcut: 'opt+p',
     action: async () => {
-      const rem = await plugin.focus.getFocusedRem();
-      if (!rem) {
+      console.log("--- Set Priority Command Triggered ---");
+      let remId: string | undefined;
+      const url = await plugin.window.getURL();
+      console.log("Current URL:", url);
+
+      // Check if we are in the queue
+      if (url.includes('/flashcards')) {
+        console.log("In flashcards view.");
+        // First, try to get the current native flashcard. This works for regular cards.
+        const card = await plugin.queue.getCurrentCard();
+        console.log("Result of getCurrentCard():", card);
+
+        if (card) {
+          remId = card.remId;
+          console.log("Found native card. remId:", remId);
+        } else {
+          console.log("Not a native card. Checking session storage for incremental rem...");
+          // If it's not a native card, it's our plugin's queue view.
+          // The source of truth is the remId stored in session by queue.tsx.
+          remId = await plugin.storage.getSession(currentIncRemKey);
+          console.log("remId from session storage (currentIncRemKey):", remId);
+        }
+      } else {
+        console.log("Not in flashcards view. Getting focused editor rem.");
+        // If not in the queue, get the focused Rem from the editor
+        const focusedRem = await plugin.focus.getFocusedRem();
+        remId = focusedRem?._id;
+        console.log("Focused editor remId:", remId);
+      }
+
+      console.log("Final remId to be used:", remId);
+
+      if (!remId) {
+        console.log("Set Priority: No focused Rem or card in queue found. Aborting.");
+        await plugin.app.toast("Could not find a Rem to set priority for.");
         return;
       }
-      if (!(await rem.hasPowerup(powerupCode))) {
-        await initIncrementalRem(rem);
-      }
+      
+      console.log(`Opening 'priority' popup for remId: ${remId}`);
       await plugin.widget.openPopup('priority', {
-        remId: rem._id,
+        remId: remId,
       });
     },
   });
@@ -814,6 +857,26 @@ async function onActivate(plugin: ReactRNPlugin) {
     } else {
     }
   });
+
+  // Event listener for assigning priority when cards are created
+  plugin.event.addListener(
+    AppEvents.RemChanged,
+    undefined,
+    async (data) => {
+      const rem = await plugin.rem.findOne(data.remId);
+      if (!rem) return;
+      
+      const cards = await rem.getCards();
+      if (cards && cards.length > 0) {
+        // Check if this rem already has card priority
+        const existingPriority = await getCardPriority(plugin, rem);
+        if (!existingPriority) {
+          // Auto-assign priority based on context
+          await autoAssignCardPriority(plugin, rem);
+        }
+      }
+    }
+  );
 
   plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
     powerupFilter: powerupCode,
@@ -1072,3 +1135,4 @@ async function onActivate(plugin: ReactRNPlugin) {
 async function onDeactivate(_: ReactRNPlugin) {}
 
 declareIndexPlugin(onActivate, onDeactivate);
+

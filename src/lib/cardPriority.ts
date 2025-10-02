@@ -18,52 +18,6 @@ export interface CardPriorityInfo {
   dueCards: number;
 }
 
-/**
- * Get card priority info for a rem
- */
-export async function getCardPriority(
-  plugin: RNPlugin,
-  rem: Rem
-): Promise<CardPriorityInfo | null> {
-  const hasPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
-  if (!hasPowerup) return null;
-
-  const priority = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
-  const source = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-  const lastUpdated = await rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT);
-  
-  const cards = await rem.getCards();
-  const now = Date.now();
-  const dueCards = cards.filter(card => card.nextRepetitionTime <= now).length;
-
-  return {
-    remId: rem._id,
-    priority: parseInt(priority) || 50,
-    source: (source as PrioritySource) || 'default',
-    lastUpdated: parseInt(lastUpdated) || now,
-    cardCount: cards.length,
-    dueCards
-  };
-}
-
-/**
- * Set card priority
- */
-export async function setCardPriority(
-  plugin: RNPlugin,
-  rem: Rem,
-  priority: number,
-  source: PrioritySource
-): Promise<void> {
-  const hasPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
-  if (!hasPowerup) {
-    await rem.addPowerup(CARD_PRIORITY_CODE);
-  }
-
-  await rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT, [priority.toString()]);
-  await rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]);
-  await rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()]);
-}
 
 /**
  * Find the closest ancestor with priority (either Incremental or CardPriority)
@@ -94,6 +48,86 @@ async function findClosestAncestorWithPriority(
   }
   
   return null;
+}
+
+
+/**
+ * Get card priority info for a rem.
+ * If no priority is set, it checks for inherited priority before returning a default state.
+ */
+export async function getCardPriority(
+  plugin: RNPlugin,
+  rem: Rem
+): Promise<CardPriorityInfo | null> {
+  const cards = await rem.getCards();
+  const now = Date.now();
+  const dueCards = cards.filter(card => card.nextRepetitionTime <= now).length;
+
+  const hasPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
+  
+  if (!hasPowerup) {
+    // If there are no cards, there's nothing to set a priority for. Return null.
+    if (cards.length === 0) {
+      return null;
+    }
+
+    // --- NEW LOGIC IS HERE ---
+    // Before returning a generic default, check for an inheritable priority.
+    const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
+    if (ancestorPriority) {
+      return {
+        remId: rem._id,
+        priority: ancestorPriority.priority,
+        source: 'inherited',
+        lastUpdated: 0, // 0 indicates it's not saved yet
+        cardCount: cards.length,
+        dueCards
+      };
+    }
+    // --- END OF NEW LOGIC ---
+
+    // If no ancestor is found, then use the default.
+    return {
+      remId: rem._id,
+      priority: (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50,
+      source: 'default',
+      lastUpdated: 0, // 0 indicates it's not saved
+      cardCount: cards.length,
+      dueCards
+    };
+  }
+
+  const priority = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+  const source = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
+  const lastUpdated = await rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT);
+
+  return {
+    remId: rem._id,
+    priority: parseInt(priority) || 50,
+    source: (source as PrioritySource) || 'default',
+    lastUpdated: parseInt(lastUpdated) || now,
+    cardCount: cards.length,
+    dueCards
+  };
+}
+
+/**
+ * Set card priority
+ */
+export async function setCardPriority(
+  plugin: RNPlugin,
+  rem: Rem,
+  priority: number,
+  source: PrioritySource
+): Promise<void> {
+  const hasPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
+  if (!hasPowerup) {
+    await rem.addPowerup(CARD_PRIORITY_CODE);
+  }
+
+  await rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT, [priority.toString()]);
+  await rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]);
+  await rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()]);
 }
 
 /**

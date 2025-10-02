@@ -1,7 +1,7 @@
 import { RNPlugin, Rem } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './types';
 import { getCardRandomness, getSortingRandomness, getCardsPerRem, applySortingCriteria } from './sorting';
-import { getDueCardsWithPriorities } from './flashcardPriority';
+import { getDueCardsWithPriorities } from './cardPriority';
 import { allIncrementalRemKey } from './consts';
 
 export interface ReviewDocumentConfig {

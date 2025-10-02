@@ -55,16 +55,23 @@ export function QueueComponent() {
   }, [plugin, shouldCollapseTopBar]);
 
   useEffect(() => {
-    setCurrentIncrementalRem(plugin, remAndType?.rem?._id);
+    // The true identity of the incremental item in the queue is ALWAYS ctx.remId.
+    // remAndType tells us WHAT to display, but ctx.remId tells us WHO we are.
+    const incrementalRemId = ctx?.remId;
+    setCurrentIncrementalRem(plugin, incrementalRemId);
+    
     plugin.storage.setSession(currentIncrementalRemTypeKey, remAndType?.type);
-    // If the new card is NOT a highlight, explicitly clear the highlight signal.
-    if (remAndType?.type !== 'pdf-highlight' && remAndType?.type !== 'html-highlight') {
-      plugin.storage.setSession(activeHighlightIdKey, null);
-    }
+    
+    // For highlights, we still need to identify the specific extract.
+    const activeHighlight = (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight') 
+      ? (remAndType as any).extract?._id 
+      : null;
+    plugin.storage.setSession(activeHighlightIdKey, activeHighlight);
+
     if (remAndType === null) {
       plugin.queue.removeCurrentCardFromQueue(false);
     }
-  }, [remAndType, plugin]);
+  }, [ctx?.remId, remAndType, plugin]);
 
   const shouldRenderEditorForRemType = useRunAsync(async () => {
     if (remAndType?.type !== 'rem') {
@@ -107,3 +114,5 @@ export function QueueComponent() {
 }
 
 renderWidget(QueueComponent);
+
+
