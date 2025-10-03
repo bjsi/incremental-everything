@@ -152,13 +152,13 @@ async function onActivate(plugin: ReactRNPlugin) {
           code: 'prioritySource',
           name: 'Priority Source',
           propertyType: PropertyType.TEXT,
-          propertyLocation: PropertyLocation.HIDDEN,  // Hidden from UI
+          propertyLocation: PropertyLocation.ONLY_IN_TABLE,
         },
         {
           code: 'lastUpdated',
           name: 'Last Updated',
           propertyType: PropertyType.NUMBER,  // Timestamp
-          propertyLocation: PropertyLocation.HIDDEN,
+          propertyLocation: PropertyLocation.ONLY_IN_TABLE,
         }
       ],
     },
@@ -608,12 +608,19 @@ async function onActivate(plugin: ReactRNPlugin) {
   });
 
   // Register the priority editor widget for the right side of editor
+
+  // NEW LOG: Check if the registration code is being reached.
+  console.log('Attempting to register priority_editor widget...');
+  
   plugin.app.registerWidget('priority_editor', WidgetLocation.RightSideOfEditor, {
     dimensions: {
       height: 'auto',
       width: 'auto',
     },
   });
+
+  // NEW LOG: Confirm that the registration call completed without error.
+  console.log('SUCCESS: priority_editor widget registered.');
 
   plugin.app.registerWidget('batch_priority', WidgetLocation.Popup, {
     dimensions: {
