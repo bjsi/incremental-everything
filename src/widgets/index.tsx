@@ -43,6 +43,10 @@ import {
   priorityShieldHistoryMenuItemId,
   documentPriorityShieldHistoryKey,
   currentSubQueueIdKey,
+  seenCardInSessionKey,
+  cardPriorityShieldHistoryKey,
+  documentCardPriorityShieldHistoryKey,
+  allCardPriorityInfoKey,
   remnoteEnvironmentId,
   pageRangeWidgetId,
   noIncRemTimerKey,
@@ -61,11 +65,48 @@ import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 import { getInitialPriority } from '../lib/priority_inheritance';
 import { findPDFinRem } from '../lib/pdfUtils';
-import { autoAssignCardPriority, getCardPriority } from '../lib/cardPriority';
+import { autoAssignCardPriority, getCardPriority, getDueCardsWithPriorities, CardPriorityInfo } from '../lib/cardPriority';
 dayjs.extend(relativeTime);
 
-//Debug
-console.log('🚀 INCREMENTAL EVERYTHING PLUGIN LOADED - VERSION CHECK');
+// Helper function needed for history saving
+function calculateRelativeCardPriority(allItems: CardPriorityInfo[], currentRemId: RemId): number | null {
+  if (!allItems || allItems.length === 0) return null;
+  const sortedItems = _.sortBy(allItems, (x) => x.priority);
+  const index = sortedItems.findIndex((x) => x.remId === currentRemId);
+  if (index === -1) return null;
+  return Math.round(((index + 1) / sortedItems.length) * 100);
+}
+
+// CARD PRIORITIES CACHING FUNCTION with console.log statements
+async function cacheAllCardPriorities(plugin: RNPlugin) {
+  console.log('CACHE: Starting to build a COMPLETE card priority cache...');
+  
+  // 1. Get ALL cards in the knowledge base. This is the most reliable starting point.
+  const allCards = await plugin.card.getAll();
+  if (!allCards || allCards.length === 0) {
+    console.log('CACHE: No cards found in the knowledge base. Setting empty cache.');
+    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    return;
+  }
+  console.log(`CACHE: Found ${allCards.length} total cards. Identifying unique parent Rems...`);
+
+  // 2. Get the unique list of Rems that contain these cards.
+  const remIdsWithCards = _.uniq(allCards.map(c => c.remId));
+  const remsWithCards = (await plugin.rem.findMany(remIdsWithCards)) || [];
+  console.log(`CACHE: Found ${remsWithCards.length} unique Rems with cards. Processing priority for each...`);
+
+  // 3. Now, get the priority info for this complete list.
+  // getCardPriority will correctly handle tagged, inherited, and default cases for each Rem.
+  const allCardInfos = (
+    await Promise.all(remsWithCards.map(r => getCardPriority(plugin, r)))
+  ).filter(Boolean) as CardPriorityInfo[];
+
+  console.log(`CACHE: Processing complete. Final cache size is ${allCardInfos.length} items.`, allCardInfos);
+
+  await plugin.storage.setSession(allCardPriorityInfoKey, allCardInfos);
+  console.log('CACHE: COMPLETE card priority cache has been successfully built and saved.');
+  await plugin.app.toast(`Refreshed card priority cache (${allCardInfos.length} items).`);
+}
 
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -247,6 +288,8 @@ async function onActivate(plugin: ReactRNPlugin) {
     ]
   });
 
+  await cacheAllCardPriorities(plugin);
+
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
@@ -343,8 +386,67 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
     }
 
+    // --- NEW: Card Priority Shield Logic ---
+    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+    const allPrioritizedRems = cardPriorityPowerup ? await cardPriorityPowerup.taggedRem() : [];
+
+    if (allPrioritizedRems.length > 0) {
+        const today = dayjs().format('YYYY-MM-DD');
+        const subQueueIdForExit = subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
+        const seenCardIds = await plugin.storage.getSession<string[]>(seenCardInSessionKey) || [];
+
+        const unreviewedFilter = (c: { rem: Rem, priority: number }) => !seenCardIds.includes(c.rem._id);
+
+        // --- Calculate final KB card shield ---
+        const allDueCards = await getDueCardsWithPriorities(plugin, null, false);
+        const unreviewedDueKb = allDueCards.filter(unreviewedFilter);
+        let kbCardFinalStatus = { absolute: null as number | null, percentile: 100 };
+        if (unreviewedDueKb.length > 0) {
+            const topMissed = _.minBy(unreviewedDueKb, c => c.priority);
+            if (topMissed) {
+                const allCardInfos = (await Promise.all(allPrioritizedRems.map(r => getCardPriority(plugin, r)))).filter(Boolean) as CardPriorityInfo[];
+                kbCardFinalStatus.absolute = topMissed.priority;
+                kbCardFinalStatus.percentile = calculateRelativeCardPriority(allCardInfos, topMissed.rem._id);
+            }
+        }
+        const cardKbHistory = (await plugin.storage.getSynced(cardPriorityShieldHistoryKey)) || {};
+        cardKbHistory[today] = kbCardFinalStatus;
+        await plugin.storage.setSynced(cardPriorityShieldHistoryKey, cardKbHistory);
+        console.log('Saved Card KB history:', kbCardFinalStatus);
+
+        // --- Calculate final Doc card shield ---
+        if (subQueueIdForExit) {
+            const scopeRem = await plugin.rem.findOne(subQueueIdForExit);
+            if (scopeRem) {
+                const docDueCards = await getDueCardsWithPriorities(plugin, scopeRem, false);
+                const unreviewedDueDoc = docDueCards.filter(unreviewedFilter);
+                let docCardFinalStatus = { absolute: null as number | null, percentile: 100 };
+
+                if (unreviewedDueDoc.length > 0) {
+                    const topMissed = _.minBy(unreviewedDueDoc, c => c.priority);
+                    if (topMissed) {
+                        const scopeDescendants = await scopeRem.getDescendants();
+                        const scopeIds = [scopeRem._id, ...scopeDescendants.map(d => d._id)];
+                        const allCardInfos = (await Promise.all(allPrioritizedRems.map(r => getCardPriority(plugin, r)))).filter(Boolean) as CardPriorityInfo[];
+                        const docCardInfos = allCardInfos.filter(ci => scopeIds.includes(ci.remId));
+                        docCardFinalStatus.absolute = topMissed.priority;
+                        docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.rem._id);
+                    }
+                }
+                const docCardHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) || {};
+                if (!docCardHistory[subQueueIdForExit]) {
+                    docCardHistory[subQueueIdForExit] = {};
+                }
+                docCardHistory[subQueueIdForExit][today] = docCardFinalStatus;
+                await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, docCardHistory);
+                console.log('Saved Card Document history for', subQueueIdForExit, ':', docCardFinalStatus);
+            }
+        }
+    }
+
     // Reset session-specific state AFTER we've used the data
     await plugin.storage.setSession(seenRemInSessionKey, []);
+    await plugin.storage.setSession(seenCardInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
     await plugin.storage.setSession(currentSubQueueIdKey, null);
@@ -353,6 +455,7 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     await plugin.storage.setSession(seenRemInSessionKey, []);
+    await plugin.storage.setSession(seenCardInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
     // Store the current subQueueId
@@ -986,7 +1089,6 @@ async function onActivate(plugin: ReactRNPlugin) {
         });
       }
     },
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
   });
 
   plugin.app.registerMenuItem({
@@ -1007,7 +1109,6 @@ async function onActivate(plugin: ReactRNPlugin) {
         remId: args.remId,
       });
     },
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2040/2040651.png', // Priority icon
   });
 
   // No Inc Rem Timer
@@ -1079,10 +1180,26 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   });
 
+  // Command to manually refresh the card priority cache ---
+  plugin.app.registerCommand({
+    id: 'refresh-card-priority-cache',
+    name: 'Refresh Card Priority Cache',
+    action: async () => {
+      await cacheAllCardPriorities(plugin);
+    },
+  });
+
   // Register the review document creator widget
   plugin.app.registerWidget('review_document_creator', WidgetLocation.Popup, {
     dimensions: {
       width: 500,
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerWidget('card_priority_display', WidgetLocation.FlashcardUnder, {
+    dimensions: {
+      width: '100%',
       height: 'auto',
     },
   });
@@ -1105,7 +1222,6 @@ async function onActivate(plugin: ReactRNPlugin) {
       
       await plugin.widget.openPopup('review_document_creator');
     },
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1828/1828640.png', // Document icon
   });
 
   // Also add to Queue Menu for easy access while in queue

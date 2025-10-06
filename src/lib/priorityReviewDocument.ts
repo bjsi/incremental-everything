@@ -1,8 +1,21 @@
-import { RNPlugin, Rem } from '@remnote/plugin-sdk';
+import { RNPlugin, Rem, RichTextInterface } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './types';
-import { getCardRandomness, getSortingRandomness, getCardsPerRem, applySortingCriteria } from './sorting';
+import { getCardRandomness, getSortingRandomness, applySortingCriteria } from './sorting';
 import { getDueCardsWithPriorities } from './cardPriority';
 import { allIncrementalRemKey } from './consts';
+
+
+// Helper function to find or create a tag
+async function findOrCreateTag(plugin: RNPlugin, tagName: string): Promise<Rem | undefined> {
+  let tag = await plugin.rem.findByName([tagName], null);
+  if (!tag) {
+    tag = await plugin.rem.createRem();
+    if (tag) {
+      await tag.setText([tagName]);
+    }
+  }
+  return tag;
+}
 
 export interface ReviewDocumentConfig {
   scopeRemId: string | null;  // null = full KB
@@ -18,15 +31,30 @@ export async function createPriorityReviewDocument(
   config: ReviewDocumentConfig
 ): Promise<Rem> {
   const { scopeRemId, itemCount, cardRatio } = config;
-  
+
   // 1. Create the review document
-  const timestamp = new Date().toLocaleString();
+  const timestamp = new Date().toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
   const scopeName = scopeRemId 
     ? (await plugin.rem.findOne(scopeRemId))?.text?.join('') || 'Document'
-    : 'Full KB';
+    : 'Full Knowledge Base';
   const docName = `Priority Review - ${scopeName} - ${timestamp}`;
   
-  const reviewDoc = await plugin.app.createNewDocument(docName);
+  // Create a blank Rem
+  const reviewDoc = await plugin.rem.createRem();
+  if (!reviewDoc) {
+    throw new Error("Failed to create the initial review document Rem.");
+  }
+  
+  // Set its name and make it a document
+  await reviewDoc.setText([docName]);
+  await reviewDoc.setIsDocument(true);
   
   // 2. Get scope rem if specified
   const scopeRem = scopeRemId ? await plugin.rem.findOne(scopeRemId) : null;
@@ -61,77 +89,92 @@ export async function createPriorityReviewDocument(
   const sortedIncRems = applySortingCriteria(dueIncRems, incRemRandomness);
   const sortedCards = applySortingCriteria(cardsWithPriority, cardRandomness);
   
-  // 6. Mix according to ratio
+  // 6. Mix according to ratio - FIXED LOGIC
   const mixedItems: Array<{ rem: Rem; type: 'incremental' | 'flashcard' }> = [];
-  
-  if (cardRatio === 'no-cards') {
-    // Only incremental rems
-    for (const incRem of sortedIncRems.slice(0, itemCount)) {
-      const rem = await plugin.rem.findOne(incRem.remId);
-      if (rem) mixedItems.push({ rem, type: 'incremental' });
+  let incRemIndex = 0;
+  let cardIndex = 0;
+
+  if (typeof cardRatio === 'number') {
+    while (mixedItems.length < itemCount) {
+      let addedThisCycle = false;
+      
+      // Try to add one incremental rem
+      if (incRemIndex < sortedIncRems.length) {
+        const rem = await plugin.rem.findOne(sortedIncRems[incRemIndex].remId);
+        if (rem) {
+          mixedItems.push({ rem, type: 'incremental' });
+          addedThisCycle = true;
+        }
+        incRemIndex++;
+      }
+
+      // Try to add flashcards according to ratio
+      for (let i = 0; i < cardRatio && mixedItems.length < itemCount; i++) {
+        if (cardIndex < sortedCards.length) {
+          mixedItems.push({ rem: sortedCards[cardIndex].rem, type: 'flashcard' });
+          cardIndex++;
+          addedThisCycle = true;
+        }
+      }
+      
+      // If we couldn't add anything this cycle, we're done
+      if (!addedThisCycle) {
+        break;
+      }
     }
-  } else if (cardRatio === 'no-rem') {
-    // Only flashcards
-    for (const flashcard of sortedCards.slice(0, itemCount)) {
-      mixedItems.push({ rem: flashcard.rem, type: 'flashcard' });
-    }
+
   } else {
-    // Mix based on ratio
-    const cardsPerIncRem = cardRatio;
-    let incRemIndex = 0;
-    let cardIndex = 0;
-    let itemCounter = 0;
-    
-    while (mixedItems.length < itemCount && 
-           (incRemIndex < sortedIncRems.length || cardIndex < sortedCards.length)) {
-      
-      // Add incremental rem
-      if (incRemIndex < sortedIncRems.length && itemCounter % (cardsPerIncRem + 1) === 0) {
-        const rem = await plugin.rem.findOne(sortedIncRems[incRemIndex].remId);
+    // Handle 'no-cards' or 'no-rem'
+    const sourceList = cardRatio === 'no-cards' ? sortedIncRems : sortedCards;
+    const type = cardRatio === 'no-cards' ? 'incremental' : 'flashcard';
+    for (let i = 0; i < itemCount && i < sourceList.length; i++) {
+        const item = sourceList[i];
+        const rem = item.remId ? await plugin.rem.findOne(item.remId) : item.rem;
         if (rem) {
-          mixedItems.push({ rem, type: 'incremental' });
-          incRemIndex++;
+            mixedItems.push({ rem, type: type as 'incremental' | 'flashcard' });
         }
-      } 
-      // Add flashcards
-      else if (cardIndex < sortedCards.length) {
-        mixedItems.push({ rem: sortedCards[cardIndex].rem, type: 'flashcard' });
-        cardIndex++;
-      }
-      // Fallback to incremental if no flashcards left
-      else if (incRemIndex < sortedIncRems.length) {
-        const rem = await plugin.rem.findOne(sortedIncRems[incRemIndex].remId);
-        if (rem) {
-          mixedItems.push({ rem, type: 'incremental' });
-          incRemIndex++;
-        }
-      }
-      
-      itemCounter++;
     }
   }
   
   // 7. Create portals in the document
+  const reviewQueueTag = await findOrCreateTag(plugin, 'Priority Review Queue');
+  if (reviewQueueTag) { await reviewDoc.addTag(reviewQueueTag); }
+
   for (const item of mixedItems) {
-    const portal = await plugin.richText.rem(item.rem).value();
-    const child = await reviewDoc.addChild(portal);
+    // Create a regular rem that will contain the portal reference
+    const childRem = await plugin.rem.createRem();
+    if (!childRem) continue;
     
-    // Add type indicator
-    const typeTag = item.type === 'incremental' ? '[INC]' : '[FC]';
-    await child.setText([typeTag, ' ', ...portal]);
+    // Set it as a child of the review document first
+    await childRem.setParent(reviewDoc);
+    
+    // Set its text to be a portal reference to the target rem
+    const portalContent: RichTextInterface = [
+      {
+        i: 'q',
+        _id: item.rem._id,
+      }
+    ];
+    await childRem.setText(portalContent);
+
+    // Add type tag
+    const typeTagText = item.type === 'incremental' ? 'INC' : 'FC';
+    const typeTag = await findOrCreateTag(plugin, typeTagText);
+    if (typeTag) { await childRem.addTag(typeTag); }
   }
   
   // 8. Add metadata to document
-  await reviewDoc.addTag('Priority Review Queue');
-  await reviewDoc.setText([
-    `Priority Review Document`,
-    '\n',
-    `Scope: ${scopeName}`,
-    '\n',
-    `Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} incremental, ${mixedItems.filter(i => i.type === 'flashcard').length} flashcards)`,
-    '\n',
-    `Created: ${timestamp}`
-  ]);
+  const metadataText = `Scope: ${scopeName}
+Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} incremental, ${mixedItems.filter(i => i.type === 'flashcard').length} flashcards)
+Created: ${timestamp}`;
+
+  // Create a code block with metadata
+  const metadataRem = await plugin.rem.createRem();
+  if (metadataRem) {
+    await metadataRem.setText([metadataText]);
+    await metadataRem.setIsCode(true);
+    await metadataRem.setParent(reviewDoc);
+  }
   
   return reviewDoc;
 }

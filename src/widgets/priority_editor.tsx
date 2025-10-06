@@ -198,6 +198,12 @@ export function PriorityEditor() {
               </div>
             )}
           </div>
+            <button
+            onClick={() => plugin.widget.openPopup('priority', { remId })}
+            style={buttonStyle}
+          >
+            Open Full Priority Panel
+          </button>
         </div>
       )}
     </div>

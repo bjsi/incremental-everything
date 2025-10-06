@@ -361,6 +361,13 @@ function Priority() {
             </p>
             <div className="flex flex-col gap-2">
               <button
+                style={{ backgroundColor: '#6B7280', color: 'white' }}
+                className="px-4 py-1 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-400"
+                onClick={() => saveAndClose(incAbsPriority, cardAbsPriority)}
+              >
+                Save Both As-Is (Enter)
+              </button>
+              <button
                 style={{ backgroundColor: '#3B82F6', color: 'white' }}
                 className="px-4 py-2 rounded font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
                 onClick={() => saveAndClose(incAbsPriority, incAbsPriority)}
@@ -373,13 +380,6 @@ function Priority() {
                 onClick={() => saveAndClose(cardAbsPriority, cardAbsPriority)}
               >
                 IncRem inherits Card priority ({cardAbsPriority})
-              </button>
-              <button
-                style={{ backgroundColor: '#6B7280', color: 'white' }}
-                className="px-4 py-1 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-400"
-                onClick={() => saveAndClose(incAbsPriority, cardAbsPriority)}
-              >
-                Save Both As-Is (Enter)
               </button>
             </div>
             <button

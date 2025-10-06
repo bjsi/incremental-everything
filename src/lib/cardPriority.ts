@@ -1,6 +1,7 @@
 import { Rem, RNPlugin } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './types';
 import { getIncrementalRemInfo } from './incremental_rem';
+import * as _ from 'remeda';
 
 const CARD_PRIORITY_CODE = 'cardPriority';
 const PRIORITY_SLOT = 'priority';
@@ -223,10 +224,16 @@ export async function getDueCardsWithPriorities(
     source: PrioritySource;
   }> = [];
 
-  // Get all rems in scope
-  const remsToCheck = scopeRem 
-    ? [scopeRem, ...(await scopeRem.getDescendants())]
-    : await plugin.rem.findMany(await plugin.rem.getAllRemIds());
+  let remsToCheck: Rem[];
+
+  if (scopeRem) {
+    remsToCheck = [scopeRem, ...(await scopeRem.getDescendants())];
+  } else {
+    // CORRECTED LOGIC: Get all cards, then find their unique parent Rems.
+    const allCards = await plugin.card.getAll();
+    const remIdsWithCards = _.uniq(allCards.map(c => c.remId));
+    remsToCheck = await plugin.rem.findMany(remIdsWithCards) || [];
+  }
 
   const now = Date.now();
 
@@ -240,7 +247,7 @@ export async function getDueCardsWithPriorities(
       
       // If no priority exists and includeNonPrioritized is true, auto-assign
       if (!priorityInfo && includeNonPrioritized) {
-        const assignedPriority = await autoAssignCardPriority(plugin, rem);
+        await autoAssignCardPriority(plugin, rem);
         priorityInfo = await getCardPriority(plugin, rem);
       }
       

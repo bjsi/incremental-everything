@@ -21,7 +21,7 @@ function ReviewDocumentCreator() {
   );
   
   // Get current flashcard ratio setting
-  const defaultRatio = useTrackerPlugin(
+  const flashcardRatio = useTrackerPlugin(
     async (rp) => await getCardsPerRem(rp),
     []
   );
@@ -29,35 +29,13 @@ function ReviewDocumentCreator() {
   // Form state
   const [itemCount, setItemCount] = useState(50);
   const [useFullKB, setUseFullKB] = useState(false);
-  const [flashcardRatio, setFlashcardRatio] = useState<number | 'no-cards' | 'no-rem'>(
-    defaultRatio || 6
-  );
   const [isCreating, setIsCreating] = useState(false);
   
-  // Convert ratio to slider value (similar to sorting_criteria.tsx)
-  const MAX_CARDS = 25;
-  const ONLY_INC_VALUE = 0;
-  const ONLY_FLASHCARDS_VALUE = MAX_CARDS + 1;
-  
-  const ratioToSliderValue = (ratio: number | 'no-cards' | 'no-rem'): number => {
-    if (ratio === 'no-cards') return ONLY_INC_VALUE;
-    if (ratio === 'no-rem') return ONLY_FLASHCARDS_VALUE;
-    return typeof ratio === 'number' ? ratio : 6;
+  const ratioToLabel = (ratio: number | 'no-cards' | 'no-rem'): string => {
+    if (ratio === 'no-cards') return 'Only Incremental Rems';
+    if (ratio === 'no-rem') return 'Only Flashcards';
+    return `${ratio} flashcard${ratio !== 1 ? 's' : ''} for every incremental rem`;
   };
-  
-  const sliderValueToRatio = (value: number): number | 'no-cards' | 'no-rem' => {
-    if (value === ONLY_INC_VALUE) return 'no-cards';
-    if (value === ONLY_FLASHCARDS_VALUE) return 'no-rem';
-    return value;
-  };
-  
-  const sliderValueToLabel = (value: number): string => {
-    if (value === ONLY_INC_VALUE) return 'Only Incremental Rems';
-    if (value === ONLY_FLASHCARDS_VALUE) return 'Only Flashcards';
-    return `${value} flashcard${value !== 1 ? 's' : ''} for every incremental rem`;
-  };
-  
-  const [sliderValue, setSliderValue] = useState(ratioToSliderValue(flashcardRatio));
   
   const handleCreate = async () => {
     setIsCreating(true);
@@ -66,15 +44,18 @@ function ReviewDocumentCreator() {
       const config = {
         scopeRemId: useFullKB ? null : context?.scopeRemId || null,
         itemCount: itemCount,
-        flashcardRatio: flashcardRatio,
+        cardRatio: flashcardRatio || 6,
       };
       
       const doc = await createPriorityReviewDocument(plugin, config);
       
-      await plugin.app.toast(`Created review document with ${itemCount} items`);
+      // Wait for document to be fully created
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Open the document in queue mode
-      await plugin.queue.startQueue(doc._id);
+      // Open the document as a page
+      await doc.openRemAsPage();
+      
+      await plugin.app.toast(`Created review document with ${itemCount} items`);
       
       // Close the popup
       plugin.widget.closePopup();
@@ -87,9 +68,14 @@ function ReviewDocumentCreator() {
     }
   };
   
-  const handleSliderChange = (value: number) => {
-    setSliderValue(value);
-    setFlashcardRatio(sliderValueToRatio(value));
+  const handleOpenSortingSettings = async () => {
+    try {
+      // Open sorting criteria as a popup
+      await plugin.widget.openPopup('sorting_criteria');
+    } catch (error) {
+      console.error('Error opening sorting criteria:', error);
+      await plugin.app.toast('Could not open sorting criteria settings');
+    }
   };
   
   // Styles matching the existing widgets
@@ -119,9 +105,6 @@ function ReviewDocumentCreator() {
       borderRadius: '6px',
       border: '1px solid #d1d5db',
       fontSize: '14px',
-    },
-    slider: {
-      width: '100%',
     },
     sublabel: {
       fontSize: '12px',
@@ -169,7 +152,7 @@ function ReviewDocumentCreator() {
     },
   };
   
-  if (!context) {
+  if (!context || flashcardRatio === undefined) {
     return <div style={styles.container}>Loading...</div>;
   }
   
@@ -217,30 +200,39 @@ function ReviewDocumentCreator() {
         </div>
       </div>
       
-      {/* Flashcard Ratio */}
+      {/* Content Mix - READ ONLY with Settings Button */}
       <div style={styles.section}>
-        <label style={styles.label}>Content Mix</label>
-        <div style={styles.sublabel}>
-          {sliderValueToLabel(sliderValue)}
+        <label style={styles.label}>Content Mix (from Sorting Criteria)</label>
+        <div style={{
+          padding: '12px',
+          backgroundColor: '#f3f4f6',
+          borderRadius: '6px',
+          fontSize: '14px',
+          marginBottom: '8px'
+        }}>
+          {ratioToLabel(flashcardRatio)}
         </div>
-        <input
-          type="range"
-          min={ONLY_INC_VALUE}
-          max={ONLY_FLASHCARDS_VALUE}
-          step={1}
-          value={sliderValue}
-          onChange={(e) => handleSliderChange(Number(e.target.value))}
-          style={styles.slider}
-        />
+        <button
+          onClick={handleOpenSortingSettings}
+          style={{
+            ...styles.button,
+            backgroundColor: '#6b7280',
+            color: 'white',
+            width: '100%'
+          }}
+          disabled={isCreating}
+        >
+          Change Sorting Criteria Settings
+        </button>
       </div>
       
       {/* Info Box */}
       <div style={styles.infoBox}>
         <strong>How it works:</strong><br/>
         • Items are selected based on priority and due date<br/>
-        • Sorting criteria (randomness) from your settings will be applied<br/>
-        • The document will open in queue mode after creation<br/>
-        • Items reviewed in the queue will be marked as complete
+        • Sorting criteria (randomness and content mix) from your settings will be applied<br/>
+        • The document will open as a page after creation<br/>
+        • Items reviewed can be marked as complete
       </div>
       
       {/* Buttons */}
