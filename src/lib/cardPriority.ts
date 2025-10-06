@@ -112,6 +112,20 @@ export async function getCardPriority(
   };
 }
 
+export function calculateRelativeCardPriority(allItems: CardPriorityInfo[], currentRemId: RemId): number | null {
+  if (!allItems || !currentRemId || allItems.length === 0) {
+    return null;
+  }
+  // Use spread operator to avoid mutating the original cache array during sort
+  const sortedItems = [...allItems].sort((a, b) => a.priority - b.priority);
+  const index = sortedItems.findIndex((x) => x.remId === currentRemId);
+  if (index === -1) {
+    return null;
+  }
+  const percentile = ((index + 1) / sortedItems.length) * 100;
+  return Math.round(percentile * 10) / 10;
+}
+
 /**
  * Set card priority
  */

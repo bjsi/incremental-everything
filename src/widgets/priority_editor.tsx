@@ -3,15 +3,17 @@ import {
   usePlugin,
   useRunAsync,
   useTrackerPlugin,
+  Rem,
 } from '@remnote/plugin-sdk';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { getCardPriority, setCardPriority } from '../lib/cardPriority';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
+import { getCardPriority, setCardPriority, CardPriorityInfo, calculateRelativeCardPriority } from '../lib/cardPriority';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/types';
-// NEW: Import the color and priority calculation functions
 import { percentileToHslColor } from '../lib/color';
-import { calculateRelativePriority } from '../lib/priority';
+import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority'; // Aliased to avoid name clash
+import { updateCardPriorityInCache } from '../lib/cache';
+
 
 export function PriorityEditor() {
   const plugin = usePlugin();
@@ -53,16 +55,26 @@ export function PriorityEditor() {
     [rem]
   );
 
-  // NEW: A hook to calculate the relative percentile of the incremental rem
   const incRemRelativePriority = useTrackerPlugin(
     async (plugin) => {
       if (!rem || !incRemInfo) return null;
       const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-      if (allIncRems.length === 0) return 50; // Default to middle if list is empty
-      return calculateRelativePriority(allIncRems, rem._id);
+      if (allIncRems.length === 0) return 50;
+      return calculateIncRemRelativePriority(allIncRems, rem._id);
     },
     [rem, incRemInfo]
   );
+
+  const allPrioritizedCardInfo = useTrackerPlugin(
+    (rp) => rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
+    []
+  );
+
+  const cardRelativePriority = useMemo(() => {
+    if (!rem || !allPrioritizedCardInfo) return null;
+    return calculateRelativeCardPriority(allPrioritizedCardInfo, rem._id);
+  }, [rem, allPrioritizedCardInfo]);
+
 
   if (!rem || (!incRemInfo && !hasCards)) {
     return null;
@@ -78,7 +90,9 @@ export function PriorityEditor() {
     if (!rem) return;
     const currentPriority = cardInfo?.priority || 50;
     const newPriority = Math.max(0, Math.min(100, currentPriority + delta));
+    
     await setCardPriority(plugin, rem, newPriority, 'manual');
+    await updateCardPriorityInCache(plugin, rem._id);
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -91,13 +105,13 @@ export function PriorityEditor() {
     color: 'var(--rn-clr-content-primary)',
   };
   
-  // NEW: Calculate colors based on priority
-  // For Inc Rem, we use its relative rank (percentile)
+  // CHANGED: Removed the `100 - ...` inversion. Now low percentile (high priority) maps to red.
   const incRemColor = incRemRelativePriority ? percentileToHslColor(incRemRelativePriority) : undefined;
-  // For Cards, we map its absolute priority (0-100) directly to the color scale
-  const cardColor = cardInfo ? percentileToHslColor(cardInfo.priority) : undefined;
+  
+  // CHANGED: Removed the `100 - ...` inversion here as well for consistency.
+  const cardColor = cardRelativePriority ? percentileToHslColor(cardRelativePriority) : undefined;
 
-  // NEW: Style for the colored priority "pill"
+
   const priorityPillStyle: React.CSSProperties = {
     color: 'white',
     padding: '2px 6px',
@@ -130,14 +144,14 @@ export function PriorityEditor() {
           title="Click to expand priority controls"
         >
           {incRemInfo && (
-            <div className="mb-1" title={`Inc Priority: ${incRemInfo.priority}`}>
+            <div className="mb-1" title={`Inc Priority: ${incRemInfo.priority} (${incRemRelativePriority}%)`}>
               <span style={{ ...priorityPillStyle, backgroundColor: incRemColor, fontSize: '11px' }}>
                 I:{incRemInfo.priority}
               </span>
             </div>
           )}
           {hasCards && (
-            <div title={`Card Priority: ${cardInfo?.priority || 'None'}`}>
+            <div title={`Card Priority: ${cardInfo?.priority || 'None'} (${cardRelativePriority}%)`}>
               <span style={{ ...priorityPillStyle, backgroundColor: cardColor, fontSize: '11px' }}>
                 C:{cardInfo?.priority || '-'}
               </span>
@@ -162,7 +176,7 @@ export function PriorityEditor() {
             {incRemInfo && (
               <div className="mb-3">
                 <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-blue-600)' }}>
-                  Inc Rem
+                  Inc Rem ({incRemRelativePriority}%)
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => quickUpdateIncPriority(-10)} style={buttonStyle}>-10</button>
@@ -179,7 +193,7 @@ export function PriorityEditor() {
             {hasCards && (
               <div>
                 <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-green-600)' }}>
-                  Cards
+                  Cards ({cardRelativePriority}%)
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => quickUpdateCardPriority(-10)} style={buttonStyle}>-10</button>

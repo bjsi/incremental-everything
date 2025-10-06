@@ -66,6 +66,7 @@ import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/curre
 import { getInitialPriority } from '../lib/priority_inheritance';
 import { findPDFinRem } from '../lib/pdfUtils';
 import { autoAssignCardPriority, getCardPriority, getDueCardsWithPriorities, CardPriorityInfo } from '../lib/cardPriority';
+import { updateCardPriorityInCache } from '../lib/cache';
 dayjs.extend(relativeTime);
 
 // Helper function needed for history saving
@@ -985,6 +986,8 @@ async function onActivate(plugin: ReactRNPlugin) {
           await autoAssignCardPriority(plugin, rem);
         }
       }
+
+      await updateCardPriorityInCache(plugin, data.remId);
     }
   );
 

@@ -11,6 +11,8 @@ import { getCardPriority, setCardPriority, PrioritySource, CardPriorityInfo } fr
 import { calculateRelativePriority } from '../lib/priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, currentSubQueueIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/types';
+import { updateCardPriorityInCache } from '../lib/cache';
+import { cardPriorityCacheRefreshKey } from '../lib/consts';
 import * as _ from 'remeda';
 
 // Debounce hook to prevent excessive writes to the database while sliding
@@ -267,7 +269,13 @@ function Priority() {
   }, [rem, plugin, incRemInfo]);
   const saveCardPriority = useCallback(async (priority: number) => {
     if (!rem) return;
+
+    // 1. Save the priority to the Rem itself.
     await setCardPriority(plugin, rem, priority, 'manual');
+
+    // 2. Directly update the central cache for this Rem.
+    await updateCardPriorityInCache(plugin, rem._id);
+
   }, [rem, plugin]);
   const saveAndClose = async (incP: number, cardP: number) => {
     if (showIncSection) await saveIncPriority(incP);
