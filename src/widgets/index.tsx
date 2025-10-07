@@ -82,7 +82,6 @@ function calculateRelativeCardPriority(allItems: CardPriorityInfo[], currentRemI
 async function cacheAllCardPriorities(plugin: RNPlugin) {
   console.log('CACHE: Starting to build a COMPLETE card priority cache...');
   
-  // 1. Get ALL cards in the knowledge base. This is the most reliable starting point.
   const allCards = await plugin.card.getAll();
   if (!allCards || allCards.length === 0) {
     console.log('CACHE: No cards found in the knowledge base. Setting empty cache.');
@@ -91,19 +90,30 @@ async function cacheAllCardPriorities(plugin: RNPlugin) {
   }
   console.log(`CACHE: Found ${allCards.length} total cards. Identifying unique parent Rems...`);
 
-  // 2. Get the unique list of Rems that contain these cards.
   const remIdsWithCards = _.uniq(allCards.map(c => c.remId));
   const remsWithCards = (await plugin.rem.findMany(remIdsWithCards)) || [];
-  console.log(`CACHE: Found ${remsWithCards.length} unique Rems with cards. Processing priority for each...`);
+  console.log(`CACHE: Found ${remsWithCards.length} unique Rems with cards. Starting batch processing...`);
 
-  // 3. Now, get the priority info for this complete list.
-  // getCardPriority will correctly handle tagged, inherited, and default cases for each Rem.
-  const allCardInfos = (
-    await Promise.all(remsWithCards.map(r => getCardPriority(plugin, r)))
-  ).filter(Boolean) as CardPriorityInfo[];
+  const allCardInfos: CardPriorityInfo[] = [];
+  // CHANGED: Reduced batch size and increased delay.
+  const batchSize = 2000;
+  const delayBetweenBatches = 100; // milliseconds
+  const numBatches = Math.ceil(remsWithCards.length / batchSize);
 
-  console.log(`CACHE: Processing complete. Final cache size is ${allCardInfos.length} items.`, allCardInfos);
+  for (let i = 0; i < remsWithCards.length; i += batchSize) {
+    const batch = remsWithCards.slice(i, i + batchSize);
+    console.log(`CACHE: Processing batch ${Math.floor(i / batchSize) + 1} of ${numBatches}...`);
+    
+    const batchInfos = (
+      await Promise.all(batch.map(r => getCardPriority(plugin, r)))
+    ).filter(Boolean) as CardPriorityInfo[];
+    
+    allCardInfos.push(...batchInfos);
 
+    await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+  }
+
+  console.log(`CACHE: Processing complete. Final cache size is ${allCardInfos.length} items.`);
   await plugin.storage.setSession(allCardPriorityInfoKey, allCardInfos);
   console.log('CACHE: COMPLETE card priority cache has been successfully built and saved.');
   await plugin.app.toast(`Refreshed card priority cache (${allCardInfos.length} items).`);
@@ -294,12 +304,33 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
   plugin.track(async (rp) => {
+    console.log('TRACKER: Incremental Rem tracker starting...');
     const powerup = await rp.powerup.getPowerupByCode(powerupCode);
     const taggedRem = (await powerup?.taggedRem()) || [];
-    const updatedAllRem = (
-      await Promise.all(taggedRem.map((rem) => getIncrementalRemInfo(plugin, rem)))
-    ).filter(Boolean) as IncrementalRem[];
+    console.log(`TRACKER: Found ${taggedRem.length} Incremental Rems. Starting batch processing...`);
+
+    const updatedAllRem: IncrementalRem[] = [];
+    // CHANGED: Reduced batch size and increased delay.
+    const batchSize = 500;
+    const delayBetweenBatches = 100; // milliseconds
+    const numBatches = Math.ceil(taggedRem.length / batchSize);
+
+    for (let i = 0; i < taggedRem.length; i += batchSize) {
+      const batch = taggedRem.slice(i, i + batchSize);
+      console.log(`TRACKER: Processing IncRem batch ${Math.floor(i / batchSize) + 1} of ${numBatches}...`);
+      
+      const batchInfos = (
+        await Promise.all(batch.map((rem) => getIncrementalRemInfo(plugin, rem)))
+      ).filter(Boolean) as IncrementalRem[];
+
+      updatedAllRem.push(...batchInfos);
+      
+      await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+    }
+    
+    console.log(`TRACKER: Processing complete. Final IncRem cache size is ${updatedAllRem.length}.`);
     await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+    console.log('TRACKER: Incremental Rem cache has been saved.');
   });
 
   // TODO: some handling to include extracts created in current queue in the queue?
@@ -969,25 +1000,69 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   });
 
-  // Event listener for assigning priority when cards are created
-  plugin.event.addListener(
-    AppEvents.RemChanged,
-    undefined,
-    async (data) => {
-      const rem = await plugin.rem.findOne(data.remId);
-      if (!rem) return;
-      
-      const cards = await rem.getCards();
-      if (cards && cards.length > 0) {
-        // Check if this rem already has card priority
-        const existingPriority = await getCardPriority(plugin, rem);
-        if (!existingPriority) {
-          // Auto-assign priority based on context
-          await autoAssignCardPriority(plugin, rem);
-        }
-      }
+ // Event listeners for assigning priority when cards are created and update due status when cards are rated
+ 
+  // Define a variable outside the listener to hold our timer.
+  let remChangeDebounceTimer: NodeJS.Timeout;
 
-      await updateCardPriorityInCache(plugin, data.remId);
+  // Replace your existing GlobalRemChanged listener with this debounced version.
+  plugin.event.addListener(
+    AppEvents.GlobalRemChanged,
+    undefined,
+    (data) => {
+      // Every time a change happens (e.g., a keystroke), clear the previous timer.
+      clearTimeout(remChangeDebounceTimer);
+
+      // Start a new timer. If another change happens within 500ms, this timer
+      // will be cleared and a new one will start.
+      remChangeDebounceTimer = setTimeout(async () => {
+        // This code will only run after the user has stopped typing for 500ms.
+        console.log(`LISTENER: (Debounced) GlobalRemChanged fired for RemId: ${data.remId}`);
+        
+        const rem = await plugin.rem.findOne(data.remId);
+        if (!rem) {
+          return;
+        }
+        
+        const cards = await rem.getCards();
+        if (cards && cards.length > 0) {
+          const existingPriority = await getCardPriority(plugin, rem);
+          if (!existingPriority) {
+            await autoAssignCardPriority(plugin, rem);
+          }
+        }
+
+        await updateCardPriorityInCache(plugin, data.remId);
+        console.log('LISTENER: (Debounced) Finished processing event.');
+
+      }, 1000); // 1000 milliseconds = one second
+    }
+  );
+  plugin.event.addListener(
+    AppEvents.QueueCompleteCard,
+    undefined,
+    async (data: { cardId: RemId }) => {
+      // DEBUG LOG: Log the entire data object to see its structure.
+      console.log('LISTENER: QueueCompleteCard event fired. Full data object:', data);
+
+      if (!data || !data.cardId) {
+        console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
+        return;
+      }
+      
+      // Use the cardId to find the full card object.
+      const card = await plugin.card.findOne(data.cardId);
+      // Get the parent Rem's ID from the card object.
+      const remId = card?.remId;
+      
+      console.log(`LISTENER: Found cardId ${data.cardId}, which belongs to remId ${remId}`);
+
+      if (remId) {
+        console.log('LISTENER: Calling updateCardPriorityInCache to update due status...');
+        await updateCardPriorityInCache(plugin, remId);
+      } else {
+        console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
+      }
     }
   );
 
