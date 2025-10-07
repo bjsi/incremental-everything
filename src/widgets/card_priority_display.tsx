@@ -14,6 +14,15 @@ import { percentileToHslColor } from '../lib/color';
 
 export function CardPriorityDisplay() {
   const plugin = usePlugin();
+    
+  // ADD THIS SYNCHRONOUS CHECK FIRST - before any hooks!
+  const ctx = plugin.widget.getWidgetContext();
+  
+  // If this is a Plugin queue item (IncRem), don't render anything
+  // This check happens synchronously before any async operations
+  if (ctx?.queueItemType === QueueItemType.Plugin) {
+    return null;
+  }
 
   const rem = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext();

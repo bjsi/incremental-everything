@@ -299,7 +299,8 @@ async function onActivate(plugin: ReactRNPlugin) {
     ]
   });
 
-  await cacheAllCardPriorities(plugin);
+  // Run the cache build in the background without blocking plugin initialization.
+  cacheAllCardPriorities(plugin);
 
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
@@ -419,50 +420,43 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
 
     // --- NEW: Card Priority Shield Logic ---
-    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
-    const allPrioritizedRems = cardPriorityPowerup ? await cardPriorityPowerup.taggedRem() : [];
+    const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
 
-    if (allPrioritizedRems.length > 0) {
+    if (allCardInfos && allCardInfos.length > 0) {
         const today = dayjs().format('YYYY-MM-DD');
         const subQueueIdForExit = subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
-        const seenCardIds = await plugin.storage.getSession<string[]>(seenCardInSessionKey) || [];
+        const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
 
-        const unreviewedFilter = (c: { rem: Rem, priority: number }) => !seenCardIds.includes(c.rem._id);
-
-        // --- Calculate final KB card shield ---
-        const allDueCards = await getDueCardsWithPriorities(plugin, null, false);
-        const unreviewedDueKb = allDueCards.filter(unreviewedFilter);
+        // --- Calculate final KB card shield from the cache ---
+        const unreviewedDueKb = allCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
         let kbCardFinalStatus = { absolute: null as number | null, percentile: 100 };
         if (unreviewedDueKb.length > 0) {
             const topMissed = _.minBy(unreviewedDueKb, c => c.priority);
             if (topMissed) {
-                const allCardInfos = (await Promise.all(allPrioritizedRems.map(r => getCardPriority(plugin, r)))).filter(Boolean) as CardPriorityInfo[];
                 kbCardFinalStatus.absolute = topMissed.priority;
-                kbCardFinalStatus.percentile = calculateRelativeCardPriority(allCardInfos, topMissed.rem._id);
+                kbCardFinalStatus.percentile = calculateRelativeCardPriority(allCardInfos, topMissed.remId);
             }
         }
         const cardKbHistory = (await plugin.storage.getSynced(cardPriorityShieldHistoryKey)) || {};
         cardKbHistory[today] = kbCardFinalStatus;
         await plugin.storage.setSynced(cardPriorityShieldHistoryKey, cardKbHistory);
-        console.log('Saved Card KB history:', kbCardFinalStatus);
 
-        // --- Calculate final Doc card shield ---
+        // --- Calculate final Doc card shield from the cache ---
         if (subQueueIdForExit) {
             const scopeRem = await plugin.rem.findOne(subQueueIdForExit);
             if (scopeRem) {
-                const docDueCards = await getDueCardsWithPriorities(plugin, scopeRem, false);
-                const unreviewedDueDoc = docDueCards.filter(unreviewedFilter);
+                const scopeDescendants = await scopeRem.getDescendants();
+                const scopeIds = new Set([scopeRem._id, ...scopeDescendants.map(d => d._id)]);
+                const docCardInfos = allCardInfos.filter(ci => scopeIds.has(ci.remId));
+
+                const unreviewedDueDoc = docCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
                 let docCardFinalStatus = { absolute: null as number | null, percentile: 100 };
 
                 if (unreviewedDueDoc.length > 0) {
                     const topMissed = _.minBy(unreviewedDueDoc, c => c.priority);
                     if (topMissed) {
-                        const scopeDescendants = await scopeRem.getDescendants();
-                        const scopeIds = [scopeRem._id, ...scopeDescendants.map(d => d._id)];
-                        const allCardInfos = (await Promise.all(allPrioritizedRems.map(r => getCardPriority(plugin, r)))).filter(Boolean) as CardPriorityInfo[];
-                        const docCardInfos = allCardInfos.filter(ci => scopeIds.includes(ci.remId));
                         docCardFinalStatus.absolute = topMissed.priority;
-                        docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.rem._id);
+                        docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.remId);
                     }
                 }
                 const docCardHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) || {};
@@ -471,7 +465,6 @@ async function onActivate(plugin: ReactRNPlugin) {
                 }
                 docCardHistory[subQueueIdForExit][today] = docCardFinalStatus;
                 await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, docCardHistory);
-                console.log('Saved Card Document history for', subQueueIdForExit, ':', docCardFinalStatus);
             }
         }
     }
@@ -526,22 +519,30 @@ async function onActivate(plugin: ReactRNPlugin) {
 
       // Check if "No Inc Rem" timer is active (using SYNCED storage)
       const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
-      const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > Date.now();
+      const now = Date.now();
+      console.log('⏰ TIMER CHECK:', {
+        noIncRemTimerEnd,
+        now,
+        isTimerActive: noIncRemTimerEnd && noIncRemTimerEnd > now,
+        timerWillExpireIn: noIncRemTimerEnd ? Math.ceil((noIncRemTimerEnd - now) / 1000) + ' seconds' : 'no timer set'
+      });
+
+      const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > now;
       
       if (isTimerActive) {
-        const remainingSeconds = Math.ceil((noIncRemTimerEnd - Date.now()) / 1000);
-        console.log('No Inc Rem timer active. Time remaining:', remainingSeconds, 'seconds');
+        const remainingSeconds = Math.ceil((noIncRemTimerEnd - now) / 1000);
+        console.log('⚠️ TIMER IS ACTIVE - BLOCKING INCREM! Time remaining:', remainingSeconds, 'seconds');
         
-        // Clear any incremental rem UI elements
         await plugin.app.registerCSS(queueLayoutFixId, '');
         await plugin.app.registerCSS(queueCounterId, '');
         
-        // Return null to let regular flashcards take over
         return null;
-      } else if (noIncRemTimerEnd && noIncRemTimerEnd <= Date.now()) {
-        // Timer has expired, clean it up
+      } else if (noIncRemTimerEnd && noIncRemTimerEnd <= now) {
+        console.log('🧹 Timer expired, cleaning up...');
         await plugin.storage.setSynced(noIncRemTimerKey, null);
         console.log('No Inc Rem timer expired and cleared');
+      } else {
+        console.log('✅ No timer active - IncRem allowed');
       }
 
 
@@ -612,6 +613,14 @@ async function onActivate(plugin: ReactRNPlugin) {
         }
       });
 
+      console.log('📊 GetNextCard Summary:', {
+        allIncrementalRem: allIncrementalRem.length,
+        sorted: sorted.length,
+        filtered: filtered.length,
+        seenRemIds: seenRemIds.length,
+        queueMode: queueInfo.mode,
+        subQueueId: queueInfo.subQueueId
+      });
 
       plugin.app.registerCSS(
         queueCounterId,
@@ -648,6 +657,16 @@ async function onActivate(plugin: ReactRNPlugin) {
         queueInfo.numCardsRemaining === 0 ||
         intervalBetweenIncRem === 'no-cards'
       ) {
+        // CONDITION IS TRUE - SHOULD SHOW INCREMENTAL REM
+        console.log('🎯 INCREM CONDITION TRUE:', {
+          sessionItemCounter,
+          intervalBetweenIncRem,
+          calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${(sessionItemCounter + 1) % intervalBetweenIncRem}`,
+          numCardsRemaining: queueInfo.numCardsRemaining,
+          filteredLength: filtered.length,
+          allIncrementalRemLength: allIncrementalRem.length
+        });
+
         // do n random swaps
         const sortingRandomness = await getSortingRandomness(plugin);
         const num_random_swaps = sortingRandomness * allIncrementalRem.length;
@@ -660,14 +679,17 @@ async function onActivate(plugin: ReactRNPlugin) {
         }
 
         if (filtered.length === 0) {
+          console.log('⚠️ FILTERED LENGTH IS 0 - Returning null for flashcard');
           await plugin.app.registerCSS(queueLayoutFixId, '');
           return null;
         } else {
+          console.log('✅ Filtered has items, selecting first IncRem');
           // make sure we don't show a rem that has been deleted
           let first = filtered[0];
           while (!(await getIncrementalRemInfo(plugin, await plugin.rem.findOne(first.remId)))) {
             filtered.shift();
             if (filtered.length === 0) {
+              console.log('❌ All filtered items were invalid - Returning null');
               return null;
             } else {
               first = filtered[0];
@@ -675,14 +697,40 @@ async function onActivate(plugin: ReactRNPlugin) {
           }
           await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
           await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
-          console.log('nextRep', first, 'due', dayjs(first.nextRepDate).fromNow());
+
+          // ADD THIS VERIFICATION:
+          const remToShow = await plugin.rem.findOne(first.remId);
+          const hasPowerup = remToShow ? await remToShow.hasPowerup(powerupCode) : false;
+          console.log('🔍 FINAL VERIFICATION before return:', {
+            remId: first.remId,
+            remExists: !!remToShow,
+            hasPowerup: hasPowerup,
+            powerupCode: powerupCode,
+            returnObject: {
+              type: QueueItemType.Plugin,
+              remId: first.remId,
+              pluginId: 'incremental-everything'
+            }
+          });
+
+          console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
           sessionItemCounter++;
           return {
+            type: QueueItemType.Plugin,
             remId: first.remId,
             pluginId: 'incremental-everything',
           };
         }
       } else {
+        // CONDITION IS FALSE - SHOWING FLASHCARD
+        console.log('🎴 FLASHCARD TURN:', {
+          sessionItemCounter,
+          intervalBetweenIncRem,
+          calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${(sessionItemCounter + 1) % intervalBetweenIncRem}`,
+          nextIncRemAt: typeof intervalBetweenIncRem === 'number' 
+            ? intervalBetweenIncRem - ((sessionItemCounter + 1) % intervalBetweenIncRem)
+            : 'N/A'
+        });
         sessionItemCounter++;
         await plugin.app.registerCSS(queueLayoutFixId, '');
         return null;
@@ -1042,20 +1090,19 @@ async function onActivate(plugin: ReactRNPlugin) {
     AppEvents.QueueCompleteCard,
     undefined,
     async (data: { cardId: RemId }) => {
-      // DEBUG LOG: Log the entire data object to see its structure.
-      console.log('LISTENER: QueueCompleteCard event fired. Full data object:', data);
-
+      console.log('🎴 CARD COMPLETED:', data);
+      
       if (!data || !data.cardId) {
         console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
         return;
       }
       
-      // Use the cardId to find the full card object.
       const card = await plugin.card.findOne(data.cardId);
-      // Get the parent Rem's ID from the card object.
       const remId = card?.remId;
+      const rem = remId ? await plugin.rem.findOne(remId) : null;
+      const isIncRem = rem ? await rem.hasPowerup(powerupCode) : false;
       
-      console.log(`LISTENER: Found cardId ${data.cardId}, which belongs to remId ${remId}`);
+      console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
 
       if (remId) {
         console.log('LISTENER: Calling updateCardPriorityInCache to update due status...');
@@ -1280,6 +1327,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       width: '100%',
       height: 'auto',
     },
+    queueItemTypeFilter: QueueItemType.Flashcard, // ← ADD THIS LINE!
   });
 
   // Add menu item for quick access
