@@ -1330,6 +1330,28 @@ async function onActivate(plugin: ReactRNPlugin) {
     queueItemTypeFilter: QueueItemType.Flashcard, // ← ADD THIS LINE!
   });
 
+  plugin.app.registerWidget('video_debug', WidgetLocation.Popup, {
+    dimensions: {
+      width: '500px',
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'debug-video',
+    name: 'Debug Video Detection',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('Please focus on a rem first');
+        return;
+      }
+      await plugin.widget.openPopup('video_debug', {
+        remId: rem._id,
+      });
+    },
+  });
+
   // Add menu item for quick access
   plugin.app.registerMenuItem({
     id: 'create_priority_review_menuitem',

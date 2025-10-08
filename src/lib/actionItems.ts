@@ -13,10 +13,10 @@ export const remToActionItemType = async (
   // Check if this rem has a tag reference to "extractviewer"
   // This allows chapters with PDF sources to be viewed as extracts
   try {
-    // Get all tags for this rem
     const tags = await rem.getTagRems();
     
     for (const tagRem of tags) {
+      if (!tagRem.text) continue;
       const tagText = await plugin.richText.toString(tagRem.text);
       
       if (tagText.toLowerCase() === 'extractviewer' || 
@@ -28,6 +28,7 @@ export const remToActionItemType = async (
   } catch (error) {
     console.log('Error checking for extractviewer tag:', error);
   }
+
   if (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) {
     const pdfId = (
       (
@@ -62,6 +63,11 @@ export const remToActionItemType = async (
     }
   } else if (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
     return { rem, type: 'pdf' };
+  } else if (await rem.hasPowerup('vi')) {
+    // VIDEO POWERUP: Temporary solution using DocumentViewer
+    // TODO: Once RemNote provides URL access via SDK, change to 'youtube' type with ReactPlayer
+    console.log('✅ Video powerup detected - using simple video viewer');
+    return { rem, type: 'video' };
   } else if (
     (await rem.hasPowerup(BuiltInPowerupCodes.Link)) &&
     (await rem.getPowerupProperty<BuiltInPowerupCodes.Link>(BuiltInPowerupCodes.Link, 'URL'))

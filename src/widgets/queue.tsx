@@ -9,6 +9,7 @@ import {
 import React, { useEffect, useRef } from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
+import { NativeVideoViewer } from '../components/NativeVideoViewer';
 import { ExtractViewer } from '../components/ExtractViewer';
 import { remToActionItemType } from '../lib/actionItems';
 import {
@@ -31,13 +32,27 @@ export function QueueComponent() {
 
   const remAndType = useTrackerPlugin(
     async (rp) => {
-      if (!ctx) return undefined;
-      const rem = await rp.rem.findOne(ctx?.remId);
+      if (!ctx?.remId) return undefined;
+      const rem = await rp.rem.findOne(ctx.remId);
       if (!rem) return null;
-      return await remToActionItemType(rp, rem);
+      
+      // Call only once per rem change
+      const result = await remToActionItemType(rp, rem);
+      console.log('✅ remToActionItemType result:', result?.type);
+      return result;
     },
     [ctx?.remId]
   );
+
+  // Add a ref to prevent duplicate calls
+  const lastProcessedRemId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (ctx?.remId && ctx.remId !== lastProcessedRemId.current) {
+      lastProcessedRemId.current = ctx.remId;
+      console.log('📍 Processing new rem in queue:', ctx.remId);
+    }
+  }, [ctx?.remId]);
 
   const shouldCollapseTopBar = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(collapseQueueTopBar),
@@ -105,6 +120,8 @@ export function QueueComponent() {
           <Reader actionItem={remAndType} />
         ) : remAndType.type === 'youtube' ? (
           <VideoViewer actionItem={remAndType} />
+        ) : remAndType.type === 'video' ? (
+          <NativeVideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' ? (
           <ExtractViewer rem={remAndType.rem} plugin={plugin} />
         ) : null}
