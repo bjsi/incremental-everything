@@ -174,7 +174,21 @@ function Priority() {
   useEffect(() => { if (cardInfo) setCardAbsPriority(cardInfo.priority) }, [cardInfo]);
   useEffect(() => {
     if (!rem || !scopedIncRems) return;
-   const newRelPriority = calculateIncRemRelativePriority(scopedIncRems, rem._id);
+    // Create a hypothetical list of rems with the updated absolute priority.
+    const hypotheticalRems = scopedIncRems.map((r) =>
+      r.remId === rem._id ? { ...r, priority: incAbsPriority } : r
+    );
+    // If the current rem is new and not in the list, add it for the calculation.
+    if (!hypotheticalRems.find((r) => r.remId === rem._id)) {
+      hypotheticalRems.push({
+        remId: rem._id,
+        priority: incAbsPriority,
+        // The other properties are not needed for the priority calculation.
+        nextRepDate: 0,
+        history: [],
+      });
+    }
+    const newRelPriority = calculateIncRemRelativePriority(hypotheticalRems, rem._id);
     if (newRelPriority !== null) setIncRelPriority(newRelPriority);
   }, [scopedIncRems, incAbsPriority, rem]);
   useEffect(() => {

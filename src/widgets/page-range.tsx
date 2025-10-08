@@ -22,6 +22,8 @@ import { getIncrementalRemInfo } from '../lib/incremental_rem';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
+  const pageRangeInputRefs = React.useRef<Record<string, {start: HTMLInputElement | null, end: HTMLInputElement | null}>>({});
+  const inputStartRef = React.useRef<HTMLInputElement>(null);
   
   const contextData = useTrackerPlugin(
     async (rp) => {
@@ -298,6 +300,40 @@ function PageRangeWidget() {
 
     loadData();
   }, [contextData?.incrementalRemId, contextData?.pdfRemId, plugin]);
+    
+  // Auto-focus main input on load
+  useEffect(() => {
+    if (!isLoading && contextData) {
+      setTimeout(() => {
+        inputStartRef.current?.focus();
+        inputStartRef.current?.select();
+      }, 50);
+    }
+  }, [isLoading, contextData]);
+
+  // Auto-focus page range editor when editing starts
+  useEffect(() => {
+    if (editingRemId) {
+      // Use a longer delay and retry mechanism for first render
+      let attempts = 0;
+      const maxAttempts = 10; // Try for up to 500ms (10 * 50ms)
+      
+      const tryFocus = () => {
+        const inputElement = pageRangeInputRefs.current[editingRemId]?.start;
+        
+        if (inputElement) {
+          inputElement.focus();
+          inputElement.select();
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(tryFocus, 50);
+        }
+      };
+      
+      // Start trying after a small initial delay
+      setTimeout(tryFocus, 50);
+    }
+  }, [editingRemId]);
 
   const handleSave = async () => {
     if (!contextData?.incrementalRemId || !contextData?.pdfRemId) return;
@@ -329,16 +365,7 @@ function PageRangeWidget() {
 
   const handleClose = () => plugin.widget.closePopup();
 
-  const inputStartRef = React.useRef<HTMLInputElement>(null);
-  
-  useEffect(() => {
-    if (!isLoading && contextData) {
-      setTimeout(() => {
-        inputStartRef.current?.focus();
-        inputStartRef.current?.select();
-      }, 50);
-    }
-  }, [isLoading, contextData]);
+
 
   if (isLoading) {
     return <div className="p-4">Loading...</div>;
@@ -352,6 +379,7 @@ function PageRangeWidget() {
       </div>
     );
   }
+
   
   // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
@@ -715,6 +743,12 @@ function PageRangeWidget() {
                     {editingRemId === item.remId && editingRanges[item.remId] && (
                       <div className="flex gap-2 mb-2">
                         <input
+                          ref={(el) => {
+                            if (!pageRangeInputRefs.current[item.remId]) {
+                              pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                            }
+                            pageRangeInputRefs.current[item.remId].start = el;
+                          }}
                           type="number"
                           min="1"
                           value={editingRanges[item.remId].start}
@@ -725,11 +759,32 @@ function PageRangeWidget() {
                               start: parseInt(e.target.value) || 1
                             }
                           })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              saveRemRange(item.remId);
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setEditingRemId(null);
+                            }
+                            // Tab cycling: Shift+Tab from start goes to end
+                            if (e.key === 'Tab' && e.shiftKey) {
+                              e.preventDefault();
+                              pageRangeInputRefs.current[item.remId]?.end?.focus();
+                            }
+                          }}
                           className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
                           placeholder="Start"
                         />
                         <span className="text-xs self-center">to</span>
                         <input
+                          ref={(el) => {
+                            if (!pageRangeInputRefs.current[item.remId]) {
+                              pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                            }
+                            pageRangeInputRefs.current[item.remId].end = el;
+                          }}
                           type="number"
                           min={editingRanges[item.remId].start}
                           value={editingRanges[item.remId].end || ''}
@@ -740,6 +795,21 @@ function PageRangeWidget() {
                               end: parseInt(e.target.value) || 0
                             }
                           })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              saveRemRange(item.remId);
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setEditingRemId(null);
+                            }
+                            // Tab cycling: Tab from end goes to start
+                            if (e.key === 'Tab' && !e.shiftKey) {
+                              e.preventDefault();
+                              pageRangeInputRefs.current[item.remId]?.start?.focus();
+                            }
+                          }}
                           className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
                           placeholder="End"
                         />

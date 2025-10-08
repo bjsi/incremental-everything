@@ -25,18 +25,63 @@ const safeRemTextToString = async (
     return 'Untitled';
   }
   
-  // Try to convert to string
+  // Try to normalize first (this might fix malformed richText)
   try {
-    const text = await plugin.richText.toString(remText);
-    // Handle empty string result
-    if (!text || text.trim().length === 0) {
-      return 'Untitled';
+    const normalized = await plugin.richText.normalize(remText);
+    
+    // Then try to convert to string
+    try {
+      const text = await plugin.richText.toString(normalized);
+      // Handle empty string result
+      if (!text || text.trim().length === 0) {
+        return 'Untitled';
+      }
+      return text;
+    } catch (toStringError) {
+      // If toString fails after normalization, try manual extraction
+      console.warn('toString failed after normalization, trying manual extraction');
+      const manualText = extractTextManually(normalized);
+      return manualText || 'Untitled';
     }
-    return text;
-  } catch (error) {
-    console.warn('Failed to convert rem text to string:', error, 'Text was:', remText);
-    return 'Untitled';
+  } catch (normalizeError) {
+    // If normalize fails, try toString directly on original
+    try {
+      const text = await plugin.richText.toString(remText);
+      if (!text || text.trim().length === 0) {
+        return 'Untitled';
+      }
+      return text;
+    } catch (toStringError) {
+      // Last resort: manual extraction
+      console.warn('All conversion methods failed, using manual extraction. Original text:', remText);
+      const manualText = extractTextManually(remText);
+      return manualText || 'Untitled';
+    }
   }
+};
+
+/**
+ * Manually extract text from richText array as a fallback
+ */
+const extractTextManually = (richText: any): string => {
+  if (!Array.isArray(richText)) return '';
+  
+  let text = '';
+  for (const element of richText) {
+    if (typeof element === 'string') {
+      text += element;
+    } else if (element && typeof element === 'object') {
+      // Handle text elements with formatting
+      if (element.i === 'm' && element.text) {
+        text += element.text;
+      }
+      // Handle other text-like elements
+      else if (element.text) {
+        text += element.text;
+      }
+    }
+  }
+  return text.trim();
 };
 
 /**
