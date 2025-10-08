@@ -1,6 +1,6 @@
 // lib/pdfUtils.ts
 import { RNPlugin, Rem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { powerupCode } from './consts';
+import { powerupCode, allIncrementalRemKey } from './consts';
 
 /**
  * Safely convert rem text to string, handling all edge cases
@@ -298,13 +298,11 @@ export const getAllIncrementsForPDF = async (
       return result;
     }
     
-    // Build a comprehensive search scope
+    // ===== PART 1: LOCAL SEARCH for NON-incremental rems =====
+    console.log('\n===== PART 1: Searching locally for non-incremental rems =====');
+    
     const remsToCheck: Rem[] = [];
     const processSearchScope = new Set<string>();
-    
-    // Always include the incremental rem itself
-    remsToCheck.push(incrementalRem);
-    processSearchScope.add(incrementalRem._id);
     
     // Get parent and search from there
     let searchRoot: Rem | null = null;
@@ -318,7 +316,7 @@ export const getAllIncrementsForPDF = async (
           processSearchScope.add(searchRoot._id);
         }
         
-        // Add all siblings (children of parent)
+        // Add all siblings
         const siblings = await searchRoot.getChildrenRem();
         for (const sibling of siblings) {
           if (!processSearchScope.has(sibling._id)) {
@@ -327,7 +325,7 @@ export const getAllIncrementsForPDF = async (
           }
         }
         
-        // Add descendants of parent (up to 3 levels deep)
+        // Add descendants of parent (up to 3 levels)
         const descendants = await getDescendantsToDepth(searchRoot, 3);
         for (const desc of descendants) {
           if (!processSearchScope.has(desc._id)) {
@@ -339,21 +337,11 @@ export const getAllIncrementsForPDF = async (
         const searchRootText = await safeRemTextToString(plugin, searchRoot.text);
         console.log(`Search root (parent): "${searchRootText}" (${searchRoot._id})`);
       }
-    } else {
-      // No parent, search from incremental rem
-      const descendants = await getDescendantsToDepth(incrementalRem, 3);
-      for (const desc of descendants) {
-        if (!processSearchScope.has(desc._id)) {
-          remsToCheck.push(desc);
-          processSearchScope.add(desc._id);
-        }
-      }
-      console.log(`No parent found, searching from incremental rem`);
     }
     
-    console.log(`Checking ${remsToCheck.length} rems (parent + siblings + descendants)`);
+    console.log(`Checking ${remsToCheck.length} local rems (parent + siblings + descendants)`);
     
-    // Check each rem
+    // Check each local rem
     for (const rem of remsToCheck) {
       if (processedRemIds.has(rem._id)) continue;
       processedRemIds.add(rem._id);
@@ -361,7 +349,6 @@ export const getAllIncrementsForPDF = async (
       const remText = await safeRemTextToString(plugin, rem.text);
       console.log(`Checking rem: "${remText}" (${rem._id})`);
       
-      // Pass the target PDF ID to search for the specific PDF
       const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
       
       if (foundPDF) {
@@ -386,6 +373,50 @@ export const getAllIncrementsForPDF = async (
         });
         
         console.log(`✓ ADDED: "${remText}" (Incremental: ${isIncremental}, Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
+      }
+    }
+    
+    // ===== PART 2: COMPREHENSIVE SEARCH for all incremental rems =====
+    console.log('\n===== PART 2: Searching all incremental rems from cache =====');
+    
+    const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+    console.log(`Found ${allIncrementalRems.length} incremental rems in cache`);
+    
+    for (const incRemInfo of allIncrementalRems) {
+      if (processedRemIds.has(incRemInfo.remId)) {
+        console.log(`Skipping ${incRemInfo.remId} (already processed)`);
+        continue;
+      }
+      
+      const rem = await plugin.rem.findOne(incRemInfo.remId);
+      if (!rem) continue;
+      
+      const remText = await safeRemTextToString(plugin, rem.text);
+      
+      // Check if this is a PDF highlight (skip if it is)
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+      if (isPdfHighlight) {
+        console.log(`Skipping "${remText}" (PDF highlight, not a reading incremental)`);
+        continue;
+      }
+      
+      // Check if this incremental rem has the target PDF
+      const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
+      
+      if (foundPDF && foundPDF._id === pdfRemId) {
+        const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
+        const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
+        
+        result.push({
+          remId: rem._id,
+          name: remText,
+          range,
+          currentPage,
+          isIncremental: true // All items in this search are incremental
+        });
+        
+        processedRemIds.add(rem._id);
+        console.log(`✓ ADDED: "${remText}" (Incremental: true, Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
       }
     }
     
