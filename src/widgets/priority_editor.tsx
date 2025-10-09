@@ -55,6 +55,12 @@ export function PriorityEditor() {
     [rem]
   );
 
+  // NEW: Tracker to check if the Rem has the cardPriority powerup.
+  const hasCardPriorityPowerup = useTrackerPlugin(async (plugin) => {
+    if (!rem) return false;
+    return await rem.hasPowerup('cardPriority');
+  }, [rem]);
+
   const incRemRelativePriority = useTrackerPlugin(
     async (plugin) => {
       if (!rem || !incRemInfo) return null;
@@ -76,7 +82,8 @@ export function PriorityEditor() {
   }, [rem, allPrioritizedCardInfo]);
 
 
-  if (!rem || (!incRemInfo && !hasCards)) {
+  // MODIFIED: The main rendering condition now checks for the powerup directly.
+  if (!rem || (!incRemInfo && !hasCards && !hasCardPriorityPowerup)) {
     return null;
   }
 
@@ -105,10 +112,8 @@ export function PriorityEditor() {
     color: 'var(--rn-clr-content-primary)',
   };
   
-  // CHANGED: Removed the `100 - ...` inversion. Now low percentile (high priority) maps to red.
   const incRemColor = incRemRelativePriority ? percentileToHslColor(incRemRelativePriority) : undefined;
   
-  // CHANGED: Removed the `100 - ...` inversion here as well for consistency.
   const cardColor = cardRelativePriority ? percentileToHslColor(cardRelativePriority) : undefined;
 
 
@@ -119,6 +124,9 @@ export function PriorityEditor() {
     display: 'inline-block',
     lineHeight: '1.2',
   };
+
+  // MODIFIED: The condition to show the card editor is now simpler and more accurate.
+  const showCardEditor = hasCards || hasCardPriorityPowerup;
 
   return (
     <div
@@ -150,7 +158,7 @@ export function PriorityEditor() {
               </span>
             </div>
           )}
-          {hasCards && (
+          {showCardEditor && (
             <div title={`Card Priority: ${cardInfo?.priority || 'None'} (${cardRelativePriority}%)`}>
               <span style={{ ...priorityPillStyle, backgroundColor: cardColor, fontSize: '11px' }}>
                 C:{cardInfo?.priority || '-'}
@@ -190,7 +198,7 @@ export function PriorityEditor() {
               </div>
             )}
 
-            {hasCards && (
+            {showCardEditor && (
               <div>
                 <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-green-600)' }}>
                   Cards ({cardRelativePriority}%)
@@ -204,17 +212,16 @@ export function PriorityEditor() {
                   <button onClick={() => quickUpdateCardPriority(1)} style={buttonStyle}>+1</button>
                   <button onClick={() => quickUpdateCardPriority(10)} style={buttonStyle}>+10</button>
                 </div>
-                {cardInfo?.source && (
-                  <div className="text-xs mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                    Source: {cardInfo.source}
-                  </div>
-                )}
+                <div className="text-xs mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                  {/* MODIFIED: Clarifying text for inheritance-only case */}
+                  {!hasCards && hasCardPriorityPowerup ? "Set for inheritance" : `Source: ${cardInfo?.source}`}
+                </div>
               </div>
             )}
           </div>
             <button
             onClick={() => plugin.widget.openPopup('priority', { remId })}
-            style={buttonStyle}
+            style={{...buttonStyle, width: '100%'}}
           >
             Open Full Priority Panel
           </button>

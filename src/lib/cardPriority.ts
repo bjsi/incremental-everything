@@ -67,12 +67,6 @@ export async function getCardPriority(
   const hasPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
   
   if (!hasPowerup) {
-    // If there are no cards, there's nothing to set a priority for. Return null.
-    if (cards.length === 0) {
-      return null;
-    }
-
-    // --- NEW LOGIC IS HERE ---
     // Before returning a generic default, check for an inheritable priority.
     const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
     if (ancestorPriority) {
@@ -85,7 +79,6 @@ export async function getCardPriority(
         dueCards
       };
     }
-    // --- END OF NEW LOGIC ---
 
     // If no ancestor is found, then use the default.
     return {

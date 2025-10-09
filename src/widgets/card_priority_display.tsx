@@ -4,6 +4,7 @@ import {
   useTrackerPlugin,
   WidgetLocation,
   Rem,
+  QueueItemType,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useMemo } from 'react';
 import { powerupCode, seenCardInSessionKey, currentSubQueueIdKey, allCardPriorityInfoKey } from '../lib/consts';

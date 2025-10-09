@@ -167,6 +167,16 @@ function Priority() {
   const incRemInfo = useTrackerPlugin(async (plugin) => rem ? await getIncrementalRemInfo(plugin, rem) : null, [rem?._id]);
   const cardInfo = useTrackerPlugin(async (plugin) => rem ? await getCardPriority(plugin, rem) : null, [rem?._id]);
   const hasCards = useTrackerPlugin(async (plugin) => rem ? (await rem.getCards()).length > 0 : false, [rem?._id]);
+  
+  // Tracker to check and for descendant cards and counts
+  const descendantCardCount = useTrackerPlugin(async (plugin) => {
+    if (!rem) return 0;
+    const descendants = await rem.getDescendants();
+    if (descendants.length === 0) return 0;
+    const cardChecks = await Promise.all(descendants.map(d => d.getCards()));
+    // Sum up the number of cards from all descendants.
+    return cardChecks.reduce((sum, cards) => sum + cards.length, 0);
+  }, [rem?._id]);
   const prioritySourceCounts = useMemo(() => scopedCardRems.reduce((counts, rem) => ({...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0 }), [scopedCardRems]);
 
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -222,6 +232,9 @@ function Priority() {
   };
   const showIncSection = incRemInfo !== null;
   const showCardSection = hasCards || (cardInfo && cardInfo.cardCount > 0);
+  // Condition to show the special inheritance section
+  const showInheritanceSection = !showIncSection && !showCardSection && descendantCardCount > 0;
+
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
     if (!incRemInfo) {
@@ -247,7 +260,7 @@ function Priority() {
   }, [rem, plugin]);
   const saveAndClose = async (incP: number, cardP: number) => {
     if (showIncSection) await saveIncPriority(incP);
-    if (showCardSection) {
+    if (showCardSection || showInheritanceSection) { // Modified condition
       await saveCardPriority(cardP);
       // Send a signal to other widgets (like the queue display) that data has changed.
       await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
@@ -255,20 +268,36 @@ function Priority() {
     plugin.widget.closePopup();
   };
   const handleConfirmAndClose = async () => {
-    if (showConfirmation) {
-      await saveAndClose(incAbsPriority, cardAbsPriority);
-      return;
+    const bothSectionsVisible = showIncSection && (showCardSection || showInheritanceSection);
+
+    if (bothSectionsVisible && incRemInfo && cardInfo) {
+      const wasIncPriorityChanged = incAbsPriority !== incRemInfo.priority;
+      const wasCardPriorityChanged = cardAbsPriority !== cardInfo.priority;
+      const isCardPriorityManual = cardInfo.source === 'manual';
+      const prioritiesAreDifferent = incAbsPriority !== cardAbsPriority;
+
+      // Case 1: A conflict that requires user input.
+      // This happens if priorities are different AND the card priority was already manual,
+      // or if the user intentionally changed both sliders to different values.
+      if (prioritiesAreDifferent && (isCardPriorityManual || (wasIncPriorityChanged && wasCardPriorityChanged))) {
+        setShowConfirmation(true);
+        return;
+      }
+
+      // Case 2: Implicitly sync priorities.
+      // This happens if the user ONLY changed the IncRem priority, and the card's
+      // priority was 'default' or 'inherited'. We assume they want both to match.
+      if (wasIncPriorityChanged && !wasCardPriorityChanged && !isCardPriorityManual) {
+        await saveAndClose(incAbsPriority, incAbsPriority); // Card inherits the new IncRem priority
+        return;
+      }
     }
-    if (showIncSection && showCardSection && incAbsPriority !== cardAbsPriority) {
-      setShowConfirmation(true);
-      return;
-    }
-    if (cardInfo && (cardInfo.source === 'inherited' || cardInfo.source === 'default')) {
-        await saveCardPriority(cardAbsPriority);
-    }
-    else if (incRemInfo && incAbsPriority !== incRemInfo.priority) {
-        await saveIncPriority(incAbsPriority);
-    }
+
+    // Fallback for all other non-conflicting scenarios:
+    // - Only one section is visible.
+    // - Priorities were already matching and were changed together.
+    // - Only the card priority was changed.
+    // In these cases, we just save the values as they appear on the sliders.
     await saveAndClose(incAbsPriority, cardAbsPriority);
   };
   
@@ -287,7 +316,7 @@ function Priority() {
   }, [incRemInfo, cardInfo]);
 
   const handleTabCycle = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showIncSection || !showCardSection || e.key !== 'Tab' || e.shiftKey) {
+    if (!showIncSection || (!showCardSection && !showInheritanceSection) || e.key !== 'Tab' || e.shiftKey) {
         return;
     }
 
@@ -319,13 +348,16 @@ function Priority() {
   }, [plugin, rem, widgetContext?.contextData?.remId]);
   
   if (!widgetContext || !rem) { return <div className="p-4">Loading Rem Data...</div>; }
-  if (!showIncSection && !showCardSection) { return <div className="p-4 text-center rn-clr-content-secondary">This rem is neither an Incremental Rem nor has flashcards.</div>; }
+  // MODIFIED: The final check to show the message
+  if (!showIncSection && !showCardSection && !showInheritanceSection) { 
+    return <div className="p-4 text-center rn-clr-content-secondary">This rem is neither an Incremental Rem nor has flashcards.</div>; 
+  }
 
   const secondaryTextStyle = { color: 'rgba(255, 255, 255, 0.8)' };
   
   return (
     <div className="p-4 flex flex-col gap-4 relative" onKeyDown={async (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !showConfirmation) {
         e.preventDefault();
         await handleConfirmAndClose();
       } else if (e.key === 'Escape') {
@@ -337,12 +369,12 @@ function Priority() {
           <div className="p-6 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col gap-4 text-center max-w-sm">
             <h3 className="font-semibold text-lg">Priorities are different</h3>
             <p className="text-sm rn-clr-content-secondary">
-              Incremental Rem ({incAbsPriority}) and Flashcard ({cardAbsPriority}) priorities do not match.
+              Incremental Rem ({incAbsPriority}) and Flashcard ({cardAbsPriority}) priorities do not match.  Please choose an option below.
             </p>
             <div className="flex flex-col gap-2">
               <button
                 style={{ backgroundColor: '#6B7280', color: 'white' }}
-                className="px-4 py-1 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-400"
+                className="px-4 py-2 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-400"
                 onClick={() => saveAndClose(incAbsPriority, cardAbsPriority)}
               >
                 Save Both As-Is (Enter)
@@ -352,14 +384,14 @@ function Priority() {
                 className="px-4 py-2 rounded font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
                 onClick={() => saveAndClose(incAbsPriority, incAbsPriority)}
               >
-                Card inherits IncRem priority ({incAbsPriority})
+                Use IncRem Priority for Both ({incAbsPriority})
               </button>
               <button
                 style={{ backgroundColor: '#10B981', color: 'white' }}
                 className="px-4 py-2 rounded font-semibold focus:outline-none focus:ring-2 focus:ring-green-400"
                 onClick={() => saveAndClose(cardAbsPriority, cardAbsPriority)}
               >
-                IncRem inherits Card priority ({cardAbsPriority})
+                Use Card Priority for Both ({cardAbsPriority})
               </button>
             </div>
             <button
@@ -446,7 +478,6 @@ function Priority() {
             <span className="mr-2">🎴</span>
             Flashcard Priority
           </h3>
-          {cardInfo && cardInfo.cardCount > 0 ? (
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center">
                 <label className="font-medium">Absolute Priority:</label>
@@ -476,15 +507,15 @@ function Priority() {
                 <span>Default: {prioritySourceCounts.default.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center text-sm mt-2" style={secondaryTextStyle}>
-                <span><span className="font-medium">Source:</span> {cardInfo.source}</span>
-                {cardInfo.source === 'inherited' && (
+                <span><span className="font-medium">Source:</span> {cardInfo?.source}</span>
+                {cardInfo?.source === 'inherited' && (
                   <button onClick={() => saveCardPriority(cardInfo.priority)} className="text-blue-500 hover:underline">
                     Convert to Manual
                   </button>
                 )}
               </div>
               <div className="text-sm" style={secondaryTextStyle}>
-                <span className="font-medium">Due Cards:</span> {cardInfo.dueCards} / {cardInfo.cardCount}
+                <span className="font-medium">Due Cards:</span> {cardInfo?.dueCards} / {cardInfo?.cardCount}
               </div>
               <div className="mt-4 pt-2 border-t dark:border-gray-600">
                   <label className="text-sm font-medium">Calculate Relative To:</label>
@@ -500,11 +531,58 @@ function Priority() {
                   </div>
               </div>
             </div>
-          ) : ( <p className="text-center" style={secondaryTextStyle}>This rem has no flashcards to prioritize.</p> )}
+          </div>
+      )}
+
+      {showInheritanceSection && (
+         <div className="p-4 border border-yellow-200 dark:border-yellow-800 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 flex flex-col gap-4">
+          <h3 className="text-lg font-semibold flex items-center text-yellow-800 dark:text-yellow-200">
+            <span className="mr-2">🌿</span>
+            Set Card Priority for Inheritance
+          </h3>
+          <p className="text-xs text-yellow-700 dark:text-yellow-300 -mt-2">
+            This Rem has no cards, but its descendants have{' '}
+            <b>
+              {descendantCardCount} {descendantCardCount === 1 ? 'flashcard' : 'flashcards'}.
+            </b>{' '}
+            You can set a priority here for them to inherit.
+          </p> 
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center">
+                <label className="font-medium">Absolute Priority:</label>
+                <input ref={cardInputRef} type="number" min={0} max={100} value={cardAbsPriority} onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) setCardAbsPriority(Math.min(100, Math.max(0, val)));
+                        else if (e.target.value === '') setCardAbsPriority(0);
+                    }}
+                    onKeyDown={handleTabCycle}
+                    className="w-20 text-center p-1 border rounded dark:bg-gray-800 border-gray-300 dark:border-gray-600" />
+              </div>
+              <input type="range" min="0" max="100" value={cardAbsPriority} onChange={(e) => setCardAbsPriority(Number(e.target.value))} className="w-full" />
+              <div className="flex justify-between items-center mt-2">
+                <label className="font-medium">Relative Priority:</label>
+                <span className="text-lg font-bold">{cardRelPriority}%</span>
+              </div>
+              <div className="relative h-8 flex items-center">
+                <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
+                <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
+              </div>
+              <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
+                  Universe: {scopedCardRems.length.toLocaleString()} flashcards
+              </div>
+            </div>
         </div>
       )}
       
-      <button onClick={handleConfirmAndClose} className="mt-2 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 self-center">
+      <button 
+        onClick={handleConfirmAndClose} 
+        className="mt-2 px-4 py-2 font-semibold rounded self-center"
+        style={{
+          backgroundColor: '#3B82F6',
+          color: 'white',
+          border: 'none',
+        }}
+      >
         Close
       </button>
     </div>
