@@ -579,7 +579,7 @@ export function Reader(props: ReaderProps) {
       fontWeight: 500
     },
     pageInput: {
-      width: '40px',
+      width: '55px',
       padding: '2px 4px',
       fontSize: '11px',
       borderRadius: '4px',

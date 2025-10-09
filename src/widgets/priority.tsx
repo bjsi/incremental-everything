@@ -180,6 +180,8 @@ function Priority() {
   const prioritySourceCounts = useMemo(() => scopedCardRems.reduce((counts, rem) => ({...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0 }), [scopedCardRems]);
 
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showInheritanceForIncRem, setShowInheritanceForIncRem] = useState(false);
+
   useEffect(() => { if (incRemInfo) setIncAbsPriority(incRemInfo.priority) }, [incRemInfo]);
   useEffect(() => { if (cardInfo) setCardAbsPriority(cardInfo.priority) }, [cardInfo]);
   useEffect(() => {
@@ -231,9 +233,20 @@ function Priority() {
     if (targetAbsPriority !== undefined) setCardAbsPriority(targetAbsPriority);
   };
   const showIncSection = incRemInfo !== null;
+  // Card section - only for Rems that actually contain cards.
   const showCardSection = hasCards || (cardInfo && cardInfo.cardCount > 0);
   // Condition to show the special inheritance section
-  const showInheritanceSection = !showIncSection && !showCardSection && descendantCardCount > 0;
+  const showInheritanceSection = 
+    // 1. A non-IncRem parent with descendant cards.
+    (!showIncSection && !showCardSection && descendantCardCount > 0) ||
+    // 2. An IncRem parent that has no cards of its own but has a manual card priority.
+    (showIncSection && !hasCards && cardInfo?.source === 'manual') ||
+    // 3. Or if we've just clicked the button to show it.
+    showInheritanceForIncRem;
+
+  // NEW: Condition to show the button that reveals the card priority editor.
+  const showAddCardPriorityButton = showIncSection && !showCardSection && descendantCardCount > 0 && !showInheritanceSection;
+
 
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
@@ -258,15 +271,18 @@ function Priority() {
     await updateCardPriorityInCache(plugin, rem._id);
 
   }, [rem, plugin]);
+
   const saveAndClose = async (incP: number, cardP: number) => {
     if (showIncSection) await saveIncPriority(incP);
-    if (showCardSection || showInheritanceSection) { // Modified condition
+    // Save card priority if either the card or inheritance section is visible.
+    if (showCardSection || showInheritanceSection) {
       await saveCardPriority(cardP);
       // Send a signal to other widgets (like the queue display) that data has changed.
       await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
     }
     plugin.widget.closePopup();
   };
+
   const handleConfirmAndClose = async () => {
     const bothSectionsVisible = showIncSection && (showCardSection || showInheritanceSection);
 
@@ -316,6 +332,7 @@ function Priority() {
   }, [incRemInfo, cardInfo]);
 
   const handleTabCycle = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // MODIFIED: Tab cycling logic is now aware of the new state.
     if (!showIncSection || (!showCardSection && !showInheritanceSection) || e.key !== 'Tab' || e.shiftKey) {
         return;
     }
@@ -346,6 +363,15 @@ function Priority() {
       await plugin.app.toast('Removed from Incremental Queue');
       plugin.widget.closePopup();
   }, [plugin, rem, widgetContext?.contextData?.remId]);
+    
+  // NEW: Function to remove the card priority.
+  const removeCardPriority = useCallback(async () => {
+    if (!rem) return;
+    await rem.removePowerup('cardPriority');
+    await updateCardPriorityInCache(plugin, rem._id);
+    await plugin.app.toast('Card Priority for inheritance removed.');
+    plugin.widget.closePopup();
+  }, [plugin, rem]);
   
   if (!widgetContext || !rem) { return <div className="p-4">Loading Rem Data...</div>; }
   // MODIFIED: The final check to show the message
@@ -466,6 +492,25 @@ function Priority() {
               Next review: {incRemInfo && new Date(incRemInfo.nextRepDate).toLocaleDateString()}
             </div>
           </div>
+
+          {/* NEW: Button to add card priority */}
+          {showAddCardPriorityButton && (
+            <div className="pt-2 mt-2 border-t border-blue-200/50 dark:border-blue-800/50">
+              <p className="text-xs text-center text-blue-700 dark:text-blue-300 mb-2">
+                This Rem has {descendantCardCount} descendant flashcards.
+              </p>
+              <button 
+                onClick={() => {
+                  setCardAbsPriority(incAbsPriority);
+                  setShowInheritanceForIncRem(true);
+                }}
+                className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 self-center font-semibold"
+                >
+                Set Card Priority for Inheritance
+              </button>
+            </div>
+          )}
+
           <button onClick={removeFromIncremental} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 self-center">
             Remove from Incremental Queue
           </button>
@@ -501,35 +546,40 @@ function Priority() {
               <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
                   Universe: {scopedCardRems.length.toLocaleString()} flashcards
               </div>
-              <div className="text-xs text-center mt-2 flex justify-around p-1 bg-gray-100 dark:bg-gray-800 rounded-sm" style={secondaryTextStyle}>
-                <span>Manual: {prioritySourceCounts.manual.toLocaleString()}</span>
-                <span>Inherited: {prioritySourceCounts.inherited.toLocaleString()}</span>
-                <span>Default: {prioritySourceCounts.default.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm mt-2" style={secondaryTextStyle}>
-                <span><span className="font-medium">Source:</span> {cardInfo?.source}</span>
-                {cardInfo?.source === 'inherited' && (
-                  <button onClick={() => saveCardPriority(cardInfo.priority)} className="text-blue-500 hover:underline">
-                    Convert to Manual
-                  </button>
-                )}
-              </div>
-              <div className="text-sm" style={secondaryTextStyle}>
-                <span className="font-medium">Due Cards:</span> {cardInfo?.dueCards} / {cardInfo?.cardCount}
-              </div>
-              <div className="mt-4 pt-2 border-t dark:border-gray-600">
-                  <label className="text-sm font-medium">Calculate Relative To:</label>
-                  <div className="flex gap-4 mt-1">
-                      <label className="flex items-center gap-2 text-sm">
-                          <input type="radio" name="cardScope" value="prioritized" checked={cardScopeType === 'prioritized'} onChange={() => setCardScopeType('prioritized')} />
-                          Prioritized Cards (Manual + Inherited)
-                      </label>
-                      <label className="flex items-center gap-2 text-sm">
-                          <input type="radio" name="cardScope" value="all" checked={cardScopeType === 'all'} onChange={() => setCardScopeType('all')} />
-                          All Cards
-                      </label>
+              {/* Only show the rest of the details if the Rem actually has cards */}
+              {hasCards && cardInfo && (
+                <>
+                  <div className="text-xs text-center mt-2 flex justify-around p-1 bg-gray-100 dark:bg-gray-800 rounded-sm" style={secondaryTextStyle}>
+                    <span>Manual: {prioritySourceCounts.manual.toLocaleString()}</span>
+                    <span>Inherited: {prioritySourceCounts.inherited.toLocaleString()}</span>
+                    <span>Default: {prioritySourceCounts.default.toLocaleString()}</span>
                   </div>
-              </div>
+                  <div className="flex justify-between items-center text-sm mt-2" style={secondaryTextStyle}>
+                    <span><span className="font-medium">Source:</span> {cardInfo?.source}</span>
+                    {cardInfo?.source === 'inherited' && (
+                      <button onClick={() => saveCardPriority(cardInfo.priority)} className="text-blue-500 hover:underline">
+                        Convert to Manual
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-sm" style={secondaryTextStyle}>
+                    <span className="font-medium">Due Cards:</span> {cardInfo?.dueCards} / {cardInfo?.cardCount}
+                  </div>
+                  <div className="mt-4 pt-2 border-t dark:border-gray-600">
+                      <label className="text-sm font-medium">Calculate Relative To:</label>
+                      <div className="flex gap-4 mt-1">
+                          <label className="flex items-center gap-2 text-sm">
+                              <input type="radio" name="cardScope" value="prioritized" checked={cardScopeType === 'prioritized'} onChange={() => setCardScopeType('prioritized')} />
+                              Prioritized Cards (Manual + Inherited)
+                          </label>
+                          <label className="flex items-center gap-2 text-sm">
+                              <input type="radio" name="cardScope" value="all" checked={cardScopeType === 'all'} onChange={() => setCardScopeType('all')} />
+                              All Cards
+                          </label>
+                      </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
       )}
@@ -541,11 +591,11 @@ function Priority() {
             Set Card Priority for Inheritance
           </h3>
           <p className="text-xs text-yellow-700 dark:text-yellow-300 -mt-2">
-            This Rem has no cards, but its descendants have{' '}
-            <b>
-              {descendantCardCount} {descendantCardCount === 1 ? 'flashcard' : 'flashcards'}.
-            </b>{' '}
-            You can set a priority here for them to inherit.
+            {/* Logic to show different text based on the situation */}
+            {showIncSection 
+              ? `This Incremental Rem has no cards, but you can set a card priority for its ${descendantCardCount} descendant flashcards to inherit.`
+              : `This Rem has no cards, but its descendants have ${descendantCardCount} ${descendantCardCount === 1 ? 'flashcard' : 'flashcards'}. You can set a priority here for them to inherit.`
+            }
           </p> 
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center">
@@ -571,6 +621,16 @@ function Priority() {
                   Universe: {scopedCardRems.length.toLocaleString()} flashcards
               </div>
             </div>
+            
+            {/* NEW: Conditional button to remove card priority */}
+            {cardInfo?.source === 'manual' && (
+              <button 
+                onClick={removeCardPriority} 
+                className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 self-center"
+              >
+                Remove Card Priority
+              </button>
+            )}
         </div>
       )}
       
