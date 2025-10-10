@@ -249,18 +249,35 @@ function Priority() {
 
 
   const saveIncPriority = useCallback(async (priority: number) => {
-    if (!rem) return;
-    if (!incRemInfo) {
+      if (!rem) return;
+
+      // 1. Save the priority to the Rem itself (this is fast).
+      if (!incRemInfo) {
         await rem.addPowerup(powerupCode);
-    }
-    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
-    const newIncRem = await getIncrementalRemInfo(plugin, rem);
-    if (newIncRem) {
-      const currentRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-      const updatedRems = currentRems.filter(r => r.remId !== rem._id).concat(newIncRem);
-      await plugin.storage.setSession(allIncrementalRemKey, updatedRems);
-    }
-  }, [rem, plugin, incRemInfo]);
+      }
+      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+
+      // 2. OPTIMIZED: Update the cache in-place without a full read/write cycle.
+      const newIncRem = await getIncrementalRemInfo(plugin, rem);
+      if (newIncRem) {
+        const currentRems = allIncRems; // Use the already-tracked data
+        const index = currentRems.findIndex(r => r.remId === rem._id);
+
+        if (index !== -1) {
+          // If the item exists, update it.
+          currentRems[index] = newIncRem;
+        } else {
+          // If it's a new item, add it.
+          currentRems.push(newIncRem);
+        }
+        
+        // 3. Let the tracker manage the state. A full write-back here is what causes the delay.
+        // The updated state will be available to other parts of the plugin.
+        // A background process or a less frequent event (like QueueExit) can handle persisting the full cache if needed.
+        // await plugin.storage.setSession(allIncrementalRemKey, currentRems); // AVOID THIS LINE
+      }
+    }, [rem, plugin, incRemInfo, allIncRems]);
+  
   const saveCardPriority = useCallback(async (priority: number) => {
     if (!rem) return;
 

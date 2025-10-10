@@ -145,33 +145,39 @@ export async function autoAssignCardPriority(
   plugin: RNPlugin,
   rem: Rem
 ): Promise<number> {
-  // Check if rem has manual priority already
+  // Check existing priority
   const existingPriority = await getCardPriority(plugin, rem);
+  
+  // ONLY preserve manual priorities - recalculate inherited and default
   if (existingPriority && existingPriority.source === 'manual') {
     return existingPriority.priority;
   }
 
-  // Check if rem itself was an incremental rem
+  // Check if rem itself is an incremental rem (highest precedence)
   const incRemInfo = await getIncrementalRemInfo(plugin, rem);
   if (incRemInfo) {
     await setCardPriority(plugin, rem, incRemInfo.priority, 'inherited');
     return incRemInfo.priority;
   }
 
-  // Check if rem itself has CardPriority (shouldn't happen but defensive check)
-  const ownCardPriority = await getCardPriority(plugin, rem);
-  if (ownCardPriority && ownCardPriority.source !== 'default') {
-    return ownCardPriority.priority;
-  }
-
-  // Search ancestors for any priority (Incremental or CardPriority)
+  // Search for closest ancestor with priority
   const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
+  
   if (ancestorPriority) {
+    // Found an ancestor - update with its priority
     await setCardPriority(plugin, rem, ancestorPriority.priority, 'inherited');
     return ancestorPriority.priority;
   }
-
-  // Use default priority
+  
+  // No ancestor found - decide what to do based on existing priority
+  if (existingPriority && existingPriority.source === 'inherited') {
+    // PRESERVE existing inherited priority when no ancestors are found
+    // The ancestor that gave this priority may have been deleted/changed,
+    // but we keep the inherited value stable
+    return existingPriority.priority;
+  }
+  
+  // Only use default if there's no existing priority or it was already default
   const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
   await setCardPriority(plugin, rem, defaultPriority, 'default');
   return defaultPriority;
