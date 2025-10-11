@@ -64,7 +64,7 @@ import { calculateRelativePriority } from '../lib/priority';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 import { getInitialPriority } from '../lib/priority_inheritance';
-import { findPDFinRem } from '../lib/pdfUtils';
+import { findPDFinRem, safeRemTextToString } from '../lib/pdfUtils';
 import { 
   autoAssignCardPriority, 
   getCardPriority, 
@@ -72,7 +72,7 @@ import {
   CardPriorityInfo,
   setCardPriority
 } from '../lib/cardPriority';
-import { updateCardPriorityInCache } from '../lib/cache';
+import { updateCardPriorityInCache, flushCacheUpdatesNow } from '../lib/cache';
 dayjs.extend(relativeTime);
 
 // Helper function needed for history saving
@@ -608,7 +608,7 @@ async function onActivate(plugin: ReactRNPlugin) {
           code: 'prioritySource',
           name: 'Priority Source',
           propertyType: PropertyType.TEXT,
-          hidden: true,
+          propertyLocation: PropertyLocation.BELOW,
         },
         {
           code: 'lastUpdated',
@@ -703,8 +703,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     ]
   });
 
-  // Run the cache build in the background without blocking plugin initialization.
-  cacheAllCardPriorities(plugin);
 
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
@@ -742,6 +740,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   // or unnecessary due to init interval? could append to this list
 
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
+    // Flush any pending cache updates immediately
+    await flushCacheUpdatesNow(plugin);
     console.log('QueueExit triggered, subQueueId:', subQueueId);
     
     // IMPORTANT: Get the scope BEFORE clearing it
@@ -1453,11 +1453,45 @@ async function onActivate(plugin: ReactRNPlugin) {
   });
 
  // Event listeners for assigning priority when cards are created and update due status when cards are rated
- 
-  // Define a variable outside the listener to hold our timer.
+  
+  let recentlyProcessedCards = new Set<string>();
+
+  plugin.event.addListener(
+    AppEvents.QueueCompleteCard,
+    undefined,
+    async (data: { cardId: RemId }) => {
+      console.log('🎴 CARD COMPLETED:', data);
+      
+      if (!data || !data.cardId) {
+        console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
+        return;
+      }
+      
+      const card = await plugin.card.findOne(data.cardId);
+      const remId = card?.remId;
+      const rem = remId ? await plugin.rem.findOne(remId) : null;
+      const isIncRem = rem ? await rem.hasPowerup(powerupCode) : false;
+      
+      console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
+
+      if (remId) {
+        // Mark as recently processed to avoid duplicate work from GlobalRemChanged
+        recentlyProcessedCards.add(remId);
+        
+        // Clear after 2 seconds (longer than debounce timer)
+        setTimeout(() => recentlyProcessedCards.delete(remId), 2000);
+
+        console.log('LISTENER: Calling updateCardPriorityInCache to update due status...');
+        await updateCardPriorityInCache(plugin, remId);
+      } else {
+        console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
+      }
+    }
+  );
+
+    // Define a variable outside the listener to hold our timer.
   let remChangeDebounceTimer: NodeJS.Timeout;
 
-  // Replace your existing GlobalRemChanged listener with this debounced version.
   plugin.event.addListener(
     AppEvents.GlobalRemChanged,
     undefined,
@@ -1470,6 +1504,12 @@ async function onActivate(plugin: ReactRNPlugin) {
       remChangeDebounceTimer = setTimeout(async () => {
         // This code will only run after the user has stopped typing for 500ms.
         console.log(`LISTENER: (Debounced) GlobalRemChanged fired for RemId: ${data.remId}`);
+              
+        // SKIP if recently processed by QueueCompleteCard
+        if (recentlyProcessedCards.has(data.remId)) {
+          console.log('LISTENER: Skipping - recently processed by QueueCompleteCard');
+          return;
+        }
         
         const rem = await plugin.rem.findOne(data.remId);
         if (!rem) {
@@ -1490,32 +1530,6 @@ async function onActivate(plugin: ReactRNPlugin) {
       }, 1000); // 1000 milliseconds = one second
     }
   );
-  plugin.event.addListener(
-    AppEvents.QueueCompleteCard,
-    undefined,
-    async (data: { cardId: RemId }) => {
-      console.log('🎴 CARD COMPLETED:', data);
-      
-      if (!data || !data.cardId) {
-        console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
-        return;
-      }
-      
-      const card = await plugin.card.findOne(data.cardId);
-      const remId = card?.remId;
-      const rem = remId ? await plugin.rem.findOne(remId) : null;
-      const isIncRem = rem ? await rem.hasPowerup(powerupCode) : false;
-      
-      console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
-
-      if (remId) {
-        console.log('LISTENER: Calling updateCardPriorityInCache to update due status...');
-        await updateCardPriorityInCache(plugin, remId);
-      } else {
-        console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
-      }
-    }
-  );
 
   plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
     powerupFilter: powerupCode,
@@ -1525,8 +1539,9 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
     queueItemTypeFilter: QueueItemType.Plugin,
   });
+  console.log('✅ Widget registered with powerupFilter:', powerupCode, 'queueItemTypeFilter:', QueueItemType.Plugin);
+  
   plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
-    powerupFilter: powerupCode,
     dimensions: {
       width: '100%',
       height: 'auto',
@@ -1702,7 +1717,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       
       await plugin.storage.setSession('reviewDocContext', {
         scopeRemId: focused?._id || null,
-        scopeName: focused ? await plugin.richText.toString(focused.text) : 'Full KB'
+        scopeName: focused ? await safeRemTextToString(plugin, focused.text) : 'Full KB'
       });
       
       await plugin.widget.openPopup('review_document_creator');
@@ -1765,7 +1780,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) return;
       
-      const remName = await plugin.richText.toString(rem.text);
+      const remName = await safeRemTextToString(plugin, rem.text);
       
       await plugin.storage.setSession('reviewDocContext', {
         scopeRemId: rem._id,
@@ -1787,7 +1802,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       
       if (subQueueId) {
         const rem = await plugin.rem.findOne(subQueueId);
-        const remName = rem ? await plugin.richText.toString(rem.text) : 'Queue Scope';
+        const remName = rem ? await safeRemTextToString(plugin, rem.text) : 'Queue Scope';
         
         await plugin.storage.setSession('reviewDocContext', {
           scopeRemId: subQueueId,
@@ -1823,6 +1838,9 @@ async function onActivate(plugin: ReactRNPlugin) {
       await removeAllCardPriorityTags(plugin);
     },
   });
+
+  // Run the cache build in the background without blocking plugin initialization.
+  cacheAllCardPriorities(plugin);
 
   
 }

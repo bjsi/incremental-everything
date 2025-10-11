@@ -5,23 +5,25 @@ import {
   RichTextElementRemInterface,
 } from '@remnote/plugin-sdk';
 import { RemAndType } from './types';
+import { safeRemTextToString } from './pdfUtils';
 
 export const remToActionItemType = async (
   plugin: RNPlugin,
   rem: Rem
 ): Promise<RemAndType | null> => {
+  console.log('📋 remToActionItemType CALLED for rem:', rem._id);
+  
   // Check if this rem has a tag reference to "extractviewer"
-  // This allows chapters with PDF sources to be viewed as extracts
   try {
     const tags = await rem.getTagRems();
     
     for (const tagRem of tags) {
       if (!tagRem.text) continue;
-      const tagText = await plugin.richText.toString(tagRem.text);
+      const tagText = await safeRemTextToString(plugin, tagRem.text);
       
       if (tagText.toLowerCase() === 'extractviewer' || 
           tagText.toLowerCase() === 'extract viewer') {
-        console.log('Found extractviewer tag! Opening in ExtractViewer');
+        console.log('📋 remToActionItemType RETURNING: extractviewer (rem type)');
         return { rem, type: 'rem' };
       }
     }
@@ -41,8 +43,10 @@ export const remToActionItemType = async (
     const pdf = await plugin.rem.findOne(pdfId);
     if (!pdf) {
       await plugin.app.toast('PDF not found for extract. Skipping.');
+      console.log('📋 remToActionItemType RETURNING: null (PDF not found)');
       return null;
     } else {
+      console.log('📋 remToActionItemType RETURNING: pdf-highlight');
       return { extract: rem, type: 'pdf-highlight', rem: pdf };
     }
   } else if (await rem.hasPowerup(BuiltInPowerupCodes.HTMLHighlight)) {
@@ -57,16 +61,17 @@ export const remToActionItemType = async (
     const htmlRem = await plugin.rem.findOne(html);
     if (!htmlRem) {
       await plugin.app.toast('HTML not found for extract. Skipping.');
+      console.log('📋 remToActionItemType RETURNING: null (HTML not found)');
       return null;
     } else {
+      console.log('📋 remToActionItemType RETURNING: html-highlight');
       return { extract: rem, type: 'html-highlight', rem: htmlRem };
     }
   } else if (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
+    console.log('📋 remToActionItemType RETURNING: pdf (UploadedFile)');
     return { rem, type: 'pdf' };
   } else if (await rem.hasPowerup('vi')) {
-    // VIDEO POWERUP: Temporary solution using DocumentViewer
-    // TODO: Once RemNote provides URL access via SDK, change to 'youtube' type with ReactPlayer
-    console.log('✅ Video powerup detected - using simple video viewer');
+    console.log('📋 remToActionItemType RETURNING: video (vi powerup)');
     return { rem, type: 'video' };
   } else if (
     (await rem.hasPowerup(BuiltInPowerupCodes.Link)) &&
@@ -77,12 +82,14 @@ export const remToActionItemType = async (
       'URL'
     );
     if (['youtube', 'youtu.be'].some((x) => url.includes(x))) {
+      console.log('📋 remToActionItemType RETURNING: youtube');
       return {
         type: 'youtube',
         url,
         rem,
       };
     } else {
+      console.log('📋 remToActionItemType RETURNING: html (Link)');
       return {
         type: 'html',
         rem,
@@ -98,20 +105,23 @@ export const remToActionItemType = async (
     if (isLink && url && url.includes('youtube')) {
       const data = await remToActionItemType(plugin, source);
       if (data) {
+        console.log('📋 remToActionItemType RETURNING: youtube from source');
         return {
           ...data,
           rem,
         };
       }
     } else {
-      // handles PDF/HTML sources
       const data = await remToActionItemType(plugin, source);
       if (data) {
+        console.log('📋 remToActionItemType RETURNING: data from source');
         return data;
       }
     }
+    console.log('📋 remToActionItemType RETURNING: rem (has sources)');
     return { rem, type: 'rem' };
   } else {
+    console.log('📋 remToActionItemType RETURNING: rem (default)');
     return { rem, type: 'rem' };
   }
 };

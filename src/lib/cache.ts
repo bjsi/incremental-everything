@@ -1,47 +1,79 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { allCardPriorityInfoKey } from './consts';
+import { allCardPriorityInfoKey, incrementalQueueActiveKey } from './consts';
 import { CardPriorityInfo, getCardPriority } from './cardPriority';
+
+// Debounce mechanism to batch cache writes
+let cacheUpdateTimer: NodeJS.Timeout | null = null;
+let pendingUpdates = new Map<RemId, CardPriorityInfo | null>();
+
+async function flushCacheUpdates(plugin: RNPlugin) {
+  if (pendingUpdates.size === 0) return;
+  
+  console.log(`CACHE-FLUSH: Writing ${pendingUpdates.size} batched updates to cache`);
+  
+  const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+  
+  // Apply all pending updates efficiently
+  for (const [remId, updatedInfo] of pendingUpdates.entries()) {
+    const index = cache.findIndex(info => info.remId === remId);
+    
+    if (index > -1) {
+      if (updatedInfo) {
+        // Update in place - NO COPY
+        cache[index] = updatedInfo;
+      } else {
+        // Remove from cache
+        cache.splice(index, 1);
+      }
+    } else if (updatedInfo) {
+      // Add new item
+      cache.push(updatedInfo);
+    }
+  }
+  
+  // Single write for all updates
+  await plugin.storage.setSession(allCardPriorityInfoKey, cache);
+  console.log(`CACHE-FLUSH: Complete. Cache size: ${cache.length}`);
+  
+  // Clear pending updates
+  pendingUpdates.clear();
+}
 
 export async function updateCardPriorityInCache(plugin: RNPlugin, remId: RemId) {
   try {
-    // DEBUG LOG: Announce that the function has been called.
-    console.log(`CACHE-UPDATE: Function called for RemId: ${remId}`);
+    console.log(`CACHE-UPDATE: Queuing update for RemId: ${remId}`);
     
-    const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
     const rem = await plugin.rem.findOne(remId);
     if (!rem) {
       return;
     }
     
     const updatedInfo = await getCardPriority(plugin, rem);
-    // DEBUG LOG: Show the fresh data fetched for the specific Rem.
-    console.log('CACHE-UPDATE: Fetched latest info for Rem:', updatedInfo);
-
-    const index = cache.findIndex(info => info.remId === remId);
-    let newCache = [...cache]; // Create a copy for immutability
-
-    if (index > -1) {
-      // The Rem is already in the cache.
-      if (updatedInfo) {
-        // DEBUG LOG: Announce that we are updating an existing entry.
-        console.log(`CACHE-UPDATE: Updating item at index ${index}.`);
-        newCache[index] = updatedInfo;
-      } else {
-        // DEBUG LOG: Announce that we are removing an entry.
-        console.log(`CACHE-UPDATE: Removing item from index ${index}.`);
-        newCache.splice(index, 1);
-      }
-    } else if (updatedInfo) {
-      // DEBUG LOG: Announce that we are adding a new entry.
-      console.log(`CACHE-UPDATE: No existing item found. Adding new item to cache.`);
-      newCache.push(updatedInfo);
+    
+    // Add to pending updates
+    pendingUpdates.set(remId, updatedInfo);
+    
+    // Clear existing timer
+    if (cacheUpdateTimer) {
+      clearTimeout(cacheUpdateTimer);
     }
-
-    // DEBUG LOG: Show the final state of the cache before it's saved.
-    console.log('CACHE-UPDATE: Saving new cache to session storage.', newCache);
-    await plugin.storage.setSession(allCardPriorityInfoKey, newCache);
-
+    
+    // Batch updates - flush after 200ms of no new updates
+    cacheUpdateTimer = setTimeout(async () => {
+      await flushCacheUpdates(plugin);
+      cacheUpdateTimer = null;
+    }, 200);
+    
   } catch(e) {
     console.error("Error updating card priority cache for Rem:", remId, e);
   }
+}
+
+// Force immediate flush (call this on queue exit)
+export async function flushCacheUpdatesNow(plugin: RNPlugin) {
+  if (cacheUpdateTimer) {
+    clearTimeout(cacheUpdateTimer);
+    cacheUpdateTimer = null;
+  }
+  await flushCacheUpdates(plugin);
 }

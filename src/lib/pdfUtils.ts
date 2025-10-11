@@ -5,7 +5,7 @@ import { powerupCode, allIncrementalRemKey } from './consts';
 /**
  * Safely convert rem text to string, handling all edge cases
  */
-const safeRemTextToString = async (
+export const safeRemTextToString = async (
   plugin: RNPlugin, 
   remText: any
 ): Promise<string> => {

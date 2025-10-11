@@ -18,6 +18,7 @@ import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { percentileToHslColor } from '../lib/color';
 import { remToActionItemType } from '../lib/actionItems';
+import { safeRemTextToString } from '../lib/pdfUtils';
 import dayjs from 'dayjs';
 
 // Types for our operations
@@ -116,7 +117,7 @@ useEffect(() => {
       }
       
       console.log('✅ BatchPriority: Found focused rem:', focusedRem._id);
-      const focusedRemText = focusedRem.text ? await plugin.richText.toString(focusedRem.text) : 'Untitled';
+      const focusedRemText = focusedRem.text ? await safeRemTextToString(plugin, focusedRem.text) : 'Untitled';
       console.log('   - Rem text:', focusedRemText);
 
       // Get all descendants of the focused rem first
@@ -142,7 +143,7 @@ useEffect(() => {
             
             const incInfo = await getIncrementalRemInfo(plugin, rem);
             if (incInfo) {
-              const remText = rem.text ? await plugin.richText.toString(rem.text) : 'Untitled';
+              const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled';
               console.log(`     - Name: ${remText}, Priority: ${incInfo.priority}`);
               
               // Calculate depth and path for hierarchy display
@@ -1148,13 +1149,13 @@ async function getRemPathWithIds(plugin: RNPlugin, rem: Rem, stopAtId: string): 
   
   // If this IS the focused rem, just return its own info
   if (current._id === stopAtId) {
-    const text = current.text ? await plugin.richText.toString(current.text) : 'Untitled';
+    const text = current.text ? await safeRemTextToString(plugin, current.text) : 'Untitled';
     return { path: [text], pathIds: [current._id] };
   }
   
   // Build path from current up to (but not including) the focused rem
   while (current) {
-    const text = current.text ? await plugin.richText.toString(current.text) : 'Untitled';
+    const text = current.text ? await safeRemTextToString(plugin, current.text) : 'Untitled';
     path.unshift(text);
     pathIds.unshift(current._id);
     

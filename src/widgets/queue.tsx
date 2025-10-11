@@ -22,35 +22,55 @@ import {
 } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/currentRem';
 
+console.log('QUEUE.TSX FILE LOADED');
+
 export function QueueComponent() {
   const plugin = usePlugin();
 
+  console.log('🎬 QueueComponent RENDER START');
+
   const ctx = useRunAsync(
-    async () => await plugin.widget.getWidgetContext<WidgetLocation.Flashcard>(),
+    async () => {
+      console.log('🎬 ctx: Getting widget context...');
+      const context = await plugin.widget.getWidgetContext<WidgetLocation.Flashcard>();
+      console.log('🎬 ctx: Got context:', context);
+      return context;
+    },
     []
   );
 
+  console.log('🎬 QueueComponent ctx value:', ctx);
+
+  // MOVE ALL HOOKS HERE - BEFORE ANY RETURNS
   const remAndType = useTrackerPlugin(
     async (rp) => {
-      if (!ctx?.remId) return undefined;
-      const rem = await rp.rem.findOne(ctx.remId);
-      if (!rem) return null;
+      // Add guard INSIDE the hook
+      if (!ctx?.remId) {
+        console.log('⛔ useTrackerPlugin: No ctx.remId yet');
+        return undefined;
+      }
       
-      // Call only once per rem change
+      console.log('🔄 useTrackerPlugin RUNNING for remId:', ctx.remId);
+      const rem = await rp.rem.findOne(ctx.remId);
+      if (!rem) {
+        console.log('⛔ useTrackerPlugin: Rem not found');
+        return null;
+      }
+      
+      console.log('🔄 useTrackerPlugin: Calling remToActionItemType');
       const result = await remToActionItemType(rp, rem);
-      console.log('✅ remToActionItemType result:', result?.type);
+      console.log('✅ useTrackerPlugin result:', result?.type);
       return result;
     },
     [ctx?.remId]
   );
 
-  // Add a ref to prevent duplicate calls
   const lastProcessedRemId = useRef<string | null>(null);
-
+  
   useEffect(() => {
     if (ctx?.remId && ctx.remId !== lastProcessedRemId.current) {
       lastProcessedRemId.current = ctx.remId;
-      console.log('📍 Processing new rem in queue:', ctx.remId);
+      console.log('🔄 Processing new rem in queue:', ctx.remId);
     }
   }, [ctx?.remId]);
 
@@ -106,9 +126,24 @@ export function QueueComponent() {
     };
   }, [remAndType?.type, shouldRenderEditorForRemType, plugin]);
   
+  // AFTER ALL HOOKS, NOW you can return early
+  if (!ctx?.remId) {
+    console.log('⛔ QueueComponent: No ctx.remId, returning null');
+    return null;
+  }
+
+  console.log('🎬 QueueComponent: ctx.remId exists:', ctx.remId);
+
+
   if (remAndType?.type === 'rem' && !shouldRenderEditorForRemType) {
     return null;
   }
+
+  console.log('🎬 QueueComponent FINAL RENDER:', {
+    remId: ctx?.remId,
+    type: remAndType?.type,
+    willRender: remAndType ? 'YES' : 'NO'
+  });
 
   return (
     <div className="incremental-everything-element" style={{ height: '100%' }}>
