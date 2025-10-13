@@ -53,6 +53,7 @@ import {
   noIncRemMenuItemId,
   noIncRemTimerWidgetId,
   currentIncRemKey,
+  queueSessionCacheKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -70,20 +71,12 @@ import {
   getCardPriority, 
   getDueCardsWithPriorities, 
   CardPriorityInfo,
-  setCardPriority
+  setCardPriority,
+  calculateRelativeCardPriority,
+  QueueSessionCache
 } from '../lib/cardPriority';
 import { updateCardPriorityInCache, flushCacheUpdatesNow } from '../lib/cache';
 dayjs.extend(relativeTime);
-
-// Helper function needed for history saving
-function calculateRelativeCardPriority(allItems: CardPriorityInfo[], currentRemId: RemId): number | null {
-  if (!allItems || allItems.length === 0) return null;
-  const sortedItems = _.sortBy(allItems, (x) => x.priority);
-  const index = sortedItems.findIndex((x) => x.remId === currentRemId);
-  if (index === -1) return null;
-  return Math.round(((index + 1) / sortedItems.length) * 100);
-}
-
 
 // CLEANUP FUNCTION - Removes all CardPriority tags and data
 async function removeAllCardPriorityTags(plugin: RNPlugin) {
@@ -914,17 +907,74 @@ async function onActivate(plugin: ReactRNPlugin) {
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
     await plugin.storage.setSession(currentSubQueueIdKey, null);
+    await plugin.storage.setSession(queueSessionCacheKey, null);
     console.log('Session state reset complete');
   });
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
+    console.log('QUEUE ENTER: Starting session pre-calculation for subQueueId:', subQueueId);
+
+    // 1. Reset all session-specific state for a clean start.
     await plugin.storage.setSession(seenRemInSessionKey, []);
     await plugin.storage.setSession(seenCardInSessionKey, []);
     sessionItemCounter = 0;
-    await plugin.storage.setSession(currentScopeRemIdsKey, null);
-    // Store the current subQueueId
+    await plugin.storage.setSession(currentScopeRemIdsKey, null); // Still useful for other parts of the plugin
     await plugin.storage.setSession(currentSubQueueIdKey, subQueueId || null);
-    console.log('QueueEnter - storing subQueueId:', subQueueId);
+
+    // 2. Get the main card priority cache, which is our source of all data.
+    const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
+
+    if (!allCardInfos || allCardInfos.length === 0) {
+      console.log('QUEUE ENTER: Main cache is empty, skipping pre-calculation.');
+      return;
+    }
+
+    // 3. Pre-calculate the list of all due cards in the entire KB.
+    const dueCardsInKB = allCardInfos.filter(info => info.dueCards > 0);
+
+    // 4. Initialize variables for the document-specific cache.
+    let docPercentiles: Record<RemId, number> = {};
+    let dueCardsInScope: CardPriorityInfo[] = [];
+
+    // 5. If we are in a document queue (subQueueId is not null), perform the heavy calculations.
+    if (subQueueId) {
+      console.log('QUEUE ENTER: Document queue detected. Starting document-scope calculations...');
+      // This is the one-time, slow operation to get all Rem IDs in the document.
+      const scopeRem = await plugin.rem.findOne(subQueueId);
+      if (scopeRem) {
+        const docDescendants = await scopeRem.getDescendants();
+        const docScopeRemIds = new Set([scopeRem._id, ...docDescendants.map(r => r._id)]);
+        
+        // Save the scope for other parts of the plugin that might need it.
+        await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(docScopeRemIds));
+
+        // a) Pre-calculate the list of due cards within this specific document.
+        dueCardsInScope = dueCardsInKB.filter(info => docScopeRemIds.has(info.remId));
+
+        // b) Pre-calculate the relative document percentile for every card in the scope.
+        const docCardInfos = allCardInfos.filter(info => docScopeRemIds.has(info.remId));
+        const sortedDocCards = _.sortBy(docCardInfos, (info) => info.priority);
+        const totalDocCards = sortedDocCards.length;
+        
+        sortedDocCards.forEach((info, index) => {
+          const percentile = totalDocCards > 0 ? Math.round(((index + 1) / totalDocCards) * 100) : 0;
+          docPercentiles[info.remId] = percentile;
+        });
+        
+        console.log(`QUEUE ENTER: Finished document-scope calculations. Found ${dueCardsInScope.length} due cards and calculated ${Object.keys(docPercentiles).length} percentiles.`);
+      }
+    }
+
+    // 6. Assemble the complete session cache object.
+    const sessionCache: QueueSessionCache = {
+      docPercentiles,
+      dueCardsInScope,
+      dueCardsInKB,
+    };
+
+    // 7. Save the newly created session cache.
+    await plugin.storage.setSession(queueSessionCacheKey, sessionCache);
+    console.log('QUEUE ENTER: Pre-calculation complete. Session cache has been saved.');
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
@@ -1104,62 +1154,52 @@ async function onActivate(plugin: ReactRNPlugin) {
           numCardsRemaining: queueInfo.numCardsRemaining,
           filteredLength: filtered.length,
           allIncrementalRemLength: allIncrementalRem.length
-        });
+       });
 
-        // do n random swaps
+        // 1. FIRST, check if there are any valid rems to show.
+        if (filtered.length === 0) {
+          console.log('⚠️ FILTERED LENGTH IS 0 - Returning null, will show a flashcard.');
+          await plugin.app.registerCSS(queueLayoutFixId, '');
+          // We still increment the counter so the next attempt isn't immediate.
+          sessionItemCounter++; 
+          return null;
+        }
+
+        // 2. SECOND, if we have items, THEN perform the random swaps.
         const sortingRandomness = await getSortingRandomness(plugin);
-        const num_random_swaps = sortingRandomness * allIncrementalRem.length;
+        const num_random_swaps = sortingRandomness * filtered.length; // Use filtered.length
         for (let i = 0; i < num_random_swaps; i++) {
           const idx1 = Math.floor(Math.random() * filtered.length);
           const idx2 = Math.floor(Math.random() * filtered.length);
-          const temp = filtered[idx1];
-          filtered[idx1] = filtered[idx2];
-          filtered[idx2] = temp;
+          // Simple swap
+          [filtered[idx1], filtered[idx2]] = [filtered[idx2], filtered[idx1]];
         }
 
-        if (filtered.length === 0) {
-          console.log('⚠️ FILTERED LENGTH IS 0 - Returning null for flashcard');
-          await plugin.app.registerCSS(queueLayoutFixId, '');
-          return null;
-        } else {
-          console.log('✅ Filtered has items, selecting first IncRem');
-          // make sure we don't show a rem that has been deleted
-          let first = filtered[0];
-          while (!(await getIncrementalRemInfo(plugin, await plugin.rem.findOne(first.remId)))) {
+        // 3. THIRD, now that we know the array is not empty, safely select the first item.
+        console.log('✅ Filtered has items, selecting first IncRem');
+        let first = filtered[0];
+
+        // 4. FINALLY, verify the rem still exists before returning it.
+        // This while-loop is a safeguard against deleted rems.
+        while (!(await getIncrementalRemInfo(plugin, await plugin.rem.findOne(first.remId)))) {
             filtered.shift();
             if (filtered.length === 0) {
-              console.log('❌ All filtered items were invalid - Returning null');
-              return null;
-            } else {
-              first = filtered[0];
-            }
-          }
-          await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
-          await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
+            console.log('❌ All filtered items were invalid after verification - Returning null');
+            return null;
+        }
+          first = filtered[0];
+        }
+        await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
+        await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
 
-          // ADD THIS VERIFICATION:
-          const remToShow = await plugin.rem.findOne(first.remId);
-          const hasPowerup = remToShow ? await remToShow.hasPowerup(powerupCode) : false;
-          console.log('🔍 FINAL VERIFICATION before return:', {
-            remId: first.remId,
-            remExists: !!remToShow,
-            hasPowerup: hasPowerup,
-            powerupCode: powerupCode,
-            returnObject: {
-              type: QueueItemType.Plugin,
-              remId: first.remId,
-              pluginId: 'incremental-everything'
-            }
-          });
-
-          console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
-          sessionItemCounter++;
-          return {
+        console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
+        sessionItemCounter++;
+        return {
             type: QueueItemType.Plugin,
             remId: first.remId,
             pluginId: 'incremental-everything',
-          };
-        }
+        };
+      
       } else {
         // CONDITION IS FALSE - SHOWING FLASHCARD
         console.log('🎴 FLASHCARD TURN:', {

@@ -57,3 +57,4 @@ export const noIncRemMenuItemId = 'no-inc-rem-15-min';
 export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
+export const queueSessionCacheKey = 'queueSessionCache';

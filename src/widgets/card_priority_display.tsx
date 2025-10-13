@@ -2,13 +2,17 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  Rem,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useMemo } from 'react';
-import { powerupCode, seenCardInSessionKey, allCardPriorityInfoKey } from '../lib/consts';
-import { CardPriorityInfo } from '../lib/cardPriority';
-import { calculateCardPriorityShield } from '../lib/priority_shield';
+import React, { useMemo } from 'react';
+import { 
+  powerupCode, 
+  seenCardInSessionKey, 
+  allCardPriorityInfoKey,
+  queueSessionCacheKey
+} from '../lib/consts';
+import { CardPriorityInfo, QueueSessionCache } from '../lib/cardPriority';
 import { percentileToHslColor } from '../lib/color';
+import * as _ from 'remeda';
 
 export function CardPriorityDisplay() {
   const plugin = usePlugin();
@@ -22,13 +26,19 @@ export function CardPriorityDisplay() {
     return rem ? await rem.hasPowerup(powerupCode) : false;
   }, [rem]);
 
-  // 1. Fetch the entire enriched cache. This is a single, fast read from session storage.
+  // --- NEW: Fetch our ultra-fast session cache ---
+  const sessionCache = useTrackerPlugin(
+    (rp) => rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey),
+    []
+  );
+
+  // We still need the main cache to find the info for the *current* card.
   const allPrioritizedCardInfo = useTrackerPlugin(
     (rp) => rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
     []
   );
 
-  // 2. Derive the specific card's info from the cache using useMemo. This is an instant, in-memory lookup.
+  // This lookup remains the same and is very fast.
   const cardInfo = useMemo(() => {
     if (!rem || isIncRem || !allPrioritizedCardInfo) {
       return null;
@@ -36,32 +46,56 @@ export function CardPriorityDisplay() {
     return allPrioritizedCardInfo.find(info => info.remId === rem._id);
   }, [rem, isIncRem, allPrioritizedCardInfo]);
   
-  // 3. The shield calculation uses the cache and is fast, as we will only display the KB part.
-  const shieldStatus = useTrackerPlugin(async (rp) => {
-    if (!rem || isIncRem || !allPrioritizedCardInfo) return null;
-    return await calculateCardPriorityShield(rp, allPrioritizedCardInfo, rem._id);
-  }, [rem, isIncRem, allPrioritizedCardInfo]);
+   // --- MOVED THIS HOOK TO THE TOP LEVEL ---
+  const docPercentile = useMemo(() => {
+    if (!rem || !sessionCache?.docPercentiles) return null;
+    // Simple, instant lookup from the pre-calculated map.
+    return sessionCache.docPercentiles[rem._id];
+  }, [rem, sessionCache]);
 
-  useEffect(() => {
-    if (rem && !isIncRem) {
-      const updateSeen = async () => {
-        const seen = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
-        if (!seen.includes(rem._id)) {
-          await plugin.storage.setSession(seenCardInSessionKey, [...seen, rem._id]);
-        }
-      };
-      updateSeen();
-    }
-  }, [rem?._id, isIncRem, plugin]);
-  
-  if (!rem || isIncRem || !cardInfo || !allPrioritizedCardInfo) {
+  // --- REWRITTEN: The Shield calculation is now ultra-fast ---
+  // It reads from the small, pre-filtered lists in our new session cache.
+   const shieldStatus = useTrackerPlugin(async (rp) => { // Added 'async'
+    if (!rem || !sessionCache) return null;
+
+    // Get the list of cards seen in this session, now with 'await'.
+    const seenRemIds = (await rp.storage.getSession<string[]>(seenCardInSessionKey)) || []; // Added 'await'
+
+    // --- KB Shield Calculation (fast) ---
+    // Filter the small `dueCardsInKB` list, not the whole main cache.
+    const unreviewedDueKb = sessionCache.dueCardsInKB.filter(
+      (info) => !seenRemIds.includes(info.remId) || info.remId === rem._id
+    );
+    const topMissedInKb = _.minBy(unreviewedDueKb, (info) => info.priority);
+    
+    // --- Document Shield Calculation (fast) ---
+    // Filter the small `dueCardsInScope` list.
+    const unreviewedDueDoc = sessionCache.dueCardsInScope.filter(
+      (info) => !seenRemIds.includes(info.remId) || info.remId === rem._id
+    );
+    const topMissedInDoc = _.minBy(unreviewedDueDoc, (info) => info.priority);
+
+    return {
+      kb: topMissedInKb ? {
+        absolute: topMissedInKb.priority,
+        percentile: topMissedInKb.kbPercentile || 0,
+      } : null,
+      doc: topMissedInDoc && sessionCache.docPercentiles[topMissedInDoc.remId] !== undefined ? {
+        absolute: topMissedInDoc.priority,
+        percentile: sessionCache.docPercentiles[topMissedInDoc.remId]
+      } : null,
+    };
+  }, [rem, sessionCache]); // Depends on the rem and the new cache
+
+  if (!rem || isIncRem || !cardInfo) {
     return null;
   }
 
-  // 4. SIMPLIFIED: Directly read the pre-calculated percentile from the card's info object.
+  // KB percentile is read directly from the main cache, which is already fast.
   const kbPercentile = cardInfo.kbPercentile;
-  
   const priorityColor = (kbPercentile !== undefined) ? percentileToHslColor(kbPercentile) : '#6b7280';
+
+  // ... (style objects remain the same) ...
 
   const infoBarStyle: React.CSSProperties = {
     display: 'flex',
@@ -95,21 +129,25 @@ export function CardPriorityDisplay() {
         <span style={{ fontWeight: 500 }}>🎴 Priority:</span>
         <div style={priorityBadgeStyle}>
           <span>{cardInfo.priority}</span>
+          {/* --- RESTORED: Document percentile display --- */}
           {kbPercentile !== undefined && (
             <span style={{ opacity: 0.9, fontSize: '11px' }}>
-              ({kbPercentile}% of KB)
+              ({kbPercentile}% KB
+              {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
             </span>
           )}
         </div>
       </div>
       
-      {shieldStatus?.kb && (
+      {/* --- RESTORED: Document Shield display --- */}
+      {(shieldStatus?.kb || shieldStatus?.doc) && (
         <>
           <span style={{ color: '#9ca3af' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontWeight: 600 }}>🛡️ Card Shield</span>
             <div style={{ display: 'flex', gap: '12px' }}>
-              <span>KB: <strong>{shieldStatus.kb.absolute}</strong> ({shieldStatus.kb.percentile}%)</span>
+              {shieldStatus.kb && <span>KB: <strong>{shieldStatus.kb.absolute}</strong> ({shieldStatus.kb.percentile}%)</span>}
+              {shieldStatus.doc && <span>Doc: <strong>{shieldStatus.doc.absolute}</strong> ({shieldStatus.doc.percentile}%)</span>}
             </div>
           </div>
         </>

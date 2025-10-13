@@ -1,4 +1,4 @@
-import { Rem, RNPlugin } from '@remnote/plugin-sdk';
+import { Rem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './types';
 import { getIncrementalRemInfo } from './incremental_rem';
 import * as _ from 'remeda';
@@ -18,6 +18,29 @@ export interface CardPriorityInfo {
   cardCount: number;
   dueCards: number;
   kbPercentile?: number; // Add this new optional property
+}
+
+export interface QueueSessionCache {
+  /**
+   * A map of RemID -> document-level percentile.
+   * Pre-calculated for every card in the current document scope.
+   * Allows for an instant lookup of the "X% of Doc" value.
+   */
+  docPercentiles: Record<RemId, number>;
+
+  /**
+   * A pre-filtered list of all due cards that are part of the current document/folder.
+   * Used for the fast Document Shield calculation.
+   */
+  dueCardsInScope: CardPriorityInfo[];
+
+  /**
+   * A pre-filtered list of all due cards from the entire Knowledge Base.
+   * Used for the fast KB Shield calculation.
+   */
+  dueCardsInKB: CardPriorityInfo[];
+
+  
 }
 
 
@@ -106,16 +129,26 @@ export async function getCardPriority(
   };
 }
 
-export function calculateRelativeCardPriority(allItems: CardPriorityInfo[], currentRemId: RemId): number | null {
-  if (!allItems || !currentRemId || allItems.length === 0) {
+export function calculateRelativeCardPriority(allItems: CardPriority.tsInfo[], currentRemId: RemId): number | null {
+  if (!allItems || !currentRemId) {
     return null;
   }
-  // Use spread operator to avoid mutating the original cache array during sort
-  const sortedItems = [...allItems].sort((a, b) => a.priority - b.priority);
+
+  // A more robust filter to ensure every item is a valid object with a remId.
+  // This is the definitive fix for the "cannot read properties of undefined" error.
+  const validItems = allItems.filter(item => item && typeof item === 'object' && item.remId);
+
+  if (validItems.length === 0) {
+    return null;
+  }
+
+  const sortedItems = [...validItems].sort((a, b) => a.priority - b.priority);
   const index = sortedItems.findIndex((x) => x.remId === currentRemId);
+  
   if (index === -1) {
     return null;
   }
+  
   const percentile = ((index + 1) / sortedItems.length) * 100;
   return Math.round(percentile * 10) / 10;
 }
