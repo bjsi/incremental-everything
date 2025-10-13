@@ -2,14 +2,12 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  WidgetLocation,
   Rem,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useMemo } from 'react'; // Import useMemo
-import { powerupCode, seenCardInSessionKey, currentSubQueueIdKey, allCardPriorityInfoKey } from '../lib/consts';
-import { CardPriorityInfo, calculateRelativeCardPriority } from '../lib/cardPriority'; // getCardPriority is no longer needed here
+import React, { useEffect, useMemo } from 'react';
+import { powerupCode, seenCardInSessionKey, allCardPriorityInfoKey } from '../lib/consts';
+import { CardPriorityInfo } from '../lib/cardPriority';
 import { calculateCardPriorityShield } from '../lib/priority_shield';
-import * as _ from 'remeda';
 import { percentileToHslColor } from '../lib/color';
 
 export function CardPriorityDisplay() {
@@ -24,16 +22,13 @@ export function CardPriorityDisplay() {
     return rem ? await rem.hasPowerup(powerupCode) : false;
   }, [rem]);
 
-  // --- OPTIMIZED LOGIC ---
-
-  // 1. Fetch the entire cache. This is a SINGLE, FAST read from session storage.
+  // 1. Fetch the entire enriched cache. This is a single, fast read from session storage.
   const allPrioritizedCardInfo = useTrackerPlugin(
     (rp) => rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
     []
   );
 
-  // 2. Derive the specific card's info from the cache using useMemo.
-  // This is a lightning-fast, in-memory JavaScript operation. NO API calls.
+  // 2. Derive the specific card's info from the cache using useMemo. This is an instant, in-memory lookup.
   const cardInfo = useMemo(() => {
     if (!rem || isIncRem || !allPrioritizedCardInfo) {
       return null;
@@ -41,7 +36,7 @@ export function CardPriorityDisplay() {
     return allPrioritizedCardInfo.find(info => info.remId === rem._id);
   }, [rem, isIncRem, allPrioritizedCardInfo]);
   
-  // 3. The shield calculation remains the same, as it already correctly uses the full cache.
+  // 3. The shield calculation uses the cache and is fast, as we will only display the KB part.
   const shieldStatus = useTrackerPlugin(async (rp) => {
     if (!rem || isIncRem || !allPrioritizedCardInfo) return null;
     return await calculateCardPriorityShield(rp, allPrioritizedCardInfo, rem._id);
@@ -59,14 +54,14 @@ export function CardPriorityDisplay() {
     }
   }, [rem?._id, isIncRem, plugin]);
   
-  // The default return case now also checks for cardInfo
   if (!rem || isIncRem || !cardInfo || !allPrioritizedCardInfo) {
     return null;
   }
 
-  // The rest of your component's JSX remains exactly the same...
-  const kbPercentile = calculateRelativeCardPriority(allPrioritizedCardInfo, rem._id);
-  const priorityColor = kbPercentile ? percentileToHslColor(kbPercentile) : '#6b7280';
+  // 4. SIMPLIFIED: Directly read the pre-calculated percentile from the card's info object.
+  const kbPercentile = cardInfo.kbPercentile;
+  
+  const priorityColor = (kbPercentile !== undefined) ? percentileToHslColor(kbPercentile) : '#6b7280';
 
   const infoBarStyle: React.CSSProperties = {
     display: 'flex',
@@ -100,8 +95,7 @@ export function CardPriorityDisplay() {
         <span style={{ fontWeight: 500 }}>🎴 Priority:</span>
         <div style={priorityBadgeStyle}>
           <span>{cardInfo.priority}</span>
-          {/* MODIFIED: The display no longer shows document percentile */}
-          {kbPercentile !== null && (
+          {kbPercentile !== undefined && (
             <span style={{ opacity: 0.9, fontSize: '11px' }}>
               ({kbPercentile}% of KB)
             </span>
@@ -109,16 +103,13 @@ export function CardPriorityDisplay() {
         </div>
       </div>
       
-      {shieldStatus && (
+      {shieldStatus?.kb && (
         <>
           <span style={{ color: '#9ca3af' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontWeight: 600 }}>🛡️ Card Shield</span>
             <div style={{ display: 'flex', gap: '12px' }}>
-              {/* MODIFIED: Only the KB shield status is shown */}
-              {shieldStatus.kb ? (
-                <span>KB: <strong>{shieldStatus.kb.absolute}</strong> ({shieldStatus.kb.percentile}%)</span>
-              ) : <span>KB: 100%</span>}
+              <span>KB: <strong>{shieldStatus.kb.absolute}</strong> ({shieldStatus.kb.percentile}%)</span>
             </div>
           </div>
         </>

@@ -17,6 +17,7 @@ export interface CardPriorityInfo {
   lastUpdated: number;
   cardCount: number;
   dueCards: number;
+  kbPercentile?: number; // Add this new optional property
 }
 
 

@@ -1,64 +1,69 @@
+// in lib/cache.ts
+
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { allCardPriorityInfoKey, incrementalQueueActiveKey } from './consts';
+import { allCardPriorityInfoKey } from './consts';
 import { CardPriorityInfo, getCardPriority } from './cardPriority';
+import * as _ from 'remeda';
 
-// Debounce mechanism to batch cache writes
 let cacheUpdateTimer: NodeJS.Timeout | null = null;
-let pendingUpdates = new Map<RemId, CardPriorityInfo | null>();
+let pendingUpdates = new Map<RemId, { info: CardPriorityInfo | null; isLight: boolean }>();
 
-async function flushCacheUpdates(plugin: RNPlugin) {
+async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   if (pendingUpdates.size === 0) return;
   
-  console.log(`CACHE-FLUSH: Writing ${pendingUpdates.size} batched updates to cache`);
+  // Check if any of the pending updates requires a heavy recalculation.
+  const needsHeavyRecalc = forceHeavyRecalc || Array.from(pendingUpdates.values()).some(update => !update.isLight);
+
+  console.log(`CACHE-FLUSH: Writing ${pendingUpdates.size} batched updates. Heavy Recalc: ${needsHeavyRecalc}`);
   
   const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
   
-  // Apply all pending updates efficiently
-  for (const [remId, updatedInfo] of pendingUpdates.entries()) {
+  for (const [remId, update] of pendingUpdates.entries()) {
     const index = cache.findIndex(info => info.remId === remId);
-    
     if (index > -1) {
-      if (updatedInfo) {
-        // Update in place - NO COPY
-        cache[index] = updatedInfo;
+      if (update.info) {
+        // For a light update, we must preserve the old percentile
+        const oldPercentile = cache[index].kbPercentile;
+        cache[index] = { ...update.info, kbPercentile: oldPercentile };
       } else {
-        // Remove from cache
         cache.splice(index, 1);
       }
-    } else if (updatedInfo) {
-      // Add new item
-      cache.push(updatedInfo);
+    } else if (update.info) {
+      cache.push(update.info);
     }
   }
   
-  // Single write for all updates
-  await plugin.storage.setSession(allCardPriorityInfoKey, cache);
-  console.log(`CACHE-FLUSH: Complete. Cache size: ${cache.length}`);
+  if (needsHeavyRecalc) {
+    console.log(`CACHE-FLUSH: Re-calculating percentiles for ${cache.length} items...`);
+    const sortedCache = _.sortBy(cache, (info) => info.priority);
+    const totalItems = sortedCache.length;
+    const enrichedCache = sortedCache.map((info, index) => {
+      const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+      return { ...info, kbPercentile: percentile };
+    });
+    await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
+    console.log(`CACHE-FLUSH: Complete. Enriched cache size: ${enrichedCache.length}`);
+  } else {
+    // For a light update, just save the modified cache without re-sorting.
+    await plugin.storage.setSession(allCardPriorityInfoKey, cache);
+    console.log(`CACHE-FLUSH: Light update complete. Cache size: ${cache.length}`);
+  }
   
-  // Clear pending updates
   pendingUpdates.clear();
 }
 
-export async function updateCardPriorityInCache(plugin: RNPlugin, remId: RemId) {
+// Add a new 'isLightUpdate' parameter
+export async function updateCardPriorityInCache(plugin: RNPlugin, remId: RemId, isLightUpdate = false) {
   try {
-    console.log(`CACHE-UPDATE: Queuing update for RemId: ${remId}`);
+    console.log(`CACHE-UPDATE: Queuing ${isLightUpdate ? 'light' : 'heavy'} update for RemId: ${remId}`);
     
     const rem = await plugin.rem.findOne(remId);
-    if (!rem) {
-      return;
-    }
+    const updatedInfo = rem ? await getCardPriority(plugin, rem) : null;
     
-    const updatedInfo = await getCardPriority(plugin, rem);
+    pendingUpdates.set(remId, { info: updatedInfo, isLight: isLightUpdate });
     
-    // Add to pending updates
-    pendingUpdates.set(remId, updatedInfo);
+    if (cacheUpdateTimer) clearTimeout(cacheUpdateTimer);
     
-    // Clear existing timer
-    if (cacheUpdateTimer) {
-      clearTimeout(cacheUpdateTimer);
-    }
-    
-    // Batch updates - flush after 200ms of no new updates
     cacheUpdateTimer = setTimeout(async () => {
       await flushCacheUpdates(plugin);
       cacheUpdateTimer = null;
@@ -69,11 +74,11 @@ export async function updateCardPriorityInCache(plugin: RNPlugin, remId: RemId) 
   }
 }
 
-// Force immediate flush (call this on queue exit)
 export async function flushCacheUpdatesNow(plugin: RNPlugin) {
   if (cacheUpdateTimer) {
     clearTimeout(cacheUpdateTimer);
     cacheUpdateTimer = null;
   }
-  await flushCacheUpdates(plugin);
+  // Force a heavy recalculation when flushing manually
+  await flushCacheUpdates(plugin, true);
 }

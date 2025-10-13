@@ -363,21 +363,28 @@ async function cacheAllCardPriorities(plugin: RNPlugin) {
       }
     }));
   }
+
+  // --- PERCENTILE CALCULATION LOGIC ---
+  console.log(`CACHE: Found ${taggedPriorities.length} tagged entries. Calculating percentiles...`);
+  const sortedInfos = _.sortBy(taggedPriorities, (info) => info.priority);
+  const totalItems = sortedInfos.length;
+  const enrichedTaggedPriorities = sortedInfos.map((info, index) => {
+    const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+    return { ...info, kbPercentile: percentile };
+  });
   
   // Set the initial cache with tagged cards (instant availability)
-  await plugin.storage.setSession(allCardPriorityInfoKey, taggedPriorities);
+  await plugin.storage.setSession(allCardPriorityInfoKey, enrichedTaggedPriorities);
   
   const phase1Time = Math.round((Date.now() - startTime) / 1000);
-  console.log(`CACHE: Phase 1 complete. Loaded ${taggedPriorities.length} tagged cards in ${phase1Time}s`);
+  console.log(`CACHE: Phase 1 complete. Loaded and enriched ${enrichedTaggedPriorities.length} tagged cards in ${phase1Time}s`);
   console.log(`CACHE: Found ${untaggedRemIds.length} untagged cards for deferred processing`);
   
-  if (taggedPriorities.length > 0) {
-    await plugin.app.toast(`✅ Loaded ${taggedPriorities.length} card priorities instantly`);
+  if (enrichedTaggedPriorities.length > 0) {
+    await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} card priorities instantly`);
   }
   
-  // Step 2: Process untagged cards in the background (deferred)
   if (untaggedRemIds.length > 0) {
-    // Show warning if many cards are untagged
     const untaggedPercentage = Math.round((untaggedRemIds.length / uniqueRemIds.length) * 100);
     if (untaggedPercentage > 20) {
       await plugin.app.toast(
@@ -386,7 +393,6 @@ async function cacheAllCardPriorities(plugin: RNPlugin) {
       );
     }
     
-    // Start deferred processing after 3 seconds
     setTimeout(async () => {
       await processDeferredCards(plugin, untaggedRemIds);
     }, 3000);
@@ -439,8 +445,17 @@ async function processDeferredCards(plugin: RNPlugin, untaggedRemIds: string[]) 
       // Update the cache incrementally
       if (newPriorities.length > 0) {
         const currentCache = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
-        const updatedCache = [...currentCache, ...newPriorities];
-        await plugin.storage.setSession(allCardPriorityInfoKey, updatedCache);
+        const mergedCache = [...currentCache, ...newPriorities];
+
+        // --- NEW: Re-calculate all percentiles for the updated cache ---
+        const sortedMergedCache = _.sortBy(mergedCache, (info) => info.priority);
+        const totalItems = sortedMergedCache.length;
+        const enrichedCache = sortedMergedCache.map((info, index) => {
+            const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+            return { ...info, kbPercentile: percentile };
+        });
+        
+        await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
       }
       
       // Progress logging every 20% or 500 cards
@@ -484,43 +499,63 @@ async function processDeferredCards(plugin: RNPlugin, untaggedRemIds: string[]) 
 }
 
 // OPTIMIZED CACHE BUILDER - Uses pre-tagged priorities for fast loading
+// in index.tsx
+
 async function buildOptimizedCache(plugin: RNPlugin) {
   console.log('CACHE: Building optimized cache from pre-tagged priorities...');
-  
+
   const allCards = await plugin.card.getAll();
   if (!allCards || allCards.length === 0) {
     console.log('CACHE: No cards found. Setting empty cache.');
     await plugin.storage.setSession(allCardPriorityInfoKey, []);
     return;
   }
-  
+
   const uniqueRemIds = _.uniq(allCards.map(c => c.remId));
   const cardPriorityInfos: CardPriorityInfo[] = [];
   const batchSize = 100;
-  
+
   for (let i = 0; i < uniqueRemIds.length; i += batchSize) {
     const batch = uniqueRemIds.slice(i, i + batchSize);
-    
+
     const batchResults = await Promise.all(batch.map(async (remId) => {
       const rem = await plugin.rem.findOne(remId);
       if (!rem) return null;
-      
-      // This is now FAST because we're just reading the powerup property
-      // No ancestor chain traversal needed!
+
+      // This is fast because it's just reading the powerup property
       const cardInfo = await getCardPriority(plugin, rem);
       return cardInfo;
     }));
-    
-    cardPriorityInfos.push(...batchResults.filter(info => info !== null));
-    
+
+    cardPriorityInfos.push(...(batchResults.filter(info => info !== null) as CardPriorityInfo[]));
+
     // Log progress for large collections
     if (i % 1000 === 0) {
       console.log(`CACHE: Processed ${i}/${uniqueRemIds.length} rems...`);
     }
   }
-  
-  console.log(`CACHE: Successfully built cache with ${cardPriorityInfos.length} entries`);
-  await plugin.storage.setSession(allCardPriorityInfoKey, cardPriorityInfos);
+
+  // --- NEW PERCENTILE CALCULATION LOGIC ---
+  console.log(`CACHE: Found ${cardPriorityInfos.length} raw entries. Calculating percentiles...`);
+
+  // 1. Sort the entire list by priority just once.
+  const sortedInfos = _.sortBy(cardPriorityInfos, (info) => info.priority);
+
+  // 2. Map over the sorted list to calculate and add the percentile to each object.
+  const totalItems = sortedInfos.length;
+  const enrichedInfos = sortedInfos.map((info, index) => {
+    // Handle the case of an empty list to avoid division by zero.
+    const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+    return {
+      ...info,
+      kbPercentile: percentile,
+    };
+  });
+  // --- END NEW LOGIC ---
+
+  console.log(`CACHE: Successfully built and enriched cache with ${enrichedInfos.length} entries.`);
+  // Save the new, enriched data to the session
+  await plugin.storage.setSession(allCardPriorityInfoKey, enrichedInfos);
 }
 
 
@@ -1475,21 +1510,19 @@ async function onActivate(plugin: ReactRNPlugin) {
       console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
 
       if (remId) {
-        // Mark as recently processed to avoid duplicate work from GlobalRemChanged
         recentlyProcessedCards.add(remId);
-        
-        // Clear after 2 seconds (longer than debounce timer)
         setTimeout(() => recentlyProcessedCards.delete(remId), 2000);
 
-        console.log('LISTENER: Calling updateCardPriorityInCache to update due status...');
-        await updateCardPriorityInCache(plugin, remId);
+        // Call the cache update with the 'isLightUpdate' flag set to true.
+        console.log('LISTENER: Calling LIGHT updateCardPriorityInCache...');
+        await updateCardPriorityInCache(plugin, remId, true); // Pass true here
       } else {
         console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
       }
     }
   );
 
-    // Define a variable outside the listener to hold our timer.
+  // Define a variable outside the listener to hold our timer.
   let remChangeDebounceTimer: NodeJS.Timeout;
 
   plugin.event.addListener(
