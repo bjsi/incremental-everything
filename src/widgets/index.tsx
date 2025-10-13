@@ -1529,16 +1529,24 @@ async function onActivate(plugin: ReactRNPlugin) {
     AppEvents.GlobalRemChanged,
     undefined,
     (data) => {
-      // Every time a change happens (e.g., a keystroke), clear the previous timer.
+      // Every time a change happens, clear the previous timer.
       clearTimeout(remChangeDebounceTimer);
 
-      // Start a new timer. If another change happens within 500ms, this timer
-      // will be cleared and a new one will start.
+      // Start a new timer.
       remChangeDebounceTimer = setTimeout(async () => {
-        // This code will only run after the user has stopped typing for 500ms.
+        // This code will only run after the user has stopped typing for 1 second.
+        
+        // --- NEW LOGIC START ---
+        // Check if we are currently in a queue session.
+        const inQueue = !!(await plugin.storage.getSession(currentSubQueueIdKey));
+        if (inQueue) {
+          console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping processing because user is in the queue.');
+          return; // Exit early and do nothing
+        }
+        // --- NEW LOGIC END ---
+
         console.log(`LISTENER: (Debounced) GlobalRemChanged fired for RemId: ${data.remId}`);
               
-        // SKIP if recently processed by QueueCompleteCard
         if (recentlyProcessedCards.has(data.remId)) {
           console.log('LISTENER: Skipping - recently processed by QueueCompleteCard');
           return;
@@ -1556,13 +1564,15 @@ async function onActivate(plugin: ReactRNPlugin) {
             await autoAssignCardPriority(plugin, rem);
           }
         }
-
+        
+        // The default here is a HEAVY update, which is now safe because we know we are NOT in the queue.
         await updateCardPriorityInCache(plugin, data.remId);
         console.log('LISTENER: (Debounced) Finished processing event.');
 
-      }, 1000); // 1000 milliseconds = one second
+      }, 1000);
     }
   );
+
 
   plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
     powerupFilter: powerupCode,
