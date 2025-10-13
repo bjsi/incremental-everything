@@ -1542,6 +1542,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   console.log('✅ Widget registered with powerupFilter:', powerupCode, 'queueItemTypeFilter:', QueueItemType.Plugin);
   
   plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
+    powerupFilter: powerupCode,
     dimensions: {
       width: '100%',
       height: 'auto',
@@ -1742,11 +1743,12 @@ async function onActivate(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerWidget('card_priority_display', WidgetLocation.FlashcardUnder, {
+    powerupFilter: 'cardPriority',
     dimensions: {
       width: '100%',
       height: 'auto',
     },
-    queueItemTypeFilter: QueueItemType.Flashcard, // ← ADD THIS LINE!
+    queueItemTypeFilter: QueueItemType.Flashcard,
   });
 
   plugin.app.registerWidget('video_debug', WidgetLocation.Popup, {

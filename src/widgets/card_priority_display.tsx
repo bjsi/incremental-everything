@@ -5,24 +5,15 @@ import {
   WidgetLocation,
   Rem,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react'; // Import useMemo
 import { powerupCode, seenCardInSessionKey, currentSubQueueIdKey, allCardPriorityInfoKey } from '../lib/consts';
-import { CardPriorityInfo, getCardPriority, calculateRelativeCardPriority } from '../lib/cardPriority';
+import { CardPriorityInfo, calculateRelativeCardPriority } from '../lib/cardPriority'; // getCardPriority is no longer needed here
 import { calculateCardPriorityShield } from '../lib/priority_shield';
 import * as _ from 'remeda';
 import { percentileToHslColor } from '../lib/color';
 
 export function CardPriorityDisplay() {
   const plugin = usePlugin();
-    
-  // ADD THIS SYNCHRONOUS CHECK FIRST - before any hooks!
-  const ctx = plugin.widget.getWidgetContext();
-  
-  // If this is a Plugin queue item (IncRem), don't render anything
-  // This check happens synchronously before any async operations
-  if (ctx?.queueItemType === QueueItemType.Plugin) {
-    return null;
-  }
 
   const rem = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext();
@@ -33,40 +24,28 @@ export function CardPriorityDisplay() {
     return rem ? await rem.hasPowerup(powerupCode) : false;
   }, [rem]);
 
-  // --- THIS IS THE NEW REACTIVE LOGIC ---
+  // --- OPTIMIZED LOGIC ---
 
-  // 1. Fetch the priority info for the CURRENT card directly.
-  // `useTrackerPlugin` will automatically re-run this when the card's
-  // priority property changes, making the widget reactive.
-  const cardInfo = useTrackerPlugin(async (rp) => {
-    if (!rem || isIncRem) return null;
-    return await getCardPriority(rp, rem);
-  }, [rem, isIncRem]);
-  
-  // 2. Fetch the full cache for context. This is still fast because it's
-  // just reading from session storage.
+  // 1. Fetch the entire cache. This is a SINGLE, FAST read from session storage.
   const allPrioritizedCardInfo = useTrackerPlugin(
     (rp) => rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
     []
   );
 
-  // 3. The shield calculation now uses the fresh `cardInfo` and the cached context.
+  // 2. Derive the specific card's info from the cache using useMemo.
+  // This is a lightning-fast, in-memory JavaScript operation. NO API calls.
+  const cardInfo = useMemo(() => {
+    if (!rem || isIncRem || !allPrioritizedCardInfo) {
+      return null;
+    }
+    return allPrioritizedCardInfo.find(info => info.remId === rem._id);
+  }, [rem, isIncRem, allPrioritizedCardInfo]);
+  
+  // 3. The shield calculation remains the same, as it already correctly uses the full cache.
   const shieldStatus = useTrackerPlugin(async (rp) => {
     if (!rem || isIncRem || !allPrioritizedCardInfo) return null;
     return await calculateCardPriorityShield(rp, allPrioritizedCardInfo, rem._id);
   }, [rem, isIncRem, allPrioritizedCardInfo]);
-  
-  // The rest of the component remains largely the same...
-  const docPrioritizedCardInfo = useTrackerPlugin(async (rp) => {
-    if (!rem || isIncRem || !allPrioritizedCardInfo) return null;
-    const subQueueId = await rp.storage.getSession<string | null>(currentSubQueueIdKey);
-    if (!subQueueId) return null;
-    const scopeRem = await rp.rem.findOne(subQueueId);
-    if (!scopeRem) return null;
-    const descendants = await scopeRem.getDescendants();
-    const scopeIds = [scopeRem._id, ...descendants.map(d => d._id)];
-    return allPrioritizedCardInfo.filter(c => scopeIds.includes(c.remId));
-  }, [allPrioritizedCardInfo, rem, isIncRem]);
 
   useEffect(() => {
     if (rem && !isIncRem) {
@@ -80,12 +59,13 @@ export function CardPriorityDisplay() {
     }
   }, [rem?._id, isIncRem, plugin]);
   
+  // The default return case now also checks for cardInfo
   if (!rem || isIncRem || !cardInfo || !allPrioritizedCardInfo) {
     return null;
   }
 
+  // The rest of your component's JSX remains exactly the same...
   const kbPercentile = calculateRelativeCardPriority(allPrioritizedCardInfo, rem._id);
-  const docPercentile = docPrioritizedCardInfo ? calculateRelativeCardPriority(docPrioritizedCardInfo, rem._id) : null;
   const priorityColor = kbPercentile ? percentileToHslColor(kbPercentile) : '#6b7280';
 
   const infoBarStyle: React.CSSProperties = {
@@ -120,9 +100,10 @@ export function CardPriorityDisplay() {
         <span style={{ fontWeight: 500 }}>🎴 Priority:</span>
         <div style={priorityBadgeStyle}>
           <span>{cardInfo.priority}</span>
+          {/* MODIFIED: The display no longer shows document percentile */}
           {kbPercentile !== null && (
             <span style={{ opacity: 0.9, fontSize: '11px' }}>
-              ({kbPercentile}% of KB{docPercentile !== null && `, ${docPercentile}% of Doc`})
+              ({kbPercentile}% of KB)
             </span>
           )}
         </div>
@@ -134,14 +115,10 @@ export function CardPriorityDisplay() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontWeight: 600 }}>🛡️ Card Shield</span>
             <div style={{ display: 'flex', gap: '12px' }}>
+              {/* MODIFIED: Only the KB shield status is shown */}
               {shieldStatus.kb ? (
                 <span>KB: <strong>{shieldStatus.kb.absolute}</strong> ({shieldStatus.kb.percentile}%)</span>
               ) : <span>KB: 100%</span>}
-              {docPrioritizedCardInfo && (
-                  shieldStatus.doc ? (
-                  <span>Doc: <strong>{shieldStatus.doc.absolute}</strong> ({shieldStatus.doc.percentile}%)</span>
-                ) : <span>Doc: 100%</span>
-              )}
             </div>
           </div>
         </>
