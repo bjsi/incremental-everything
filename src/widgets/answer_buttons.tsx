@@ -6,25 +6,25 @@ import {
   RNPlugin,
   Rem,
 } from '@remnote/plugin-sdk';
-import React from 'react';
+import React, { useEffect } from 'react';
+import * as _ from 'remeda';
 import { NextRepTime } from '../components/NextRepTime';
 import {
   allIncrementalRemKey,
   powerupCode,
   activeHighlightIdKey,
   currentIncrementalRemTypeKey,
-  currentScopeRemIdsKey,
   displayPriorityShieldId,
   seenRemInSessionKey,
   remnoteEnvironmentId,
+  queueSessionCacheKey
 } from '../lib/consts';
 import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
-import { calculatePriorityShield } from '../lib/priority_shield';
-import { addPageToHistory, findPDFinRem, getCurrentPageKey } from '../lib/pdfUtils'; // Import helpers
-
+import { findPDFinRem, addPageToHistory, getCurrentPageKey } from '../lib/pdfUtils';
+import { QueueSessionCache } from '../lib/cardPriority';
 const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined) => {
   if (!rem) return;
   const incRemInfo = await getIncrementalRemInfo(plugin, rem);
@@ -120,28 +120,108 @@ function Button({ children, onClick, variant = 'secondary', style, disabled }: B
 }
 
 export function AnswerButtons() {
+  console.log('🕹️ AnswerButtons: Render start.');
   const plugin = usePlugin();
+  
+  useEffect(() => {
+    console.log('🕹️ AnswerButtons: Component has mounted.');
+    return () => {
+      console.log('🕹️ AnswerButtons: Component is unmounting.');
+    }
+  }, []);
+
+  // --- DATA FETCHING HOOKS ---
   const ctx = useTrackerPlugin(
-    async (rp) => await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>(),
+    async (rp) => {
+      const context = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
+      console.log('🕹️ AnswerButtons: [DATA] Context object:', context);
+      return context;
+    },
     []
   );
 
-  const rem = useTrackerPlugin(
-    (rp) => rp.rem.findOne(ctx?.remId),
-    [ctx?.remId]
-  );
+  const rem = useTrackerPlugin((rp) => {
+    const foundRem = rp.rem.findOne(ctx?.remId);
+    console.log('🕹️ AnswerButtons: [DATA] Rem object:', foundRem);
+    return foundRem;
+  }, [ctx?.remId]);
 
-  const incRem = useTrackerPlugin(
-    async () => rem ? await getIncrementalRemInfo(plugin, rem) : undefined,
-    [rem]
+  const incRem = useTrackerPlugin(async () => {
+    const info = rem ? await getIncrementalRemInfo(plugin, rem) : undefined;
+    console.log('🕹️ AnswerButtons: [DATA] Incremental Rem Info:', info);
+    return info;
+  }, [rem]);
+  
+  const allIncrementalRems = useTrackerPlugin((rp) => {
+    const allRems = rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);
+    console.log('🕹️ AnswerButtons: [DATA] All Incremental Rems (length):', (allRems || []).length);
+    return allRems;
+  }, []);
+
+  const shouldDisplayShield = useTrackerPlugin((rp) => {
+    const setting = rp.settings.getSetting<boolean>(displayPriorityShieldId);
+    console.log('🕹️ AnswerButtons: [DATA] shouldDisplayShield setting:', setting);
+    return setting;
+  }, []);
+
+  const sessionCache = useTrackerPlugin((rp) => {
+    const cache = rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey);
+    console.log('🕹️ AnswerButtons: [DATA] sessionCache object:', cache);
+    return cache;
+  }, []);
+  const activeHighlightId = useTrackerPlugin((rp) => rp.storage.getSession<string | null>(activeHighlightIdKey), []);
+  const remType = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string | null>(currentIncrementalRemTypeKey),
+    []
   );
+  // --- REWRITTEN: The Shield calculation is now ultra-fast ---
+  // --- MODIFIED: This hook is now correctly marked as 'async' ---
+  // --- SHIELD CALCULATION HOOK ---
+  const shieldStatus = useTrackerPlugin(async (rp) => {
+    console.log('🕹️ AnswerButtons: [SHIELD CALC] Starting shield calculation...');
+    if (!shouldDisplayShield || !rem || !sessionCache) {
+      console.log('🕹️ AnswerButtons: [SHIELD CALC] Aborting early. Conditions not met:', { shouldDisplayShield, hasRem: !!rem, hasCache: !!sessionCache });
+      return null;
+    }
+
+    const seenRemIds = (await rp.storage.getSession<string[]>(seenRemInSessionKey)) || [];
+    console.log('🕹️ AnswerButtons: [SHIELD CALC] Seen Rem IDs (length):', seenRemIds.length);
+
+    // KB Shield
+    const dueKb = sessionCache.dueIncRemsInKB || [];
+    const unreviewedDueKb = dueKb.filter(
+      (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
+    );
+    const topMissedInKb = _.minBy(unreviewedDueKb, (r) => r.priority);
+    console.log('🕹️ AnswerButtons: [SHIELD CALC] KB Shield - Top missed:', topMissedInKb);
+    
+    // Doc Shield
+    const dueDoc = sessionCache.dueIncRemsInScope || [];
+    const unreviewedDueDoc = dueDoc.filter(
+      (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
+    );
+    const topMissedInDoc = _.minBy(unreviewedDueDoc, (r) => r.priority);
+    console.log('🕹️ AnswerButtons: [SHIELD CALC] Doc Shield - Top missed:', topMissedInDoc);
+
+    const result = {
+      kb: topMissedInKb ? {
+        absolute: topMissedInKb.priority,
+        percentile: calculateRelativePriority(allIncrementalRems || [], topMissedInKb.remId),
+      } : null,
+      doc: topMissedInDoc ? {
+        absolute: topMissedInDoc.priority,
+        percentile: sessionCache.incRemDocPercentiles?.[topMissedInDoc.remId] ?? null,
+      } : null,
+    };
+    console.log('🕹️ AnswerButtons: [SHIELD CALC] Final shieldStatus object:', result);
+    return result;
+  }, [rem, sessionCache, shouldDisplayShield, allIncrementalRems]);
 
     // --- New Logic to handle the "Next" button click ---
   const handleNextClick = async () => {
     if (!rem || !incRem) return;
 
     // Check if the current view is a PDF
-    const remType = await plugin.storage.getSession<string | null>(currentIncrementalRemTypeKey);
     if (remType === 'pdf') {
       // Find the associated PDF Rem
       const pdfRem = await findPDFinRem(plugin, rem);
@@ -162,43 +242,6 @@ export function AnswerButtons() {
     await handleHextRepetitionClick(plugin, incRem);
   };
 
-  const allIncrementalRems = useTrackerPlugin(
-    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
-    []
-  );
-  
-  const currentScopeRemIds = useTrackerPlugin(
-    (rp) => rp.storage.getSession<string[] | null>(currentScopeRemIdsKey),
-    []
-  );
-
-  const shouldDisplayShield = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
-    []
-  );
-
-  const shieldStatus = useTrackerPlugin(
-    async (rp) => {
-      await rp.storage.getSession(allIncrementalRemKey);
-      await rp.storage.getSession(seenRemInSessionKey);
-      await rp.storage.getSession(currentScopeRemIdsKey);
-      
-      const currentRemId = ctx?.remId;
-      return await calculatePriorityShield(plugin, currentRemId);
-    },
-    [plugin, ctx?.remId]
-  );
-
-  const activeHighlightId = useTrackerPlugin(
-    (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey),
-    []
-  );
-
-  const remType = useTrackerPlugin(
-    (rp) => rp.storage.getSession<string | null>(currentIncrementalRemTypeKey),
-    []
-  );
-
   // Calculate priority percentiles
   let kbPercentile: number | null = null;
   let docPercentile: number | null = null;
@@ -206,11 +249,12 @@ export function AnswerButtons() {
   if (incRem && allIncrementalRems) {
     kbPercentile = calculateRelativePriority(allIncrementalRems, incRem.remId);
 
-    if (currentScopeRemIds && currentScopeRemIds.length > 0) {
-      const scopedRems = allIncrementalRems.filter(r => currentScopeRemIds.includes(r.remId));
-      docPercentile = calculateRelativePriority(scopedRems, incRem.remId);
+    // NEW: Doc percentile is now an instant lookup from the session cache.
+    if (sessionCache?.incRemDocPercentiles) {
+      docPercentile = sessionCache.incRemDocPercentiles[incRem.remId];
     }
   }
+   console.log('🕹️ AnswerButtons: [CALC] Percentiles:', { kbPercentile, docPercentile });
 
   const priorityColor = kbPercentile ? percentileToHslColor(kbPercentile) : '#6b7280';
 
@@ -262,6 +306,14 @@ export function AnswerButtons() {
     color: '#1e40af',
     borderLeft: `3px solid ${priorityColor}`,
   };
+
+    console.log('🕹️ AnswerButtons: Final state before render:', {
+    hasCtx: !!ctx,
+    hasRem: !!rem,
+    hasIncRem: !!incRem,
+    hasShieldStatus: !!shieldStatus,
+    shouldDisplayShield,
+  });
 
   return (
     <div style={containerStyle} className="incremental-everything-answer-buttons">
@@ -410,7 +462,7 @@ export function AnswerButtons() {
                 <span>{incRem.priority}</span>
                 {kbPercentile !== null && (
                   <span style={{ opacity: 0.9, fontSize: '11px' }}>
-                    ({kbPercentile}% of KB{docPercentile !== null && `, ${docPercentile}% of Doc`})
+                    ({kbPercentile}% KB{docPercentile !== null && `, ${docPercentile}% Doc`})
                   </span>
                 )}
               </div>
@@ -424,21 +476,21 @@ export function AnswerButtons() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontWeight: 600 }}>🛡️ Priority Shield</span>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  {shieldStatus.kb.absolute !== null ? (
+                  {shieldStatus.kb ? (
                     <span>
                       KB: <strong>{shieldStatus.kb.absolute}</strong> ({shieldStatus.kb.percentile}%)
                     </span>
                   ) : (
                     <span>KB: 100%</span>
                   )}
-                  {currentScopeRemIds && (
-                    shieldStatus.doc.absolute !== null ? (
-                      <span>
-                        Doc: <strong>{shieldStatus.doc.absolute}</strong> ({shieldStatus.doc.percentile}%)
-                      </span>
-                    ) : (
-                      <span>Doc: 100%</span>
-                    )
+                  {/* --- SIMPLIFIED JSX: Check shieldStatus.doc directly --- */}
+                  {shieldStatus.doc ? (
+                    <span>
+                      Doc: <strong>{shieldStatus.doc.absolute}</strong> ({shieldStatus.doc.percentile}%)
+                    </span>
+                  ) : (
+                    // Only show "Doc: 100%" if we are actually in a document queue.
+                    sessionCache?.dueIncRemsInScope && <span>Doc: 100%</span>
                   )}
                 </div>
               </div>

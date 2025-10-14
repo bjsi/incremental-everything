@@ -40,7 +40,26 @@ export interface QueueSessionCache {
    */
   dueCardsInKB: CardPriorityInfo[];
 
-  
+
+  // --- NEW: Incremental Rem Data ---
+  /**
+   * A pre-filtered list of all due Incremental Rems in the document scope.
+   * Used for the fast Incremental Rem Document Shield.
+   */
+  dueIncRemsInScope: IncrementalRem[];
+
+  /**
+   * A pre-filtered list of all due Incremental Rems in the entire KB.
+   * Used for the fast Incremental Rem KB Shield.
+   */
+  dueIncRemsInKB: IncrementalRem[];
+
+  // --- NEW: Pre-calculated IncRem Percentiles ---
+  /**
+   * A map of RemID -> document-level percentile for Incremental Rems.
+   * Pre-calculated for every IncRem in the current document scope.
+   */
+  incRemDocPercentiles: Record<RemId, number>;
 }
 
 

@@ -918,23 +918,27 @@ async function onActivate(plugin: ReactRNPlugin) {
     await plugin.storage.setSession(seenRemInSessionKey, []);
     await plugin.storage.setSession(seenCardInSessionKey, []);
     sessionItemCounter = 0;
-    await plugin.storage.setSession(currentScopeRemIdsKey, null); // Still useful for other parts of the plugin
+    await plugin.storage.setSession(currentScopeRemIdsKey, null);
     await plugin.storage.setSession(currentSubQueueIdKey, subQueueId || null);
 
+    // --- CARD PRIORITY PRE-CALCULATION ---
     // 2. Get the main card priority cache, which is our source of all data.
     const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
 
-    if (!allCardInfos || allCardInfos.length === 0) {
-      console.log('QUEUE ENTER: Main cache is empty, skipping pre-calculation.');
-      return;
-    }
+
 
     // 3. Pre-calculate the list of all due cards in the entire KB.
-    const dueCardsInKB = allCardInfos.filter(info => info.dueCards > 0);
+    const dueCardsInKB = allCardInfos?.filter(info => info.dueCards > 0) || [];
 
     // 4. Initialize variables for the document-specific cache.
     let docPercentiles: Record<RemId, number> = {};
     let dueCardsInScope: CardPriorityInfo[] = [];
+
+        // --- INCREMENTAL REM PRE-CALCULATION (New) ---
+    const allIncRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);
+    const dueIncRemsInKB = allIncRems?.filter(rem => Date.now() >= rem.nextRepDate) || [];
+    let dueIncRemsInScope: IncrementalRem[] = [];
+        let incRemDocPercentiles: Record<RemId, number> = {}; // Initialize new map
 
     // 5. If we are in a document queue (subQueueId is not null), perform the heavy calculations.
     if (subQueueId) {
@@ -954,14 +958,21 @@ async function onActivate(plugin: ReactRNPlugin) {
         // b) Pre-calculate the relative document percentile for every card in the scope.
         const docCardInfos = allCardInfos.filter(info => docScopeRemIds.has(info.remId));
         const sortedDocCards = _.sortBy(docCardInfos, (info) => info.priority);
-        const totalDocCards = sortedDocCards.length;
         
         sortedDocCards.forEach((info, index) => {
-          const percentile = totalDocCards > 0 ? Math.round(((index + 1) / totalDocCards) * 100) : 0;
-          docPercentiles[info.remId] = percentile;
+          docPercentiles[info.remId] = Math.round(((index + 1) / sortedDocCards.length) * 100);
         });
         
-        console.log(`QUEUE ENTER: Finished document-scope calculations. Found ${dueCardsInScope.length} due cards and calculated ${Object.keys(docPercentiles).length} percentiles.`);
+        // b) Calculate doc scope for Incremental Rems
+        dueIncRemsInScope = dueIncRemsInKB.filter(rem => docScopeRemIds.has(rem.remId));
+        // --- NEW: Calculate IncRem Document Percentiles ---
+        const scopedIncRems = allIncRems.filter(rem => docScopeRemIds.has(rem.remId));
+        const sortedIncRems = _.sortBy(scopedIncRems, (rem) => rem.priority);
+        sortedIncRems.forEach((rem, index) => {
+          incRemDocPercentiles[rem.remId] = Math.round(((index + 1) / sortedIncRems.length) * 100);
+        });
+
+        console.log(`QUEUE ENTER: Finished document-scope calculations.`);
       }
     }
 
@@ -970,6 +981,9 @@ async function onActivate(plugin: ReactRNPlugin) {
       docPercentiles,
       dueCardsInScope,
       dueCardsInKB,
+      dueIncRemsInScope,
+      dueIncRemsInKB,
+      incRemDocPercentiles, // Add new data
     };
 
     // 7. Save the newly created session cache.
