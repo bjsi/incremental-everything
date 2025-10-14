@@ -11,7 +11,7 @@ import { getCardPriority, setCardPriority, PrioritySource, CardPriorityInfo, cal
 import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, currentSubQueueIdKey, allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/types';
-import { updateCardPriorityInCache } from '../lib/cache';
+import { updateCardPriorityInCache, flushCacheUpdatesNow } from '../lib/cache';
 import * as _ from 'remeda';
 
 // Debounce hook to prevent excessive writes to the database while sliding
@@ -280,23 +280,36 @@ function Priority() {
   
   const saveCardPriority = useCallback(async (priority: number) => {
     if (!rem) return;
+    console.log('💾 priority.tsx: [saveCardPriority] CALLED');
 
     // 1. Save the priority to the Rem itself.
     await setCardPriority(plugin, rem, priority, 'manual');
 
     // 2. Directly update the central cache for this Rem.
     await updateCardPriorityInCache(plugin, rem._id);
+    console.log('💾 priority.tsx: [saveCardPriority] FINISHED');
 
   }, [rem, plugin]);
 
   const saveAndClose = async (incP: number, cardP: number) => {
+    console.log('💾 priority.tsx: [saveAndClose] CALLED with:', { incP, cardP });
+    
     if (showIncSection) await saveIncPriority(incP);
     // Save card priority if either the card or inheritance section is visible.
     if (showCardSection || showInheritanceSection) {
       await saveCardPriority(cardP);
+
+      // --- 2. THE FIX: Force the cache to update NOW ---
+      console.log('💾 priority.tsx: Forcing immediate cache flush...');
+      await flushCacheUpdatesNow(plugin);
+      console.log('💾 priority.tsx: Cache flush complete.');
+
       // Send a signal to other widgets (like the queue display) that data has changed.
       await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+      console.log('💾 priority.tsx: Refresh signal sent.');
     }
+    
+    console.log('💾 priority.tsx: Closing popup...');
     plugin.widget.closePopup();
   };
 

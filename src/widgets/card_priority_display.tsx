@@ -8,7 +8,8 @@ import {
   powerupCode, 
   seenCardInSessionKey, 
   allCardPriorityInfoKey,
-  queueSessionCacheKey
+  queueSessionCacheKey,
+  cardPriorityCacheRefreshKey // 1. Import the refresh key
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache } from '../lib/cardPriority';
 import { percentileToHslColor } from '../lib/color';
@@ -16,6 +17,12 @@ import * as _ from 'remeda';
 
 export function CardPriorityDisplay() {
   const plugin = usePlugin();
+
+  // 2. Add a new tracker to listen for the refresh signal.
+  const refreshSignal = useTrackerPlugin(
+    (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
+    []
+  );
 
   const rem = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext();
@@ -27,15 +34,16 @@ export function CardPriorityDisplay() {
   }, [rem]);
 
   // --- NEW: Fetch our ultra-fast session cache ---
+  // 3. Add the refreshSignal to the dependency arrays of our main data hooks.
   const sessionCache = useTrackerPlugin(
     (rp) => rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey),
-    []
+    [refreshSignal] // Re-fetch when signal changes
   );
 
   // We still need the main cache to find the info for the *current* card.
   const allPrioritizedCardInfo = useTrackerPlugin(
     (rp) => rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-    []
+    [refreshSignal] // Re-fetch when signal changes
   );
 
   // This lookup remains the same and is very fast.
