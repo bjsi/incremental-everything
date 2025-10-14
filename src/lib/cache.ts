@@ -82,3 +82,17 @@ export async function flushCacheUpdatesNow(plugin: RNPlugin) {
   // Force a heavy recalculation when flushing manually
   await flushCacheUpdates(plugin, true);
 }
+
+/**
+ * Flushes pending cache updates immediately but respects the 'isLight'
+ * flag of the pending updates. It does NOT force a heavy recalculation.
+ * This is used for fast, in-queue UI updates.
+ */
+export async function flushLightCacheUpdates(plugin: RNPlugin) {
+  if (cacheUpdateTimer) {
+    clearTimeout(cacheUpdateTimer);
+    cacheUpdateTimer = null;
+  }
+  // Call without the 'true' flag to perform a light flush if possible.
+  await flushCacheUpdates(plugin);
+}
