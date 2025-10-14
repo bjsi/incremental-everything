@@ -13,6 +13,7 @@ import { calculateRelativePriority as calculateIncRemRelativePriority } from '..
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, currentSubQueueIdKey, allCardPriorityInfoKey, cardPriorityCacheRefreshKey, queueSessionCacheKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/types';
 import { updateCardPriorityInCache, flushLightCacheUpdates } from '../lib/cache';
+import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import * as _ from 'remeda';
 
 type Scope = { remId: string | null; name: string; };
@@ -56,6 +57,11 @@ function Priority() {
   const incRemInfo = useTrackerPlugin(async (plugin) => rem ? await getIncrementalRemInfo(plugin, rem) : null, [rem?._id]);
   const cardInfo = useTrackerPlugin(async (plugin) => rem ? await getCardPriority(plugin, rem) : null, [rem?._id]);
   const hasCards = useTrackerPlugin(async (plugin) => rem ? (await rem.getCards()).length > 0 : false, [rem?._id]);
+
+  const ancestorPriorityInfo = useTrackerPlugin(async (plugin) => {
+    if (!rem) return null;
+    return await findClosestAncestorWithAnyPriority(plugin, rem);
+  }, [rem]);
 
   // Asynchronous Derived Data Hook
 
@@ -420,6 +426,17 @@ function Priority() {
             </div>
           )}
 
+          {ancestorPriorityInfo && ancestorPriorityInfo.sourceType === 'IncRem' && (
+            <div className="mt-2 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                Closest Ancestor Priority: {ancestorPriorityInfo.priority}
+              </div>
+              <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate">
+                {ancestorPriorityInfo.ancestorName}
+              </div>
+            </div>
+          )}
+
           <button onClick={removeFromIncremental} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 self-center">
             Remove from Incremental Queue
           </button>
@@ -455,6 +472,19 @@ function Priority() {
               <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
                   Universe: {scopedCardRems.length.toLocaleString()} flashcards
               </div>
+              
+              {ancestorPriorityInfo && (
+                <div className="mt-4 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                  <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                    Inherits from Ancestor ({ancestorPriorityInfo.sourceType}): {ancestorPriorityInfo.priority}
+                  </div>
+                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate">
+                    {ancestorPriorityInfo.ancestorName}
+                  </div>
+                </div>
+              )}
+
+
               {hasCards && cardInfo && (
                 <>
                   <div className="text-xs text-center mt-2 flex justify-around p-1 bg-gray-100 dark:bg-gray-800 rounded-sm" style={secondaryTextStyle}>
