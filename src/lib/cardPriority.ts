@@ -1,7 +1,8 @@
-import { Rem, RNPlugin, RemId } from '@remnote/plugin-sdk';
+import { Rem, RNPlugin, RemId, Query_DUPE_2 as Query, BuiltInPowerupCodes, SearchPortalQuery } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './types';
 import { getIncrementalRemInfo } from './incremental_rem';
 import { safeRemTextToString } from './pdfUtils';
+import { allCardPriorityInfoKey } from './consts';
 import * as _ from 'remeda';
 
 const CARD_PRIORITY_CODE = 'cardPriority';
@@ -295,9 +296,154 @@ export async function updateInheritedPriorities(
 }
 
 /**
- * Get all due cards with priorities from a scope
+ * Get all due cards with priorities from a scope (used in priorityReviewDocument.ts)
+ * OPTIMIZED VERSION - Uses the pre-built cache for maximum speed
  */
 export async function getDueCardsWithPriorities(
+  plugin: RNPlugin,
+  scopeRem: Rem | null,
+  includeNonPrioritized: boolean = true
+): Promise<Array<{
+  rem: Rem;
+  cards: any[];
+  priority: number;
+  source: PrioritySource;
+}>> {
+  console.log(`[getDueCardsWithPriorities] Starting OPTIMIZED cache-based gathering...`);
+  const startTime = Date.now();
+
+  const results: Array<{
+    rem: Rem;
+    cards: any[];
+    priority: number;
+    source: PrioritySource;
+  }> = [];
+
+  // Get the pre-built cache - this is the key optimization!
+  const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
+  
+  if (!allCardInfos || allCardInfos.length === 0) {
+    console.warn(`[getDueCardsWithPriorities] Cache is empty! Consider running cache build first.`);
+    // Fallback to slow method if cache doesn't exist
+    return getDueCardsWithPrioritiesSlow(plugin, scopeRem, includeNonPrioritized);
+  }
+
+  console.log(`[getDueCardsWithPriorities] Cache loaded: ${allCardInfos.length} card priority entries`);
+
+  // Build a lookup map for O(1) access
+  const priorityMap = new Map<RemId, CardPriorityInfo>();
+  allCardInfos.forEach(info => priorityMap.set(info.remId, info));
+
+  let scopeRemIds: Set<RemId>;
+
+  if (scopeRem) {
+    // --- COMPREHENSIVE HYBRID GATHERING LOGIC ---
+    console.log(`[getDueCardsWithPriorities] Gathering scope rems...`);
+
+    // 1. Get structural descendants (hierarchical children)
+    const descendants = await scopeRem.getDescendants();
+    console.log(`[getDueCardsWithPriorities] Found ${descendants.length} descendants (may include duplicates)`);
+
+    // 2. Get all Rem that appear in this document/portal context
+    const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+    console.log(`[getDueCardsWithPriorities] Found ${allRemsInContext.length} rems in document/portal context (may include duplicates)`);
+
+    // 3. Combine and deduplicate - but we only need the IDs!
+    scopeRemIds = new Set<RemId>();
+    // Add the scope rem itself
+    scopeRemIds.add(scopeRem._id);
+    // Add all descendants
+    descendants.forEach(rem => scopeRemIds.add(rem._id));
+    const afterDescendants = scopeRemIds.size;
+    // Add all rems from document/portal context
+    allRemsInContext.forEach(rem => scopeRemIds.add(rem._id));
+    const afterContext = scopeRemIds.size;
+
+    console.log(`[getDueCardsWithPriorities] Scope contains ${scopeRemIds.size} unique rems`);
+    console.log(`[getDueCardsWithPriorities] Deduplication results:`);
+    console.log(`[getDueCardsWithPriorities]  - After adding scope rem + descendants: ${afterDescendants} unique rems`);
+    console.log(`[getDueCardsWithPriorities]  - After adding document/portal context: ${afterContext} unique rems`);
+    console.log(`[getDueCardsWithPriorities]  - New rems from context: ${afterContext - afterDescendants}`);
+    console.log(`[getDueCardsWithPriorities]  - Final comprehensive scope size: ${scopeRemIds.size} unique Rem`);
+  } else {
+    // Full KB - all rems in cache are in scope
+    scopeRemIds = new Set(allCardInfos.map(info => info.remId));
+    console.log(`[getDueCardsWithPriorities] Using full KB scope: ${scopeRemIds.size} rems`);
+  }
+
+  const now = Date.now();
+  let processedCount = 0;
+  let dueCardsCount = 0;
+
+  // Process only rems that are in scope AND have due cards
+  for (const remId of scopeRemIds) {
+    const cardInfo = priorityMap.get(remId);
+    
+    if (!cardInfo) {
+      // Rem not in cache - might not have cards, or cache needs refresh
+      if (includeNonPrioritized) {
+        // Fallback: fetch the rem and process it the slow way
+        const rem = await plugin.rem.findOne(remId);
+        if (rem) {
+          const cards = await rem.getCards();
+          if (cards.length > 0) {
+            await autoAssignCardPriority(plugin, rem);
+            const newCardInfo = await getCardPriority(plugin, rem);
+            if (newCardInfo) {
+              results.push({
+                rem,
+                cards: cards.filter(card => card.nextRepetitionTime <= now),
+                priority: newCardInfo.priority,
+                source: newCardInfo.source
+              });
+            }
+          }
+        }
+      }
+      continue;
+    }
+
+    // Check if this rem has due cards
+    if (cardInfo.dueCards > 0) {
+      dueCardsCount++;
+      
+      // Get the actual Rem object (lightweight operation)
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) continue;
+
+      // Get the actual card objects (we need these for the return value)
+      const cards = await rem.getCards();
+      const dueCards = cards.filter(card => card.nextRepetitionTime <= now);
+
+      if (dueCards.length > 0) {
+        results.push({
+          rem,
+          cards: dueCards,
+          priority: cardInfo.priority,
+          source: cardInfo.source
+        });
+      }
+      
+      processedCount++;
+    }
+  }
+
+  const elapsedTime = Date.now() - startTime;
+  console.log(`[getDueCardsWithPriorities] OPTIMIZED completion:`);
+  console.log(`  - Processed ${processedCount} rems with due cards`);
+  console.log(`  - Found ${results.length} rems with due cards to include`);
+  console.log(`  - Time elapsed: ${elapsedTime}ms`);
+  console.log(`  - Average time per rem: ${(elapsedTime / processedCount).toFixed(2)}ms`);
+
+  return results;
+}
+
+
+/**
+ * FALLBACK: Slow version for when cache doesn't exist
+ * This is your original implementation
+ */
+async function getDueCardsWithPrioritiesSlow(
   plugin: RNPlugin,
   scopeRem: Rem | null,
   includeNonPrioritized: boolean = true
@@ -317,12 +463,47 @@ export async function getDueCardsWithPriorities(
   let remsToCheck: Rem[];
 
   if (scopeRem) {
-    remsToCheck = [scopeRem, ...(await scopeRem.getDescendants())];
+    // --- COMPREHENSIVE HYBRID GATHERING LOGIC ---
+    console.log(`[getDueCardsWithPrioritiesSlow] Starting comprehensive scope gathering...`);
+
+    // 1. Get structural descendants (hierarchical children)
+    const descendants = await scopeRem.getDescendants();
+    console.log(`[getDueCardsWithPrioritiesSlow] Found ${descendants.length} descendants (may include duplicates)`);
+
+    // 2. Get all Rem that appear in this document/portal context
+    // This includes fixed portals, search portals, and table views
+    const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+    console.log(`[getDueCardsWithPrioritiesSlow] Found ${allRemsInContext.length} rems in document/portal context (may include duplicates)`);
+
+    // 3. Combine and deduplicate all sources
+    const combinedRems = new Map<RemId, Rem>();
+    
+    // Add the scope rem itself
+    combinedRems.set(scopeRem._id, scopeRem);
+    
+    // Add all descendants
+    descendants.forEach(rem => combinedRems.set(rem._id, rem));
+    const afterDescendants = combinedRems.size;
+    
+    // Add all rems from document/portal context
+    allRemsInContext.forEach(rem => combinedRems.set(rem._id, rem));
+    const afterContext = combinedRems.size;
+
+    remsToCheck = Array.from(combinedRems.values());
+    
+    console.log(`[getDueCardsWithPrioritiesSlow] Deduplication results:`);
+    console.log(`[getDueCardsWithPrioritiesSlow]  - After adding scope rem + descendants: ${afterDescendants} unique rems`);
+    console.log(`[getDueCardsWithPrioritiesSlow]  - After adding document/portal context: ${afterContext} unique rems`);
+    console.log(`[getDueCardsWithPrioritiesSlow]  - New rems from context: ${afterContext - afterDescendants}`);
+    console.log(`[getDueCardsWithPrioritiesSlow]  - Final comprehensive scope size: ${remsToCheck.length} unique Rem`);
+
   } else {
-    // CORRECTED LOGIC: Get all cards, then find their unique parent Rems.
+    // Full KB logic - get all rems that have cards
+    console.log(`[getDueCardsWithPrioritiesSlow] Using full KB scope...`);
     const allCards = await plugin.card.getAll();
     const remIdsWithCards = _.uniq(allCards.map(c => c.remId));
     remsToCheck = await plugin.rem.findMany(remIdsWithCards) || [];
+    console.log(`[getDueCardsWithPrioritiesSlow] Found ${remsToCheck.length} rems with cards in full KB`);
   }
 
   const now = Date.now();
