@@ -14,6 +14,7 @@ import { allIncrementalRemKey, powerupCode, prioritySlotCode, currentSubQueueIdK
 import { IncrementalRem } from '../lib/types';
 import { updateCardPriorityInCache, flushLightCacheUpdates } from '../lib/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
+import { safeRemTextToString } from '../lib/pdfUtils';
 import * as _ from 'remeda';
 
 type Scope = { remId: string | null; name: string; };
@@ -143,7 +144,7 @@ function Priority() {
     }
     const hierarchy: Scope[] = [{ remId: null, name: 'All KB' }];
     for (const ancestor of ancestors.reverse()) { 
-      hierarchy.push({ remId: ancestor._id, name: await plugin.richText.toString(ancestor.text) });
+      hierarchy.push({ remId: ancestor._id, name: await safeRemTextToString(plugin, ancestor.text) });
     }
     setScopeHierarchy(hierarchy);
   }, [rem?._id]);
@@ -153,7 +154,7 @@ function Priority() {
       if (inQueue && queueSubQueueId) {
         const queueRem = await plugin.rem.findOne(queueSubQueueId);
         if (queueRem) {
-          setScope({ remId: queueRem._id, name: await plugin.richText.toString(queueRem.text) });
+          setScope({ remId: queueRem._id, name: await safeRemTextToString(plugin, queueRem.text) });
           setScopeMode('document');
         }
       }

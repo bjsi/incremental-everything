@@ -1,6 +1,7 @@
 import { Rem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './types';
 import { getIncrementalRemInfo } from './incremental_rem';
+import { safeRemTextToString } from './pdfUtils';
 import * as _ from 'remeda';
 
 const CARD_PRIORITY_CODE = 'cardPriority';
@@ -82,10 +83,13 @@ async function findClosestAncestorWithPriority(
       return { priority: parentIncInfo.priority, source: 'incremental' };
     }
     
-    // Check for CardPriority powerup
-    const parentCardInfo = await getCardPriority(plugin, parent);
-    if (parentCardInfo) {
-      return { priority: parentCardInfo.priority, source: 'card' };
+    // Then, DIRECTLY check for a CardPriority powerup property on the parent
+    const parentCardPriorityValue = await parent.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+    if (parentCardPriorityValue) {
+        const priority = parseInt(parentCardPriorityValue);
+        if (!isNaN(priority)) {
+            return { priority: priority, source: 'card' };
+        }
     }
     
     current = parent;
@@ -99,54 +103,74 @@ async function findClosestAncestorWithPriority(
  * Get card priority info for a rem.
  * If no priority is set, it checks for inherited priority before returning a default state.
  */
+// --- NEW DEBUG-INSTRUMENTED VERSION ---
 export async function getCardPriority(
   plugin: RNPlugin,
   rem: Rem
 ): Promise<CardPriorityInfo | null> {
+  const remText = await safeRemTextToString(plugin, rem.text);
+  //console.log(`[DEBUG getCardPriority] -----------------------------------------`);
+  //console.log(`[DEBUG getCardPriority] 1. START processing Rem: "${remText.slice(0, 30)}..." (${rem._id})`);
+
   const cards = await rem.getCards();
   const now = Date.now();
   const dueCards = cards.filter(card => card.nextRepetitionTime <= now).length;
 
-  const hasPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
+  //console.log(`[DEBUG getCardPriority] 2. Attempting to read priority slot directly...`);
+  const priorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+  //console.log(`[DEBUG getCardPriority] 3. Result of getPowerupProperty:`, { priorityValue });
   
-  if (!hasPowerup) {
-    // Before returning a generic default, check for an inheritable priority.
-    const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
-    if (ancestorPriority) {
-      return {
-        remId: rem._id,
-        priority: ancestorPriority.priority,
-        source: 'inherited',
-        lastUpdated: 0, // 0 indicates it's not saved yet
-        cardCount: cards.length,
-        dueCards
-      };
-    }
-
-    // If no ancestor is found, then use the default.
-    return {
+  if (priorityValue) {
+    //console.log(`[DEBUG getCardPriority] 4a. SUCCESS: Priority slot has a value. Reading from powerup.`);
+    const source = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
+    const lastUpdated = await rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT);
+    
+    const result = {
       remId: rem._id,
-      priority: (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50,
-      source: 'default',
-      lastUpdated: 0, // 0 indicates it's not saved
+      priority: parseInt(priorityValue) || 50,
+      source: (source as PrioritySource) || 'default',
+      lastUpdated: parseInt(lastUpdated) || now,
       cardCount: cards.length,
       dueCards
     };
+    //console.log(`[DEBUG getCardPriority] 5a. FINAL RESULT from direct read:`, result);
+    //console.log(`[DEBUG getCardPriority] -----------------------------------------`);
+    return result;
+
+  } else {
+    //console.log(`[DEBUG getCardPriority] 4b. FAILED: Priority slot is empty. Checking for inheritance.`);
+    const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
+    //console.log(`[DEBUG getCardPriority] 5b. Result of findClosestAncestorWithPriority:`, ancestorPriority);
+
+    if (ancestorPriority) {
+      const result = {
+        remId: rem._id,
+        priority: ancestorPriority.priority,
+        source: 'inherited' as PrioritySource,
+        lastUpdated: 0,
+        cardCount: cards.length,
+        dueCards
+      };
+      //console.log(`[DEBUG getCardPriority] 6b. FINAL RESULT from inheritance:`, result);
+      //console.log(`[DEBUG getCardPriority] -----------------------------------------`);
+      return result;
+    }
+
+    const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+    const result = {
+      remId: rem._id,
+      priority: defaultPriority,
+      source: 'default' as PrioritySource,
+      lastUpdated: 0,
+      cardCount: cards.length,
+      dueCards
+    };
+    //console.log(`[DEBUG getCardPriority] 7b. FINAL RESULT from default:`, result);
+    //console.log(`[DEBUG getCardPriority] -----------------------------------------`);
+    return result;
   }
-
-  const priority = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
-  const source = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-  const lastUpdated = await rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT);
-
-  return {
-    remId: rem._id,
-    priority: parseInt(priority) || 50,
-    source: (source as PrioritySource) || 'default',
-    lastUpdated: parseInt(lastUpdated) || now,
-    cardCount: cards.length,
-    dueCards
-  };
 }
+
 
 export function calculateRelativeCardPriority(allItems: CardPriority.tsInfo[], currentRemId: RemId): number | null {
   if (!allItems || !currentRemId) {
