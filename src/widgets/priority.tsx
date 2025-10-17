@@ -8,9 +8,26 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { getCardPriority, setCardPriority, PrioritySource, CardPriorityInfo, calculateRelativeCardPriority, QueueSessionCache } from '../lib/cardPriority';
+import { 
+  getCardPriority, 
+  setCardPriority, 
+  PrioritySource, 
+  CardPriorityInfo, 
+  calculateRelativeCardPriority, 
+  QueueSessionCache 
+} from '../lib/cardPriority';
 import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode, currentSubQueueIdKey, allCardPriorityInfoKey, cardPriorityCacheRefreshKey, queueSessionCacheKey } from '../lib/consts';
+import { 
+  allIncrementalRemKey, 
+  powerupCode, 
+  nextRepDateSlotCode, 
+  prioritySlotCode, 
+  currentSubQueueIdKey, 
+  allCardPriorityInfoKey, 
+  cardPriorityCacheRefreshKey, 
+  queueSessionCacheKey 
+
+} from '../lib/consts';
 import { IncrementalRem } from '../lib/types';
 import { updateCardPriorityInCache, flushLightCacheUpdates } from '../lib/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
@@ -87,7 +104,7 @@ function Priority() {
     let finalPrioritySourceCounts = { manual: 0, inherited: 0, default: 0 };
 
     if (useFastCache && sessionCache) {
-      // --- ULTRA-FAST PATH ---
+      // --- ULTRA-FAST PATH (uses pre-calculated cache from QueueEnter) ---
       const incRemsInScope = allIncRems.filter(r => sessionCache.incRemDocPercentiles.hasOwnProperty(r.remId));
       const cardRemsInScope = allCardInfos.filter(ci => sessionCache.docPercentiles.hasOwnProperty(ci.remId));
       finalScopedIncRems = (scopeMode === 'all') ? allIncRems : incRemsInScope;
@@ -98,10 +115,58 @@ function Priority() {
       finalCardRel = (scopeMode === 'document') ? sessionCache.docPercentiles[rem._id] : calculateRelativeCardPriority(allCardInfos, rem._id);
       
     } else {
-      // --- OPTIMIZED ASYNC FALLBACK PATH ---
+      // --- OPTIMIZED ASYNC FALLBACK PATH WITH COMPREHENSIVE SCOPE ---
       const scopeRem = scopeMode === 'document' && scope.remId ? await plugin.rem.findOne(scope.remId) : null;
-      const descendants = scopeRem ? await scopeRem.getDescendants() : [];
-      const scopeIds = scopeRem ? new Set([scopeRem._id, ...descendants.map(d => d._id)]) : null;
+      
+      let scopeIds: Set<RemId> | null = null;
+      
+      if (scopeRem) {
+        // --- COMPREHENSIVE SCOPE CALCULATION ---
+        console.log('[Priority Widget] Building comprehensive document scope...');
+        
+        // 1. Get structural descendants
+        const descendants = await scopeRem.getDescendants();
+        
+        // 2. Get all rems in document/portal context
+        const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+        
+        // 3. Get folder queue rems
+        const folderQueueRems = await scopeRem.allRemInFolderQueue();
+        
+        // 4. Get sources
+        const sources = await scopeRem.getSources();
+        
+        // 5. Get referencing rems (with property value filtering)
+        const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+          powerupCode,
+          nextRepDateSlotCode
+        );
+        
+        const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
+          if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+            return rem.parent;
+          } else {
+            return rem._id;
+          }
+        }).filter(id => id !== null && id !== undefined) as RemId[];
+        
+        // 6. Combine and deduplicate
+        scopeIds = new Set<RemId>([
+          scopeRem._id,
+          ...descendants.map(d => d._id),
+          ...allRemsInContext.map(r => r._id),
+          ...folderQueueRems.map(r => r._id),
+          ...sources.map(r => r._id),
+          ...referencingRems
+        ]);
+        
+        console.log(`[Priority Widget] Comprehensive scope: ${scopeIds.size} rems`);
+        console.log(`[Priority Widget]  - Descendants: ${descendants.length}`);
+        console.log(`[Priority Widget]  - Document/portal: ${allRemsInContext.length}`);
+        console.log(`[Priority Widget]  - Folder queue: ${folderQueueRems.length}`);
+        console.log(`[Priority Widget]  - Sources: ${sources.length}`);
+        console.log(`[Priority Widget]  - References: ${referencingRems.length}`);
+      }
       
       finalScopedIncRems = scopeIds ? allIncRems.filter(r => scopeIds.has(r.remId)) : allIncRems;
       let tempScopedCardRems = scopeIds ? allCardInfos.filter(ci => scopeIds.has(ci.remId)) : allCardInfos;
@@ -114,14 +179,13 @@ function Priority() {
       finalScopedCardRems = tempScopedCardRems;
       finalIncRel = calculateIncRemRelativePriority(finalScopedIncRems, rem._id);
       finalCardRel = calculateRelativeCardPriority(finalScopedCardRems, rem._id);
-    }
-    
+    }    
     return { 
       scopedIncRems: finalScopedIncRems, 
       scopedCardRems: finalScopedCardRems,
       incRelPriority: finalIncRel || 50,
       cardRelPriority: finalCardRel || 50,
-      descendantCardCount: finalDescendantCardCount, // Use the new correct value
+      descendantCardCount: finalDescendantCardCount, 
       prioritySourceCounts: finalPrioritySourceCounts,
     };
   }, [rem, inQueue, scope, allIncRems, allCardInfos, cardScopeType, sessionCache, queueSubQueueId, scopeMode]);

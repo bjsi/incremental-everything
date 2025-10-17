@@ -923,9 +923,12 @@ async function onActivate(plugin: ReactRNPlugin) {
 
     // --- CARD PRIORITY PRE-CALCULATION ---
     // 2. Get the main card priority cache, which is our source of all data.
-    const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
-
-
+    const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+    
+    // ✅ FIX: Check if cache is empty and warn
+    if (allCardInfos.length === 0) {
+      console.warn('QUEUE ENTER: Card priority cache is empty! Flashcard calculations will be skipped.');
+    }
 
     // 3. Pre-calculate the list of all due cards in the entire KB.
     const dueCardsInKB = allCardInfos?.filter(info => info.dueCards > 0) || [];
@@ -934,24 +937,88 @@ async function onActivate(plugin: ReactRNPlugin) {
     let docPercentiles: Record<RemId, number> = {};
     let dueCardsInScope: CardPriorityInfo[] = [];
 
-        // --- INCREMENTAL REM PRE-CALCULATION (New) ---
-    const allIncRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);
+        // --- INCREMENTAL REM PRE-CALCULATION ---
+    const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    
+    // ✅ FIX: Check if IncRem cache is empty and warn
+    if (allIncRems.length === 0) {
+      console.warn('QUEUE ENTER: Incremental Rem cache is empty! IncRem calculations will be skipped.');
+    }
+    
     const dueIncRemsInKB = allIncRems?.filter(rem => Date.now() >= rem.nextRepDate) || [];
     let dueIncRemsInScope: IncrementalRem[] = [];
-        let incRemDocPercentiles: Record<RemId, number> = {}; // Initialize new map
+    let incRemDocPercentiles: Record<RemId, number> = {}; // Initialize new map
 
     // 5. If we are in a document queue (subQueueId is not null), perform the heavy calculations.
     if (subQueueId) {
-      console.log('QUEUE ENTER: Document queue detected. Starting document-scope calculations...');
-      // This is the one-time, slow operation to get all Rem IDs in the document.
+      console.log('QUEUE ENTER: Document queue detected. Starting comprehensive scope calculation...');
       const scopeRem = await plugin.rem.findOne(subQueueId);
+      
       if (scopeRem) {
-        const docDescendants = await scopeRem.getDescendants();
-        const docScopeRemIds = new Set([scopeRem._id, ...docDescendants.map(r => r._id)]);
+        // --- COMPREHENSIVE SCOPE CALCULATION (NEW) ---
+        console.log('QUEUE ENTER: Gathering all scope sources...');
+        const startTime = Date.now();
         
-        // Save the scope for other parts of the plugin that might need it.
+        // 1. Get structural descendants (hierarchical children)
+        const descendants = await scopeRem.getDescendants();
+        console.log(`QUEUE ENTER: ✓ Found ${descendants.length} descendants`);
+        
+        // 2. Get all rems in document/portal context (portals, tables, search portals)
+        const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+        console.log(`QUEUE ENTER: ✓ Found ${allRemsInContext.length} rems in document/portal context`);
+        
+        // 3. Get folder queue rems (RemNote's native scope)
+        const folderQueueRems = await scopeRem.allRemInFolderQueue();
+        console.log(`QUEUE ENTER: ✓ Found ${folderQueueRems.length} rems via allRemInFolderQueue`);
+        
+        // 4. Get sources (bibliography, references FROM this document)
+        const sources = await scopeRem.getSources();
+        console.log(`QUEUE ENTER: ✓ Found ${sources.length} sources`);
+        
+        // 5. Get rems that reference this document (backlinks)
+        // Use the same logic as GetNextCard to filter out property value rems
+        const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+          powerupCode,
+          nextRepDateSlotCode
+        );
+        
+        const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
+          if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+            // This is a property value rem - return its parent (the actual incremental rem)
+            return rem.parent;
+          } else {
+            // Normal rem that references the document
+            return rem._id;
+          }
+        }).filter(id => id !== null && id !== undefined) as RemId[];
+        
+        console.log(`QUEUE ENTER: ✓ Found ${referencingRems.length} referencing rems`);
+        
+        // 6. Combine and deduplicate ALL sources
+        const docScopeRemIds = new Set<RemId>([
+          scopeRem._id,
+          ...descendants.map(r => r._id),
+          ...allRemsInContext.map(r => r._id),
+          ...folderQueueRems.map(r => r._id),
+          ...sources.map(r => r._id),
+          ...referencingRems
+        ]);
+        
+        const elapsed = Date.now() - startTime;
+        console.log(`QUEUE ENTER: ✓ Comprehensive scope calculation complete (${elapsed}ms)`);
+        console.log(`QUEUE ENTER: Final scope breakdown:`);
+        console.log(`  - Scope rem itself: 1`);
+        console.log(`  - Descendants: ${descendants.length}`);
+        console.log(`  - Document/portal context: ${allRemsInContext.length}`);
+        console.log(`  - Folder queue: ${folderQueueRems.length}`);
+        console.log(`  - Sources: ${sources.length}`);
+        console.log(`  - Referencing rems: ${referencingRems.length}`);
+        console.log(`  - Total unique rems: ${docScopeRemIds.size}`);
+        
+        // Save the comprehensive scope for other parts of the plugin
         await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(docScopeRemIds));
 
+        // --- FLASHCARD SCOPE CALCULATIONS ---
         // a) Pre-calculate the list of due cards within this specific document.
         dueCardsInScope = dueCardsInKB.filter(info => docScopeRemIds.has(info.remId));
 
@@ -963,16 +1030,22 @@ async function onActivate(plugin: ReactRNPlugin) {
           docPercentiles[info.remId] = Math.round(((index + 1) / sortedDocCards.length) * 100);
         });
         
-        // b) Calculate doc scope for Incremental Rems
+        // --- INCREMENTAL REM SCOPE CALCULATIONS ---
+        // c) Calculate doc scope for Incremental Rems
         dueIncRemsInScope = dueIncRemsInKB.filter(rem => docScopeRemIds.has(rem.remId));
-        // --- NEW: Calculate IncRem Document Percentiles ---
+        
+        // d) Calculate IncRem Document Percentiles
         const scopedIncRems = allIncRems.filter(rem => docScopeRemIds.has(rem.remId));
         const sortedIncRems = _.sortBy(scopedIncRems, (rem) => rem.priority);
         sortedIncRems.forEach((rem, index) => {
           incRemDocPercentiles[rem.remId] = Math.round(((index + 1) / sortedIncRems.length) * 100);
         });
 
-        console.log(`QUEUE ENTER: Finished document-scope calculations.`);
+        console.log(`QUEUE ENTER: Finished document-scope calculations:`);
+        console.log(`  - Cards in scope: ${docCardInfos.length}`);
+        console.log(`  - Due cards in scope: ${dueCardsInScope.length}`);
+        console.log(`  - IncRems in scope: ${scopedIncRems.length}`);
+        console.log(`  - Due IncRems in scope: ${dueIncRemsInScope.length}`);
       }
     }
 
@@ -983,12 +1056,36 @@ async function onActivate(plugin: ReactRNPlugin) {
       dueCardsInKB,
       dueIncRemsInScope,
       dueIncRemsInKB,
-      incRemDocPercentiles, // Add new data
+      incRemDocPercentiles,
     };
 
     // 7. Save the newly created session cache.
     await plugin.storage.setSession(queueSessionCacheKey, sessionCache);
     console.log('QUEUE ENTER: Pre-calculation complete. Session cache has been saved.');
+    
+    // 8. Update the queue counter CSS immediately after cache is built ---
+    const dueIncRemCount = subQueueId 
+      ? sessionCache.dueIncRemsInScope.length 
+      : sessionCache.dueIncRemsInKB.length;
+
+    plugin.app.registerCSS(
+      queueCounterId,
+      `
+      .rn-queue__card-counter {
+        /*visibility: hidden;*/
+      }
+
+      .light .rn-queue__card-counter:after {
+        content: ' + ${dueIncRemCount}';
+      }
+
+      .dark .rn-queue__card-counter:after {
+        content: ' + ${dueIncRemCount}';
+      }`.trim()
+    );
+
+    console.log(`QUEUE ENTER: Queue counter updated to show ${dueIncRemCount} due IncRems`);
+
   });
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
@@ -1052,12 +1149,17 @@ async function onActivate(plugin: ReactRNPlugin) {
       const allIncrementalRem: IncrementalRem[] =
         (await plugin.storage.getSession(allIncrementalRemKey)) || [];
 
-      // --- REFACTORED LOGIC START ---
-      // Read the scope directly from session storage, making it the single source of truth.
+      // --- NEW: Check if session cache is ready for document queues ---
       let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
 
-      // If we are in a document queue but the scope hasn't been calculated yet for this session (it's null)...
+      // If in document queue but cache not ready, don't show counter yet
       if (queueInfo.subQueueId && docScopeRemIds === null) {
+        console.log('⏳ GetNextCard: Session cache not ready yet, hiding counter temporarily...');
+        
+        // Hide the counter temporarily - QueueEnter will update it when ready
+        await plugin.app.registerCSS(queueCounterId, '');
+        
+        // Still need to calculate scope for this call using fallback
         const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
         // Special handling for studying a daily doc.
         const referencedRemIds = _.compact(
@@ -1079,9 +1181,10 @@ async function onActivate(plugin: ReactRNPlugin) {
         
         // Update our variable for this run AND save to storage for other parts of the plugin.
         docScopeRemIds = newScope;
-        await plugin.storage.setSession(currentScopeRemIdsKey, docScopeRemIds);
+        // Don't save this to storage - let QueueEnter set the correct one
+        console.log('⚠️ GetNextCard: Using temporary fallback scope (will be replaced by QueueEnter)');
       }
-      // --- REFACTORED LOGIC END ---
+
 
       const cardsPerRem = await getCardsPerRem(plugin);
       const intervalBetweenIncRem = 
@@ -1122,37 +1225,28 @@ async function onActivate(plugin: ReactRNPlugin) {
         filtered: filtered.length,
         seenRemIds: seenRemIds.length,
         queueMode: queueInfo.mode,
-        subQueueId: queueInfo.subQueueId
+        subQueueId: queueInfo.subQueueId,
+        usingCachedScope: queueInfo.subQueueId ? (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null : 'N/A'
       });
 
-      plugin.app.registerCSS(
-        queueCounterId,
-        `
-        .rn-queue__card-counter {
-          /*visibility: hidden;*/
-        }
+      // Only update counter if cache is ready OR we're not in a document queue
+      if (!queueInfo.subQueueId || (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null) {
+        plugin.app.registerCSS(
+          queueCounterId,
+          `
+          .rn-queue__card-counter {
+            /*visibility: hidden;*/
+          }
 
-        .light .rn-queue__card-counter:after {
-          content: ' + ${filtered.length}';
-          /* visibility: visible;
-          background-color: #f0f0f0;
-          display: inline-block;
-          padding: 0.5rem 1rem;
-          font-size: 0.875rem;
-          border-radius: 0.25rem; */
-        }
+          .light .rn-queue__card-counter:after {
+            content: ' + ${filtered.length}';
+          }
 
-        .dark .rn-queue__card-counter:after {
-          content: ' + ${filtered.length}';
-          /* visibility: visible;
-          background-color: #34343c;
-          font-color: #d4d4d0;
-          display: inline-block;
-          padding: 0.5rem 1rem;
-          font-size: 0.875rem;
-          border-radius: 0.25rem; */
-        }`.trim()
-              );
+          .dark .rn-queue__card-counter:after {
+            content: ' + ${filtered.length}';
+          }`.trim()
+        );
+      }
 
       if (
         (typeof intervalBetweenIncRem === 'number' &&

@@ -5,6 +5,8 @@ import {
   seenRemInSessionKey,
   currentSubQueueIdKey,
   seenCardInSessionKey,
+  powerupCode,
+  nextRepDateSlotCode,
 } from './consts';
 import { IncrementalRem } from './types';
 import { calculateRelativePriority } from './priority';
@@ -129,13 +131,57 @@ export async function calculateCardPriorityShield(
     }
   }
 
-  // 2. Calculate the Document Shield
+  // 2. Calculate the Document Shield with COMPREHENSIVE SCOPE
   const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
   if (subQueueId) {
     const scopeRem = await plugin.rem.findOne(subQueueId);
     if (scopeRem) {
-      const docDescendants = await scopeRem.getDescendants();
-      const scopeRemIds = new Set([scopeRem._id, ...docDescendants.map(r => r._id)]);
+      console.log('[CardPriorityShield] Building comprehensive document scope...');
+      
+      // --- COMPREHENSIVE SCOPE CALCULATION ---
+      // 1. Get structural descendants
+      const descendants = await scopeRem.getDescendants();
+      
+      // 2. Get all rems in document/portal context
+      const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+      
+      // 3. Get folder queue rems
+      const folderQueueRems = await scopeRem.allRemInFolderQueue();
+      
+      // 4. Get sources
+      const sources = await scopeRem.getSources();
+      
+      // 5. Get referencing rems (with property value filtering)
+      // Import these from consts if not already imported
+      const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+        powerupCode,
+        nextRepDateSlotCode
+      );
+      
+      const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
+        if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+          return rem.parent;
+        } else {
+          return rem._id;
+        }
+      }).filter(id => id !== null && id !== undefined) as RemId[];
+      
+      // 6. Combine and deduplicate
+      const scopeRemIds = new Set<RemId>([
+        scopeRem._id,
+        ...descendants.map(r => r._id),
+        ...allRemsInContext.map(r => r._id),
+        ...folderQueueRems.map(r => r._id),
+        ...sources.map(r => r._id),
+        ...referencingRems
+      ]);
+      
+      console.log(`[CardPriorityShield] Comprehensive scope: ${scopeRemIds.size} rems`);
+      console.log(`[CardPriorityShield]  - Descendants: ${descendants.length}`);
+      console.log(`[CardPriorityShield]  - Document/portal: ${allRemsInContext.length}`);
+      console.log(`[CardPriorityShield]  - Folder queue: ${folderQueueRems.length}`);
+      console.log(`[CardPriorityShield]  - Sources: ${sources.length}`);
+      console.log(`[CardPriorityShield]  - References: ${referencingRems.length}`);
       
       // Filter the main cache to get only the cards in the current document scope.
       const docPrioritizedCardInfo = allPrioritizedCardInfo.filter(info => scopeRemIds.has(info.remId));

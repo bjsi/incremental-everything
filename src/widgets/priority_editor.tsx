@@ -78,7 +78,10 @@ export function PriorityEditor() {
 
   const cardRelativePriority = useMemo(() => {
     if (!rem || !allPrioritizedCardInfo) return null;
-    return calculateRelativeCardPriority(allPrioritizedCardInfo, rem._id);
+    
+    // Use pre-calculated kbPercentile from cache for consistency
+    const cardInfo = allPrioritizedCardInfo.find(info => info.remId === rem._id);
+    return cardInfo?.kbPercentile ?? null;
   }, [rem, allPrioritizedCardInfo]);
 
 
