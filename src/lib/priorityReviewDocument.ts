@@ -32,7 +32,7 @@ export async function createPriorityReviewDocument(
 ): Promise<Rem> {
   const { scopeRemId, itemCount, cardRatio } = config;
 
-  // 1. Create the review document
+  // 1. Create the review document with rem reference in title
   const timestamp = new Date().toLocaleString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -41,19 +41,38 @@ export async function createPriorityReviewDocument(
     minute: '2-digit'
   });
   
-  const scopeName = scopeRemId 
-    ? (await plugin.rem.findOne(scopeRemId))?.text?.join('') || 'Document'
-    : 'Full Knowledge Base';
-  const docName = `Priority Review - ${scopeName} - ${timestamp}`;
-  
-  // Create a blank Rem
+  // Create a blank Rem first
   const reviewDoc = await plugin.rem.createRem();
   if (!reviewDoc) {
     throw new Error("Failed to create the initial review document Rem.");
   }
   
-  // Set its name and make it a document
-  await reviewDoc.setText([docName]);
+  // Build the document name with rem reference if there's a scope
+  let docNameContent: RichTextInterface;
+  
+  if (scopeRemId) {
+    const scopeRem = await plugin.rem.findOne(scopeRemId);
+    if (scopeRem) {
+      // Create rich text with rem reference
+      docNameContent = [
+        'Priority Review - ',
+        {
+          i: 'q',  // Rem reference/portal
+          _id: scopeRem._id,
+        },
+        ` - ${timestamp}`
+      ];
+    } else {
+      // Fallback if scope rem not found
+      docNameContent = [`Priority Review - Document - ${timestamp}`];
+    }
+  } else {
+    // Full KB scope
+    docNameContent = [`Priority Review - Full Knowledge Base - ${timestamp}`];
+  }
+  
+  // Set the rich text name and make it a document
+  await reviewDoc.setText(docNameContent);
   await reviewDoc.setIsDocument(true);
   
   // 2. Get scope rem if specified
@@ -164,6 +183,9 @@ export async function createPriorityReviewDocument(
   }
   
   // 8. Add metadata to document
+    const scopeName = scopeRemId 
+    ? (await plugin.rem.findOne(scopeRemId))?.text?.join('') || 'Document'
+    : 'Full Knowledge Base';
   const metadataText = `Scope: ${scopeName}
 Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} incremental, ${mixedItems.filter(i => i.type === 'flashcard').length} flashcards)
 Created: ${timestamp}`;

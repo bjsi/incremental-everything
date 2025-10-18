@@ -552,6 +552,64 @@ async function buildOptimizedCache(plugin: RNPlugin) {
 }
 
 
+/**
+ * Check if a rem is a Priority Review Document by checking for the tag
+ */
+async function isPriorityReviewDocument(plugin: RNPlugin, rem: Rem): Promise<boolean> {
+  const tags = await rem.getTagRems();
+  if (!tags || tags.length === 0) return false;
+  
+  // Check if any tag has the name "Priority Review Queue"
+  for (const tag of tags) {
+    // Use the text property directly from RemObject
+    const tagText = tag.text;
+    if (tagText) {
+      // Convert RichTextInterface to string
+      const tagTextString = typeof tagText === 'string' ? tagText : tagText.join('');
+      if (tagTextString.includes('Priority Review Queue')) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Extract the original scope rem from a Priority Review Document's title
+ * The title format is: "Priority Review - [RemReference] - [Timestamp]"
+ */
+async function extractOriginalScopeFromPriorityReview(
+  plugin: RNPlugin, 
+  reviewDocRem: Rem
+): Promise<string | null> {
+  const richText = reviewDocRem.text;
+  if (!richText || richText.length === 0) return null;
+  
+  // Search for a rem reference in the rich text
+  for (const element of richText) {
+    if (typeof element === 'object' && element !== null) {
+      // Check if it's a rem reference (portal)
+      if ('i' in element && element.i === 'q' && '_id' in element) {
+        // This is a rem reference, return the referenced rem ID
+        return element._id as string;
+      }
+    }
+  }
+  
+  // No rem reference found - might be "Full Knowledge Base"
+  const textContent = richText.join('');
+  if (textContent.includes('Full Knowledge Base')) {
+    // Return null to indicate full KB scope
+    return null;
+  }
+  
+  // Could not determine scope
+  console.warn('Could not extract scope from Priority Review Document title');
+  return null;
+}
+
+
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
   console.log('🚀 INCREMENTAL EVERYTHING onActivate CALLED');
@@ -771,10 +829,15 @@ async function onActivate(plugin: ReactRNPlugin) {
     // Flush any pending cache updates immediately
     await flushCacheUpdatesNow(plugin);
     console.log('QueueExit triggered, subQueueId:', subQueueId);
+  
+    // --- NEW: Get the effective scope that was determined at QueueEnter ---
+    const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
+    const effectiveScopeId = await plugin.storage.getSession<string | null>('effectiveScopeId');
     
     // IMPORTANT: Get the scope BEFORE clearing it
     const docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
     console.log('Document scope RemIds at exit:', docScopeRemIds);
+    console.log('Original scope ID for history:', originalScopeId);
     
     const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
 
@@ -806,7 +869,6 @@ async function onActivate(plugin: ReactRNPlugin) {
       console.log('Saved KB history:', kbFinalStatus);
       
       // Save Document-level priority shield if we have scope data
-      // Note: We check docScopeRemIds (which we got BEFORE clearing) instead of subQueueId
       if (docScopeRemIds && docScopeRemIds.length > 0) {
         console.log('Processing document-level shield with', docScopeRemIds.length, 'scoped rems');
         
@@ -831,35 +893,35 @@ async function onActivate(plugin: ReactRNPlugin) {
           }
         }
         
-        // Get the stored subQueueId since the parameter might not always be passed
-        const storedSubQueueId = subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
-        
-        if (storedSubQueueId) {
-          // Save document history with subQueueId as key
-          const docHistory = (await plugin.storage.getSynced(documentPriorityShieldHistoryKey)) || {};
-          if (!docHistory[storedSubQueueId]) {
-            docHistory[storedSubQueueId] = {};
-          }
-          docHistory[storedSubQueueId][today] = docFinalStatus;
-          await plugin.storage.setSynced(documentPriorityShieldHistoryKey, docHistory);
-          console.log('Saved document history for', storedSubQueueId, ':', docFinalStatus);
-        } else {
-          console.log('Warning: No subQueueId available for saving document history');
+      // --- CRITICAL CHANGE: Use originalScopeId for history storage ---
+      // This ensures Priority Review Documents save their history under the original document
+      const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
+      
+      if (historyKey) {
+        // Save document history with the ORIGINAL scope ID as key, not the Priority Review Doc ID
+        const docHistory = (await plugin.storage.getSynced(documentPriorityShieldHistoryKey)) || {};
+        if (!docHistory[historyKey]) {
+          docHistory[historyKey] = {};
         }
+        docHistory[historyKey][today] = docFinalStatus;
+        await plugin.storage.setSynced(documentPriorityShieldHistoryKey, docHistory);
+        console.log('Saved document history for original scope', historyKey, ':', docFinalStatus);
       } else {
-        console.log('No document scope RemIds found or empty - skipping document history save');
+        console.log('Warning: No scope ID available for saving document history');
       }
+    } else {
+      console.log('No document scope RemIds found or empty - skipping document history save');
     }
+  }
 
-    // --- NEW: Card Priority Shield Logic ---
+    // --- NEW: Card Priority Shield Logic (with same Priority Review Document handling) ---
     const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
 
     if (allCardInfos && allCardInfos.length > 0) {
         const today = dayjs().format('YYYY-MM-DD');
-        const subQueueIdForExit = subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
         const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
 
-        // --- Calculate final KB card shield from the cache ---
+        // Calculate final KB card shield from the cache
         const unreviewedDueKb = allCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
         let kbCardFinalStatus = { absolute: null as number | null, percentile: 100 };
         if (unreviewedDueKb.length > 0) {
@@ -873,9 +935,12 @@ async function onActivate(plugin: ReactRNPlugin) {
         cardKbHistory[today] = kbCardFinalStatus;
         await plugin.storage.setSynced(cardPriorityShieldHistoryKey, cardKbHistory);
 
-        // --- Calculate final Doc card shield from the cache ---
-        if (subQueueIdForExit) {
-            const scopeRem = await plugin.rem.findOne(subQueueIdForExit);
+        // Calculate final Doc card shield from the cache
+        // --- CRITICAL: Use originalScopeId here too ---
+        const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
+        
+        if (historyKey) {
+            const scopeRem = await plugin.rem.findOne(effectiveScopeId || historyKey);
             if (scopeRem) {
                 const scopeDescendants = await scopeRem.getDescendants();
                 const scopeIds = new Set([scopeRem._id, ...scopeDescendants.map(d => d._id)]);
@@ -892,11 +957,12 @@ async function onActivate(plugin: ReactRNPlugin) {
                     }
                 }
                 const docCardHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) || {};
-                if (!docCardHistory[subQueueIdForExit]) {
-                    docCardHistory[subQueueIdForExit] = {};
+                if (!docCardHistory[historyKey]) {
+                    docCardHistory[historyKey] = {};
                 }
-                docCardHistory[subQueueIdForExit][today] = docCardFinalStatus;
+                docCardHistory[historyKey][today] = docCardFinalStatus;
                 await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, docCardHistory);
+                console.log('Saved card document history for original scope', historyKey);
             }
         }
     }
@@ -907,9 +973,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
     await plugin.storage.setSession(currentSubQueueIdKey, null);
+    await plugin.storage.setSession('effectiveScopeId', null);
+    await plugin.storage.setSession('originalScopeId', null);
     await plugin.storage.setSession(queueSessionCacheKey, null);
     console.log('Session state reset complete');
   });
+
+  // Updated QueueEnter listener with dual scope handling
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     console.log('QUEUE ENTER: Starting session pre-calculation for subQueueId:', subQueueId);
@@ -919,133 +989,242 @@ async function onActivate(plugin: ReactRNPlugin) {
     await plugin.storage.setSession(seenCardInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    
+    // --- NEW: Priority Review Document Detection with DUAL SCOPE ---
+    let scopeForPriorityCalc = subQueueId || null;  // Scope for priority calculations
+    let scopeForItemSelection = subQueueId || null; // Scope for GetNextCard item selection
+    let originalScopeId = subQueueId || null;       // For history storage
+    let isPriorityReviewDoc = false;
+    
+    if (subQueueId) {
+      const queueRem = await plugin.rem.findOne(subQueueId);
+      if (queueRem) {
+        isPriorityReviewDoc = await isPriorityReviewDocument(plugin, queueRem);
+        
+        if (isPriorityReviewDoc) {
+          console.log('QUEUE ENTER: Priority Review Document detected!');
+          
+          // Extract the original scope for priority calculations ONLY
+          const extractedScopeId = await extractOriginalScopeFromPriorityReview(plugin, queueRem);
+          
+          if (extractedScopeId !== undefined) {
+            // For priority calculations, use the original scope
+            scopeForPriorityCalc = extractedScopeId;
+            originalScopeId = extractedScopeId;
+            
+            // For item selection, KEEP using the Priority Review Document itself
+            scopeForItemSelection = subQueueId;
+            
+            console.log(`QUEUE ENTER: Priority Review Document setup:`);
+            console.log(`  - Item selection from: Priority Review Doc (${subQueueId})`);
+            console.log(`  - Priority calculations for: ${extractedScopeId ? `Original scope (${extractedScopeId})` : 'Full KB'}`);
+          } else {
+            console.warn('QUEUE ENTER: Could not extract scope from Priority Review Document');
+          }
+        }
+      }
+    }
+    
+    // Store the scopes appropriately
     await plugin.storage.setSession(currentSubQueueIdKey, subQueueId || null);
+    await plugin.storage.setSession('originalScopeId', originalScopeId);
+    await plugin.storage.setSession('isPriorityReviewDoc', isPriorityReviewDoc);
+    // --- END NEW ---
 
     // --- CARD PRIORITY PRE-CALCULATION ---
-    // 2. Get the main card priority cache, which is our source of all data.
     const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
     
-    // ✅ FIX: Check if cache is empty and warn
     if (allCardInfos.length === 0) {
       console.warn('QUEUE ENTER: Card priority cache is empty! Flashcard calculations will be skipped.');
     }
 
-    // 3. Pre-calculate the list of all due cards in the entire KB.
     const dueCardsInKB = allCardInfos?.filter(info => info.dueCards > 0) || [];
 
-    // 4. Initialize variables for the document-specific cache.
     let docPercentiles: Record<RemId, number> = {};
     let dueCardsInScope: CardPriorityInfo[] = [];
 
-        // --- INCREMENTAL REM PRE-CALCULATION ---
+    // --- INCREMENTAL REM PRE-CALCULATION ---
     const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
     
-    // ✅ FIX: Check if IncRem cache is empty and warn
     if (allIncRems.length === 0) {
       console.warn('QUEUE ENTER: Incremental Rem cache is empty! IncRem calculations will be skipped.');
     }
     
     const dueIncRemsInKB = allIncRems?.filter(rem => Date.now() >= rem.nextRepDate) || [];
     let dueIncRemsInScope: IncrementalRem[] = [];
-    let incRemDocPercentiles: Record<RemId, number> = {}; // Initialize new map
+    let incRemDocPercentiles: Record<RemId, number> = {};
 
-    // 5. If we are in a document queue (subQueueId is not null), perform the heavy calculations.
-    if (subQueueId) {
-      console.log('QUEUE ENTER: Document queue detected. Starting comprehensive scope calculation...');
-      const scopeRem = await plugin.rem.findOne(subQueueId);
+    // --- DUAL SCOPE CALCULATION ---
+    // For Priority Review Documents, we need TWO different scopes:
+    // 1. Item selection scope (the Priority Review Document's actual contents)
+    // 2. Priority calculation scope (the original document's comprehensive scope)
+    
+    if (scopeForItemSelection) {
+      console.log('QUEUE ENTER: Setting up scopes...');
       
-      if (scopeRem) {
-        // --- COMPREHENSIVE SCOPE CALCULATION (NEW) ---
-        console.log('QUEUE ENTER: Gathering all scope sources...');
-        const startTime = Date.now();
-        
-        // 1. Get structural descendants (hierarchical children)
-        const descendants = await scopeRem.getDescendants();
-        console.log(`QUEUE ENTER: ✓ Found ${descendants.length} descendants`);
-        
-        // 2. Get all rems in document/portal context (portals, tables, search portals)
-        const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-        console.log(`QUEUE ENTER: ✓ Found ${allRemsInContext.length} rems in document/portal context`);
-        
-        // 3. Get folder queue rems (RemNote's native scope)
-        const folderQueueRems = await scopeRem.allRemInFolderQueue();
-        console.log(`QUEUE ENTER: ✓ Found ${folderQueueRems.length} rems via allRemInFolderQueue`);
-        
-        // 4. Get sources (bibliography, references FROM this document)
-        const sources = await scopeRem.getSources();
-        console.log(`QUEUE ENTER: ✓ Found ${sources.length} sources`);
-        
-        // 5. Get rems that reference this document (backlinks)
-        // Use the same logic as GetNextCard to filter out property value rems
-        const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-          powerupCode,
-          nextRepDateSlotCode
-        );
-        
-        const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
-          if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-            // This is a property value rem - return its parent (the actual incremental rem)
-            return rem.parent;
-          } else {
-            // Normal rem that references the document
-            return rem._id;
-          }
-        }).filter(id => id !== null && id !== undefined) as RemId[];
-        
-        console.log(`QUEUE ENTER: ✓ Found ${referencingRems.length} referencing rems`);
-        
-        // 6. Combine and deduplicate ALL sources
-        const docScopeRemIds = new Set<RemId>([
-          scopeRem._id,
-          ...descendants.map(r => r._id),
-          ...allRemsInContext.map(r => r._id),
-          ...folderQueueRems.map(r => r._id),
-          ...sources.map(r => r._id),
-          ...referencingRems
-        ]);
-        
-        const elapsed = Date.now() - startTime;
-        console.log(`QUEUE ENTER: ✓ Comprehensive scope calculation complete (${elapsed}ms)`);
-        console.log(`QUEUE ENTER: Final scope breakdown:`);
-        console.log(`  - Scope rem itself: 1`);
-        console.log(`  - Descendants: ${descendants.length}`);
-        console.log(`  - Document/portal context: ${allRemsInContext.length}`);
-        console.log(`  - Folder queue: ${folderQueueRems.length}`);
-        console.log(`  - Sources: ${sources.length}`);
-        console.log(`  - Referencing rems: ${referencingRems.length}`);
-        console.log(`  - Total unique rems: ${docScopeRemIds.size}`);
-        
-        // Save the comprehensive scope for other parts of the plugin
-        await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(docScopeRemIds));
-
-        // --- FLASHCARD SCOPE CALCULATIONS ---
-        // a) Pre-calculate the list of due cards within this specific document.
-        dueCardsInScope = dueCardsInKB.filter(info => docScopeRemIds.has(info.remId));
-
-        // b) Pre-calculate the relative document percentile for every card in the scope.
-        const docCardInfos = allCardInfos.filter(info => docScopeRemIds.has(info.remId));
+      // SCOPE 1: Item Selection Scope (for GetNextCard)
+      // This determines which items actually appear in the queue
+      let itemSelectionScope: Set<RemId>;
+      
+      if (isPriorityReviewDoc) {
+        // For Priority Review Docs: Use the SAME comprehensive gathering method
+        // This will automatically resolve portals and get the actual referenced rems
+        const reviewDocRem = await plugin.rem.findOne(scopeForItemSelection);
+        if (reviewDocRem) {
+          const startTime = Date.now();
+          
+          // Use the exact same comprehensive scope calculation
+          const descendants = await reviewDocRem.getDescendants();
+          const allRemsInContext = await reviewDocRem.allRemInDocumentOrPortal();
+          const folderQueueRems = await reviewDocRem.allRemInFolderQueue();
+          const sources = await reviewDocRem.getSources();
+          
+          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+            powerupCode,
+            nextRepDateSlotCode
+          );
+          
+          const referencingRems = ((await reviewDocRem.remsReferencingThis()) || []).map((rem) => {
+            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+              return rem.parent;
+            } else {
+              return rem._id;
+            }
+          }).filter(id => id !== null && id !== undefined) as RemId[];
+          
+          itemSelectionScope = new Set<RemId>([
+            reviewDocRem._id,
+            ...descendants.map(r => r._id),
+            ...allRemsInContext.map(r => r._id),
+            ...folderQueueRems.map(r => r._id),
+            ...sources.map(r => r._id),
+            ...referencingRems
+          ]);
+          
+          const elapsed = Date.now() - startTime;
+          console.log(`QUEUE ENTER: Priority Review Doc scope: ${itemSelectionScope.size} items for selection (${elapsed}ms)`);
+          
+          // Store this scope for GetNextCard to use
+          await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
+        }
+      } else {
+        // For regular documents: Calculate comprehensive scope for BOTH selection and priorities
+        const scopeRem = await plugin.rem.findOne(scopeForItemSelection);
+        if (scopeRem) {
+          // ... (existing comprehensive scope calculation code)
+          const startTime = Date.now();
+          
+          const descendants = await scopeRem.getDescendants();
+          const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+          const folderQueueRems = await scopeRem.allRemInFolderQueue();
+          const sources = await scopeRem.getSources();
+          
+          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+            powerupCode,
+            nextRepDateSlotCode
+          );
+          
+          const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
+            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+              return rem.parent;
+            } else {
+              return rem._id;
+            }
+          }).filter(id => id !== null && id !== undefined) as RemId[];
+          
+          itemSelectionScope = new Set<RemId>([
+            scopeRem._id,
+            ...descendants.map(r => r._id),
+            ...allRemsInContext.map(r => r._id),
+            ...folderQueueRems.map(r => r._id),
+            ...sources.map(r => r._id),
+            ...referencingRems
+          ]);
+          
+          const elapsed = Date.now() - startTime;
+          console.log(`QUEUE ENTER: Regular document comprehensive scope: ${itemSelectionScope.size} items (${elapsed}ms)`);
+          
+          // Store comprehensive scope for GetNextCard
+          await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
+        }
+      }
+      
+      // SCOPE 2: Priority Calculation Scope
+      // This determines percentiles and priority shields
+      let priorityCalcScope: Set<RemId>;
+      
+      if (isPriorityReviewDoc && scopeForPriorityCalc) {
+        // Calculate comprehensive scope for the ORIGINAL document
+        const originalScopeRem = await plugin.rem.findOne(scopeForPriorityCalc);
+        if (originalScopeRem) {
+          const descendants = await originalScopeRem.getDescendants();
+          const allRemsInContext = await originalScopeRem.allRemInDocumentOrPortal();
+          const folderQueueRems = await originalScopeRem.allRemInFolderQueue();
+          const sources = await originalScopeRem.getSources();
+          
+          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+            powerupCode,
+            nextRepDateSlotCode
+          );
+          
+          const referencingRems = ((await originalScopeRem.remsReferencingThis()) || []).map((rem) => {
+            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+              return rem.parent;
+            } else {
+              return rem._id;
+            }
+          }).filter(id => id !== null && id !== undefined) as RemId[];
+          
+          priorityCalcScope = new Set<RemId>([
+            originalScopeRem._id,
+            ...descendants.map(r => r._id),
+            ...allRemsInContext.map(r => r._id),
+            ...folderQueueRems.map(r => r._id),
+            ...sources.map(r => r._id),
+            ...referencingRems
+          ]);
+          
+          console.log(`QUEUE ENTER: Original document scope for priorities: ${priorityCalcScope.size} items`);
+        } else {
+          // Full KB scope
+          priorityCalcScope = new Set<RemId>();
+        }
+      } else {
+        // For regular documents, both scopes are the same
+        priorityCalcScope = itemSelectionScope || new Set<RemId>();
+      }
+      
+      // --- CALCULATE PRIORITIES AND PERCENTILES ---
+      // Use priorityCalcScope for percentile calculations
+      
+      if (priorityCalcScope.size > 0) {
+        // FLASHCARD SCOPE CALCULATIONS
+        const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
         const sortedDocCards = _.sortBy(docCardInfos, (info) => info.priority);
         
         sortedDocCards.forEach((info, index) => {
           docPercentiles[info.remId] = Math.round(((index + 1) / sortedDocCards.length) * 100);
         });
         
-        // --- INCREMENTAL REM SCOPE CALCULATIONS ---
-        // c) Calculate doc scope for Incremental Rems
-        dueIncRemsInScope = dueIncRemsInKB.filter(rem => docScopeRemIds.has(rem.remId));
+        // Due cards in scope (for priority shield)
+        dueCardsInScope = dueCardsInKB.filter(info => priorityCalcScope.has(info.remId));
         
-        // d) Calculate IncRem Document Percentiles
-        const scopedIncRems = allIncRems.filter(rem => docScopeRemIds.has(rem.remId));
+        // INCREMENTAL REM SCOPE CALCULATIONS
+        const scopedIncRems = allIncRems.filter(rem => priorityCalcScope.has(rem.remId));
         const sortedIncRems = _.sortBy(scopedIncRems, (rem) => rem.priority);
+        
         sortedIncRems.forEach((rem, index) => {
           incRemDocPercentiles[rem.remId] = Math.round(((index + 1) / sortedIncRems.length) * 100);
         });
-
-        console.log(`QUEUE ENTER: Finished document-scope calculations:`);
-        console.log(`  - Cards in scope: ${docCardInfos.length}`);
-        console.log(`  - Due cards in scope: ${dueCardsInScope.length}`);
-        console.log(`  - IncRems in scope: ${scopedIncRems.length}`);
-        console.log(`  - Due IncRems in scope: ${dueIncRemsInScope.length}`);
+        
+        // Due IncRems in scope (for priority shield)
+        dueIncRemsInScope = dueIncRemsInKB.filter(rem => priorityCalcScope.has(rem.remId));
+        
+        console.log(`QUEUE ENTER: Priority calculations complete:`);
+        console.log(`  - Cards in priority scope: ${docCardInfos.length}`);
+        console.log(`  - Due cards in priority scope: ${dueCardsInScope.length}`);
+        console.log(`  - IncRems in priority scope: ${scopedIncRems.length}`);
+        console.log(`  - Due IncRems in priority scope: ${dueIncRemsInScope.length}`);
       }
     }
 
@@ -1063,10 +1242,23 @@ async function onActivate(plugin: ReactRNPlugin) {
     await plugin.storage.setSession(queueSessionCacheKey, sessionCache);
     console.log('QUEUE ENTER: Pre-calculation complete. Session cache has been saved.');
     
-    // 8. Update the queue counter CSS immediately after cache is built ---
-    const dueIncRemCount = subQueueId 
-      ? sessionCache.dueIncRemsInScope.length 
-      : sessionCache.dueIncRemsInKB.length;
+    // 8. Update the queue counter CSS
+    // For Priority Review Docs, show count of items actually in the document
+    let dueIncRemCount: number;
+    
+    if (isPriorityReviewDoc) {
+      // Count the actual IncRems in the Priority Review Document
+      const scopeRemIds = await plugin.storage.getSession<RemId[]>(currentScopeRemIdsKey) || [];
+      dueIncRemCount = allIncRems.filter(rem => 
+        scopeRemIds.includes(rem.remId) && Date.now() >= rem.nextRepDate
+      ).length;
+    } else if (scopeForItemSelection) {
+      // Regular document - use the scope count
+      dueIncRemCount = sessionCache.dueIncRemsInScope.length;
+    } else {
+      // Full KB
+      dueIncRemCount = sessionCache.dueIncRemsInKB.length;
+    }
 
     plugin.app.registerCSS(
       queueCounterId,
@@ -1085,13 +1277,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     );
 
     console.log(`QUEUE ENTER: Queue counter updated to show ${dueIncRemCount} due IncRems`);
-
   });
-
-  const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-    powerupCode,
-    nextRepDateSlotCode
-  );
 
   plugin.app.registerCommand({
     id: nextRepCommandId,
@@ -1162,6 +1348,11 @@ async function onActivate(plugin: ReactRNPlugin) {
         // Still need to calculate scope for this call using fallback
         const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
         // Special handling for studying a daily doc.
+        const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+            powerupCode,
+            nextRepDateSlotCode
+          );
+
         const referencedRemIds = _.compact(
           ((await subQueueRem?.remsReferencingThis()) || []).map((rem) => {
             if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {

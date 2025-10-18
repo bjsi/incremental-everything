@@ -232,7 +232,9 @@ function ReviewDocumentCreator() {
         • Items are selected based on priority and due date<br/>
         • Sorting criteria (randomness and content mix) from your settings will be applied<br/>
         • The document will open as a page after creation<br/>
-        • Items reviewed can be marked as complete
+        • Practice RemNote regular document-scope queue from this Priority Review document<br/>
+        • After finishing the review of all Cards/IncRems, delete the created document<br/>
+        • You can find all your Priority Review Documents searching for the tag "Priority Review Queue"<br/>
       </div>
       
       {/* Buttons */}
