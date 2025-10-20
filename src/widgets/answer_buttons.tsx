@@ -1,3 +1,4 @@
+// answer_buttons.tsx (Corrected)
 import {
   renderWidget,
   usePlugin,
@@ -25,12 +26,32 @@ import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey } from '../lib/pdfUtils';
 import { QueueSessionCache } from '../lib/cardPriority';
-const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined) => {
+
+// ** START OF FIX **
+// Modified the function to accept the 'remType' to know if it's a PDF.
+const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined, remType: string | null) => {
   if (!rem) return;
+
+  // Added the PDF progress saving logic, copied from handleNextClick.
+  if (remType === 'pdf') {
+    const pdfRem = await findPDFinRem(plugin, rem);
+    if (pdfRem) {
+      const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
+      const currentPage = await plugin.storage.getSynced<number>(pageKey);
+      
+      if (currentPage) {
+        await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
+        console.log(`Manually logged page ${currentPage} for ${rem._id} on 'Review & Open' click.`);
+      }
+    }
+  }
+
+  // The original logic is preserved.
   const incRemInfo = await getIncrementalRemInfo(plugin, rem);
   await reviewRem(plugin, incRemInfo);
   await plugin.window.openRem(rem);
 };
+// ** END OF FIX **
 
 // Enhanced button styles
 const buttonStyles = {
@@ -362,7 +383,7 @@ export function AnswerButtons() {
         </Button>
 
         <Button
-          onClick={() => handleReviewAndOpenRem(plugin, rem)}
+          onClick={() => handleReviewAndOpenRem(plugin, rem, remType)}
         >
           <div style={buttonStyles.label}>Review & Open</div>
           <div style={buttonStyles.sublabel}>Go to Editor</div>

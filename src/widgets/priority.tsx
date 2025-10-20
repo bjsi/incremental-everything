@@ -41,7 +41,7 @@ type CardScopeType = 'prioritized' | 'all';
 function Priority() {
   const plugin = usePlugin();
   
-  // --- STEP 1: ALL HOOKS ARE DECLARED UNCONDITIONALLY AT THE TOP ---
+  // --- ALL HOOKS DECLARED UNCONDITIONALLY AT THE TOP ---
 
   // State Hooks
   const [scope, setScope] = useState<Scope>({ remId: null, name: 'All KB' });
@@ -70,6 +70,17 @@ function Priority() {
   const allCardInfos = useTrackerPlugin(async (plugin) => await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [], []);
   const queueSubQueueId = useTrackerPlugin((rp) => rp.storage.getSession<string | null>(currentSubQueueIdKey), []);
   
+  // --- NEW: Priority Review Document awareness ---
+  const originalScopeId = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string | null>('originalScopeId'),
+    []
+  );
+  
+  const isPriorityReviewDoc = useTrackerPlugin(
+    (rp) => rp.storage.getSession<boolean>('isPriorityReviewDoc'),
+    []
+  );
+  
   const inQueue = !!queueSubQueueId;
 
   const incRemInfo = useTrackerPlugin(async (plugin) => rem ? await getIncrementalRemInfo(plugin, rem) : null, [rem?._id]);
@@ -82,12 +93,10 @@ function Priority() {
   }, [rem]);
 
   // Asynchronous Derived Data Hook
-
   const derivedData = useRunAsync(async () => {
     if (!rem) return undefined;
 
-    // --- NEW: Correct descendant card count calculation ---
-    // This is now calculated once at the top, based on the actual Rem being edited.
+    // Calculate descendant card count
     const remDescendants = await rem.getDescendants();
     const remDescendantIds = new Set(remDescendants.map(d => d._id));
     const finalDescendantCardCount = _.sumBy(
@@ -95,7 +104,13 @@ function Priority() {
       c => c.cardCount
     );
 
-    const useFastCache = inQueue && scope.remId === queueSubQueueId;
+    // --- MODIFIED: Use originalScopeId for cache matching in Priority Review Documents ---
+    const effectiveScopeForCache = originalScopeId || queueSubQueueId;
+    const useFastCache = inQueue && scope.remId === effectiveScopeForCache;
+    
+    if (useFastCache && isPriorityReviewDoc) {
+      console.log('[Priority Widget] Using fast cache with original scope:', originalScopeId);
+    }
     
     let finalScopedIncRems: IncrementalRem[];
     let finalScopedCardRems: CardPriorityInfo[];
@@ -124,19 +139,11 @@ function Priority() {
         // --- COMPREHENSIVE SCOPE CALCULATION ---
         console.log('[Priority Widget] Building comprehensive document scope...');
         
-        // 1. Get structural descendants
         const descendants = await scopeRem.getDescendants();
-        
-        // 2. Get all rems in document/portal context
         const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-        
-        // 3. Get folder queue rems
         const folderQueueRems = await scopeRem.allRemInFolderQueue();
-        
-        // 4. Get sources
         const sources = await scopeRem.getSources();
         
-        // 5. Get referencing rems (with property value filtering)
         const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
           powerupCode,
           nextRepDateSlotCode
@@ -150,7 +157,6 @@ function Priority() {
           }
         }).filter(id => id !== null && id !== undefined) as RemId[];
         
-        // 6. Combine and deduplicate
         scopeIds = new Set<RemId>([
           scopeRem._id,
           ...descendants.map(d => d._id),
@@ -188,7 +194,7 @@ function Priority() {
       descendantCardCount: finalDescendantCardCount, 
       prioritySourceCounts: finalPrioritySourceCounts,
     };
-  }, [rem, inQueue, scope, allIncRems, allCardInfos, cardScopeType, sessionCache, queueSubQueueId, scopeMode]);
+  }, [rem, inQueue, scope, allIncRems, allCardInfos, cardScopeType, sessionCache, queueSubQueueId, scopeMode, originalScopeId, isPriorityReviewDoc]);
 
   // Synchronous Derived Data Hooks (Memoization)
   const documentScopes = useMemo(() => scopeHierarchy.filter(s => s.remId !== null), [scopeHierarchy]);
@@ -213,18 +219,29 @@ function Priority() {
     setScopeHierarchy(hierarchy);
   }, [rem?._id]);
   
+  // --- MODIFIED: Initialize scope with original scope for Priority Review Documents ---
   useEffect(() => {
     const initializeScope = async () => {
       if (inQueue && queueSubQueueId) {
-        const queueRem = await plugin.rem.findOne(queueSubQueueId);
-        if (queueRem) {
-          setScope({ remId: queueRem._id, name: await safeRemTextToString(plugin, queueRem.text) });
+        // Use originalScopeId if available (Priority Review Document case)
+        const effectiveScopeId = originalScopeId || queueSubQueueId;
+        const scopeRem = await plugin.rem.findOne(effectiveScopeId);
+        
+        if (scopeRem) {
+          setScope({ 
+            remId: scopeRem._id, 
+            name: await safeRemTextToString(plugin, scopeRem.text) 
+          });
           setScopeMode('document');
+          
+          if (isPriorityReviewDoc && originalScopeId) {
+            console.log('[Priority Widget] Using original scope from Priority Review Document:', originalScopeId);
+          }
         }
       }
     };
     initializeScope();
-  }, [inQueue, queueSubQueueId]);
+  }, [inQueue, queueSubQueueId, originalScopeId, isPriorityReviewDoc]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -260,7 +277,7 @@ function Priority() {
     }
   }, [cardAbsPriority, derivedData, rem]);
 
-  // Event Handlers (useCallback is a hook, so it must be at the top level)
+  // Event Handlers
   const showIncSection = incRemInfo !== null;
   const showCardSection = hasCards || (cardInfo && cardInfo.cardCount > 0);
   
@@ -321,8 +338,8 @@ function Priority() {
     const targetAbsPriority = otherRems[clampedIndex]?.priority;
     if (targetAbsPriority !== undefined) setIncAbsPriority(targetAbsPriority);
   };
-  
-  const handleCardRelativeSliderChange = (newRelPriority: number) => {
+
+    const handleCardRelativeSliderChange = (newRelPriority: number) => {
     if (!rem || !derivedData?.scopedCardRems || derivedData.scopedCardRems.length < 2) return;
     const otherRems = _.sortBy(derivedData.scopedCardRems.filter((r) => r.remId !== rem._id), (x) => x.priority);
     const targetIndex = Math.floor(((newRelPriority - 1) / 100) * otherRems.length);
@@ -331,9 +348,35 @@ function Priority() {
     if (targetAbsPriority !== undefined) setCardAbsPriority(targetAbsPriority);
   };
 
-  const handleTabCycle = (e: React.KeyboardEvent<HTMLInputElement>) => { /* ... */ };
-  const removeFromIncremental = useCallback(async () => { /* ... */ }, [plugin, rem]);
-  const removeCardPriority = useCallback(async () => { /* ... */ }, [plugin, rem]);
+  const handleTabCycle = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showIncSection || (!showCardSection && !showInheritanceSection) || e.key !== 'Tab' || e.shiftKey) return;
+    const incInput = incInputRef.current;
+    const cardInput = cardInputRef.current;
+    e.preventDefault();
+    if (document.activeElement === incInput && cardInput) {
+        cardInput.focus(); cardInput.select();
+    } else if (document.activeElement === cardInput && incInput) {
+        incInput.focus(); incInput.select();
+    }
+  };
+
+  const removeFromIncremental = useCallback(async () => {
+    if (!rem) return;
+    await rem.removePowerup(powerupCode);
+    const currentIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    const updated = currentIncRems.filter(r => r.remId !== rem._id);
+    await plugin.storage.setSession(allIncrementalRemKey, updated);
+    await plugin.app.toast('Removed from Incremental Queue');
+    plugin.widget.closePopup();
+  }, [plugin, rem]);
+    
+  const removeCardPriority = useCallback(async () => {
+    if (!rem) return;
+    await rem.removePowerup('cardPriority');
+    await updateCardPriorityInCache(plugin, rem._id);
+    await plugin.app.toast('Card Priority for inheritance removed.');
+    plugin.widget.closePopup();
+  }, [plugin, rem]);
   
   // --- EARLY RETURNS & FINAL DATA DE-STRUCTURING ---
   if (!widgetContext || !rem) { return <div className="p-4">Loading Rem Data...</div>; }
@@ -412,6 +455,13 @@ function Priority() {
       )}
 
       <h2 className="text-xl font-bold">Priority Settings</h2>
+
+      {/* --- NEW: Show indicator when in Priority Review Document --- */}
+      {isPriorityReviewDoc && originalScopeId && scopeMode === 'document' && (
+        <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-center">
+          📊 Scope: <span className="font-semibold">{scope.name}</span> (Original Document)
+        </div>
+      )}
 
       <div className="flex justify-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
         <label className={`cursor-pointer w-1/2 text-center text-sm py-1 px-3 rounded-md transition-colors ${
