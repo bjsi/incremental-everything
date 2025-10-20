@@ -126,8 +126,6 @@ export const setIncrementalReadingPosition = async (
 ): Promise<void> => {
   const pageKey = getCurrentPageKey(incrementalRemId, pdfRemId);
   await plugin.storage.setSynced(pageKey, page);
-  
-  await addPageToHistory(plugin, incrementalRemId, pdfRemId, page);
 };
 
 /**
@@ -140,7 +138,7 @@ export const getIncrementalPageRange = async (
 ): Promise<{start: number, end: number} | null> => {
   const rangeKey = getPageRangeKey(incrementalRemId, pdfRemId);
   const savedRange = await plugin.storage.getSynced(rangeKey);
-  return savedRange && typeof savedRange === 'object' && savedRange.start && savedRange.end 
+  return savedRange && typeof savedRange === 'object' && 'start' in savedRange
     ? savedRange as {start: number, end: number} 
     : null;
 };
