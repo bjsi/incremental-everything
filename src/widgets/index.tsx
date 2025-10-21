@@ -54,6 +54,7 @@ import {
   noIncRemTimerWidgetId,
   currentIncRemKey,
   queueSessionCacheKey,
+  priorityCalcScopeRemIdsKey,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -934,44 +935,53 @@ async function onActivate(plugin: ReactRNPlugin) {
         const cardKbHistory = (await plugin.storage.getSynced(cardPriorityShieldHistoryKey)) || {};
         cardKbHistory[today] = kbCardFinalStatus;
         await plugin.storage.setSynced(cardPriorityShieldHistoryKey, cardKbHistory);
+        console.log('Saved KB card history:', kbCardFinalStatus);
 
-        // Calculate final Doc card shield from the cache
-        // --- CRITICAL: Use originalScopeId here too ---
+        // ✅ Calculate final Doc card shield - USE PRIORITY CALCULATION SCOPE
         const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
         
-        if (historyKey) {
-            const scopeRem = await plugin.rem.findOne(effectiveScopeId || historyKey);
-            if (scopeRem) {
-                const scopeDescendants = await scopeRem.getDescendants();
-                const scopeIds = new Set([scopeRem._id, ...scopeDescendants.map(d => d._id)]);
-                const docCardInfos = allCardInfos.filter(ci => scopeIds.has(ci.remId));
+        // Get the PRIORITY CALCULATION scope, not the item selection scope
+        const priorityCalcScopeRemIds = await plugin.storage.getSession<RemId[]>(priorityCalcScopeRemIdsKey);
+        
+        if (historyKey && priorityCalcScopeRemIds && priorityCalcScopeRemIds.length > 0) {
+            console.log('[QueueExit] Calculating card shield using PRIORITY CALC scope:', priorityCalcScopeRemIds.length, 'rems');
+            
+            // Filter cards using the priority calculation scope (not item selection scope!)
+            const docCardInfos = allCardInfos.filter(ci => priorityCalcScopeRemIds.includes(ci.remId));
+            console.log('[QueueExit] Found', docCardInfos.length, 'cards in priority calculation scope');
 
-                const unreviewedDueDoc = docCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
-                let docCardFinalStatus = { absolute: null as number | null, percentile: 100 };
+            // Find unreviewed due cards in scope
+            const unreviewedDueDoc = docCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
+            let docCardFinalStatus = { absolute: null as number | null, percentile: 100 };
 
-                if (unreviewedDueDoc.length > 0) {
-                    const topMissed = _.minBy(unreviewedDueDoc, c => c.priority);
-                    if (topMissed) {
-                        docCardFinalStatus.absolute = topMissed.priority;
-                        docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.remId);
-                    }
+            if (unreviewedDueDoc.length > 0) {
+                const topMissed = _.minBy(unreviewedDueDoc, c => c.priority);
+                if (topMissed) {
+                    docCardFinalStatus.absolute = topMissed.priority;
+                    // Calculate percentile against the priority calculation scope
+                    docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.remId);
+                    console.log('[QueueExit] Doc card shield - Priority:', docCardFinalStatus.absolute, 'Percentile:', docCardFinalStatus.percentile + '%');
                 }
-                const docCardHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) || {};
-                if (!docCardHistory[historyKey]) {
-                    docCardHistory[historyKey] = {};
-                }
-                docCardHistory[historyKey][today] = docCardFinalStatus;
-                await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, docCardHistory);
-                console.log('Saved card document history for original scope', historyKey);
             }
+            
+            // Save to history under the original scope key
+            const docCardHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) || {};
+            if (!docCardHistory[historyKey]) {
+                docCardHistory[historyKey] = {};
+            }
+            docCardHistory[historyKey][today] = docCardFinalStatus;
+            await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, docCardHistory);
+            console.log('Saved card document history for original scope', historyKey, ':', docCardFinalStatus);
+        } else {
+            console.log('[QueueExit] Skipping card document shield - no priority calc scope available');
         }
     }
-
     // Reset session-specific state AFTER we've used the data
     await plugin.storage.setSession(seenRemInSessionKey, []);
     await plugin.storage.setSession(seenCardInSessionKey, []);
     sessionItemCounter = 0;
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    await plugin.storage.setSession(priorityCalcScopeRemIdsKey, null);
     await plugin.storage.setSession(currentSubQueueIdKey, null);
     await plugin.storage.setSession('effectiveScopeId', null);
     await plugin.storage.setSession('originalScopeId', null);
@@ -1185,6 +1195,10 @@ async function onActivate(plugin: ReactRNPlugin) {
           ]);
           
           console.log(`QUEUE ENTER: Original document scope for priorities: ${priorityCalcScope.size} items`);
+    
+          // ✅ NEW: Store the priority calculation scope separately
+          await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
+          
         } else {
           // Full KB scope
           priorityCalcScope = new Set<RemId>();
@@ -1193,11 +1207,12 @@ async function onActivate(plugin: ReactRNPlugin) {
         // For regular documents, both scopes are the same
         priorityCalcScope = itemSelectionScope || new Set<RemId>();
       }
-      
-      // --- CALCULATE PRIORITIES AND PERCENTILES ---
-      // Use priorityCalcScope for percentile calculations
-      
+
+      // ✅ SINGLE if block that does BOTH: stores the scope AND calculates percentiles
       if (priorityCalcScope.size > 0) {
+        // Store the priority calculation scope
+        await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
+        
         // FLASHCARD SCOPE CALCULATIONS
         const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
         const sortedDocCards = _.sortBy(docCardInfos, (info) => info.priority);

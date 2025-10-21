@@ -58,3 +58,4 @@ export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 export const queueSessionCacheKey = 'queueSessionCache';
+export const priorityCalcScopeRemIdsKey = 'priority-calc-scope-rem-ids-key';
