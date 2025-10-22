@@ -836,8 +836,8 @@ async function onActivate(plugin: ReactRNPlugin) {
     const effectiveScopeId = await plugin.storage.getSession<string | null>('effectiveScopeId');
     
     // IMPORTANT: Get the scope BEFORE clearing it
-    const docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
-    console.log('Document scope RemIds at exit:', docScopeRemIds);
+    const docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(priorityCalcScopeRemIdsKey);
+    console.log('[QueueExit] IncRem shield - Priority calculation scope:', docScopeRemIds?.length || 0, 'rems');
     console.log('Original scope ID for history:', originalScopeId);
     
     const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
@@ -867,19 +867,19 @@ async function onActivate(plugin: ReactRNPlugin) {
       const kbHistory = (await plugin.storage.getSynced(priorityShieldHistoryKey)) || {};
       kbHistory[today] = kbFinalStatus;
       await plugin.storage.setSynced(priorityShieldHistoryKey, kbHistory);
-      console.log('Saved KB history:', kbFinalStatus);
+      console.log('[QueueExit] Saved KB IncRem history:', kbFinalStatus);
       
-      // Save Document-level priority shield if we have scope data
+      // Save Document-level priority shield using PRIORITY CALCULATION scope
       if (docScopeRemIds && docScopeRemIds.length > 0) {
-        console.log('Processing document-level shield with', docScopeRemIds.length, 'scoped rems');
+        console.log('[QueueExit] Processing IncRem document shield with PRIORITY CALC scope:', docScopeRemIds.length, 'rems');
         
         const scopedRems = allRems.filter((rem) => docScopeRemIds.includes(rem.remId));
-        console.log('Found', scopedRems.length, 'incremental rems in document scope');
+        console.log('[QueueExit] Found', scopedRems.length, 'incremental rems in priority calculation scope');
         
         const unreviewedDueInScope = scopedRems.filter(
           (rem) => Date.now() >= rem.nextRepDate
         );
-        console.log('Found', unreviewedDueInScope.length, 'due rems in document scope');
+        console.log('[QueueExit] Found', unreviewedDueInScope.length, 'due IncRems in priority calculation scope');
         
         let docFinalStatus = {
           absolute: null as number | null,
@@ -891,6 +891,7 @@ async function onActivate(plugin: ReactRNPlugin) {
           if (topMissedInDoc) {
             docFinalStatus.absolute = topMissedInDoc.priority;
             docFinalStatus.percentile = calculateRelativePriority(scopedRems, topMissedInDoc.remId);
+            console.log('[QueueExit] IncRem doc shield - Priority:', docFinalStatus.absolute, 'Percentile:', docFinalStatus.percentile + '%');
           }
         }
         

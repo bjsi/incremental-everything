@@ -167,4 +167,3 @@ export function QueueComponent() {
 
 renderWidget(QueueComponent);
 
-
