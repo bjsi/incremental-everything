@@ -285,7 +285,30 @@ function Priority() {
     if (!rem) return;
     if (!incRemInfo) await rem.addPowerup(powerupCode);
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
-  }, [rem, incRemInfo]);
+    
+    // Get the updated IncRem info and update allIncrementalRemKey
+    const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+    if (updatedIncRem) {
+      const allIncRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+      const updatedAllIncRems = allIncRems
+        .filter((r) => r.remId !== updatedIncRem.remId)
+        .concat(updatedIncRem);
+      await plugin.storage.setSession(allIncrementalRemKey, updatedAllIncRems);
+    }
+    
+    // Remove the doc percentile from cache to avoid showing stale data
+    if (sessionCache && originalScopeId) {
+      const newIncRemDocPercentiles = { ...sessionCache.incRemDocPercentiles };
+      delete newIncRemDocPercentiles[rem._id];
+      
+      const updatedCache = {
+        ...sessionCache,
+        incRemDocPercentiles: newIncRemDocPercentiles
+      };
+      
+      await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+    }
+  }, [rem, incRemInfo, plugin, sessionCache, originalScopeId]);
 
   const saveCardPriority = useCallback(async (priority: number) => {
     if (!rem) return;
@@ -293,7 +316,36 @@ function Priority() {
     const numCardsRemaining = await plugin.queue.getNumRemainingCards();
     const isInQueueNow = numCardsRemaining !== undefined;
     await updateCardPriorityInCache(plugin, rem._id, isInQueueNow);
-  }, [rem, plugin]); 
+    
+    // Flush the pending cache update first, so the new priority is in the cache
+    await flushLightCacheUpdates(plugin);
+    
+    // Now recalculate KB percentiles (fast - just sort and calculate)
+    const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
+    const sortedInfos = [...allCardInfos].sort((a, b) => a.priority - b.priority);
+    const totalItems = sortedInfos.length;
+    const recalculatedInfos = sortedInfos.map((info, index) => {
+      const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+      return { ...info, kbPercentile: percentile };
+    });
+    await plugin.storage.setSession(allCardPriorityInfoKey, recalculatedInfos);
+    
+    // Trigger refresh signal immediately so display updates before popup closes
+    await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+    
+    // Remove the doc percentile from cache (still needs full recalculation on next queue)
+    if (sessionCache && originalScopeId) {
+      const newDocPercentiles = { ...sessionCache.docPercentiles };
+      delete newDocPercentiles[rem._id];
+      
+      const updatedCache = {
+        ...sessionCache,
+        docPercentiles: newDocPercentiles
+      };
+      
+      await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+    }
+  }, [rem, plugin, sessionCache, originalScopeId]); 
 
   const showInheritanceSection = 
     (!showIncSection && !showCardSection && derivedData?.descendantCardCount > 0) ||
@@ -304,8 +356,7 @@ function Priority() {
     if (showIncSection) await saveIncPriority(incP);
     if (showCardSection || showInheritanceSection) {
       await saveCardPriority(cardP);
-      await flushLightCacheUpdates(plugin);
-      await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+      // Cache flush and refresh signal are now handled inside saveCardPriority
     }
     plugin.widget.closePopup();
   }, [plugin, showIncSection, showCardSection, showInheritanceSection, saveIncPriority, saveCardPriority]);
@@ -591,7 +642,10 @@ function Priority() {
               {ancestorPriorityInfo && (
                 <div className="mt-4 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
                   <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                    Inherits from Ancestor ({ancestorPriorityInfo.sourceType}): {ancestorPriorityInfo.priority}
+                    {cardInfo?.source === 'inherited' 
+                      ? `Inherits from Ancestor (${ancestorPriorityInfo.sourceType}): ${ancestorPriorityInfo.priority}`
+                      : `Ancestor Priority (${ancestorPriorityInfo.sourceType}): ${ancestorPriorityInfo.priority}`
+                    }
                   </div>
                   <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate">
                     {ancestorPriorityInfo.ancestorName}

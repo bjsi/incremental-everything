@@ -137,7 +137,7 @@ export function CardPriorityDisplay() {
         <span style={{ fontWeight: 500 }}>🎴 Priority:</span>
         <div style={priorityBadgeStyle}>
           <span>{cardInfo.priority}</span>
-          {/* --- RESTORED: Document percentile display --- */}
+          {/* Show KB percentile (always current). Doc percentile removed after priority change. */}
           {kbPercentile !== undefined && (
             <span style={{ opacity: 0.9, fontSize: '11px' }}>
               ({kbPercentile}% KB
@@ -145,6 +145,19 @@ export function CardPriorityDisplay() {
             </span>
           )}
         </div>
+        {/* Show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
+        {(docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
+          <span 
+            style={{ 
+              fontSize: '16px', 
+              opacity: 0.6,
+              cursor: 'help'
+            }}
+            title="Doc percentile will be recalculated when you start a new queue session"
+          >
+            ⟳
+          </span>
+        )}
       </div>
       
       {/* --- RESTORED: Document Shield display --- */}

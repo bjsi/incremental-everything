@@ -444,12 +444,26 @@ export function AnswerButtons() {
             <span style={{ fontWeight: 500 }}>Priority:</span>
             <div style={priorityBadgeStyle}>
               <span>{incRemInfo.priority}</span>
+              {/* Show KB percentile (always current). Doc percentile removed from cache after priority change. */}
               {percentiles.kb !== null && (
                 <span style={{ opacity: 0.9, fontSize: '11px' }}>
                   ({percentiles.kb}% KB{percentiles.doc !== null && `, ${percentiles.doc}% Doc`})
                 </span>
               )}
             </div>
+            {/* Show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
+            {percentiles.kb !== null && percentiles.doc === null && (
+              <span 
+                style={{ 
+                  fontSize: '16px', 
+                  opacity: 0.6,
+                  cursor: 'help'
+                }}
+                title="Doc percentile will be recalculated when you start a new queue session"
+              >
+                ⟳
+              </span>
+            )}
           </div>
 
           {/* Shield Display */}
