@@ -18,7 +18,6 @@ export const remToActionItemType = async (
     
     for (const tagRem of tags) {
       const tagText = await plugin.richText.toString(tagRem.text);
-      console.log(`Checking tag: "${tagText}" for rem: "${await plugin.richText.toString(rem.text)}"`);
       
       if (tagText.toLowerCase() === 'extractviewer' || 
           tagText.toLowerCase() === 'extract viewer') {

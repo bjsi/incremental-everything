@@ -1,5 +1,5 @@
 import React from 'react';
-import { Rem, RNPlugin, useTracker, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { Rem, RNPlugin, useTrackerPlugin, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode } from '../lib/consts';
 
 interface ExtractViewerProps {
@@ -8,7 +8,7 @@ interface ExtractViewerProps {
 }
 
 export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
-  const remData = useTracker(async (rp) => {
+  const remData = useTrackerPlugin(async (rp) => {
     if (!rem) return null;
 
     const remText = rem.text ? await plugin.richText.toString(rem.text) : '';
@@ -92,7 +92,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   } = remData;
   
   return (
-    <div className="extract-viewer" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="extract-viewer" style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}>
       {/* Breadcrumb Section */}
       {ancestors.length > 0 && (
         <div className="breadcrumb-section px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -108,7 +108,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
       )}
       
       {/* DocumentViewer Section */}
-      <div className="document-viewer-section flex-1 overflow-hidden">
+      <div className="document-viewer-section overflow-hidden">
         <DocumentViewer width={'100%'} height={'100%'} documentId={rem._id} />
       </div>
       

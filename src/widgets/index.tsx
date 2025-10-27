@@ -45,6 +45,9 @@ import {
   currentSubQueueIdKey,
   remnoteEnvironmentId,
   pageRangeWidgetId,
+  noIncRemTimerKey,
+  noIncRemMenuItemId,
+  noIncRemTimerWidgetId,
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -59,7 +62,18 @@ import { getInitialPriority } from '../lib/priority_inheritance';
 import { findPDFinRem } from '../lib/pdfUtils';
 dayjs.extend(relativeTime);
 
+//Debug
+console.log('🚀 INCREMENTAL EVERYTHING PLUGIN LOADED - VERSION CHECK');
+
+
 async function onActivate(plugin: ReactRNPlugin) {
+  //Debug
+  console.log('🚀 INCREMENTAL EVERYTHING onActivate CALLED');
+  console.log('Plugin type:', typeof plugin);
+  console.log('Plugin methods:', Object.keys(plugin));
+  console.log('Plugin.app methods:', Object.keys(plugin.app));
+  console.log('Plugin.storage methods:', Object.keys(plugin.storage));
+
   let sessionItemCounter = 0;
 
   const QUEUE_LAYOUT_FIX_CSS = `
@@ -89,26 +103,33 @@ async function onActivate(plugin: ReactRNPlugin) {
   `.trim();
 
 
-  await plugin.app.registerPowerup('Incremental', powerupCode, 'Incremental Everything Powerup', {
-    slots: [
-      {
-        code: prioritySlotCode,
-        name: 'Priority',
-        propertyType: PropertyType.NUMBER,
-        propertyLocation: PropertyLocation.BELOW,
-      },
-      {
-        code: nextRepDateSlotCode,
-        name: 'Next Rep Date',
-        propertyType: PropertyType.DATE,
-        propertyLocation: PropertyLocation.BELOW,
-      },
-      {
-        code: repHistorySlotCode,
-        name: 'History',
-        hidden: true,
-      },
-    ],
+  // New, corrected registerPowerup format with a single object (since plugin-sdk@0.0.39)
+  // `slots` is nested inside `options`
+  await plugin.app.registerPowerup({
+    name: 'Incremental',
+    code: powerupCode,
+    description: 'Incremental Everything Powerup',
+    options: {
+      slots: [
+        {
+          code: prioritySlotCode,
+          name: 'Priority',
+          propertyType: PropertyType.NUMBER,
+          propertyLocation: PropertyLocation.BELOW,
+        },
+        {
+          code: nextRepDateSlotCode,
+          name: 'Next Rep Date',
+          propertyType: PropertyType.DATE,
+          propertyLocation: PropertyLocation.BELOW,
+        },
+        {
+          code: repHistorySlotCode,
+          name: 'History',
+          hidden: true,
+        },
+      ],
+    },
   });
 
   plugin.settings.registerNumberSetting({
@@ -323,6 +344,28 @@ async function onActivate(plugin: ReactRNPlugin) {
     SpecialPluginCallback.GetNextCard,
     async (queueInfo) => {
       console.log('queueInfo', queueInfo);
+
+      // Check if "No Inc Rem" timer is active (using SYNCED storage)
+      const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
+      const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > Date.now();
+      
+      if (isTimerActive) {
+        const remainingSeconds = Math.ceil((noIncRemTimerEnd - Date.now()) / 1000);
+        console.log('No Inc Rem timer active. Time remaining:', remainingSeconds, 'seconds');
+        
+        // Clear any incremental rem UI elements
+        await plugin.app.registerCSS(queueLayoutFixId, '');
+        await plugin.app.registerCSS(queueCounterId, '');
+        
+        // Return null to let regular flashcards take over
+        return null;
+      } else if (noIncRemTimerEnd && noIncRemTimerEnd <= Date.now()) {
+        // Timer has expired, clean it up
+        await plugin.storage.setSynced(noIncRemTimerKey, null);
+        console.log('No Inc Rem timer expired and cleared');
+      }
+
+
       const allIncrementalRem: IncrementalRem[] =
         (await plugin.storage.getSession(allIncrementalRemKey)) || [];
 
@@ -395,28 +438,28 @@ async function onActivate(plugin: ReactRNPlugin) {
         queueCounterId,
         `
         .rn-queue__card-counter {
-          visibility: hidden;
+          /*visibility: hidden;*/
         }
 
         .light .rn-queue__card-counter:after {
-          content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
-          visibility: visible;
+          content: ' + ${filtered.length}';
+          /* visibility: visible;
           background-color: #f0f0f0;
           display: inline-block;
           padding: 0.5rem 1rem;
           font-size: 0.875rem;
-          border-radius: 0.25rem;
+          border-radius: 0.25rem; */
         }
 
         .dark .rn-queue__card-counter:after {
-          content: '${queueInfo.numCardsRemaining} + ${filtered.length}';
-          visibility: visible;
+          content: ' + ${filtered.length}';
+          /* visibility: visible;
           background-color: #34343c;
           font-color: #d4d4d0;
           display: inline-block;
           padding: 0.5rem 1rem;
           font-size: 0.875rem;
-          border-radius: 0.25rem;
+          border-radius: 0.25rem; */
         }`.trim()
               );
 
@@ -519,6 +562,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerWidget('batch_priority', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1000,
+      height: 950,
+    },
+  });
+
   plugin.app.registerWidget('reschedule', WidgetLocation.Popup, {
     dimensions: {
     width: '100%',
@@ -591,6 +641,28 @@ async function onActivate(plugin: ReactRNPlugin) {
       });
     },
   });
+
+  plugin.app.registerCommand({
+    id: 'batch-priority-change',
+    name: 'Batch Priority Change',
+    keyboardShortcut: 'opt+shift+p',
+    action: async () => {
+      const focusedRem = await plugin.focus.getFocusedRem();
+      if (!focusedRem) {
+        await plugin.app.toast('Please focus on a rem to perform batch priority changes');
+        return;
+      }
+      
+      // Store the focused rem ID in session for the popup to access
+      await plugin.storage.setSession('batchPriorityFocusedRem', focusedRem._id);
+      
+      // Open the popup
+      await plugin.widget.openPopup('batch_priority', {
+        remId: focusedRem._id,
+      });
+    },
+  });
+    
 
   plugin.app.registerCommand({
     id: 'pdf-control-panel',
@@ -803,6 +875,79 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
     },
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
+  });
+
+  plugin.app.registerMenuItem({
+    id: 'batch_priority_menuitem',
+    location: PluginCommandMenuLocation.DocumentMenu,
+    name: 'Batch Priority Change',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) {
+        return;
+      }
+      
+      // Store the rem ID in session for the popup to access
+      await plugin.storage.setSession('batchPriorityFocusedRem', args.remId);
+      
+      // Open the popup
+      await plugin.widget.openPopup('batch_priority', {
+        remId: args.remId,
+      });
+    },
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2040/2040651.png', // Priority icon
+  });
+
+  // No Inc Rem Timer
+
+  // Register the timer indicator widget (add this with other widget registrations)
+  plugin.app.registerWidget('no_inc_timer_indicator', WidgetLocation.QueueToolbar, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
+
+  // Update the menu item registration to use synced storage
+  plugin.app.registerMenuItem({
+    id: noIncRemMenuItemId,
+    name: 'No Inc Rem for 15 min',
+    location: PluginCommandMenuLocation.QueueMenu,
+    action: async () => {
+      // Check if timer is already active
+      const currentTimer = await plugin.storage.getSynced<number>(noIncRemTimerKey);
+      if (currentTimer && currentTimer > Date.now()) {
+        const remainingMinutes = Math.ceil((currentTimer - Date.now()) / 60000);
+        await plugin.app.toast(`Timer already active: ${remainingMinutes} minutes remaining`);
+        return;
+      }
+      
+      // Set timer for 15 minutes from now using SYNCED storage
+      const endTime = Date.now() + (15 * 60 * 1000);
+      await plugin.storage.setSynced(noIncRemTimerKey, endTime);
+      
+      await plugin.app.toast('Incremental rems disabled for 15 minutes. Only flashcards will be shown.');
+      
+      // Force queue refresh
+      await plugin.storage.setSynced('queue-refresh-trigger', Date.now());
+    },
+  });
+
+  // Update the cancel command to use synced storage
+  plugin.app.registerCommand({
+    id: 'cancel-no-inc-rem-timer',
+    name: 'Cancel No Inc Rem Timer',
+    action: async () => {
+      const timerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
+      if (timerEnd && timerEnd > Date.now()) {
+        await plugin.storage.setSynced(noIncRemTimerKey, null);
+        await plugin.app.toast('Incremental rem timer cancelled. Normal queue behavior resumed.');
+        // Force queue refresh
+        await plugin.storage.setSynced('queue-refresh-trigger', Date.now());
+      } else {
+        await plugin.app.toast('No active timer to cancel.');
+      }
+    },
   });
 
   

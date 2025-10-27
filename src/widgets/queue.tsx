@@ -3,7 +3,7 @@ import {
   renderWidget,
   usePlugin,
   useRunAsync,
-  useTracker,
+  useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useRef } from 'react';
@@ -29,7 +29,7 @@ export function QueueComponent() {
     []
   );
 
-  const remAndType = useTracker(
+  const remAndType = useTrackerPlugin(
     async (rp) => {
       if (!ctx) return undefined;
       const rem = await rp.rem.findOne(ctx?.remId);
@@ -39,7 +39,7 @@ export function QueueComponent() {
     [ctx?.remId]
   );
 
-  const shouldCollapseTopBar = useTracker(
+  const shouldCollapseTopBar = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(collapseQueueTopBar),
     []
   );
@@ -90,7 +90,7 @@ export function QueueComponent() {
 
   return (
     <div className="incremental-everything-element" style={{ height: '100%' }}>
-      <div className="box-border p-2" style={{ height: `100%` }}>
+      <div className="box-border p-2" style={{ height: `100vh` }}>
         {!remAndType ? null : remAndType.type === 'pdf' ||
           remAndType.type === 'html' ||
           remAndType.type === 'pdf-highlight' ||

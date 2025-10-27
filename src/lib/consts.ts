@@ -47,3 +47,7 @@ export const currentSubQueueIdKey = 'current-sub-queue-id-key';
 
 // --- Keys for Open Editor in a new tab/window (PDFs) ---
 export const remnoteEnvironmentId = 'remnote-environment';
+
+export const noIncRemTimerKey = 'no-inc-rem-timer-end';
+export const noIncRemMenuItemId = 'no-inc-rem-15-min';
+export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';

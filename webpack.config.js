@@ -57,6 +57,7 @@ const config = {
   plugins: [
     isDevelopment ? undefined : new MiniCssExtractPlugin({
       filename: '[name].css',
+      chunkFilename: '[id].css',
     }),
     new HtmlWebpackPlugin({
       templateContent: `
@@ -109,8 +110,14 @@ if (isProd) {
     hot: true,
     compress: true,
     watchFiles: ['src/*'],
+    static: {  // Add this section
+      directory: resolve(__dirname, 'src'),
+      publicPath: '/',
+    },
     headers: {
       'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',  // Add this
+      'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization',  // Add this
     },
   };
 }

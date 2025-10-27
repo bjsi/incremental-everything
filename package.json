@@ -9,7 +9,7 @@
     "build": "npx remnote-plugin validate && shx rm -rf dist && cross-env NODE_ENV=production webpack --color --progress && shx cp README.md dist && cd dist && bestzip ../PluginZip.zip ./*"
   },
   "dependencies": {
-    "@remnote/plugin-sdk": "^0.0.33",
+    "@remnote/plugin-sdk": "^0.0.46",
     "dayjs": "^1.11.9",
     "re-resizable": "^6.9.9",
     "react": "^17.0.2",

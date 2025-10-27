@@ -2,7 +2,7 @@ import {
   renderWidget,
   usePlugin,
   useRunAsync,
-  useTracker,
+  useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
@@ -31,8 +31,8 @@ export function Priority() {
 
   const remId = ctx?.contextData?.remId;
 
-  const allIncrementalRems = useTracker(
-    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+  const allIncrementalRems = useTrackerPlugin(
+    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [],
     []
   );
 
@@ -43,7 +43,7 @@ export function Priority() {
     return await findClosestIncrementalAncestor(plugin, rem);
   }, [remId]);
 
-  const initialPriority = useTracker(async (rp) => {
+  const initialPriority = useTrackerPlugin(async (rp) => {
     if (!remId) return 10;
     const rem = await rp.rem.findOne(remId);
     if (!rem) return 10;

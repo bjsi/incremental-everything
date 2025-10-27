@@ -2,7 +2,7 @@
 import {
   renderWidget,
   usePlugin,
-  useTracker,
+  useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
@@ -23,7 +23,7 @@ import { getIncrementalRemInfo } from '../lib/incremental_rem';
 function PageRangeWidget() {
   const plugin = usePlugin();
   
-  const contextData = useTracker(
+  const contextData = useTrackerPlugin(
     async (rp) => {
       const data = await rp.storage.getSession('pageRangeContext');
       console.log('PageRange: Context data from session:', data);
@@ -32,7 +32,7 @@ function PageRangeWidget() {
     []
   );
 
-  const allIncrementalRems = useTracker(
+  const allIncrementalRems = useTrackerPlugin(
     (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
     []
   );
