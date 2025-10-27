@@ -110,17 +110,17 @@ export async function findClosestAncestorWithAnyPriority(
 
 /**
  * Gets the initial priority for a new incremental rem
- * Tries to inherit from closest incremental ancestor, otherwise uses default
+ * Tries to inherit from closest ancestor with any priority (IncRem or Card), otherwise uses default
  */
 export async function getInitialPriority(
   plugin: RNPlugin,
   rem: Rem,
   defaultPriority: number
 ): Promise<number> {
-  const ancestorInfo = await findClosestIncrementalAncestor(plugin, rem);
+  const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem);
   
   if (ancestorInfo) {
-    console.log(`Inheriting priority ${ancestorInfo.priority} from ancestor: ${ancestorInfo.ancestorName}`);
+    console.log(`Inheriting priority ${ancestorInfo.priority} from ${ancestorInfo.sourceType} ancestor: ${ancestorInfo.ancestorName}`);
     return ancestorInfo.priority;
   }
   
