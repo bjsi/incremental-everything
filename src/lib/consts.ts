@@ -13,6 +13,7 @@ export const defaultPriorityId = 'default-priority'; //New
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
 export const currentIncRemKey = 'current-inc-rem';
+export const allCardPriorityInfoKey = 'all-card-priority-info-key';
 
 // widgets
 export const scrollToHighlightId = 'scroll-to-highlight';
@@ -39,11 +40,14 @@ export const currentScopeRemIdsKey = 'current-scope-rem-ids-key';
 
 // --- Keys for the Priority Protection ---
 export const seenRemInSessionKey = 'seen-rem-in-session-key';
+export const seenCardInSessionKey = 'seen-card-in-session-key';
 export const displayPriorityShieldId = 'display-priority-shield';
 export const priorityShieldHistoryKey = 'priority-shield-history-key';
 export const priorityShieldHistoryMenuItemId = 'priority-shield-history-menu-item-id';
 export const documentPriorityShieldHistoryKey = 'document-priority-shield-history-key';
 export const currentSubQueueIdKey = 'current-sub-queue-id-key';
+export const cardPriorityShieldHistoryKey = 'card-priority-shield-history-key';
+export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shield-history-key';
 
 // --- Keys for Open Editor in a new tab/window (PDFs) ---
 export const remnoteEnvironmentId = 'remnote-environment';
@@ -51,3 +55,7 @@ export const remnoteEnvironmentId = 'remnote-environment';
 export const noIncRemTimerKey = 'no-inc-rem-timer-end';
 export const noIncRemMenuItemId = 'no-inc-rem-15-min';
 export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
+
+export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
+export const queueSessionCacheKey = 'queueSessionCache';
+export const priorityCalcScopeRemIdsKey = 'priority-calc-scope-rem-ids-key';

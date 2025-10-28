@@ -1,6 +1,88 @@
 // lib/pdfUtils.ts
 import { RNPlugin, Rem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { powerupCode } from './consts';
+import { powerupCode, allIncrementalRemKey } from './consts';
+
+/**
+ * Safely convert rem text to string, handling all edge cases
+ */
+export const safeRemTextToString = async (
+  plugin: RNPlugin, 
+  remText: any
+): Promise<string> => {
+  // Handle null/undefined
+  if (remText == null) {
+    return 'Untitled';
+  }
+  
+  // Handle non-array types
+  if (!Array.isArray(remText)) {
+    console.warn('rem.text is not an array:', typeof remText, remText);
+    return 'Untitled';
+  }
+  
+  // Handle empty array
+  if (remText.length === 0) {
+    return 'Untitled';
+  }
+  
+  // Try to normalize first (this might fix malformed richText)
+  try {
+    const normalized = await plugin.richText.normalize(remText);
+    
+    // Then try to convert to string
+    try {
+      const text = await plugin.richText.toString(normalized);
+      // Handle empty string result
+      if (!text || text.trim().length === 0) {
+        return 'Untitled';
+      }
+      return text;
+    } catch (toStringError) {
+      // If toString fails after normalization, try manual extraction
+      console.warn('toString failed after normalization, trying manual extraction');
+      const manualText = extractTextManually(normalized);
+      return manualText || 'Untitled';
+    }
+  } catch (normalizeError) {
+    // If normalize fails, try toString directly on original
+    try {
+      const text = await plugin.richText.toString(remText);
+      if (!text || text.trim().length === 0) {
+        return 'Untitled';
+      }
+      return text;
+    } catch (toStringError) {
+      // Last resort: manual extraction
+      console.warn('All conversion methods failed, using manual extraction. Original text:', remText);
+      const manualText = extractTextManually(remText);
+      return manualText || 'Untitled';
+    }
+  }
+};
+
+/**
+ * Manually extract text from richText array as a fallback
+ */
+const extractTextManually = (richText: any): string => {
+  if (!Array.isArray(richText)) return '';
+  
+  let text = '';
+  for (const element of richText) {
+    if (typeof element === 'string') {
+      text += element;
+    } else if (element && typeof element === 'object') {
+      // Handle text elements with formatting
+      if (element.i === 'm' && element.text) {
+        text += element.text;
+      }
+      // Handle other text-like elements
+      else if (element.text) {
+        text += element.text;
+      }
+    }
+  }
+  return text.trim();
+};
 
 /**
  * Generate key for storing current page position per incremental rem
@@ -44,8 +126,6 @@ export const setIncrementalReadingPosition = async (
 ): Promise<void> => {
   const pageKey = getCurrentPageKey(incrementalRemId, pdfRemId);
   await plugin.storage.setSynced(pageKey, page);
-  
-  await addPageToHistory(plugin, incrementalRemId, pdfRemId, page);
 };
 
 /**
@@ -58,7 +138,7 @@ export const getIncrementalPageRange = async (
 ): Promise<{start: number, end: number} | null> => {
   const rangeKey = getPageRangeKey(incrementalRemId, pdfRemId);
   const savedRange = await plugin.storage.getSynced(rangeKey);
-  return savedRange && typeof savedRange === 'object' && savedRange.start && savedRange.end 
+  return savedRange && typeof savedRange === 'object' && 'start' in savedRange
     ? savedRange as {start: number, end: number} 
     : null;
 };
@@ -134,31 +214,63 @@ export const addPageToHistory = async (
 };
 
 /**
- * Finds the first PDF Rem within a given Rem or its sources.
+ * Finds a specific PDF Rem within a given Rem or its sources.
+ * If targetPdfId is provided, searches for that specific PDF.
+ * If not provided, returns the first PDF found.
  */
-export const findPDFinRem = async (plugin: RNPlugin, rem: Rem): Promise<Rem | null> => {
-  const remName = await plugin.richText.toString(rem.text || []);
-  console.log(`[findPDFinRem] Starting search in Rem: "${remName}" (${rem._id})`);
-
+export const findPDFinRem = async (
+  plugin: RNPlugin, 
+  rem: Rem, 
+  targetPdfId?: string
+): Promise<Rem | null> => {
   const isUploadedPdf = async (r: Rem): Promise<boolean> => {
     const hasPowerup = await r.hasPowerup(BuiltInPowerupCodes.UploadedFile);
     if (!hasPowerup) return false;
     try {
       const url = await r.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
-      return typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
+      const isPdf = typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
+      return isPdf;
     } catch (e) {
       return false;
     }
   };
 
-  if (await isUploadedPdf(rem)) return rem;
-
-  const sources = await rem.getSources();
-  for (const source of sources) {
-    if (await isUploadedPdf(source)) return source;
+  // Check if rem itself is a PDF
+  if (await isUploadedPdf(rem)) {
+    if (!targetPdfId || rem._id === targetPdfId) {
+      console.log(`    [findPDFinRem] Rem itself is a PDF (${rem._id})`);
+      return rem;
+    }
   }
 
-  return null;
+  // Check sources
+  const sources = await rem.getSources();
+  console.log(`    [findPDFinRem] Checking ${sources.length} sources`);
+  
+  const foundPdfs: Rem[] = [];
+  
+  for (const source of sources) {
+    if (await isUploadedPdf(source)) {
+      const sourceText = await safeRemTextToString(plugin, source.text);
+      console.log(`    [findPDFinRem] Found PDF in source: "${sourceText}" (${source._id})`);
+      foundPdfs.push(source);
+      
+      // If we're looking for a specific PDF and found it, return immediately
+      if (targetPdfId && source._id === targetPdfId) {
+        console.log(`    [findPDFinRem] ✓ MATCH! This is the target PDF`);
+        return source;
+      }
+    }
+  }
+  
+  // If we have a target PDF but didn't find it, return null
+  if (targetPdfId) {
+    console.log(`    [findPDFinRem] Found ${foundPdfs.length} PDF(s) but none matched target ${targetPdfId}`);
+    return null;
+  }
+  
+  // If no target specified, return the first PDF found (backward compatibility)
+  return foundPdfs.length > 0 ? foundPdfs[0] : null;
 };
 
 /**
@@ -188,7 +300,6 @@ const getDescendantsToDepth = async (rem: Rem, maxDepth: number): Promise<Rem[]>
 
 /**
  * Get all rems (incremental and non-incremental) that use a specific PDF
- * This function is called from the page-range popup widget
  */
 export const getAllIncrementsForPDF = async (
   plugin: RNPlugin,
@@ -211,13 +322,11 @@ export const getAllIncrementsForPDF = async (
     
     const processedRemIds = new Set<string>();
     
-    // Get the PDF rem
     const pdfRem = await plugin.rem.findOne(pdfRemId);
     if (!pdfRem) return result;
     
     console.log('Searching for rems using PDF:', pdfRemId);
     
-    // Get the context - the incremental rem that opened the popup
     const contextData = await plugin.storage.getSession('pageRangeContext');
     const incrementalRemId = contextData?.incrementalRemId;
     
@@ -226,45 +335,73 @@ export const getAllIncrementsForPDF = async (
       return result;
     }
     
-    // Get the incremental rem that has the PDF as source (e.g., Chapter 9)
     const incrementalRem = await plugin.rem.findOne(incrementalRemId);
     if (!incrementalRem) {
       console.log('Incremental rem not found');
       return result;
     }
     
-    // Get the parent of this incremental rem (e.g., BTM folder)
+    // ===== PART 1: LOCAL SEARCH for NON-incremental rems =====
+    console.log('\n===== PART 1: Searching locally for non-incremental rems =====');
+    
+    const remsToCheck: Rem[] = [];
+    const processSearchScope = new Set<string>();
+    
+    // Get parent and search from there
     let searchRoot: Rem | null = null;
     if (incrementalRem.parent) {
       searchRoot = await plugin.rem.findOne(incrementalRem.parent);
+      
+      if (searchRoot) {
+        // Add parent
+        if (!processSearchScope.has(searchRoot._id)) {
+          remsToCheck.push(searchRoot);
+          processSearchScope.add(searchRoot._id);
+        }
+        
+        // Add all siblings
+        const siblings = await searchRoot.getChildrenRem();
+        for (const sibling of siblings) {
+          if (!processSearchScope.has(sibling._id)) {
+            remsToCheck.push(sibling);
+            processSearchScope.add(sibling._id);
+          }
+        }
+        
+        // Add descendants of parent (up to 3 levels)
+        const descendants = await getDescendantsToDepth(searchRoot, 3);
+        for (const desc of descendants) {
+          if (!processSearchScope.has(desc._id)) {
+            remsToCheck.push(desc);
+            processSearchScope.add(desc._id);
+          }
+        }
+        
+        const searchRootText = await safeRemTextToString(plugin, searchRoot.text);
+        console.log(`Search root (parent): "${searchRootText}" (${searchRoot._id})`);
+      }
     }
     
-    // If no parent, use the incremental rem itself as the search root
-    if (!searchRoot) {
-      searchRoot = incrementalRem;
-    }
+    console.log(`Checking ${remsToCheck.length} local rems (parent + siblings + descendants)`);
     
-    console.log(`Search root: "${await plugin.richText.toString(searchRoot.text || [])}" (${searchRoot._id})`);
-    
-    // Collect the search root and its descendants (up to 3 levels)
-    const remsToCheck: Rem[] = [searchRoot];
-    const descendants = await getDescendantsToDepth(searchRoot, 3);
-    remsToCheck.push(...descendants);
-    
-    console.log(`Checking ${remsToCheck.length} rems (parent + descendants)`);
-    
-    // Check each rem to see if it has the target PDF as a source
+    // Check each local rem
     for (const rem of remsToCheck) {
       if (processedRemIds.has(rem._id)) continue;
       processedRemIds.add(rem._id);
       
-      // Use findPDFinRem to check if this rem has access to a PDF
-      const foundPDF = await findPDFinRem(plugin, rem);
+      const remText = await safeRemTextToString(plugin, rem.text);
+      console.log(`Checking rem: "${remText}" (${rem._id})`);
       
-      // Only include if the found PDF matches our target PDF
+      const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
+      
+      if (foundPDF) {
+        console.log(`  - Found PDF: ${foundPDF._id}, Target PDF: ${pdfRemId}, Match: ${foundPDF._id === pdfRemId}`);
+      } else {
+        console.log(`  - No matching PDF found in this rem`);
+      }
+      
       if (foundPDF && foundPDF._id === pdfRemId) {
         const isIncremental = await rem.hasPowerup(powerupCode);
-        const remText = rem.text ? await plugin.richText.toString(rem.text) : 'Untitled';
         
         const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
         const currentPage = isIncremental ? 
@@ -278,11 +415,55 @@ export const getAllIncrementsForPDF = async (
           isIncremental
         });
         
-        console.log(`Found rem with PDF: "${remText}" (Incremental: ${isIncremental})`);
+        console.log(`✓ ADDED: "${remText}" (Incremental: ${isIncremental}, Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
       }
     }
     
-    // Also check known rems from storage (for formerly incremental rems)
+    // ===== PART 2: COMPREHENSIVE SEARCH for all incremental rems =====
+    console.log('\n===== PART 2: Searching all incremental rems from cache =====');
+    
+    const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+    console.log(`Found ${allIncrementalRems.length} incremental rems in cache`);
+    
+    for (const incRemInfo of allIncrementalRems) {
+      if (processedRemIds.has(incRemInfo.remId)) {
+        console.log(`Skipping ${incRemInfo.remId} (already processed)`);
+        continue;
+      }
+      
+      const rem = await plugin.rem.findOne(incRemInfo.remId);
+      if (!rem) continue;
+      
+      const remText = await safeRemTextToString(plugin, rem.text);
+      
+      // Check if this is a PDF highlight (skip if it is)
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+      if (isPdfHighlight) {
+        console.log(`Skipping "${remText}" (PDF highlight, not a reading incremental)`);
+        continue;
+      }
+      
+      // Check if this incremental rem has the target PDF
+      const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
+      
+      if (foundPDF && foundPDF._id === pdfRemId) {
+        const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
+        const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
+        
+        result.push({
+          remId: rem._id,
+          name: remText,
+          range,
+          currentPage,
+          isIncremental: true // All items in this search are incremental
+        });
+        
+        processedRemIds.add(rem._id);
+        console.log(`✓ ADDED: "${remText}" (Incremental: true, Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
+      }
+    }
+    
+    // Check known rems from storage
     const knownRemsKey = getKnownPdfRemsKey(pdfRemId);
     let knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
     
@@ -292,9 +473,8 @@ export const getAllIncrementsForPDF = async (
       const rem = await plugin.rem.findOne(remId);
       if (rem) {
         const isIncremental = await rem.hasPowerup(powerupCode);
-        const remText = rem.text ? await plugin.richText.toString(rem.text) : 'Untitled';
+        const remText = await safeRemTextToString(plugin, rem.text); // FIXED
         
-        // Verify it still has the PDF as source
         const foundPDF = await findPDFinRem(plugin, rem);
         if (foundPDF && foundPDF._id === pdfRemId) {
           const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
@@ -315,11 +495,11 @@ export const getAllIncrementsForPDF = async (
       }
     }
     
-    // Update the known rems list for future use
+    // Update the known rems list
     const allFoundRemIds = Array.from(processedRemIds);
     await plugin.storage.setSynced(knownRemsKey, allFoundRemIds);
     
-    // Sort results: incremental rems first, then by name
+    // Sort results
     result.sort((a, b) => {
       if (a.isIncremental !== b.isIncremental) {
         return a.isIncremental ? -1 : 1;
