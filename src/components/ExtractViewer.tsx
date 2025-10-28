@@ -1,6 +1,7 @@
 import React from 'react';
 import { Rem, RNPlugin, useTrackerPlugin, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode } from '../lib/consts';
+import { safeRemTextToString } from '../lib/pdfUtils';
 
 interface ExtractViewerProps {
   rem: Rem;
@@ -11,7 +12,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   const remData = useTrackerPlugin(async (rp) => {
     if (!rem) return null;
 
-    const remText = rem.text ? await plugin.richText.toString(rem.text) : '';
+    const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : '';
     const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
 
     // Get direct children and count incremental ones
@@ -53,7 +54,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
         const parentRem = await plugin.rem.findOne(currentParent);
         if (!parentRem || !parentRem.text) break;
         
-        const parentText = await plugin.richText.toString(parentRem.text);
+        const parentText = await safeRemTextToString(plugin, parentRem.text);
         
         ancestorList.unshift({
           text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),

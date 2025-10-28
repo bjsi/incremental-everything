@@ -7,6 +7,9 @@ import {
   setCardsPerRem,
   CardsPerRem,
   DEFAULT_CARDS_PER_REM,
+  getCardRandomness,  // Add this
+  setCardRandomness,   // Add this
+  DEFAULT_CARD_RANDOMNESS  // Add this
 } from '../lib/sorting';
 import { useState, useEffect } from 'react';
 import { noIncRemTimerKey } from '../lib/consts';
@@ -41,18 +44,26 @@ const sliderValueToLabel = (value: number): string => {
 export function SortingCriteria() {
   const plugin = usePlugin();
 
+  // --- ALL HOOKS MOVED TO THE TOP ---
   const sortingRandomness = useTrackerPlugin(async (rp) => await getSortingRandomness(rp), []);
   const storedCards = useTrackerPlugin(async (rp) => await getCardsPerRem(rp), []);
-  const [sliderValue, setSliderValue] = useState<number | undefined>(undefined);
-
-    //No Inc Rem timer
+  
+  //No Inc Rem timer
   const noIncRemTimerEnd = useTrackerPlugin(
     async (rp) => await rp.storage.getSynced<number>(noIncRemTimerKey),
     []
   );
 
+  const cardRandomness = useTrackerPlugin(
+    async (rp) => await getCardRandomness(rp), 
+    []
+  );
+
+  const [sliderValue, setSliderValue] = useState<number | undefined>(undefined);
+
   const [currentTime, setCurrentTime] = useState(Date.now());
 
+  // --- EFFECTS ---
   // Add timer update effect
   useEffect(() => {
     const interval = setInterval(() => {
@@ -68,62 +79,66 @@ export function SortingCriteria() {
     }
   }, [storedCards]);
 
+  // --- EVENT HANDLER ---
   const handleSliderChange = (value: number) => {
     setSliderValue(value);
     setCardsPerRem(plugin, sliderValueToCards(value));
   };
 
+  // --- CONDITIONAL RETURN ---
+
   if (sliderValue === undefined) {
     return null; 
   }
 
-
+  // --- RENDER LOGIC ---
   const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > currentTime;
   const timeRemainingMs = isTimerActive ? noIncRemTimerEnd - currentTime : 0;
   const minutes = Math.floor(timeRemainingMs / 60000);
   const seconds = Math.floor((timeRemainingMs % 60000) / 1000);
 
+
   return (
     <div className="flex flex-col p-4 gap-4">
-        {/* Timer notification if active */}
-        {isTimerActive && (
-          <div style={{
-            padding: '12px',
-            marginBottom: '4px',
-            backgroundColor: '#fef3c7',
-            borderRadius: '6px',
-            border: '2px solid #f59e0b',
-          }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>
-              ⏱️ No Inc Rem Timer Active
-            </div>
-            <div style={{ fontSize: '13px', color: '#78350f', marginBottom: '8px' }}>
-              Only flashcards are being shown. Time remaining: {minutes}:{seconds.toString().padStart(2, '0')}
-            </div>
-            <div style={{ fontSize: '11px', color: '#92400e', fontStyle: 'italic' }}>
-              Note: The settings below are temporarily overridden while this timer is active.
-            </div>
-            <button
-              onClick={async () => {
-                await plugin.storage.setSynced(noIncRemTimerKey, null);
-                await plugin.app.toast('Timer cancelled - Incremental rems re-enabled');
-              }}
-              style={{
-                marginTop: '8px',
-                padding: '6px 12px',
-                fontSize: '12px',
-                backgroundColor: '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 500
-              }}
-            >
-              Cancel Timer & Re-enable Inc Rems
-            </button>
+      {/* Timer notification if active */}
+      {isTimerActive && (
+        <div style={{
+          padding: '12px',
+          marginBottom: '4px',
+          backgroundColor: '#fef3c7',
+          borderRadius: '6px',
+          border: '2px solid #f59e0b',
+        }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>
+            ⏱️ No Inc Rem Timer Active
           </div>
-        )}
+          <div style={{ fontSize: '13px', color: '#78350f', marginBottom: '8px' }}>
+            Only flashcards are being shown. Time remaining: {minutes}:{seconds.toString().padStart(2, '0')}
+          </div>
+          <div style={{ fontSize: '11px', color: '#92400e', fontStyle: 'italic' }}>
+            Note: The settings below are temporarily overridden while this timer is active.
+          </div>
+          <button
+            onClick={async () => {
+              await plugin.storage.setSynced(noIncRemTimerKey, null);
+              await plugin.app.toast('Timer cancelled - Incremental rems re-enabled');
+            }}
+            style={{
+              marginTop: '8px',
+              padding: '6px 12px',
+              fontSize: '12px',
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+          >
+            Cancel Timer & Re-enable Inc Rems
+          </button>
+        </div>
+      )}
       
       <div className="text-2xl font-bold">Sorting Criteria</div>
 
@@ -131,7 +146,7 @@ export function SortingCriteria() {
       <div className="flex flex-col gap-2 ">
         <div>
           <label htmlFor="randomness" className="font-semibold">
-            Randomness
+            Incremental Rem Randomness
           </label>
         </div>
         <div className="rn-clr-content-secondary">Higher = ignores priority more</div>
@@ -146,6 +161,30 @@ export function SortingCriteria() {
           type="range"
           id="randomness"
           name="randomness"
+        />
+      </div>
+
+      {/* Flashcard Randomness slider */}
+      <div className="flex flex-col gap-2">
+        <div>
+          <label htmlFor="card-randomness" className="font-semibold">
+            Flashcard Randomness
+          </label>
+        </div>
+        <div className="rn-clr-content-secondary">
+          For Priority Review Documents (do not apply to regular RemNote Queue!)
+        </div>
+        <input
+          min={0}
+          step={0.01}
+          max={1}
+          onChange={(e) => {
+            setCardRandomness(plugin, Number(e.target.value));
+          }}
+          value={cardRandomness == null ? DEFAULT_CARD_RANDOMNESS : cardRandomness}
+          type="range"
+          id="card-randomness"
+          name="card-randomness"
         />
       </div>
 

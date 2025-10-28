@@ -42,8 +42,6 @@ function NoIncTimerIndicator() {
     }
   }, [noIncRemTimerEnd, currentTime, plugin]);
 
-  console.log('NoIncTimerIndicator: Rendering, isTimerActive:', isTimerActive);
-
   if (!isTimerActive) {
     return null;
   }

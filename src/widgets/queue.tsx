@@ -9,6 +9,7 @@ import {
 import React, { useEffect, useRef } from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
+import { NativeVideoViewer } from '../components/NativeVideoViewer';
 import { ExtractViewer } from '../components/ExtractViewer';
 import { remToActionItemType } from '../lib/actionItems';
 import {
@@ -21,23 +22,57 @@ import {
 } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/currentRem';
 
+console.log('QUEUE.TSX FILE LOADED');
+
 export function QueueComponent() {
   const plugin = usePlugin();
 
+  console.log('🎬 QueueComponent RENDER START');
+
   const ctx = useRunAsync(
-    async () => await plugin.widget.getWidgetContext<WidgetLocation.Flashcard>(),
+    async () => {
+      console.log('🎬 ctx: Getting widget context...');
+      const context = await plugin.widget.getWidgetContext<WidgetLocation.Flashcard>();
+      console.log('🎬 ctx: Got context:', context);
+      return context;
+    },
     []
   );
 
+  console.log('🎬 QueueComponent ctx value:', ctx);
+
+  // MOVE ALL HOOKS HERE - BEFORE ANY RETURNS
   const remAndType = useTrackerPlugin(
     async (rp) => {
-      if (!ctx) return undefined;
-      const rem = await rp.rem.findOne(ctx?.remId);
-      if (!rem) return null;
-      return await remToActionItemType(rp, rem);
+      // Add guard INSIDE the hook
+      if (!ctx?.remId) {
+        console.log('⛔ useTrackerPlugin: No ctx.remId yet');
+        return undefined;
+      }
+      
+      console.log('🔄 useTrackerPlugin RUNNING for remId:', ctx.remId);
+      const rem = await rp.rem.findOne(ctx.remId);
+      if (!rem) {
+        console.log('⛔ useTrackerPlugin: Rem not found');
+        return null;
+      }
+      
+      console.log('🔄 useTrackerPlugin: Calling remToActionItemType');
+      const result = await remToActionItemType(rp, rem);
+      console.log('✅ useTrackerPlugin result:', result?.type);
+      return result;
     },
     [ctx?.remId]
   );
+
+  const lastProcessedRemId = useRef<string | null>(null);
+  
+  useEffect(() => {
+    if (ctx?.remId && ctx.remId !== lastProcessedRemId.current) {
+      lastProcessedRemId.current = ctx.remId;
+      console.log('🔄 Processing new rem in queue:', ctx.remId);
+    }
+  }, [ctx?.remId]);
 
   const shouldCollapseTopBar = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(collapseQueueTopBar),
@@ -55,16 +90,23 @@ export function QueueComponent() {
   }, [plugin, shouldCollapseTopBar]);
 
   useEffect(() => {
-    setCurrentIncrementalRem(plugin, remAndType?.rem?._id);
+    // The true identity of the incremental item in the queue is ALWAYS ctx.remId.
+    // remAndType tells us WHAT to display, but ctx.remId tells us WHO we are.
+    const incrementalRemId = ctx?.remId;
+    setCurrentIncrementalRem(plugin, incrementalRemId);
+    
     plugin.storage.setSession(currentIncrementalRemTypeKey, remAndType?.type);
-    // If the new card is NOT a highlight, explicitly clear the highlight signal.
-    if (remAndType?.type !== 'pdf-highlight' && remAndType?.type !== 'html-highlight') {
-      plugin.storage.setSession(activeHighlightIdKey, null);
-    }
+    
+    // For highlights, we still need to identify the specific extract.
+    const activeHighlight = (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight') 
+      ? (remAndType as any).extract?._id 
+      : null;
+    plugin.storage.setSession(activeHighlightIdKey, activeHighlight);
+
     if (remAndType === null) {
       plugin.queue.removeCurrentCardFromQueue(false);
     }
-  }, [remAndType, plugin]);
+  }, [ctx?.remId, remAndType, plugin]);
 
   const shouldRenderEditorForRemType = useRunAsync(async () => {
     if (remAndType?.type !== 'rem') {
@@ -84,9 +126,24 @@ export function QueueComponent() {
     };
   }, [remAndType?.type, shouldRenderEditorForRemType, plugin]);
   
+  // AFTER ALL HOOKS, NOW you can return early
+  if (!ctx?.remId) {
+    console.log('⛔ QueueComponent: No ctx.remId, returning null');
+    return null;
+  }
+
+  console.log('🎬 QueueComponent: ctx.remId exists:', ctx.remId);
+
+
   if (remAndType?.type === 'rem' && !shouldRenderEditorForRemType) {
     return null;
   }
+
+  console.log('🎬 QueueComponent FINAL RENDER:', {
+    remId: ctx?.remId,
+    type: remAndType?.type,
+    willRender: remAndType ? 'YES' : 'NO'
+  });
 
   return (
     <div className="incremental-everything-element" style={{ height: '100%' }}>
@@ -98,6 +155,8 @@ export function QueueComponent() {
           <Reader actionItem={remAndType} />
         ) : remAndType.type === 'youtube' ? (
           <VideoViewer actionItem={remAndType} />
+        ) : remAndType.type === 'video' ? (
+          <NativeVideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' ? (
           <ExtractViewer rem={remAndType.rem} plugin={plugin} />
         ) : null}
@@ -107,3 +166,4 @@ export function QueueComponent() {
 }
 
 renderWidget(QueueComponent);
+

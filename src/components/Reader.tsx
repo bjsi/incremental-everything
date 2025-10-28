@@ -344,53 +344,106 @@ export function Reader(props: ReaderProps) {
     console.log('Reader: Page range popup open command sent');
   }, [remData?.incrementalRemId, remData?.pdfRemId, totalPages, currentPage, plugin]);
 
-  // Listen for popup close and reload settings
+  // ** START OF FIX **
+  // This single, combined hook replaces the two previous hooks that caused a race condition.
   React.useEffect(() => {
-    const checkForChanges = async () => {
-      if (!remData?.incrementalRemId) return;
-      
-      // Always check for page range changes
-      const range = await getIncrementalPageRange(
+    // If we don't have the incremental rem context, do nothing.
+    if (!remData?.incrementalRemId) return;
+    
+    const loadAndValidateSettings = async () => {
+      // 1. Load data from storage in parallel.
+      const savedPagePromise = getIncrementalReadingPosition(
         plugin,
         remData.incrementalRemId,
         actionItem.rem._id
       );
-      
-      if (range) {
-        if (range.start !== pageRangeStart || range.end !== pageRangeEnd) {
-          setPageRangeStart(range.start);
-          setPageRangeEnd(range.end);
-          console.log(`Page range updated: ${range.start}-${range.end}`);
-          
-          // Ensure current page is within new range
-          const minPage = Math.max(1, range.start);
-          const maxPage = range.end > 0 ? Math.min(range.end, totalPages || Infinity) : (totalPages || Infinity);
-          
-          if (currentPage < minPage) {
-            setCurrentPage(minPage);
-            setPageInputValue(minPage.toString());
-            saveCurrentPage(minPage);
-          } else if (currentPage > maxPage) {
-            setCurrentPage(maxPage);
-            setPageInputValue(maxPage.toString());
-            saveCurrentPage(maxPage);
-          }
-        }
-      } else if (pageRangeStart !== 1 || pageRangeEnd !== 0) {
-        setPageRangeStart(1);
-        setPageRangeEnd(0);
-        console.log('Page range cleared');
+      const rangePromise = getIncrementalPageRange(
+        plugin,
+        remData.incrementalRemId,
+        actionItem.rem._id
+      );
+      const [savedPage, range] = await Promise.all([savedPagePromise, rangePromise]);
+  
+      // 2. Set the state for the page range first.
+      const startRange = range?.start || 1;
+      const endRange = range?.end || 0;
+      setPageRangeStart(startRange);
+      setPageRangeEnd(endRange);
+      console.log(`Loaded page range ${startRange}-${endRange}`);
+  
+      // 3. Determine the initial page, defaulting to the start of the range or 1.
+      let initialPage = savedPage && savedPage > 0 ? savedPage : startRange;
+  
+      // 4. Validate the initial page against the just-loaded range.
+      // Note: We don't use `totalPages` here yet, as it might not be ready.
+      const minPage = Math.max(1, startRange);
+      if (initialPage < minPage) {
+        initialPage = minPage;
       }
+      // We only validate against the end of the range if it's explicitly set.
+      if (endRange > 0 && initialPage > endRange) {
+        initialPage = endRange;
+      }
+  
+      // 5. Set the final page state.
+      console.log(`Loading initial page: ${initialPage}`);
+      setCurrentPage(initialPage);
+      setPageInputValue(initialPage.toString());
     };
     
-    // Check every 2 seconds
+    loadAndValidateSettings();
+  
+    // This interval will now handle live updates if the user changes the range in the popup
+    const checkForChanges = async () => {
+        if (!remData?.incrementalRemId) return; // Guard inside interval
+
+        const range = await getIncrementalPageRange(
+          plugin,
+          remData.incrementalRemId,
+          actionItem.rem._id
+        );
+        
+        const newStart = range?.start || 1;
+        const newEnd = range?.end || 0;
+  
+        // Check if the range has actually changed in storage by comparing with state
+        if (newStart !== pageRangeStart || newEnd !== pageRangeEnd) {
+            console.log(`Page range updated via polling: ${newStart}-${newEnd}`);
+            setPageRangeStart(newStart);
+            setPageRangeEnd(newEnd);
+  
+            // Now, re-validate the current page against the NEW range
+            // This time, we can safely use totalPages because the PDF is likely loaded
+            const minPage = Math.max(1, newStart);
+            const maxPage = newEnd > 0 ? Math.min(newEnd, totalPages || Infinity) : (totalPages || Infinity);
+  
+            // Use a function to get the latest currentPage state to avoid stale closures
+            setCurrentPage(currentVal => {
+              let correctedPage = currentVal;
+              if (currentVal < minPage) {
+                correctedPage = minPage;
+              } else if (currentVal > maxPage) {
+                correctedPage = maxPage;
+              }
+    
+              if (correctedPage !== currentVal) {
+                 console.log(`Correcting current page from ${currentVal} to ${correctedPage} due to range update.`);
+                 setPageInputValue(correctedPage.toString());
+                 saveCurrentPage(correctedPage);
+                 return correctedPage;
+              }
+              return currentVal;
+            });
+        }
+    };
+  
     const interval = setInterval(checkForChanges, 2000);
-    
-    // Also check immediately when this effect runs
-    checkForChanges();
-    
+      
+    // Cleanup the interval when the component unmounts
     return () => clearInterval(interval);
-  }, [remData?.incrementalRemId, actionItem.rem._id, plugin, pageRangeStart, pageRangeEnd, currentPage, totalPages, saveCurrentPage]);
+  
+  }, [remData?.incrementalRemId, actionItem.rem._id, plugin, totalPages]);
+  // ** END OF FIX **
 
   const handleClearPageRange = React.useCallback(async () => {
     if (!remData?.incrementalRemId) return;
@@ -405,42 +458,6 @@ export function Reader(props: ReaderProps) {
     setCurrentPage(1);
     setPageInputValue('1');
     console.log('Cleared all page data');
-  }, [remData?.incrementalRemId, actionItem.rem._id, plugin]);
-
-  // Load saved settings only once when component mounts or rem changes
-  React.useEffect(() => {
-    if (!remData?.incrementalRemId) return;
-    
-    const loadSavedSettings = async () => {
-      const savedPage = await getIncrementalReadingPosition(
-        plugin,
-        remData.incrementalRemId!,
-        actionItem.rem._id
-      );
-      
-      if (savedPage && savedPage > 0) {
-        console.log(`Loading saved page ${savedPage}`);
-        setCurrentPage(savedPage);
-        setPageInputValue(savedPage.toString());
-      }
-      
-      const range = await getIncrementalPageRange(
-        plugin,
-        remData.incrementalRemId!,
-        actionItem.rem._id
-      );
-      
-      if (range) {
-        setPageRangeStart(range.start);
-        setPageRangeEnd(range.end);
-        console.log(`Loaded page range ${range.start}-${range.end}`);
-      } else {
-        setPageRangeStart(1);
-        setPageRangeEnd(0);
-      }
-    };
-    
-    loadSavedSettings();
   }, [remData?.incrementalRemId, actionItem.rem._id, plugin]);
 
   // Handle highlights
@@ -579,7 +596,7 @@ export function Reader(props: ReaderProps) {
       fontWeight: 500
     },
     pageInput: {
-      width: '40px',
+      width: '55px',
       padding: '2px 4px',
       fontSize: '11px',
       borderRadius: '4px',

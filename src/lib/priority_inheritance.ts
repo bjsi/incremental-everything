@@ -1,6 +1,8 @@
 import { Rem, RNPlugin } from '@remnote/plugin-sdk';
 import { powerupCode, prioritySlotCode } from './consts';
 import { getIncrementalRemInfo } from './incremental_rem';
+import { getCardPriority } from './cardPriority';
+import { safeRemTextToString } from './pdfUtils';
 
 export interface AncestorPriorityInfo {
   priority: number;
@@ -39,7 +41,7 @@ export async function findClosestIncrementalAncestor(
         
         if (incRemInfo && incRemInfo.priority !== undefined) {
           // Get the name/text of the ancestor for display
-          const ancestorText = await plugin.richText.toString(currentRem.text);
+          const ancestorText = await safeRemTextToString(plugin, currentRem.text);
           const ancestorName = ancestorText.slice(0, 50) + (ancestorText.length > 50 ? '...' : '');
           
           return {
@@ -60,19 +62,65 @@ export async function findClosestIncrementalAncestor(
   return null;
 }
 
+
+/**
+ * Find the closest ancestor with either an Incremental Rem priority or a Card priority
+ */
+export async function findClosestAncestorWithAnyPriority(
+  plugin: RNPlugin,
+  rem: Rem | undefined
+): Promise<{ priority: number; ancestorName: string; sourceType: 'IncRem' | 'Card' } | null> {
+  if (!rem) return null;
+
+  let current = rem;
+  while (current.parent) {
+    const parent = await plugin.rem.findOne(current.parent);
+    if (!parent) break;
+
+    const parentName = await safeRemTextToString(plugin, parent.text);
+    const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
+
+    // Check for Incremental Rem priority first
+    const parentIncInfo = await getIncrementalRemInfo(plugin, parent);
+    if (parentIncInfo) {
+      return { 
+        priority: parentIncInfo.priority, 
+        ancestorName: truncatedName, 
+        sourceType: 'IncRem' 
+      };
+    }
+    
+    // Then check for CardPriority powerup
+    const parentCardInfo = await getCardPriority(plugin, parent);
+    // We only care about manually set or already-inherited priorities on ancestors
+    if (parentCardInfo && parentCardInfo.source !== 'default') {
+      return { 
+        priority: parentCardInfo.priority, 
+        ancestorName: truncatedName, 
+        sourceType: 'Card' 
+      };
+    }
+    
+    current = parent;
+  }
+  
+  return null;
+}
+
+
 /**
  * Gets the initial priority for a new incremental rem
- * Tries to inherit from closest incremental ancestor, otherwise uses default
+ * Tries to inherit from closest ancestor with any priority (IncRem or Card), otherwise uses default
  */
 export async function getInitialPriority(
   plugin: RNPlugin,
   rem: Rem,
   defaultPriority: number
 ): Promise<number> {
-  const ancestorInfo = await findClosestIncrementalAncestor(plugin, rem);
+  const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem);
   
   if (ancestorInfo) {
-    console.log(`Inheriting priority ${ancestorInfo.priority} from ancestor: ${ancestorInfo.ancestorName}`);
+    console.log(`Inheriting priority ${ancestorInfo.priority} from ${ancestorInfo.sourceType} ancestor: ${ancestorInfo.ancestorName}`);
     return ancestorInfo.priority;
   }
   

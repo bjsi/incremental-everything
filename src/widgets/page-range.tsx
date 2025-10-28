@@ -10,7 +10,9 @@ import {
   getPageRangeKey, 
   getPageHistory,
   getAllIncrementsForPDF,
-  getIncrementalPageRange
+  getIncrementalPageRange,
+  setIncrementalReadingPosition, // <-- Import new function
+  addPageToHistory               // <-- Import new function
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, defaultPriorityId, allIncrementalRemKey } from '../lib/consts';
 import { getDailyDocReferenceForDate } from '../lib/date';
@@ -22,6 +24,8 @@ import { getIncrementalRemInfo } from '../lib/incremental_rem';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
+  const pageRangeInputRefs = React.useRef<Record<string, {start: HTMLInputElement | null, end: HTMLInputElement | null}>>({});
+  const inputStartRef = React.useRef<HTMLInputElement>(null);
   
   const contextData = useTrackerPlugin(
     async (rp) => {
@@ -52,6 +56,10 @@ function PageRangeWidget() {
   const [remPriorities, setRemPriorities] = useState<Record<string, {absolute: number, percentile: number | null}>>({});
   const [editingPriorityRemId, setEditingPriorityRemId] = useState<string | null>(null);
   const [editingPriorities, setEditingPriorities] = useState<Record<string, number>>({});
+  
+  // --- NEW: State for the history editor ---
+  const [editingHistoryRemId, setEditingHistoryRemId] = useState<string | null>(null);
+  const [editingHistoryPage, setEditingHistoryPage] = useState<number>(0);
 
   // Initialize an incremental rem
   const initIncrementalRem = async (remId: string) => {
@@ -250,6 +258,32 @@ function PageRangeWidget() {
     await reloadRelatedRems();
   };
 
+  // --- NEW: Start editing history ---
+  const startEditingHistory = (remId: string, currentPage: number | null) => {
+    setEditingHistoryRemId(remId);
+    // Pre-fill with the current page to make it easier to increment
+    setEditingHistoryPage(currentPage || 0); 
+  };
+  
+  // --- NEW: Save reading history record ---
+  const saveReadingHistory = async (remId: string) => {
+    if (!contextData?.pdfRemId || !editingHistoryPage || editingHistoryPage <= 0) {
+      await plugin.app.toast("Please enter a valid page number.");
+      return;
+    }
+  
+    // Update both the current reading position (for the queue) and the history log
+    await setIncrementalReadingPosition(plugin, remId, contextData.pdfRemId, editingHistoryPage);
+    await addPageToHistory(plugin, remId, contextData.pdfRemId, editingHistoryPage);
+  
+    await plugin.app.toast(`Updated reading position to page ${editingHistoryPage}`);
+    
+    // Reset state and reload the list to show the new data
+    setEditingHistoryRemId(null);
+    setEditingHistoryPage(0);
+    await reloadRelatedRems();
+  };
+
   // Load data effect
   useEffect(() => {
     const loadData = async () => {
@@ -266,7 +300,7 @@ function PageRangeWidget() {
         const currentRem = await plugin.rem.findOne(incrementalRemId);
         if (currentRem) {
           const remText = currentRem.text ? await plugin.richText.toString(currentRem.text) : 'Untitled';
-          const isIncremental = await currentRem.hasPowerup('incremental');
+          const isIncremental = await currentRem.hasPowerup(powerupCode);
           setCurrentRemName(remText);
           setIsCurrentRemIncremental(isIncremental);
         }
@@ -298,6 +332,40 @@ function PageRangeWidget() {
 
     loadData();
   }, [contextData?.incrementalRemId, contextData?.pdfRemId, plugin]);
+    
+  // Auto-focus main input on load
+  useEffect(() => {
+    if (!isLoading && contextData) {
+      setTimeout(() => {
+        inputStartRef.current?.focus();
+        inputStartRef.current?.select();
+      }, 50);
+    }
+  }, [isLoading, contextData]);
+
+  // Auto-focus page range editor when editing starts
+  useEffect(() => {
+    if (editingRemId) {
+      // Use a longer delay and retry mechanism for first render
+      let attempts = 0;
+      const maxAttempts = 10; // Try for up to 500ms (10 * 50ms)
+      
+      const tryFocus = () => {
+        const inputElement = pageRangeInputRefs.current[editingRemId]?.start;
+        
+        if (inputElement) {
+          inputElement.focus();
+          inputElement.select();
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(tryFocus, 50);
+        }
+      };
+      
+      // Start trying after a small initial delay
+      setTimeout(tryFocus, 50);
+    }
+  }, [editingRemId]);
 
   const handleSave = async () => {
     if (!contextData?.incrementalRemId || !contextData?.pdfRemId) return;
@@ -329,16 +397,7 @@ function PageRangeWidget() {
 
   const handleClose = () => plugin.widget.closePopup();
 
-  const inputStartRef = React.useRef<HTMLInputElement>(null);
-  
-  useEffect(() => {
-    if (!isLoading && contextData) {
-      setTimeout(() => {
-        inputStartRef.current?.focus();
-        inputStartRef.current?.select();
-      }, 50);
-    }
-  }, [isLoading, contextData]);
+
 
   if (isLoading) {
     return <div className="p-4">Loading...</div>;
@@ -352,37 +411,43 @@ function PageRangeWidget() {
       </div>
     );
   }
+
   
+  // ** START OF FIX **
   // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
     const assignedRanges = relatedRems
-      .filter(item => item.isIncremental && item.range)
-      .map(item => item.range)
+      .filter((item) => item.isIncremental && item.range)
+      .map((item) => item.range)
       .filter(Boolean)
       .sort((a, b) => a.start - b.start);
-
+  
     const unassignedRanges = [];
     let lastEnd = 0;
-    
+  
     for (const range of assignedRanges) {
       if (range.start > lastEnd + 1) {
         unassignedRanges.push({
           start: lastEnd + 1,
-          end: range.start - 1
+          end: range.start - 1,
         });
       }
       lastEnd = Math.max(lastEnd, range.end || range.start);
     }
-    
-    if (!contextData?.totalPages || lastEnd < 1000) {
+  
+    const totalPages = contextData?.totalPages;
+  
+    // Only add a final open range if not all pages are covered.
+    if (!totalPages || lastEnd < totalPages) {
       unassignedRanges.push({
         start: lastEnd + 1,
-        end: null
+        end: null, // `null` represents the end of the document
       });
     }
-    
+  
     return unassignedRanges;
   };
+  // ** END OF FIX **
   
   // Sort related rems: current first, then by page range, then alphabetically
   const sortedRelatedRems = [...relatedRems].sort((a, b) => {
@@ -415,11 +480,11 @@ function PageRangeWidget() {
       className="flex flex-col p-4 gap-4"
       style={{ minWidth: '550px', maxWidth: '700px', maxHeight: '95vh', overflowY: 'auto' }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !editingRemId && !editingPriorityRemId) { 
+        if (e.key === 'Enter' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) { 
           e.preventDefault(); 
           handleSave(); 
         }
-        if (e.key === 'Escape' && !editingRemId && !editingPriorityRemId) { 
+        if (e.key === 'Escape' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) { 
           e.preventDefault(); 
           handleClose(); 
         }
@@ -475,14 +540,21 @@ function PageRangeWidget() {
           <div className="p-2 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
             <div className="text-sm text-yellow-700 dark:text-yellow-300">
               <div className="font-semibold">Available page ranges:</div>
+              {/* ** START OF FIX ** */}
               <div className="text-xs mt-1">
-                {unassignedRanges.map((range, idx) => (
-                  <span key={idx}>
-                    {range.start}-{range.end || '∞'}
-                    {idx < unassignedRanges.length - 1 && ', '}
-                  </span>
-                ))}
+                {unassignedRanges.map((range, idx) => {
+                  // Determine the end page display value.
+                  const endPageDisplay =
+                    range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
+                  return (
+                    <span key={idx}>
+                      {range.start}-{endPageDisplay}
+                      {idx < unassignedRanges.length - 1 && ', '}
+                    </span>
+                  );
+                })}
               </div>
+              {/* ** END OF FIX ** */}
             </div>
           </div>
         ) : (
@@ -621,6 +693,17 @@ function PageRangeWidget() {
                             >
                               Cancel Priority Edit
                             </button>
+                          ) : editingHistoryRemId === item.remId ? (
+                            <button
+                              onClick={() => setEditingHistoryRemId(null)}
+                              className="px-3 py-1 text-xs rounded"
+                              style={{
+                                backgroundColor: '#6B7280',
+                                color: 'white',
+                              }}
+                            >
+                              Cancel History Edit
+                            </button>
                           ) : (
                             <>
                               <button
@@ -642,6 +725,17 @@ function PageRangeWidget() {
                                 }}
                               >
                                 Edit Priority
+                              </button>
+                              {/* --- NEW BUTTON --- */}
+                              <button
+                                onClick={() => startEditingHistory(item.remId, item.currentPage)}
+                                className="px-3 py-1 text-xs rounded"
+                                style={{
+                                  backgroundColor: '#10B981',
+                                  color: 'white',
+                                }}
+                              >
+                                Add History Record
                               </button>
                             </>
                           )}
@@ -715,6 +809,12 @@ function PageRangeWidget() {
                     {editingRemId === item.remId && editingRanges[item.remId] && (
                       <div className="flex gap-2 mb-2">
                         <input
+                          ref={(el) => {
+                            if (!pageRangeInputRefs.current[item.remId]) {
+                              pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                            }
+                            pageRangeInputRefs.current[item.remId].start = el;
+                          }}
                           type="number"
                           min="1"
                           value={editingRanges[item.remId].start}
@@ -725,11 +825,31 @@ function PageRangeWidget() {
                               start: parseInt(e.target.value) || 1
                             }
                           })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              saveRemRange(item.remId);
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setEditingRemId(null);
+                            }
+                            if (e.key === 'Tab' && e.shiftKey) {
+                              e.preventDefault();
+                              pageRangeInputRefs.current[item.remId]?.end?.focus();
+                            }
+                          }}
                           className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
                           placeholder="Start"
                         />
                         <span className="text-xs self-center">to</span>
                         <input
+                          ref={(el) => {
+                            if (!pageRangeInputRefs.current[item.remId]) {
+                              pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                            }
+                            pageRangeInputRefs.current[item.remId].end = el;
+                          }}
                           type="number"
                           min={editingRanges[item.remId].start}
                           value={editingRanges[item.remId].end || ''}
@@ -740,9 +860,73 @@ function PageRangeWidget() {
                               end: parseInt(e.target.value) || 0
                             }
                           })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              saveRemRange(item.remId);
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setEditingRemId(null);
+                            }
+                            if (e.key === 'Tab' && !e.shiftKey) {
+                              e.preventDefault();
+                              pageRangeInputRefs.current[item.remId]?.start?.focus();
+                            }
+                          }}
                           className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
                           placeholder="End"
                         />
+                      </div>
+                    )}
+
+                    {/* --- NEW: Inline History Editor --- */}
+                    {editingHistoryRemId === item.remId && (
+                      <div className="flex flex-col gap-2 mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-semibold">End Page:</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={editingHistoryPage || ''}
+                            onChange={(e) => setEditingHistoryPage(parseInt(e.target.value) || 0)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                saveReadingHistory(item.remId);
+                              }
+                              if (e.key === 'Escape') {
+                                e.preventDefault();
+                                setEditingHistoryRemId(null);
+                              }
+                            }}
+                            className="w-20 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                            placeholder="e.g., 42"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => saveReadingHistory(item.remId)}
+                            className="px-3 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: '#10B981',
+                              color: 'white',
+                            }}
+                          >
+                            Save Record
+                          </button>
+                          <button
+                            onClick={() => setEditingHistoryRemId(null)}
+                            className="px-3 py-1 text-xs rounded"
+                            style={{
+                              backgroundColor: '#6B7280',
+                              color: 'white',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     )}
                     
