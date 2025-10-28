@@ -885,6 +885,25 @@ async function onActivate(plugin: ReactRNPlugin) {
     ]
   });
 
+  plugin.settings.registerDropdownSetting({
+    id: 'performanceMode',
+    title: 'Performance Mode',
+    description: 'Choose performance level. "Light" is recommended for web/mobile.',
+    defaultValue: 'full',
+    options: [
+      {
+        key: 'full',
+        label: 'Full (All Features, High Resource Use)',
+        value: 'full'
+      },
+      {
+        key: 'light',
+        label: 'Light (Faster, No Relative Priority/Shield)',
+        value: 'light'
+      }
+    ]
+  });
+  
   plugin.settings.registerBooleanSetting({
     id: displayPriorityShieldId,
     title: 'Display Priority Shield in Queue',
@@ -954,151 +973,168 @@ async function onActivate(plugin: ReactRNPlugin) {
   
     // --- NEW: Get the effective scope that was determined at QueueEnter ---
     const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
-    const effectiveScopeId = await plugin.storage.getSession<string | null>('effectiveScopeId');
     
     // IMPORTANT: Get the scope BEFORE clearing it
     const docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(priorityCalcScopeRemIdsKey);
     console.log('[QueueExit] IncRem shield - Priority calculation scope:', docScopeRemIds?.length || 0, 'rems');
     console.log('Original scope ID for history:', originalScopeId);
     
-    const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    // ---
+    // --- ⬇️ HERE IS THE MODIFICATION ⬇️ ---
+    // ---
+    
+    // Get the performance mode setting
+    const performanceMode = await plugin.settings.getSetting('performanceMode') || 'full';
 
-    if (allRems.length > 0) {
-      const today = dayjs().format('YYYY-MM-DD');
+    // Only run history calculations in 'full' mode
+    if (performanceMode === 'full') {
+      console.log('[QueueExit] Full mode. Saving Priority Shield history...');
       
-      // Save KB-level priority shield
-      const unreviewedDueRems = allRems.filter(
-        (rem) => Date.now() >= rem.nextRepDate
-      );
+      const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
 
-      let kbFinalStatus = {
-        absolute: null as number | null,
-        percentile: 100,
-      };
-
-      if (unreviewedDueRems.length > 0) {
-        const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
-        if (topMissedInKb) {
-          kbFinalStatus.absolute = topMissedInKb.priority;
-          kbFinalStatus.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
-        }
-      }
-      
-      // Save KB history
-      const kbHistory = (await plugin.storage.getSynced(priorityShieldHistoryKey)) || {};
-      kbHistory[today] = kbFinalStatus;
-      await plugin.storage.setSynced(priorityShieldHistoryKey, kbHistory);
-      console.log('[QueueExit] Saved KB IncRem history:', kbFinalStatus);
-      
-      // Save Document-level priority shield using PRIORITY CALCULATION scope
-      if (docScopeRemIds && docScopeRemIds.length > 0) {
-        console.log('[QueueExit] Processing IncRem document shield with PRIORITY CALC scope:', docScopeRemIds.length, 'rems');
+      if (allRems.length > 0) {
+        const today = dayjs().format('YYYY-MM-DD');
         
-        const scopedRems = allRems.filter((rem) => docScopeRemIds.includes(rem.remId));
-        console.log('[QueueExit] Found', scopedRems.length, 'incremental rems in priority calculation scope');
-        
-        const unreviewedDueInScope = scopedRems.filter(
+        // Save KB-level priority shield
+        const unreviewedDueRems = allRems.filter(
           (rem) => Date.now() >= rem.nextRepDate
         );
-        console.log('[QueueExit] Found', unreviewedDueInScope.length, 'due IncRems in priority calculation scope');
-        
-        let docFinalStatus = {
+
+        let kbFinalStatus = {
           absolute: null as number | null,
           percentile: 100,
         };
-        
-        if (unreviewedDueInScope.length > 0) {
-          const topMissedInDoc = _.minBy(unreviewedDueInScope, (rem) => rem.priority);
-          if (topMissedInDoc) {
-            docFinalStatus.absolute = topMissedInDoc.priority;
-            docFinalStatus.percentile = calculateRelativePriority(scopedRems, topMissedInDoc.remId);
-            console.log('[QueueExit] IncRem doc shield - Priority:', docFinalStatus.absolute, 'Percentile:', docFinalStatus.percentile + '%');
+
+        if (unreviewedDueRems.length > 0) {
+          const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
+          if (topMissedInKb) {
+            kbFinalStatus.absolute = topMissedInKb.priority;
+            kbFinalStatus.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
           }
         }
         
-      // --- CRITICAL CHANGE: Use originalScopeId for history storage ---
-      // This ensures Priority Review Documents save their history under the original document
-      const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
-      
-      if (historyKey) {
-        // Save document history with the ORIGINAL scope ID as key, not the Priority Review Doc ID
-        const docHistory = (await plugin.storage.getSynced(documentPriorityShieldHistoryKey)) || {};
-        if (!docHistory[historyKey]) {
-          docHistory[historyKey] = {};
-        }
-        docHistory[historyKey][today] = docFinalStatus;
-        await plugin.storage.setSynced(documentPriorityShieldHistoryKey, docHistory);
-        console.log('Saved document history for original scope', historyKey, ':', docFinalStatus);
-      } else {
-        console.log('Warning: No scope ID available for saving document history');
-      }
-    } else {
-      console.log('No document scope RemIds found or empty - skipping document history save');
-    }
-  }
-
-    // --- NEW: Card Priority Shield Logic (with same Priority Review Document handling) ---
-    const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
-
-    if (allCardInfos && allCardInfos.length > 0) {
-        const today = dayjs().format('YYYY-MM-DD');
-        const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
-
-        // Calculate final KB card shield from the cache
-        const unreviewedDueKb = allCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
-        let kbCardFinalStatus = { absolute: null as number | null, percentile: 100 };
-        if (unreviewedDueKb.length > 0) {
-            const topMissed = _.minBy(unreviewedDueKb, c => c.priority);
-            if (topMissed) {
-                kbCardFinalStatus.absolute = topMissed.priority;
-                kbCardFinalStatus.percentile = calculateRelativeCardPriority(allCardInfos, topMissed.remId);
+        // Save KB history
+        const kbHistory = (await plugin.storage.getSynced(priorityShieldHistoryKey)) || {};
+        kbHistory[today] = kbFinalStatus;
+        await plugin.storage.setSynced(priorityShieldHistoryKey, kbHistory);
+        console.log('[QueueExit] Saved KB IncRem history:', kbFinalStatus);
+        
+        // Save Document-level priority shield using PRIORITY CALCULATION scope
+        if (docScopeRemIds && docScopeRemIds.length > 0) {
+          console.log('[QueueExit] Processing IncRem document shield with PRIORITY CALC scope:', docScopeRemIds.length, 'rems');
+          
+          const scopedRems = allRems.filter((rem) => docScopeRemIds.includes(rem.remId));
+          console.log('[QueueExit] Found', scopedRems.length, 'incremental rems in priority calculation scope');
+          
+          const unreviewedDueInScope = scopedRems.filter(
+            (rem) => Date.now() >= rem.nextRepDate
+          );
+          console.log('[QueueExit] Found', unreviewedDueInScope.length, 'due IncRems in priority calculation scope');
+          
+          let docFinalStatus = {
+            absolute: null as number | null,
+            percentile: 100,
+          };
+          
+          if (unreviewedDueInScope.length > 0) {
+            const topMissedInDoc = _.minBy(unreviewedDueInScope, (rem) => rem.priority);
+            if (topMissedInDoc) {
+              docFinalStatus.absolute = topMissedInDoc.priority;
+              docFinalStatus.percentile = calculateRelativePriority(scopedRems, topMissedInDoc.remId);
+              console.log('[QueueExit] IncRem doc shield - Priority:', docFinalStatus.absolute, 'Percentile:', docFinalStatus.percentile + '%');
             }
-        }
-        const cardKbHistory = (await plugin.storage.getSynced(cardPriorityShieldHistoryKey)) || {};
-        cardKbHistory[today] = kbCardFinalStatus;
-        await plugin.storage.setSynced(cardPriorityShieldHistoryKey, cardKbHistory);
-        console.log('Saved KB card history:', kbCardFinalStatus);
-
-        // ✅ Calculate final Doc card shield - USE PRIORITY CALCULATION SCOPE
+          }
+          
+        // --- CRITICAL CHANGE: Use originalScopeId for history storage ---
         const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
         
-        // Get the PRIORITY CALCULATION scope, not the item selection scope
-        const priorityCalcScopeRemIds = await plugin.storage.getSession<RemId[]>(priorityCalcScopeRemIdsKey);
-        
-        if (historyKey && priorityCalcScopeRemIds && priorityCalcScopeRemIds.length > 0) {
-            console.log('[QueueExit] Calculating card shield using PRIORITY CALC scope:', priorityCalcScopeRemIds.length, 'rems');
-            
-            // Filter cards using the priority calculation scope (not item selection scope!)
-            const docCardInfos = allCardInfos.filter(ci => priorityCalcScopeRemIds.includes(ci.remId));
-            console.log('[QueueExit] Found', docCardInfos.length, 'cards in priority calculation scope');
-
-            // Find unreviewed due cards in scope
-            const unreviewedDueDoc = docCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
-            let docCardFinalStatus = { absolute: null as number | null, percentile: 100 };
-
-            if (unreviewedDueDoc.length > 0) {
-                const topMissed = _.minBy(unreviewedDueDoc, c => c.priority);
-                if (topMissed) {
-                    docCardFinalStatus.absolute = topMissed.priority;
-                    // Calculate percentile against the priority calculation scope
-                    docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.remId);
-                    console.log('[QueueExit] Doc card shield - Priority:', docCardFinalStatus.absolute, 'Percentile:', docCardFinalStatus.percentile + '%');
-                }
-            }
-            
-            // Save to history under the original scope key
-            const docCardHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) || {};
-            if (!docCardHistory[historyKey]) {
-                docCardHistory[historyKey] = {};
-            }
-            docCardHistory[historyKey][today] = docCardFinalStatus;
-            await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, docCardHistory);
-            console.log('Saved card document history for original scope', historyKey, ':', docCardFinalStatus);
+        if (historyKey) {
+          // Save document history with the ORIGINAL scope ID as key, not the Priority Review Doc ID
+          const docHistory = (await plugin.storage.getSynced(documentPriorityShieldHistoryKey)) || {};
+          if (!docHistory[historyKey]) {
+            docHistory[historyKey] = {};
+          }
+          docHistory[historyKey][today] = docFinalStatus;
+          await plugin.storage.setSynced(documentPriorityShieldHistoryKey, docHistory);
+          console.log('Saved document history for original scope', historyKey, ':', docFinalStatus);
         } else {
-            console.log('[QueueExit] Skipping card document shield - no priority calc scope available');
+          console.log('Warning: No scope ID available for saving document history');
         }
+      } else {
+        console.log('No document scope RemIds found or empty - skipping document history save');
+      }
     }
-    // Reset session-specific state AFTER we've used the data
+
+      // --- NEW: Card Priority Shield Logic (with same Priority Review Document handling) ---
+      const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
+
+      if (allCardInfos && allCardInfos.length > 0) {
+          const today = dayjs().format('YYYY-MM-DD');
+          const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
+
+          // Calculate final KB card shield from the cache
+          const unreviewedDueKb = allCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
+          let kbCardFinalStatus = { absolute: null as number | null, percentile: 100 };
+          if (unreviewedDueKb.length > 0) {
+              const topMissed = _.minBy(unreviewedDueKb, c => c.priority);
+              if (topMissed) {
+                  kbCardFinalStatus.absolute = topMissed.priority;
+                  kbCardFinalStatus.percentile = calculateRelativeCardPriority(allCardInfos, topMissed.remId);
+              }
+          }
+          const cardKbHistory = (await plugin.storage.getSynced(cardPriorityShieldHistoryKey)) || {};
+          cardKbHistory[today] = kbCardFinalStatus;
+          await plugin.storage.setSynced(cardPriorityShieldHistoryKey, cardKbHistory);
+          console.log('Saved KB card history:', kbCardFinalStatus);
+
+          // ✅ Calculate final Doc card shield - USE PRIORITY CALCULATION SCOPE
+          const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
+          
+          // Get the PRIORITY CALCULATION scope, not the item selection scope
+          const priorityCalcScopeRemIds = await plugin.storage.getSession<RemId[]>(priorityCalcScopeRemIdsKey);
+          
+          if (historyKey && priorityCalcScopeRemIds && priorityCalcScopeRemIds.length > 0) {
+              console.log('[QueueExit] Calculating card shield using PRIORITY CALC scope:', priorityCalcScopeRemIds.length, 'rems');
+              
+              // Filter cards using the priority calculation scope (not item selection scope!)
+              const docCardInfos = allCardInfos.filter(ci => priorityCalcScopeRemIds.includes(ci.remId));
+              console.log('[QueueExit] Found', docCardInfos.length, 'cards in priority calculation scope');
+
+              // Find unreviewed due cards in scope
+              const unreviewedDueDoc = docCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
+              let docCardFinalStatus = { absolute: null as number | null, percentile: 100 };
+
+              if (unreviewedDueDoc.length > 0) {
+                  const topMissed = _.minBy(unreviewedDueDoc, c => c.priority);
+                  if (topMissed) {
+                      docCardFinalStatus.absolute = topMissed.priority;
+                      // Calculate percentile against the priority calculation scope
+                      docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.remId);
+                      console.log('[QueueExit] Doc card shield - Priority:', docCardFinalStatus.absolute, 'Percentile:', docCardFinalStatus.percentile + '%');
+                  }
+              }
+              
+              // Save to history under the original scope key
+              const docCardHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) || {};
+              if (!docCardHistory[historyKey]) {
+                  docCardHistory[historyKey] = {};
+              }
+              docCardHistory[historyKey][today] = docCardFinalStatus;
+              await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, docCardHistory);
+              console.log('Saved card document history for original scope', historyKey, ':', docCardFinalStatus);
+          } else {
+              console.log('[QueueExit] Skipping card document shield - no priority calc scope available');
+          }
+      }
+    } else {
+      console.log('[QueueExit] Light mode. Skipping Priority Shield history save.');
+    }
+    
+    // ---
+    // --- ⬆️ END OF MODIFICATION ⬆️ ---
+    // ---
+
+    // Reset session-specific state AFTER we've used the data (runs in both modes)
     await plugin.storage.setSession(seenRemInSessionKey, []);
     await plugin.storage.setSession(seenCardInSessionKey, []);
     sessionItemCounter = 0;
@@ -1163,6 +1199,9 @@ async function onActivate(plugin: ReactRNPlugin) {
     await plugin.storage.setSession('isPriorityReviewDoc', isPriorityReviewDoc);
     // --- END NEW ---
 
+    // Get the performance mode
+    const performanceMode = await plugin.settings.getSetting('performanceMode') || 'full';
+
     // --- CARD PRIORITY PRE-CALCULATION ---
     const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
     
@@ -1170,7 +1209,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       console.warn('QUEUE ENTER: Card priority cache is empty! Flashcard calculations will be skipped.');
     }
 
-    const dueCardsInKB = allCardInfos?.filter(info => info.dueCards > 0) || [];
+    const dueCardsInKB = (performanceMode === 'full') ? allCardInfos.filter(info => info.dueCards > 0) : [];
 
     let docPercentiles: Record<RemId, number> = {};
     let dueCardsInScope: CardPriorityInfo[] = [];
@@ -1330,42 +1369,62 @@ async function onActivate(plugin: ReactRNPlugin) {
         priorityCalcScope = itemSelectionScope || new Set<RemId>();
       }
 
-      // ✅ SINGLE if block that does BOTH: stores the scope AND calculates percentiles
+      // ---
+      // --- ⬇️ HERE IS THE MODIFICATION ⬇️ ---
+      // ---
+
+      // We still check if a scope exists
       if (priorityCalcScope.size > 0) {
-        // Store the priority calculation scope
+        
+        // Storing the scope ID list is fast and needed for QueueExit, so we do it in both modes.
         await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
         
-        // FLASHCARD SCOPE CALCULATIONS
-        const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
-        const sortedDocCards = _.sortBy(docCardInfos, (info) => info.priority);
+        // ✅ NOW, check performance mode before running expensive calculations
+        if (performanceMode === 'full') {
+          console.log('QUEUE ENTER: Full mode. Calculating session cache...');
+          
+          // FLASHCARD SCOPE CALCULATIONS
+          const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
+          const sortedDocCards = _.sortBy(docCardInfos, (info) => info.priority);
+          
+          sortedDocCards.forEach((info, index) => {
+            docPercentiles[info.remId] = Math.round(((index + 1) / sortedDocCards.length) * 100);
+          });
+          
+          // Due cards in scope (for priority shield)
+          dueCardsInScope = dueCardsInKB.filter(info => priorityCalcScope.has(info.remId));
+          
+          // INCREMENTAL REM SCOPE CALCULATIONS
+          const scopedIncRems = allIncRems.filter(rem => priorityCalcScope.has(rem.remId));
+          const sortedIncRems = _.sortBy(scopedIncRems, (rem) => rem.priority);
+          
+          sortedIncRems.forEach((rem, index) => {
+            incRemDocPercentiles[rem.remId] = Math.round(((index + 1) / sortedIncRems.length) * 100);
+          });
+          
+          // Due IncRems in scope (for priority shield)
+          dueIncRemsInScope = dueIncRemsInKB.filter(rem => priorityCalcScope.has(rem.remId));
+          
+          console.log(`QUEUE ENTER: Priority calculations complete:`);
+          console.log(`  - Cards in priority scope: ${docCardInfos.length}`);
+          console.log(`  - Due cards in priority scope: ${dueCardsInScope.length}`);
+          console.log(`  - IncRems in priority scope: ${scopedIncRems.length}`);
+          console.log(`  - Due IncRems in priority scope: ${dueIncRemsInScope.length}`);
         
-        sortedDocCards.forEach((info, index) => {
-          docPercentiles[info.remId] = Math.round(((index + 1) / sortedDocCards.length) * 100);
-        });
-        
-        // Due cards in scope (for priority shield)
-        dueCardsInScope = dueCardsInKB.filter(info => priorityCalcScope.has(info.remId));
-        
-        // INCREMENTAL REM SCOPE CALCULATIONS
-        const scopedIncRems = allIncRems.filter(rem => priorityCalcScope.has(rem.remId));
-        const sortedIncRems = _.sortBy(scopedIncRems, (rem) => rem.priority);
-        
-        sortedIncRems.forEach((rem, index) => {
-          incRemDocPercentiles[rem.remId] = Math.round(((index + 1) / sortedIncRems.length) * 100);
-        });
-        
-        // Due IncRems in scope (for priority shield)
-        dueIncRemsInScope = dueIncRemsInKB.filter(rem => priorityCalcScope.has(rem.remId));
-        
-        console.log(`QUEUE ENTER: Priority calculations complete:`);
-        console.log(`  - Cards in priority scope: ${docCardInfos.length}`);
-        console.log(`  - Due cards in priority scope: ${dueCardsInScope.length}`);
-        console.log(`  - IncRems in priority scope: ${scopedIncRems.length}`);
-        console.log(`  - Due IncRems in priority scope: ${dueIncRemsInScope.length}`);
+        } else {
+          // In 'light' mode, we skip all these calculations.
+          console.log('QUEUE ENTER: Light mode. Skipping session cache calculation.');
+        }
       }
-    }
+      
+      // ---
+      // --- ⬆️ END OF MODIFICATION ⬆️ ---
+      // ---
+
+    } // end of if (scopeForItemSelection)
 
     // 6. Assemble the complete session cache object.
+    // (In 'light' mode, the arrays/objects will be empty, which is correct)
     const sessionCache: QueueSessionCache = {
       docPercentiles,
       dueCardsInScope,
@@ -2427,7 +2486,18 @@ async function onActivate(plugin: ReactRNPlugin) {
   });
 
   // Run the cache build in the background without blocking plugin initialization.
-  cacheAllCardPriorities(plugin);
+
+  // Get the performance mode setting
+  const performanceMode = await plugin.settings.getSetting('performanceMode') || 'full';
+
+  if (performanceMode === 'full') {
+    // Run the full, expensive cache build
+    cacheAllCardPriorities(plugin);
+  } else {
+    // In 'light' mode, just set an empty cache.
+    console.log('CACHE: Light mode enabled. Skipping card priority cache build.');
+    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+  }
 
   
 }

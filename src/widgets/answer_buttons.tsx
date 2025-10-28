@@ -138,6 +138,12 @@ export function AnswerButtons() {
 
   // ✅ ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP
   
+  // ✅ Get the performance mode setting first
+  const performanceMode = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<string>('performanceMode'), 
+    []
+  ) || 'full';
+  
   // Consolidate core data into a single tracker
   const coreData = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
@@ -149,9 +155,12 @@ export function AnswerButtons() {
     const incRemInfo = await getIncrementalRemInfo(rp, rem);
     if (!incRemInfo) return null;
 
+    // 🔌 Conditionally fetch sessionCache based on performanceMode
     const [allIncRems, sessionCache, shouldDisplayShield] = await Promise.all([
       rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
-      rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey),
+      (performanceMode === 'full')
+        ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey)
+        : Promise.resolve(null), // In 'light' mode, resolve to null
       rp.settings.getSetting<boolean>(displayPriorityShieldId),
     ]);
 
@@ -160,10 +169,11 @@ export function AnswerButtons() {
       rem,
       incRemInfo,
       allIncRems: allIncRems || [],
-      sessionCache,
+      sessionCache, // This will be null in 'light' mode
       shouldDisplayShield: shouldDisplayShield ?? true,
+      performanceMode: performanceMode, // Pass the mode to the component
     };
-  }, []);
+  }, [performanceMode]); // 🔌 Add performanceMode to the dependency array
 
   // Separate lightweight trackers for UI state
   const activeHighlightId = useTrackerPlugin(
@@ -176,9 +186,10 @@ export function AnswerButtons() {
     []
   );
 
-  // Async shield calculation with seen rems
+  // Async shield calculation
   const shieldStatusAsync = useTrackerPlugin(async (rp) => {
-    if (!coreData?.shouldDisplayShield || !coreData?.sessionCache) return null;
+    // 🔌 Add check for light mode
+    if (performanceMode === 'light' || !coreData?.shouldDisplayShield || !coreData?.sessionCache) return null;
 
     const seenRemIds = (await rp.storage.getSession<string[]>(seenRemInSessionKey)) || [];
     
@@ -205,7 +216,7 @@ export function AnswerButtons() {
         percentile: sessionCache.incRemDocPercentiles?.[topMissedInDoc.remId] ?? null,
       } : null,
     };
-  }, [coreData?.shouldDisplayShield, coreData?.sessionCache, coreData?.allIncRems, coreData?.rem._id]);
+  }, [coreData?.shouldDisplayShield, coreData?.sessionCache, coreData?.allIncRems, coreData?.rem._id, performanceMode]);
 
   // ✅ MEMOIZE CALCULATIONS (but they must run every render, not conditionally)
   const percentiles = useMemo(() => {
@@ -447,7 +458,9 @@ export function AnswerButtons() {
               {/* Show KB percentile (always current). Doc percentile removed from cache after priority change. */}
               {percentiles.kb !== null && (
                 <span style={{ opacity: 0.9, fontSize: '11px' }}>
-                  ({percentiles.kb}% KB{percentiles.doc !== null && `, ${percentiles.doc}% Doc`})
+                  ({percentiles.kb}% KB
+                  {/* 🔌 Conditionally show Doc percentile */}
+                  {performanceMode === 'full' && percentiles.doc !== null && `, ${percentiles.doc}% Doc`})
                 </span>
               )}
             </div>
@@ -467,7 +480,8 @@ export function AnswerButtons() {
           </div>
 
           {/* Shield Display */}
-          {shouldDisplayShield && shieldStatusAsync && (
+          {/* 🔌 Conditionally show Shield */}
+          {performanceMode === 'full' && shouldDisplayShield && shieldStatusAsync && (
             <>
               <span style={{ color: '#9ca3af' }}>|</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
