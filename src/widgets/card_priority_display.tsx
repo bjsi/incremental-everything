@@ -9,14 +9,20 @@ import {
   seenCardInSessionKey, 
   allCardPriorityInfoKey,
   queueSessionCacheKey,
-  cardPriorityCacheRefreshKey // 1. Import the refresh key
+  cardPriorityCacheRefreshKey
 } from '../lib/consts';
-import { CardPriorityInfo, QueueSessionCache } from '../lib/cardPriority';
+import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/cardPriority';
 import { percentileToHslColor } from '../lib/color';
 import * as _ from 'remeda';
 
 export function CardPriorityDisplay() {
   const plugin = usePlugin();
+
+  // ✅ Get the performance mode
+  const performanceMode = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<string>('performanceMode'), 
+    []
+  ) || 'full';
 
   // 2. Add a new tracker to listen for the refresh signal.
   const refreshSignal = useTrackerPlugin(
@@ -33,41 +39,43 @@ export function CardPriorityDisplay() {
     return rem ? await rem.hasPowerup(powerupCode) : false;
   }, [rem]);
 
-  // --- NEW: Fetch our ultra-fast session cache ---
-  // 3. Add the refreshSignal to the dependency arrays of our main data hooks.
+
+  // --- 🔌 CACHE-BASED PATH (Full Mode) ---
   const sessionCache = useTrackerPlugin(
-    (rp) => rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey),
-    [refreshSignal] // Re-fetch when signal changes
+    (rp) => (performanceMode === 'full') 
+      ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey) 
+      : null,
+    [performanceMode, refreshSignal]
   );
 
-  // We still need the main cache to find the info for the *current* card.
   const allPrioritizedCardInfo = useTrackerPlugin(
-    (rp) => rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-    [refreshSignal] // Re-fetch when signal changes
+    (rp) => (performanceMode === 'full') 
+      ? rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) 
+      : null,
+    [performanceMode, refreshSignal]
   );
 
-  // This lookup remains the same and is very fast.
   const cardInfo = useMemo(() => {
-    if (!rem || isIncRem || !allPrioritizedCardInfo) {
+    if (performanceMode === 'light' || !rem || isIncRem || !allPrioritizedCardInfo) {
       return null;
     }
     return allPrioritizedCardInfo.find(info => info.remId === rem._id);
-  }, [rem, isIncRem, allPrioritizedCardInfo]);
+  }, [rem, isIncRem, allPrioritizedCardInfo, performanceMode]);
   
-   // --- MOVED THIS HOOK TO THE TOP LEVEL ---
   const docPercentile = useMemo(() => {
-    if (!rem || !sessionCache?.docPercentiles) return null;
-    // Simple, instant lookup from the pre-calculated map.
+    if (performanceMode === 'light' || !rem || !sessionCache?.docPercentiles) return null;
     return sessionCache.docPercentiles[rem._id];
-  }, [rem, sessionCache]);
+  }, [rem, sessionCache, performanceMode]);
+
 
   // --- REWRITTEN: The Shield calculation is now ultra-fast ---
   // It reads from the small, pre-filtered lists in our new session cache.
-   const shieldStatus = useTrackerPlugin(async (rp) => { // Added 'async'
-    if (!rem || !sessionCache) return null;
+  const shieldStatus = useTrackerPlugin(async (rp) => {
+    if (performanceMode === 'light' || !rem || !sessionCache) return null;
+
 
     // Get the list of cards seen in this session, now with 'await'.
-    const seenRemIds = (await rp.storage.getSession<string[]>(seenCardInSessionKey)) || []; // Added 'await'
+    const seenRemIds = (await rp.storage.getSession<string[]>(seenCardInSessionKey)) || []; 
 
     // --- KB Shield Calculation (fast) ---
     // Filter the small `dueCardsInKB` list, not the whole main cache.
@@ -93,15 +101,34 @@ export function CardPriorityDisplay() {
         percentile: sessionCache.docPercentiles[topMissedInDoc.remId]
       } : null,
     };
-  }, [rem, sessionCache]); // Depends on the rem and the new cache
+  }, [rem, sessionCache, performanceMode]);
 
-  if (!rem || isIncRem || !cardInfo) {
+
+  // --- 🔌 ON-DEMAND PATH (Light Mode) ---
+  const lightCardInfo = useTrackerPlugin(async (rp) => {
+    if (performanceMode !== 'light' || !rem || isIncRem) return null;
+    // Fetch priority directly, on-demand. This is fast for a single rem.
+    return await getCardPriority(rp, rem);
+  }, [performanceMode, rem, isIncRem]);
+
+
+  // --- 🔌 COMBINE RESULTS ---
+  const finalCardInfo = performanceMode === 'light' ? lightCardInfo : cardInfo;
+
+  if (!rem || isIncRem || !finalCardInfo) {
     return null;
   }
 
   // KB percentile is read directly from the main cache, which is already fast.
-  const kbPercentile = cardInfo.kbPercentile;
-  const priorityColor = (kbPercentile !== undefined) ? percentileToHslColor(kbPercentile) : '#6b7280';
+  const kbPercentile = (performanceMode === 'full' && cardInfo) ? cardInfo.kbPercentile : undefined;
+  
+  // Use relative percentile for color in 'full' mode if available,
+  // otherwise fall back to the absolute priority.
+  const colorValue = (performanceMode === 'full' && kbPercentile !== undefined)
+    ? kbPercentile            // Use relative percentile (full mode)
+    : finalCardInfo.priority; // Use absolute priority (light mode or fallback)
+
+  const priorityColor = percentileToHslColor(colorValue);
 
   // ... (style objects remain the same) ...
 
@@ -136,17 +163,19 @@ export function CardPriorityDisplay() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ fontWeight: 500 }}>🎴 Priority:</span>
         <div style={priorityBadgeStyle}>
-          <span>{cardInfo.priority}</span>
-          {/* Show KB percentile (always current). Doc percentile removed after priority change. */}
-          {kbPercentile !== undefined && (
+          <span>{finalCardInfo.priority}</span> {/* 🔌 Show absolute priority */}
+          
+          {/* 🔌 Conditionally show percentiles */}
+          {performanceMode === 'full' && kbPercentile !== undefined && (
             <span style={{ opacity: 0.9, fontSize: '11px' }}>
               ({kbPercentile}% KB
               {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
             </span>
           )}
         </div>
-        {/* Show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
-        {(docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
+        {/*  🔌 Conditionally show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
+        {performanceMode === 'full' && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
+
           <span 
             style={{ 
               fontSize: '16px', 
@@ -160,8 +189,8 @@ export function CardPriorityDisplay() {
         )}
       </div>
       
-      {/* --- RESTORED: Document Shield display --- */}
-      {(shieldStatus?.kb || shieldStatus?.doc) && (
+      {/* 🔌 Conditionally show Shield display */}
+      {performanceMode === 'full' && (shieldStatus?.kb || shieldStatus?.doc) && (
         <>
           <span style={{ color: '#9ca3af' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -40,8 +40,14 @@ type CardScopeType = 'prioritized' | 'all';
 
 function Priority() {
   const plugin = usePlugin();
-  
+
   // --- ALL HOOKS DECLARED UNCONDITIONALLY AT THE TOP ---
+
+  // ✅ Get the performance mode setting first
+  const performanceMode = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<string>('performanceMode'), 
+    []
+  ) || 'full';
 
   // State Hooks
   const [scope, setScope] = useState<Scope>({ remId: null, name: 'All KB' });
@@ -65,9 +71,21 @@ function Priority() {
     return await plugin.rem.findOne(remId);
   }, [widgetContext?.contextData?.remId]);
 
-  const sessionCache = useTrackerPlugin((rp) => rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey), []);
+  // 🔌 Conditionally fetch cache based on performance mode
+  const sessionCache = useTrackerPlugin(
+    (rp) => (performanceMode === 'full') 
+      ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey) 
+      : Promise.resolve(null), 
+  [performanceMode]);
+  
   const allIncRems = useTrackerPlugin(async (plugin) => await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [], []);
-  const allCardInfos = useTrackerPlugin(async (plugin) => await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [], []);
+  
+  const allCardInfos = useTrackerPlugin(async (plugin) => 
+    (performanceMode === 'full')
+      ? await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [] 
+      : Promise.resolve([]), 
+  [performanceMode]);
+
   const queueSubQueueId = useTrackerPlugin((rp) => rp.storage.getSession<string | null>(currentSubQueueIdKey), []);
   
   // --- NEW: Priority Review Document awareness ---
@@ -87,6 +105,8 @@ function Priority() {
   const cardInfo = useTrackerPlugin(async (plugin) => rem ? await getCardPriority(plugin, rem) : null, [rem?._id]);
   const hasCards = useTrackerPlugin(async (plugin) => rem ? (await rem.getCards()).length > 0 : false, [rem?._id]);
 
+  // This tracker is fast (direct Rem lookup) so it can run in both modes,
+  // but we will conditionally *show* the UI in 'full' mode only.
   const ancestorPriorityInfo = useTrackerPlugin(async (plugin) => {
     if (!rem) return null;
     return await findClosestAncestorWithAnyPriority(plugin, rem);
@@ -96,15 +116,39 @@ function Priority() {
   const derivedData = useRunAsync(async () => {
     if (!rem) return undefined;
 
-    // Calculate descendant card count
-    const remDescendants = await rem.getDescendants();
-    const remDescendantIds = new Set(remDescendants.map(d => d._id));
-    const finalDescendantCardCount = _.sumBy(
-      allCardInfos.filter(info => remDescendantIds.has(info.remId)), 
-      c => c.cardCount
-    );
+    // Calculate descendant card count (needed for "Set Card Priority" button)
+    // We fetch this in both modes, but it's much faster in 'light' mode.
+    let finalDescendantCardCount = 0;
+    if (performanceMode === 'full') {
+        const remDescendants = await rem.getDescendants();
+        const remDescendantIds = new Set(remDescendants.map(d => d._id));
+        finalDescendantCardCount = _.sumBy(
+          allCardInfos.filter(info => remDescendantIds.has(info.remId)), 
+          c => c.cardCount
+        );
+    } else {
+        // Light mode: a faster, less accurate (but still useful) check
+        const descendants = await rem.getDescendants();
+        // This is a rough proxy but avoids loading the allCardInfos cache
+        const cardsInDescendants = await Promise.all(descendants.map(d => d.getCards()));
+        finalDescendantCardCount = cardsInDescendants.flat().length;
+    }
 
-    // --- MODIFIED: Use originalScopeId for cache matching in Priority Review Documents ---
+    // 🔌 Check performance mode
+    if (performanceMode === 'light') {
+      // In light mode, we only return the descendant count and empty arrays
+      return { 
+        scopedIncRems: [], 
+        scopedCardRems: [],
+        incRelPriority: 50,
+        cardRelPriority: 50,
+        descendantCardCount: finalDescendantCardCount, 
+        prioritySourceCounts: { manual: 0, inherited: 0, default: 0 },
+      };
+    }
+
+    // --- FULL MODE LOGIC ---
+    // ... (rest of the existing derivedData logic) ...
     const effectiveScopeForCache = originalScopeId || queueSubQueueId;
     const useFastCache = inQueue && scope.remId === effectiveScopeForCache;
     
@@ -194,7 +238,7 @@ function Priority() {
       descendantCardCount: finalDescendantCardCount, 
       prioritySourceCounts: finalPrioritySourceCounts,
     };
-  }, [rem, inQueue, scope, allIncRems, allCardInfos, cardScopeType, sessionCache, queueSubQueueId, scopeMode, originalScopeId, isPriorityReviewDoc]);
+  }, [rem, inQueue, scope, allIncRems, allCardInfos, cardScopeType, sessionCache, queueSubQueueId, scopeMode, originalScopeId, isPriorityReviewDoc, performanceMode]); // 🔌 Add performanceMode
 
   // Synchronous Derived Data Hooks (Memoization)
   const documentScopes = useMemo(() => scopeHierarchy.filter(s => s.remId !== null), [scopeHierarchy]);
@@ -204,8 +248,9 @@ function Priority() {
   useEffect(() => { if (incRemInfo) setIncAbsPriority(incRemInfo.priority) }, [incRemInfo]);
   useEffect(() => { if (cardInfo) setCardAbsPriority(cardInfo.priority) }, [cardInfo]);
   
+  // This tracker is fast and only runs in 'full' mode, so it's fine.
   useTrackerPlugin(async (plugin) => {
-    if (!rem) return;
+    if (!rem || performanceMode === 'light') return; // 🔌 Skip in light mode
     const ancestors: Rem[] = [];
     let current: Rem | undefined = rem;
     while (current?.parent) {
@@ -217,12 +262,12 @@ function Priority() {
       hierarchy.push({ remId: ancestor._id, name: await safeRemTextToString(plugin, ancestor.text) });
     }
     setScopeHierarchy(hierarchy);
-  }, [rem?._id]);
+  }, [rem?._id, performanceMode]); // 🔌 Add performanceMode
   
   // --- MODIFIED: Initialize scope with original scope for Priority Review Documents ---
   useEffect(() => {
     const initializeScope = async () => {
-      if (inQueue && queueSubQueueId) {
+      if (inQueue && queueSubQueueId && performanceMode === 'full') { // 🔌 Skip in light mode
         // Use originalScopeId if available (Priority Review Document case)
         const effectiveScopeId = originalScopeId || queueSubQueueId;
         const scopeRem = await plugin.rem.findOne(effectiveScopeId);
@@ -241,7 +286,7 @@ function Priority() {
       }
     };
     initializeScope();
-  }, [inQueue, queueSubQueueId, originalScopeId, isPriorityReviewDoc]);
+  }, [inQueue, queueSubQueueId, originalScopeId, isPriorityReviewDoc, performanceMode]); // 🔌 Add performanceMode
 
   useEffect(() => {
     setTimeout(() => {
@@ -255,8 +300,9 @@ function Priority() {
     }, 50);
   }, [incRemInfo, cardInfo]);
 
+  // This effect calculates hypothetical relative priority, skip in 'light' mode
   useEffect(() => {
-    if (derivedData && rem) {
+    if (performanceMode === 'full' && derivedData && rem) {
       const hypotheticalRems = [
         ...derivedData.scopedIncRems.filter(r => r.remId !== rem._id),
         { remId: rem._id, priority: incAbsPriority } as IncrementalRem
@@ -264,10 +310,10 @@ function Priority() {
       const newRelPriority = calculateIncRemRelativePriority(hypotheticalRems, rem._id);
       if (newRelPriority !== null) setIncRelPriority(newRelPriority);
     }
-  }, [incAbsPriority, derivedData, rem]);
+  }, [incAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode
 
   useEffect(() => {
-    if (derivedData && rem) {
+    if (performanceMode === 'full' && derivedData && rem) {
       const hypotheticalRems = [
         ...derivedData.scopedCardRems.filter(r => r.remId !== rem._id),
         { remId: rem._id, priority: cardAbsPriority, source: 'manual' } as CardPriorityInfo
@@ -275,7 +321,7 @@ function Priority() {
       const newRelPriority = calculateRelativeCardPriority(hypotheticalRems, rem._id);
       if (newRelPriority !== null) setCardRelPriority(newRelPriority);
     }
-  }, [cardAbsPriority, derivedData, rem]);
+  }, [cardAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode
 
   // Event Handlers
   const showIncSection = incRemInfo !== null;
@@ -296,8 +342,8 @@ function Priority() {
       await plugin.storage.setSession(allIncrementalRemKey, updatedAllIncRems);
     }
     
-    // Remove the doc percentile from cache to avoid showing stale data
-    if (sessionCache && originalScopeId) {
+    // 🔌 Conditionally update session cache
+    if (performanceMode === 'full' && sessionCache && originalScopeId) {
       const newIncRemDocPercentiles = { ...sessionCache.incRemDocPercentiles };
       delete newIncRemDocPercentiles[rem._id];
       
@@ -308,44 +354,44 @@ function Priority() {
       
       await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
     }
-  }, [rem, incRemInfo, plugin, sessionCache, originalScopeId]);
+  }, [rem, incRemInfo, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
   const saveCardPriority = useCallback(async (priority: number) => {
     if (!rem) return;
     await setCardPriority(plugin, rem, priority, 'manual');
-    const numCardsRemaining = await plugin.queue.getNumRemainingCards();
-    const isInQueueNow = numCardsRemaining !== undefined;
-    await updateCardPriorityInCache(plugin, rem._id, isInQueueNow);
-    
-    // Flush the pending cache update first, so the new priority is in the cache
-    await flushLightCacheUpdates(plugin);
-    
-    // Now recalculate KB percentiles (fast - just sort and calculate)
-    const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
-    const sortedInfos = [...allCardInfos].sort((a, b) => a.priority - b.priority);
-    const totalItems = sortedInfos.length;
-    const recalculatedInfos = sortedInfos.map((info, index) => {
-      const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-      return { ...info, kbPercentile: percentile };
-    });
-    await plugin.storage.setSession(allCardPriorityInfoKey, recalculatedInfos);
-    
-    // Trigger refresh signal immediately so display updates before popup closes
-    await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
-    
-    // Remove the doc percentile from cache (still needs full recalculation on next queue)
-    if (sessionCache && originalScopeId) {
-      const newDocPercentiles = { ...sessionCache.docPercentiles };
-      delete newDocPercentiles[rem._id];
-      
-      const updatedCache = {
-        ...sessionCache,
-        docPercentiles: newDocPercentiles
-      };
-      
-      await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+
+    // 🔌 Only do cache updates in 'full' mode
+    if (performanceMode === 'full') {
+        const numCardsRemaining = await plugin.queue.getNumRemainingCards();
+        const isInQueueNow = numCardsRemaining !== undefined;
+        await updateCardPriorityInCache(plugin, rem._id, isInQueueNow);
+        
+        await flushLightCacheUpdates(plugin);
+        
+        const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
+        const sortedInfos = [...allCardInfos].sort((a, b) => a.priority - b.priority);
+        const totalItems = sortedInfos.length;
+        const recalculatedInfos = sortedInfos.map((info, index) => {
+          const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+          return { ...info, kbPercentile: percentile };
+        });
+        await plugin.storage.setSession(allCardPriorityInfoKey, recalculatedInfos);
+        
+        await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+        
+        if (sessionCache && originalScopeId) {
+          const newDocPercentiles = { ...sessionCache.docPercentiles };
+          delete newDocPercentiles[rem._id];
+          
+          const updatedCache = {
+            ...sessionCache,
+            docPercentiles: newDocPercentiles
+          };
+          
+          await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+        }
     }
-  }, [rem, plugin, sessionCache, originalScopeId]); 
+  }, [rem, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
   const showInheritanceSection = 
     (!showIncSection && !showCardSection && derivedData?.descendantCardCount > 0) ||
@@ -424,10 +470,13 @@ function Priority() {
   const removeCardPriority = useCallback(async () => {
     if (!rem) return;
     await rem.removePowerup('cardPriority');
-    await updateCardPriorityInCache(plugin, rem._id);
+    // 🔌 Conditionally update cache
+    if (performanceMode === 'full') {
+        await updateCardPriorityInCache(plugin, rem._id);
+    }
     await plugin.app.toast('Card Priority for inheritance removed.');
     plugin.widget.closePopup();
-  }, [plugin, rem]);
+  }, [plugin, rem, performanceMode]); // 🔌 Add performanceMode
   
   // --- EARLY RETURNS & FINAL DATA DE-STRUCTURING ---
   if (!widgetContext || !rem) { return <div className="p-4">Loading Rem Data...</div>; }
@@ -507,38 +556,42 @@ function Priority() {
 
       <h2 className="text-xl font-bold">Priority Settings</h2>
 
-      {/* --- NEW: Show indicator when in Priority Review Document --- */}
-      {isPriorityReviewDoc && originalScopeId && scopeMode === 'document' && (
-        <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-center">
-          📊 Scope: <span className="font-semibold">{scope.name}</span> (Original Document)
-        </div>
-      )}
+      {/* 🔌 Conditionally render scope UI */}
+      {performanceMode === 'full' && (
+        <>
+          {isPriorityReviewDoc && originalScopeId && scopeMode === 'document' && (
+            <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-center">
+              📊 Scope: <span className="font-semibold">{scope.name}</span> (Original Document)
+            </div>
+          )}
 
-      <div className="flex justify-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
-        <label className={`cursor-pointer w-1/2 text-center text-sm py-1 px-3 rounded-md transition-colors ${
-            scopeMode === 'all'
-            ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 font-semibold shadow-sm'
-            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50 dark:hover:bg-gray-700'
-        }`}>
-          <input type="radio" name="scopeMode" value="all" checked={scopeMode === 'all'} onChange={() => { setScopeMode('all'); setScope({ remId: null, name: 'All KB' }); }} className="sr-only" />
-          All KB
-        </label>
-        <label className={`cursor-pointer w-1/2 text-center text-sm py-1 px-3 rounded-md transition-colors ${
-            scopeMode === 'document'
-            ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 font-semibold shadow-sm'
-            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50 dark:hover:bg-gray-700'
-        }`}>
-          <input type="radio" name="scopeMode" value="document" checked={scopeMode === 'document'} onChange={() => { setScopeMode('document'); if (currentDocumentScopeIndex === -1 && documentScopes.length > 0) { setScope(documentScopes[0]); } }} className="sr-only" />
-          Document
-        </label>
-      </div>
+          <div className="flex justify-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+            <label className={`cursor-pointer w-1/2 text-center text-sm py-1 px-3 rounded-md transition-colors ${
+                scopeMode === 'all'
+                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 font-semibold shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50 dark:hover:bg-gray-700'
+            }`}>
+              <input type="radio" name="scopeMode" value="all" checked={scopeMode === 'all'} onChange={() => { setScopeMode('all'); setScope({ remId: null, name: 'All KB' }); }} className="sr-only" />
+              All KB
+            </label>
+            <label className={`cursor-pointer w-1/2 text-center text-sm py-1 px-3 rounded-md transition-colors ${
+                scopeMode === 'document'
+                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 font-semibold shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50 dark:hover:bg-gray-700'
+            }`}>
+              <input type="radio" name="scopeMode" value="document" checked={scopeMode === 'document'} onChange={() => { setScopeMode('document'); if (currentDocumentScopeIndex === -1 && documentScopes.length > 0) { setScope(documentScopes[0]); } }} className="sr-only" />
+              Document
+            </label>
+          </div>
 
-      {scopeMode === 'document' && (
-        <div className="p-2 border rounded-md dark:border-gray-600 flex items-center justify-between mt-2">
-            <button onClick={() => { if (currentDocumentScopeIndex > 0) { setScope(documentScopes[currentDocumentScopeIndex - 1]); } }} disabled={currentDocumentScopeIndex <= 0} className="px-2 py-1 rounded disabled:opacity-20">↑</button>
-            <div className="text-sm font-semibold text-center truncate" title={scope.name}>{scope.name}</div>
-            <button onClick={() => { if (currentDocumentScopeIndex < documentScopes.length - 1) { setScope(documentScopes[currentDocumentScopeIndex + 1]); } }} disabled={currentDocumentScopeIndex >= documentScopes.length - 1} className="px-2 py-1 rounded disabled:opacity-20">↓</button>
-        </div>
+          {scopeMode === 'document' && (
+            <div className="p-2 border rounded-md dark:border-gray-600 flex items-center justify-between mt-2">
+                <button onClick={() => { if (currentDocumentScopeIndex > 0) { setScope(documentScopes[currentDocumentScopeIndex - 1]); } }} disabled={currentDocumentScopeIndex <= 0} className="px-2 py-1 rounded disabled:opacity-20">↑</button>
+                <div className="text-sm font-semibold text-center truncate" title={scope.name}>{scope.name}</div>
+                <button onClick={() => { if (currentDocumentScopeIndex < documentScopes.length - 1) { setScope(documentScopes[currentDocumentScopeIndex + 1]); } }} disabled={currentDocumentScopeIndex >= documentScopes.length - 1} className="px-2 py-1 rounded disabled:opacity-20">↓</button>
+            </div>
+          )}
+        </>
       )}
       
       {showIncSection && (
@@ -559,17 +612,24 @@ function Priority() {
                 className="w-20 text-center p-1 border rounded dark:bg-gray-800 border-gray-300 dark:border-gray-600" />
             </div>
             <input type="range" min="0" max="100" value={incAbsPriority} onChange={(e) => setIncAbsPriority(Number(e.target.value))} className="w-full" />
-            <div className="flex justify-between items-center mt-2">
-              <label className="font-medium">Relative Priority:</label>
-              <span className="text-lg font-bold">{incRelPriority}%</span>
-            </div>
-            <div className="relative h-8 flex items-center">
-               <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
-              <input type="range" min="1" max="100" value={incRelPriority} onChange={(e) => handleIncRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
-            </div>
-            <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
-              Universe: {scopedIncRems.length.toLocaleString()} Inc Rem
-            </div>
+            
+            {/* 🔌 Conditionally render relative priority */}
+            {performanceMode === 'full' && (
+              <>
+                <div className="flex justify-between items-center mt-2">
+                  <label className="font-medium">Relative Priority:</label>
+                  <span className="text-lg font-bold">{incRelPriority}%</span>
+                </div>
+                <div className="relative h-8 flex items-center">
+                  <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
+                  <input type="range" min="1" max="100" value={incRelPriority} onChange={(e) => handleIncRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
+                </div>
+                <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
+                  Universe: {scopedIncRems.length.toLocaleString()} Inc Rem
+                </div>
+              </>
+            )}
+
             <div className="text-sm mt-2" style={secondaryTextStyle}>
               Next review: {incRemInfo && new Date(incRemInfo.nextRepDate).toLocaleDateString()}
             </div>
@@ -592,7 +652,8 @@ function Priority() {
             </div>
           )}
 
-          {ancestorPriorityInfo && ancestorPriorityInfo.sourceType === 'IncRem' && (
+          {/* 🔌 Conditionally render ancestor info */}
+          {performanceMode === 'full' && ancestorPriorityInfo && ancestorPriorityInfo.sourceType === 'IncRem' && (
             <div className="mt-2 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
               <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
                 Closest Ancestor Priority: {ancestorPriorityInfo.priority}
@@ -627,19 +688,26 @@ function Priority() {
                     className="w-20 text-center p-1 border rounded dark:bg-gray-800 border-gray-300 dark:border-gray-600" />
               </div>
               <input type="range" min="0" max="100" value={cardAbsPriority} onChange={(e) => setCardAbsPriority(Number(e.target.value))} className="w-full" />
-              <div className="flex justify-between items-center mt-2">
-                <label className="font-medium">Relative Priority:</label>
-                <span className="text-lg font-bold">{cardRelPriority}%</span>
-              </div>
-              <div className="relative h-8 flex items-center">
-                <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
-                <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
-              </div>
-              <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
-                  Universe: {scopedCardRems.length.toLocaleString()} flashcards
-              </div>
               
-              {ancestorPriorityInfo && (
+              {/* 🔌 Conditionally render relative priority */}
+              {performanceMode === 'full' && (
+                <>
+                  <div className="flex justify-between items-center mt-2">
+                    <label className="font-medium">Relative Priority:</label>
+                    <span className="text-lg font-bold">{cardRelPriority}%</span>
+                  </div>
+                  <div className="relative h-8 flex items-center">
+                    <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
+                    <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
+                  </div>
+                  <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
+                      Universe: {scopedCardRems.length.toLocaleString()} flashcards
+                  </div>
+                </>
+              )}
+              
+              {/* 🔌 Conditionally render ancestor info */}
+              {performanceMode === 'full' && ancestorPriorityInfo && (
                 <div className="mt-4 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
                   <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
                     {cardInfo?.source === 'inherited' 
@@ -656,11 +724,14 @@ function Priority() {
 
               {hasCards && cardInfo && (
                 <>
-                  <div className="text-xs text-center mt-2 flex justify-around p-1 bg-gray-100 dark:bg-gray-800 rounded-sm" style={secondaryTextStyle}>
-                    <span>Manual: {prioritySourceCounts.manual.toLocaleString()}</span>
-                    <span>Inherited: {prioritySourceCounts.inherited.toLocaleString()}</span>
-                    <span>Default: {prioritySourceCounts.default.toLocaleString()}</span>
-                  </div>
+                  {/* 🔌 Conditionally render statistics */}
+                  {performanceMode === 'full' && (
+                    <div className="text-xs text-center mt-2 flex justify-around p-1 bg-gray-100 dark:bg-gray-800 rounded-sm" style={secondaryTextStyle}>
+                      <span>Manual: {prioritySourceCounts.manual.toLocaleString()}</span>
+                      <span>Inherited: {prioritySourceCounts.inherited.toLocaleString()}</span>
+                      <span>Default: {prioritySourceCounts.default.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-sm mt-2" style={secondaryTextStyle}>
                     <span><span className="font-medium">Source:</span> {cardInfo?.source}</span>
                     {cardInfo?.source === 'inherited' && (
@@ -672,19 +743,23 @@ function Priority() {
                   <div className="text-sm" style={secondaryTextStyle}>
                     <span className="font-medium">Due Cards:</span> {cardInfo?.dueCards} / {cardInfo?.cardCount}
                   </div>
-                  <div className="mt-4 pt-2 border-t dark:border-gray-600">
-                      <label className="text-sm font-medium">Calculate Relative To:</label>
-                      <div className="flex gap-4 mt-1">
-                          <label className="flex items-center gap-2 text-sm">
-                              <input type="radio" name="cardScope" value="prioritized" checked={cardScopeType === 'prioritized'} onChange={() => setCardScopeType('prioritized')} />
-                              Prioritized Cards (Manual + Inherited)
-                          </label>
-                          <label className="flex items-center gap-2 text-sm">
-                              <input type="radio" name="cardScope" value="all" checked={cardScopeType === 'all'} onChange={() => setCardScopeType('all')} />
-                              All Cards
-                          </label>
-                      </div>
-                  </div>
+                  
+                  {/* 🔌 Conditionally render scope type radio buttons */}
+                  {performanceMode === 'full' && (
+                    <div className="mt-4 pt-2 border-t dark:border-gray-600">
+                        <label className="text-sm font-medium">Calculate Relative To:</label>
+                        <div className="flex gap-4 mt-1">
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="radio" name="cardScope" value="prioritized" checked={cardScopeType === 'prioritized'} onChange={() => setCardScopeType('prioritized')} />
+                                Prioritized Cards (Manual + Inherited)
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="radio" name="cardScope" value="all" checked={cardScopeType === 'all'} onChange={() => setCardScopeType('all')} />
+                                All Cards
+                            </label>
+                        </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -715,17 +790,23 @@ function Priority() {
                     className="w-20 text-center p-1 border rounded dark:bg-gray-800 border-gray-300 dark:border-gray-600" />
               </div>
               <input type="range" min="0" max="100" value={cardAbsPriority} onChange={(e) => setCardAbsPriority(Number(e.target.value))} className="w-full" />
-              <div className="flex justify-between items-center mt-2">
-                <label className="font-medium">Relative Priority:</label>
-                <span className="text-lg font-bold">{cardRelPriority}%</span>
-              </div>
-              <div className="relative h-8 flex items-center">
-                <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
-                <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
-              </div>
-              <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
-                  Universe: {scopedCardRems.length.toLocaleString()} flashcards
-              </div>
+              
+              {/* 🔌 Conditionally render relative priority */}
+              {performanceMode === 'full' && (
+                <>
+                  <div className="flex justify-between items-center mt-2">
+                    <label className="font-medium">Relative Priority:</label>
+                    <span className="text-lg font-bold">{cardRelPriority}%</span>
+                  </div>
+                  <div className="relative h-8 flex items-center">
+                    <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
+                    <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
+                  </div>
+                  <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
+                      Universe: {scopedCardRems.length.toLocaleString()} flashcards
+                  </div>
+                </>
+              )}
             </div>
             
             {cardInfo?.source === 'manual' && (
