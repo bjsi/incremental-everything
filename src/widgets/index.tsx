@@ -218,8 +218,10 @@ async function precomputeAllCardPriorities(plugin: RNPlugin) {
     
     let processed = 0;
     let tagged = 0;
+    let priorityChanged = 0; // Track how many had their priority value changed
     let skippedManual = 0;
     let errors = 0;
+    const errorDetails: Array<{ remId: string; reason: string; error?: any }> = []; // Track error details
     
     const batchSize = 50; // Process in batches to avoid overwhelming the system
     
@@ -231,6 +233,10 @@ async function precomputeAllCardPriorities(plugin: RNPlugin) {
           const rem = await plugin.rem.findOne(remId);
           if (!rem) {
             errors++;
+            errorDetails.push({ 
+              remId, 
+              reason: 'Rem not found - may have been deleted' 
+            });
             return;
           }
           
@@ -244,6 +250,9 @@ async function precomputeAllCardPriorities(plugin: RNPlugin) {
             return;
           }
           
+          // Store the old priority value (if any)
+          const oldPriorityValue = existingPriority ? existingPriority.priority : null;
+          
           // Use autoAssignCardPriority which handles all the logic:
           // - Checks for incremental rem
           // - Searches ancestors using findClosestAncestorWithPriority
@@ -251,11 +260,26 @@ async function precomputeAllCardPriorities(plugin: RNPlugin) {
           // - Saves the priority with appropriate source
           await autoAssignCardPriority(plugin, rem);
           tagged++;
+          
+          // Check if priority value actually changed
+          if (oldPriorityValue !== null) {
+            const newPriority = await getCardPriority(plugin, rem);
+            if (newPriority && newPriority.priority !== oldPriorityValue) {
+              priorityChanged++;
+            }
+          }
+          
           processed++;
           
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           console.error(`Error processing rem ${remId}:`, error);
           errors++;
+          errorDetails.push({ 
+            remId, 
+            reason: `Exception during processing: ${errorMessage}`,
+            error: error 
+          });
         }
       }));
       
@@ -268,7 +292,7 @@ async function precomputeAllCardPriorities(plugin: RNPlugin) {
         );
         console.log(
           `Progress: ${processed}/${uniqueRemIds.length} (${progress}%) - ` +
-          `Tagged: ${tagged}, Skipped manual: ${skippedManual}, Errors: ${errors}`
+          `Tagged: ${tagged}, Changed: ${priorityChanged}, Skipped manual: ${skippedManual}, Errors: ${errors}`
         );
       }
       
@@ -288,15 +312,45 @@ async function precomputeAllCardPriorities(plugin: RNPlugin) {
     await buildOptimizedCache(plugin);
     const cacheTime = Math.round((Date.now() - cacheStartTime) / 1000);
     
+    // Analyze error types
+    let errorBreakdown = '';
+    if (errorDetails.length > 0) {
+      const notFoundErrors = errorDetails.filter(e => e.reason.includes('not found')).length;
+      const exceptionErrors = errorDetails.filter(e => e.reason.includes('Exception')).length;
+      
+      errorBreakdown = `\n• Error breakdown:\n` +
+        `  - Rem not found: ${notFoundErrors}\n` +
+        `  - Processing exceptions: ${exceptionErrors}`;
+      
+      // Log detailed errors to console
+      console.log('\n=== DETAILED ERROR LOG ===');
+      console.log(`Total errors: ${errorDetails.length}\n`);
+      errorDetails.forEach((err, index) => {
+        console.log(`\nError ${index + 1}/${errorDetails.length}:`);
+        console.log(`  RemId: ${err.remId}`);
+        console.log(`  Reason: ${err.reason}`);
+        if (err.error) {
+          console.log(`  Details:`, err.error);
+        }
+      });
+      console.log('\n=== END ERROR LOG ===\n');
+      
+      // Also provide a simple list of failed RemIds for easy copying
+      console.log('=== FAILED REM IDs (for investigation) ===');
+      console.log(errorDetails.map(e => e.remId).join('\n'));
+      console.log('=== END FAILED REM IDs ===\n');
+    }
+    
     // Final report
     const message = 
       `✅ Pre-computation complete!\n\n` +
       `• Total rems processed: ${processed}\n` +
-      `• Newly tagged: ${tagged}\n` +
+      `• Newly tagged: ${tagged}${priorityChanged > 0 ? ` (${priorityChanged} with changed priority)` : ''}\n` +
       `• Preserved manual priorities: ${skippedManual}\n` +
-      `• Errors: ${errors}\n` +
+      `• Errors: ${errors}${errorBreakdown}\n` +
       `• Total time: ${totalTime}s\n` +
       `• Cache build time: ${cacheTime}s\n\n` +
+      `${errors > 0 ? 'Check console for detailed error log.\n\n' : ''}` +
       `Future startups will be much faster!`;
     
     console.log(message);
@@ -618,6 +672,73 @@ async function onActivate(plugin: ReactRNPlugin) {
   console.log('Plugin methods:', Object.keys(plugin));
   console.log('Plugin.app methods:', Object.keys(plugin.app));
   console.log('Plugin.storage methods:', Object.keys(plugin.storage));
+
+  // Store plugin reference globally for helper functions
+  (window as any).__plugin = plugin;
+
+  // Define console helper function (works only within plugin's iframe context)
+  // For easier access, use the "Jump to Rem by ID" plugin command instead (Ctrl+P)
+  const jumpToRemByIdFunction = async function(remId: string) {
+    if (!remId || typeof remId !== 'string' || remId.trim() === '') {
+      console.error('❌ Invalid RemId provided');
+      console.log('Usage: jumpToRemById(\'your-rem-id-here\')');
+      console.log('Example: jumpToRemById(\'abc123xyz\')');
+      return;
+    }
+    
+    try {
+      const plugin = (window as any).__plugin;
+      if (!plugin) {
+        console.error('❌ Plugin not found. Make sure the Incremental Everything plugin is loaded.');
+        console.log('Try reloading the plugin from RemNote Settings → Plugins');
+        return;
+      }
+      
+      console.log(`🔍 Searching for rem: ${remId}...`);
+      const rem = await plugin.rem.findOne(remId.trim());
+      
+      if (!rem) {
+        console.error(`❌ Rem not found: ${remId}`);
+        console.log('💡 Possible reasons:');
+        console.log('   • The rem was deleted');
+        console.log('   • The RemId is incorrect');
+        console.log('   • The rem is from a different knowledge base');
+        return;
+      }
+      
+      const remText = await rem.text;
+      const textPreview = remText ? (typeof remText === 'string' ? remText : '[Complex content]') : '[No text]';
+      const preview = textPreview.length > 100 ? textPreview.substring(0, 100) + '...' : textPreview;
+      
+      console.log(`✅ Found rem: "${preview}"`);
+      console.log('📍 Opening rem in RemNote...');
+      await plugin.window.openRem(rem);
+      
+    } catch (error) {
+      console.error('❌ Error finding rem:', error);
+      console.log('💡 Try reloading the plugin if this error persists.');
+    }
+  };
+
+  // Attach to window object (works only in iframe context)
+  (window as any).jumpToRemById = jumpToRemByIdFunction;
+
+  // Log availability information
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('💡 Jump to Rem by ID - Available Methods:');
+  console.log('');
+  console.log('   RECOMMENDED: Use plugin command');
+  console.log('   • Press Ctrl+P (or Cmd+P)');
+  console.log('   • Type: "Jump to Rem by ID"');
+  console.log('   • Enter your RemId');
+  console.log('');
+  console.log('   ADVANCED: Console function (iframe context only)');
+  console.log('   • Only works if console context is set to plugin iframe');
+  console.log('   • Usage: jumpToRemById(\'your-rem-id-here\')');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('   Usage: jumpToRemById(\'your-rem-id-here\')');
+  console.log('   Example: jumpToRemById(\'abc123xyz\')');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   let sessionItemCounter = 0;
 
@@ -2132,10 +2253,28 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  // Command to jump to rem by ID using a popup widget
+  plugin.app.registerCommand({
+    id: 'jump-to-rem-by-id',
+    name: 'Jump to Rem by ID',
+    action: async () => {
+      // Open the popup widget for input
+      await plugin.widget.openPopup('jump_to_rem_input');
+    },
+  });
+
   // Register the review document creator widget
   plugin.app.registerWidget('review_document_creator', WidgetLocation.Popup, {
     dimensions: {
       width: 500,
+      height: 'auto',
+    },
+  });
+
+  // Register the jump to rem input widget
+  plugin.app.registerWidget('jump_to_rem_input', WidgetLocation.Popup, {
+    dimensions: {
+      width: 400,
       height: 'auto',
     },
   });
@@ -2239,6 +2378,54 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  // Test console function availability (useful for debugging)
+  await plugin.app.registerCommand({
+    id: 'test-console-function',
+    name: 'Test Console Function',
+    description: 'Check if jumpToRemById() is available in console',
+    action: async () => {
+      // Check if function exists on window
+      const isOnWindow = typeof (window as any).jumpToRemById === 'function';
+      
+      // Log detailed debugging info
+      console.log('=== CONSOLE FUNCTION DEBUG ===');
+      console.log('typeof (window as any).jumpToRemById:', typeof (window as any).jumpToRemById);
+      console.log('typeof window.jumpToRemById:', typeof (window as any).jumpToRemById);
+      console.log('Function defined on window:', isOnWindow);
+      console.log('window object:', window);
+      console.log('Top window === current window:', window === window.top);
+      
+      // Try to log the function itself
+      if (isOnWindow) {
+        console.log('Function reference:', (window as any).jumpToRemById);
+      }
+      
+      // Check if we're in an iframe
+      const inIframe = window !== window.top;
+      if (inIframe) {
+        console.warn('⚠️ Plugin is running in an iframe!');
+        console.log('To use the function in console, you need to:');
+        console.log('1. Open DevTools (F12)');
+        console.log('2. Look for the context dropdown (usually says "top")');
+        console.log('3. Select the RemNote iframe context');
+        console.log('OR use: window.jumpToRemById("rem-id")');
+      }
+      
+      console.log('==============================');
+      
+      if (isOnWindow) {
+        await plugin.app.toast('✅ Function is defined. Check console for details.');
+        console.log('✅ jumpToRemById() is available!');
+        console.log('If you get "not defined" error, try:');
+        console.log('  window.jumpToRemById(\'your-rem-id-here\')');
+      } else {
+        await plugin.app.toast('❌ jumpToRemById() is NOT available');
+        console.error('❌ jumpToRemById() is NOT available');
+        console.log('This might indicate the plugin needs to be rebuilt');
+      }
+    },
+  });
+
   // Run the cache build in the background without blocking plugin initialization.
   cacheAllCardPriorities(plugin);
 
@@ -2248,4 +2435,3 @@ async function onActivate(plugin: ReactRNPlugin) {
 async function onDeactivate(_: ReactRNPlugin) {}
 
 declareIndexPlugin(onActivate, onDeactivate);
-
