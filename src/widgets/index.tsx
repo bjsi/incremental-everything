@@ -762,6 +762,12 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   `;
 
+  const hideCardPriorityTagId = 'hide-card-priority-tag';
+  const HIDE_CARD_PRIORITY_CSS = `
+    [data-rem-tags~="cardpriority"] .hierarchy-editor__tag-bar__tag {
+    display: none; }
+  `;
+
   const COLLAPSE_TOP_BAR_CSS = `
     .spacedRepetitionContent { height: 100%; box-sizing: border-box; }
     .queue__title { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
@@ -850,6 +856,20 @@ async function onActivate(plugin: ReactRNPlugin) {
       'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
     defaultValue: true,
   });
+
+  plugin.settings.registerBooleanSetting({
+    id: 'hideCardPriorityTag',
+    title: 'Hide CardPriority Tag in Editor',
+    description:
+      'If enabled, this will hide the "CardPriority" powerup tag in the editor to reduce clutter. You can still set priority with (Alt+P). After changing this setting, reload RemNote.',
+    defaultValue: true,
+  });
+
+  // Apply the CSS hide setting on startup
+  const shouldHide = await plugin.settings.getSetting('hideCardPriorityTag');
+  if (shouldHide) {
+    await plugin.app.registerCSS(hideCardPriorityTagId, HIDE_CARD_PRIORITY_CSS);
+  }
   
   // Register the new setting as a number input, as sliders are not supported.
   plugin.settings.registerNumberSetting({
@@ -1448,7 +1468,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       dueIncRemCount = allIncRems.filter(rem => 
         scopeRemIds.includes(rem.remId) && Date.now() >= rem.nextRepDate
       ).length;
-      
+
     } else if (scopeForItemSelection) {
           // Regular document - LOGIC MUST DIVERGE
           
