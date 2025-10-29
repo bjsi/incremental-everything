@@ -17,16 +17,26 @@ export interface PriorityShieldStatus {
   kb: {
     absolute: number | null;
     percentile: number | null;
+    universeSize?: number; // NEW: Track total KB IncRems
   };
   doc: {
     absolute: number | null;
     percentile: number | null;
+    universeSize?: number; // NEW: Track total doc IncRems
   };
 }
 
 export interface CardPriorityShieldStatus {
-  kb: { absolute: number; percentile: number } | null;
-  doc: { absolute: number; percentile: number } | null;
+  kb: { 
+    absolute: number; 
+    percentile: number;
+    universeSize?: number; // NEW: Track total KB cards
+  } | null;
+  doc: { 
+    absolute: number; 
+    percentile: number;
+    universeSize?: number; // NEW: Track total doc cards
+  } | null;
 }
 
 function calculateRelativeCardPriority(allItems: { priority: number; remId: string }[], currentRemId: RemId): number | null {
@@ -63,8 +73,16 @@ export async function calculateCardPriorityShield(
       status.kb = {
         absolute: topMissedInKb.priority,
         percentile: percentile === null ? 100 : percentile,
+        universeSize: allPrioritizedCardInfo.length, // NEW: Track KB universe size
       };
     }
+  } else if (allPrioritizedCardInfo.length > 0) {
+    // Even if no unreviewed due cards, still track universe size
+    status.kb = {
+      absolute: null,
+      percentile: 100,
+      universeSize: allPrioritizedCardInfo.length,
+    };
   }
 
   // 2. Calculate the Document Shield with COMPREHENSIVE SCOPE
@@ -135,8 +153,16 @@ export async function calculateCardPriorityShield(
           status.doc = {
             absolute: topMissedInDoc.priority,
             percentile: percentile === null ? 100 : percentile,
+            universeSize: docPrioritizedCardInfo.length, // NEW: Track doc universe size
           };
         }
+      } else if (docPrioritizedCardInfo.length > 0) {
+        // Even if no unreviewed due cards, still track universe size
+        status.doc = {
+          absolute: null,
+          percentile: 100,
+          universeSize: docPrioritizedCardInfo.length,
+        };
       }
     }
   }
@@ -151,8 +177,8 @@ export async function calculatePriorityShield(
   currentRemId?: RemId
 ): Promise<PriorityShieldStatus> {
   const status: PriorityShieldStatus = {
-    kb: { absolute: null, percentile: null },
-    doc: { absolute: null, percentile: null },
+    kb: { absolute: null, percentile: null, universeSize: 0 },
+    doc: { absolute: null, percentile: null, universeSize: 0 },
   };
 
   const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
@@ -212,6 +238,9 @@ export async function calculatePriorityShield(
     return status;
   }
 
+  // Track KB universe size
+  status.kb.universeSize = allRems.length;
+
   const unreviewedDueRems = allRems.filter(
     (rem) =>
       (Date.now() >= rem.nextRepDate && !seenRemIds.includes(rem.remId)) ||
@@ -219,6 +248,7 @@ export async function calculatePriorityShield(
   );
 
   if (unreviewedDueRems.length === 0) {
+    // Still return universe size even if no unreviewed due rems
     return status;
   }
 
@@ -230,6 +260,9 @@ export async function calculatePriorityShield(
 
   if (docScopeRemIds && docScopeRemIds.length > 0) {
     const scopedRems = allRems.filter((rem) => docScopeRemIds.includes(rem.remId));
+    
+    // Track doc universe size
+    status.doc.universeSize = scopedRems.length;
 
     if (scopedRems.length > 0) {
       const unreviewedDueInScope = scopedRems.filter(

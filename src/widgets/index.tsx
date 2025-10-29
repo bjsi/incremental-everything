@@ -931,6 +931,31 @@ async function onActivate(plugin: ReactRNPlugin) {
     defaultValue: true,
   });
 
+    plugin.settings.registerDropdownSetting({
+    id: 'priorityEditorDisplayMode', // ID for the new setting
+    title: 'Priority Editor in Editor',
+    description:
+      'Controls when to show the priority widget in the right-hand margin of the editor.',
+    defaultValue: 'all',
+    options: [
+      {
+        key: 'all',
+        label: 'Show for IncRem and Cards',
+        value: 'all',
+      },
+      {
+        key: 'incRemOnly',
+        label: 'Show only for IncRem',
+        value: 'incRemOnly',
+      },
+      {
+        key: 'disable',
+        label: 'Disable',
+        value: 'disable',
+      },
+    ],
+  });
+
   plugin.settings.registerDropdownSetting({
     id: remnoteEnvironmentId,
     title: 'RemNote Environment',
@@ -1023,6 +1048,7 @@ async function onActivate(plugin: ReactRNPlugin) {
         let kbFinalStatus = {
           absolute: null as number | null,
           percentile: 100,
+          universeSize: allRems.length,
         };
 
         if (unreviewedDueRems.length > 0) {
@@ -1054,6 +1080,7 @@ async function onActivate(plugin: ReactRNPlugin) {
           let docFinalStatus = {
             absolute: null as number | null,
             percentile: 100,
+            universeSize: scopedRems.length,
           };
           
           if (unreviewedDueInScope.length > 0) {
@@ -1061,7 +1088,7 @@ async function onActivate(plugin: ReactRNPlugin) {
             if (topMissedInDoc) {
               docFinalStatus.absolute = topMissedInDoc.priority;
               docFinalStatus.percentile = calculateRelativePriority(scopedRems, topMissedInDoc.remId);
-              console.log('[QueueExit] IncRem doc shield - Priority:', docFinalStatus.absolute, 'Percentile:', docFinalStatus.percentile + '%');
+              console.log('[QueueExit] IncRem doc shield - Priority:', docFinalStatus.absolute, 'Percentile:', docFinalStatus.percentile + '%', 'Universe: ', docFinalStatus.universeSize);
             }
           }
           
@@ -1094,7 +1121,11 @@ async function onActivate(plugin: ReactRNPlugin) {
 
           // Calculate final KB card shield from the cache
           const unreviewedDueKb = allCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
-          let kbCardFinalStatus = { absolute: null as number | null, percentile: 100 };
+          let kbCardFinalStatus = { 
+            absolute: null as number | null, 
+            percentile: 100,
+            universeSize: allCardInfos.length, // ADD THIS LINE
+          };
           if (unreviewedDueKb.length > 0) {
               const topMissed = _.minBy(unreviewedDueKb, c => c.priority);
               if (topMissed) {
@@ -1122,7 +1153,11 @@ async function onActivate(plugin: ReactRNPlugin) {
 
               // Find unreviewed due cards in scope
               const unreviewedDueDoc = docCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
-              let docCardFinalStatus = { absolute: null as number | null, percentile: 100 };
+              let docCardFinalStatus = { 
+                absolute: null as number | null, 
+                percentile: 100,
+                universeSize: docCardInfos.length, // ADD THIS LINE
+              };
 
               if (unreviewedDueDoc.length > 0) {
                   const topMissed = _.minBy(unreviewedDueDoc, c => c.priority);
@@ -1130,7 +1165,7 @@ async function onActivate(plugin: ReactRNPlugin) {
                       docCardFinalStatus.absolute = topMissed.priority;
                       // Calculate percentile against the priority calculation scope
                       docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.remId);
-                      console.log('[QueueExit] Doc card shield - Priority:', docCardFinalStatus.absolute, 'Percentile:', docCardFinalStatus.percentile + '%');
+                      console.log('[QueueExit] Doc card shield - Priority:', docCardFinalStatus.absolute, 'Percentile:', docCardFinalStatus.percentile + '%', 'Universe: ', docCardFinalStatus.universeSize);
                   }
               }
               
@@ -2203,7 +2238,7 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('priority_shield_graph', WidgetLocation.Popup, {
     dimensions: {
-      width: 1000,
+      width: 1075,
       height: 1050,
     },
   });
