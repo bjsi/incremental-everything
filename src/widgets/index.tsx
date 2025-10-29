@@ -1807,6 +1807,14 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerWidget('batch_card_priority', WidgetLocation.Popup, {
+    dimensions: {
+      width: 600,
+      height: 'auto',
+    },
+  });
+  
+
   plugin.app.registerWidget('reschedule', WidgetLocation.Popup, {
     dimensions: {
     width: '100%',
@@ -1931,6 +1939,34 @@ async function onActivate(plugin: ReactRNPlugin) {
         remId: focusedRem._id,
       });
     },
+  });
+
+  // Register command for batch card priority assignment
+  plugin.app.registerCommand({
+    id: 'batch-card-priority',
+    name: 'Batch Assign Card Priority for tagged rems',
+    keyboardShortcut: 'opt+shift+c',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      
+      if (!focused) {
+        await plugin.app.toast('Please focus on a tag rem first');
+        return;
+      }
+      
+      // Check if this rem is actually being used as a tag
+      const taggedRems = await focused.taggedRem();
+      if (!taggedRems || taggedRems.length === 0) {
+        await plugin.app.toast('The focused rem is not used as a tag. No rems are tagged with it.');
+        return;
+      }
+      
+      // Store the tag rem ID in session storage
+      await plugin.storage.setSession('batchCardPriorityTagRem', focused._id);
+      
+      // Open the batch card priority widget
+      await plugin.widget.openPopup('batch_card_priority');
+    }
   });
     
 
@@ -2252,6 +2288,33 @@ async function onActivate(plugin: ReactRNPlugin) {
       await plugin.widget.openPopup('batch_priority', {
         remId: args.remId,
       });
+    },
+  });
+
+  // Add menu item for batch card priority assignment
+  plugin.app.registerMenuItem({
+    id: 'batch_card_priority_menuitem',
+    location: PluginCommandMenuLocation.DocumentMenu,
+    name: 'Batch Assign Card Priority for tagged Rems',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) {
+        await plugin.app.toast('Could not find the rem');
+        return;
+      }
+      
+      // Check if this rem is actually being used as a tag
+      const taggedRems = await rem.taggedRem();
+      if (!taggedRems || taggedRems.length === 0) {
+        await plugin.app.toast('This rem is not used as a tag. No rems are tagged with it.');
+        return;
+      }
+      
+      // Store the tag rem ID in session storage for the widget to access
+      await plugin.storage.setSession('batchCardPriorityTagRem', rem._id);
+      
+      // Open the batch card priority widget
+      await plugin.widget.openPopup('batch_card_priority');
     },
   });
 
