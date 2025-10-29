@@ -762,6 +762,12 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   `;
 
+  const hideCardPriorityTagId = 'hide-card-priority-tag';
+  const HIDE_CARD_PRIORITY_CSS = `
+    [data-rem-tags~="cardpriority"] .hierarchy-editor__tag-bar__tag {
+    display: none; }
+  `;
+
   const COLLAPSE_TOP_BAR_CSS = `
     .spacedRepetitionContent { height: 100%; box-sizing: border-box; }
     .queue__title { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
@@ -850,6 +856,20 @@ async function onActivate(plugin: ReactRNPlugin) {
       'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
     defaultValue: true,
   });
+
+  plugin.settings.registerBooleanSetting({
+    id: 'hideCardPriorityTag',
+    title: 'Hide CardPriority Tag in Editor',
+    description:
+      'If enabled, this will hide the "CardPriority" powerup tag in the editor to reduce clutter. You can still set priority with (Alt+P). After changing this setting, reload RemNote.',
+    defaultValue: true,
+  });
+
+  // Apply the CSS hide setting on startup
+  const shouldHide = await plugin.settings.getSetting('hideCardPriorityTag');
+  if (shouldHide) {
+    await plugin.app.registerCSS(hideCardPriorityTagId, HIDE_CARD_PRIORITY_CSS);
+  }
   
   // Register the new setting as a number input, as sliders are not supported.
   plugin.settings.registerNumberSetting({
@@ -1448,13 +1468,35 @@ async function onActivate(plugin: ReactRNPlugin) {
       dueIncRemCount = allIncRems.filter(rem => 
         scopeRemIds.includes(rem.remId) && Date.now() >= rem.nextRepDate
       ).length;
+
     } else if (scopeForItemSelection) {
-      // Regular document - use the scope count
-      dueIncRemCount = sessionCache.dueIncRemsInScope.length;
-    } else {
-      // Full KB
-      dueIncRemCount = sessionCache.dueIncRemsInKB.length;
-    }
+          // Regular document - LOGIC MUST DIVERGE
+          
+          if (performanceMode === 'full') {
+            // FULL MODE: Use the pre-calculated cache (fast)
+            dueIncRemCount = sessionCache.dueIncRemsInScope.length;
+          } else {
+            // LIGHT MODE: Manually calculate the count, just like GetNextCard
+            // This is necessary because sessionCache.dueIncRemsInScope is empty.
+            console.log('QUEUE ENTER: Light mode - manually calculating due IncRem count...');
+            const scopeRemIds = await plugin.storage.getSession<RemId[]>(currentScopeRemIdsKey) || [];
+            if (scopeRemIds) {
+              dueIncRemCount = allIncRems.filter(rem => 
+                Date.now() >= rem.nextRepDate && // isDue
+                scopeRemIds.includes(rem.remId)   // isInScope
+                // We assume seenRemIds is [] at the start of the queue
+              ).length;
+            } else {
+              dueIncRemCount = 0; // Scope not ready, though it should be
+            }
+            console.log(`QUEUE ENTER: Light mode - found ${dueIncRemCount} due IncRems`);
+          }
+
+        } else {
+          // Full KB
+          // This is fine, as dueIncRemsInKB is populated in both modes
+          dueIncRemCount = sessionCache.dueIncRemsInKB.length;
+        }
 
     plugin.app.registerCSS(
       queueCounterId,
@@ -1531,46 +1573,25 @@ async function onActivate(plugin: ReactRNPlugin) {
       const allIncrementalRem: IncrementalRem[] =
         (await plugin.storage.getSession(allIncrementalRemKey)) || [];
 
-      // --- NEW: Check if session cache is ready for document queues ---
+      // ---
+      // --- ⬇️ MODIFIED LOGIC ⬇️ ---
+      // ---
+
+      // Check if session cache is ready
       let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
 
-      // If in document queue but cache not ready, don't show counter yet
+      // If in document queue but cache not ready, STOP.
       if (queueInfo.subQueueId && docScopeRemIds === null) {
-        console.log('⏳ GetNextCard: Session cache not ready yet, hiding counter temporarily...');
+        console.log('⏳ GetNextCard: Session cache not ready yet, waiting for QueueEnter. Returning null.');
         
         // Hide the counter temporarily - QueueEnter will update it when ready
         await plugin.app.registerCSS(queueCounterId, '');
         
-        // Still need to calculate scope for this call using fallback
-        const subQueueRem = await plugin.rem.findOne(queueInfo.subQueueId);
-        // Special handling for studying a daily doc.
-        const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-            powerupCode,
-            nextRepDateSlotCode
-          );
-
-        const referencedRemIds = _.compact(
-          ((await subQueueRem?.remsReferencingThis()) || []).map((rem) => {
-            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-              return rem.parent;
-            } else {
-              return rem._id;
-            }
-          })
-        );
-        
-        // Calculate the new scope.
-        const newScope = ((await subQueueRem?.allRemInFolderQueue()) || [])
-          .map((x) => x._id)
-          .concat(((await subQueueRem?.getSources()) || []).map((x) => x._id))
-          .concat(referencedRemIds)
-          .concat(queueInfo.subQueueId);
-        
-        // Update our variable for this run AND save to storage for other parts of the plugin.
-        docScopeRemIds = newScope;
-        // Don't save this to storage - let QueueEnter set the correct one
-        console.log('⚠️ GetNextCard: Using temporary fallback scope (will be replaced by QueueEnter)');
+        // Return null immediately. DO NOT run the fallback calculation.
+        return null;
       }
+      
+      // --- ⬆️ END OF MODIFICATION ⬆️ ---
 
 
       const cardsPerRem = await getCardsPerRem(plugin);

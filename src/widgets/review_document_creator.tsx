@@ -137,11 +137,11 @@ function ReviewDocumentCreator() {
     },
     primaryButton: {
       backgroundColor: '#3b82f6',
-      color: 'white',
+      color: 'white !important', // ✅ Added !important
     },
     secondaryButton: {
       backgroundColor: '#6b7280',
-      color: 'white',
+      color: 'white !important', // ✅ Added !important
     },
     infoBox: {
       padding: '12px',
@@ -149,6 +149,7 @@ function ReviewDocumentCreator() {
       border: '1px solid #3b82f6',
       borderRadius: '6px',
       fontSize: '13px',
+      color: '#1e3a8a', // ✅ ADDED: Dark blue text color
     },
   };
   
@@ -208,7 +209,8 @@ function ReviewDocumentCreator() {
           backgroundColor: '#f3f4f6',
           borderRadius: '6px',
           fontSize: '14px',
-          marginBottom: '8px'
+          marginBottom: '8px',
+          color: '#1f2937' // ✅ ADDED: Dark gray text color
         }}>
           {ratioToLabel(flashcardRatio)}
         </div>
@@ -217,7 +219,7 @@ function ReviewDocumentCreator() {
           style={{
             ...styles.button,
             backgroundColor: '#6b7280',
-            color: 'white',
+            color: 'white !important', // ✅ ADDED !important
             width: '100%'
           }}
           disabled={isCreating}
