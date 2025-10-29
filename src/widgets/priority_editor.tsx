@@ -119,6 +119,9 @@ export function PriorityEditor() {
   
   const cardColor = cardRelativePriority ? percentileToHslColor(cardRelativePriority) : undefined;
 
+  // <-- 1. ADDED: Determine font weight based on the card's priority source -->
+  const cardPriorityFontWeight = cardInfo?.source === 'manual' ? 'bold' : 'normal';
+
 
   const priorityPillStyle: React.CSSProperties = {
     color: 'white',
@@ -163,8 +166,9 @@ export function PriorityEditor() {
           )}
           {showCardEditor && (
             <div title={`Card Priority: ${cardInfo?.priority || 'None'} (${cardRelativePriority}%)`}>
+              {/* <-- 2. MODIFIED: Split span to apply conditional font weight --> */}
               <span style={{ ...priorityPillStyle, backgroundColor: cardColor, fontSize: '11px' }}>
-                C:{cardInfo?.priority || '-'}
+                C:<span style={{ fontWeight: cardPriorityFontWeight }}>{cardInfo?.priority || '-'}</span>
               </span>
             </div>
           )}
@@ -209,7 +213,8 @@ export function PriorityEditor() {
                 <div className="flex items-center gap-1">
                   <button onClick={() => quickUpdateCardPriority(-10)} style={buttonStyle}>-10</button>
                   <button onClick={() => quickUpdateCardPriority(-1)} style={buttonStyle}>-1</button>
-                  <span className="px-2 text-sm font-bold" style={{ ...priorityPillStyle, backgroundColor: cardColor }}>
+                  {/* <-- 3. MODIFIED: Removed 'font-bold' from className and used inline style --> */}
+                  <span className="px-2 text-sm" style={{ ...priorityPillStyle, backgroundColor: cardColor, fontWeight: cardPriorityFontWeight }}>
                     {cardInfo?.priority || 50}
                   </span>
                   <button onClick={() => quickUpdateCardPriority(1)} style={buttonStyle}>+1</button>
