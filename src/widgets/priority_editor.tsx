@@ -76,6 +76,13 @@ export function PriorityEditor() {
     []
   );
 
+  // --- 1. GET THE NEW SETTING ---
+  const displayMode = useTrackerPlugin(
+    async (plugin) =>
+      (await plugin.settings.getSetting<string>('priorityEditorDisplayMode')) || 'all',
+    []
+  );
+
   const cardRelativePriority = useMemo(() => {
     if (!rem || !allPrioritizedCardInfo) return null;
     
@@ -85,10 +92,28 @@ export function PriorityEditor() {
   }, [rem, allPrioritizedCardInfo]);
 
 
-  // MODIFIED: The main rendering condition now checks for the powerup directly.
-  if (!rem || (!incRemInfo && !hasCards && !hasCardPriorityPowerup)) {
+  // --- 2. UPDATED RENDER LOGIC ---
+
+  // Determine what we *can* show based on the rem's properties
+  const canShowIncRem = !!incRemInfo;
+  const canShowCard = hasCards || hasCardPriorityPowerup;
+
+  // Handle loading and disabled states first
+  if (!rem || !displayMode || displayMode === 'disable') {
     return null;
   }
+
+  // Handle logic for 'incRemOnly' and 'all'
+  if (displayMode === 'incRemOnly' && !canShowIncRem) {
+    return null; // Mode is 'incRemOnly' but this isn't an IncRem
+  }
+
+  if (displayMode === 'all' && !canShowIncRem && !canShowCard) {
+    return null; // Mode is 'all' but this is neither an IncRem nor a Card
+  }
+  
+  // --- END OF UPDATED RENDER LOGIC ---
+
 
   const quickUpdateIncPriority = async (delta: number) => {
     if (!incRemInfo || !rem) return;
@@ -119,7 +144,6 @@ export function PriorityEditor() {
   
   const cardColor = cardRelativePriority ? percentileToHslColor(cardRelativePriority) : undefined;
 
-  // <-- 1. ADDED: Determine font weight based on the card's priority source -->
   const cardPriorityFontWeight = cardInfo?.source === 'manual' ? 'bold' : 'normal';
 
 
@@ -131,8 +155,8 @@ export function PriorityEditor() {
     lineHeight: '1.2',
   };
 
-  // MODIFIED: The condition to show the card editor is now simpler and more accurate.
-  const showCardEditor = hasCards || hasCardPriorityPowerup;
+  // --- 3. CONDITIONALLY SHOW CARD EDITOR ---
+  const showCardEditor = (displayMode === 'all') && (hasCards || hasCardPriorityPowerup);
 
   return (
     <div
@@ -157,16 +181,15 @@ export function PriorityEditor() {
           className="cursor-pointer p-1 text-center"
           title="Click to expand priority controls"
         >
-          {incRemInfo && (
+          {incRemInfo && ( // This is already conditional
             <div className="mb-1" title={`Inc Priority: ${incRemInfo.priority} (${incRemRelativePriority}%)`}>
               <span style={{ ...priorityPillStyle, backgroundColor: incRemColor, fontSize: '11px' }}>
                 I:{incRemInfo.priority}
               </span>
             </div>
           )}
-          {showCardEditor && (
+          {showCardEditor && ( // This now respects the new setting
             <div title={`Card Priority: ${cardInfo?.priority || 'None'} (${cardRelativePriority}%)`}>
-              {/* <-- 2. MODIFIED: Split span to apply conditional font weight --> */}
               <span style={{ ...priorityPillStyle, backgroundColor: cardColor, fontSize: '11px' }}>
                 C:<span style={{ fontWeight: cardPriorityFontWeight }}>{cardInfo?.priority || '-'}</span>
               </span>
@@ -188,7 +211,7 @@ export function PriorityEditor() {
               Priority Control
             </div>
 
-            {incRemInfo && (
+            {incRemInfo && ( // This is already conditional
               <div className="mb-3">
                 <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-blue-600)' }}>
                   Inc Rem ({incRemRelativePriority}%)
@@ -205,7 +228,7 @@ export function PriorityEditor() {
               </div>
             )}
 
-            {showCardEditor && (
+            {showCardEditor && ( // This now respects the new setting
               <div>
                 <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-green-600)' }}>
                   Cards ({cardRelativePriority}%)
@@ -213,7 +236,6 @@ export function PriorityEditor() {
                 <div className="flex items-center gap-1">
                   <button onClick={() => quickUpdateCardPriority(-10)} style={buttonStyle}>-10</button>
                   <button onClick={() => quickUpdateCardPriority(-1)} style={buttonStyle}>-1</button>
-                  {/* <-- 3. MODIFIED: Removed 'font-bold' from className and used inline style --> */}
                   <span className="px-2 text-sm" style={{ ...priorityPillStyle, backgroundColor: cardColor, fontWeight: cardPriorityFontWeight }}>
                     {cardInfo?.priority || 50}
                   </span>
@@ -221,7 +243,6 @@ export function PriorityEditor() {
                   <button onClick={() => quickUpdateCardPriority(10)} style={buttonStyle}>+10</button>
                 </div>
                 <div className="text-xs mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                  {/* MODIFIED: Clarifying text for inheritance-only case */}
                   {!hasCards && hasCardPriorityPowerup ? "Set for inheritance" : `Source: ${cardInfo?.source}`}
                 </div>
               </div>
