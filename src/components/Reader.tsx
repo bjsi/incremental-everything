@@ -57,28 +57,47 @@ export function Reader(props: ReaderProps) {
 
       // Find the incremental rem context
       let incrementalRem = null;
+
+      // --- START FIX ---
+      // NEW STEP 0: Check if the PDF Rem IS the Incremental Rem.
+      // This is the case you described.
+      try {
+        if (await pdfRem.hasPowerup(powerupCode)) {
+          incrementalRem = pdfRem;
+        }
+        console.log('[READER DEBUG] 0. Found from self-check?', incrementalRem?._id || 'No');
+      } catch (selfCheckError) {
+        console.error('[READER DEBUG] Error during self-check:', selfCheckError);
+      }
+      // --- END FIX ---
       
       // Try to get from widget context first
-      try {
-        const widgetContext = await plugin.widget.getWidgetContext();
-        if (widgetContext?.remId && widgetContext.remId !== pdfRem._id) {
-          const contextRem = await plugin.rem.findOne(widgetContext.remId);
-          if (contextRem && await contextRem.hasPowerup(powerupCode)) {
-            incrementalRem = contextRem;
+      // MODIFIED: Added `if (!incrementalRem)`
+      if (!incrementalRem) {
+        try {
+          const widgetContext = await plugin.widget.getWidgetContext();
+          if (widgetContext?.remId && widgetContext.remId !== pdfRem._id) {
+            const contextRem = await plugin.rem.findOne(widgetContext.remId);
+            if (contextRem && (await contextRem.hasPowerup(powerupCode))) {
+              incrementalRem = contextRem;
+            }
           }
+          // --- DEBUG ---
+          console.log('[READER DEBUG] 1. Found from context?', incrementalRem?._id || 'No');
+        } catch (contextError) {
+          console.log(
+            '[READER DEBUG] No widget context available:',
+            (contextError as Error).message
+          );
         }
-        // --- DEBUG ---
-        console.log('[READER DEBUG] 1. Found from context?', incrementalRem?._id || 'No');
-
-      } catch (contextError) {
-        console.log('[READER DEBUG] No widget context available:', (contextError as Error).message);
       }
 
       // Check parent rem
+      // MODIFIED: Added `if (!incrementalRem)`
       if (!incrementalRem && pdfRem.parent) {
         try {
           const parentRem = await plugin.rem.findOne(pdfRem.parent);
-          if (parentRem && await parentRem.hasPowerup(powerupCode)) {
+          if (parentRem && (await parentRem.hasPowerup(powerupCode))) {
             incrementalRem = parentRem;
           }
           // --- DEBUG ---
@@ -89,32 +108,39 @@ export function Reader(props: ReaderProps) {
       }
 
       // Search for incremental rems containing this PDF
+      // MODIFIED: Added `if (!incrementalRem)`
       if (!incrementalRem) {
         try {
           // --- DEBUG ---
-          console.log('[READER DEBUG] 3. Starting KB search (this may be slow)...');
-          const allRems = await plugin.rem.findMany();
-          for (const candidateRem of allRems) {
-            if (await candidateRem.hasPowerup(powerupCode)) {
+          console.log('[READER DEBUG] 3. Starting targeted KB search...');
+
+          const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
+          if (incPowerup) {
+            const allIncRems = await incPowerup.taggedRem();
+
+            for (const candidateRem of allIncRems) {
               const descendants = await candidateRem.getDescendants();
-              if (descendants.some(desc => desc._id === pdfRem._id)) {
+              if (descendants.some((desc) => desc._id === pdfRem._id)) {
                 incrementalRem = candidateRem;
-                break;
+                break; // Found it
               }
             }
           }
           // --- DEBUG ---
-          console.log('[READER DEBUG] 3. Found from KB search?', incrementalRem?._id || 'No');
-
+          console.log(
+            '[READER DEBUG] 3. Found from targeted KB search?',
+            incrementalRem?._id || 'No'
+          );
         } catch (searchError) {
-          console.log('[READER DEBUG] Error searching for referencing rems:', searchError);
+          console.log('[READER DEBUG] Error in targeted KB search:', searchError);
         }
       }
       
       const rem = incrementalRem || pdfRem;
       // --- DEBUG ---
-      console.log(`[READER DEBUG] Using rem for data: ${rem._id} (Is Incremental: ${!!incrementalRem})`);
-
+      console.log(
+        `[READER DEBUG] Using rem for data: ${rem._id} (Is Incremental: ${!!incrementalRem})`
+      );
 
       const remText = rem.text ? await plugin.richText.toString(rem.text) : '';
       const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
@@ -123,20 +149,21 @@ export function Reader(props: ReaderProps) {
       const children = await rem.getChildrenRem();
       const childrenCount = children.length;
       const isIncrementalChecks = await Promise.all(
-        children.map(child => child.hasPowerup(powerupCode))
+        children.map((child) => child.hasPowerup(powerupCode))
       );
       const incrementalChildrenCount = isIncrementalChecks.filter(Boolean).length;
 
       const descendants = await rem.getDescendants();
       const descendantsCount = descendants.length;
       const isIncrementalDescendantChecks = await Promise.all(
-        descendants.map(descendant => descendant.hasPowerup(powerupCode))
+        descendants.map((descendant) => descendant.hasPowerup(powerupCode))
       );
-      const incrementalDescendantsCount = isIncrementalDescendantChecks.filter(Boolean).length;
+      const incrementalDescendantsCount =
+        isIncrementalDescendantChecks.filter(Boolean).length;
 
       const remsToCheckForCards = [rem, ...descendants];
       const cardArrays = await Promise.all(
-        remsToCheckForCards.map(r => r.getCards())
+        remsToCheckForCards.map((r) => r.getCards())
       );
       const flashcardCount = cardArrays.reduce((total, cards) => total + cards.length, 0);
 
@@ -147,10 +174,9 @@ export function Reader(props: ReaderProps) {
         const pdfDescendants = await pdfRem.getDescendants();
         const allPdfRems = [...pdfChildren, ...pdfDescendants];
         const highlightChecks = await Promise.all(
-          allPdfRems.map(child => child.hasPowerup(BuiltInPowerupCodes.PDFHighlight))
+          allPdfRems.map((child) => child.hasPowerup(BuiltInPowerupCodes.PDFHighlight))
         );
         pdfHighlightCount = highlightChecks.filter(Boolean).length;
-        console.log('[READER DEBUG] PDF highlight count:', pdfHighlightCount);
       } catch (highlightError) {
         console.error('[READER DEBUG] Error counting PDF highlights:', highlightError);
       }
@@ -165,14 +191,14 @@ export function Reader(props: ReaderProps) {
         try {
           const parentRem = await plugin.rem.findOne(currentParent);
           if (!parentRem || !parentRem.text) break;
-          
+
           const parentText = await plugin.richText.toString(parentRem.text);
-          
+
           ancestorList.unshift({
             text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),
-            id: currentParent
+            id: currentParent,
           });
-          
+
           currentParent = parentRem.parent;
           depth++;
         } catch (error) {
@@ -180,10 +206,10 @@ export function Reader(props: ReaderProps) {
           break;
         }
       }
-      
+
       // --- DEBUG ---
       console.log(`[READER DEBUG] FINAL incrementalRemId: ${incrementalRem?._id || null}`);
-      
+
       return {
         text: remText,
         hasDocumentPowerup,
@@ -197,14 +223,14 @@ export function Reader(props: ReaderProps) {
         remDisplayName: remText || 'Untitled Rem',
         pdfHighlightCount,
         incrementalRemId: incrementalRem?._id || null,
-        pdfRemId: pdfRem._id
+        pdfRemId: pdfRem._id,
       };
     } catch (error) {
       console.error('[READER DEBUG] Error in remData tracker:', error);
       return null;
     }
   }, [actionItem.rem?._id, actionItem.rem?.parent]);
-
+  
   // --- NEW: Add state to control PDF rendering on iOS ---
   const [canRenderPdf, setCanRenderPdf] = React.useState(
     !(isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight'))
