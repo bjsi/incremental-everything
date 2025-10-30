@@ -52,7 +52,8 @@ export function Reader(props: ReaderProps) {
       const pdfRem = actionItem.rem;
       if (!pdfRem) return null;
 
-      console.log('PDF Rem ID:', pdfRem._id, 'Parent:', pdfRem.parent);
+      // --- DEBUG ---
+      console.log('[READER DEBUG] Starting remData tracker for PDF:', pdfRem._id);
 
       // Find the incremental rem context
       let incrementalRem = null;
@@ -64,11 +65,13 @@ export function Reader(props: ReaderProps) {
           const contextRem = await plugin.rem.findOne(widgetContext.remId);
           if (contextRem && await contextRem.hasPowerup(powerupCode)) {
             incrementalRem = contextRem;
-            console.log('Found incremental rem from context:', incrementalRem._id);
           }
         }
+        // --- DEBUG ---
+        console.log('[READER DEBUG] 1. Found from context?', incrementalRem?._id || 'No');
+
       } catch (contextError) {
-        console.log('No widget context available:', contextError.message);
+        console.log('[READER DEBUG] No widget context available:', (contextError as Error).message);
       }
 
       // Check parent rem
@@ -78,32 +81,40 @@ export function Reader(props: ReaderProps) {
           if (parentRem && await parentRem.hasPowerup(powerupCode)) {
             incrementalRem = parentRem;
           }
+          // --- DEBUG ---
+          console.log('[READER DEBUG] 2. Found from parent?', incrementalRem?._id || 'No');
         } catch (error) {
-          console.error('Error finding parent rem:', error);
+          console.error('[READER DEBUG] Error finding parent rem:', error);
         }
       }
 
       // Search for incremental rems containing this PDF
       if (!incrementalRem) {
         try {
+          // --- DEBUG ---
+          console.log('[READER DEBUG] 3. Starting KB search (this may be slow)...');
           const allRems = await plugin.rem.findMany();
           for (const candidateRem of allRems) {
             if (await candidateRem.hasPowerup(powerupCode)) {
               const descendants = await candidateRem.getDescendants();
               if (descendants.some(desc => desc._id === pdfRem._id)) {
                 incrementalRem = candidateRem;
-                console.log('Found incremental rem containing PDF:', incrementalRem._id);
                 break;
               }
             }
           }
+          // --- DEBUG ---
+          console.log('[READER DEBUG] 3. Found from KB search?', incrementalRem?._id || 'No');
+
         } catch (searchError) {
-          console.log('Error searching for referencing rems:', searchError);
+          console.log('[READER DEBUG] Error searching for referencing rems:', searchError);
         }
       }
       
       const rem = incrementalRem || pdfRem;
-      console.log('Using rem for data:', rem._id, 'isIncremental:', !!incrementalRem);
+      // --- DEBUG ---
+      console.log(`[READER DEBUG] Using rem for data: ${rem._id} (Is Incremental: ${!!incrementalRem})`);
+
 
       const remText = rem.text ? await plugin.richText.toString(rem.text) : '';
       const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
@@ -139,9 +150,9 @@ export function Reader(props: ReaderProps) {
           allPdfRems.map(child => child.hasPowerup(BuiltInPowerupCodes.PDFHighlight))
         );
         pdfHighlightCount = highlightChecks.filter(Boolean).length;
-        console.log('PDF highlight count:', pdfHighlightCount);
+        console.log('[READER DEBUG] PDF highlight count:', pdfHighlightCount);
       } catch (highlightError) {
-        console.error('Error counting PDF highlights:', highlightError);
+        console.error('[READER DEBUG] Error counting PDF highlights:', highlightError);
       }
 
       // Get ancestors for breadcrumb
@@ -165,10 +176,13 @@ export function Reader(props: ReaderProps) {
           currentParent = parentRem.parent;
           depth++;
         } catch (error) {
-          console.error('Error processing ancestor:', error);
+          console.error('[READER DEBUG] Error processing ancestor:', error);
           break;
         }
       }
+      
+      // --- DEBUG ---
+      console.log(`[READER DEBUG] FINAL incrementalRemId: ${incrementalRem?._id || null}`);
       
       return {
         text: remText,
@@ -186,7 +200,7 @@ export function Reader(props: ReaderProps) {
         pdfRemId: pdfRem._id
       };
     } catch (error) {
-      console.error('Error in remData tracker:', error);
+      console.error('[READER DEBUG] Error in remData tracker:', error);
       return null;
     }
   }, [actionItem.rem?._id, actionItem.rem?.parent]);
