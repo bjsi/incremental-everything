@@ -927,11 +927,11 @@ async function onActivate(plugin: ReactRNPlugin) {
   plugin.settings.registerBooleanSetting({
     id: displayPriorityShieldId,
     title: 'Display Priority Shield in Queue',
-    description: 'If enabled, shows a real-time status of your highest-priority due items in the queue top bar.',
+    description: 'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
     defaultValue: true,
   });
 
-    plugin.settings.registerDropdownSetting({
+  plugin.settings.registerDropdownSetting({
     id: 'priorityEditorDisplayMode', // ID for the new setting
     title: 'Priority Editor in Editor',
     description:

@@ -9,7 +9,8 @@ import {
   seenCardInSessionKey, 
   allCardPriorityInfoKey,
   queueSessionCacheKey,
-  cardPriorityCacheRefreshKey
+  cardPriorityCacheRefreshKey,
+  displayPriorityShieldId
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/cardPriority';
 import { percentileToHslColor } from '../lib/color';
@@ -23,6 +24,12 @@ export function CardPriorityDisplay() {
     (rp) => rp.settings.getSetting<string>('performanceMode'), 
     []
   ) || 'full';
+
+  // ✅ Get the display priority shield setting
+  const displayPriorityShield = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
+    []
+  ) ?? true;
 
   // 2. Add a new tracker to listen for the refresh signal.
   const refreshSignal = useTrackerPlugin(
@@ -189,8 +196,8 @@ export function CardPriorityDisplay() {
         )}
       </div>
       
-      {/* 🔌 Conditionally show Shield display */}
-      {performanceMode === 'full' && (shieldStatus?.kb || shieldStatus?.doc) && (
+      {/* 🔌 Conditionally show Shield display based on setting */}
+      {displayPriorityShield && performanceMode === 'full' && (shieldStatus?.kb || shieldStatus?.doc) && (
         <>
           <span style={{ color: '#9ca3af' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
