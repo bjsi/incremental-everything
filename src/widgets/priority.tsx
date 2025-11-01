@@ -25,8 +25,9 @@ import {
   currentSubQueueIdKey, 
   allCardPriorityInfoKey, 
   cardPriorityCacheRefreshKey, 
-  queueSessionCacheKey 
-
+  queueSessionCacheKey,
+  isMobileDeviceKey,          
+  alwaysUseLightModeOnMobileId 
 } from '../lib/consts';
 import { IncrementalRem } from '../lib/types';
 import { updateCardPriorityInCache, flushLightCacheUpdates } from '../lib/cache';
@@ -43,11 +44,26 @@ function Priority() {
 
   // --- ALL HOOKS DECLARED UNCONDITIONALLY AT THE TOP ---
 
-  // ✅ Get the performance mode setting first
-  const performanceMode = useTrackerPlugin(
+  // ✅ Track the values that determine effective mode
+  const performanceModeSetting = useTrackerPlugin(
     (rp) => rp.settings.getSetting<string>('performanceMode'), 
     []
   ) || 'full';
+
+  const isMobile = useTrackerPlugin(
+    async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
+    []
+  );
+
+  const alwaysUseLightOnMobile = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId),
+    []
+  );
+
+  // ✅ Calculate effective mode
+  const performanceMode = performanceModeSetting === 'light' || 
+                          (isMobile && alwaysUseLightOnMobile !== false) 
+                          ? 'light' : 'full';
 
   // State Hooks
   const [scope, setScope] = useState<Scope>({ remId: null, name: 'All KB' });
