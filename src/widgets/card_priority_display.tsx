@@ -9,7 +9,10 @@ import {
   seenCardInSessionKey, 
   allCardPriorityInfoKey,
   queueSessionCacheKey,
-  cardPriorityCacheRefreshKey
+  cardPriorityCacheRefreshKey,
+  displayPriorityShieldId,
+  isMobileDeviceKey,
+  alwaysUseLightModeOnMobileId
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/cardPriority';
 import { percentileToHslColor } from '../lib/color';
@@ -18,11 +21,31 @@ import * as _ from 'remeda';
 export function CardPriorityDisplay() {
   const plugin = usePlugin();
 
-  // ✅ Get the performance mode
-  const performanceMode = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<string>('performanceMode'), 
+  // ✅ Track the values that determine effective mode
+  const performanceModeSetting = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<string>('performanceMode'),
     []
   ) || 'full';
+
+  const isMobile = useTrackerPlugin(
+    async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
+    []
+  );
+
+  const alwaysUseLightOnMobile = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId),
+    []
+  );
+
+  // ✅ Calculate effective mode
+  const useLightMode = performanceModeSetting === 'light' || 
+                       (isMobile && alwaysUseLightOnMobile !== false);
+
+  // ✅ Get the display priority shield setting
+  const displayPriorityShield = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
+    []
+  ) ?? true;
 
   // 2. Add a new tracker to listen for the refresh signal.
   const refreshSignal = useTrackerPlugin(
@@ -42,36 +65,36 @@ export function CardPriorityDisplay() {
 
   // --- 🔌 CACHE-BASED PATH (Full Mode) ---
   const sessionCache = useTrackerPlugin(
-    (rp) => (performanceMode === 'full') 
+    (rp) => (!useLightMode) 
       ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey) 
       : null,
-    [performanceMode, refreshSignal]
+    [useLightMode, refreshSignal]
   );
 
   const allPrioritizedCardInfo = useTrackerPlugin(
-    (rp) => (performanceMode === 'full') 
+    (rp) => (!useLightMode) 
       ? rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) 
       : null,
-    [performanceMode, refreshSignal]
+    [useLightMode, refreshSignal]
   );
 
   const cardInfo = useMemo(() => {
-    if (performanceMode === 'light' || !rem || isIncRem || !allPrioritizedCardInfo) {
+    if (useLightMode || !rem || isIncRem || !allPrioritizedCardInfo) {
       return null;
     }
     return allPrioritizedCardInfo.find(info => info.remId === rem._id);
-  }, [rem, isIncRem, allPrioritizedCardInfo, performanceMode]);
+  }, [rem, isIncRem, allPrioritizedCardInfo, useLightMode]);
   
   const docPercentile = useMemo(() => {
-    if (performanceMode === 'light' || !rem || !sessionCache?.docPercentiles) return null;
+    if (useLightMode || !rem || !sessionCache?.docPercentiles) return null;
     return sessionCache.docPercentiles[rem._id];
-  }, [rem, sessionCache, performanceMode]);
+  }, [rem, sessionCache, useLightMode]);
 
 
   // --- REWRITTEN: The Shield calculation is now ultra-fast ---
   // It reads from the small, pre-filtered lists in our new session cache.
   const shieldStatus = useTrackerPlugin(async (rp) => {
-    if (performanceMode === 'light' || !rem || !sessionCache) return null;
+    if (useLightMode || !rem || !sessionCache) return null;
 
 
     // Get the list of cards seen in this session, now with 'await'.
@@ -101,30 +124,30 @@ export function CardPriorityDisplay() {
         percentile: sessionCache.docPercentiles[topMissedInDoc.remId]
       } : null,
     };
-  }, [rem, sessionCache, performanceMode]);
+  }, [rem, sessionCache, useLightMode]);
 
 
   // --- 🔌 ON-DEMAND PATH (Light Mode) ---
   const lightCardInfo = useTrackerPlugin(async (rp) => {
-    if (performanceMode !== 'light' || !rem || isIncRem) return null;
+    if (!useLightMode || !rem || isIncRem) return null;
     // Fetch priority directly, on-demand. This is fast for a single rem.
     return await getCardPriority(rp, rem);
-  }, [performanceMode, rem, isIncRem]);
+  }, [useLightMode, rem, isIncRem]);
 
 
   // --- 🔌 COMBINE RESULTS ---
-  const finalCardInfo = performanceMode === 'light' ? lightCardInfo : cardInfo;
+  const finalCardInfo = useLightMode ? lightCardInfo : cardInfo;
 
   if (!rem || isIncRem || !finalCardInfo) {
     return null;
   }
 
   // KB percentile is read directly from the main cache, which is already fast.
-  const kbPercentile = (performanceMode === 'full' && cardInfo) ? cardInfo.kbPercentile : undefined;
+  const kbPercentile = (!useLightMode && cardInfo) ? cardInfo.kbPercentile : undefined;
   
   // Use relative percentile for color in 'full' mode if available,
   // otherwise fall back to the absolute priority.
-  const colorValue = (performanceMode === 'full' && kbPercentile !== undefined)
+  const colorValue = (!useLightMode && kbPercentile !== undefined)
     ? kbPercentile            // Use relative percentile (full mode)
     : finalCardInfo.priority; // Use absolute priority (light mode or fallback)
 
@@ -166,7 +189,7 @@ export function CardPriorityDisplay() {
           <span>{finalCardInfo.priority}</span> {/* 🔌 Show absolute priority */}
           
           {/* 🔌 Conditionally show percentiles */}
-          {performanceMode === 'full' && kbPercentile !== undefined && (
+          {!useLightMode && kbPercentile !== undefined && (
             <span style={{ opacity: 0.9, fontSize: '11px' }}>
               ({kbPercentile}% KB
               {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
@@ -174,7 +197,7 @@ export function CardPriorityDisplay() {
           )}
         </div>
         {/*  🔌 Conditionally show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
-        {performanceMode === 'full' && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
+        {!useLightMode && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
 
           <span 
             style={{ 
@@ -189,8 +212,8 @@ export function CardPriorityDisplay() {
         )}
       </div>
       
-      {/* 🔌 Conditionally show Shield display */}
-      {performanceMode === 'full' && (shieldStatus?.kb || shieldStatus?.doc) && (
+      {/* 🔌 Conditionally show Shield display based on setting */}
+      {displayPriorityShield && !useLightMode && (shieldStatus?.kb || shieldStatus?.doc) && (
         <>
           <span style={{ color: '#9ca3af' }}>|</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

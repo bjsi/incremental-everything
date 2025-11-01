@@ -59,3 +59,8 @@ export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 export const queueSessionCacheKey = 'queueSessionCache';
 export const priorityCalcScopeRemIdsKey = 'priority-calc-scope-rem-ids-key';
+
+// --- Keys for Mobile Light Mode Auto-Switch ---
+export const alwaysUseLightModeOnMobileId = 'always-use-light-mode-on-mobile';
+export const lastDetectedOSKey = 'last-detected-os';
+export const isMobileDeviceKey = 'is-mobile-device'; // Stores whether current device is mobile

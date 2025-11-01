@@ -55,6 +55,8 @@ import {
   currentIncRemKey,
   queueSessionCacheKey,
   priorityCalcScopeRemIdsKey,
+  alwaysUseLightModeOnMobileId,
+  isMobileDeviceKey
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -67,6 +69,13 @@ import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 import { getInitialPriority } from '../lib/priority_inheritance';
 import { findPDFinRem, safeRemTextToString } from '../lib/pdfUtils';
+import { 
+  handleMobileDetectionOnStartup,
+  getOperatingSystem,
+  isMobileDevice,
+  shouldUseLightMode,
+  getEffectivePerformanceMode
+} from '../lib/mobileUtils';
 import { 
   autoAssignCardPriority, 
   getCardPriority, 
@@ -923,15 +932,22 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
     ]
   });
+
+  plugin.settings.registerBooleanSetting({
+    id: alwaysUseLightModeOnMobileId,
+    title: 'Always use Light Mode on Mobile',
+    description: 'Automatically switch to Light performance mode when using RemNote on iOS or Android. This prevents crashes and improves performance on mobile devices. Recommended: enabled.',
+    defaultValue: true,
+  });
   
   plugin.settings.registerBooleanSetting({
     id: displayPriorityShieldId,
     title: 'Display Priority Shield in Queue',
-    description: 'If enabled, shows a real-time status of your highest-priority due items in the queue top bar.',
+    description: 'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
     defaultValue: true,
   });
 
-    plugin.settings.registerDropdownSetting({
+  plugin.settings.registerDropdownSetting({
     id: 'priorityEditorDisplayMode', // ID for the new setting
     title: 'Priority Editor in Editor',
     description:
@@ -2620,12 +2636,46 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  // Mobile Light Mode Features
+  await handleMobileDetectionOnStartup(plugin);
+  console.log('Mobile detection completed');
+
+  plugin.app.registerCommand({
+    id: 'test-mobile-detection',
+    name: '🧪 Test Mobile Detection',
+    action: async () => {
+      // Get all the info
+      const os = await getOperatingSystem(plugin);
+      const isMobile = await isMobileDevice(plugin);
+      const shouldLight = await shouldUseLightMode(plugin);
+      const effective = await getEffectivePerformanceMode(plugin);
+      const setting = await plugin.settings.getSetting<string>('performanceMode');
+      const autoSwitch = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
+      
+      // Log to console
+      console.log('=== Mobile Detection Test ===');
+      console.log('OS:', os);
+      console.log('Is Mobile:', isMobile);
+      console.log('Setting:', setting);
+      console.log('Auto-switch:', autoSwitch);
+      console.log('Should Use Light:', shouldLight);
+      console.log('Effective Mode:', effective);
+      
+      // Show toast
+      await plugin.app.toast(
+        `OS: ${os} | Mobile: ${isMobile} | Effective: ${effective}`
+      );
+      
+      // Optionally, trigger the full startup detection
+      await handleMobileDetectionOnStartup(plugin);
+    },
+  });
+
   // Run the cache build in the background without blocking plugin initialization.
 
-  // Get the performance mode setting
-  const performanceMode = await plugin.settings.getSetting('performanceMode') || 'full';
-
-  if (performanceMode === 'full') {
+  // Get the performance mode
+  const useLightMode = await shouldUseLightMode(plugin);
+  if (!useLightMode) {
     // Run the full, expensive cache build
     cacheAllCardPriorities(plugin);
   } else {
