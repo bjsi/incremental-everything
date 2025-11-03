@@ -61,6 +61,12 @@ export const queueSessionCacheKey = 'queueSessionCache';
 export const priorityCalcScopeRemIdsKey = 'priority-calc-scope-rem-ids-key';
 
 // --- Keys for Mobile Light Mode Auto-Switch ---
+// Mobile Detection
 export const alwaysUseLightModeOnMobileId = 'always-use-light-mode-on-mobile';
 export const lastDetectedOSKey = 'last-detected-os';
 export const isMobileDeviceKey = 'is-mobile-device'; // Stores whether current device is mobile
+
+// Web Platform Detection
+export const alwaysUseLightModeOnWebId = 'alwaysUseLightModeOnWeb';
+export const isWebPlatformKey = 'isWebPlatform';
+export const lastDetectedPlatformKey = 'lastDetectedPlatform';
