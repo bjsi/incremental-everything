@@ -265,7 +265,9 @@ function PriorityShieldGraph() {
         )}
         
         <p className="mb-3">
-          <b>Universe Size (dashed line):</b> Shows the total number of IncRems or Cards in the respective scope. When this number decreases, it often indicates successful processing and removal of items (e.g., removing the Incremental tag after processing). This explains why priority percentiles might suddenly change - a smaller universe means each remaining item represents a larger percentage of the whole.
+          <b>Universe Size (dashed line):</b> Shows the total number of <b>IncRems</b> or <b>Rems with Cards</b> in the respective scope. When this number decreases, it often indicates successful processing and removal of items (e.g., removing the Incremental tag after processing). This explains why priority percentiles might suddenly change - a smaller universe means each remaining item represents a larger percentage of the whole.
+          <br></br>
+          <i>Note:</i> The universe shown in the <b>Card Shield</b> is total number of <b>Rems with Cards</b>, which is <i>different</i> from the total number of <b>flashcards</b> shown in other RemNote UI (remember that a Rem can have several flashcards!). `cardPriority` powerup (and its priority) is assigned per rem, not per flashcard. The total number of flashcards is larger them the universe shown here.
         </p>
         
         <p className="mb-3">

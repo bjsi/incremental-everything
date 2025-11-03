@@ -27,12 +27,14 @@ import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/cardPriority';
+import { shouldUseLightMode } from '../lib/mobileUtils';
 
 const MAX_DEPTH_CHECK = 3;
 
 /**
  * Smart function to check if a Rem or its descendants have flashcards.
  * **OPTIMIZED: Checks up to MAX_DEPTH_CHECK (3 levels: Rem, Children, Grandchildren).**
+ * **PERFORMANCE MODE: In Light Mode, skips flashcard checking and adds cardPriority directly.**
  */
 const handleCardPriorityInheritance = async (
   plugin: RNPlugin, 
@@ -56,7 +58,17 @@ const handleCardPriorityInheritance = async (
       return;
     }
     
-    // 2. Check the Rem itself for flashcards (Depth 1)
+    // 2. Check if we should use Light Mode for performance
+    const useLightMode = await shouldUseLightMode(plugin);
+    
+    if (useLightMode) {
+      // In Light Mode, skip expensive flashcard checking and add cardPriority directly
+      await setCardPriority(plugin, rem, incRemInfo.priority, 'manual');
+      console.log(`[Done Button] ⚡ Light Mode: Set card priority ${incRemInfo.priority} without flashcard check. Total time: ${Date.now() - startTime}ms.`);
+      return;
+    }
+    
+    // 3. Full Mode: Check the Rem itself for flashcards (Depth 1)
     const remCards = await rem.getCards();
     if (remCards && remCards.length > 0) {
       // Rem has its own flashcards, set card priority
@@ -65,7 +77,7 @@ const handleCardPriorityInheritance = async (
       return;
     }
     
-    // 3. Check descendants up to MAX_DEPTH_CHECK (Children and Grandchildren)
+    // 4. Full Mode: Check descendants up to MAX_DEPTH_CHECK (Children and Grandchildren)
     // Uses getDescendantsToDepth to avoid fetching the entire hierarchy upfront.
     const descendantsToCheck = await getDescendantsToDepth(rem, MAX_DEPTH_CHECK);
     
@@ -76,7 +88,7 @@ const handleCardPriorityInheritance = async (
     
     console.log(`[Done Button] Checking ${descendantsToCheck.length} descendants up to level ${MAX_DEPTH_CHECK}...`);
 
-    // 4. Batch-check the limited descendants with early termination
+    // 5. Full Mode: Batch-check the limited descendants with early termination
     const BATCH_SIZE = 50;
     
     for (let i = 0; i < descendantsToCheck.length; i += BATCH_SIZE) {

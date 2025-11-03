@@ -56,7 +56,10 @@ import {
   queueSessionCacheKey,
   priorityCalcScopeRemIdsKey,
   alwaysUseLightModeOnMobileId,
-  isMobileDeviceKey
+  isMobileDeviceKey,
+  alwaysUseLightModeOnWebId,
+  isWebPlatformKey,
+  lastDetectedPlatformKey
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -74,7 +77,11 @@ import {
   getOperatingSystem,
   isMobileDevice,
   shouldUseLightMode,
-  getEffectivePerformanceMode
+  getEffectivePerformanceMode,
+  getPlatform,              // NEW
+  isWebPlatform,            // NEW
+  getFriendlyOSName,
+  getFriendlyPlatformName   // NEW
 } from '../lib/mobileUtils';
 import { 
   autoAssignCardPriority, 
@@ -937,6 +944,13 @@ async function onActivate(plugin: ReactRNPlugin) {
     id: alwaysUseLightModeOnMobileId,
     title: 'Always use Light Mode on Mobile',
     description: 'Automatically switch to Light performance mode when using RemNote on iOS or Android. This prevents crashes and improves performance on mobile devices. Recommended: enabled.',
+    defaultValue: true,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: alwaysUseLightModeOnWebId,
+    title: 'Always use Light Mode on Web Browser',
+    description: 'Automatically switch to Light performance mode when using RemNote on the web browser. Full Mode can be slow or unstable on web browsers. Recommended: enabled.',
     defaultValue: true,
   });
   
@@ -2712,37 +2726,58 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
-  // Mobile Light Mode Features
+  // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
   console.log('Mobile detection completed');
 
   plugin.app.registerCommand({
     id: 'test-mobile-detection',
-    name: '🧪 Test Mobile Detection',
+    name: '🧪 Test Mobile & Platform Detection',
     action: async () => {
-      // Get all the info
+      // Get all the detection info
       const os = await getOperatingSystem(plugin);
+      const platform = await getPlatform(plugin);
       const isMobile = await isMobileDevice(plugin);
+      const isWeb = await isWebPlatform(plugin);
       const shouldLight = await shouldUseLightMode(plugin);
       const effective = await getEffectivePerformanceMode(plugin);
+      
+      // Get settings
       const setting = await plugin.settings.getSetting<string>('performanceMode');
-      const autoSwitch = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
+      const autoSwitchMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
+      const autoSwitchWeb = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnWebId);
       
-      // Log to console
-      console.log('=== Mobile Detection Test ===');
-      console.log('OS:', os);
-      console.log('Is Mobile:', isMobile);
-      console.log('Setting:', setting);
-      console.log('Auto-switch:', autoSwitch);
-      console.log('Should Use Light:', shouldLight);
-      console.log('Effective Mode:', effective);
+      // Get friendly names
+      const friendlyOS = getFriendlyOSName(os);
+      const friendlyPlatform = getFriendlyPlatformName(platform);
       
-      // Show toast
+      // Log detailed info to console
+      console.log('╔═══════════════════════════════════════════════╗');
+      console.log('║   Mobile & Platform Detection Test Results   ║');
+      console.log('╠═══════════════════════════════════════════════╣');
+      console.log('║ ENVIRONMENT DETECTION:                        ║');
+      console.log(`║   Operating System: ${friendlyOS.padEnd(26)} ║`);
+      console.log(`║   Platform: ${friendlyPlatform.padEnd(32)} ║`);
+      console.log(`║   Is Mobile Device: ${(isMobile ? 'Yes' : 'No').padEnd(26)} ║`);
+      console.log(`║   Is Web Browser: ${(isWeb ? 'Yes' : 'No').padEnd(28)} ║`);
+      console.log('║                                               ║');
+      console.log('║ SETTINGS:                                     ║');
+      console.log(`║   Performance Mode Setting: ${setting.padEnd(18)} ║`);
+      console.log(`║   Auto Light on Mobile: ${(autoSwitchMobile !== false ? 'Enabled' : 'Disabled').padEnd(22)} ║`);
+      console.log(`║   Auto Light on Web: ${(autoSwitchWeb !== false ? 'Enabled' : 'Disabled').padEnd(25)} ║`);
+      console.log('║                                               ║');
+      console.log('║ RESULT:                                       ║');
+      console.log(`║   Should Use Light Mode: ${(shouldLight ? 'YES' : 'NO').padEnd(21)} ║`);
+      console.log(`║   Effective Mode: ${effective.padEnd(26)} ║`);
+      console.log('╚═══════════════════════════════════════════════╝');
+      
+      // Show concise toast
       await plugin.app.toast(
-        `OS: ${os} | Mobile: ${isMobile} | Effective: ${effective}`
+        `${isWeb ? '🌐' : isMobile ? '📱' : '💻'} ${friendlyPlatform} on ${friendlyOS} → ${effective.toUpperCase()} MODE`
       );
       
-      // Optionally, trigger the full startup detection
+      // Optionally, trigger the full startup detection to see the startup toast
+      console.log('\nRe-running startup detection...');
       await handleMobileDetectionOnStartup(plugin);
     },
   });

@@ -90,7 +90,12 @@ const config = {
     new CopyPlugin({
       patterns: [
         {from: 'public', to: ''},
-        {from: 'README.md', to: ''}
+        {from: 'README.md', to: ''},
+        {
+          from: 'src/style.css',
+          to: 'App.css',
+          noErrorOnMissing: true, // Don't fail if style.css doesn't exist
+        },
       ]
     }),
     fastRefresh,
