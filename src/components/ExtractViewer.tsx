@@ -1,5 +1,5 @@
-import React from 'react';
-import { Rem, RNPlugin, useTrackerPlugin, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import React, { useState, useEffect } from 'react';
+import { Rem, RNPlugin, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
 
@@ -8,128 +8,229 @@ interface ExtractViewerProps {
   plugin: RNPlugin;
 }
 
+// Define the critical context structure
+interface CriticalContext {
+  hasDocumentPowerup: boolean;
+  ancestors: Array<{ text: string, id: string }>;
+}
+
+// Define the metadata structure (already deferred)
+interface Metadata {
+  childrenCount: number;
+  incrementalChildrenCount: number;
+  descendantsCount: number;
+  incrementalDescendantsCount: number;
+  flashcardCount: number;
+}
+
+const BATCH_SIZE = 50;
+const BATCH_DELAY_MS = 10; 
+
 export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
-  const remData = useTrackerPlugin(async (rp) => {
-    if (!rem) return null;
+  if (!rem) return null;
 
-    const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : '';
-    const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
+  // --- STATE 1: DEFERRED METADATA (Statistics) ---
+  const [metadata, setMetadata] = useState<Metadata | null>(null);
 
-    // Get direct children and count incremental ones
-    const children = await rem.getChildrenRem();
-    const childrenCount = children.length;
-    const isIncrementalChecks = await Promise.all(
-      children.map(child => child.hasPowerup(powerupCode))
-    );
-    const incrementalChildrenCount = isIncrementalChecks.filter(Boolean).length;
+  // --- STATE 2: DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status) ---
+  const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
 
-    // Get all descendants and count incremental ones
-    const descendants = await rem.getDescendants();
-    const descendantsCount = descendants.length;
-    const isIncrementalDescendantChecks = await Promise.all(
-      descendants.map(descendant => descendant.hasPowerup(powerupCode))
-    );
-    const incrementalDescendantsCount = isIncrementalDescendantChecks.filter(Boolean).length;
+  // -----------------------------------------------------------
+  // 1. EFFECT FOR DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status)
+  //    - This replaces the slow parts of the original remData tracker.
+  // -----------------------------------------------------------
+  useEffect(() => {
+    setCriticalContext(null);
 
-    // --- UPDATED: Correctly count all flashcard types ---
-    const remsToCheckForCards = [rem, ...descendants];
-    
-    // Fetch the card arrays for every rem and descendant in parallel.
-    const cardArrays = await Promise.all(
-      remsToCheckForCards.map(r => r.getCards())
-    );
+    const loadCriticalData = async () => {
+      // 1. Check Document Powerup (fast)
+      const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
 
-    // Sum the number of cards found in each array.
-    const flashcardCount = cardArrays.reduce((total, cards) => total + cards.length, 0);
-    // ----------------------------------------------------
+      // 2. Get Ancestors (slow part)
+      const ancestorList = [];
+      let currentParent = rem.parent;
+      let depth = 0;
+      const maxDepth = 10;
 
-    // Get ancestors for breadcrumb
-    const ancestorList = [];
-    let currentParent = rem.parent;
-    let depth = 0;
-    const maxDepth = 10;
+      while (currentParent && depth < maxDepth) {
+        try {
+          // Add a yield point here to prevent blocking if the hierarchy is deep.
+          if (depth % 2 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 1));
+          }
 
-    while (currentParent && depth < maxDepth) {
-      try {
-        const parentRem = await plugin.rem.findOne(currentParent);
-        if (!parentRem || !parentRem.text) break;
-        
-        const parentText = await safeRemTextToString(plugin, parentRem.text);
-        
-        ancestorList.unshift({
-          text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),
-          id: currentParent
-        });
-        
-        currentParent = parentRem.parent;
-        depth++;
-      } catch (error) {
-        break;
+          const parentRem = await plugin.rem.findOne(currentParent);
+          if (!parentRem || !parentRem.text) break;
+          
+          const parentText = await safeRemTextToString(plugin, parentRem.text);
+          
+          ancestorList.unshift({
+            text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),
+            id: currentParent
+          });
+          
+          currentParent = parentRem.parent;
+          depth++;
+        } catch (error) {
+          break;
+        }
       }
-    }
-    
-    return {
-      text: remText,
-      hasDocumentPowerup,
-      childrenCount,
-      incrementalChildrenCount,
-      descendantsCount,
-      incrementalDescendantsCount,
-      flashcardCount,
-      ancestors: ancestorList
+
+      setCriticalContext({
+        hasDocumentPowerup,
+        ancestors: ancestorList
+      });
     };
-  }, [rem?._id, rem?.parent]);
+    
+    // Execute after a short delay to ensure initial render is not blocked
+    const timeoutId = setTimeout(() => {
+      loadCriticalData().catch(console.error);
+    }, 10); 
+
+    return () => clearTimeout(timeoutId);
+    
+  }, [rem._id, plugin]);
   
-  if (!rem || !remData) return null;
+  // -----------------------------------------------------------
+  // 2. EFFECT FOR DEFERRED METADATA CALCULATION (Statistics) (Unchanged)
+  // -----------------------------------------------------------
+  useEffect(() => {
+    setMetadata(null); 
+    
+    const calculateMetadata = async () => {
+      console.log("[ExtractViewer] Starting heavy metadata calculation...");
+      
+      const descendants = await rem.getDescendants();
+      const descendantsCount = descendants.length;
+      
+      const children = await rem.getChildrenRem();
+      const childrenCount = children.length;
+
+      const remsToProcess = [rem, ...descendants];
+      
+      let incrementalDescendantsCount = 0;
+      let flashcardCount = 0;
+      let incrementalChildrenCount = 0;
+      let processedCount = 0;
+      
+      for (let i = 0; i < remsToProcess.length; i += BATCH_SIZE) {
+          const batch = remsToProcess.slice(i, i + BATCH_SIZE);
+          
+          const batchResults = await Promise.all(
+              batch.map(async (r) => ({
+                  remId: r._id,
+                  isIncremental: await r.hasPowerup(powerupCode),
+                  cards: await r.getCards(),
+              }))
+          );
+          
+          for (const result of batchResults) {
+              if (result.isIncremental) {
+                  incrementalDescendantsCount++;
+              }
+              if (result.cards.length > 0) {
+                  flashcardCount += result.cards.length;
+              }
+              if (children.some(c => c._id === result.remId) && result.isIncremental) {
+                  incrementalChildrenCount++;
+              }
+          }
+          processedCount += batch.length;
+          
+          if (i + BATCH_SIZE < remsToProcess.length) {
+              await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+          }
+      }
+
+      setMetadata({
+        childrenCount,
+        incrementalChildrenCount,
+        descendantsCount,
+        incrementalDescendantsCount,
+        flashcardCount,
+      });
+      console.log(`[ExtractViewer] Metadata calculation complete. Processed ${processedCount} rems.`);
+    };
+
+    const timeoutId = setTimeout(() => {
+        calculateMetadata().catch(console.error);
+    }, 50); 
+    
+    return () => clearTimeout(timeoutId);
+    
+  }, [rem._id, plugin]); 
+
+  // -----------------------------------------------------------
+  // 3. MAIN RENDER LOGIC
+  // -----------------------------------------------------------
+
+  // --- IMMEDIATE RENDER ---
+  // We no longer rely on remData. We use null coalescing for the deferred state.
   
-  const { 
-    hasDocumentPowerup, 
-    childrenCount, 
-    ancestors, 
-    incrementalChildrenCount,
-    descendantsCount,
-    incrementalDescendantsCount,
-    flashcardCount
-  } = remData;
+  const isMetadataLoading = !metadata;
+  const {
+    childrenCount = '...',
+    incrementalChildrenCount = '...',
+    descendantsCount = '...',
+    incrementalDescendantsCount = '...',
+    flashcardCount = '...'
+  } = metadata || {}; 
+
+  // Fallback for Critical Context (Breadcrumbs/Status)
+  const isContextLoading = !criticalContext;
+  const ancestors = criticalContext?.ancestors || [];
+  const hasDocumentPowerup = criticalContext?.hasDocumentPowerup ?? false;
+
   
   return (
     <div className="extract-viewer" style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}>
-      {/* Breadcrumb Section */}
-      {ancestors.length > 0 && (
-        <div className="breadcrumb-section px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+      {/* Breadcrumb Section (Hidden/Placeholder while loading context) */}
+      <div className={`breadcrumb-section px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 ${isContextLoading ? 'opacity-0 h-8' : 'h-auto'}`}>
+        {!isContextLoading && ancestors.length > 0 && (
           <div className="text-sm text-gray-600 dark:text-gray-400">
             {ancestors.map((ancestor, index) => (
-              <span key={ancestor.id}>
+              <span key={ancestor.id} onClick={() => plugin.window.openRem(ancestor.id)} style={{cursor: 'pointer'}}>
                 {ancestor.text}
                 {index < ancestors.length - 1 && ' › '}
               </span>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
       
-      {/* DocumentViewer Section */}
+      {/* DocumentViewer Section (Renders immediately using rem._id) */}
       <div className="document-viewer-section overflow-hidden">
         <DocumentViewer width={'100%'} height={'100%'} documentId={rem._id} />
       </div>
       
-      {/* Metadata Section */}
-      <div className="metadata-section px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+      {/* Metadata Section (Updates when metadata is ready) */}
+      <div className={`metadata-section px-4 py-3 border-t flex-shrink-0 ${isMetadataLoading ? 'opacity-50' : ''}`} 
+           style={{
+             borderColor: '#e5e7eb',
+             backgroundColor: isMetadataLoading ? 'rgba(0,0,0,0.05)' : 'transparent',
+           }}
+      >
         <div className="text-xs text-gray-500 dark:text-gray-400">
           <div className="flex items-center justify-between">
             <span>
-              {hasDocumentPowerup ? 'Document' : 'Extract'} • Incremental Rem
+              {isContextLoading ? 'Loading...' : (hasDocumentPowerup ? 'Document' : 'Extract')} • Incremental Rem
             </span>
             <div className="flex items-center gap-4">
-              <span>
-                {childrenCount} direct {childrenCount === 1 ? 'child' : 'children'} ({incrementalChildrenCount} incremental)
-              </span>                
-              <span>
-                {descendantsCount} {descendantsCount === 1 ? 'descendant' : 'descendants'} ({incrementalDescendantsCount} incremental)
-              </span>
-              <span>
-                {flashcardCount} {flashcardCount === 1 ? 'flashcard' : 'flashcards'}
-              </span>
+              {isMetadataLoading ? (
+                <span>Calculating statistics...</span>
+              ) : (
+                <>
+                  <span>
+                    {childrenCount} direct {childrenCount === 1 ? 'child' : 'children'} ({incrementalChildrenCount} incremental)
+                  </span>                
+                  <span>
+                    {descendantsCount} {descendantsCount === 1 ? 'descendant' : 'descendants'} ({incrementalDescendantsCount} incremental)
+                  </span>
+                  <span>
+                    {flashcardCount} {flashcardCount === 1 ? 'flashcard' : 'flashcards'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>

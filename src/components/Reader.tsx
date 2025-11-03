@@ -5,21 +5,23 @@ import {
   useTrackerPlugin,
   BuiltInPowerupCodes,
   WidgetLocation,
-  useRunAsync, // Import useRunAsync, you'll need it
+  useRunAsync,
 } from '@remnote/plugin-sdk';
-import React from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { activeHighlightIdKey, powerupCode, pageRangeWidgetId } from '../lib/consts';
 import {
   HTMLActionItem,
   HTMLHighlightActionItem,
   PDFActionItem,
   PDFHighlightActionItem,
+  RemActionItem, // Added RemActionItem for type clarity
 } from '../lib/types';
 import {
   getIncrementalReadingPosition,
   getIncrementalPageRange,
   clearIncrementalPDFData,
   addPageToHistory,
+  safeRemTextToString, // Import safeRemTextToString for critical context
 } from '../lib/pdfUtils';
 
 interface ReaderProps {
@@ -34,347 +36,79 @@ const sharedProps = {
   initOnlyShowReader: false,
 };
 
+// Define the critical context structure
+interface CriticalContext {
+  ancestors: Array<{ text: string, id: string }>;
+  remDisplayName: string;
+  incrementalRemId: string | null;
+  pdfRemId: string;
+  hasDocumentPowerup: boolean;
+}
+
+// Define the metadata structure for deferred calculation
+interface Metadata {
+  childrenCount: number;
+  incrementalChildrenCount: number;
+  descendantsCount: number;
+  incrementalDescendantsCount: number;
+  flashcardCount: number;
+  pdfHighlightCount: number;
+}
+
+const BATCH_SIZE = 50;
+const BATCH_DELAY_MS = 10;
 
 export function Reader(props: ReaderProps) {
   const { actionItem } = props;
   const plugin = usePlugin();
+
+  // --- 1. ALL useRef and useState Hooks MUST BE HERE ---
+  
+  // useRef
   const hasScrolled = React.useRef(false);
-  const [isReaderReady, setIsReaderReady] = React.useState(false);
   const pdfReaderRef = React.useRef<any>(null);
+
+  // useState (Main UI State)
+  const [isReaderReady, setIsReaderReady] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState<number>(1);
   const [totalPages, setTotalPages] = React.useState<number>(0);
   const [pageInputValue, setPageInputValue] = React.useState<string>('1');
   const [pageRangeStart, setPageRangeStart] = React.useState<number>(1);
   const [pageRangeEnd, setPageRangeEnd] = React.useState<number>(0);
   const [isInputFocused, setIsInputFocused] = React.useState<boolean>(false);
-
-  // --- START: Dark Mode Detection ---
-  // Detect RemNote's dark mode by checking for the .dark class
   const [isDarkMode, setIsDarkMode] = React.useState(false);
-
-  React.useEffect(() => {
-    let lastKnownDarkMode = false;
-
-    // Function to check if dark mode is active
-    const checkDarkMode = () => {
-      // Check multiple locations where RemNote might apply the dark class
-      const htmlHasDark = document.documentElement.classList.contains('dark');
-      const bodyHasDark = document.body?.classList.contains('dark');
-      
-      // Also check if we're in an iframe and check the parent
-      let parentHasDark = false;
-      try {
-        if (window.parent && window.parent !== window) {
-          parentHasDark = window.parent.document.documentElement.classList.contains('dark');
-        }
-      } catch (e) {
-        // Cross-origin iframe, can't access parent
-      }
-
-      // Also check for dark mode by looking at computed background color
-      const backgroundColor = window.getComputedStyle(document.body).backgroundColor;
-      const isDarkByColor = backgroundColor && 
-        backgroundColor.startsWith('rgb') && 
-        (() => {
-          const matches = backgroundColor.match(/\d+/g);
-          if (matches && matches.length >= 3) {
-            const [r, g, b] = matches.map(Number);
-            // If average RGB is less than 128, it's dark
-            return (r + g + b) / 3 < 128;
-          }
-          return false;
-        })();
-
-      const isDark = htmlHasDark || bodyHasDark || parentHasDark || isDarkByColor;
-      
-      // Only update state and log if the value actually changed
-      if (isDark !== lastKnownDarkMode) {
-        lastKnownDarkMode = isDark;
-        setIsDarkMode(isDark);
-        
-        // Debug logging only on change
-        console.log('[Reader Dark Mode] Theme changed to:', isDark ? 'DARK' : 'LIGHT', {
-          htmlHasDark,
-          bodyHasDark,
-          parentHasDark,
-          isDarkByColor,
-          backgroundColor
-        });
-      }
-    };
-
-    // Create a MutationObserver to watch for class changes
-    const observer = new MutationObserver(() => {
-      checkDarkMode();
-    });
-
-    // Observe both html and body elements
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    if (document.body) {
-      observer.observe(document.body, {
-        attributes: true,
-        attributeFilter: ['class']
-      });
-    }
-
-    // Also observe style changes that might indicate theme change
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['style']
-    });
-
-    // Initial check
-    checkDarkMode();
-
-    // Re-check periodically in case we miss the mutation (less frequently)
-    const interval = setInterval(checkDarkMode, 2000);
-
-    // Cleanup
-    return () => {
-      observer.disconnect();
-      clearInterval(interval);
-    };
-  }, []);
-  // --- END: Dark Mode Detection ---
-
-  const remData = useTrackerPlugin(async (rp) => {
-    try {
-      const pdfRem = actionItem.rem;
-      if (!pdfRem) return null;
-
-      // --- DEBUG ---
-      console.log('[READER DEBUG] Starting remData tracker for PDF:', pdfRem._id);
-
-      // Find the incremental rem context
-      let incrementalRem = null;
-
-      // --- START FIX ---
-      // NEW STEP 0: Check if the PDF Rem IS the Incremental Rem.
-      // This is the case you described.
-      try {
-        if (await pdfRem.hasPowerup(powerupCode)) {
-          incrementalRem = pdfRem;
-        }
-        console.log('[READER DEBUG] 0. Found from self-check?', incrementalRem?._id || 'No');
-      } catch (selfCheckError) {
-        console.error('[READER DEBUG] Error during self-check:', selfCheckError);
-      }
-      // --- END FIX ---
-      
-      // Try to get from widget context first
-      // MODIFIED: Added `if (!incrementalRem)`
-      if (!incrementalRem) {
-        try {
-          const widgetContext = await plugin.widget.getWidgetContext();
-          if (widgetContext?.remId && widgetContext.remId !== pdfRem._id) {
-            const contextRem = await plugin.rem.findOne(widgetContext.remId);
-            if (contextRem && (await contextRem.hasPowerup(powerupCode))) {
-              incrementalRem = contextRem;
-            }
-          }
-          // --- DEBUG ---
-          console.log('[READER DEBUG] 1. Found from context?', incrementalRem?._id || 'No');
-        } catch (contextError) {
-          console.log(
-            '[READER DEBUG] No widget context available:',
-            (contextError as Error).message
-          );
-        }
-      }
-
-      // Check parent rem
-      // MODIFIED: Added `if (!incrementalRem)`
-      if (!incrementalRem && pdfRem.parent) {
-        try {
-          const parentRem = await plugin.rem.findOne(pdfRem.parent);
-          if (parentRem && (await parentRem.hasPowerup(powerupCode))) {
-            incrementalRem = parentRem;
-          }
-          // --- DEBUG ---
-          console.log('[READER DEBUG] 2. Found from parent?', incrementalRem?._id || 'No');
-        } catch (error) {
-          console.error('[READER DEBUG] Error finding parent rem:', error);
-        }
-      }
-
-      // Search for incremental rems containing this PDF
-      // MODIFIED: Added `if (!incrementalRem)`
-      if (!incrementalRem) {
-        try {
-          // --- DEBUG ---
-          console.log('[READER DEBUG] 3. Starting targeted KB search...');
-
-          const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
-          if (incPowerup) {
-            const allIncRems = await incPowerup.taggedRem();
-
-            for (const candidateRem of allIncRems) {
-              const descendants = await candidateRem.getDescendants();
-              if (descendants.some((desc) => desc._id === pdfRem._id)) {
-                incrementalRem = candidateRem;
-                break; // Found it
-              }
-            }
-          }
-          // --- DEBUG ---
-          console.log(
-            '[READER DEBUG] 3. Found from targeted KB search?',
-            incrementalRem?._id || 'No'
-          );
-        } catch (searchError) {
-          console.log('[READER DEBUG] Error in targeted KB search:', searchError);
-        }
-      }
-      
-      const rem = incrementalRem || pdfRem;
-      // --- DEBUG ---
-      console.log(
-        `[READER DEBUG] Using rem for data: ${rem._id} (Is Incremental: ${!!incrementalRem})`
-      );
-
-      const remText = rem.text ? await plugin.richText.toString(rem.text) : '';
-      const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
-
-      // Get statistics
-      const children = await rem.getChildrenRem();
-      const childrenCount = children.length;
-      const isIncrementalChecks = await Promise.all(
-        children.map((child) => child.hasPowerup(powerupCode))
-      );
-      const incrementalChildrenCount = isIncrementalChecks.filter(Boolean).length;
-
-      const descendants = await rem.getDescendants();
-      const descendantsCount = descendants.length;
-      const isIncrementalDescendantChecks = await Promise.all(
-        descendants.map((descendant) => descendant.hasPowerup(powerupCode))
-      );
-      const incrementalDescendantsCount =
-        isIncrementalDescendantChecks.filter(Boolean).length;
-
-      const remsToCheckForCards = [rem, ...descendants];
-      const cardArrays = await Promise.all(
-        remsToCheckForCards.map((r) => r.getCards())
-      );
-      const flashcardCount = cardArrays.reduce((total, cards) => total + cards.length, 0);
-
-      // Get highlight count
-      let pdfHighlightCount = 0;
-      try {
-        const pdfChildren = await pdfRem.getChildrenRem();
-        const pdfDescendants = await pdfRem.getDescendants();
-        const allPdfRems = [...pdfChildren, ...pdfDescendants];
-        const highlightChecks = await Promise.all(
-          allPdfRems.map((child) => child.hasPowerup(BuiltInPowerupCodes.PDFHighlight))
-        );
-        pdfHighlightCount = highlightChecks.filter(Boolean).length;
-      } catch (highlightError) {
-        console.error('[READER DEBUG] Error counting PDF highlights:', highlightError);
-      }
-
-      // Get ancestors for breadcrumb
-      const ancestorList = [];
-      let currentParent = rem.parent;
-      let depth = 0;
-      const maxDepth = 10;
-
-      while (currentParent && depth < maxDepth) {
-        try {
-          const parentRem = await plugin.rem.findOne(currentParent);
-          if (!parentRem || !parentRem.text) break;
-
-          const parentText = await plugin.richText.toString(parentRem.text);
-
-          ancestorList.unshift({
-            text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),
-            id: currentParent,
-          });
-
-          currentParent = parentRem.parent;
-          depth++;
-        } catch (error) {
-          console.error('[READER DEBUG] Error processing ancestor:', error);
-          break;
-        }
-      }
-
-      // --- DEBUG ---
-      console.log(`[READER DEBUG] FINAL incrementalRemId: ${incrementalRem?._id || null}`);
-
-      return {
-        text: remText,
-        hasDocumentPowerup,
-        childrenCount,
-        incrementalChildrenCount,
-        descendantsCount,
-        incrementalDescendantsCount,
-        flashcardCount,
-        ancestors: ancestorList,
-        isUsingIncrementalParent: !!incrementalRem,
-        remDisplayName: remText || 'Untitled Rem',
-        pdfHighlightCount,
-        incrementalRemId: incrementalRem?._id || null,
-        pdfRemId: pdfRem._id,
-      };
-    } catch (error) {
-      console.error('[READER DEBUG] Error in remData tracker:', error);
-      return null;
-    }
-  }, [actionItem.rem?._id, actionItem.rem?.parent]);
-  
-  // --- NEW: Add state to control PDF rendering on iOS ---
   const [canRenderPdf, setCanRenderPdf] = React.useState(
     !(isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight'))
-  );
+  ); 
+  
+  // useState (Deferred States)
+  const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
+  const [metadata, setMetadata] = useState<Metadata | null>(null);
 
-  // --- NEW: Add an effect to enable rendering after a short delay ---
-  React.useEffect(() => {
-    // Log the value of isIOS every time this effect runs
-    console.log('Reader.tsx: Checking for iOS...', { isIOS });
-    if (isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight')) {
-      const timer = setTimeout(() => {
-        setCanRenderPdf(true);
-      }, 250);
-      return () => clearTimeout(timer);
-    }
-  }, [actionItem.type]);
+  // --- 2. useTrackerPlugin MUST BE HERE ---
 
-
-  // Save current page position (but NOT to history)
+  // CRITICAL DATA TRACKER (Minimal: Only used to enforce hook order if needed, but not necessary for logic)
+  // Reverting to the simplest tracker just to keep the hook count consistent
+  const trackerOutput = useTrackerPlugin(() => ({
+    remId: actionItem.rem._id,
+    parentId: actionItem.rem.parent,
+    pdfRem: actionItem.rem,
+  }), [actionItem.rem._id, actionItem.rem.parent]); 
+  // NOTE: remData is removed, replaced by criticalContext state below.
+  
+  
+  // --- 3. ALL useCallback / useMemo Hooks MUST BE HERE ---
+  
+  // Save current page position (UPDATED TO USE criticalContext)
   const saveCurrentPage = React.useCallback(async (page: number) => {
-    if (!remData?.incrementalRemId) return;
+    if (!criticalContext?.incrementalRemId) return; // Use criticalContext
     
-    const pageKey = `incremental_current_page_${remData.incrementalRemId}_${actionItem.rem._id}`;
+    const pageKey = `incremental_current_page_${criticalContext.incrementalRemId}_${actionItem.rem._id}`;
     await plugin.storage.setSynced(pageKey, page);
-    console.log(`Saved current page ${page} for incremental rem ${remData.incrementalRemId}`);
-    // Note: We do NOT add to history here - only save the position
-  }, [remData?.incrementalRemId, actionItem.rem._id, plugin]);
+  // Dependencies MUST include criticalContext
+  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin]);
 
-  // Save to history only once when leaving the card
-  React.useEffect(() => {
-    // Track the page when component mounts
-    const startPage = currentPage;
-    
-    return () => {
-      // Cleanup function runs when component unmounts (leaving the card)
-      if (remData?.incrementalRemId && currentPage) {
-        // Add to history only once when leaving
-        addPageToHistory(
-          plugin,
-          remData.incrementalRemId,
-          actionItem.rem._id,
-          currentPage
-        ).then(() => {
-          console.log(`Added final page ${currentPage} to history when leaving card`);
-        });
-      }
-    };
-  }, [remData?.incrementalRemId, actionItem.rem._id, plugin]); // Remove currentPage from dependencies
-
-  // Handle page navigation
+  // Handle page navigation (UPDATED TO USE saveCurrentPage)
   const incrementPage = React.useCallback(() => {
     const newPage = currentPage + 1;
     const maxPage = pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || Infinity);
@@ -383,7 +117,6 @@ export function Reader(props: ReaderProps) {
       setCurrentPage(newPage);
       setPageInputValue(newPage.toString());
       saveCurrentPage(newPage);
-      console.log(`Incremented to page ${newPage}`);
     }
   }, [currentPage, totalPages, pageRangeEnd, saveCurrentPage]);
 
@@ -394,14 +127,12 @@ export function Reader(props: ReaderProps) {
     setCurrentPage(newPage);
     setPageInputValue(newPage.toString());
     saveCurrentPage(newPage);
-    console.log(`Decremented to page ${newPage}`);
   }, [currentPage, pageRangeStart, saveCurrentPage]);
 
   const handlePageInputChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setPageInputValue(value);
     
-    // Immediately update page if value is valid
     const page = parseInt(value);
     if (!isNaN(page) && page >= 1) {
       const minPage = Math.max(1, pageRangeStart);
@@ -410,38 +141,30 @@ export function Reader(props: ReaderProps) {
       if (page >= minPage && page <= maxPage) {
         setCurrentPage(page);
         saveCurrentPage(page);
-        console.log(`Updated page to ${page} via input`);
       }
     }
   }, [pageRangeStart, pageRangeEnd, totalPages, saveCurrentPage]);
 
   const handlePageInputBlur = React.useCallback(() => {
     setIsInputFocused(false);
-    // Validate and correct input on blur
     const page = parseInt(pageInputValue);
     
     if (isNaN(page) || page < 1) {
-      // Reset to current valid page
       setPageInputValue(currentPage.toString());
     } else {
       const minPage = Math.max(1, pageRangeStart);
       const maxPage = pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || Infinity);
       
       if (page < minPage || page > maxPage) {
-        // Show error message
         const message = pageRangeEnd > 0 
           ? `Page must be between ${minPage} and ${maxPage}` 
           : `Page must be ${minPage} or higher`;
         
         plugin.app.toast(message);
-        
-        // Reset to previous valid value
         setPageInputValue(currentPage.toString());
       } else if (page !== currentPage) {
-        // Valid page number that's different from current
         setCurrentPage(page);
         saveCurrentPage(page);
-        console.log(`Set page to ${page} on blur`);
       }
     }
   }, [pageInputValue, currentPage, pageRangeStart, pageRangeEnd, totalPages, saveCurrentPage, plugin]);
@@ -454,113 +177,449 @@ export function Reader(props: ReaderProps) {
   }, []);
 
   const handleSetPageRange = React.useCallback(async () => {
-    if (!remData?.incrementalRemId || !remData?.pdfRemId) {
-      console.log('Reader: Cannot open page range - no incremental rem ID or PDF ID');
+    if (!criticalContext?.incrementalRemId || !criticalContext?.pdfRemId) {
       return;
     }
     
-    // Store context for the popup with PDF ID
     const context = {
-      incrementalRemId: remData.incrementalRemId,
-      pdfRemId: remData.pdfRemId,
+      incrementalRemId: criticalContext.incrementalRemId,
+      pdfRemId: criticalContext.pdfRemId,
       totalPages: totalPages,
       currentPage: currentPage
     };
     
-    console.log('Reader: Storing page range context:', context);
     await plugin.storage.setSession('pageRangeContext', context);
-    
-    // Set a flag that we're waiting for popup to close
     await plugin.storage.setSession('pageRangePopupOpen', true);
     
-    console.log('Reader: Opening page range popup with widget ID:', pageRangeWidgetId);
     await plugin.widget.openPopup(pageRangeWidgetId);
-    console.log('Reader: Page range popup open command sent');
-  }, [remData?.incrementalRemId, remData?.pdfRemId, totalPages, currentPage, plugin]);
+  }, [criticalContext?.incrementalRemId, criticalContext?.pdfRemId, totalPages, currentPage, plugin]);
 
-  // This single, combined hook replaces the two previous hooks that caused a race condition.
-  React.useEffect(() => {
-    // If we don't have the incremental rem context, do nothing.
-    if (!remData?.incrementalRemId) return;
+  const handleClearPageRange = React.useCallback(async () => {
+    if (!criticalContext?.incrementalRemId) return;
     
+    await clearIncrementalPDFData(
+      plugin,
+      criticalContext.incrementalRemId,
+      actionItem.rem._id
+    );
+    setPageRangeStart(1);
+    setPageRangeEnd(0);
+    setCurrentPage(1);
+    setPageInputValue('1');
+  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin]);
+  
+  // Metadata Bar Styles (Stabilized)
+  const metadataBarStyles = useMemo(() => {
+    // ... (rest of styles logic)
+    const color = isDarkMode ? '#f9fafb' : '#111827';
+    const subColor = isDarkMode ? '#9ca3af' : '#6b7280';
+    const border = isDarkMode ? '#374151' : '#e5e7eb';
+    const bg = isDarkMode ? '#1f2937' : '#fafafa';
+    
+    return {
+      container: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', 
+        borderTop: `1px solid ${border}`, backgroundColor: bg, minHeight: '28px', gap: '12px', 
+        flexWrap: 'nowrap' as const, overflow: 'hidden'
+      },
+      title: {
+        fontSize: '12px', fontWeight: 600, color: color, whiteSpace: 'nowrap' as const, 
+        overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px'
+      },
+      statsGroup: {
+        display: 'flex', alignItems: 'center', gap: '16px', fontSize: '11px', 
+        color: subColor, flex: '1 1 auto', justifyContent: 'center'
+      },
+      statNumber: { fontWeight: 600, color: color },
+      pageButton: {
+        padding: '2px 6px', fontSize: '11px', borderRadius: '4px', 
+        border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
+        backgroundColor: isDarkMode ? '#374151' : '#ffffff', color: isDarkMode ? '#f3f4f6' : '#111827',
+        cursor: 'pointer', transition: 'all 0.15s ease', fontWeight: 500
+      },
+      pageInput: {
+        width: '55px', padding: '2px 4px', fontSize: '11px', borderRadius: '4px', 
+        border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
+        textAlign: 'center' as const, backgroundColor: isDarkMode ? '#374151' : '#ffffff', 
+        color: isDarkMode ? '#f3f4f6' : '#111827',
+      },
+      pageLabel: { fontSize: '11px', color: subColor },
+      rangeButton: {
+        padding: '2px 8px', fontSize: '11px', borderRadius: '4px', 
+        border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
+        backgroundColor: isDarkMode ? '#374151' : '#ffffff', color: isDarkMode ? '#f3f4f6' : '#111827',
+        cursor: 'pointer', transition: 'all 0.15s ease', fontWeight: 500, display: 'flex', 
+        alignItems: 'center', gap: '4px'
+      },
+      clearButton: {
+        padding: '2px 6px', fontSize: '11px', color: isDarkMode ? '#f87171' : '#dc2626',
+        cursor: 'pointer', transition: 'opacity 0.15s ease', opacity: 0.7, border: 'none', background: 'none'
+      },
+      activeRangeButton: {
+        backgroundColor: isDarkMode ? '#1e3a8a' : '#eff6ff', borderColor: isDarkMode ? '#3b82f6' : '#3b82f6',
+        color: isDarkMode ? '#bfdbfe' : '#1e40af',
+      }
+    };
+  }, [isDarkMode]);
+
+  // Active range button style when a range is set
+  const activeRangeButtonStyle = {
+    ...metadataBarStyles.rangeButton,
+    ...(pageRangeStart > 1 || pageRangeEnd > 0 ? metadataBarStyles.activeRangeButton : {}),
+  };
+  
+  // --- 4. ALL useEffect Hooks MUST BE HERE ---
+
+// Dark Mode Detection Effect
+  React.useEffect(() => {
+    let lastKnownDarkMode = false;
+
+    const checkDarkMode = () => {
+      // Logic for checking dark mode...
+      const htmlHasDark = document.documentElement.classList.contains('dark');
+      const bodyHasDark = document.body?.classList.contains('dark');
+      
+      let parentHasDark = false;
+      try {
+        if (window.parent && window.parent !== window) {
+          parentHasDark = window.parent.document.documentElement.classList.contains('dark');
+        }
+      } catch (e) {
+        // Cross-origin iframe, can't access parent
+      }
+
+      const backgroundColor = window.getComputedStyle(document.body).backgroundColor;
+      const isDarkByColor = backgroundColor && 
+        backgroundColor.startsWith('rgb') && 
+        (() => {
+          const matches = backgroundColor.match(/\d+/g);
+          if (matches && matches.length >= 3) {
+            const [r, g, b] = matches.map(Number);
+            return (r + g + b) / 3 < 128;
+          }
+          return false;
+        })();
+
+      const isDark = htmlHasDark || bodyHasDark || parentHasDark || isDarkByColor;
+      
+      if (isDark !== lastKnownDarkMode) {
+        lastKnownDarkMode = isDark;
+        setIsDarkMode(isDark);
+      }
+    };
+
+    const observer = new MutationObserver(() => { checkDarkMode(); });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    if (document.body) {
+      observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+    
+    checkDarkMode();
+    const interval = setInterval(checkDarkMode, 2000);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, []);
+
+  // DEFERRED CRITICAL CONTEXT CALCULATION (NEW: Replaces slow tracker logic)
+  React.useEffect(() => {
+    const pdfRem = actionItem.rem;
+    setCriticalContext(null);
+
+    const loadCriticalData = async () => {
+      // 1. Find Incremental Rem (the slow search logic)
+      let incrementalRem = null;
+      
+      // 0. Check if the PDF Rem IS the Incremental Rem.
+      if (await pdfRem.hasPowerup(powerupCode)) {
+        incrementalRem = pdfRem;
+      }
+      
+      // 1-3. Ancestor/Context/KB search (time consuming!)
+      if (!incrementalRem) {
+        // Try to get from widget context / parent
+        try {
+          const widgetContext = await plugin.widget.getWidgetContext();
+          if (widgetContext?.remId && widgetContext.remId !== pdfRem._id) {
+            const contextRem = await plugin.rem.findOne(widgetContext.remId);
+            if (contextRem && (await contextRem.hasPowerup(powerupCode))) {
+              incrementalRem = contextRem;
+            }
+          }
+        } catch (e) {}
+        
+        if (!incrementalRem && pdfRem.parent) {
+          try {
+            const parentRem = await plugin.rem.findOne(pdfRem.parent);
+            if (parentRem && (await parentRem.hasPowerup(powerupCode))) {
+              incrementalRem = parentRem;
+            }
+          } catch (e) {}
+        }
+
+        // Search descendants of IncRems in KB (slowest part)
+        if (!incrementalRem) {
+          try {
+            const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
+            if (incPowerup) {
+              const allIncRems = await incPowerup.taggedRem();
+              for (const candidateRem of allIncRems) {
+                // Yield thread periodically during this heavy search
+                if (Math.random() < 0.05) await new Promise(resolve => setTimeout(resolve, 1));
+                
+                const descendants = await candidateRem.getDescendants();
+                if (descendants.some((desc) => desc._id === pdfRem._id)) {
+                  incrementalRem = candidateRem;
+                  break; 
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      const rem = incrementalRem || pdfRem;
+      const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled Rem';
+      const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
+
+      // 2. Get Ancestors (also slow)
+      const ancestorList = [];
+      let currentParent = rem.parent;
+      let depth = 0;
+      const maxDepth = 10;
+
+      while (currentParent && depth < maxDepth) {
+        if (depth % 2 === 0) await new Promise(resolve => setTimeout(resolve, 1));
+
+        try {
+          const parentRem = await plugin.rem.findOne(currentParent);
+          if (!parentRem || !parentRem.text) break;
+
+          const parentText = await safeRemTextToString(plugin, parentRem.text);
+
+          ancestorList.unshift({
+            text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),
+            id: currentParent,
+          });
+
+          currentParent = parentRem.parent;
+          depth++;
+        } catch (error) {
+          break;
+        }
+      }
+
+      setCriticalContext({
+        ancestors: ancestorList,
+        remDisplayName: remText,
+        incrementalRemId: incrementalRem?._id || null,
+        pdfRemId: pdfRem._id,
+        hasDocumentPowerup: hasDocumentPowerup,
+      });
+    };
+    
+    // Execute after a short delay to ensure initial render is not blocked
+    const timeoutId = setTimeout(() => {
+      loadCriticalData().catch(console.error);
+    }, 50); 
+
+    return () => clearTimeout(timeoutId);
+    
+  }, [trackerOutput?.remId, trackerOutput?.parentId, plugin]); // Use trackerOutput for stability
+
+
+  // DEFERRED METADATA CALCULATION (Statistics)
+  React.useEffect(() => {
+    if (!criticalContext) return;
+    
+    // Reset metadata when context changes
+    setMetadata(null); 
+    
+    const calculateMetadata = async () => {
+      // Find the correct rem to calculate stats on (the Incremental Rem or the PDF itself)
+      const rem = criticalContext.incrementalRemId 
+        ? await plugin.rem.findOne(criticalContext.incrementalRemId) 
+        : actionItem.rem;
+        
+      if (!rem) return;
+
+      // START OF HEAVY I/O (Time-sliced)
+      const descendants = await rem.getDescendants();
+      const descendantsCount = descendants.length;
+      const children = await rem.getChildrenRem();
+      const childrenCount = children.length;
+
+      const remsToProcess = [rem, ...descendants];
+      
+      let incrementalDescendantsCount = 0;
+      let flashcardCount = 0;
+      let incrementalChildrenCount = 0;
+      
+      for (let i = 0; i < remsToProcess.length; i += BATCH_SIZE) {
+        const batch = remsToProcess.slice(i, i + BATCH_SIZE);
+        
+        const batchResults = await Promise.all(
+          batch.map(async (r) => ({
+            remId: r._id,
+            isIncremental: await r.hasPowerup(powerupCode),
+            cards: await r.getCards(),
+          }))
+        );
+        
+        for (const result of batchResults) {
+          if (result.isIncremental) {
+              incrementalDescendantsCount++;
+          }
+          if (result.cards.length > 0) {
+              flashcardCount += result.cards.length;
+          }
+          if (children.some(c => c._id === result.remId) && result.isIncremental) {
+              incrementalChildrenCount++;
+          }
+        }
+        
+        // Yield thread
+        if (i + BATCH_SIZE < remsToProcess.length) await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+      }
+      
+      // Get highlight count (Time-sliced)
+      let pdfHighlightCount = 0;
+      try {
+        const pdfRem = actionItem.rem;
+        const pdfChildren = await pdfRem.getChildrenRem();
+        const pdfDescendants = await pdfRem.getDescendants();
+        const allPdfRems = [...pdfChildren, ...pdfDescendants];
+        
+        const highlightBatchSize = 100;
+        for (let i = 0; i < allPdfRems.length; i += highlightBatchSize) {
+          const highlightBatch = allPdfRems.slice(i, i + highlightBatchSize);
+          
+          const highlightChecks = await Promise.all(
+            highlightBatch.map((child) => child.hasPowerup(BuiltInPowerupCodes.PDFHighlight))
+          );
+          pdfHighlightCount += highlightChecks.filter(Boolean).length;
+          
+          // Yield thread
+          if (i + highlightBatchSize < allPdfRems.length) await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+        }
+
+      } catch (highlightError) {
+        console.error('[READER DEBUG] Error counting PDF highlights:', highlightError);
+      }
+      // END OF HEAVY I/O
+
+      setMetadata({
+        childrenCount,
+        incrementalChildrenCount,
+        descendantsCount,
+        incrementalDescendantsCount,
+        flashcardCount,
+        pdfHighlightCount
+      });
+    };
+
+    const timeoutId = setTimeout(() => {
+        calculateMetadata().catch(console.error);
+    }, 50); 
+    
+    return () => clearTimeout(timeoutId);
+    
+  }, [criticalContext, actionItem.rem._id, plugin]);
+  
+  // iOS PDF Render Effect
+  React.useEffect(() => {
+    if (isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight')) {
+      const timer = setTimeout(() => {
+        setCanRenderPdf(true);
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [actionItem.type]);
+
+// Save to history only once when leaving the card (THE FIX IS HERE)
+  React.useEffect(() => {
+    // Capture the current context and page for the cleanup function
+    const incRemId = criticalContext?.incrementalRemId;
+    const finalPage = currentPage;
+
+    return () => {
+      // Use the captured local variables
+      if (incRemId && finalPage) {
+        addPageToHistory(
+          plugin,
+          incRemId,
+          actionItem.rem._id,
+          finalPage
+        ).then(() => {
+          // Log is already in addPageToHistory
+        });
+      }
+    };
+  // Dependencies are incRemId (from criticalContext) and currentPage
+  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin, currentPage]);
+ 
+  // Page Range/Position Loader and Poller (Updated to use criticalContext)
+  React.useEffect(() => {
+    if (!criticalContext?.incrementalRemId) return;
+    // ... (rest of logic)
     const loadAndValidateSettings = async () => {
-      // 1. Load data from storage in parallel.
       const savedPagePromise = getIncrementalReadingPosition(
         plugin,
-        remData.incrementalRemId,
+        criticalContext.incrementalRemId, // Use criticalContext
         actionItem.rem._id
       );
       const rangePromise = getIncrementalPageRange(
         plugin,
-        remData.incrementalRemId,
+        criticalContext.incrementalRemId, // Use criticalContext
         actionItem.rem._id
       );
+      // ... (rest of load logic)
       const [savedPage, range] = await Promise.all([savedPagePromise, rangePromise]);
   
-      // 2. Set the state for the page range first.
       const startRange = range?.start || 1;
       const endRange = range?.end || 0;
       setPageRangeStart(startRange);
       setPageRangeEnd(endRange);
-      console.log(`Loaded page range ${startRange}-${endRange}`);
-  
-      // 3. Determine the initial page, defaulting to the start of the range or 1.
+      // ... (rest of setting page logic)
+      
       let initialPage = savedPage && savedPage > 0 ? savedPage : startRange;
-  
-      // 4. Validate the initial page against the just-loaded range.
-      // Note: We don't use `totalPages` here yet, as it might not be ready.
       const minPage = Math.max(1, startRange);
-      if (initialPage < minPage) {
-        initialPage = minPage;
-      }
-      // We only validate against the end of the range if it's explicitly set.
-      if (endRange > 0 && initialPage > endRange) {
-        initialPage = endRange;
-      }
-  
-      // 5. Set the final page state.
-      console.log(`Loading initial page: ${initialPage}`);
+      if (initialPage < minPage) { initialPage = minPage; }
+      if (endRange > 0 && initialPage > endRange) { initialPage = endRange; }
       setCurrentPage(initialPage);
       setPageInputValue(initialPage.toString());
     };
     
     loadAndValidateSettings();
   
-    // This interval will now handle live updates if the user changes the range in the popup
     const checkForChanges = async () => {
-        if (!remData?.incrementalRemId) return; // Guard inside interval
-
+        if (!criticalContext?.incrementalRemId) return; 
+        // ... (rest of poll logic using criticalContext)
         const range = await getIncrementalPageRange(
           plugin,
-          remData.incrementalRemId,
+          criticalContext.incrementalRemId, // Use criticalContext
           actionItem.rem._id
         );
         
         const newStart = range?.start || 1;
         const newEnd = range?.end || 0;
-  
-        // Check if the range has actually changed in storage by comparing with state
+        // ... (rest of comparison/update logic)
         if (newStart !== pageRangeStart || newEnd !== pageRangeEnd) {
-            console.log(`Page range updated via polling: ${newStart}-${newEnd}`);
             setPageRangeStart(newStart);
             setPageRangeEnd(newEnd);
-  
-            // Now, re-validate the current page against the NEW range
-            // This time, we can safely use totalPages because the PDF is likely loaded
+            
             const minPage = Math.max(1, newStart);
             const maxPage = newEnd > 0 ? Math.min(newEnd, totalPages || Infinity) : (totalPages || Infinity);
-  
-            // Use a function to get the latest currentPage state to avoid stale closures
+            
             setCurrentPage(currentVal => {
               let correctedPage = currentVal;
-              if (currentVal < minPage) {
-                correctedPage = minPage;
-              } else if (currentVal > maxPage) {
-                correctedPage = maxPage;
-              }
-    
+              if (currentVal < minPage) { correctedPage = minPage; } 
+              else if (currentVal > maxPage) { correctedPage = maxPage; }
+              
               if (correctedPage !== currentVal) {
-                 console.log(`Correcting current page from ${currentVal} to ${correctedPage} due to range update.`);
                  setPageInputValue(correctedPage.toString());
                  saveCurrentPage(correctedPage);
                  return correctedPage;
@@ -572,25 +631,9 @@ export function Reader(props: ReaderProps) {
   
     const interval = setInterval(checkForChanges, 2000);
       
-    // Cleanup the interval when the component unmounts
     return () => clearInterval(interval);
   
-  }, [remData?.incrementalRemId, actionItem.rem._id, plugin, totalPages]);
-
-  const handleClearPageRange = React.useCallback(async () => {
-    if (!remData?.incrementalRemId) return;
-    
-    await clearIncrementalPDFData(
-      plugin,
-      remData.incrementalRemId,
-      actionItem.rem._id
-    );
-    setPageRangeStart(1);
-    setPageRangeEnd(0);
-    setCurrentPage(1);
-    setPageInputValue('1');
-    console.log('Cleared all page data');
-  }, [remData?.incrementalRemId, actionItem.rem._id, plugin]);
+  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin, totalPages, pageRangeStart, pageRangeEnd, saveCurrentPage]);
 
   // Handle highlights
   React.useEffect(() => {
@@ -627,167 +670,45 @@ export function Reader(props: ReaderProps) {
     hasScrolled.current = false;
   }, [actionItem.rem._id]);
 
-  if (!remData) {
-    return (
-      <div className="pdf-reader-viewer" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="pdf-reader-section flex-1 overflow-hidden">
-          <PDFWebReader 
-            remId={actionItem.rem._id} 
-            {...sharedProps}
-            key={actionItem.rem._id}
-          />
-        </div>
-        <div className="metadata-section px-4 py-2 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            <div className="flex items-center justify-between">
-              <span>Loading metadata...</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // --- 5. RENDER START ---
+  
+  // Use remId from props immediately for Document Viewer
+  const pdfRemId = actionItem.rem._id;
+  
+  // Use state variables for rendering
+  const isContextLoading = !criticalContext;
+  const isMetadataLoading = !metadata;
+  
   const { 
-    hasDocumentPowerup, 
-    childrenCount, 
-    ancestors, 
-    incrementalChildrenCount,
-    descendantsCount,
-    incrementalDescendantsCount,
-    flashcardCount,
-    remDisplayName,
-    pdfHighlightCount,
-    incrementalRemId
-  } = remData;
+    ancestors = [], 
+    remDisplayName = 'Loading...',
+    incrementalRemId,
+    hasDocumentPowerup = false,
+  } = criticalContext || {}; 
 
-  // --- START FIX: Use CSS Variables ---
-  // Hard-coded dark mode colors for reliable rendering
-  const metadataBarStyles = {
-    container: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '4px 12px',
-      borderTop: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
-      backgroundColor: isDarkMode ? '#1f2937' : '#fafafa',
-      minHeight: '28px',
-      gap: '12px',
-      flexWrap: 'nowrap' as const,
-      overflow: 'hidden'
-    },
-    leftSection: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      minWidth: 0,
-      flex: '0 1 auto'
-    },
-    title: {
-      fontSize: '12px',
-      fontWeight: 600,
-      color: isDarkMode ? '#f9fafb' : '#111827',
-      whiteSpace: 'nowrap' as const,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      maxWidth: '300px'
-    },
-    statsGroup: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '16px',
-      fontSize: '11px',
-      color: isDarkMode ? '#9ca3af' : '#6b7280',
-      flex: '1 1 auto',
-      justifyContent: 'center'
-    },
-    statItem: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-      whiteSpace: 'nowrap' as const
-    },
-    statNumber: {
-      fontWeight: 600,
-      color: isDarkMode ? '#e5e7eb' : '#374151'
-    },
-    pageControls: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      flex: '0 0 auto'
-    },
-    pageButton: {
-      padding: '2px 6px',
-      fontSize: '11px',
-      borderRadius: '4px',
-      border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
-      backgroundColor: isDarkMode ? '#374151' : '#ffffff',
-      color: isDarkMode ? '#f3f4f6' : '#111827',
-      cursor: 'pointer',
-      transition: 'all 0.15s ease',
-      fontWeight: 500
-    },
-    pageInput: {
-      width: '55px',
-      padding: '2px 4px',
-      fontSize: '11px',
-      borderRadius: '4px',
-      border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
-      textAlign: 'center' as const,
-      backgroundColor: isDarkMode ? '#374151' : '#ffffff',
-      color: isDarkMode ? '#f3f4f6' : '#111827',
-    },
-    pageLabel: {
-      fontSize: '11px',
-      color: isDarkMode ? '#9ca3af' : '#6b7280',
-    },
-    rangeButton: {
-      padding: '2px 8px',
-      fontSize: '11px',
-      borderRadius: '4px',
-      border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
-      backgroundColor: isDarkMode ? '#374151' : '#ffffff',
-      color: isDarkMode ? '#f3f4f6' : '#111827',
-      cursor: 'pointer',
-      transition: 'all 0.15s ease',
-      fontWeight: 500,
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px'
-    },
-    clearButton: {
-      padding: '2px 6px',
-      fontSize: '11px',
-      color: isDarkMode ? '#f87171' : '#dc2626',
-      cursor: 'pointer',
-      transition: 'opacity 0.15s ease',
-      opacity: 0.7,
-      border: 'none',
-      background: 'none'
-    }
-  };
+  const {
+    childrenCount = '...',
+    incrementalChildrenCount = '...',
+    descendantsCount = '...',
+    incrementalDescendantsCount = '...',
+    flashcardCount = '...',
+    pdfHighlightCount = '...',
+  } = metadata || {};
 
-  // Active range button style when a range is set
-  const activeRangeButtonStyle = {
-    ...metadataBarStyles.rangeButton,
-    ...(pageRangeStart > 1 || pageRangeEnd > 0 ? {
-      backgroundColor: isDarkMode ? '#1e3a8a' : '#eff6ff',
-      borderColor: isDarkMode ? '#3b82f6' : '#3b82f6',
-      color: isDarkMode ? '#bfdbfe' : '#1e40af',
-    } : {}),
-  };
 
   return (
     <div className="pdf-reader-viewer" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Breadcrumb Section */}
-      {ancestors.length > 0 && (
-        <div className="breadcrumb-section" style={{
-          padding: '8px 12px',
-          borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
-          backgroundColor: isDarkMode ? '#111827' : '#f9fafb',
-          flexShrink: 0
-        }}>
+      
+      {/* Breadcrumb Section (Placeholder until context loads) */}
+      <div className="breadcrumb-section" style={{
+        padding: '8px 12px',
+        borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+        backgroundColor: isDarkMode ? '#111827' : '#f9fafb',
+        flexShrink: 0,
+        opacity: isContextLoading ? 0.2 : 1, // Dim while loading
+        minHeight: '28px', // Ensure a minimum height so layout doesn't jump
+      }}>
+        {!isContextLoading && ancestors.length > 0 && (
           <div style={{
             fontSize: '11px',
             color: isDarkMode ? '#9ca3af' : '#6b7280',
@@ -802,18 +723,18 @@ export function Reader(props: ReaderProps) {
               </span>
             ))}
           </div>
-        </div>
-      )}
+        )}
+        {isContextLoading && <span style={{fontSize: '11px'}}>Loading breadcrumbs...</span>}
+      </div>
       
-      {/* PDF Reader Section */}
+      {/* PDF Reader Section (Renders INSTANTLY) */}
       <div className="pdf-reader-section flex-1 overflow-hidden">
-        {/* --- UPDATE: Conditionally render the PDFWebReader based on the new state --- */}
         {canRenderPdf ? (
           <PDFWebReader 
             ref={pdfReaderRef}
-            remId={actionItem.rem._id} 
+            remId={pdfRemId} 
             {...sharedProps}
-            key={actionItem.rem._id}
+            key={pdfRemId} // Ensure key is the PDF rem ID
           />
         ) : (
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading PDF for iOS...</div>
@@ -821,9 +742,15 @@ export function Reader(props: ReaderProps) {
       </div>
       
       {/* Improved Metadata Section */}
-      <div className="metadata-section" style={metadataBarStyles.container}>
+      <div className="metadata-section" style={{...metadataBarStyles.container, opacity: isMetadataLoading ? 0.5 : 1}}>
         {/* Left: Title */}
-        <div style={metadataBarStyles.leftSection}>
+        <div style={{
+           display: 'flex',
+           alignItems: 'center',
+           gap: '12px',
+           minWidth: 0,
+           flex: '0 1 auto'
+        }}>
           <span style={metadataBarStyles.title} title={remDisplayName}>
             {remDisplayName}
           </span>
@@ -831,36 +758,47 @@ export function Reader(props: ReaderProps) {
 
         {/* Center: Stats */}
         <div style={metadataBarStyles.statsGroup}>
-          <div style={metadataBarStyles.statItem}>
-            <span style={metadataBarStyles.statNumber}>{childrenCount}</span>
-            <span>direct children</span>
-            {incrementalChildrenCount > 0 && (
-              <span style={{ color: '#3b82f6' }}>({incrementalChildrenCount} inc)</span>
-            )}
-          </div>
-          
-          <div style={metadataBarStyles.statItem}>
-            <span style={metadataBarStyles.statNumber}>{descendantsCount}</span>
-            <span>descendants</span>
-            {incrementalDescendantsCount > 0 && (
-              <span style={{ color: '#3b82f6' }}>({incrementalDescendantsCount} inc)</span>
-            )}
-          </div>
-          
-          <div style={metadataBarStyles.statItem}>
-            <span style={metadataBarStyles.statNumber}>{flashcardCount}</span>
-            <span>cards</span>
-          </div>
-          
-          <div style={metadataBarStyles.statItem}>
-            <span style={metadataBarStyles.statNumber}>{pdfHighlightCount}</span>
-            <span>highlights</span>
-          </div>
+          {isMetadataLoading ? (
+            <span>Calculating statistics...</span>
+          ) : (
+            <>
+              <div style={metadataBarStyles.statItem}>
+                <span style={metadataBarStyles.statNumber}>{childrenCount}</span>
+                <span>direct children</span>
+                {incrementalChildrenCount > 0 && (
+                  <span style={{ color: isDarkMode ? '#60a5fa' : '#3b82f6' }}>({incrementalChildrenCount} inc)</span>
+                )}
+              </div>
+              
+              <div style={metadataBarStyles.statItem}>
+                <span style={metadataBarStyles.statNumber}>{descendantsCount}</span>
+                <span>descendants</span>
+                {incrementalDescendantsCount > 0 && (
+                  <span style={{ color: isDarkMode ? '#60a5fa' : '#3b82f6' }}>({incrementalDescendantsCount} inc)</span>
+                )}
+              </div>
+              
+              <div style={metadataBarStyles.statItem}>
+                <span style={metadataBarStyles.statNumber}>{flashcardCount}</span>
+                <span>cards</span>
+              </div>
+              
+              <div style={metadataBarStyles.statItem}>
+                <span style={metadataBarStyles.statNumber}>{pdfHighlightCount}</span>
+                <span>highlights</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right: Page Controls */}
         {incrementalRemId && (
-          <div style={metadataBarStyles.pageControls}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flex: '0 0 auto'
+          }}>
             <button 
               onClick={decrementPage}
               style={{
@@ -874,9 +812,7 @@ export function Reader(props: ReaderProps) {
             </button>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {/* --- START FIX: Apply pageLabel style --- */}
               <span style={metadataBarStyles.pageLabel}>Page</span>
-              {/* --- END FIX --- */}
               <input
                 type="number"
                 min={Math.max(1, pageRangeStart)}
@@ -889,11 +825,9 @@ export function Reader(props: ReaderProps) {
                 style={metadataBarStyles.pageInput}
               />
               {totalPages > 0 && (
-                /* --- START FIX: Apply pageLabel style --- */
                 <span style={metadataBarStyles.pageLabel}>
                   / {totalPages}
                 </span>
-                /* --- END FIX --- */
               )}
             </div>
             
@@ -909,13 +843,11 @@ export function Reader(props: ReaderProps) {
               →
             </button>
             
-            <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--rn-clr-border-primary, #e5e7eb)', margin: '0 4px' }} />
+            <div style={{ width: '1px', height: '16px', backgroundColor: metadataBarStyles.container.borderColor, margin: '0 4px' }} />
             
             <button
               onClick={handleSetPageRange}
-              // --- START FIX: Use the conditional style object ---
               style={activeRangeButtonStyle}
-              // --- END FIX ---
               title={pageRangeStart > 1 || pageRangeEnd > 0 ? `Current range: ${pageRangeStart}-${pageRangeEnd || '∞'}` : "Set page range"}
             >
               <span>📄</span>

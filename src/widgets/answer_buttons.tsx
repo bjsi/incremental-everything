@@ -25,8 +25,88 @@ import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
-import { findPDFinRem, addPageToHistory, getCurrentPageKey } from '../lib/pdfUtils';
-import { QueueSessionCache } from '../lib/cardPriority';
+import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
+import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/cardPriority';
+
+const MAX_DEPTH_CHECK = 3;
+
+/**
+ * Smart function to check if a Rem or its descendants have flashcards.
+ * **OPTIMIZED: Checks up to MAX_DEPTH_CHECK (3 levels: Rem, Children, Grandchildren).**
+ */
+const handleCardPriorityInheritance = async (
+  plugin: RNPlugin, 
+  rem: Rem, 
+  incRemInfo: IncrementalRem | null
+) => {
+  if (!rem || !incRemInfo) return;
+  
+  // Start the timer
+  const startTime = Date.now();
+  console.log(`[Done Button] 🏁 Starting depth-limited (max ${MAX_DEPTH_CHECK} levels) check for Rem: ${rem._id}`);
+  
+  try {
+    // 1. Check if the Rem already has a *set* cardPriority tag with a non-default source.
+    const existingSource = await rem.getPowerupProperty('cardPriority', 'prioritySource');
+    
+    // If the Rem is tagged AND the source is 'manual' or 'inherited', we stop.
+    // We proceed if the Rem is untagged (existingSource is null) or if the tag source is 'default'.
+    if (existingSource && typeof existingSource === 'string' && existingSource.toLowerCase() !== 'default') {
+      console.log(`[Done Button] Rem already has manual/inherited priority tag. Skipping check. Total time: ${Date.now() - startTime}ms.`);
+      return;
+    }
+    
+    // 2. Check the Rem itself for flashcards (Depth 1)
+    const remCards = await rem.getCards();
+    if (remCards && remCards.length > 0) {
+      // Rem has its own flashcards, set card priority
+      await setCardPriority(plugin, rem, incRemInfo.priority, 'manual');
+      console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} for Rem with direct flashcards. Total time: ${Date.now() - startTime}ms.`);
+      return;
+    }
+    
+    // 3. Check descendants up to MAX_DEPTH_CHECK (Children and Grandchildren)
+    // Uses getDescendantsToDepth to avoid fetching the entire hierarchy upfront.
+    const descendantsToCheck = await getDescendantsToDepth(rem, MAX_DEPTH_CHECK);
+    
+    if (descendantsToCheck.length === 0) {
+      console.log(`[Done Button] No descendants found within ${MAX_DEPTH_CHECK} levels. Total time: ${Date.now() - startTime}ms.`);
+      return;
+    }
+    
+    console.log(`[Done Button] Checking ${descendantsToCheck.length} descendants up to level ${MAX_DEPTH_CHECK}...`);
+
+    // 4. Batch-check the limited descendants with early termination
+    const BATCH_SIZE = 50;
+    
+    for (let i = 0; i < descendantsToCheck.length; i += BATCH_SIZE) {
+      const batch = descendantsToCheck.slice(i, i + BATCH_SIZE);
+      
+      // Check batch in parallel
+      const batchResults = await Promise.all(
+        batch.map(async (descendant) => {
+          const cards = await descendant.getCards();
+          return cards && cards.length > 0;
+        })
+      );
+      
+      // Check if any descendant in this batch has flashcards
+      if (batchResults.some(hasCards => hasCards)) {
+        // Found at least one descendant with flashcards
+        await setCardPriority(plugin, rem, incRemInfo.priority, 'manual');
+        console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} for Rem with descendant flashcards. Found in batch starting at index ${i}. Total time: ${Date.now() - startTime}ms.`);
+        return; // Early termination
+      }
+      console.log(`[Done Button] Batch ${Math.floor(i / BATCH_SIZE) + 1} clear. Moving to next batch...`);
+    }
+    
+    // No flashcards found in the Rem or its checked descendants
+    console.log(`[Done Button] No flashcards found in Rem or all checked descendants. Total time: ${Date.now() - startTime}ms.`);
+    
+  } catch (error) {
+    console.error(`[Done Button] ❌ Error in handleCardPriorityInheritance. Total time: ${Date.now() - startTime}ms.`, error);
+  }
+};
 
 const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined, remType: string | null) => {
   if (!rem) return;
@@ -353,11 +433,15 @@ export function AnswerButtons() {
         <Button
           variant="danger"
           onClick={async () => {
-            const updatedAllRem = allIncRems.filter((r) => r.remId !== rem._id);
-            await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
-            await plugin.queue.removeCurrentCardFromQueue(true);
-            await rem.removePowerup(powerupCode);
-          }}
+                  // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
+                  await handleCardPriorityInheritance(plugin, rem, incRemInfo);
+                  
+                  // 2. Proceed with the final, destructive Done button logic
+                  const updatedAllRem = allIncRems.filter((r) => r.remId !== rem._id);
+                  await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+                  await plugin.queue.removeCurrentCardFromQueue(true);
+                  await rem.removePowerup(powerupCode);
+              }}
         >
           <div style={buttonStyles.label}>Done</div>
           <div style={buttonStyles.sublabel}>Untag</div>
