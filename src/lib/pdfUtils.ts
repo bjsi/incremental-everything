@@ -281,7 +281,7 @@ const getKnownPdfRemsKey = (pdfRemId: string) => `known_pdf_rems_${pdfRemId}`;
 /**
  * Get descendants up to a specified depth
  */
-const getDescendantsToDepth = async (rem: Rem, maxDepth: number): Promise<Rem[]> => {
+export const getDescendantsToDepth = async (rem: Rem, maxDepth: number): Promise<Rem[]> => {
   const result: Rem[] = [];
   
   const collectDescendants = async (currentRem: Rem, currentDepth: number) => {

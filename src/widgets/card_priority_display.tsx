@@ -155,6 +155,11 @@ export function CardPriorityDisplay() {
 
   // ... (style objects remain the same) ...
 
+  const handleClick = async () => {
+    if (!rem) return;
+    await plugin.widget.openPopup('priority', { remId: rem._id });
+  };
+
   const infoBarStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -167,6 +172,8 @@ export function CardPriorityDisplay() {
     color: '#1e40af',
     borderLeft: `3px solid ${priorityColor}`,
     margin: '4px 0',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease, transform 0.1s ease',
   };
 
   const priorityBadgeStyle: React.CSSProperties = {
@@ -182,7 +189,26 @@ export function CardPriorityDisplay() {
   };
 
   return (
-    <div style={infoBarStyle} className="card-priority-display dark:bg-gray-800 dark:text-gray-200">
+    <div 
+      style={infoBarStyle} 
+      className="card-priority-display dark:bg-gray-800 dark:text-gray-200"
+      onClick={handleClick}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+        e.currentTarget.style.transform = 'scale(1.01)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
+        e.currentTarget.style.transform = 'scale(1)';
+      }}
+      onTouchStart={(e) => {
+        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)';
+      }}
+      onTouchEnd={(e) => {
+        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
+      }}
+      title="Click to set priority (Opt+P)"
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <span style={{ fontWeight: 500 }}>🎴 Priority:</span>
         <div style={priorityBadgeStyle}>

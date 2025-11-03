@@ -1971,6 +1971,82 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+  // Reschedule Command for Incremental Rems
+  // Add this command registration in index.tsx after the set-priority command (around line 1973)
+
+  plugin.app.registerCommand({
+    id: 'reschedule-incremental',
+    name: 'Reschedule Incremental Rem',
+    keyboardShortcut: 'ctrl+j', // Will be Ctrl+J on Mac also!
+    action: async () => {
+      console.log("--- Reschedule Incremental Rem Command Triggered ---");
+      let remId: string | undefined;
+      const url = await plugin.window.getURL();
+      console.log("Current URL:", url);
+
+      // Check if we are in the queue
+      if (url.includes('/flashcards')) {
+        console.log("In flashcards view.");
+        // First, try to get the current native flashcard
+        const card = await plugin.queue.getCurrentCard();
+        console.log("Result of getCurrentCard():", card);
+
+        if (card) {
+          remId = card.remId;
+          console.log("Found native card. remId:", remId);
+        } else {
+          console.log("Not a native card. Checking session storage for incremental rem...");
+          // If it's not a native card, it might be our plugin's queue view
+          remId = await plugin.storage.getSession(currentIncRemKey);
+          console.log("remId from session storage (currentIncRemKey):", remId);
+        }
+      } else {
+        console.log("Not in flashcards view. Getting focused editor rem.");
+        // If not in the queue, get the focused Rem from the editor
+        const focusedRem = await plugin.focus.getFocusedRem();
+        remId = focusedRem?._id;
+        console.log("Focused editor remId:", remId);
+      }
+
+      console.log("Final remId to be used:", remId);
+
+      if (!remId) {
+        console.log("Reschedule: No focused Rem or card in queue found. Aborting.");
+        await plugin.app.toast("Could not find a Rem to reschedule.");
+        return;
+      }
+
+      // Check if the Rem is an Incremental Rem
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) {
+        console.log("Reschedule: Rem not found. Aborting.");
+        await plugin.app.toast("Could not find the Rem.");
+        return;
+      }
+
+      // Check if it has the Incremental powerup
+      const hasIncrementalPowerup = await rem.hasPowerup(powerupCode);
+      if (!hasIncrementalPowerup) {
+        console.log("Reschedule: Rem is not tagged as Incremental. Aborting.");
+        await plugin.app.toast("This command only works with Incremental Rems.");
+        return;
+      }
+
+      // Verify it's actually an Incremental Rem with valid data
+      const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+      if (!incRemInfo) {
+        console.log("Reschedule: Could not get Incremental Rem info. Aborting.");
+        await plugin.app.toast("Could not retrieve Incremental Rem information.");
+        return;
+      }
+
+      console.log(`Opening 'reschedule' popup for remId: ${remId}`);
+      await plugin.widget.openPopup('reschedule', {
+        remId: remId,
+      });
+    },
+  });
+
   plugin.app.registerCommand({
     id: 'batch-priority-change',
     name: 'Batch Priority Change',
