@@ -57,7 +57,8 @@ export async function shouldUseLightMode(plugin: RNPlugin): Promise<boolean> {
   }
   
   // If setting is full, check if we should override for mobile
-  const isMobile = await plugin.storage.getSynced<boolean>(isMobileDeviceKey);
+  // CHANGED: Use session storage instead of synced storage to prevent cross-device sync
+  const isMobile = await plugin.storage.getSession<boolean>(isMobileDeviceKey);
   const alwaysUseLightOnMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
   
   // Override to light mode if on mobile and setting is enabled (default true)
@@ -85,14 +86,14 @@ export async function handleMobileDetectionOnStartup(plugin: RNPlugin): Promise<
   const isMobile = os === 'ios' || os === 'android';
   const friendlyOSName = getFriendlyOSName(os);
   
-  // Store whether device is mobile in synced storage
-  await plugin.storage.setSynced(isMobileDeviceKey, isMobile);
+  // CHANGED: Store whether device is mobile in SESSION storage (device-specific, doesn't sync)
+  await plugin.storage.setSession(isMobileDeviceKey, isMobile);
   
   // Get settings
   const alwaysUseLightOnMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
   const performanceModeSetting = await plugin.settings.getSetting<string>('performanceMode');
   
-  // Get last detected OS
+  // Get last detected OS (this can stay in synced storage for cross-device history tracking)
   const lastOS = await plugin.storage.getSynced<string>(lastDetectedOSKey);
   const osChanged = lastOS && lastOS !== os;
   
