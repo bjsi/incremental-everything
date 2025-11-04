@@ -90,7 +90,8 @@ import {
   CardPriorityInfo,
   setCardPriority,
   calculateRelativeCardPriority,
-  QueueSessionCache
+  QueueSessionCache,
+  calculateNewPriority
 } from '../lib/cardPriority';
 import { updateCardPriorityInCache, flushCacheUpdatesNow } from '../lib/cache';
 dayjs.extend(relativeTime);
@@ -256,35 +257,58 @@ async function precomputeAllCardPriorities(plugin: RNPlugin) {
             return;
           }
           
-          // Check if rem already has cardPriority powerup
-          const existingPriority = await getCardPriority(plugin, rem);
-          
-          if (existingPriority && existingPriority.source === 'manual') {
-            // Don't override manual priorities
-            skippedManual++;
-            processed++;
-            return;
+          // Check if rem actually has the cardPriority powerup tag
+          const hasPowerupTag = await rem.hasPowerup('cardPriority');
+
+          let existingPriority: CardPriorityInfo | null = null;
+          if (hasPowerupTag) {
+            // Only get the priority if the tag exists
+            const priorityValue = await rem.getPowerupProperty('cardPriority', 'priority');
+            const source = await rem.getPowerupProperty('cardPriority', 'prioritySource');
+            
+            if (priorityValue && source === 'manual') {
+              // Don't override manual priorities
+              skippedManual++;
+              processed++;
+              return;
+            }
+            
+            if (priorityValue) {
+              existingPriority = {
+                remId: rem._id,
+                priority: parseInt(priorityValue),
+                source: source as PrioritySource,
+                lastUpdated: 0, // We don't care about this for comparison
+                cardCount: 0,
+                dueCards: 0
+              };
+            }
           }
-          
+
           // Store the old priority value (if any)
           const oldPriorityValue = existingPriority ? existingPriority.priority : null;
-          
-          // Use autoAssignCardPriority which handles all the logic:
-          // - Checks for incremental rem
-          // - Searches ancestors using findClosestAncestorWithPriority
-          // - Sets default if needed
-          // - Saves the priority with appropriate source
-          await autoAssignCardPriority(plugin, rem);
-          tagged++;
-          
-          // Check if priority value actually changed
-          if (oldPriorityValue !== null) {
-            const newPriority = await getCardPriority(plugin, rem);
-            if (newPriority && newPriority.priority !== oldPriorityValue) {
+          const oldPrioritySource = existingPriority ? existingPriority.source : null;
+
+          // Calculate what the new priority SHOULD be (without saving yet)
+          const calculatedPriority = await calculateNewPriority(plugin, rem, existingPriority);
+
+          // Only update if:
+          // 1. Rem doesn't have the powerup tag yet (needs to be tagged), OR
+          // 2. The priority value changed, OR
+          // 3. The source type changed
+          if (!hasPowerupTag ||
+              calculatedPriority.priority !== oldPriorityValue || 
+              calculatedPriority.source !== oldPrioritySource) {
+            // Priority changed or needs initial tagging - save it
+            await setCardPriority(plugin, rem, calculatedPriority.priority, calculatedPriority.source);
+            tagged++;
+            
+            if (hasPowerupTag && oldPriorityValue !== null && calculatedPriority.priority !== oldPriorityValue) {
               priorityChanged++;
             }
           }
-          
+          // If priority unchanged AND already tagged, we simply skip the update
+
           processed++;
           
         } catch (error) {
