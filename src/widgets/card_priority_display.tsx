@@ -16,30 +16,19 @@ import {
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/cardPriority';
 import { percentileToHslColor } from '../lib/color';
+import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import * as _ from 'remeda';
 
 export function CardPriorityDisplay() {
   const plugin = usePlugin();
 
-  // ✅ Track the values that determine effective mode
-  const performanceModeSetting = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<string>('performanceMode'),
-    []
-  ) || 'full';
-
-  const isMobile = useTrackerPlugin(
-    async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
+  // ✅ Use the centralized function that handles mobile AND web detection
+  const effectiveMode = useTrackerPlugin(
+    async (rp) => await getEffectivePerformanceMode(rp),
     []
   );
 
-  const alwaysUseLightOnMobile = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId),
-    []
-  );
-
-  // ✅ Calculate effective mode
-  const useLightMode = performanceModeSetting === 'light' || 
-                       (isMobile && alwaysUseLightOnMobile !== false);
+  const useLightMode = effectiveMode === 'light';
 
   // ✅ Get the display priority shield setting
   const displayPriorityShield = useTrackerPlugin(
