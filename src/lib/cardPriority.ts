@@ -262,6 +262,44 @@ export async function autoAssignCardPriority(
 }
 
 /**
+ * Calculate what the priority should be without actually saving it
+ * Used for optimization to avoid unnecessary updates
+ */
+export async function calculateNewPriority(
+  plugin: RNPlugin,
+  rem: Rem,
+  existingPriority: CardPriorityInfo | null = null
+): Promise<{ priority: number; source: PrioritySource }> {
+  // ONLY preserve manual priorities
+  if (existingPriority && existingPriority.source === 'manual') {
+    return { priority: existingPriority.priority, source: 'manual' };
+  }
+
+  // Check if rem itself is an incremental rem (highest precedence)
+  const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+  if (incRemInfo) {
+    return { priority: incRemInfo.priority, source: 'inherited' };
+  }
+
+  // Search for closest ancestor with priority
+  const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
+  
+  if (ancestorPriority) {
+    return { priority: ancestorPriority.priority, source: 'inherited' };
+  }
+  
+  // No ancestor found - check existing inherited priority
+  if (existingPriority && existingPriority.source === 'inherited') {
+    // Preserve existing inherited priority
+    return { priority: existingPriority.priority, source: 'inherited' };
+  }
+  
+  // Use default priority
+  const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+  return { priority: defaultPriority, source: 'default' };
+}
+
+/**
  * Update inherited priorities when parent changes
  * This recursively updates all descendants that have inherited or default priority
  */
