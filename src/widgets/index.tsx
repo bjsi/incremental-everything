@@ -2458,19 +2458,18 @@ async function onActivate(plugin: ReactRNPlugin) {
     name: 'Toggle Incremental Rem',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
-      if (!rem) {
-        return;
-      }
+      if (!rem) return;
 
       const isIncremental = await rem.hasPowerup(powerupCode);
 
       if (isIncremental) {
-        // If it's already incremental, just remove the powerup.
         await rem.removePowerup(powerupCode);
-        await plugin.app.toast('Untagged as Incremental Rem');
+        await rem.setHighlightColor('Yellow'); // Reset to default
+        await plugin.app.toast('❌ Removed Incremental tag');
       } else {
-        // If it's not incremental, initialize it and open the priority popup.
         await initIncrementalRem(rem);
+        await rem.setHighlightColor('Blue'); // Blue = Incremental
+        await plugin.app.toast('✅ Tagged as Incremental Rem');
         await plugin.widget.openPopup('priority', {
           remId: rem._id,
         });
