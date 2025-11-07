@@ -1,0 +1,228 @@
+import {
+  renderWidget,
+  usePlugin,
+  useTrackerPlugin,
+  WidgetLocation,
+} from '@remnote/plugin-sdk';
+import React, { useEffect, useState } from 'react';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { updateSRSDataForRem } from '../lib/scheduler';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
+import { IncrementalRem, IncrementalRep } from '../lib/types';
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration';
+
+dayjs.extend(duration);
+
+function EditorReviewTimer() {
+  const plugin = usePlugin();
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  
+  const timerData = useTrackerPlugin(
+    async (rp) => {
+      const remId = await rp.storage.getSession<string>('editor-review-timer-rem-id');
+      if (!remId) return null;
+      
+      const startTime = await rp.storage.getSession<number>('editor-review-timer-start');
+      const interval = await rp.storage.getSession<number>('editor-review-timer-interval');
+      const priority = await rp.storage.getSession<number>('editor-review-timer-priority');
+      const remName = await rp.storage.getSession<string>('editor-review-timer-rem-name');
+      
+      return {
+        remId,
+        startTime,
+        interval,
+        priority,
+        remName: remName || 'Unnamed Rem',
+      };
+    },
+    []
+  );
+
+  // Update current time every second
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
+  if (!timerData || !timerData.startTime) {
+    return null;
+  }
+
+  const elapsedMs = currentTime - timerData.startTime;
+  const elapsedDuration = dayjs.duration(elapsedMs);
+  const hours = Math.floor(elapsedDuration.asHours());
+  const minutes = elapsedDuration.minutes();
+  const seconds = elapsedDuration.seconds();
+
+  const timeDisplay = hours > 0 
+    ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+    : `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+  const handleEndReview = async () => {
+    const rem = await plugin.rem.findOne(timerData.remId);
+    if (!rem) {
+      await plugin.app.toast('Error: Rem not found');
+      return;
+    }
+
+    const incRem = await getIncrementalRemInfo(plugin, rem);
+    if (!incRem) {
+      await plugin.app.toast('Error: Not an Incremental Rem');
+      return;
+    }
+
+    // Update priority if changed
+    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+
+    const newNextRepDate = Date.now() + timerData.interval * 1000 * 60 * 60 * 24;
+    
+    // Calculate early/late status
+    const scheduledDate = incRem.nextRepDate;
+    const actualDate = Date.now();
+    const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+    const wasEarly = daysDifference < 0;
+    const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+    
+    // Calculate review time in seconds
+    const reviewTimeSeconds = Math.round(elapsedMs / 1000);
+    
+    const newHistory: IncrementalRep[] = [
+      ...(incRem.history || []),
+      {
+        date: actualDate,
+        scheduled: scheduledDate,
+        interval: timerData.interval,
+        wasEarly: wasEarly,
+        daysEarlyOrLate: daysEarlyOrLate,
+        queueMode: 'editor',
+        reviewTimeSeconds: reviewTimeSeconds,
+      },
+    ];
+    
+    await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
+
+    const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+    if (updatedIncRem) {
+      const allRem: IncrementalRem[] =
+        (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+      const updatedAllRem = allRem
+        .filter((r) => r.remId !== updatedIncRem.remId)
+        .concat(updatedIncRem);
+      await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+    }
+
+    // Clear timer data
+    await plugin.storage.setSession('editor-review-timer-rem-id', null);
+    await plugin.storage.setSession('editor-review-timer-start', null);
+    await plugin.storage.setSession('editor-review-timer-interval', null);
+    await plugin.storage.setSession('editor-review-timer-priority', null);
+    await plugin.storage.setSession('editor-review-timer-rem-name', null);
+
+    const dateStr = dayjs(newNextRepDate).format('MMMM D, YYYY');
+    await plugin.app.toast(`✓ ${timerData.remName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
+  };
+
+  const handleCancel = async () => {
+    // Clear timer data without saving
+    await plugin.storage.setSession('editor-review-timer-rem-id', null);
+    await plugin.storage.setSession('editor-review-timer-start', null);
+    await plugin.storage.setSession('editor-review-timer-interval', null);
+    await plugin.storage.setSession('editor-review-timer-priority', null);
+    await plugin.storage.setSession('editor-review-timer-rem-name', null);
+    
+    await plugin.app.toast('Timer cancelled');
+  };
+
+  // Truncate rem name if too long
+  const displayName = timerData.remName.length > 40 
+    ? timerData.remName.substring(0, 37) + '...'
+    : timerData.remName;
+
+  return (
+    <div 
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '8px 16px',
+        backgroundColor: '#dbeafe',
+        borderRadius: '6px',
+        border: '1px solid #3b82f6',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        maxWidth: '100%',
+      }}
+    >
+      <span style={{ fontSize: '18px' }}>⏱️</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+        <div style={{ 
+          fontSize: '13px', 
+          fontWeight: 600, 
+          color: '#1e40af',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          Reviewing: {displayName}
+        </div>
+        <div style={{ 
+          fontSize: '16px', 
+          color: '#1e3a8a',
+          fontVariantNumeric: 'tabular-nums',
+          fontWeight: 700,
+        }}>
+          {timeDisplay}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button
+          onClick={handleEndReview}
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            backgroundColor: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#059669';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#10b981';
+          }}
+        >
+          ✓ End Review
+        </button>
+        <button
+          onClick={handleCancel}
+          style={{
+            padding: '6px 12px',
+            fontSize: '13px',
+            backgroundColor: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 500,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#dc2626';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ef4444';
+          }}
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
+
+renderWidget(EditorReviewTimer);

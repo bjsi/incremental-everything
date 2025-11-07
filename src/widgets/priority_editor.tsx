@@ -123,7 +123,7 @@ export function PriorityEditor() {
 
   const quickUpdateCardPriority = async (delta: number) => {
     if (!rem) return;
-    const currentPriority = cardInfo?.priority || 50;
+    const currentPriority = cardInfo?.priority ?? 50; // Use ?? instead of || to handle 0 correctly
     const newPriority = Math.max(0, Math.min(100, currentPriority + delta));
     
     await setCardPriority(plugin, rem, newPriority, 'manual');
@@ -189,9 +189,9 @@ export function PriorityEditor() {
             </div>
           )}
           {showCardEditor && ( // This now respects the new setting
-            <div title={`Card Priority: ${cardInfo?.priority || 'None'} (${cardRelativePriority}%)`}>
+            <div title={`Card Priority: ${cardInfo?.priority ?? 'None'} (${cardRelativePriority}%)`}>
               <span style={{ ...priorityPillStyle, backgroundColor: cardColor, fontSize: '11px' }}>
-                C:<span style={{ fontWeight: cardPriorityFontWeight }}>{cardInfo?.priority || '-'}</span>
+                C:<span style={{ fontWeight: cardPriorityFontWeight }}>{cardInfo?.priority ?? '-'}</span>
               </span>
             </div>
           )}
@@ -237,7 +237,7 @@ export function PriorityEditor() {
                   <button onClick={() => quickUpdateCardPriority(-10)} style={buttonStyle}>-10</button>
                   <button onClick={() => quickUpdateCardPriority(-1)} style={buttonStyle}>-1</button>
                   <span className="px-2 text-sm" style={{ ...priorityPillStyle, backgroundColor: cardColor, fontWeight: cardPriorityFontWeight }}>
-                    {cardInfo?.priority || 50}
+                    {cardInfo?.priority ?? 50}
                   </span>
                   <button onClick={() => quickUpdateCardPriority(1)} style={buttonStyle}>+1</button>
                   <button onClick={() => quickUpdateCardPriority(10)} style={buttonStyle}>+10</button>

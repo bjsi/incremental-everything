@@ -115,9 +115,9 @@ function BatchCardPriority() {
             // Check for cardPriority
             const cardPriorityInfo = await getCardPriority(plugin, rem);
             const hasCardPriority = cardPriorityInfo !== null;
-            // Extract just the priority number from the object
-            const cardPriorityValue = cardPriorityInfo?.priority || null;
-            const cardPrioritySource = cardPriorityInfo?.source || null;
+            // Extract just the priority number from the object - use ?? to handle 0 correctly
+            const cardPriorityValue = cardPriorityInfo?.priority ?? null;
+            const cardPrioritySource = cardPriorityInfo?.source ?? null;
             // Check if it's manually set (not inherited or default)
             const hasManualCardPriority = hasCardPriority && cardPrioritySource === 'manual';
 

@@ -126,9 +126,13 @@ export async function getCardPriority(
     const source = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
     const lastUpdated = await rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT);
     
+    // Parse priority - use ?? instead of || to handle 0 correctly
+    const parsedPriority = parseInt(priorityValue);
+    const finalPriority = !isNaN(parsedPriority) ? parsedPriority : 50;
+    
     const result = {
       remId: rem._id,
-      priority: parseInt(priorityValue) || 50,
+      priority: finalPriority,
       source: (source as PrioritySource) || 'default',
       lastUpdated: parseInt(lastUpdated) || now,
       cardCount: cards.length,

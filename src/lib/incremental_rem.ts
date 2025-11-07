@@ -20,28 +20,46 @@ import { tryParseJson } from './utils';
  * This is the new, fundamental function that only handles reviewing/rescheduling.
  * It does NOT advance the queue, making it reusable for different buttons.
  */
-export async function reviewRem(plugin: RNPlugin, incRem: IncrementalRem | undefined) {
+export async function reviewRem(
+  plugin: RNPlugin, 
+  incRem: IncrementalRem | undefined,
+  queueMode?: 'srs' | 'practice-all' | 'in-order' | 'editor'
+) {
   if (!incRem) {
     return null;
   }
+  
+  // Calculate review time
+  const startTime = await plugin.storage.getSession<number>('increm-review-start-time');
+  const reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
+  
   const inLookbackMode = !!(await plugin.queue.inLookbackMode());
-  const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
+  const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode, queueMode);
   if (!nextSpacing) {
     return null;
   }
-  await updateSRSDataForRem(plugin, incRem.remId, nextSpacing.newNextRepDate, nextSpacing.newHistory);
-  return nextSpacing;
+  
+  // Add review time to the last history entry
+  const newHistory = [...nextSpacing.newHistory];
+  const lastEntry = newHistory[newHistory.length - 1];
+  if (lastEntry && reviewTimeSeconds !== undefined) {
+    lastEntry.reviewTimeSeconds = reviewTimeSeconds;
+  }
+  
+  await updateSRSDataForRem(plugin, incRem.remId, nextSpacing.newNextRepDate, newHistory);
+  
+  // Clear the start time
+  await plugin.storage.setSession('increm-review-start-time', null);
+  
+  return { ...nextSpacing, newHistory };
 }
 
-// --- REFACTORED ORIGINAL FUNCTION ---
-/**
- * This function now uses the core `reviewRem` function and then performs
- * the specific action for the "Next" button: advancing the queue.
- */
-export async function handleHextRepetitionClick(plugin: RNPlugin, incRem: IncrementalRem | undefined) {
-  // Step 1: Call the core review logic
-  await reviewRem(plugin, incRem);
-  // Step 2: Perform the action specific to the "Next" button
+export async function handleHextRepetitionClick(
+  plugin: RNPlugin, 
+  incRem: IncrementalRem | undefined,
+  queueMode?: 'srs' | 'practice-all' | 'in-order'
+) {
+  await reviewRem(plugin, incRem, queueMode);
   await plugin.queue.removeCurrentCardFromQueue();
 }
 
