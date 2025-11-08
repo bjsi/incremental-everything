@@ -78,7 +78,13 @@ import {
   calculateNewPriority
 } from '../lib/cardPriority';
 import { updateCardPriorityInCache } from '../lib/cache';
-import { registerQueueExitListener, registerQueueEnterListener } from './events';
+import {
+  registerQueueExitListener,
+  registerQueueEnterListener,
+  registerURLChangeListener,
+  registerQueueCompleteCardListener,
+  registerGlobalRemChangedListener,
+} from './events';
 dayjs.extend(relativeTime);
 
 let sessionItemCounter = 0;
@@ -1749,119 +1755,9 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
-    const url = await plugin.window.getURL();
-    if (!url.includes('/flashcards')) {
-      plugin.app.unregisterMenuItem(scrollToHighlightId);
-      plugin.app.registerCSS(collapseTopBarId, '');
-      plugin.app.registerCSS(queueCounterId, '');
-      plugin.app.registerCSS(hideIncEverythingId, '');
-      setCurrentIncrementalRem(plugin, undefined);
-    } else {
-    }
-  });
-
- // Event listeners for assigning priority when cards are created and update due status when cards are rated
-  
-  let recentlyProcessedCards = new Set<string>();
-
-  plugin.event.addListener(
-    AppEvents.QueueCompleteCard,
-    undefined,
-    async (data: { cardId: RemId }) => {
-      // Get performance mode, default to 'light'
-      const performanceMode = (await plugin.settings.getSetting('performanceMode')) || 'light';
-      if (performanceMode !== 'full') {
-        // In Light Mode, do nothing on card completion.
-        return;
-      }
-
-      console.log('🎴 CARD COMPLETED (Full Mode):', data); // Log that we're in Full Mode
-      
-      if (!data || !data.cardId) {
-        console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
-        return;
-      }
-      
-      const card = await plugin.card.findOne(data.cardId);
-      const remId = card?.remId;
-      const rem = remId ? await plugin.rem.findOne(remId) : null;
-      const isIncRem = rem ? await rem.hasPowerup(powerupCode) : false;
-      
-      console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
-
-      if (remId) {
-        recentlyProcessedCards.add(remId);
-        setTimeout(() => recentlyProcessedCards.delete(remId), 2000);
-
-        // Call the cache update with the 'isLightUpdate' flag set to true.
-        console.log('LISTENER: Calling LIGHT updateCardPriorityInCache...');
-        await updateCardPriorityInCache(plugin, remId, true); // Pass true here
-      } else {
-        console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
-      }
-    }
-  );
-
-  // Define a variable outside the listener to hold our timer.
-  let remChangeDebounceTimer: NodeJS.Timeout;
-
-  plugin.event.addListener(
-      AppEvents.GlobalRemChanged,
-      undefined,
-      (data) => {
-        // Every time a change happens, clear the previous timer.
-        clearTimeout(remChangeDebounceTimer);
-
-        // Start a new timer.
-        remChangeDebounceTimer = setTimeout(async () => {
-          // This code will only run after the user has stopped typing for 1 second.
-          
-          // Check if we are currently in a queue session.
-          const inQueue = !!(await plugin.storage.getSession(currentSubQueueIdKey));
-          if (inQueue) {
-            console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping processing because user is in the queue.');
-            return; // Exit early and do nothing
-          }
-
-          // --- START FIX ---
-          // Get performance mode, default to 'light'
-          const performanceMode = (await plugin.settings.getSetting('performanceMode')) || 'light';
-          if (performanceMode !== 'full') {
-            // In Light Mode, do not auto-assign or update cache.
-            console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping (Light Mode).');
-            return;
-          }
-          // --- END FIX ---
-
-          console.log(`LISTENER: (Debounced) GlobalRemChanged fired for RemId: ${data.remId} (Full Mode)`);
-                
-          if (recentlyProcessedCards.has(data.remId)) {
-            console.log('LISTENER: Skipping - recently processed by QueueCompleteCard');
-            return;
-          }
-          
-          const rem = await plugin.rem.findOne(data.remId);
-          if (!rem) {
-            return;
-          }
-          
-          const cards = await rem.getCards();
-          if (cards && cards.length > 0) {
-            const existingPriority = await getCardPriority(plugin, rem);
-            if (!existingPriority) {
-              // This is the automatic assignment you wanted to restrict
-              await autoAssignCardPriority(plugin, rem);
-            }
-          }
-          
-          // This is the automatic cache update you wanted to restrict
-          await updateCardPriorityInCache(plugin, data.remId);
-          console.log('LISTENER: (Debounced) Finished processing event.');
-
-        }, 1000);
-      }
-    );
+  registerURLChangeListener(plugin);
+  registerQueueCompleteCardListener(plugin);
+  registerGlobalRemChangedListener(plugin);
 
 
   plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {

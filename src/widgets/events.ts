@@ -17,15 +17,21 @@ import {
   queueCounterId,
   powerupCode,
   nextRepDateSlotCode,
+  scrollToHighlightId,
+  collapseTopBarId,
+  hideIncEverythingId,
 } from '../lib/consts';
 import { calculateRelativePriority } from '../lib/priority';
 import {
   CardPriorityInfo,
   calculateRelativeCardPriority,
   QueueSessionCache,
+  autoAssignCardPriority,
+  getCardPriority,
 } from '../lib/cardPriority';
 import { IncrementalRem } from '../lib/types';
-import { flushCacheUpdatesNow } from '../lib/cache';
+import { flushCacheUpdatesNow, updateCardPriorityInCache } from '../lib/cache';
+import { setCurrentIncrementalRem } from '../lib/currentRem';
 
 type ResetSessionItemCounter = () => void;
 type PriorityReviewHelpers = {
@@ -197,6 +203,19 @@ export function registerQueueExitListener(
     resetSessionItemCounter();
 
     console.log('Session state reset complete');
+  });
+}
+
+export function registerURLChangeListener(plugin: ReactRNPlugin) {
+  plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
+    const url = await plugin.window.getURL();
+    if (!url.includes('/flashcards')) {
+      plugin.app.unregisterMenuItem(scrollToHighlightId);
+      plugin.app.registerCSS(collapseTopBarId, '');
+      plugin.app.registerCSS(queueCounterId, '');
+      plugin.app.registerCSS(hideIncEverythingId, '');
+      await setCurrentIncrementalRem(plugin, undefined);
+    }
   });
 }
 
@@ -500,4 +519,94 @@ export function registerQueueEnterListener(
 
     console.log(`QUEUE ENTER: Queue counter updated to show ${dueIncRemCount} due IncRems`);
   });
+}
+
+// Shared Set for coordinating between QueueCompleteCard and GlobalRemChanged listeners
+// to avoid duplicate processing
+const recentlyProcessedCards = new Set<string>();
+
+export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
+  plugin.event.addListener(
+    AppEvents.QueueCompleteCard,
+    undefined,
+    async (data: { cardId: RemId }) => {
+      const performanceMode = (await plugin.settings.getSetting('performanceMode')) || 'light';
+      if (performanceMode !== 'full') {
+        return;
+      }
+
+      console.log('🎴 CARD COMPLETED (Full Mode):', data);
+
+      if (!data || !data.cardId) {
+        console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
+        return;
+      }
+
+      const card = await plugin.card.findOne(data.cardId);
+      const remId = card?.remId;
+      const rem = remId ? await plugin.rem.findOne(remId) : null;
+      const isIncRem = rem ? await rem.hasPowerup(powerupCode) : false;
+
+      console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
+
+      if (remId) {
+        recentlyProcessedCards.add(remId);
+        setTimeout(() => recentlyProcessedCards.delete(remId), 2000);
+
+        console.log('LISTENER: Calling LIGHT updateCardPriorityInCache...');
+        await updateCardPriorityInCache(plugin, remId, true);
+      } else {
+        console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
+      }
+    }
+  );
+}
+
+export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
+  let remChangeDebounceTimer: NodeJS.Timeout;
+
+  plugin.event.addListener(
+    AppEvents.GlobalRemChanged,
+    undefined,
+    (data) => {
+      clearTimeout(remChangeDebounceTimer);
+
+      remChangeDebounceTimer = setTimeout(async () => {
+        const inQueue = !!(await plugin.storage.getSession(currentSubQueueIdKey));
+        if (inQueue) {
+          console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping processing because user is in the queue.');
+          return;
+        }
+
+        const performanceMode = (await plugin.settings.getSetting('performanceMode')) || 'light';
+        if (performanceMode !== 'full') {
+          console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping (Light Mode).');
+          return;
+        }
+
+        console.log(`LISTENER: (Debounced) GlobalRemChanged fired for RemId: ${data.remId} (Full Mode)`);
+
+        if (recentlyProcessedCards.has(data.remId)) {
+          console.log('LISTENER: Skipping - recently processed by QueueCompleteCard');
+          return;
+        }
+
+        const rem = await plugin.rem.findOne(data.remId);
+        if (!rem) {
+          return;
+        }
+
+        const cards = await rem.getCards();
+        if (cards && cards.length > 0) {
+          const existingPriority = await getCardPriority(plugin, rem);
+          if (!existingPriority) {
+            await autoAssignCardPriority(plugin, rem);
+          }
+        }
+
+        await updateCardPriorityInCache(plugin, data.remId);
+        console.log('LISTENER: (Debounced) Finished processing event.');
+      }, 1000);
+    }
+  );
 }
