@@ -59,9 +59,16 @@ async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
  * Extract the original scope rem from a Priority Review Document's title
  * The title format is: "Priority Review - [RemReference] - [Timestamp]"
  */
-async function extractOriginalScopeFromPriorityReview(reviewDocRem: PluginRem): Promise<string | null> {
+async function extractOriginalScopeFromPriorityReview(
+  reviewDocRem: PluginRem
+): Promise<string | null | undefined> {
+  // NOTE: returning `null` means "Full KB scope" while `undefined` signals "missing / unparseable scope".
+  // Keeping those distinct prevents Priority Review docs from silently inheriting stale session state (bug #???).
   const richText = reviewDocRem.text;
-  if (!richText || richText.length === 0) return null;
+  if (!richText || richText.length === 0) {
+    console.warn('Priority Review Document has no title content to parse for scope.');
+    return undefined;
+  }
 
   // Search for a rem reference in the rich text
   for (const element of richText) {
@@ -83,7 +90,7 @@ async function extractOriginalScopeFromPriorityReview(reviewDocRem: PluginRem): 
 
   // Could not determine scope
   console.warn('Could not extract scope from Priority Review Document title');
-  return null;
+  return undefined;
 }
 
 export function registerQueueExitListener(
@@ -294,16 +301,20 @@ export function registerQueueEnterListener(
           
           const extractedScopeId = await extractOriginalScopeFromPriorityReview(queueRem);
           
-          if (extractedScopeId !== undefined) {
+          if (extractedScopeId === undefined) {
+            console.warn('QUEUE ENTER: Could not extract scope from Priority Review Document');
+          } else {
             scopeForPriorityCalc = extractedScopeId;
             originalScopeId = extractedScopeId;
             scopeForItemSelection = subQueueId;
             
             console.log(`QUEUE ENTER: Priority Review Document setup:`);
             console.log(`  - Item selection from: Priority Review Doc (${subQueueId})`);
-            console.log(`  - Priority calculations for: ${extractedScopeId ? `Original scope (${extractedScopeId})` : 'Full KB'}`);
-          } else {
-            console.warn('QUEUE ENTER: Could not extract scope from Priority Review Document');
+            console.log(
+              `  - Priority calculations for: ${
+                extractedScopeId ? `Original scope (${extractedScopeId})` : 'Full KB'
+              }`
+            );
           }
         }
       }
