@@ -285,10 +285,11 @@ export function registerQueueEnterListener(
     await plugin.storage.setSession(seenCardInSessionKey, []);
     resetSessionItemCounter();
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    await plugin.storage.setSession(priorityCalcScopeRemIdsKey, null);
     
-    let scopeForPriorityCalc = subQueueId || null;
-    let scopeForItemSelection = subQueueId || null;
-    let originalScopeId = subQueueId || null;
+    let scopeForPriorityCalc: RemId | null | undefined = subQueueId || null;
+    let scopeForItemSelection: RemId | null = subQueueId || null;
+    let originalScopeId: RemId | null | undefined = subQueueId || null;
     let isPriorityReviewDoc = false;
     
     if (subQueueId) {
@@ -428,42 +429,48 @@ export function registerQueueEnterListener(
         }
       }
       
-      let priorityCalcScope: Set<RemId>;
+      let priorityCalcScope: Set<RemId> = new Set<RemId>();
       
-      if (isPriorityReviewDoc && scopeForPriorityCalc) {
-        const originalScopeRem = await plugin.rem.findOne(scopeForPriorityCalc);
-        if (originalScopeRem) {
-          const descendants = await originalScopeRem.getDescendants();
-          const allRemsInContext = await originalScopeRem.allRemInDocumentOrPortal();
-          const folderQueueRems = await originalScopeRem.allRemInFolderQueue();
-          const sources = await originalScopeRem.getSources();
-          
-          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-            powerupCode,
-            nextRepDateSlotCode
-          );
-          
-          const referencingRems = ((await originalScopeRem.remsReferencingThis()) || []).map((rem) => {
-            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-              return rem.parent;
-            } else {
-              return rem._id;
-            }
-          }).filter(id => id !== null && id !== undefined) as RemId[];
-          
-          priorityCalcScope = new Set<RemId>([
-            originalScopeRem._id,
-            ...descendants.map(r => r._id),
-            ...allRemsInContext.map(r => r._id),
-            ...folderQueueRems.map(r => r._id),
-            ...sources.map(r => r._id),
-            ...referencingRems
-          ]);
-    
-          await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
-          
+      if (isPriorityReviewDoc && scopeForPriorityCalc !== undefined) {
+        if (scopeForPriorityCalc === null) {
+          const fullKbIds = [
+            ...allCardInfos.map(info => info.remId).filter((id): id is RemId => !!id),
+            ...allIncRems.map(rem => rem.remId),
+          ];
+          priorityCalcScope = new Set<RemId>(fullKbIds);
+          console.log(`QUEUE ENTER: Priority Review Doc using FULL KB for priority calculations (${priorityCalcScope.size} rems).`);
         } else {
-          priorityCalcScope = new Set<RemId>();
+          const originalScopeRem = await plugin.rem.findOne(scopeForPriorityCalc);
+          if (originalScopeRem) {
+            const descendants = await originalScopeRem.getDescendants();
+            const allRemsInContext = await originalScopeRem.allRemInDocumentOrPortal();
+            const folderQueueRems = await originalScopeRem.allRemInFolderQueue();
+            const sources = await originalScopeRem.getSources();
+            
+            const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+              powerupCode,
+              nextRepDateSlotCode
+            );
+            
+            const referencingRems = ((await originalScopeRem.remsReferencingThis()) || []).map((rem) => {
+              if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+                return rem.parent;
+              } else {
+                return rem._id;
+              }
+            }).filter(id => id !== null && id !== undefined) as RemId[];
+            
+            priorityCalcScope = new Set<RemId>([
+              originalScopeRem._id,
+              ...descendants.map(r => r._id),
+              ...allRemsInContext.map(r => r._id),
+              ...folderQueueRems.map(r => r._id),
+              ...sources.map(r => r._id),
+              ...referencingRems
+            ]);
+          } else {
+            priorityCalcScope = new Set<RemId>();
+          }
         }
       } else {
         priorityCalcScope = itemSelectionScope || new Set<RemId>();
