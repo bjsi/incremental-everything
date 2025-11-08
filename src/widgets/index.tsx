@@ -59,14 +59,15 @@ import {
   isMobileDeviceKey,
   alwaysUseLightModeOnWebId,
   isWebPlatformKey,
-  lastDetectedPlatformKey
+  lastDetectedPlatformKey,
+  pdfHighlightColorId
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
 import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
@@ -415,15 +416,25 @@ async function cacheAllCardPriorities(plugin: RNPlugin) {
   const startTime = Date.now();
   
   const allCards = await plugin.card.getAll();
-  if (!allCards || allCards.length === 0) {
-    console.log('CACHE: No cards found. Setting empty cache.');
+  const cardRemIds = allCards ? _.uniq(allCards.map(c => c.remId)) : [];
+  console.log(`CACHE: Found ${cardRemIds.length} rems with cards`);
+  
+  // CRITICAL FIX: Also get rems that are tagged with cardPriority for inheritance
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedForInheritanceRems = (await cardPriorityPowerup?.taggedRem()) || [];
+  const inheritanceRemIds = taggedForInheritanceRems.map(r => r._id);
+  console.log(`CACHE: Found ${inheritanceRemIds.length} rems tagged with cardPriority powerup`);
+  
+  // Combine both sets of remIds (cards + inheritance-only)
+  const uniqueRemIds = _.uniq([...cardRemIds, ...inheritanceRemIds]);
+  console.log(`CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${inheritanceRemIds.length - cardRemIds.length} inheritance-only)`);
+  
+  if (uniqueRemIds.length === 0) {
+    console.log('CACHE: No cards or cardPriority tags found. Setting empty cache.');
     await plugin.storage.setSession(allCardPriorityInfoKey, []);
     return;
   }
-  
-  const uniqueRemIds = _.uniq(allCards.map(c => c.remId));
-  console.log(`CACHE: Found ${uniqueRemIds.length} rems with cards`);
-  
+    
   // Step 1: Quickly load all pre-tagged cards for immediate use
   console.log('CACHE: Phase 1 - Loading pre-tagged cards...');
   const taggedPriorities: CardPriorityInfo[] = [];
@@ -593,13 +604,25 @@ async function buildOptimizedCache(plugin: RNPlugin) {
   console.log('CACHE: Building optimized cache from pre-tagged priorities...');
 
   const allCards = await plugin.card.getAll();
-  if (!allCards || allCards.length === 0) {
-    console.log('CACHE: No cards found. Setting empty cache.');
+  const cardRemIds = allCards ? _.uniq(allCards.map(c => c.remId)) : [];
+  console.log(`CACHE: Found ${cardRemIds.length} rems with cards`);
+  
+  // CRITICAL FIX: Also get rems that are tagged with cardPriority for inheritance
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedForInheritanceRems = (await cardPriorityPowerup?.taggedRem()) || [];
+  const inheritanceRemIds = taggedForInheritanceRems.map(r => r._id);
+  console.log(`CACHE: Found ${inheritanceRemIds.length} rems tagged with cardPriority powerup`);
+  
+  // Combine both sets of remIds (cards + inheritance-only)
+  const uniqueRemIds = _.uniq([...cardRemIds, ...inheritanceRemIds]);
+  console.log(`CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${inheritanceRemIds.length - cardRemIds.length} inheritance-only)`);
+
+  if (uniqueRemIds.length === 0) {
+    console.log('CACHE: No cards or cardPriority tags found. Setting empty cache.');
     await plugin.storage.setSession(allCardPriorityInfoKey, []);
     return;
   }
 
-  const uniqueRemIds = _.uniq(allCards.map(c => c.remId));
   const cardPriorityInfos: CardPriorityInfo[] = [];
   const batchSize = 100;
 
@@ -1026,6 +1049,20 @@ async function onActivate(plugin: ReactRNPlugin) {
         label: 'Regular (www.remnote.com)',
         value: 'www'
       }
+    ]
+  });
+
+  plugin.settings.registerDropdownSetting({
+    id: pdfHighlightColorId,
+    title: 'Incremental PDF Highlight Color',
+    description: 'Choose the highlight color for PDF highlights tagged as Incremental Rem. When toggling OFF (removing Incremental tag), the highlight will be reset to Yellow.',
+    defaultValue: 'Blue',
+    options: [
+      { key: 'Red', label: 'Red', value: 'Red' },
+      { key: 'Orange', label: 'Orange', value: 'Orange' },
+      { key: 'Green', label: 'Green', value: 'Green' },
+      { key: 'Blue', label: 'Blue', value: 'Blue' },
+      { key: 'Purple', label: 'Purple', value: 'Purple' }
     ]
   });
 
@@ -1796,6 +1833,10 @@ async function onActivate(plugin: ReactRNPlugin) {
         }
         await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
         await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
+        
+        // NEW: Store queue mode and start time for review tracking
+        await plugin.storage.setSession('current-queue-mode', queueInfo.mode);
+        await plugin.storage.setSession('increm-review-start-time', Date.now());
 
         console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
         sessionItemCounter++;
@@ -2432,19 +2473,20 @@ async function onActivate(plugin: ReactRNPlugin) {
     name: 'Toggle Incremental Rem',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
-      if (!rem) {
-        return;
-      }
+      if (!rem) return;
 
       const isIncremental = await rem.hasPowerup(powerupCode);
 
       if (isIncremental) {
-        // If it's already incremental, just remove the powerup.
         await rem.removePowerup(powerupCode);
-        await plugin.app.toast('Untagged as Incremental Rem');
+        await rem.setHighlightColor('Yellow'); // Reset to default
+        await plugin.app.toast('❌ Removed Incremental tag');
       } else {
-        // If it's not incremental, initialize it and open the priority popup.
         await initIncrementalRem(rem);
+        // Get the user-configured highlight color from settings
+        const highlightColor = (await plugin.settings.getSetting(pdfHighlightColorId)) as 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple' || 'Blue';
+        await rem.setHighlightColor(highlightColor);
+        await plugin.app.toast('✅ Tagged as Incremental Rem');
         await plugin.widget.openPopup('priority', {
           remId: rem._id,
         });
@@ -2619,6 +2661,52 @@ async function onActivate(plugin: ReactRNPlugin) {
     },
   });
 
+    // Register editor review popup
+  plugin.app.registerWidget(
+    'editor_review',
+    WidgetLocation.Popup,
+    {
+      dimensions: { height: 'auto', width: '500px' },
+    }
+  );
+  
+  // Register editor review timer widget
+  plugin.app.registerWidget(
+    'editor_review_timer',
+    WidgetLocation.DocumentAboveToolbar,
+    {
+      dimensions: { height: 'auto', width: '100%' },
+    }
+  );
+
+  plugin.app.registerCommand({
+    id: 'review-increm-in-editor',
+    name: 'Execute Incremental Rem Repetition (Review in Editor)',
+    keyboardShortcut: 'ctrl+shift+j', 
+    action: async () => {
+      console.log("--- Review Incremental Rem in Editor Command Triggered ---");
+      
+      // Get focused Rem
+      const focusedRem = await plugin.focus.getFocusedRem();
+      if (!focusedRem) {
+        await plugin.app.toast("No Rem focused");
+        return;
+      }
+      
+      // Check if it's an Incremental Rem
+      const hasIncPowerup = await focusedRem.hasPowerup(powerupCode);
+      if (!hasIncPowerup) {
+        await plugin.app.toast("This Rem is not tagged as an Incremental Rem");
+        return;
+      }
+      
+      // Open the editor review popup
+      await plugin.widget.openPopup('editor_review', {
+        remId: focusedRem._id,
+      });
+    },
+  });
+
   plugin.app.registerCommand({
     id: 'debug-video',
     name: 'Debug Video Detection',
@@ -2749,6 +2837,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
     },
   });
+
 
   // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);

@@ -369,7 +369,13 @@ export function AnswerButtons() {
       }
     }
 
-    await handleHextRepetitionClick(plugin, incRemInfo);
+    const queueMode = await plugin.storage.getSession<string>('current-queue-mode');
+    // Map RemNote's mode to your enum
+    const mappedMode = queueMode === 'practice-all' ? 'practice-all' 
+      : queueMode === 'in-order' ? 'in-order' 
+      : 'srs';
+
+    await handleHextRepetitionClick(plugin, incRemInfo, mappedMode);
   };
 
   const priorityColor = percentiles.kb ? percentileToHslColor(percentiles.kb) : '#6b7280';

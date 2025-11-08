@@ -57,7 +57,8 @@ export const removeLastInteraction = (history: IncrementalRep[]): IncrementalRep
 export async function getNextSpacingDateForRem(
   plugin: RNPlugin,
   remId: string,
-  inLookbackMode: boolean
+  inLookbackMode: boolean,
+    queueMode?: 'srs' | 'practice-all' | 'in-order' | 'editor' // NEW parameter
 ) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) {
@@ -81,14 +82,29 @@ export async function getNextSpacingDateForRem(
   // it's a simple exponential, but shouldn't explode if you do a bunch of practice-all
   const newInterval = Math.ceil(multiplier ** Math.max(cleansedHistory.length, 1));
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
+  
+  // Calculate if review was early/late and by how many days
+  const scheduledDate = inLookbackMode 
+    ? dayjs().startOf('day').valueOf() 
+    : incrementalRemInfo.nextRepDate;
+  const actualDate = Date.now();
+  const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+  const wasEarly = daysDifference < 0;
+  const daysEarlyOrLate = Math.round(daysDifference * 10) / 10; // Round to 1 decimal
+
   const newHistory: IncrementalRep[] = [
     // if lookback mode, remove the last interaction but keep responsesBeforeEarlyResponses
     ...(inLookbackMode ? removeLastInteraction(rawHistory) : rawHistory),
     {
-      date: Date.now(),
+      date: actualDate,
       // TODO: wrong in lookbackMode, but no way to compute because the old nextRepDate has been overwritten
       // should fix if algo changes to use nextRepDate / scheduled / actual interval
-      scheduled: inLookbackMode ? dayjs().startOf('day').valueOf() : incrementalRemInfo.nextRepDate,
+      scheduled: scheduledDate,
+      interval: newInterval,
+      wasEarly: wasEarly,
+      daysEarlyOrLate: daysEarlyOrLate,
+      queueMode: queueMode,
+      // reviewTimeSeconds will be added by reviewRem()
     },
   ];
   return {
