@@ -115,7 +115,7 @@ export async function getCardPriority(
 
   const cards = await rem.getCards();
   const now = Date.now();
-  const dueCards = cards.filter(card => card.nextRepetitionTime <= now).length;
+  const dueCards = cards.filter(card => (card.nextRepetitionTime ?? Infinity) <= now).length;
 
   //console.log(`[DEBUG getCardPriority] 2. Attempting to read priority slot directly...`);
   const priorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
@@ -177,7 +177,10 @@ export async function getCardPriority(
 }
 
 
-export function calculateRelativeCardPriority(allItems: CardPriority.tsInfo[], currentRemId: RemId): number | null {
+export function calculateRelativeCardPriority(
+  allItems: CardPriorityInfo[],
+  currentRemId: RemId
+): number | null {
   if (!allItems || !currentRemId) {
     return null;
   }
@@ -472,7 +475,7 @@ export async function getDueCardsWithPriorities(
             if (newCardInfo) {
               results.push({
                 rem,
-                cards: cards.filter(card => card.nextRepetitionTime <= now),
+                cards: cards.filter(card => (card.nextRepetitionTime ?? Infinity) <= now),
                 priority: newCardInfo.priority,
                 source: newCardInfo.source
               });
@@ -493,7 +496,7 @@ export async function getDueCardsWithPriorities(
 
       // Get the actual card objects (we need these for the return value)
       const cards = await rem.getCards();
-      const dueCards = cards.filter(card => card.nextRepetitionTime <= now);
+      const dueCards = cards.filter(card => (card.nextRepetitionTime ?? Infinity) <= now);
 
       if (dueCards.length > 0) {
         results.push({
@@ -637,7 +640,7 @@ async function getDueCardsWithPrioritiesSlow(
 
   for (const rem of remsToCheck) {
     const cards = await rem.getCards();
-    const dueCards = cards.filter(card => card.nextRepetitionTime <= now);
+    const dueCards = cards.filter(card => (card.nextRepetitionTime ?? Infinity) <= now);
       
     if (dueCards.length > 0) {
       // Try to get existing priority

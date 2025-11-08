@@ -120,7 +120,11 @@ const handleCardPriorityInheritance = async (
   }
 };
 
-const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: PluginRem | undefined, remType: string | null) => {
+const handleReviewAndOpenRem = async (
+  plugin: RNPlugin,
+  rem: PluginRem | undefined,
+  remType: string | null | undefined
+) => {
   if (!rem) return;
 
   if (remType === 'pdf') {
@@ -136,7 +140,7 @@ const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: PluginRem | undefin
   }
 
   const incRemInfo = await getIncrementalRemInfo(plugin, rem);
-  await reviewRem(plugin, incRemInfo);
+  await reviewRem(plugin, incRemInfo ?? undefined);
   await plugin.window.openRem(rem);
 };
 
@@ -193,9 +197,10 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'danger';
   style?: React.CSSProperties;
   disabled?: boolean;
+  className?: string;
 }
 
-function Button({ children, onClick, variant = 'secondary', style, disabled }: ButtonProps) {
+function Button({ children, onClick, variant = 'secondary', style, disabled, className }: ButtonProps) {
   const variantStyles = variant === 'primary' ? buttonStyles.primary : 
                         variant === 'danger' ? buttonStyles.danger : 
                         buttonStyles.secondary;
@@ -221,6 +226,7 @@ function Button({ children, onClick, variant = 'secondary', style, disabled }: B
         e.currentTarget.style.transform = 'translateY(0)';
         e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
       }}
+      className={className}
     >
       {children}
     </button>

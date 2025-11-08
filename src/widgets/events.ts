@@ -35,6 +35,15 @@ import { setCurrentIncrementalRem } from '../lib/currentRem';
 
 type ResetSessionItemCounter = () => void;
 
+type ShieldHistoryEntry = {
+  absolute: number | null;
+  percentile: number;
+  universeSize: number;
+};
+
+type ShieldHistory = Record<string, ShieldHistoryEntry>;
+type ShieldHistoryByScope = Record<string, ShieldHistory>;
+
 async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
   const tags = await rem.getTagRems();
   if (!tags || tags.length === 0) return false;
@@ -133,7 +142,8 @@ export function registerQueueExitListener(
           }
         }
         
-        const kbHistory = (await plugin.storage.getSynced(priorityShieldHistoryKey)) || {};
+        const kbHistory =
+          (await plugin.storage.getSynced<ShieldHistory>(priorityShieldHistoryKey)) || {};
         kbHistory[today] = kbFinalStatus;
         await plugin.storage.setSynced(priorityShieldHistoryKey, kbHistory);
         console.log('[QueueExit] Saved KB IncRem history:', kbFinalStatus);
@@ -167,7 +177,9 @@ export function registerQueueExitListener(
           const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
           
           if (historyKey) {
-            const docHistory = (await plugin.storage.getSynced(documentPriorityShieldHistoryKey)) || {};
+            const docHistory =
+              (await plugin.storage.getSynced<ShieldHistoryByScope>(documentPriorityShieldHistoryKey)) ||
+              {};
             if (!docHistory[historyKey]) {
               docHistory[historyKey] = {};
             }
@@ -201,7 +213,8 @@ export function registerQueueExitListener(
                   kbCardFinalStatus.percentile = calculateRelativeCardPriority(allCardInfos, topMissed.remId);
               }
           }
-          const cardKbHistory = (await plugin.storage.getSynced(cardPriorityShieldHistoryKey)) || {};
+          const cardKbHistory =
+            (await plugin.storage.getSynced<ShieldHistory>(cardPriorityShieldHistoryKey)) || {};
           cardKbHistory[today] = kbCardFinalStatus;
           await plugin.storage.setSynced(cardPriorityShieldHistoryKey, cardKbHistory);
           console.log('Saved KB card history:', kbCardFinalStatus);
@@ -231,7 +244,10 @@ export function registerQueueExitListener(
                   }
               }
               
-              const docCardHistory = (await plugin.storage.getSynced(documentCardPriorityShieldHistoryKey)) || {};
+              const docCardHistory =
+                (await plugin.storage.getSynced<ShieldHistoryByScope>(
+                  documentCardPriorityShieldHistoryKey
+                )) || {};
               if (!docCardHistory[historyKey]) {
                   docCardHistory[historyKey] = {};
               }

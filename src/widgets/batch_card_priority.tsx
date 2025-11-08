@@ -2,7 +2,6 @@
 import {
   renderWidget,
   usePlugin,
-  useTracker,
   useTrackerPlugin,
   PluginRem,
   RNPlugin,

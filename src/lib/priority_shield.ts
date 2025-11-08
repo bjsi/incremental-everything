@@ -27,15 +27,15 @@ export interface PriorityShieldStatus {
 }
 
 export interface CardPriorityShieldStatus {
-  kb: { 
-    absolute: number; 
-    percentile: number;
-    universeSize?: number; // NEW: Track total KB cards
+  kb: {
+    absolute: number | null;
+    percentile: number | null;
+    universeSize?: number;
   } | null;
-  doc: { 
-    absolute: number; 
-    percentile: number;
-    universeSize?: number; // NEW: Track total doc cards
+  doc: {
+    absolute: number | null;
+    percentile: number | null;
+    universeSize?: number;
   } | null;
 }
 
@@ -258,8 +258,9 @@ export async function calculatePriorityShield(
     status.kb.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
   }
 
-  if (docScopeRemIds && docScopeRemIds.length > 0) {
-    const scopedRems = allRems.filter((rem) => docScopeRemIds.includes(rem.remId));
+  const scopeIds = docScopeRemIds;
+  if (scopeIds && scopeIds.length > 0) {
+    const scopedRems = allRems.filter((rem) => scopeIds.includes(rem.remId));
     
     // Track doc universe size
     status.doc.universeSize = scopedRems.length;

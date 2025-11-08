@@ -3,6 +3,13 @@ import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin
 import { powerupCode, allIncrementalRemKey } from './consts';
 import { IncrementalRem } from './types';
 
+export interface PageRangeContext {
+  incrementalRemId: RemId;
+  pdfRemId: RemId;
+  totalPages: number;
+  currentPage: number;
+}
+
 /**
  * Safely convert rem text to string, handling all edge cases
  */
@@ -328,7 +335,7 @@ export const getAllIncrementsForPDF = async (
     
     console.log('Searching for rems using PDF:', pdfRemId);
     
-    const contextData = await plugin.storage.getSession('pageRangeContext');
+    const contextData = await plugin.storage.getSession<PageRangeContext | null>('pageRangeContext');
     const incrementalRemId = contextData?.incrementalRemId;
     
     if (!incrementalRemId) {
@@ -349,9 +356,8 @@ export const getAllIncrementsForPDF = async (
     const processSearchScope = new Set<string>();
     
     // Get parent and search from there
-    let searchRoot: PluginRem | null = null;
     if (incrementalRem.parent) {
-      searchRoot = await plugin.rem.findOne(incrementalRem.parent);
+      const searchRoot = await plugin.rem.findOne(incrementalRem.parent);
       
       if (searchRoot) {
         // Add parent

@@ -76,7 +76,7 @@ export async function createPriorityReviewDocument(
   await reviewDoc.setIsDocument(true);
   
   // 2. Get scope rem if specified
-  const scopeRem = scopeRemId ? await plugin.rem.findOne(scopeRemId) : null;
+  const scopeRem = scopeRemId ? (await plugin.rem.findOne(scopeRemId)) ?? null : null;
   
   // 3. Get all incremental rems (filtered by scope and due status)
   const allIncrementalRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
@@ -142,16 +142,18 @@ export async function createPriorityReviewDocument(
       }
     }
 
+  } else if (cardRatio === 'no-cards') {
+    for (let i = 0; i < itemCount && i < sortedIncRems.length; i++) {
+      const item = sortedIncRems[i];
+      const rem = await plugin.rem.findOne(item.remId);
+      if (rem) {
+        mixedItems.push({ rem, type: 'incremental' });
+      }
+    }
   } else {
-    // Handle 'no-cards' or 'no-rem'
-    const sourceList = cardRatio === 'no-cards' ? sortedIncRems : sortedCards;
-    const type = cardRatio === 'no-cards' ? 'incremental' : 'flashcard';
-    for (let i = 0; i < itemCount && i < sourceList.length; i++) {
-        const item = sourceList[i];
-        const rem = item.remId ? await plugin.rem.findOne(item.remId) : item.rem;
-        if (rem) {
-            mixedItems.push({ rem, type: type as 'incremental' | 'flashcard' });
-        }
+    for (let i = 0; i < itemCount && i < sortedCards.length; i++) {
+      const item = sortedCards[i];
+      mixedItems.push({ rem: item.rem, type: 'flashcard' });
     }
   }
   
