@@ -37,7 +37,7 @@ type ResetSessionItemCounter = () => void;
 
 type ShieldHistoryEntry = {
   absolute: number | null;
-  percentile: number;
+  percentile: number | null;
   universeSize: number;
 };
 
@@ -128,8 +128,8 @@ export function registerQueueExitListener(
           (rem) => Date.now() >= rem.nextRepDate
         );
 
-        let kbFinalStatus = {
-          absolute: null as number | null,
+        const kbFinalStatus: ShieldHistoryEntry = {
+          absolute: null,
           percentile: 100,
           universeSize: allRems.length,
         };
@@ -159,8 +159,8 @@ export function registerQueueExitListener(
           );
           console.log('[QueueExit] Found', unreviewedDueInScope.length, 'due IncRems in priority calculation scope');
           
-          let docFinalStatus = {
-            absolute: null as number | null,
+          const docFinalStatus: ShieldHistoryEntry = {
+            absolute: null,
             percentile: 100,
             universeSize: scopedRems.length,
           };
@@ -201,8 +201,8 @@ export function registerQueueExitListener(
           const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
 
           const unreviewedDueKb = allCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
-          let kbCardFinalStatus = { 
-            absolute: null as number | null, 
+          const kbCardFinalStatus: ShieldHistoryEntry = { 
+            absolute: null, 
             percentile: 100,
             universeSize: allCardInfos.length,
           };
@@ -229,8 +229,8 @@ export function registerQueueExitListener(
               console.log('[QueueExit] Found', docCardInfos.length, 'cards in priority calculation scope');
 
               const unreviewedDueDoc = docCardInfos.filter(c => c.dueCards > 0 && !seenCardIds.includes(c.remId));
-              let docCardFinalStatus = { 
-                absolute: null as number | null, 
+              const docCardFinalStatus: ShieldHistoryEntry = { 
+                absolute: null, 
                 percentile: 100,
                 universeSize: docCardInfos.length,
               };
@@ -367,7 +367,7 @@ export function registerQueueEnterListener(
     if (scopeForItemSelection) {
       console.log('QUEUE ENTER: Setting up scopes...');
       
-      let itemSelectionScope: Set<RemId>;
+      let itemSelectionScope: Set<RemId> = new Set<RemId>();
       
       if (isPriorityReviewDoc) {
         const reviewDocRem = await plugin.rem.findOne(scopeForItemSelection);
