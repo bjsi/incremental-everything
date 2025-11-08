@@ -11,7 +11,6 @@ import {
   RNPlugin,
   SelectionType,
   SpecialPluginCallback,
-  StorageEvents,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import '../style.css';
@@ -30,18 +29,12 @@ import {
   queueCounterId,
   hideIncEverythingId,
   nextRepCommandId,
-  shouldHideIncEverythingKey,
-  collapseTopBarKey,
   queueLayoutFixId,
-  incrementalQueueActiveKey,
-  activeHighlightIdKey,
   currentScopeRemIdsKey,
   defaultPriorityId,
   seenRemInSessionKey,
   displayPriorityShieldId,
-  priorityShieldHistoryKey,
   priorityShieldHistoryMenuItemId,
-  documentPriorityShieldHistoryKey,
   currentSubQueueIdKey,
   seenCardInSessionKey,
   cardPriorityShieldHistoryKey,
@@ -51,15 +44,9 @@ import {
   pageRangeWidgetId,
   noIncRemTimerKey,
   noIncRemMenuItemId,
-  noIncRemTimerWidgetId,
   currentIncRemKey,
-  queueSessionCacheKey,
-  priorityCalcScopeRemIdsKey,
   alwaysUseLightModeOnMobileId,
-  isMobileDeviceKey,
   alwaysUseLightModeOnWebId,
-  isWebPlatformKey,
-  lastDetectedPlatformKey,
   pdfHighlightColorId
 } from '../lib/consts';
 import * as _ from 'remeda';
@@ -67,8 +54,7 @@ import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
 import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
-import { calculateRelativePriority } from '../lib/priority';
+import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
 import { getInitialPriority } from '../lib/priority_inheritance';
@@ -87,10 +73,8 @@ import {
 import { 
   autoAssignCardPriority, 
   getCardPriority, 
-  getDueCardsWithPriorities, 
   CardPriorityInfo,
   setCardPriority,
-  calculateRelativeCardPriority,
   calculateNewPriority
 } from '../lib/cardPriority';
 import { updateCardPriorityInCache } from '../lib/cache';
