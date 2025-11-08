@@ -11,7 +11,6 @@ import {
   RNPlugin,
   SelectionType,
   SpecialPluginCallback,
-  StorageEvents,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import '../style.css';
@@ -30,11 +29,7 @@ import {
   queueCounterId,
   hideIncEverythingId,
   nextRepCommandId,
-  shouldHideIncEverythingKey,
-  collapseTopBarKey,
   queueLayoutFixId,
-  incrementalQueueActiveKey,
-  activeHighlightIdKey,
   currentScopeRemIdsKey,
   defaultPriorityId,
   seenRemInSessionKey,
@@ -51,15 +46,11 @@ import {
   pageRangeWidgetId,
   noIncRemTimerKey,
   noIncRemMenuItemId,
-  noIncRemTimerWidgetId,
   currentIncRemKey,
   queueSessionCacheKey,
   priorityCalcScopeRemIdsKey,
   alwaysUseLightModeOnMobileId,
-  isMobileDeviceKey,
   alwaysUseLightModeOnWebId,
-  isWebPlatformKey,
-  lastDetectedPlatformKey,
   pdfHighlightColorId
 } from '../lib/consts';
 import * as _ from 'remeda';
@@ -67,7 +58,7 @@ import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
 import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { getDailyDocReferenceForDate } from '../lib/date';
 import { getCurrentIncrementalRem, setCurrentIncrementalRem } from '../lib/currentRem';
@@ -84,10 +75,9 @@ import {
   getFriendlyOSName,
   getFriendlyPlatformName   // NEW
 } from '../lib/mobileUtils';
-import { 
-  autoAssignCardPriority, 
-  getCardPriority, 
-  getDueCardsWithPriorities, 
+import {
+  autoAssignCardPriority,
+  getCardPriority,
   CardPriorityInfo,
   setCardPriority,
   calculateRelativeCardPriority,
@@ -673,10 +663,10 @@ async function buildOptimizedCache(plugin: RNPlugin) {
 /**
  * Check if a rem is a Priority Review Document by checking for the tag
  */
-async function isPriorityReviewDocument(plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
+async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
   const tags = await rem.getTagRems();
   if (!tags || tags.length === 0) return false;
-  
+
   // Check if any tag has the name "Priority Review Queue"
   for (const tag of tags) {
     // Use the text property directly from RemObject
@@ -689,7 +679,7 @@ async function isPriorityReviewDocument(plugin: RNPlugin, rem: PluginRem): Promi
       }
     }
   }
-  
+
   return false;
 }
 
@@ -698,7 +688,6 @@ async function isPriorityReviewDocument(plugin: RNPlugin, rem: PluginRem): Promi
  * The title format is: "Priority Review - [RemReference] - [Timestamp]"
  */
 async function extractOriginalScopeFromPriorityReview(
-  plugin: RNPlugin, 
   reviewDocRem: PluginRem
 ): Promise<string | null> {
   const richText = reviewDocRem.text;
@@ -830,13 +819,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     [data-rem-tags~="cardpriority"] .hierarchy-editor__tag-bar__tag {
     display: none; }
   `;
-
-  const COLLAPSE_TOP_BAR_CSS = `
-    .spacedRepetitionContent { height: 100%; box-sizing: border-box; }
-    .queue__title { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-    .queue__title:hover { max-height: 999px; }
-  `.trim();
-
 
   // New, corrected registerPowerup format with a single object (since plugin-sdk@0.0.39)
   // `slots` is nested inside `options`
@@ -1657,10 +1639,6 @@ async function onActivate(plugin: ReactRNPlugin) {
       await handleHextRepetitionClick(plugin, incRem);
     },
   });
-
-  const unregisterQueueCSS = async (plugin: RNPlugin) => {
-    await plugin.app.registerCSS(collapseTopBarId, '');
-  };
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
