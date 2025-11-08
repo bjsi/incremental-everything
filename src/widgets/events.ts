@@ -34,10 +34,60 @@ import { flushCacheUpdatesNow, updateCardPriorityInCache } from '../lib/cache';
 import { setCurrentIncrementalRem } from '../lib/currentRem';
 
 type ResetSessionItemCounter = () => void;
-type PriorityReviewHelpers = {
-  isPriorityReviewDocument: (plugin: RNPlugin, rem: PluginRem) => Promise<boolean>;
-  extractOriginalScopeFromPriorityReview: (plugin: RNPlugin, reviewDocRem: PluginRem) => Promise<string | null>;
-};
+
+async function isPriorityReviewDocument(plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
+  const tags = await rem.getTagRems();
+  if (!tags || tags.length === 0) return false;
+
+  // Check if any tag has the name "Priority Review Queue"
+  for (const tag of tags) {
+    // Use the text property directly from RemObject
+    const tagText = tag.text;
+    if (tagText) {
+      // Convert RichTextInterface to string
+      const tagTextString = typeof tagText === 'string' ? tagText : tagText.join('');
+      if (tagTextString.includes('Priority Review Queue')) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Extract the original scope rem from a Priority Review Document's title
+ * The title format is: "Priority Review - [RemReference] - [Timestamp]"
+ */
+async function extractOriginalScopeFromPriorityReview(
+  plugin: RNPlugin,
+  reviewDocRem: PluginRem
+): Promise<string | null> {
+  const richText = reviewDocRem.text;
+  if (!richText || richText.length === 0) return null;
+
+  // Search for a rem reference in the rich text
+  for (const element of richText) {
+    if (typeof element === 'object' && element !== null) {
+      // Check if it's a rem reference (portal)
+      if ('i' in element && element.i === 'q' && '_id' in element) {
+        // This is a rem reference, return the referenced rem ID
+        return element._id as string;
+      }
+    }
+  }
+
+  // No rem reference found - might be "Full Knowledge Base"
+  const textContent = richText.join('');
+  if (textContent.includes('Full Knowledge Base')) {
+    // Return null to indicate full KB scope
+    return null;
+  }
+
+  // Could not determine scope
+  console.warn('Could not extract scope from Priority Review Document title');
+  return null;
+}
 
 export function registerQueueExitListener(
   plugin: ReactRNPlugin,
@@ -221,18 +271,8 @@ export function registerURLChangeListener(plugin: ReactRNPlugin) {
 
 export function registerQueueEnterListener(
   plugin: ReactRNPlugin,
-  {
-    resetSessionItemCounter,
-    priorityReviewHelpers,
-  }: {
-    resetSessionItemCounter: ResetSessionItemCounter;
-    priorityReviewHelpers: PriorityReviewHelpers;
-  }
+  resetSessionItemCounter: ResetSessionItemCounter
 ) {
-  const {
-    isPriorityReviewDocument,
-    extractOriginalScopeFromPriorityReview,
-  } = priorityReviewHelpers;
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     console.log('QUEUE ENTER: Starting session pre-calculation for subQueueId:', subQueueId);

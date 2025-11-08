@@ -899,65 +899,6 @@ async function buildOptimizedCache(plugin: RNPlugin) {
   await plugin.storage.setSession(allCardPriorityInfoKey, enrichedInfos);
 }
 
-
-/**
- * Check if a rem is a Priority Review Document by checking for the tag
- */
-async function isPriorityReviewDocument(plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
-  const tags = await rem.getTagRems();
-  if (!tags || tags.length === 0) return false;
-  
-  // Check if any tag has the name "Priority Review Queue"
-  for (const tag of tags) {
-    // Use the text property directly from RemObject
-    const tagText = tag.text;
-    if (tagText) {
-      // Convert RichTextInterface to string
-      const tagTextString = typeof tagText === 'string' ? tagText : tagText.join('');
-      if (tagTextString.includes('Priority Review Queue')) {
-        return true;
-      }
-    }
-  }
-  
-  return false;
-}
-
-/**
- * Extract the original scope rem from a Priority Review Document's title
- * The title format is: "Priority Review - [RemReference] - [Timestamp]"
- */
-async function extractOriginalScopeFromPriorityReview(
-  plugin: RNPlugin, 
-  reviewDocRem: PluginRem
-): Promise<string | null> {
-  const richText = reviewDocRem.text;
-  if (!richText || richText.length === 0) return null;
-  
-  // Search for a rem reference in the rich text
-  for (const element of richText) {
-    if (typeof element === 'object' && element !== null) {
-      // Check if it's a rem reference (portal)
-      if ('i' in element && element.i === 'q' && '_id' in element) {
-        // This is a rem reference, return the referenced rem ID
-        return element._id as string;
-      }
-    }
-  }
-  
-  // No rem reference found - might be "Full Knowledge Base"
-  const textContent = richText.join('');
-  if (textContent.includes('Full Knowledge Base')) {
-    // Return null to indicate full KB scope
-    return null;
-  }
-  
-  // Could not determine scope
-  console.warn('Could not extract scope from Priority Review Document title');
-  return null;
-}
-
-
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
   console.log('🚀 INCREMENTAL EVERYTHING onActivate CALLED');
@@ -1103,14 +1044,8 @@ async function onActivate(plugin: ReactRNPlugin) {
     sessionItemCounter = 0;
   });
 
-  registerQueueEnterListener(plugin, {
-    resetSessionItemCounter: () => {
-      sessionItemCounter = 0;
-    },
-    priorityReviewHelpers: {
-      isPriorityReviewDocument,
-      extractOriginalScopeFromPriorityReview,
-    },
+  registerQueueEnterListener(plugin, () => {
+    sessionItemCounter = 0;
   });
 
   plugin.app.registerCommand({
