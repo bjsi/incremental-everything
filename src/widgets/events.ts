@@ -1,4 +1,4 @@
-import { AppEvents, ReactRNPlugin, RemId, PluginRem, RNPlugin } from '@remnote/plugin-sdk';
+import { AppEvents, ReactRNPlugin, RemId, PluginRem } from '@remnote/plugin-sdk';
 import dayjs from 'dayjs';
 import * as _ from 'remeda';
 import {
@@ -35,7 +35,7 @@ import { setCurrentIncrementalRem } from '../lib/currentRem';
 
 type ResetSessionItemCounter = () => void;
 
-async function isPriorityReviewDocument(plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
+async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
   const tags = await rem.getTagRems();
   if (!tags || tags.length === 0) return false;
 
@@ -59,10 +59,7 @@ async function isPriorityReviewDocument(plugin: RNPlugin, rem: PluginRem): Promi
  * Extract the original scope rem from a Priority Review Document's title
  * The title format is: "Priority Review - [RemReference] - [Timestamp]"
  */
-async function extractOriginalScopeFromPriorityReview(
-  plugin: RNPlugin,
-  reviewDocRem: PluginRem
-): Promise<string | null> {
+async function extractOriginalScopeFromPriorityReview(reviewDocRem: PluginRem): Promise<string | null> {
   const richText = reviewDocRem.text;
   if (!richText || richText.length === 0) return null;
 
@@ -290,12 +287,12 @@ export function registerQueueEnterListener(
     if (subQueueId) {
       const queueRem = await plugin.rem.findOne(subQueueId);
       if (queueRem) {
-        isPriorityReviewDoc = await isPriorityReviewDocument(plugin, queueRem);
+        isPriorityReviewDoc = await isPriorityReviewDocument(queueRem);
         
         if (isPriorityReviewDoc) {
           console.log('QUEUE ENTER: Priority Review Document detected!');
           
-          const extractedScopeId = await extractOriginalScopeFromPriorityReview(plugin, queueRem);
+          const extractedScopeId = await extractOriginalScopeFromPriorityReview(queueRem);
           
           if (extractedScopeId !== undefined) {
             scopeForPriorityCalc = extractedScopeId;
