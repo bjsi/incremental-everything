@@ -53,7 +53,7 @@ export function QueueComponent() {
       console.log('🔄 useTrackerPlugin RUNNING for remId:', ctx.remId);
       const rem = await rp.rem.findOne(ctx.remId);
       if (!rem) {
-        console.log('⛔ useTrackerPlugin: Rem not found');
+        console.log('⛔ useTrackerPlugin: PluginRem not found');
         return null;
       }
       

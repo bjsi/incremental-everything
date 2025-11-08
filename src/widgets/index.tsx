@@ -6,7 +6,7 @@ import {
   PropertyType,
   QueueItemType,
   ReactRNPlugin,
-  Rem,
+  PluginRem,
   RemId,
   RNPlugin,
   SelectionType,
@@ -650,7 +650,7 @@ async function buildOptimizedCache(plugin: RNPlugin) {
 /**
  * Check if a rem is a Priority Review Document by checking for the tag
  */
-async function isPriorityReviewDocument(plugin: RNPlugin, rem: Rem): Promise<boolean> {
+async function isPriorityReviewDocument(plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
   const tags = await rem.getTagRems();
   if (!tags || tags.length === 0) return false;
   
@@ -676,7 +676,7 @@ async function isPriorityReviewDocument(plugin: RNPlugin, rem: Rem): Promise<boo
  */
 async function extractOriginalScopeFromPriorityReview(
   plugin: RNPlugin, 
-  reviewDocRem: Rem
+  reviewDocRem: PluginRem
 ): Promise<string | null> {
   const richText = reviewDocRem.text;
   if (!richText || richText.length === 0) return null;
@@ -1822,7 +1822,7 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   );
 
-  async function initIncrementalRem(rem: Rem) {
+  async function initIncrementalRem(rem: PluginRem) {
     // First, check if the Rem has already been initialized.
     const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
 
@@ -2057,7 +2057,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       // Check if the Rem is an Incremental Rem
       const rem = await plugin.rem.findOne(remId);
       if (!rem) {
-        console.log("Reschedule: Rem not found. Aborting.");
+        console.log("Reschedule: PluginRem not found. Aborting.");
         await plugin.app.toast("Could not find the Rem.");
         return;
       }
@@ -2065,7 +2065,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       // Check if it has the Incremental powerup
       const hasIncrementalPowerup = await rem.hasPowerup(powerupCode);
       if (!hasIncrementalPowerup) {
-        console.log("Reschedule: Rem is not tagged as Incremental. Aborting.");
+        console.log("Reschedule: PluginRem is not tagged as Incremental. Aborting.");
         await plugin.app.toast("This command only works with Incremental Rems.");
         return;
       }

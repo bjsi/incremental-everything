@@ -4,7 +4,7 @@ import {
   useTrackerPlugin,
   WidgetLocation,
   RNPlugin,
-  Rem,
+  PluginRem,
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import * as _ from 'remeda';
@@ -33,12 +33,12 @@ const MAX_DEPTH_CHECK = 3;
 
 /**
  * Smart function to check if a Rem or its descendants have flashcards.
- * **OPTIMIZED: Checks up to MAX_DEPTH_CHECK (3 levels: Rem, Children, Grandchildren).**
+ * **OPTIMIZED: Checks up to MAX_DEPTH_CHECK (3 levels: PluginRem, Children, Grandchildren).**
  * **PERFORMANCE MODE: In Light Mode, skips flashcard checking and adds cardPriority directly.**
  */
 const handleCardPriorityInheritance = async (
   plugin: RNPlugin, 
-  rem: Rem, 
+  rem: PluginRem, 
   incRemInfo: IncrementalRem | null
 ) => {
   if (!rem || !incRemInfo) return;
@@ -120,7 +120,7 @@ const handleCardPriorityInheritance = async (
   }
 };
 
-const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: Rem | undefined, remType: string | null) => {
+const handleReviewAndOpenRem = async (plugin: RNPlugin, rem: PluginRem | undefined, remType: string | null) => {
   if (!rem) return;
 
   if (remType === 'pdf') {

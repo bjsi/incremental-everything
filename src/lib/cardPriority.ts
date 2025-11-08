@@ -1,4 +1,4 @@
-import { Rem, RNPlugin, RemId, Query_DUPE_2 as Query, BuiltInPowerupCodes, SearchPortalQuery } from '@remnote/plugin-sdk';
+import { PluginRem, RNPlugin, RemId, Query_DUPE_2 as Query, BuiltInPowerupCodes, SearchPortalQuery } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './types';
 import { getIncrementalRemInfo } from './incremental_rem';
 import { safeRemTextToString } from './pdfUtils';
@@ -70,7 +70,7 @@ export interface QueueSessionCache {
  */
 async function findClosestAncestorWithPriority(
   plugin: RNPlugin,
-  rem: Rem
+  rem: PluginRem
 ): Promise<{ priority: number; source: 'incremental' | 'card' } | null> {
   let current = rem;
   
@@ -107,7 +107,7 @@ async function findClosestAncestorWithPriority(
 // --- NEW DEBUG-INSTRUMENTED VERSION ---
 export async function getCardPriority(
   plugin: RNPlugin,
-  rem: Rem
+  rem: PluginRem
 ): Promise<CardPriorityInfo | null> {
   const remText = await safeRemTextToString(plugin, rem.text);
   //console.log(`[DEBUG getCardPriority] -----------------------------------------`);
@@ -202,7 +202,7 @@ export function calculateRelativeCardPriority(allItems: CardPriority.tsInfo[], c
  */
 export async function setCardPriority(
   plugin: RNPlugin,
-  rem: Rem,
+  rem: PluginRem,
   priority: number,
   source: PrioritySource
 ): Promise<void> {
@@ -221,7 +221,7 @@ export async function setCardPriority(
  */
 export async function autoAssignCardPriority(
   plugin: RNPlugin,
-  rem: Rem
+  rem: PluginRem
 ): Promise<number> {
   // Check existing priority
   const existingPriority = await getCardPriority(plugin, rem);
@@ -267,7 +267,7 @@ export async function autoAssignCardPriority(
  */
 export async function calculateNewPriority(
   plugin: RNPlugin,
-  rem: Rem,
+  rem: PluginRem,
   existingPriority: CardPriorityInfo | null = null
 ): Promise<{ priority: number; source: PrioritySource }> {
   // ONLY preserve manual priorities
@@ -305,7 +305,7 @@ export async function calculateNewPriority(
  */
 export async function updateInheritedPriorities(
   plugin: RNPlugin,
-  parentRem: Rem,
+  parentRem: PluginRem,
   newPriority: number
 ): Promise<void> {
   const descendants = await parentRem.getDescendants();
@@ -339,10 +339,10 @@ export async function updateInheritedPriorities(
  */
 export async function getDueCardsWithPriorities(
   plugin: RNPlugin,
-  scopeRem: Rem | null,
+  scopeRem: PluginRem | null,
   includeNonPrioritized: boolean = true
 ): Promise<Array<{
-  rem: Rem;
+  rem: PluginRem;
   cards: any[];
   priority: number;
   source: PrioritySource;
@@ -351,7 +351,7 @@ export async function getDueCardsWithPriorities(
   const startTime = Date.now();
 
   const results: Array<{
-    rem: Rem;
+    rem: PluginRem;
     cards: any[];
     priority: number;
     source: PrioritySource;
@@ -521,22 +521,22 @@ export async function getDueCardsWithPriorities(
  */
 async function getDueCardsWithPrioritiesSlow(
   plugin: RNPlugin,
-  scopeRem: Rem | null,
+  scopeRem: PluginRem | null,
   includeNonPrioritized: boolean = true
 ): Promise<Array<{
-  rem: Rem;
+  rem: PluginRem;
   cards: any[];
   priority: number;
   source: PrioritySource;
 }>> {
   const results: Array<{
-    rem: Rem;
+    rem: PluginRem;
     cards: any[];
     priority: number;
     source: PrioritySource;
   }> = [];
 
-  let remsToCheck: Rem[];
+  let remsToCheck: PluginRem[];
 
   if (scopeRem) {
       // --- COMPREHENSIVE SCOPE GATHERING LOGIC ---
@@ -577,7 +577,7 @@ async function getDueCardsWithPrioritiesSlow(
       console.log(`[getDueCardsWithPrioritiesSlow] ✓ Found ${referencingRemObjs.length} referencing rems`);
 
       // 3. Combine and deduplicate all sources
-      const combinedRems = new Map<RemId, Rem>();
+      const combinedRems = new Map<RemId, PluginRem>();
     
       // Add the scope rem itself
       combinedRems.set(scopeRem._id, scopeRem);
@@ -665,7 +665,7 @@ async function getDueCardsWithPrioritiesSlow(
  */
 export async function batchUpdateInheritedPriorities(
   plugin: RNPlugin,
-  parentRem: Rem,
+  parentRem: PluginRem,
   newPriority: number
 ): Promise<number> {
   let updatedCount = 0;

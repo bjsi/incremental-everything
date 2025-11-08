@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Rem, RNPlugin, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { PluginRem, RNPlugin, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
 
 interface ExtractViewerProps {
-  rem: Rem;
+  rem: PluginRem;
   plugin: RNPlugin;
 }
 

@@ -1,4 +1,4 @@
-import { Rem, RNPlugin } from '@remnote/plugin-sdk';
+import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { powerupCode, prioritySlotCode } from './consts';
 import { getIncrementalRemInfo } from './incremental_rem';
 import { getCardPriority } from './cardPriority';
@@ -6,7 +6,7 @@ import { safeRemTextToString } from './pdfUtils';
 
 export interface AncestorPriorityInfo {
   priority: number;
-  ancestorRem: Rem;
+  ancestorRem: PluginRem;
   ancestorName: string;
 }
 
@@ -18,7 +18,7 @@ export interface AncestorPriorityInfo {
  */
 export async function findClosestIncrementalAncestor(
   plugin: RNPlugin,
-  rem: Rem | undefined
+  rem: PluginRem | undefined
 ): Promise<AncestorPriorityInfo | null> {
   if (!rem) return null;
 
@@ -68,7 +68,7 @@ export async function findClosestIncrementalAncestor(
  */
 export async function findClosestAncestorWithAnyPriority(
   plugin: RNPlugin,
-  rem: Rem | undefined
+  rem: PluginRem | undefined
 ): Promise<{ priority: number; ancestorName: string; sourceType: 'IncRem' | 'Card' } | null> {
   if (!rem) return null;
 
@@ -114,7 +114,7 @@ export async function findClosestAncestorWithAnyPriority(
  */
 export async function getInitialPriority(
   plugin: RNPlugin,
-  rem: Rem,
+  rem: PluginRem,
   defaultPriority: number
 ): Promise<number> {
   const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem);

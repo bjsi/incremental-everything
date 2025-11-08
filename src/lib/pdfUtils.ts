@@ -1,6 +1,7 @@
 // lib/pdfUtils.ts
-import { RNPlugin, Rem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, allIncrementalRemKey } from './consts';
+import { IncrementalRem } from './types';
 
 /**
  * Safely convert rem text to string, handling all edge cases
@@ -220,10 +221,10 @@ export const addPageToHistory = async (
  */
 export const findPDFinRem = async (
   plugin: RNPlugin, 
-  rem: Rem, 
+  rem: PluginRem, 
   targetPdfId?: string
-): Promise<Rem | null> => {
-  const isUploadedPdf = async (r: Rem): Promise<boolean> => {
+): Promise<PluginRem | null> => {
+  const isUploadedPdf = async (r: PluginRem): Promise<boolean> => {
     const hasPowerup = await r.hasPowerup(BuiltInPowerupCodes.UploadedFile);
     if (!hasPowerup) return false;
     try {
@@ -247,7 +248,7 @@ export const findPDFinRem = async (
   const sources = await rem.getSources();
   console.log(`    [findPDFinRem] Checking ${sources.length} sources`);
   
-  const foundPdfs: Rem[] = [];
+  const foundPdfs: PluginRem[] = [];
   
   for (const source of sources) {
     if (await isUploadedPdf(source)) {
@@ -281,10 +282,10 @@ const getKnownPdfRemsKey = (pdfRemId: string) => `known_pdf_rems_${pdfRemId}`;
 /**
  * Get descendants up to a specified depth
  */
-export const getDescendantsToDepth = async (rem: Rem, maxDepth: number): Promise<Rem[]> => {
-  const result: Rem[] = [];
+export const getDescendantsToDepth = async (rem: PluginRem, maxDepth: number): Promise<PluginRem[]> => {
+  const result: PluginRem[] = [];
   
-  const collectDescendants = async (currentRem: Rem, currentDepth: number) => {
+  const collectDescendants = async (currentRem: PluginRem, currentDepth: number) => {
     if (currentDepth >= maxDepth) return;
     
     const children = await currentRem.getChildrenRem();
@@ -344,11 +345,11 @@ export const getAllIncrementsForPDF = async (
     // ===== PART 1: LOCAL SEARCH for NON-incremental rems =====
     console.log('\n===== PART 1: Searching locally for non-incremental rems =====');
     
-    const remsToCheck: Rem[] = [];
+    const remsToCheck: PluginRem[] = [];
     const processSearchScope = new Set<string>();
     
     // Get parent and search from there
-    let searchRoot: Rem | null = null;
+    let searchRoot: PluginRem | null = null;
     if (incrementalRem.parent) {
       searchRoot = await plugin.rem.findOne(incrementalRem.parent);
       

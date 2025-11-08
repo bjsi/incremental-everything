@@ -1,6 +1,6 @@
 import {
   RNPlugin,
-  Rem,
+  PluginRem,
   BuiltInPowerupCodes,
   RichTextElementRemInterface,
 } from '@remnote/plugin-sdk';
@@ -9,7 +9,7 @@ import { safeRemTextToString } from './pdfUtils';
 
 export const remToActionItemType = async (
   plugin: RNPlugin,
-  rem: Rem
+  rem: PluginRem
 ): Promise<RemAndType | null> => {
   console.log('📋 remToActionItemType CALLED for rem:', rem._id);
   
