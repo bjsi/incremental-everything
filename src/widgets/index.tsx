@@ -1706,17 +1706,29 @@ async function onActivate(plugin: ReactRNPlugin) {
       // Check if session cache is ready
       let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
 
-      // If in document queue but cache not ready, STOP.
+      // RACE CONDITION FIX:
+      // GetNextCard can be called before QueueEnter finishes calculating the scope.
+      // If the cache isn't ready yet, calculate a basic scope on-the-fly.
+      // This prevents returning null when there are IncRems to show.
       if (queueInfo.subQueueId && docScopeRemIds === null) {
-        console.log('⏳ GetNextCard: Session cache not ready yet, waiting for QueueEnter. Returning null.');
-        
-        // Hide the counter temporarily - QueueEnter will update it when ready
-        await plugin.app.registerCSS(queueCounterId, '');
-        
-        // Return null immediately. DO NOT run the fallback calculation.
-        return null;
+        console.log('⚠️ GetNextCard: Session cache not ready yet. Calculating scope on-the-fly...');
+
+        const scopeRem = await plugin.rem.findOne(queueInfo.subQueueId);
+        if (!scopeRem) {
+          console.log('❌ GetNextCard: Could not find scope Rem. Returning null.');
+          return null;
+        }
+
+        const descendants = await scopeRem.getDescendants();
+        const itemSelectionScope = new Set<RemId>([
+          scopeRem._id,
+          ...descendants.map(r => r._id)
+        ]);
+
+        docScopeRemIds = Array.from(itemSelectionScope);
+        console.log(`✅ GetNextCard: Calculated on-the-fly scope with ${docScopeRemIds.length} items`);
       }
-      
+
       // --- ⬆️ END OF MODIFICATION ⬆️ ---
 
 
