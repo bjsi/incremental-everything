@@ -3,7 +3,7 @@ import {
   usePlugin,
   useRunAsync,
   useTrackerPlugin,
-  Rem,
+  PluginRem,
   RemId,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
@@ -267,8 +267,8 @@ function Priority() {
   // This tracker is fast and only runs in 'full' mode, so it's fine.
   useTrackerPlugin(async (plugin) => {
     if (!rem || performanceMode === 'light') return; // 🔌 Skip in light mode
-    const ancestors: Rem[] = [];
-    let current: Rem | undefined = rem;
+    const ancestors: PluginRem[] = [];
+    let current: PluginRem | undefined = rem;
     while (current?.parent) {
       const parent = await plugin.rem.findOne(current.parent);
       if (parent) { ancestors.push(parent); current = parent; } else { break; }

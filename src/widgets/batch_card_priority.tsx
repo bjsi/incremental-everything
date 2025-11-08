@@ -4,7 +4,7 @@ import {
   usePlugin,
   useTracker,
   useTrackerPlugin,
-  Rem,
+  PluginRem,
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
@@ -16,7 +16,7 @@ import { updateCardPriorityInCache } from '../lib/cache'; // <-- 1. IMPORT ADDED
 
 interface RemWithPriority {
   remId: string;
-  rem: Rem;
+  rem: PluginRem;
   name: string;
   hasCardPriority: boolean;
   hasManualCardPriority: boolean; // New field to track manual source

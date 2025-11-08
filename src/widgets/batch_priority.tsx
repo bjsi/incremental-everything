@@ -3,7 +3,7 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  Rem,
+  PluginRem,
   RNPlugin,
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
@@ -28,7 +28,7 @@ type SortDirection = 'asc' | 'desc';
 
 interface IncrementalRemData {
   remId: string;
-  rem: Rem;
+  rem: PluginRem;
   name: string;
   currentPriority: number;
   newPriority: number | null;
@@ -1141,11 +1141,11 @@ useEffect(() => {
 }
 
 // Helper function with IDs for proper hierarchy tracking - including focused rem as root
-async function getRemPathWithIds(plugin: RNPlugin, rem: Rem, stopAtId: string): Promise<{path: string[], pathIds: string[]}> {
+async function getRemPathWithIds(plugin: RNPlugin, rem: PluginRem, stopAtId: string): Promise<{path: string[], pathIds: string[]}> {
   console.log('🛤️ Getting path for rem:', rem._id, 'stopping at:', stopAtId);
   const path: string[] = [];
   const pathIds: string[] = [];
-  let current: Rem | undefined = rem;
+  let current: PluginRem | undefined = rem;
   
   // If this IS the focused rem, just return its own info
   if (current._id === stopAtId) {

@@ -1,6 +1,6 @@
 import {
   BuiltInPowerupCodes,
-  Rem,
+  PluginRem,
   RichTextElementRemInterface,
   RNPlugin,
 } from '@remnote/plugin-sdk';
@@ -70,7 +70,7 @@ export async function handleHextRepetitionClick(
  */
 export const getIncrementalRemInfo = async (
   plugin: RNPlugin,
-  r: Rem | undefined
+  r: PluginRem | undefined
 ): Promise<IncrementalRem | null> => {
   if (!r) {
     return null;

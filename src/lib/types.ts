@@ -1,4 +1,4 @@
-import { Rem } from '@remnote/plugin-sdk';
+import { PluginRem } from '@remnote/plugin-sdk';
 import { z } from 'zod';
 
 export const IncrementalRep = z.object({
@@ -45,13 +45,13 @@ export type ActionItemType =
   | 'pdf-highlight'
   | 'html-highlight';
 
-export type PDFActionItem = { type: 'pdf'; rem: Rem };
-export type HTMLActionItem = { type: 'html'; rem: Rem };
-export type YoutubeActionItem = { type: 'youtube'; rem: Rem; url: string };
-export type VideoActionItem = { type: 'video'; rem: Rem };
-export type RemActionItem = { type: 'rem'; rem: Rem };
-export type PDFHighlightActionItem = { type: 'pdf-highlight'; rem: Rem; extract: Rem };
-export type HTMLHighlightActionItem = { type: 'html-highlight'; rem: Rem; extract: Rem };
+export type PDFActionItem = { type: 'pdf'; rem: PluginRem };
+export type HTMLActionItem = { type: 'html'; rem: PluginRem };
+export type YoutubeActionItem = { type: 'youtube'; rem: PluginRem; url: string };
+export type VideoActionItem = { type: 'video'; rem: PluginRem };
+export type RemActionItem = { type: 'rem'; rem: PluginRem };
+export type PDFHighlightActionItem = { type: 'pdf-highlight'; rem: PluginRem; extract: PluginRem };
+export type HTMLHighlightActionItem = { type: 'html-highlight'; rem: PluginRem; extract: PluginRem };
 
 export type RemAndType =
   | PDFActionItem

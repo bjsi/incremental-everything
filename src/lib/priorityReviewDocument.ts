@@ -1,4 +1,4 @@
-import { RNPlugin, Rem, RichTextInterface } from '@remnote/plugin-sdk';
+import { RNPlugin, PluginRem, RichTextInterface } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './types';
 import { getCardRandomness, getSortingRandomness, applySortingCriteria } from './sorting';
 import { getDueCardsWithPriorities } from './cardPriority';
@@ -6,7 +6,7 @@ import { allIncrementalRemKey } from './consts';
 
 
 // Helper function to find or create a tag
-async function findOrCreateTag(plugin: RNPlugin, tagName: string): Promise<Rem | undefined> {
+async function findOrCreateTag(plugin: RNPlugin, tagName: string): Promise<PluginRem | undefined> {
   let tag = await plugin.rem.findByName([tagName], null);
   if (!tag) {
     tag = await plugin.rem.createRem();
@@ -29,7 +29,7 @@ export interface ReviewDocumentConfig {
 export async function createPriorityReviewDocument(
   plugin: RNPlugin,
   config: ReviewDocumentConfig
-): Promise<Rem> {
+): Promise<PluginRem> {
   const { scopeRemId, itemCount, cardRatio } = config;
 
   // 1. Create the review document with rem reference in title
@@ -109,7 +109,7 @@ export async function createPriorityReviewDocument(
   const sortedCards = applySortingCriteria(cardsWithPriority, cardRandomness);
   
   // 6. Mix according to ratio - FIXED LOGIC
-  const mixedItems: Array<{ rem: Rem; type: 'incremental' | 'flashcard' }> = [];
+  const mixedItems: Array<{ rem: PluginRem; type: 'incremental' | 'flashcard' }> = [];
   let incRemIndex = 0;
   let cardIndex = 0;
 
