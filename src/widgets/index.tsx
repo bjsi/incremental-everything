@@ -59,7 +59,8 @@ import {
   isMobileDeviceKey,
   alwaysUseLightModeOnWebId,
   isWebPlatformKey,
-  lastDetectedPlatformKey
+  lastDetectedPlatformKey,
+  pdfHighlightColorId
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -1048,6 +1049,20 @@ async function onActivate(plugin: ReactRNPlugin) {
         label: 'Regular (www.remnote.com)',
         value: 'www'
       }
+    ]
+  });
+
+  plugin.settings.registerDropdownSetting({
+    id: pdfHighlightColorId,
+    title: 'Incremental PDF Highlight Color',
+    description: 'Choose the highlight color for PDF highlights tagged as Incremental Rem. When toggling OFF (removing Incremental tag), the highlight will be reset to Yellow.',
+    defaultValue: 'Blue',
+    options: [
+      { key: 'Red', label: 'Red', value: 'Red' },
+      { key: 'Orange', label: 'Orange', value: 'Orange' },
+      { key: 'Green', label: 'Green', value: 'Green' },
+      { key: 'Blue', label: 'Blue', value: 'Blue' },
+      { key: 'Purple', label: 'Purple', value: 'Purple' }
     ]
   });
 
@@ -2468,7 +2483,9 @@ async function onActivate(plugin: ReactRNPlugin) {
         await plugin.app.toast('❌ Removed Incremental tag');
       } else {
         await initIncrementalRem(rem);
-        await rem.setHighlightColor('Blue'); // Blue = Incremental
+        // Get the user-configured highlight color from settings
+        const highlightColor = (await plugin.settings.getSetting(pdfHighlightColorId)) as 'Red' | 'Orange' | 'Yellow' | 'Green' | 'Blue' | 'Purple' || 'Blue';
+        await rem.setHighlightColor(highlightColor);
         await plugin.app.toast('✅ Tagged as Incremental Rem');
         await plugin.widget.openPopup('priority', {
           remId: rem._id,

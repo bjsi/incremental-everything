@@ -77,3 +77,5 @@ export const editorReviewTimerStartKey = 'editor-review-timer-start';
 export const editorReviewTimerIntervalKey = 'editor-review-timer-interval';
 export const editorReviewTimerPriorityKey = 'editor-review-timer-priority';
 export const editorReviewTimerRemNameKey = 'editor-review-timer-rem-name';
+
+export const pdfHighlightColorId = 'pdf-highlight-color'; // Incremental PDF highlight color
