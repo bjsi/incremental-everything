@@ -1,4 +1,4 @@
-import { AppEvents, ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
+import { AppEvents, ReactRNPlugin, RemId, PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import dayjs from 'dayjs';
 import * as _ from 'remeda';
 import {
@@ -14,16 +14,24 @@ import {
   documentCardPriorityShieldHistoryKey,
   queueSessionCacheKey,
   currentScopeRemIdsKey,
+  queueCounterId,
+  powerupCode,
+  nextRepDateSlotCode,
 } from '../lib/consts';
 import { calculateRelativePriority } from '../lib/priority';
 import {
   CardPriorityInfo,
   calculateRelativeCardPriority,
+  QueueSessionCache,
 } from '../lib/cardPriority';
 import { IncrementalRem } from '../lib/types';
 import { flushCacheUpdatesNow } from '../lib/cache';
 
 type ResetSessionItemCounter = () => void;
+type PriorityReviewHelpers = {
+  isPriorityReviewDocument: (plugin: RNPlugin, rem: PluginRem) => Promise<boolean>;
+  extractOriginalScopeFromPriorityReview: (plugin: RNPlugin, reviewDocRem: PluginRem) => Promise<string | null>;
+};
 
 export function registerQueueExitListener(
   plugin: ReactRNPlugin,
@@ -189,5 +197,307 @@ export function registerQueueExitListener(
     resetSessionItemCounter();
 
     console.log('Session state reset complete');
+  });
+}
+
+export function registerQueueEnterListener(
+  plugin: ReactRNPlugin,
+  {
+    resetSessionItemCounter,
+    priorityReviewHelpers,
+  }: {
+    resetSessionItemCounter: ResetSessionItemCounter;
+    priorityReviewHelpers: PriorityReviewHelpers;
+  }
+) {
+  const {
+    isPriorityReviewDocument,
+    extractOriginalScopeFromPriorityReview,
+  } = priorityReviewHelpers;
+
+  plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
+    console.log('QUEUE ENTER: Starting session pre-calculation for subQueueId:', subQueueId);
+
+    await plugin.storage.setSession(seenRemInSessionKey, []);
+    await plugin.storage.setSession(seenCardInSessionKey, []);
+    resetSessionItemCounter();
+    await plugin.storage.setSession(currentScopeRemIdsKey, null);
+    
+    let scopeForPriorityCalc = subQueueId || null;
+    let scopeForItemSelection = subQueueId || null;
+    let originalScopeId = subQueueId || null;
+    let isPriorityReviewDoc = false;
+    
+    if (subQueueId) {
+      const queueRem = await plugin.rem.findOne(subQueueId);
+      if (queueRem) {
+        isPriorityReviewDoc = await isPriorityReviewDocument(plugin, queueRem);
+        
+        if (isPriorityReviewDoc) {
+          console.log('QUEUE ENTER: Priority Review Document detected!');
+          
+          const extractedScopeId = await extractOriginalScopeFromPriorityReview(plugin, queueRem);
+          
+          if (extractedScopeId !== undefined) {
+            scopeForPriorityCalc = extractedScopeId;
+            originalScopeId = extractedScopeId;
+            scopeForItemSelection = subQueueId;
+            
+            console.log(`QUEUE ENTER: Priority Review Document setup:`);
+            console.log(`  - Item selection from: Priority Review Doc (${subQueueId})`);
+            console.log(`  - Priority calculations for: ${extractedScopeId ? `Original scope (${extractedScopeId})` : 'Full KB'}`);
+          } else {
+            console.warn('QUEUE ENTER: Could not extract scope from Priority Review Document');
+          }
+        }
+      }
+    }
+    
+    await plugin.storage.setSession(currentSubQueueIdKey, subQueueId || null);
+    await plugin.storage.setSession('originalScopeId', originalScopeId);
+    await plugin.storage.setSession('isPriorityReviewDoc', isPriorityReviewDoc);
+
+    const performanceMode = await plugin.settings.getSetting('performanceMode') || 'full';
+
+    const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+    
+    if (allCardInfos.length === 0) {
+      console.warn('QUEUE ENTER: Card priority cache is empty! Flashcard calculations will be skipped.');
+    }
+
+    const dueCardsInKB = (performanceMode === 'full') ? allCardInfos.filter(info => info.dueCards > 0) : [];
+
+    let docPercentiles: Record<RemId, number> = {};
+    let dueCardsInScope: CardPriorityInfo[] = [];
+
+    const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    
+    if (allIncRems.length === 0) {
+      console.warn('QUEUE ENTER: Incremental Rem cache is empty! IncRem calculations will be skipped.');
+    }
+    
+    const dueIncRemsInKB = allIncRems?.filter(rem => Date.now() >= rem.nextRepDate) || [];
+    let dueIncRemsInScope: IncrementalRem[] = [];
+    let incRemDocPercentiles: Record<RemId, number> = {};
+
+    if (scopeForItemSelection) {
+      console.log('QUEUE ENTER: Setting up scopes...');
+      
+      let itemSelectionScope: Set<RemId>;
+      
+      if (isPriorityReviewDoc) {
+        const reviewDocRem = await plugin.rem.findOne(scopeForItemSelection);
+        if (reviewDocRem) {
+          const startTime = Date.now();
+          
+          const descendants = await reviewDocRem.getDescendants();
+          const allRemsInContext = await reviewDocRem.allRemInDocumentOrPortal();
+          const folderQueueRems = await reviewDocRem.allRemInFolderQueue();
+          const sources = await reviewDocRem.getSources();
+          
+          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+            powerupCode,
+            nextRepDateSlotCode
+          );
+          
+          const referencingRems = ((await reviewDocRem.remsReferencingThis()) || []).map((rem) => {
+            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+              return rem.parent;
+            } else {
+              return rem._id;
+            }
+          }).filter(id => id !== null && id !== undefined) as RemId[];
+          
+          itemSelectionScope = new Set<RemId>([
+            reviewDocRem._id,
+            ...descendants.map(r => r._id),
+            ...allRemsInContext.map(r => r._id),
+            ...folderQueueRems.map(r => r._id),
+            ...sources.map(r => r._id),
+            ...referencingRems
+          ]);
+          
+          const elapsed = Date.now() - startTime;
+          console.log(`QUEUE ENTER: Priority Review Doc scope: ${itemSelectionScope.size} items for selection (${elapsed}ms)`);
+          
+          await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
+        }
+      } else {
+        const scopeRem = await plugin.rem.findOne(scopeForItemSelection);
+        if (scopeRem) {
+          const startTime = Date.now();
+          
+          const descendants = await scopeRem.getDescendants();
+          const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+          const folderQueueRems = await scopeRem.allRemInFolderQueue();
+          const sources = await scopeRem.getSources();
+          
+          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+            powerupCode,
+            nextRepDateSlotCode
+          );
+          
+          const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
+            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+              return rem.parent;
+            } else {
+              return rem._id;
+            }
+          }).filter(id => id !== null && id !== undefined) as RemId[];
+          
+          itemSelectionScope = new Set<RemId>([
+            scopeRem._id,
+            ...descendants.map(r => r._id),
+            ...allRemsInContext.map(r => r._id),
+            ...folderQueueRems.map(r => r._id),
+            ...sources.map(r => r._id),
+            ...referencingRems
+          ]);
+          
+          const elapsed = Date.now() - startTime;
+          console.log(`QUEUE ENTER: Regular document comprehensive scope: ${itemSelectionScope.size} items (${elapsed}ms)`);
+          
+          await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
+        }
+      }
+      
+      let priorityCalcScope: Set<RemId>;
+      
+      if (isPriorityReviewDoc && scopeForPriorityCalc) {
+        const originalScopeRem = await plugin.rem.findOne(scopeForPriorityCalc);
+        if (originalScopeRem) {
+          const descendants = await originalScopeRem.getDescendants();
+          const allRemsInContext = await originalScopeRem.allRemInDocumentOrPortal();
+          const folderQueueRems = await originalScopeRem.allRemInFolderQueue();
+          const sources = await originalScopeRem.getSources();
+          
+          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+            powerupCode,
+            nextRepDateSlotCode
+          );
+          
+          const referencingRems = ((await originalScopeRem.remsReferencingThis()) || []).map((rem) => {
+            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+              return rem.parent;
+            } else {
+              return rem._id;
+            }
+          }).filter(id => id !== null && id !== undefined) as RemId[];
+          
+          priorityCalcScope = new Set<RemId>([
+            originalScopeRem._id,
+            ...descendants.map(r => r._id),
+            ...allRemsInContext.map(r => r._id),
+            ...folderQueueRems.map(r => r._id),
+            ...sources.map(r => r._id),
+            ...referencingRems
+          ]);
+    
+          await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
+          
+        } else {
+          priorityCalcScope = new Set<RemId>();
+        }
+      } else {
+        priorityCalcScope = itemSelectionScope || new Set<RemId>();
+      }
+
+      if (priorityCalcScope.size > 0) {
+        
+        await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
+        
+        if (performanceMode === 'full') {
+          console.log('QUEUE ENTER: Full mode. Calculating session cache...');
+          
+          const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
+          const sortedDocCards = _.sortBy(docCardInfos, (info) => info.priority);
+          
+          sortedDocCards.forEach((info, index) => {
+            docPercentiles[info.remId] = Math.round(((index + 1) / sortedDocCards.length) * 100);
+          });
+          
+          dueCardsInScope = dueCardsInKB.filter(info => priorityCalcScope.has(info.remId));
+          
+          const scopedIncRems = allIncRems.filter(rem => priorityCalcScope.has(rem.remId));
+          const sortedIncRems = _.sortBy(scopedIncRems, (rem) => rem.priority);
+          
+          sortedIncRems.forEach((rem, index) => {
+            incRemDocPercentiles[rem.remId] = Math.round(((index + 1) / sortedIncRems.length) * 100);
+          });
+          
+          dueIncRemsInScope = dueIncRemsInKB.filter(rem => priorityCalcScope.has(rem.remId));
+          
+          console.log(`QUEUE ENTER: Priority calculations complete:`);
+          console.log(`  - Cards in priority scope: ${docCardInfos.length}`);
+          console.log(`  - Due cards in priority scope: ${dueCardsInScope.length}`);
+          console.log(`  - IncRems in priority scope: ${scopedIncRems.length}`);
+          console.log(`  - Due IncRems in priority scope: ${dueIncRemsInScope.length}`);
+        
+        } else {
+          console.log('QUEUE ENTER: Light mode. Skipping session cache calculation.');
+        }
+      }
+      
+    }
+
+    const sessionCache: QueueSessionCache = {
+      docPercentiles,
+      dueCardsInScope,
+      dueCardsInKB,
+      dueIncRemsInScope,
+      dueIncRemsInKB,
+      incRemDocPercentiles,
+    };
+
+    await plugin.storage.setSession(queueSessionCacheKey, sessionCache);
+    console.log('QUEUE ENTER: Pre-calculation complete. Session cache has been saved.');
+    
+    let dueIncRemCount: number;
+    
+    if (isPriorityReviewDoc) {
+      const scopeRemIds = await plugin.storage.getSession<RemId[]>(currentScopeRemIdsKey) || [];
+      dueIncRemCount = allIncRems.filter(rem => 
+        scopeRemIds.includes(rem.remId) && Date.now() >= rem.nextRepDate
+      ).length;
+
+    } else if (scopeForItemSelection) {
+          
+          if (performanceMode === 'full') {
+            dueIncRemCount = sessionCache.dueIncRemsInScope.length;
+          } else {
+            console.log('QUEUE ENTER: Light mode - manually calculating due IncRem count...');
+            const scopeRemIds = await plugin.storage.getSession<RemId[]>(currentScopeRemIdsKey) || [];
+            if (scopeRemIds) {
+              dueIncRemCount = allIncRems.filter(rem => 
+                Date.now() >= rem.nextRepDate &&
+                scopeRemIds.includes(rem.remId)
+              ).length;
+            } else {
+              dueIncRemCount = 0;
+            }
+            console.log(`QUEUE ENTER: Light mode - found ${dueIncRemCount} due IncRems`);
+          }
+
+        } else {
+          dueIncRemCount = sessionCache.dueIncRemsInKB.length;
+        }
+
+    plugin.app.registerCSS(
+      queueCounterId,
+      `
+      .rn-queue__card-counter {
+        /*visibility: hidden;*/
+      }
+
+      .light .rn-queue__card-counter:after {
+        content: ' + ${dueIncRemCount}';
+      }
+
+      .dark .rn-queue__card-counter:after {
+        content: ' + ${dueIncRemCount}';
+      }`.trim()
+    );
+
+    console.log(`QUEUE ENTER: Queue counter updated to show ${dueIncRemCount} due IncRems`);
   });
 }
