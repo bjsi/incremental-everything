@@ -1000,6 +1000,18 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerPluginPowerups(plugin);
   await registerPluginSettings(plugin);
 
+  registerQueueExitListener(plugin, () => {
+    sessionItemCounter = 0;
+  });
+
+  registerQueueEnterListener(plugin, () => {
+    sessionItemCounter = 0;
+  });
+
+  registerURLChangeListener(plugin);
+  registerQueueCompleteCardListener(plugin);
+  registerGlobalRemChangedListener(plugin);
+
 
   // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
   // so added special handling in initIncrementalRem
@@ -1035,14 +1047,6 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   // TODO: some handling to include extracts created in current queue in the queue?
   // or unnecessary due to init interval? could append to this list
-
-  registerQueueExitListener(plugin, () => {
-    sessionItemCounter = 0;
-  });
-
-  registerQueueEnterListener(plugin, () => {
-    sessionItemCounter = 0;
-  });
 
   plugin.app.registerCommand({
     id: nextRepCommandId,
@@ -1685,11 +1689,6 @@ async function onActivate(plugin: ReactRNPlugin) {
       });
     },
   });
-
-  registerURLChangeListener(plugin);
-  registerQueueCompleteCardListener(plugin);
-  registerGlobalRemChangedListener(plugin);
-
 
   plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
     powerupFilter: powerupCode,
