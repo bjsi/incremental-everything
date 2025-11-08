@@ -1,5 +1,4 @@
 import {
-  AppEvents,
   declareIndexPlugin,
   PluginCommandMenuLocation,
   PropertyLocation,
@@ -24,10 +23,8 @@ import {
   prioritySlotCode,
   repHistorySlotCode,
   collapseQueueTopBar,
-  scrollToHighlightId,
   collapseTopBarId,
   queueCounterId,
-  hideIncEverythingId,
   nextRepCommandId,
   queueLayoutFixId,
   currentScopeRemIdsKey,
@@ -77,7 +74,6 @@ import {
   setCardPriority,
   calculateNewPriority
 } from '../lib/cardPriority';
-import { updateCardPriorityInCache } from '../lib/cache';
 import {
   registerQueueExitListener,
   registerQueueEnterListener,
