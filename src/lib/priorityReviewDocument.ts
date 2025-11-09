@@ -42,6 +42,41 @@ export async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean>
   });
 }
 
+/**
+ * Parses the original scope identifier embedded in a Priority Review document title.
+ *
+ * The title is expected to contain either a portal reference to the original scope
+ * (inserted when the review doc is generated) or the literal text "Full Knowledge Base".
+ * - Returns the referenced Rem ID when the portal is present.
+ * - Returns `null` when the title explicitly indicates the full knowledge base.
+ * - Returns `undefined` when the title cannot be parsed so callers can fall back safely.
+ */
+export async function extractOriginalScopeFromPriorityReview(
+  reviewDocRem: PluginRem
+): Promise<string | null | undefined> {
+  const reviewDocTitle = reviewDocRem.text;
+  if (!reviewDocTitle || reviewDocTitle.length === 0) {
+    console.warn('Priority Review Document has no title content to parse for scope.');
+    return undefined;
+  }
+
+  for (const element of reviewDocTitle) {
+    if (typeof element === 'object' && element !== null) {
+      if ('i' in element && element.i === 'q' && '_id' in element) {
+        return element._id as string;
+      }
+    }
+  }
+
+  const textContent = reviewDocTitle.join('');
+  if (textContent.includes('Full Knowledge Base')) {
+    return null;
+  }
+
+  console.warn('Could not extract scope from Priority Review Document title');
+  return undefined;
+}
+
 export interface ReviewDocumentConfig {
   scopeRemId: string | null;  // null = full KB
   itemCount: number;

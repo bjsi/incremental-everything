@@ -32,7 +32,7 @@ import {
 import { IncrementalRem } from '../lib/types';
 import { flushCacheUpdatesNow, updateCardPriorityInCache } from '../lib/cache';
 import { setCurrentIncrementalRem } from '../lib/currentRem';
-import { isPriorityReviewDocument } from '../lib/priorityReviewDocument';
+import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../lib/priorityReviewDocument';
 
 type ResetSessionItemCounter = () => void;
 
@@ -44,46 +44,6 @@ type ShieldHistoryEntry = {
 
 type ShieldHistory = Record<string, ShieldHistoryEntry>;
 type ShieldHistoryByScope = Record<string, ShieldHistory>;
-
-/**
- * Parses the original scope identifier embedded in a Priority Review document title.
- *
- * @param reviewDocRem Priority Review document Rem.
- * @returns The referenced scope RemId, null for full KB, or undefined if parsing failed.
- */
-async function extractOriginalScopeFromPriorityReview(
-  reviewDocRem: PluginRem
-): Promise<string | null | undefined> {
-  // NOTE: returning `null` means "Full KB scope" while `undefined` signals "missing / unparseable scope".
-  // Keeping those distinct prevents Priority Review docs from silently inheriting stale session state (bug #???).
-  const richText = reviewDocRem.text;
-  if (!richText || richText.length === 0) {
-    console.warn('Priority Review Document has no title content to parse for scope.');
-    return undefined;
-  }
-
-  // Search for a rem reference in the rich text
-  for (const element of richText) {
-    if (typeof element === 'object' && element !== null) {
-      // Check if it's a rem reference (portal)
-      if ('i' in element && element.i === 'q' && '_id' in element) {
-        // This is a rem reference, return the referenced rem ID
-        return element._id as string;
-      }
-    }
-  }
-
-  // No rem reference found - might be "Full Knowledge Base"
-  const textContent = richText.join('');
-  if (textContent.includes('Full Knowledge Base')) {
-    // Return null to indicate full KB scope
-    return null;
-  }
-
-  // Could not determine scope
-  console.warn('Could not extract scope from Priority Review Document title');
-  return undefined;
-}
 
 /**
  * Registers a listener that runs after the user exits the queue to flush caches and persist shield history.
