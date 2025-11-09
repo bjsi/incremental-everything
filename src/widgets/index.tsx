@@ -1,12 +1,10 @@
 import {
   declareIndexPlugin,
-  PluginCommandMenuLocation,
   QueueItemType,
   ReactRNPlugin,
   RemId,
   RNPlugin,
   SpecialPluginCallback,
-  WidgetLocation,
 } from '@remnote/plugin-sdk';
 import '../style.css';
 import '../App.css';
@@ -18,13 +16,8 @@ import {
   queueLayoutFixId,
   currentScopeRemIdsKey,
   seenRemInSessionKey,
-  priorityShieldHistoryMenuItemId,
-  currentSubQueueIdKey,
   allCardPriorityInfoKey,
-  pageRangeWidgetId,
   noIncRemTimerKey,
-  noIncRemMenuItemId,
-  pdfHighlightColorId
 } from '../lib/consts';
 import * as _ from 'remeda';
 import { getSortingRandomness, getCardsPerRem } from '../lib/sorting';
@@ -32,7 +25,6 @@ import { IncrementalRem } from '../lib/types';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { safeRemTextToString } from '../lib/pdfUtils';
 import { 
   handleMobileDetectionOnStartup,
   shouldUseLightMode,
@@ -49,7 +41,7 @@ import {
   registerQueueCompleteCardListener,
   registerGlobalRemChangedListener,
 } from './events';
-import { registerPluginPowerups, initIncrementalRem } from './powerups';
+import { registerPluginPowerups } from './powerups';
 import { registerPluginSettings } from './settings';
 import { jumpToRemById } from './jump_to_rem_input';
 import { registerPluginCommands } from './commands';
