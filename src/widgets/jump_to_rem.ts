@@ -2,7 +2,8 @@ import { ReactRNPlugin } from '@remnote/plugin-sdk';
 
 export function registerJumpToRemHelper(plugin: ReactRNPlugin) {
   const jumpToRemByIdFunction = async (remId: string) => {
-    if (!remId || typeof remId !== 'string' || remId.trim() === '') {
+    const trimmedId = typeof remId === 'string' ? remId.trim() : '';
+    if (!trimmedId) {
       console.error('❌ Invalid RemId provided');
       console.log("Usage: jumpToRemById('your-rem-id-here')");
       console.log("Example: jumpToRemById('abc123xyz')");
@@ -10,14 +11,8 @@ export function registerJumpToRemHelper(plugin: ReactRNPlugin) {
     }
 
     try {
-      if (!plugin) {
-        console.error('❌ Plugin not found. Make sure the Incremental Everything plugin is loaded.');
-        console.log('Try reloading the plugin from RemNote Settings → Plugins');
-        return;
-      }
-
-      console.log(`🔍 Searching for rem: ${remId}...`);
-      const rem = await plugin.rem.findOne(remId.trim());
+      console.log(`🔍 Searching for rem: ${trimmedId}...`);
+      const rem = await plugin.rem.findOne(trimmedId);
 
       if (!rem) {
         console.error(`❌ Rem not found: ${remId}`);
