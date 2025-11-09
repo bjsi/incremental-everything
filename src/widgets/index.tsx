@@ -53,6 +53,7 @@ import { registerPluginPowerups, initIncrementalRem } from './powerups';
 import { registerPluginSettings } from './settings';
 import { jumpToRemById } from './jump_to_rem_input';
 import { registerPluginCommands } from './commands';
+import { registerWidgets } from './widgets';
 dayjs.extend(relativeTime);
 
 let sessionItemCounter = 0;
@@ -578,93 +579,10 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   );
 
- 
-
-  // Priority widget registration to handle both IncRem and Cards
-  plugin.app.registerWidget('priority', WidgetLocation.Popup, {
-    dimensions: {
-      width: '500px',
-      height: 'auto',
-    },
-  });
-
-  // Register the priority editor widget for the right side of editor
-
-  // NEW LOG: Check if the registration code is being reached.
-  console.log('Attempting to register priority_editor widget...');
-  
-  plugin.app.registerWidget('priority_editor', WidgetLocation.RightSideOfEditor, {
-    dimensions: {
-      height: 'auto',
-      width: 'auto',
-    },
-  });
-
-  // NEW LOG: Confirm that the registration call completed without error.
-  console.log('SUCCESS: priority_editor widget registered.');
-
-  plugin.app.registerWidget('batch_priority', WidgetLocation.Popup, {
-    dimensions: {
-      width: 1000,
-      height: 950,
-    },
-  });
-
-  plugin.app.registerWidget('batch_card_priority', WidgetLocation.Popup, {
-    dimensions: {
-      width: 600,
-      height: 'auto',
-    },
-  });
-  
-
-  plugin.app.registerWidget('reschedule', WidgetLocation.Popup, {
-    dimensions: {
-    width: '100%',
-    height: 'auto',
-    },
-  });
-
-  plugin.app.registerWidget(pageRangeWidgetId, WidgetLocation.Popup, {
-    dimensions: {
-      width: 600, 
-      height: 900,
-    },
-  });
+  await registerWidgets(plugin);
 
   await registerPluginCommands(plugin, {
     cacheAllCardPriorities,
-  });
-  plugin.app.registerWidget('debug', WidgetLocation.Popup, {
-    dimensions: {
-      width: '350px',
-      height: 'auto',
-    },
-  });
-  plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
-    powerupFilter: powerupCode,
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-    queueItemTypeFilter: QueueItemType.Plugin,
-  });
-  console.log('✅ Widget registered with powerupFilter:', powerupCode, 'queueItemTypeFilter:', QueueItemType.Plugin);
-  
-  plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
-    powerupFilter: powerupCode,
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-    queueItemTypeFilter: QueueItemType.Plugin,
-  });
-
-  plugin.app.registerWidget('sorting_criteria', WidgetLocation.Popup, {
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
   });
 
   plugin.app.registerMenuItem({
@@ -675,14 +593,6 @@ async function onActivate(plugin: ReactRNPlugin) {
       await plugin.widget.openPopup('sorting_criteria');
     },
   });
-
-  plugin.app.registerWidget('priority_shield_graph', WidgetLocation.Popup, {
-    dimensions: {
-      width: 1075,
-      height: 1050,
-    },
-  });
-
 
   plugin.app.registerMenuItem({
     id: priorityShieldHistoryMenuItemId,
@@ -795,16 +705,6 @@ async function onActivate(plugin: ReactRNPlugin) {
   });
 
   // No Inc Rem Timer
-
-  // Register the timer indicator widget (add this with other widget registrations)
-  plugin.app.registerWidget('no_inc_timer_indicator', WidgetLocation.QueueToolbar, {
-    dimensions: {
-      width: 'auto',
-      height: 'auto',
-    },
-  });
-
-  // Update the menu item registration to use synced storage
   plugin.app.registerMenuItem({
     id: noIncRemMenuItemId,
     name: 'No Inc Rem for 15 min',
@@ -828,55 +728,7 @@ async function onActivate(plugin: ReactRNPlugin) {
       await plugin.storage.setSynced('queue-refresh-trigger', Date.now());
     },
   });
-  // Register the review document creator widget
-  plugin.app.registerWidget('review_document_creator', WidgetLocation.Popup, {
-    dimensions: {
-      width: 500,
-      height: 'auto',
-    },
-  });
 
-  // Register the jump to rem input widget
-  plugin.app.registerWidget('jump_to_rem_input', WidgetLocation.Popup, {
-    dimensions: {
-      width: 400,
-      height: 'auto',
-    },
-  });
-
-  plugin.app.registerWidget('card_priority_display', WidgetLocation.FlashcardUnder, {
-    powerupFilter: 'cardPriority',
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-    queueItemTypeFilter: QueueItemType.Flashcard,
-  });
-
-  plugin.app.registerWidget('video_debug', WidgetLocation.Popup, {
-    dimensions: {
-      width: '500px',
-      height: 'auto',
-    },
-  });
-
-    // Register editor review popup
-  plugin.app.registerWidget(
-    'editor_review',
-    WidgetLocation.Popup,
-    {
-      dimensions: { height: 'auto', width: '500px' },
-    }
-  );
-  
-  // Register editor review timer widget
-  plugin.app.registerWidget(
-    'editor_review_timer',
-    WidgetLocation.DocumentAboveToolbar,
-    {
-      dimensions: { height: 'auto', width: '100%' },
-    }
-  );
   // Add menu item for quick access
   plugin.app.registerMenuItem({
     id: 'create_priority_review_menuitem',
