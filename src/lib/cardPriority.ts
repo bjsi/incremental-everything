@@ -2,7 +2,14 @@ import { PluginRem, RNPlugin, RemId, Query_DUPE_2 as Query, BuiltInPowerupCodes,
 import { IncrementalRem } from './types';
 import { getIncrementalRemInfo } from './incremental_rem';
 import { safeRemTextToString } from './pdfUtils';
-import { allCardPriorityInfoKey, powerupCode, nextRepDateSlotCode } from './consts';
+import {
+  allCardPriorityInfoKey,
+  powerupCode,
+  nextRepDateSlotCode,
+  cardPriorityShieldHistoryKey,
+  documentCardPriorityShieldHistoryKey,
+  seenCardInSessionKey,
+} from './consts';
 import * as _ from 'remeda';
 
 const CARD_PRIORITY_CODE = 'cardPriority';
@@ -62,6 +69,96 @@ export interface QueueSessionCache {
    * Pre-calculated for every IncRem in the current document scope.
    */
   incRemDocPercentiles: Record<RemId, number>;
+}
+
+// CLEANUP FUNCTION - Removes all CardPriority tags and data
+export async function removeAllCardPriorityTags(plugin: RNPlugin) {
+  const confirmed = confirm(
+    '⚠️ Remove All CardPriority Data\n\n' +
+      'This will permanently remove ALL cardPriority tags and their data from your entire knowledge base.\n\n' +
+      'This action cannot be undone.\n\n' +
+      'Are you sure you want to proceed?'
+  );
+
+  if (!confirmed) {
+    console.log('CardPriority cleanup cancelled by user');
+    await plugin.app.toast('CardPriority cleanup cancelled');
+    return;
+  }
+
+  console.log('Starting CardPriority cleanup...');
+  await plugin.app.toast('Starting CardPriority cleanup...');
+
+  try {
+    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+    const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+
+    if (taggedRems.length === 0) {
+      await plugin.app.toast('No CardPriority tags found to remove');
+      console.log('No CardPriority tags found');
+      return;
+    }
+
+    let removed = 0;
+    const total = taggedRems.length;
+    const batchSize = 50;
+
+    console.log(`Found ${total} rems with CardPriority tags. Starting removal...`);
+    await plugin.app.toast(`Found ${total} CardPriority tags to remove...`);
+
+    for (let i = 0; i < taggedRems.length; i += batchSize) {
+      const batch = taggedRems.slice(i, i + batchSize);
+
+      await Promise.all(
+        batch.map(async (rem) => {
+          try {
+            await rem.setPowerupProperty('cardPriority', 'priority', []);
+            await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
+            await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
+          } catch (e) {
+            console.log(`Warning: Could not clear slots for rem ${rem._id}:`, e);
+          }
+
+          await rem.removePowerup('cardPriority');
+        })
+      );
+
+      removed += batch.length;
+
+      const progress = Math.round((removed / total) * 100);
+      if (progress % 10 === 0 || removed === total) {
+        await plugin.app.toast(`Cleanup progress: ${progress}% (${removed}/${total})`);
+        console.log(`Cleanup progress: ${progress}% (${removed}/${total})`);
+      }
+    }
+
+    console.log('Clearing session storage...');
+    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    await plugin.storage.setSession(seenCardInSessionKey, []);
+
+    console.log('Clearing synced storage...');
+    await plugin.storage.setSynced(cardPriorityShieldHistoryKey, {});
+    await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, {});
+
+    await plugin.app.toast(`✅ Cleanup complete! Removed ${removed} CardPriority tags.`);
+    console.log(`CardPriority cleanup finished. Successfully removed ${removed} tags from knowledge base.`);
+
+    const shouldRefresh = confirm(
+      'Cleanup successful!\n\n' + 'Would you like to refresh the page to ensure a clean state?'
+    );
+
+    if (shouldRefresh) {
+      window.location.reload();
+    }
+  } catch (error) {
+    console.error('Error during CardPriority cleanup:', error);
+    await plugin.app.toast('❌ Error during cleanup. Check console for details.');
+    alert(
+      'An error occurred during cleanup.\n\n' +
+        'Some tags may not have been removed.\n' +
+        'Please check the console for details.'
+    );
+  }
 }
 
 
