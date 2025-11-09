@@ -27,18 +27,16 @@ import {
   getFriendlyPlatformName,
   handleMobileDetectionOnStartup,
 } from '../lib/mobileUtils';
-import { removeAllCardPriorityTags } from '../lib/cardPriority';
+import { removeAllCardPriorityTags, precomputeAllCardPriorities } from '../lib/cardPriority';
 
 export type CommandDependencies = {
   cacheAllCardPriorities: (plugin: RNPlugin) => Promise<void>;
-  precomputeAllCardPriorities: (plugin: RNPlugin) => Promise<void>;
 };
 
 export async function registerCommands(
   plugin: ReactRNPlugin,
   {
     cacheAllCardPriorities,
-    precomputeAllCardPriorities,
   }: CommandDependencies
 ) {
   const createExtract = async () => {
