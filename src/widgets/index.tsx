@@ -20,9 +20,6 @@ import {
   seenRemInSessionKey,
   priorityShieldHistoryMenuItemId,
   currentSubQueueIdKey,
-  seenCardInSessionKey,
-  cardPriorityShieldHistoryKey,
-  documentCardPriorityShieldHistoryKey,
   allCardPriorityInfoKey,
   pageRangeWidgetId,
   noIncRemTimerKey,
@@ -60,111 +57,6 @@ dayjs.extend(relativeTime);
 
 let sessionItemCounter = 0;
 
-
-// CLEANUP FUNCTION - Removes all CardPriority tags and data
-async function removeAllCardPriorityTags(plugin: RNPlugin) {
-  const confirmed = confirm(
-    "⚠️ Remove All CardPriority Data\n\n" +
-    "This will permanently remove ALL cardPriority tags and their data from your entire knowledge base.\n\n" +
-    "This action cannot be undone.\n\n" +
-    "Are you sure you want to proceed?"
-  );
-  
-  if (!confirmed) {
-    console.log("CardPriority cleanup cancelled by user");
-    await plugin.app.toast("CardPriority cleanup cancelled");
-    return;
-  }
-  
-  console.log("Starting CardPriority cleanup...");
-  await plugin.app.toast("Starting CardPriority cleanup...");
-  
-  try {
-    // --- THIS IS THE CORRECTED LOGIC ---
-    // 1. Get the powerup object by its code.
-    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
-    
-    // 2. Then, get all Rems tagged with that powerup.
-    const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
-    // ------------------------------------
-
-    if (taggedRems.length === 0) {
-      await plugin.app.toast("No CardPriority tags found to remove");
-      console.log("No CardPriority tags found");
-      return;
-    }
-    
-    let removed = 0;
-    const total = taggedRems.length;
-    const batchSize = 50;
-    
-    console.log(`Found ${total} rems with CardPriority tags. Starting removal...`);
-    await plugin.app.toast(`Found ${total} CardPriority tags to remove...`);
-    
-    for (let i = 0; i < taggedRems.length; i += batchSize) {
-      const batch = taggedRems.slice(i, i + batchSize);
-      
-      await Promise.all(batch.map(async (rem) => {
-        try {
-          // First, explicitly clear each slot value (defensive programming)
-          await rem.setPowerupProperty('cardPriority', 'priority', []);
-          await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
-          await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
-        } catch (e) {
-          // Slots might not exist on some rems, that's ok
-          console.log(`Warning: Could not clear slots for rem ${rem._id}:`, e);
-        }
-        
-        // Then remove the powerup entirely
-        await rem.removePowerup('cardPriority');
-      }));
-      
-      removed += batch.length;
-      
-      // Show progress every 10% or at milestones
-      const progress = Math.round((removed / total) * 100);
-      if (progress % 10 === 0 || removed === total) {
-        await plugin.app.toast(`Cleanup progress: ${progress}% (${removed}/${total})`);
-        console.log(`Cleanup progress: ${progress}% (${removed}/${total})`);
-      }
-    }
-    
-    // Clear all related session storage
-    console.log("Clearing session storage...");
-    await plugin.storage.setSession(allCardPriorityInfoKey, []);
-    await plugin.storage.setSession(seenCardInSessionKey, []);
-    
-    // Clear all related synced storage
-    console.log("Clearing synced storage...");
-    await plugin.storage.setSynced(cardPriorityShieldHistoryKey, {});
-    await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, {});
-    
-    // Success message
-    await plugin.app.toast(`✅ Cleanup complete! Removed ${removed} CardPriority tags.`);
-    console.log(`CardPriority cleanup finished. Successfully removed ${removed} tags from knowledge base.`);
-    
-    // Optional: Suggest page refresh for clean state
-    const shouldRefresh = confirm(
-      "Cleanup successful!\n\n" +
-      "Would you like to refresh the page to ensure a clean state?"
-    );
-    
-    if (shouldRefresh) {
-      window.location.reload();
-    }
-    
-  } catch (error) {
-    console.error("Error during CardPriority cleanup:", error);
-    await plugin.app.toast("❌ Error during cleanup. Check console for details.");
-    alert(
-      "An error occurred during cleanup.\n\n" +
-      "Some tags may not have been removed.\n" +
-      "Please check the console for details."
-    );
-  }
-}
-
-// PRE-TAGGING FUNCTION - Pre-compute and tag all card priorities
 // CARD PRIORITIES CACHING FUNCTION - With deferred loading for untagged cards
 async function cacheAllCardPriorities(plugin: RNPlugin) {
   console.log('CACHE: Starting intelligent cache build with deferred loading...');
@@ -742,7 +634,6 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   await registerPluginCommands(plugin, {
     cacheAllCardPriorities,
-    removeAllCardPriorityTags,
   });
   plugin.app.registerWidget('debug', WidgetLocation.Popup, {
     dimensions: {
