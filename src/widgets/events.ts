@@ -1,4 +1,4 @@
-import { AppEvents, ReactRNPlugin, RemId, PluginRem } from '@remnote/plugin-sdk';
+import { AppEvents, ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
 import dayjs from 'dayjs';
 import * as _ from 'remeda';
 import {
@@ -44,6 +44,77 @@ type ShieldHistoryEntry = {
 
 type ShieldHistory = Record<string, ShieldHistoryEntry>;
 type ShieldHistoryByScope = Record<string, ShieldHistory>;
+
+type QueueScopeResolution = {
+  scopeForPriorityCalc: RemId | null | undefined;
+  scopeForItemSelection: RemId | null;
+  originalScopeId: RemId | null | undefined;
+  isPriorityReviewDoc: boolean;
+};
+
+/**
+ * Determines which scope IDs should be used for item selection and priority
+ * calculations when entering the queue.
+ *
+ * - For regular queues both scopes stay on the incoming `subQueueId`.
+ * - For Priority Review Docs, item selection stays on that generated document
+ *   while priority calculations use the original scope (or `null` for full KB).
+ * - If the title cannot be parsed we only mark `isPriorityReviewDoc` so callers
+ *   can react without inheriting a stale scope.
+ *
+ * @param plugin Plugin instance to access the RemNote API.
+ * @param subQueueId RemId of the active queue or `null`.
+ * @returns Resolved scopes plus the Priority Review flag.
+ */
+async function resolveQueueScopes(
+  plugin: ReactRNPlugin,
+  subQueueId: RemId | null | undefined
+): Promise<QueueScopeResolution> {
+  const baseScopes: QueueScopeResolution = {
+    scopeForPriorityCalc: subQueueId || null,
+    scopeForItemSelection: subQueueId || null,
+    originalScopeId: subQueueId || null,
+    isPriorityReviewDoc: false,
+  };
+
+  if (!subQueueId) {
+    return baseScopes;
+  }
+
+  const queueRem = await plugin.rem.findOne(subQueueId);
+  if (!queueRem) {
+    return baseScopes;
+  }
+
+  const isPriorityReviewDoc = await isPriorityReviewDocument(queueRem);
+  if (!isPriorityReviewDoc) {
+    return baseScopes;
+  }
+
+  console.log('QUEUE ENTER: Priority Review Document detected!');
+
+  const extractedScopeId = await extractOriginalScopeFromPriorityReview(queueRem);
+
+  if (extractedScopeId === undefined) {
+    console.warn('QUEUE ENTER: Could not extract scope from Priority Review Document');
+    return { ...baseScopes, isPriorityReviewDoc: true };
+  }
+
+  console.log('QUEUE ENTER: Priority Review Document setup:');
+  console.log(`  - Item selection from: Priority Review Doc (${subQueueId})`);
+  console.log(
+    `  - Priority calculations for: ${
+      extractedScopeId ? `Original scope (${extractedScopeId})` : 'Full KB'
+    }`
+  );
+
+  return {
+    scopeForPriorityCalc: extractedScopeId,
+    scopeForItemSelection: subQueueId,
+    originalScopeId: extractedScopeId,
+    isPriorityReviewDoc: true,
+  };
+}
 
 /**
  * Registers a listener that runs after the user exits the queue to flush caches and persist shield history.
@@ -264,39 +335,12 @@ export function registerQueueEnterListener(
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
     await plugin.storage.setSession(priorityCalcScopeRemIdsKey, null);
     
-    let scopeForPriorityCalc: RemId | null | undefined = subQueueId || null;
-    let scopeForItemSelection: RemId | null = subQueueId || null;
-    let originalScopeId: RemId | null | undefined = subQueueId || null;
-    let isPriorityReviewDoc = false;
-    
-    if (subQueueId) {
-      const queueRem = await plugin.rem.findOne(subQueueId);
-      if (queueRem) {
-        isPriorityReviewDoc = await isPriorityReviewDocument(queueRem);
-        
-        if (isPriorityReviewDoc) {
-          console.log('QUEUE ENTER: Priority Review Document detected!');
-          
-          const extractedScopeId = await extractOriginalScopeFromPriorityReview(queueRem);
-          
-          if (extractedScopeId === undefined) {
-            console.warn('QUEUE ENTER: Could not extract scope from Priority Review Document');
-          } else {
-            scopeForPriorityCalc = extractedScopeId;
-            originalScopeId = extractedScopeId;
-            scopeForItemSelection = subQueueId;
-            
-            console.log(`QUEUE ENTER: Priority Review Document setup:`);
-            console.log(`  - Item selection from: Priority Review Doc (${subQueueId})`);
-            console.log(
-              `  - Priority calculations for: ${
-                extractedScopeId ? `Original scope (${extractedScopeId})` : 'Full KB'
-              }`
-            );
-          }
-        }
-      }
-    }
+    const {
+      scopeForPriorityCalc,
+      scopeForItemSelection,
+      originalScopeId,
+      isPriorityReviewDoc,
+    } = await resolveQueueScopes(plugin, subQueueId);
     
     await plugin.storage.setSession(currentSubQueueIdKey, subQueueId || null);
     await plugin.storage.setSession('originalScopeId', originalScopeId);
