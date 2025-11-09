@@ -18,6 +18,12 @@ import { getInitialPriority } from '../lib/priority_inheritance';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { IncrementalRem } from '../lib/types';
 
+/**
+ * Registers the Incremental Everything powerups (and card priority powerup) with RemNote.
+ *
+ * @param plugin ReactRNPlugin entry point used to communicate with RemNote.
+ * @returns Promise that resolves once both powerups are registered.
+ */
 export async function registerPluginPowerups(plugin: ReactRNPlugin) {
   // New, corrected registerPowerup format with a single object (since plugin-sdk@0.0.39)
   // `slots` is nested inside `options`
@@ -78,6 +84,13 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
   });
 }
 
+/**
+ * Ensures the provided Rem is initialized as an Incremental Rem with defaults.
+ *
+ * @param plugin ReactRNPlugin used for settings/storage access.
+ * @param rem PluginRem to initialize.
+ * @returns Promise that resolves after the Rem is initialized or skipped if already incremental.
+ */
 export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) {
   // First, check if the Rem has already been initialized.
   const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
