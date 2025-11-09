@@ -79,6 +79,9 @@ export async function registerCommands(
         return;
       }
       const incRem = await getIncrementalRemInfo(plugin, rem);
+      if (!incRem) {
+        return;
+      }
       await handleHextRepetitionClick(plugin, incRem);
     },
   });
