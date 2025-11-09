@@ -115,9 +115,12 @@ async function onActivate(plugin: ReactRNPlugin) {
     .queue__title:hover { max-height: 999px; }
   `.trim();
 
-
+  // Register all plugin components
   await registerPluginPowerups(plugin);
   await registerPluginSettings(plugin);
+  await registerWidgets(plugin);
+  await registerPluginCommands(plugin);
+  await registerMenuItems(plugin);
 
   registerQueueExitListener(plugin, () => {
     sessionItemCounter = 0;
@@ -380,11 +383,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   );
 
-  await registerWidgets(plugin);
-
-  await registerPluginCommands(plugin);
-
-  await registerMenuItems(plugin);
   // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
   console.log('Mobile detection completed');
