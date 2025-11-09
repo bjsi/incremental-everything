@@ -57,6 +57,9 @@ export async function registerPluginCommands(
         return;
       }
       const incRem = await getIncrementalRemInfo(plugin, rem);
+      if (!incRem) {
+        return;
+      }
       await handleHextRepetitionClick(plugin, incRem);
     },
   });
