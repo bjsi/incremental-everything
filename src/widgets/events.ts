@@ -32,6 +32,7 @@ import {
 import { IncrementalRem } from '../lib/types';
 import { flushCacheUpdatesNow, updateCardPriorityInCache } from '../lib/cache';
 import { setCurrentIncrementalRem } from '../lib/currentRem';
+import { isPriorityReviewDocument } from '../lib/priorityReviewDocument';
 
 type ResetSessionItemCounter = () => void;
 
@@ -43,32 +44,6 @@ type ShieldHistoryEntry = {
 
 type ShieldHistory = Record<string, ShieldHistoryEntry>;
 type ShieldHistoryByScope = Record<string, ShieldHistory>;
-
-/**
- * Detects whether a Rem corresponds to a Priority Review queue document.
- *
- * @param rem Rem to inspect.
- * @returns Promise resolving to true if it is tagged as a Priority Review queue.
- */
-async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
-  const tags = await rem.getTagRems();
-  if (!tags || tags.length === 0) return false;
-
-  // Check if any tag has the name "Priority Review Queue"
-  for (const tag of tags) {
-    // Use the text property directly from RemObject
-    const tagText = tag.text;
-    if (tagText) {
-      // Convert RichTextInterface to string
-      const tagTextString = typeof tagText === 'string' ? tagText : tagText.join('');
-      if (tagTextString.includes('Priority Review Queue')) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
 
 /**
  * Parses the original scope identifier embedded in a Priority Review document title.
@@ -323,9 +298,9 @@ export function registerQueueEnterListener(
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     console.log('QUEUE ENTER: Starting session pre-calculation for subQueueId:', subQueueId);
 
+    resetSessionItemCounter();
     await plugin.storage.setSession(seenRemInSessionKey, []);
     await plugin.storage.setSession(seenCardInSessionKey, []);
-    resetSessionItemCounter();
     await plugin.storage.setSession(currentScopeRemIdsKey, null);
     await plugin.storage.setSession(priorityCalcScopeRemIdsKey, null);
     

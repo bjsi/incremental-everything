@@ -17,6 +17,31 @@ async function findOrCreateTag(plugin: RNPlugin, tagName: string): Promise<Plugi
   return tag;
 }
 
+/**
+ * Checks whether a Rem has the "Priority Review Queue" tag, meaning the document
+ * should behave as a Priority Review queue (special queue scope, history, etc.).
+ *
+ * @param rem Rem to inspect.
+ * @returns True if the rem carries the Priority Review tag.
+ */
+export async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
+  const tags = await rem.getTagRems();
+  if (!tags?.length) {
+    return false;
+  }
+
+  return tags.some((tag) => {
+    const text = tag.text;
+    const tagTextString =
+      typeof text === 'string'
+        ? text
+        : Array.isArray(text)
+        ? text.join('')
+        : '';
+    return tagTextString.includes('Priority Review Queue');
+  });
+}
+
 export interface ReviewDocumentConfig {
   scopeRemId: string | null;  // null = full KB
   itemCount: number;
