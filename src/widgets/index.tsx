@@ -12,7 +12,6 @@ import '../App.css';
 import {
   allIncrementalRemKey,
   powerupCode,
-  collapseTopBarId,
   queueCounterId,
   queueLayoutFixId,
   currentScopeRemIdsKey,
