@@ -10,15 +10,14 @@ export function registerJumpToRemHelper(plugin: ReactRNPlugin) {
     }
 
     try {
-      const pluginInstance = (window as any).__plugin;
-      if (!pluginInstance) {
+      if (!plugin) {
         console.error('❌ Plugin not found. Make sure the Incremental Everything plugin is loaded.');
         console.log('Try reloading the plugin from RemNote Settings → Plugins');
         return;
       }
 
       console.log(`🔍 Searching for rem: ${remId}...`);
-      const rem = await pluginInstance.rem.findOne(remId.trim());
+      const rem = await plugin.rem.findOne(remId.trim());
 
       if (!rem) {
         console.error(`❌ Rem not found: ${remId}`);
@@ -35,7 +34,7 @@ export function registerJumpToRemHelper(plugin: ReactRNPlugin) {
 
       console.log(`✅ Found rem: "${preview}"`);
       console.log('📍 Opening rem in RemNote...');
-      await pluginInstance.window.openRem(rem);
+      await plugin.window.openRem(rem);
     } catch (error) {
       console.error('❌ Error finding rem:', error);
       console.log('💡 Try reloading the plugin if this error persists.');
