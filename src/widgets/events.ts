@@ -44,71 +44,9 @@ type ShieldHistoryEntry = {
 type ShieldHistory = Record<string, ShieldHistoryEntry>;
 type ShieldHistoryByScope = Record<string, ShieldHistory>;
 
-/**
- * Detects whether a Rem corresponds to a Priority Review queue document.
- *
- * @param rem Rem to inspect.
- * @returns Promise resolving to true if it is tagged as a Priority Review queue.
- */
-async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
-  const tags = await rem.getTagRems();
-  if (!tags || tags.length === 0) return false;
-
-  // Check if any tag has the name "Priority Review Queue"
-  for (const tag of tags) {
-    // Use the text property directly from RemObject
-    const tagText = tag.text;
-    if (tagText) {
-      // Convert RichTextInterface to string
-      const tagTextString = typeof tagText === 'string' ? tagText : tagText.join('');
-      if (tagTextString.includes('Priority Review Queue')) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-/**
- * Parses the original scope identifier embedded in a Priority Review document title.
- *
- * @param reviewDocRem Priority Review document Rem.
- * @returns The referenced scope RemId, null for full KB, or undefined if parsing failed.
- */
-async function extractOriginalScopeFromPriorityReview(
-  reviewDocRem: PluginRem
-): Promise<string | null | undefined> {
-  // NOTE: returning `null` means "Full KB scope" while `undefined` signals "missing / unparseable scope".
-  // Keeping those distinct prevents Priority Review docs from silently inheriting stale session state (bug #???).
-  const richText = reviewDocRem.text;
-  if (!richText || richText.length === 0) {
-    console.warn('Priority Review Document has no title content to parse for scope.');
-    return undefined;
-  }
-
-  // Search for a rem reference in the rich text
-  for (const element of richText) {
-    if (typeof element === 'object' && element !== null) {
-      // Check if it's a rem reference (portal)
-      if ('i' in element && element.i === 'q' && '_id' in element) {
-        // This is a rem reference, return the referenced rem ID
-        return element._id as string;
-      }
-    }
-  }
-
-  // No rem reference found - might be "Full Knowledge Base"
-  const textContent = richText.join('');
-  if (textContent.includes('Full Knowledge Base')) {
-    // Return null to indicate full KB scope
-    return null;
-  }
-
-  // Could not determine scope
-  console.warn('Could not extract scope from Priority Review Document title');
-  return undefined;
-}
+// Shared Set for coordinating between QueueCompleteCard and GlobalRemChanged listeners
+// to avoid duplicate processing
+const recentlyProcessedCards = new Set<string>();
 
 /**
  * Registers a listener that runs after the user exits the queue to flush caches and persist shield history.
@@ -618,9 +556,71 @@ export function registerQueueEnterListener(
   });
 }
 
-// Shared Set for coordinating between QueueCompleteCard and GlobalRemChanged listeners
-// to avoid duplicate processing
-const recentlyProcessedCards = new Set<string>();
+/**
+ * Detects whether a Rem corresponds to a Priority Review queue document.
+ *
+ * @param rem Rem to inspect.
+ * @returns Promise resolving to true if it is tagged as a Priority Review queue.
+ */
+async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
+  const tags = await rem.getTagRems();
+  if (!tags || tags.length === 0) return false;
+
+  // Check if any tag has the name "Priority Review Queue"
+  for (const tag of tags) {
+    // Use the text property directly from RemObject
+    const tagText = tag.text;
+    if (tagText) {
+      // Convert RichTextInterface to string
+      const tagTextString = typeof tagText === 'string' ? tagText : tagText.join('');
+      if (tagTextString.includes('Priority Review Queue')) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Parses the original scope identifier embedded in a Priority Review document title.
+ *
+ * @param reviewDocRem Priority Review document Rem.
+ * @returns The referenced scope RemId, null for full KB, or undefined if parsing failed.
+ */
+async function extractOriginalScopeFromPriorityReview(
+  reviewDocRem: PluginRem
+): Promise<string | null | undefined> {
+  // NOTE: returning `null` means "Full KB scope" while `undefined` signals "missing / unparseable scope".
+  // Keeping those distinct prevents Priority Review docs from silently inheriting stale session state (bug #???).
+  const richText = reviewDocRem.text;
+  if (!richText || richText.length === 0) {
+    console.warn('Priority Review Document has no title content to parse for scope.');
+    return undefined;
+  }
+
+  // Search for a rem reference in the rich text
+  for (const element of richText) {
+    if (typeof element === 'object' && element !== null) {
+      // Check if it's a rem reference (portal)
+      if ('i' in element && element.i === 'q' && '_id' in element) {
+        // This is a rem reference, return the referenced rem ID
+        return element._id as string;
+      }
+    }
+  }
+
+  // No rem reference found - might be "Full Knowledge Base"
+  const textContent = richText.join('');
+  if (textContent.includes('Full Knowledge Base')) {
+    // Return null to indicate full KB scope
+    return null;
+  }
+
+  // Could not determine scope
+  console.warn('Could not extract scope from Priority Review Document title');
+  return undefined;
+}
 
 /**
  * Hooks into card completion events to keep the card priority cache fresh in full-performance mode.
