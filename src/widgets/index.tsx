@@ -10,7 +10,6 @@ import '../style.css';
 import '../App.css';
 import {
   allIncrementalRemKey,
-  powerupCode,
   collapseTopBarId,
   queueCounterId,
   queueLayoutFixId,
@@ -42,6 +41,7 @@ import { jumpToRemById } from './jump_to_rem_input';
 import { registerPluginCommands } from './commands';
 import { registerWidgets } from './widgets';
 import { registerMenuItems } from './menu_items';
+import { registerIncrementalRemTracker } from './tracker';
 import { cacheAllCardPriorities } from '../lib/cache';
 dayjs.extend(relativeTime);
 
@@ -109,12 +109,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     }
   `;
 
-  const COLLAPSE_TOP_BAR_CSS = `
-    .spacedRepetitionContent { height: 100%; box-sizing: border-box; }
-    .queue__title { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-    .queue__title:hover { max-height: 999px; }
-  `.trim();
-
   // Register all plugin components
   await registerPluginPowerups(plugin);
   await registerPluginSettings(plugin);
@@ -134,41 +128,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerQueueCompleteCardListener(plugin);
   registerGlobalRemChangedListener(plugin);
 
-
-  // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
-  // so added special handling in initIncrementalRem
-  plugin.track(async (rp) => {
-    console.log('TRACKER: Incremental Rem tracker starting...');
-    const powerup = await rp.powerup.getPowerupByCode(powerupCode);
-    const taggedRem = (await powerup?.taggedRem()) || [];
-    console.log(`TRACKER: Found ${taggedRem.length} Incremental Rems. Starting batch processing...`);
-
-    const updatedAllRem: IncrementalRem[] = [];
-    // CHANGED: Reduced batch size and increased delay.
-    const batchSize = 500;
-    const delayBetweenBatches = 100; // milliseconds
-    const numBatches = Math.ceil(taggedRem.length / batchSize);
-
-    for (let i = 0; i < taggedRem.length; i += batchSize) {
-      const batch = taggedRem.slice(i, i + batchSize);
-      console.log(`TRACKER: Processing IncRem batch ${Math.floor(i / batchSize) + 1} of ${numBatches}...`);
-      
-      const batchInfos = (
-        await Promise.all(batch.map((rem) => getIncrementalRemInfo(plugin, rem)))
-      ).filter(Boolean) as IncrementalRem[];
-
-      updatedAllRem.push(...batchInfos);
-      
-      await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
-    }
-    
-    console.log(`TRACKER: Processing complete. Final IncRem cache size is ${updatedAllRem.length}.`);
-    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
-    console.log('TRACKER: Incremental Rem cache has been saved.');
-  });
-  const unregisterQueueCSS = async (plugin: RNPlugin) => {
-    await plugin.app.registerCSS(collapseTopBarId, '');
-  };
+  registerIncrementalRemTracker(plugin);
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
