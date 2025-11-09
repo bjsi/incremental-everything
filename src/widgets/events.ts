@@ -44,6 +44,12 @@ type ShieldHistoryEntry = {
 type ShieldHistory = Record<string, ShieldHistoryEntry>;
 type ShieldHistoryByScope = Record<string, ShieldHistory>;
 
+/**
+ * Detects whether a Rem corresponds to a Priority Review queue document.
+ *
+ * @param rem Rem to inspect.
+ * @returns Promise resolving to true if it is tagged as a Priority Review queue.
+ */
 async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
   const tags = await rem.getTagRems();
   if (!tags || tags.length === 0) return false;
@@ -65,8 +71,10 @@ async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
 }
 
 /**
- * Extract the original scope rem from a Priority Review Document's title
- * The title format is: "Priority Review - [RemReference] - [Timestamp]"
+ * Parses the original scope identifier embedded in a Priority Review document title.
+ *
+ * @param reviewDocRem Priority Review document Rem.
+ * @returns The referenced scope RemId, null for full KB, or undefined if parsing failed.
  */
 async function extractOriginalScopeFromPriorityReview(
   reviewDocRem: PluginRem
@@ -102,6 +110,12 @@ async function extractOriginalScopeFromPriorityReview(
   return undefined;
 }
 
+/**
+ * Registers a listener that runs after the user exits the queue to flush caches and persist shield history.
+ *
+ * @param plugin Plugin instance to interact with RemNote APIs.
+ * @param resetSessionItemCounter Callback to reset the session counter UI.
+ */
 export function registerQueueExitListener(
   plugin: ReactRNPlugin,
   resetSessionItemCounter: ResetSessionItemCounter
@@ -276,6 +290,12 @@ export function registerQueueExitListener(
   });
 }
 
+/**
+ * Registers the global `AppEvents.URLChange` listener (triggered on any internal navigation)
+ * to tear down queue-specific UI whenever the user leaves the /flashcards view.
+ *
+ * @param plugin Plugin instance for accessing window and UI helpers.
+ */
 export function registerURLChangeListener(plugin: ReactRNPlugin) {
   plugin.event.addListener(AppEvents.URLChange, undefined, async () => {
     const url = await plugin.window.getURL();
@@ -289,6 +309,12 @@ export function registerURLChangeListener(plugin: ReactRNPlugin) {
   });
 }
 
+/**
+ * Registers logic that runs when entering the queue to precompute scopes, caches, and UI state.
+ *
+ * @param plugin Plugin instance for storage/settings access.
+ * @param resetSessionItemCounter Callback to clear per-session card counters.
+ */
 export function registerQueueEnterListener(
   plugin: ReactRNPlugin,
   resetSessionItemCounter: ResetSessionItemCounter
@@ -596,6 +622,11 @@ export function registerQueueEnterListener(
 // to avoid duplicate processing
 const recentlyProcessedCards = new Set<string>();
 
+/**
+ * Hooks into card completion events to keep the card priority cache fresh in full-performance mode.
+ *
+ * @param plugin Plugin instance for card/rem lookups and settings access.
+ */
 export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
   plugin.event.addListener(
     AppEvents.QueueCompleteCard,
@@ -633,6 +664,13 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
   );
 }
 
+/**
+ * Registers a debounced handler for the global Rem change stream: ignores updates fired while
+ * the user is in the queue or running in Light mode, then auto-assigns priorities (if missing)
+ * and refreshes the priority cache for the changed Rem.
+ *
+ * @param plugin Plugin instance for storage, settings, and Rem lookups.
+ */
 export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
   let remChangeDebounceTimer: NodeJS.Timeout;
 
