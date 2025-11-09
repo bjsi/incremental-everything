@@ -1,45 +1,5 @@
-import { ReactRNPlugin, renderWidget, usePlugin } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect } from 'react';
-
-export async function jumpToRemById(remId: string, pluginOverride?: ReactRNPlugin) {
-  if (!remId || typeof remId !== 'string' || remId.trim() === '') {
-    console.error('❌ Invalid RemId provided');
-    console.log("Usage: jumpToRemById('your-rem-id-here')");
-    console.log("Example: jumpToRemById('abc123xyz')");
-    throw new Error('RemId cannot be empty');
-  }
-
-  const plugin = pluginOverride ?? (window as any).__plugin;
-  if (!plugin) {
-    console.error('❌ Plugin not found. Make sure the Incremental Everything plugin is loaded.');
-    console.log('Try reloading the plugin from RemNote Settings → Plugins');
-    throw new Error('Plugin not found');
-  }
-
-  const normalizedId = remId.trim();
-
-  console.log(`🔍 Searching for rem: ${normalizedId}...`);
-  const rem = await plugin.rem.findOne(normalizedId);
-
-  if (!rem) {
-    console.error(`❌ Rem not found: ${normalizedId}`);
-    console.log('💡 Possible reasons:');
-    console.log('   • The rem was deleted');
-    console.log('   • The RemId is incorrect');
-    console.log('   • The rem is from a different knowledge base');
-    throw new Error(`Rem not found: ${normalizedId}`);
-  }
-
-  const remText = await rem.text;
-  const textPreview = remText ? (typeof remText === 'string' ? remText : '[Complex content]') : '[No text]';
-  const preview = textPreview.length > 100 ? textPreview.substring(0, 100) + '...' : textPreview;
-
-  console.log(`✅ Found rem: "${preview}"`);
-  console.log('📍 Opening rem in RemNote...');
-  await plugin.window.openRem(rem);
-
-  return { rem, preview };
-}
 
 export function JumpToRemInput() {
   const plugin = usePlugin();
@@ -61,16 +21,32 @@ export function JumpToRemInput() {
     }
     
     try {
-      const { preview } = await jumpToRemById(remId.trim(), plugin);
+      console.log(`🔍 Searching for rem: ${remId}...`);
+      const rem = await plugin.rem.findOne(remId.trim());
+      
+      if (!rem) {
+        console.error(`❌ Rem not found: ${remId}`);
+        setError(`Rem not found: ${remId}`);
+        return;
+      }
+      
+      const remText = await rem.text;
+      const textPreview = remText ? (typeof remText === 'string' ? remText : '[Complex content]') : '[No text]';
+      const preview = textPreview.length > 100 ? textPreview.substring(0, 100) + '...' : textPreview;
+      
+      console.log(`✅ Found rem: "${preview}"`);
       await plugin.app.toast(`✅ Found: ${preview.substring(0, 40)}...`);
-
+      
       // Close the popup
       await plugin.widget.closePopup();
       
+      // Open the rem
+      console.log('📍 Opening rem in RemNote...');
+      await plugin.window.openRem(rem);
+      
     } catch (error) {
       console.error('❌ Error finding rem:', error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      setError(message);
+      setError(`Error: ${error}`);
       console.log('💡 Try reloading the plugin if this error persists.');
     }
   };

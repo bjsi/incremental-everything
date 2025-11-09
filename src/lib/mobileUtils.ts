@@ -201,6 +201,4 @@ export async function handleMobileDetectionOnStartup(plugin: RNPlugin): Promise<
       await plugin.app.toast(`💻 ${friendlyPlatformName} on ${friendlyOSName}: running in ${modeText}`);
     }
   }
-
-  console.log('Mobile detection completed');
 }
