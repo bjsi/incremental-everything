@@ -20,7 +20,7 @@ import { registerMenus } from './menus';
 import { registerCommands } from './commands';
 import { registerCallbacks, resetSessionItemCounter } from './callbacks';
 import { registerIncrementalRemTracker } from './tracker';
-import { registerJumpToRemHelper } from './jumpToRem';
+import { registerJumpToRemHelper } from './jump_to_rem';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -49,7 +49,6 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerQueueCompleteCardListener(plugin);
   registerGlobalRemChangedListener(plugin);
 
-
   registerIncrementalRemTracker(plugin);
 
   registerCallbacks(plugin);
@@ -57,7 +56,6 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   await registerCommands(plugin);
   await registerMenus(plugin);
-
 
   // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
