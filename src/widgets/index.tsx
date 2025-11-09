@@ -61,12 +61,6 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
-  console.log('Mobile detection completed');
-
-
-
-
-  // Run the cache build in the background without blocking plugin initialization.
 
   // Get the performance mode
   const useLightMode = await shouldUseLightMode(plugin);
@@ -78,8 +72,6 @@ async function onActivate(plugin: ReactRNPlugin) {
     console.log('CACHE: Light mode enabled. Skipping card priority cache build.');
     await plugin.storage.setSession(allCardPriorityInfoKey, []);
   }
-
-  
 }
 
 async function onDeactivate(_: ReactRNPlugin) {}
