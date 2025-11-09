@@ -2,6 +2,7 @@
 
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey } from './consts';
+import { shouldUseLightMode } from './mobileUtils';
 import { CardPriorityInfo, getCardPriority, autoAssignCardPriority } from './cardPriority';
 import * as _ from 'remeda';
 
@@ -282,5 +283,15 @@ export async function cacheAllCardPriorities(plugin: RNPlugin) {
   } else {
     console.log('CACHE: All cards are pre-tagged! No deferred processing needed.');
     await plugin.app.toast('✅ All card priorities loaded instantly!');
+  }
+}
+
+export async function initializeCardPriorityCache(plugin: RNPlugin) {
+  const useLightMode = await shouldUseLightMode(plugin);
+  if (!useLightMode) {
+    await cacheAllCardPriorities(plugin);
+  } else {
+    console.log('CACHE: Light mode enabled. Skipping card priority cache build.');
+    await plugin.storage.setSession(allCardPriorityInfoKey, []);
   }
 }

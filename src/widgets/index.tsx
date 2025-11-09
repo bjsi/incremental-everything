@@ -1,11 +1,7 @@
 import { declareIndexPlugin, ReactRNPlugin } from '@remnote/plugin-sdk';
 import '../style.css';
 import '../App.css';
-import { allCardPriorityInfoKey } from '../lib/consts';
-import { 
-  handleMobileDetectionOnStartup,
-  shouldUseLightMode,
-} from '../lib/mobileUtils';
+import { handleMobileDetectionOnStartup } from '../lib/mobileUtils';
 import {
   registerQueueExitListener,
   registerQueueEnterListener,
@@ -21,7 +17,7 @@ import { registerWidgets } from './widgets';
 import { registerMenuItems } from './menu_items';
 import { registerIncrementalRemTracker } from './tracker';
 import { registerGetNextCardCallback, resetQueueSessionItemCounter } from './queue_logic';
-import { cacheAllCardPriorities } from '../lib/cache';
+import { initializeCardPriorityCache } from '../lib/cache';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -83,22 +79,9 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerIncrementalRemTracker(plugin);
   registerGetNextCardCallback(plugin);
 
-  // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
-  // Run the cache build in the background without blocking plugin initialization.
 
-  // Get the performance mode
-  const useLightMode = await shouldUseLightMode(plugin);
-  if (!useLightMode) {
-    // Run the full, expensive cache build
-    cacheAllCardPriorities(plugin);
-  } else {
-    // In 'light' mode, just set an empty cache.
-    console.log('CACHE: Light mode enabled. Skipping card priority cache build.');
-    await plugin.storage.setSession(allCardPriorityInfoKey, []);
-  }
-
-  
+  await initializeCardPriorityCache(plugin);
 }
 
 async function onDeactivate(_: ReactRNPlugin) {}
