@@ -35,14 +35,10 @@ import {
   shouldUseLightMode,
 } from '../lib/mobileUtils';
 import { initIncrementalRem } from './powerups';
-
-type CommandDependencies = {
-  cacheAllCardPriorities: (plugin: RNPlugin) => Promise<void>;
-};
+import { cacheAllCardPriorities } from '../lib/cache';
 
 export async function registerPluginCommands(
-  plugin: ReactRNPlugin,
-  deps: CommandDependencies
+  plugin: ReactRNPlugin
 ) {
 
   // TODO: some handling to include extracts created in current queue in the queue?
@@ -397,7 +393,7 @@ export async function registerPluginCommands(
     id: 'refresh-card-priority-cache',
     name: 'Refresh Card Priority Cache',
     action: async () => {
-      await deps.cacheAllCardPriorities(plugin);
+      await cacheAllCardPriorities(plugin);
     },
   });
 

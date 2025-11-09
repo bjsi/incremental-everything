@@ -30,11 +30,6 @@ import {
   shouldUseLightMode,
 } from '../lib/mobileUtils';
 import {
-  autoAssignCardPriority,
-  getCardPriority,
-  CardPriorityInfo,
-} from '../lib/cardPriority';
-import {
   registerQueueExitListener,
   registerQueueEnterListener,
   registerURLChangeListener,
@@ -47,197 +42,10 @@ import { jumpToRemById } from './jump_to_rem_input';
 import { registerPluginCommands } from './commands';
 import { registerWidgets } from './widgets';
 import { registerMenuItems } from './menu_items';
+import { cacheAllCardPriorities } from '../lib/cache';
 dayjs.extend(relativeTime);
 
 let sessionItemCounter = 0;
-
-// CARD PRIORITIES CACHING FUNCTION - With deferred loading for untagged cards
-async function cacheAllCardPriorities(plugin: RNPlugin) {
-  console.log('CACHE: Starting intelligent cache build with deferred loading...');
-  
-  const startTime = Date.now();
-  
-  const allCards = await plugin.card.getAll();
-  const cardRemIds = allCards ? _.uniq(allCards.map(c => c.remId)) : [];
-  console.log(`CACHE: Found ${cardRemIds.length} rems with cards`);
-  
-  // CRITICAL FIX: Also get rems that are tagged with cardPriority for inheritance
-  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
-  const taggedForInheritanceRems = (await cardPriorityPowerup?.taggedRem()) || [];
-  const inheritanceRemIds = taggedForInheritanceRems.map(r => r._id);
-  console.log(`CACHE: Found ${inheritanceRemIds.length} rems tagged with cardPriority powerup`);
-  
-  // Combine both sets of remIds (cards + inheritance-only)
-  const uniqueRemIds = _.uniq([...cardRemIds, ...inheritanceRemIds]);
-  console.log(`CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${inheritanceRemIds.length - cardRemIds.length} inheritance-only)`);
-  
-  if (uniqueRemIds.length === 0) {
-    console.log('CACHE: No cards or cardPriority tags found. Setting empty cache.');
-    await plugin.storage.setSession(allCardPriorityInfoKey, []);
-    return;
-  }
-    
-  // Step 1: Quickly load all pre-tagged cards for immediate use
-  console.log('CACHE: Phase 1 - Loading pre-tagged cards...');
-  const taggedPriorities: CardPriorityInfo[] = [];
-  const untaggedRemIds: string[] = [];
-  
-  // Process in batches to check what's tagged
-  const checkBatchSize = 100;
-  for (let i = 0; i < uniqueRemIds.length; i += checkBatchSize) {
-    const batch = uniqueRemIds.slice(i, i + checkBatchSize);
-    
-    await Promise.all(batch.map(async (remId) => {
-      const rem = await plugin.rem.findOne(remId);
-      if (!rem) return;
-      
-      const hasPowerup = await rem.hasPowerup('cardPriority');
-      if (hasPowerup) {
-        // It's tagged - get the info quickly
-        const cardInfo = await getCardPriority(plugin, rem);
-        if (cardInfo) {
-          taggedPriorities.push(cardInfo);
-        }
-      } else {
-        // Not tagged - queue for deferred processing
-        untaggedRemIds.push(remId);
-      }
-    }));
-  }
-
-  // --- PERCENTILE CALCULATION LOGIC ---
-  console.log(`CACHE: Found ${taggedPriorities.length} tagged entries. Calculating percentiles...`);
-  const sortedInfos = _.sortBy(taggedPriorities, (info) => info.priority);
-  const totalItems = sortedInfos.length;
-  const enrichedTaggedPriorities = sortedInfos.map((info, index) => {
-    const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-    return { ...info, kbPercentile: percentile };
-  });
-  
-  // Set the initial cache with tagged cards (instant availability)
-  await plugin.storage.setSession(allCardPriorityInfoKey, enrichedTaggedPriorities);
-  
-  const phase1Time = Math.round((Date.now() - startTime) / 1000);
-  console.log(`CACHE: Phase 1 complete. Loaded and enriched ${enrichedTaggedPriorities.length} tagged cards in ${phase1Time}s`);
-  console.log(`CACHE: Found ${untaggedRemIds.length} untagged cards for deferred processing`);
-  
-  if (enrichedTaggedPriorities.length > 0) {
-    await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} card priorities instantly`);
-  }
-  
-  if (untaggedRemIds.length > 0) {
-    const untaggedPercentage = Math.round((untaggedRemIds.length / uniqueRemIds.length) * 100);
-    if (untaggedPercentage > 20) {
-      await plugin.app.toast(
-        `⏳ Processing ${untaggedRemIds.length} untagged cards in background... ` +
-        `Consider running 'Pre-compute Card Priorities' for instant startups!`
-      );
-    }
-    
-    setTimeout(async () => {
-      await processDeferredCards(plugin, untaggedRemIds);
-    }, 3000);
-  } else {
-    console.log('CACHE: All cards are pre-tagged! No deferred processing needed.');
-    await plugin.app.toast('✅ All card priorities loaded instantly!');
-  }
-}
-
-// DEFERRED PROCESSING FUNCTION - Processes untagged cards in the background
-async function processDeferredCards(plugin: RNPlugin, untaggedRemIds: string[]) {
-  console.log(`DEFERRED: Starting background processing of ${untaggedRemIds.length} untagged cards...`);
-  const startTime = Date.now();
-  
-  let processed = 0;
-  let errorCount = 0;
-  const batchSize = 30; // Small batches to avoid blocking UI
-  const delayBetweenBatches = 100; // 100ms delay between batches
-  
-  try {
-    for (let i = 0; i < untaggedRemIds.length; i += batchSize) {
-      const batch = untaggedRemIds.slice(i, i + batchSize);
-      const newPriorities: CardPriorityInfo[] = [];
-      
-      // Process this batch
-      await Promise.all(batch.map(async (remId) => {
-        try {
-          const rem = await plugin.rem.findOne(remId);
-          if (!rem) {
-            errorCount++;
-            return;
-          }
-          
-          // Auto-assign priority (this will tag the rem)
-          await autoAssignCardPriority(plugin, rem);
-          
-          // Get the newly assigned priority info
-          const cardInfo = await getCardPriority(plugin, rem);
-          if (cardInfo) {
-            newPriorities.push(cardInfo);
-          }
-          
-          processed++;
-        } catch (error) {
-          console.error(`DEFERRED: Error processing rem ${remId}:`, error);
-          errorCount++;
-        }
-      }));
-      
-      // Update the cache incrementally
-      if (newPriorities.length > 0) {
-        const currentCache = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
-        const mergedCache = [...currentCache, ...newPriorities];
-
-        // --- NEW: Re-calculate all percentiles for the updated cache ---
-        const sortedMergedCache = _.sortBy(mergedCache, (info) => info.priority);
-        const totalItems = sortedMergedCache.length;
-        const enrichedCache = sortedMergedCache.map((info, index) => {
-            const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-            return { ...info, kbPercentile: percentile };
-        });
-        
-        await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
-      }
-      
-      // Progress logging every 20% or 500 cards
-      if (processed % Math.max(500, Math.floor(untaggedRemIds.length * 0.2)) === 0 || 
-          processed === untaggedRemIds.length) {
-        const progress = Math.round((processed / untaggedRemIds.length) * 100);
-        console.log(`DEFERRED: Progress ${progress}% (${processed}/${untaggedRemIds.length})`);
-      }
-      
-      // Yield to UI between batches (only if not the last batch)
-      if (i + batchSize < untaggedRemIds.length) {
-        await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
-      }
-    }
-    
-    const totalTime = Math.round((Date.now() - startTime) / 1000);
-    console.log(
-      `DEFERRED: Background processing complete! ` +
-      `Processed ${processed} cards in ${totalTime}s ` +
-      `(${errorCount} errors)`
-    );
-    
-    // Final notification
-    await plugin.app.toast(
-      `✅ Background processing complete! All ${processed} card priorities are now cached.`
-    );
-    
-    // If there were many untagged cards, suggest pre-computation again
-    if (untaggedRemIds.length > 1000) {
-      setTimeout(() => {
-        plugin.app.toast(
-          `💡 Tip: Run 'Pre-compute Card Priorities' to avoid background processing in future sessions`
-        );
-      }, 2000);
-    }
-    
-  } catch (error) {
-    console.error('DEFERRED: Fatal error during background processing:', error);
-    await plugin.app.toast('⚠️ Background processing encountered an error. Some cards may not be cached.');
-  }
-}
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -574,9 +382,7 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   await registerWidgets(plugin);
 
-  await registerPluginCommands(plugin, {
-    cacheAllCardPriorities,
-  });
+  await registerPluginCommands(plugin);
 
   await registerMenuItems(plugin);
   // Mobile and Web Browser Light Mode Features
