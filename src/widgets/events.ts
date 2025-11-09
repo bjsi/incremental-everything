@@ -719,3 +719,14 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
     }
   );
 }
+
+export function registerEventListeners(
+  plugin: ReactRNPlugin,
+  resetSessionItemCounter: ResetSessionItemCounter
+) {
+  registerQueueExitListener(plugin, resetSessionItemCounter);
+  registerQueueEnterListener(plugin, resetSessionItemCounter);
+  registerURLChangeListener(plugin);
+  registerQueueCompleteCardListener(plugin);
+  registerGlobalRemChangedListener(plugin);
+}

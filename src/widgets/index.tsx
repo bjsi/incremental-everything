@@ -6,13 +6,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { cacheAllCardPriorities } from '../lib/cardPriority';
-import {
-  registerQueueExitListener,
-  registerQueueEnterListener,
-  registerURLChangeListener,
-  registerQueueCompleteCardListener,
-  registerGlobalRemChangedListener,
-} from './events';
+import { registerEventListeners } from './events';
 import { registerPluginPowerups, initIncrementalRem } from './powerups';
 import { registerPluginSettings } from './settings';
 import { registerWidgets } from './widgets';
@@ -37,17 +31,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerPluginPowerups(plugin);
   await registerPluginSettings(plugin);
 
-  registerQueueExitListener(plugin, () => {
-    resetSessionItemCounter();
-  });
-
-  registerQueueEnterListener(plugin, () => {
-    resetSessionItemCounter();
-  });
-
-  registerURLChangeListener(plugin);
-  registerQueueCompleteCardListener(plugin);
-  registerGlobalRemChangedListener(plugin);
+  registerEventListeners(plugin, resetSessionItemCounter);
 
   registerIncrementalRemTracker(plugin);
 
