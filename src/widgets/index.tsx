@@ -85,7 +85,6 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
-  console.log('Mobile detection completed');
   // Run the cache build in the background without blocking plugin initialization.
 
   // Get the performance mode
