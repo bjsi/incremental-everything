@@ -1,15 +1,9 @@
 import { declareIndexPlugin, ReactRNPlugin } from '@remnote/plugin-sdk';
 import '../style.css';
 import '../App.css';
-import {
-  allIncrementalRemKey,
-  powerupCode,
-  allCardPriorityInfoKey,
-} from '../lib/consts';
-import { IncrementalRem } from '../lib/types';
+import { allCardPriorityInfoKey } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { cacheAllCardPriorities } from '../lib/cardPriority';
 import {
@@ -25,6 +19,7 @@ import { registerWidgets } from './widgets';
 import { registerMenus } from './menus';
 import { registerCommands } from './commands';
 import { registerCallbacks, resetSessionItemCounter } from './callbacks';
+import { registerIncrementalRemTracker } from './tracker';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -118,37 +113,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerGlobalRemChangedListener(plugin);
 
 
-  // Note: doesn't handle rem just tagged with incremental rem powerup because they don't have powerup slots yet
-  // so added special handling in initIncrementalRem
-  plugin.track(async (rp) => {
-    console.log('TRACKER: Incremental Rem tracker starting...');
-    const powerup = await rp.powerup.getPowerupByCode(powerupCode);
-    const taggedRem = (await powerup?.taggedRem()) || [];
-    console.log(`TRACKER: Found ${taggedRem.length} Incremental Rems. Starting batch processing...`);
-
-    const updatedAllRem: IncrementalRem[] = [];
-    // CHANGED: Reduced batch size and increased delay.
-    const batchSize = 500;
-    const delayBetweenBatches = 100; // milliseconds
-    const numBatches = Math.ceil(taggedRem.length / batchSize);
-
-    for (let i = 0; i < taggedRem.length; i += batchSize) {
-      const batch = taggedRem.slice(i, i + batchSize);
-      console.log(`TRACKER: Processing IncRem batch ${Math.floor(i / batchSize) + 1} of ${numBatches}...`);
-      
-      const batchInfos = (
-        await Promise.all(batch.map((rem) => getIncrementalRemInfo(plugin, rem)))
-      ).filter(Boolean) as IncrementalRem[];
-
-      updatedAllRem.push(...batchInfos);
-      
-      await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
-    }
-    
-    console.log(`TRACKER: Processing complete. Final IncRem cache size is ${updatedAllRem.length}.`);
-    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
-    console.log('TRACKER: Incremental Rem cache has been saved.');
-  });
+  registerIncrementalRemTracker(plugin);
 
   registerCallbacks(plugin);
   registerWidgets(plugin);
