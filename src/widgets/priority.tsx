@@ -704,38 +704,6 @@ function Priority() {
                     className="w-20 text-center p-1 border rounded dark:bg-gray-800 border-gray-300 dark:border-gray-600" />
               </div>
               <input type="range" min="0" max="100" value={cardAbsPriority} onChange={(e) => setCardAbsPriority(Number(e.target.value))} className="w-full" />
-              
-              {/* 🔌 Conditionally render relative priority */}
-              {performanceMode === 'full' && (
-                <>
-                  <div className="flex justify-between items-center mt-2">
-                    <label className="font-medium">Relative Priority:</label>
-                    <span className="text-lg font-bold">{cardRelPriority}%</span>
-                  </div>
-                  <div className="relative h-8 flex items-center">
-                    <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
-                    <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
-                  </div>
-                  <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
-                      Universe: {scopedCardRems.length.toLocaleString()} flashcards
-                  </div>
-                </>
-              )}
-              
-              {/* 🔌 Conditionally render ancestor info */}
-              {performanceMode === 'full' && ancestorPriorityInfo && (
-                <div className="mt-4 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                  <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                    {cardInfo?.source === 'inherited' 
-                      ? `Inherits from Ancestor (${ancestorPriorityInfo.sourceType}): ${ancestorPriorityInfo.priority}`
-                      : `Ancestor Priority (${ancestorPriorityInfo.sourceType}): ${ancestorPriorityInfo.priority}`
-                    }
-                  </div>
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate">
-                    {ancestorPriorityInfo.ancestorName}
-                  </div>
-                </div>
-              )}
 
 
               {hasCards && cardInfo && (
@@ -776,6 +744,105 @@ function Priority() {
                         </div>
                     </div>
                   )}
+
+                                {/* 🔌 Conditionally render relative priority */}
+              {performanceMode === 'full' && (
+                <>
+                  <div className="flex justify-between items-center mt-2">
+                    <label className="font-medium">Relative Priority:</label>
+                    <span className="text-lg font-bold">{cardRelPriority}%</span>
+                  </div>
+                  <div className="relative h-8 flex items-center">
+                    <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
+                    <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
+                  </div>
+                  <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
+                      Universe: {scopedCardRems.length.toLocaleString()} flashcards
+                  </div>
+                </>
+              )}
+              
+              {/* 🔌 Conditionally render ancestor info */}
+              {performanceMode === 'full' && ancestorPriorityInfo && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(155, 178, 215, 0.6)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)'
+                }}>
+                  {/* Badges row */}
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '8px', 
+                    marginBottom: '12px',
+                    flexWrap: 'wrap'
+                  }}>
+                    {/* Status badge */}
+                    <span style={{
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      borderRadius: '4px',
+                      textTransform: 'uppercase',
+                      backgroundColor: cardInfo?.source === 'inherited' 
+                        ? 'rgba(34, 197, 94, 0.2)' 
+                        : 'rgba(124, 130, 141, 0.2)',
+                      color: cardInfo?.source === 'inherited' 
+                        ? '#15803d' 
+                        : '#374151'
+                    }}>
+                      {cardInfo?.source === 'inherited' ? 'Inherits from Ancestor' : 'Closest Ancestor'}
+                    </span>
+                    
+                    {/* Level badge */}
+                    <span style={{
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      borderRadius: '4px',
+                      textTransform: 'uppercase',
+                      backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                      color: '#1e40af'
+                    }}>
+                      {ancestorPriorityInfo.levelDescription}
+                    </span>
+                    
+                    {/* Type badge */}
+                    <span style={{
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                      color: '#6b21a8'
+                    }}>
+                      {ancestorPriorityInfo.sourceType}
+                    </span>
+                  </div>
+                  
+                  {/* Content */}
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#1e40af',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    marginBottom: '4px'
+                  }}>
+                    <span style={{
+                      fontSize: '24px',
+                      fontWeight: '700',
+                      color: '#2563eb',
+                    }}>
+                      {ancestorPriorityInfo.priority} 
+                    </span> &nbsp; &nbsp;
+                    {ancestorPriorityInfo.ancestorName}
+                  </div>
+
+                </div>
+              )}
                 </>
               )}
             </div>
