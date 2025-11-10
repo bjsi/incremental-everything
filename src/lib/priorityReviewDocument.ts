@@ -17,6 +17,66 @@ async function findOrCreateTag(plugin: RNPlugin, tagName: string): Promise<Plugi
   return tag;
 }
 
+/**
+ * Checks whether a Rem has the "Priority Review Queue" tag, meaning the document
+ * should behave as a Priority Review queue (special queue scope, history, etc.).
+ *
+ * @param rem Rem to inspect.
+ * @returns True if the rem carries the Priority Review tag.
+ */
+export async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean> {
+  const tags = await rem.getTagRems();
+  if (!tags?.length) {
+    return false;
+  }
+
+  return tags.some((tag) => {
+    const text = tag.text;
+    const tagTextString =
+      typeof text === 'string'
+        ? text
+        : Array.isArray(text)
+        ? text.join('')
+        : '';
+    return tagTextString.includes('Priority Review Queue');
+  });
+}
+
+/**
+ * Parses the original scope identifier embedded in a Priority Review document title.
+ *
+ * The title is expected to contain either a portal reference to the original scope
+ * (inserted when the review doc is generated) or the literal text "Full Knowledge Base".
+ * - Returns the referenced Rem ID when the portal is present.
+ * - Returns `null` when the title explicitly indicates the full knowledge base.
+ * - Returns `undefined` when the title cannot be parsed so callers can fall back safely.
+ */
+export async function extractOriginalScopeFromPriorityReview(
+  reviewDocRem: PluginRem
+): Promise<string | null | undefined> {
+  const reviewDocTitle = reviewDocRem.text;
+  if (!reviewDocTitle || reviewDocTitle.length === 0) {
+    console.warn('Priority Review Document has no title content to parse for scope.');
+    return undefined;
+  }
+
+  for (const element of reviewDocTitle) {
+    if (typeof element === 'object' && element !== null) {
+      if ('i' in element && element.i === 'q' && '_id' in element) {
+        return element._id as string;
+      }
+    }
+  }
+
+  const textContent = reviewDocTitle.join('');
+  if (textContent.includes('Full Knowledge Base')) {
+    return null;
+  }
+
+  console.warn('Could not extract scope from Priority Review Document title');
+  return undefined;
+}
+
 export interface ReviewDocumentConfig {
   scopeRemId: string | null;  // null = full KB
   itemCount: number;
@@ -76,7 +136,7 @@ export async function createPriorityReviewDocument(
   await reviewDoc.setIsDocument(true);
   
   // 2. Get scope rem if specified
-  const scopeRem = scopeRemId ? await plugin.rem.findOne(scopeRemId) : null;
+  const scopeRem = scopeRemId ? (await plugin.rem.findOne(scopeRemId)) ?? null : null;
   
   // 3. Get all incremental rems (filtered by scope and due status)
   const allIncrementalRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
@@ -142,16 +202,18 @@ export async function createPriorityReviewDocument(
       }
     }
 
+  } else if (cardRatio === 'no-cards') {
+    for (let i = 0; i < itemCount && i < sortedIncRems.length; i++) {
+      const item = sortedIncRems[i];
+      const rem = await plugin.rem.findOne(item.remId);
+      if (rem) {
+        mixedItems.push({ rem, type: 'incremental' });
+      }
+    }
   } else {
-    // Handle 'no-cards' or 'no-rem'
-    const sourceList = cardRatio === 'no-cards' ? sortedIncRems : sortedCards;
-    const type = cardRatio === 'no-cards' ? 'incremental' : 'flashcard';
-    for (let i = 0; i < itemCount && i < sourceList.length; i++) {
-        const item = sourceList[i];
-        const rem = item.remId ? await plugin.rem.findOne(item.remId) : item.rem;
-        if (rem) {
-            mixedItems.push({ rem, type: type as 'incremental' | 'flashcard' });
-        }
+    for (let i = 0; i < itemCount && i < sortedCards.length; i++) {
+      const item = sortedCards[i];
+      mixedItems.push({ rem: item.rem, type: 'flashcard' });
     }
   }
   

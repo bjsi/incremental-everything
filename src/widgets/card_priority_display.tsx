@@ -2,6 +2,7 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
+  WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import { 
@@ -43,27 +44,41 @@ export function CardPriorityDisplay() {
   );
 
   const rem = useTrackerPlugin(async (rp) => {
-    const ctx = await rp.widget.getWidgetContext();
-    return ctx?.remId ? await rp.rem.findOne(ctx.remId) : undefined;
+    const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
+    if (!ctx?.remId) {
+      return null;
+    }
+    return (await rp.rem.findOne(ctx.remId)) ?? null;
   }, []);
 
-  const isIncRem = useTrackerPlugin(async (rp) => {
-    return rem ? await rem.hasPowerup(powerupCode) : false;
+  const isIncRem = useTrackerPlugin(async (_rp) => {
+    if (!rem) {
+      return false;
+    }
+    return rem.hasPowerup(powerupCode);
   }, [rem]);
 
 
   // --- 🔌 CACHE-BASED PATH (Full Mode) ---
   const sessionCache = useTrackerPlugin(
-    (rp) => (!useLightMode) 
-      ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey) 
-      : null,
+    async (rp) => {
+      if (useLightMode) {
+        return null;
+      }
+      const cache = await rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey);
+      return cache ?? null;
+    },
     [useLightMode, refreshSignal]
   );
 
   const allPrioritizedCardInfo = useTrackerPlugin(
-    (rp) => (!useLightMode) 
-      ? rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) 
-      : null,
+    async (rp) => {
+      if (useLightMode) {
+        return null;
+      }
+      const cache = await rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
+      return cache ?? [];
+    },
     [useLightMode, refreshSignal]
   );
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { PluginRem, RNPlugin, DocumentViewer, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import React, { useState, useEffect, useCallback } from 'react';
+import { PluginRem, RNPlugin, DocumentViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
 import { powerupCode } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
 
@@ -11,7 +11,7 @@ interface ExtractViewerProps {
 // Define the critical context structure
 interface CriticalContext {
   hasDocumentPowerup: boolean;
-  ancestors: Array<{ text: string, id: string }>;
+  ancestors: Array<{ text: string; id: RemId }>;
 }
 
 // Define the metadata structure (already deferred)
@@ -47,7 +47,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
       const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
 
       // 2. Get Ancestors (slow part)
-      const ancestorList = [];
+      const ancestorList: CriticalContext['ancestors'] = [];
       let currentParent = rem.parent;
       let depth = 0;
       const maxDepth = 10;
@@ -181,6 +181,15 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   const ancestors = criticalContext?.ancestors || [];
   const hasDocumentPowerup = criticalContext?.hasDocumentPowerup ?? false;
 
+  const handleAncestorClick = useCallback(
+    async (ancestorId: RemId) => {
+      const ancestorRem = await plugin.rem.findOne(ancestorId);
+      if (ancestorRem) {
+        await plugin.window.openRem(ancestorRem);
+      }
+    },
+    [plugin]
+  );
   
   return (
     <div className="extract-viewer" style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}>
@@ -189,7 +198,11 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
         {!isContextLoading && ancestors.length > 0 && (
           <div className="text-sm text-gray-600 dark:text-gray-400">
             {ancestors.map((ancestor, index) => (
-              <span key={ancestor.id} onClick={() => plugin.window.openRem(ancestor.id)} style={{cursor: 'pointer'}}>
+              <span
+                key={ancestor.id}
+                onClick={() => handleAncestorClick(ancestor.id)}
+                style={{ cursor: 'pointer' }}
+              >
                 {ancestor.text}
                 {index < ancestors.length - 1 && ' › '}
               </span>

@@ -202,7 +202,8 @@ useEffect(() => {
       
     } catch (error) {
       console.error('❌ BatchPriority: Error loading incremental rems:', error);
-      setErrorMessage(`Error: ${error.message || 'Unknown error occurred'}`);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      setErrorMessage(`Error: ${message}`);
       await plugin.app.toast('Error loading incremental rems');
     } finally {
       setIsLoading(false);

@@ -2,10 +2,8 @@
 import {
   PDFWebReader,
   usePlugin,
-  useTrackerPlugin,
   BuiltInPowerupCodes,
-  WidgetLocation,
-  useRunAsync,
+  RemId,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { activeHighlightIdKey, powerupCode, pageRangeWidgetId } from '../lib/consts';
@@ -21,7 +19,8 @@ import {
   getIncrementalPageRange,
   clearIncrementalPDFData,
   addPageToHistory,
-  safeRemTextToString, // Import safeRemTextToString for critical context
+  safeRemTextToString,
+  PageRangeContext,
 } from '../lib/pdfUtils';
 
 interface ReaderProps {
@@ -37,11 +36,13 @@ const sharedProps = {
 };
 
 // Define the critical context structure
+type AncestorBreadcrumb = { text: string; id: RemId };
+
 interface CriticalContext {
-  ancestors: Array<{ text: string, id: string }>;
+  ancestors: AncestorBreadcrumb[];
   remDisplayName: string;
-  incrementalRemId: string | null;
-  pdfRemId: string;
+  incrementalRemId: RemId | null;
+  pdfRemId: RemId;
   hasDocumentPowerup: boolean;
 }
 
@@ -89,21 +90,14 @@ export function Reader(props: ReaderProps) {
 
   // CRITICAL DATA TRACKER (Minimal: Only used to enforce hook order if needed, but not necessary for logic)
   // Reverting to the simplest tracker just to keep the hook count consistent
-  const trackerOutput = useTrackerPlugin(() => ({
-    remId: actionItem.rem._id,
-    parentId: actionItem.rem.parent,
-    pdfRem: actionItem.rem,
-  }), [actionItem.rem._id, actionItem.rem.parent]); 
-  // NOTE: remData is removed, replaced by criticalContext state below.
-  
-  
   // --- 3. ALL useCallback / useMemo Hooks MUST BE HERE ---
   
   // Save current page position (UPDATED TO USE criticalContext)
   const saveCurrentPage = React.useCallback(async (page: number) => {
-    if (!criticalContext?.incrementalRemId) return; // Use criticalContext
+    const incRemId = criticalContext?.incrementalRemId;
+    if (!incRemId) return;
     
-    const pageKey = `incremental_current_page_${criticalContext.incrementalRemId}_${actionItem.rem._id}`;
+    const pageKey = `incremental_current_page_${incRemId}_${actionItem.rem._id}`;
     await plugin.storage.setSynced(pageKey, page);
   // Dependencies MUST include criticalContext
   }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin]);
@@ -177,13 +171,16 @@ export function Reader(props: ReaderProps) {
   }, []);
 
   const handleSetPageRange = React.useCallback(async () => {
-    if (!criticalContext?.incrementalRemId || !criticalContext?.pdfRemId) {
+    const incRemId = criticalContext?.incrementalRemId;
+    const pdfRemId = criticalContext?.pdfRemId;
+    
+    if (!incRemId || !pdfRemId) {
       return;
     }
     
-    const context = {
-      incrementalRemId: criticalContext.incrementalRemId,
-      pdfRemId: criticalContext.pdfRemId,
+    const context: PageRangeContext = {
+      incrementalRemId: incRemId,
+      pdfRemId,
       totalPages: totalPages,
       currentPage: currentPage
     };
@@ -195,11 +192,12 @@ export function Reader(props: ReaderProps) {
   }, [criticalContext?.incrementalRemId, criticalContext?.pdfRemId, totalPages, currentPage, plugin]);
 
   const handleClearPageRange = React.useCallback(async () => {
-    if (!criticalContext?.incrementalRemId) return;
+    const incRemId = criticalContext?.incrementalRemId;
+    if (!incRemId) return;
     
     await clearIncrementalPDFData(
       plugin,
-      criticalContext.incrementalRemId,
+      incRemId,
       actionItem.rem._id
     );
     setPageRangeStart(1);
@@ -222,6 +220,7 @@ export function Reader(props: ReaderProps) {
         borderTop: `1px solid ${border}`, backgroundColor: bg, minHeight: '28px', gap: '12px', 
         flexWrap: 'nowrap' as const, overflow: 'hidden'
       },
+      dividerColor: border,
       title: {
         fontSize: '12px', fontWeight: 600, color: color, whiteSpace: 'nowrap' as const, 
         overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px'
@@ -229,6 +228,9 @@ export function Reader(props: ReaderProps) {
       statsGroup: {
         display: 'flex', alignItems: 'center', gap: '16px', fontSize: '11px', 
         color: subColor, flex: '1 1 auto', justifyContent: 'center'
+      },
+      statItem: {
+        display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' as const,
       },
       statNumber: { fontWeight: 600, color: color },
       pageButton: {
@@ -289,18 +291,17 @@ export function Reader(props: ReaderProps) {
       }
 
       const backgroundColor = window.getComputedStyle(document.body).backgroundColor;
-      const isDarkByColor = backgroundColor && 
-        backgroundColor.startsWith('rgb') && 
-        (() => {
-          const matches = backgroundColor.match(/\d+/g);
-          if (matches && matches.length >= 3) {
-            const [r, g, b] = matches.map(Number);
-            return (r + g + b) / 3 < 128;
-          }
-          return false;
-        })();
+      let isDarkByColor = false;
 
-      const isDark = htmlHasDark || bodyHasDark || parentHasDark || isDarkByColor;
+      if (backgroundColor && backgroundColor.startsWith('rgb')) {
+        const matches = backgroundColor.match(/\d+/g);
+        if (matches && matches.length >= 3) {
+          const [r, g, b] = matches.map(Number);
+          isDarkByColor = (r + g + b) / 3 < 128;
+        }
+      }
+
+      const isDark = Boolean(htmlHasDark || bodyHasDark || parentHasDark || isDarkByColor);
       
       if (isDark !== lastKnownDarkMode) {
         lastKnownDarkMode = isDark;
@@ -343,8 +344,13 @@ export function Reader(props: ReaderProps) {
         // Try to get from widget context / parent
         try {
           const widgetContext = await plugin.widget.getWidgetContext();
-          if (widgetContext?.remId && widgetContext.remId !== pdfRem._id) {
-            const contextRem = await plugin.rem.findOne(widgetContext.remId);
+          const contextRemId =
+            widgetContext && 'remId' in widgetContext && widgetContext.remId
+              ? (widgetContext.remId as RemId)
+              : null;
+
+          if (contextRemId && contextRemId !== pdfRem._id) {
+            const contextRem = await plugin.rem.findOne(contextRemId);
             if (contextRem && (await contextRem.hasPowerup(powerupCode))) {
               incrementalRem = contextRem;
             }
@@ -386,7 +392,7 @@ export function Reader(props: ReaderProps) {
       const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
 
       // 2. Get Ancestors (also slow)
-      const ancestorList = [];
+      const ancestorList: CriticalContext['ancestors'] = [];
       let currentParent = rem.parent;
       let depth = 0;
       const maxDepth = 10;
@@ -428,7 +434,7 @@ export function Reader(props: ReaderProps) {
 
     return () => clearTimeout(timeoutId);
     
-  }, [trackerOutput?.remId, trackerOutput?.parentId, plugin]); // Use trackerOutput for stability
+  }, [actionItem.rem._id, actionItem.rem.parent, plugin]);
 
 
   // DEFERRED METADATA CALCULATION (Statistics)
@@ -563,17 +569,18 @@ export function Reader(props: ReaderProps) {
  
   // Page Range/Position Loader and Poller (Updated to use criticalContext)
   React.useEffect(() => {
-    if (!criticalContext?.incrementalRemId) return;
+    const incRemId = criticalContext?.incrementalRemId;
+    if (!incRemId) return;
     // ... (rest of logic)
     const loadAndValidateSettings = async () => {
       const savedPagePromise = getIncrementalReadingPosition(
         plugin,
-        criticalContext.incrementalRemId, // Use criticalContext
+        incRemId,
         actionItem.rem._id
       );
       const rangePromise = getIncrementalPageRange(
         plugin,
-        criticalContext.incrementalRemId, // Use criticalContext
+        incRemId,
         actionItem.rem._id
       );
       // ... (rest of load logic)
@@ -596,11 +603,9 @@ export function Reader(props: ReaderProps) {
     loadAndValidateSettings();
   
     const checkForChanges = async () => {
-        if (!criticalContext?.incrementalRemId) return; 
-        // ... (rest of poll logic using criticalContext)
         const range = await getIncrementalPageRange(
           plugin,
-          criticalContext.incrementalRemId, // Use criticalContext
+          incRemId,
           actionItem.rem._id
         );
         
@@ -843,7 +848,14 @@ export function Reader(props: ReaderProps) {
               →
             </button>
             
-            <div style={{ width: '1px', height: '16px', backgroundColor: metadataBarStyles.container.borderColor, margin: '0 4px' }} />
+            <div
+              style={{
+                width: '1px',
+                height: '16px',
+                backgroundColor: metadataBarStyles.dividerColor,
+                margin: '0 4px',
+              }}
+            />
             
             <button
               onClick={handleSetPageRange}

@@ -2,7 +2,14 @@ import { PluginRem, RNPlugin, RemId, Query_DUPE_2 as Query, BuiltInPowerupCodes,
 import { IncrementalRem } from './types';
 import { getIncrementalRemInfo } from './incremental_rem';
 import { safeRemTextToString } from './pdfUtils';
-import { allCardPriorityInfoKey, powerupCode, nextRepDateSlotCode } from './consts';
+import {
+  allCardPriorityInfoKey,
+  powerupCode,
+  nextRepDateSlotCode,
+  cardPriorityShieldHistoryKey,
+  documentCardPriorityShieldHistoryKey,
+  seenCardInSessionKey,
+} from './consts';
 import * as _ from 'remeda';
 
 const CARD_PRIORITY_CODE = 'cardPriority';
@@ -64,6 +71,529 @@ export interface QueueSessionCache {
   incRemDocPercentiles: Record<RemId, number>;
 }
 
+// CLEANUP FUNCTION - Removes all CardPriority tags and data
+export async function removeAllCardPriorityTags(plugin: RNPlugin) {
+  const confirmed = confirm(
+    '⚠️ Remove All CardPriority Data\n\n' +
+      'This will permanently remove ALL cardPriority tags and their data from your entire knowledge base.\n\n' +
+      'This action cannot be undone.\n\n' +
+      'Are you sure you want to proceed?'
+  );
+
+  if (!confirmed) {
+    console.log('CardPriority cleanup cancelled by user');
+    await plugin.app.toast('CardPriority cleanup cancelled');
+    return;
+  }
+
+  console.log('Starting CardPriority cleanup...');
+  await plugin.app.toast('Starting CardPriority cleanup...');
+
+  try {
+    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+    const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+
+    if (taggedRems.length === 0) {
+      await plugin.app.toast('No CardPriority tags found to remove');
+      console.log('No CardPriority tags found');
+      return;
+    }
+
+    let removed = 0;
+    const total = taggedRems.length;
+    const batchSize = 50;
+
+    console.log(`Found ${total} rems with CardPriority tags. Starting removal...`);
+    await plugin.app.toast(`Found ${total} CardPriority tags to remove...`);
+
+    for (let i = 0; i < taggedRems.length; i += batchSize) {
+      const batch = taggedRems.slice(i, i + batchSize);
+
+      await Promise.all(
+        batch.map(async (rem) => {
+          try {
+            await rem.setPowerupProperty('cardPriority', 'priority', []);
+            await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
+            await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
+          } catch (e) {
+            console.log(`Warning: Could not clear slots for rem ${rem._id}:`, e);
+          }
+
+          await rem.removePowerup('cardPriority');
+        })
+      );
+
+      removed += batch.length;
+
+      const progress = Math.round((removed / total) * 100);
+      if (progress % 10 === 0 || removed === total) {
+        await plugin.app.toast(`Cleanup progress: ${progress}% (${removed}/${total})`);
+        console.log(`Cleanup progress: ${progress}% (${removed}/${total})`);
+      }
+    }
+
+    console.log('Clearing session storage...');
+    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    await plugin.storage.setSession(seenCardInSessionKey, []);
+
+    console.log('Clearing synced storage...');
+    await plugin.storage.setSynced(cardPriorityShieldHistoryKey, {});
+    await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, {});
+
+    await plugin.app.toast(`✅ Cleanup complete! Removed ${removed} CardPriority tags.`);
+    console.log(`CardPriority cleanup finished. Successfully removed ${removed} tags from knowledge base.`);
+
+    const shouldRefresh = confirm(
+      'Cleanup successful!\n\n' + 'Would you like to refresh the page to ensure a clean state?'
+    );
+
+    if (shouldRefresh) {
+      window.location.reload();
+    }
+  } catch (error) {
+    console.error('Error during CardPriority cleanup:', error);
+    await plugin.app.toast('❌ Error during cleanup. Check console for details.');
+    alert(
+      'An error occurred during cleanup.\n\n' +
+        'Some tags may not have been removed.\n' +
+        'Please check the console for details.'
+    );
+  }
+}
+
+// PRE-TAGGING FUNCTION - Pre-compute and tag all card priorities
+export async function precomputeAllCardPriorities(plugin: RNPlugin) {
+  const confirmed = confirm(
+    '📊 Pre-compute All Card Priorities\n\n' +
+      'This will analyze all flashcards in your knowledge base and pre-compute their priorities based on inheritance from their ancestors priorities.\n\n' +
+      'Your manually set card priorities will not be affected.\n\n' +
+      'This is a one-time optimization that will significantly speed up future plugin startups.\n\n' +
+      'This may take several minutes for large collections. Continue?'
+  );
+
+  if (!confirmed) {
+    console.log('Pre-computation cancelled by user');
+    await plugin.app.toast('Pre-computation cancelled');
+    return;
+  }
+
+  console.log('Starting card priority pre-computation...');
+  await plugin.app.toast('Starting card priority pre-computation. This may take a few minutes...');
+
+  try {
+    const startTime = Date.now();
+
+    const allCards = await plugin.card.getAll();
+    const uniqueRemIds = _.uniq(allCards.map((c) => c.remId));
+
+    if (uniqueRemIds.length === 0) {
+      await plugin.app.toast('No flashcards found in knowledge base');
+      return;
+    }
+
+    console.log(`Found ${uniqueRemIds.length} rems with flashcards to process`);
+    await plugin.app.toast(`Found ${uniqueRemIds.length} rems with flashcards. Processing...`);
+
+    let processed = 0;
+    let tagged = 0;
+    let priorityChanged = 0;
+    let skippedManual = 0;
+    let errors = 0;
+    const errorDetails: Array<{ remId: string; reason: string; error?: any }> = [];
+
+    const batchSize = 50;
+
+    for (let i = 0; i < uniqueRemIds.length; i += batchSize) {
+      const batch = uniqueRemIds.slice(i, i + batchSize);
+
+      await Promise.all(
+        batch.map(async (remId) => {
+          try {
+            const rem = await plugin.rem.findOne(remId);
+            if (!rem) {
+              errors++;
+              errorDetails.push({
+                remId,
+                reason: 'Rem not found - may have been deleted',
+              });
+              return;
+            }
+
+            const hasPowerupTag = await rem.hasPowerup('cardPriority');
+
+            let existingPriority: CardPriorityInfo | null = null;
+            if (hasPowerupTag) {
+              const priorityValue = await rem.getPowerupProperty('cardPriority', 'priority');
+              const source = await rem.getPowerupProperty('cardPriority', 'prioritySource');
+
+              if (priorityValue && source === 'manual') {
+                skippedManual++;
+                processed++;
+                return;
+              }
+
+              if (priorityValue) {
+                existingPriority = {
+                  remId: rem._id,
+                  priority: parseInt(priorityValue),
+                  source: source as PrioritySource,
+                  lastUpdated: 0,
+                  cardCount: 0,
+                  dueCards: 0,
+                };
+              }
+            }
+
+            const oldPriorityValue = existingPriority ? existingPriority.priority : null;
+            const oldPrioritySource = existingPriority ? existingPriority.source : null;
+
+            const calculatedPriority = await calculateNewPriority(plugin, rem, existingPriority);
+
+            if (
+              !hasPowerupTag ||
+              calculatedPriority.priority !== oldPriorityValue ||
+              calculatedPriority.source !== oldPrioritySource
+            ) {
+              await setCardPriority(plugin, rem, calculatedPriority.priority, calculatedPriority.source);
+              tagged++;
+
+              if (hasPowerupTag && oldPriorityValue !== null && calculatedPriority.priority !== oldPriorityValue) {
+                priorityChanged++;
+              }
+            }
+
+            processed++;
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`Error processing rem ${remId}:`, error);
+            errors++;
+            errorDetails.push({
+              remId,
+              reason: `Exception during processing: ${errorMessage}`,
+              error: error,
+            });
+          }
+        })
+      );
+
+      const progress = Math.round((processed / uniqueRemIds.length) * 100);
+      if (progress % 10 === 0 || processed === uniqueRemIds.length) {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        await plugin.app.toast(`Progress: ${progress}% (${processed}/${uniqueRemIds.length}) - ${elapsed}s elapsed`);
+        console.log(
+          `Progress: ${processed}/${uniqueRemIds.length} (${progress}%) - ` +
+            `Tagged: ${tagged}, Changed: ${priorityChanged}, Skipped manual: ${skippedManual}, Errors: ${errors}`
+        );
+      }
+
+      if (i + batchSize < uniqueRemIds.length) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+
+    const totalTime = Math.round((Date.now() - startTime) / 1000);
+
+    console.log('Building optimized cache from tagged priorities...');
+    await plugin.app.toast('Building optimized cache...');
+
+    const cacheStartTime = Date.now();
+    await buildOptimizedCache(plugin);
+    const cacheTime = Math.round((Date.now() - cacheStartTime) / 1000);
+
+    let errorBreakdown = '';
+    if (errorDetails.length > 0) {
+      const notFoundErrors = errorDetails.filter((e) => e.reason.includes('not found')).length;
+      const exceptionErrors = errorDetails.filter((e) => e.reason.includes('Exception')).length;
+
+      errorBreakdown =
+        `\n• Error breakdown:\n` +
+        `  - Rem not found: ${notFoundErrors}\n` +
+        `  - Processing exceptions: ${exceptionErrors}`;
+
+      console.log('\n=== DETAILED ERROR LOG ===');
+      console.log(`Total errors: ${errorDetails.length}\n`);
+      errorDetails.forEach((err, index) => {
+        console.log(`\nError ${index + 1}/${errorDetails.length}:`);
+        console.log(`  RemId: ${err.remId}`);
+        console.log(`  Reason: ${err.reason}`);
+        if (err.error) {
+          console.log(`  Details:`, err.error);
+        }
+      });
+      console.log('\n=== END ERROR LOG ===\n');
+
+      console.log('=== FAILED REM IDs (for investigation) ===');
+      console.log(errorDetails.map((e) => e.remId).join('\n'));
+      console.log('=== END FAILED REM IDs ===\n');
+    }
+
+    const message =
+      `✅ Pre-computation complete!\n\n` +
+      `• Total rems processed: ${processed}\n` +
+      `• Newly tagged: ${tagged}${priorityChanged > 0 ? ` (${priorityChanged} with changed priority)` : ''}\n` +
+      `• Preserved manual priorities: ${skippedManual}\n` +
+      `• Errors: ${errors}${errorBreakdown}\n` +
+      `• Total time: ${totalTime}s\n` +
+      `• Cache build time: ${cacheTime}s\n\n` +
+      `${errors > 0 ? 'Check console for detailed error log.\n\n' : ''}` +
+      `Future startups will be much faster!`;
+
+    console.log(message);
+    await plugin.app.toast('✅ Pre-computation complete! See console for details.');
+    alert(message);
+  } catch (error) {
+    console.error('Error during pre-computation:', error);
+    await plugin.app.toast('❌ Error during pre-computation. Check console for details.');
+    alert(
+      'An error occurred during pre-computation.\n\n' + 'Please check the console for details:\n' + String(error)
+    );
+  }
+}
+
+async function buildOptimizedCache(plugin: RNPlugin) {
+  console.log('CACHE: Building optimized cache from pre-tagged priorities...');
+
+  const allCards = await plugin.card.getAll();
+  const cardRemIds = allCards ? _.uniq(allCards.map((c) => c.remId)) : [];
+  console.log(`CACHE: Found ${cardRemIds.length} rems with cards`);
+
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedForInheritanceRems = (await cardPriorityPowerup?.taggedRem()) || [];
+  const inheritanceRemIds = taggedForInheritanceRems.map((r) => r._id);
+  console.log(`CACHE: Found ${inheritanceRemIds.length} rems tagged with cardPriority powerup`);
+
+  const uniqueRemIds = _.uniq([...cardRemIds, ...inheritanceRemIds]);
+  console.log(
+    `CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${
+      inheritanceRemIds.length - cardRemIds.length
+    } inheritance-only)`
+  );
+
+  if (uniqueRemIds.length === 0) {
+    console.log('CACHE: No cards or cardPriority tags found. Setting empty cache.');
+    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    return;
+  }
+
+  const cardPriorityInfos: CardPriorityInfo[] = [];
+  const batchSize = 100;
+
+  for (let i = 0; i < uniqueRemIds.length; i += batchSize) {
+    const batch = uniqueRemIds.slice(i, i + batchSize);
+
+    const batchResults = await Promise.all(
+      batch.map(async (remId) => {
+        const rem = await plugin.rem.findOne(remId);
+        if (!rem) return null;
+
+        const cardInfo = await getCardPriority(plugin, rem);
+        return cardInfo;
+      })
+    );
+
+    cardPriorityInfos.push(...(batchResults.filter((info) => info !== null) as CardPriorityInfo[]));
+
+    if (i % 1000 === 0) {
+      console.log(`CACHE: Processed ${i}/${uniqueRemIds.length} rems...`);
+    }
+  }
+
+  console.log(`CACHE: Found ${cardPriorityInfos.length} raw entries. Calculating percentiles...`);
+
+  const sortedInfos = _.sortBy(cardPriorityInfos, (info) => info.priority);
+  const totalItems = sortedInfos.length;
+  const enrichedInfos = sortedInfos.map((info, index) => {
+    const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+    return {
+      ...info,
+      kbPercentile: percentile,
+    };
+  });
+
+  console.log(`CACHE: Successfully built and enriched cache with ${enrichedInfos.length} entries.`);
+  await plugin.storage.setSession(allCardPriorityInfoKey, enrichedInfos);
+}
+
+// CARD PRIORITIES CACHING FUNCTION - With deferred loading for untagged cards
+export async function cacheAllCardPriorities(plugin: RNPlugin) {
+  console.log('CACHE: Starting intelligent cache build with deferred loading...');
+
+  const startTime = Date.now();
+
+  const allCards = await plugin.card.getAll();
+  const cardRemIds = allCards ? _.uniq(allCards.map((c) => c.remId)) : [];
+  console.log(`CACHE: Found ${cardRemIds.length} rems with cards`);
+
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedForInheritanceRems = (await cardPriorityPowerup?.taggedRem()) || [];
+  const inheritanceRemIds = taggedForInheritanceRems.map((r) => r._id);
+  console.log(`CACHE: Found ${inheritanceRemIds.length} rems tagged with cardPriority powerup`);
+
+  const uniqueRemIds = _.uniq([...cardRemIds, ...inheritanceRemIds]);
+  console.log(
+    `CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${
+      inheritanceRemIds.length - cardRemIds.length
+    } inheritance-only)`
+  );
+
+  if (uniqueRemIds.length === 0) {
+    console.log('CACHE: No cards or cardPriority tags found. Setting empty cache.');
+    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    return;
+  }
+
+  console.log('CACHE: Phase 1 - Loading pre-tagged cards...');
+  const taggedPriorities: CardPriorityInfo[] = [];
+  const untaggedRemIds: string[] = [];
+
+  const checkBatchSize = 100;
+  for (let i = 0; i < uniqueRemIds.length; i += checkBatchSize) {
+    const batch = uniqueRemIds.slice(i, i + checkBatchSize);
+
+    await Promise.all(
+      batch.map(async (remId) => {
+        const rem = await plugin.rem.findOne(remId);
+        if (!rem) return;
+
+        const hasPowerup = await rem.hasPowerup('cardPriority');
+        if (hasPowerup) {
+          const cardInfo = await getCardPriority(plugin, rem);
+          if (cardInfo) {
+            taggedPriorities.push(cardInfo);
+          }
+        } else {
+          untaggedRemIds.push(remId);
+        }
+      })
+    );
+  }
+
+  console.log(`CACHE: Found ${taggedPriorities.length} tagged entries. Calculating percentiles...`);
+  const sortedInfos = _.sortBy(taggedPriorities, (info) => info.priority);
+  const totalItems = sortedInfos.length;
+  const enrichedTaggedPriorities = sortedInfos.map((info, index) => {
+    const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+    return { ...info, kbPercentile: percentile };
+  });
+
+  await plugin.storage.setSession(allCardPriorityInfoKey, enrichedTaggedPriorities);
+
+  const phase1Time = Math.round((Date.now() - startTime) / 1000);
+  console.log(
+    `CACHE: Phase 1 complete. Loaded and enriched ${enrichedTaggedPriorities.length} tagged cards in ${phase1Time}s`
+  );
+  console.log(`CACHE: Found ${untaggedRemIds.length} untagged cards for deferred processing`);
+
+  if (enrichedTaggedPriorities.length > 0) {
+    await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} card priorities instantly`);
+  }
+
+  if (untaggedRemIds.length > 0) {
+    const untaggedPercentage = Math.round((untaggedRemIds.length / uniqueRemIds.length) * 100);
+    if (untaggedPercentage > 20) {
+      await plugin.app.toast(
+        `⏳ Processing ${untaggedRemIds.length} untagged cards in background... ` +
+          `Consider running 'Pre-compute Card Priorities' for instant startups!`
+      );
+    }
+
+    setTimeout(async () => {
+      await processDeferredCards(plugin, untaggedRemIds);
+    }, 3000);
+  } else {
+    console.log('CACHE: All cards are pre-tagged! No deferred processing needed.');
+    await plugin.app.toast('✅ All card priorities loaded instantly!');
+  }
+}
+
+async function processDeferredCards(plugin: RNPlugin, untaggedRemIds: string[]) {
+  console.log(`DEFERRED: Starting background processing of ${untaggedRemIds.length} untagged cards...`);
+  const startTime = Date.now();
+
+  let processed = 0;
+  let errorCount = 0;
+  const batchSize = 30;
+  const delayBetweenBatches = 100;
+
+  try {
+    for (let i = 0; i < untaggedRemIds.length; i += batchSize) {
+      const batch = untaggedRemIds.slice(i, i + batchSize);
+      const newPriorities: CardPriorityInfo[] = [];
+
+      await Promise.all(
+        batch.map(async (remId) => {
+          try {
+            const rem = await plugin.rem.findOne(remId);
+            if (!rem) {
+              errorCount++;
+              return;
+            }
+
+            await autoAssignCardPriority(plugin, rem);
+
+            const cardInfo = await getCardPriority(plugin, rem);
+            if (cardInfo) {
+              newPriorities.push(cardInfo);
+            }
+
+            processed++;
+          } catch (error) {
+            console.error(`DEFERRED: Error processing rem ${remId}:`, error);
+            errorCount++;
+          }
+        })
+      );
+
+      if (newPriorities.length > 0) {
+        const currentCache =
+          (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+        const mergedCache = [...currentCache, ...newPriorities];
+
+        const sortedMergedCache = _.sortBy(mergedCache, (info) => info.priority);
+        const totalItems = sortedMergedCache.length;
+        const enrichedCache = sortedMergedCache.map((info, index) => {
+          const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+          return { ...info, kbPercentile: percentile };
+        });
+
+        await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
+      }
+
+      if (
+        processed % Math.max(500, Math.floor(untaggedRemIds.length * 0.2)) === 0 ||
+        processed === untaggedRemIds.length
+      ) {
+        const progress = Math.round((processed / untaggedRemIds.length) * 100);
+        console.log(`DEFERRED: Progress ${progress}% (${processed}/${untaggedRemIds.length})`);
+      }
+
+      if (i + batchSize < untaggedRemIds.length) {
+        await new Promise((resolve) => setTimeout(resolve, delayBetweenBatches));
+      }
+    }
+
+    const totalTime = Math.round((Date.now() - startTime) / 1000);
+    console.log(
+      `DEFERRED: Background processing complete! ` +
+        `Processed ${processed} cards in ${totalTime}s ` +
+        `(${errorCount} errors)`
+    );
+
+    await plugin.app.toast(`✅ Background processing complete! All ${processed} card priorities are now cached.`);
+
+    if (untaggedRemIds.length > 1000) {
+      setTimeout(() => {
+        plugin.app.toast(
+          `💡 Tip: Run 'Pre-compute Card Priorities' to avoid background processing in future sessions`
+        );
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('DEFERRED: Fatal error during background processing:', error);
+    await plugin.app.toast('⚠️ Background processing encountered an error. Some cards may not be cached.');
+  }
+}
+
 
 /**
  * Find the closest ancestor with priority (either Incremental or CardPriority)
@@ -115,7 +645,7 @@ export async function getCardPriority(
 
   const cards = await rem.getCards();
   const now = Date.now();
-  const dueCards = cards.filter(card => card.nextRepetitionTime <= now).length;
+  const dueCards = cards.filter(card => (card.nextRepetitionTime ?? Infinity) <= now).length;
 
   //console.log(`[DEBUG getCardPriority] 2. Attempting to read priority slot directly...`);
   const priorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
@@ -177,7 +707,10 @@ export async function getCardPriority(
 }
 
 
-export function calculateRelativeCardPriority(allItems: CardPriority.tsInfo[], currentRemId: RemId): number | null {
+export function calculateRelativeCardPriority(
+  allItems: CardPriorityInfo[],
+  currentRemId: RemId
+): number | null {
   if (!allItems || !currentRemId) {
     return null;
   }
@@ -472,7 +1005,7 @@ export async function getDueCardsWithPriorities(
             if (newCardInfo) {
               results.push({
                 rem,
-                cards: cards.filter(card => card.nextRepetitionTime <= now),
+                cards: cards.filter(card => (card.nextRepetitionTime ?? Infinity) <= now),
                 priority: newCardInfo.priority,
                 source: newCardInfo.source
               });
@@ -493,7 +1026,7 @@ export async function getDueCardsWithPriorities(
 
       // Get the actual card objects (we need these for the return value)
       const cards = await rem.getCards();
-      const dueCards = cards.filter(card => card.nextRepetitionTime <= now);
+      const dueCards = cards.filter(card => (card.nextRepetitionTime ?? Infinity) <= now);
 
       if (dueCards.length > 0) {
         results.push({
@@ -637,7 +1170,7 @@ async function getDueCardsWithPrioritiesSlow(
 
   for (const rem of remsToCheck) {
     const cards = await rem.getCards();
-    const dueCards = cards.filter(card => card.nextRepetitionTime <= now);
+    const dueCards = cards.filter(card => (card.nextRepetitionTime ?? Infinity) <= now);
       
     if (dueCards.length > 0) {
       // Try to get existing priority
