@@ -669,12 +669,77 @@ function Priority() {
           )}
 
           {/* 🔌 Conditionally render ancestor info */}
-          {performanceMode === 'full' && ancestorPriorityInfo && ancestorPriorityInfo.sourceType === 'IncRem' && (
-            <div className="mt-2 p-3 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                Closest Ancestor Priority: {ancestorPriorityInfo.priority}
+          {performanceMode === 'full' && ancestorPriorityInfo && (
+            <div style={{
+              marginTop: '16px',
+              padding: '12px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(155, 178, 215, 0.6)',
+              border: '1px solid rgba(59, 130, 246, 0.3)'
+            }}>
+              {/* Badges row */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '8px', 
+                marginBottom: '12px',
+                flexWrap: 'wrap'
+              }}>
+                {/* Status badge - Note: IncRems don't have 'source', so we show "Closest Ancestor" */}
+                <span style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase',
+                  backgroundColor: 'rgba(124, 130, 141, 0.2)',
+                  color: '#374151'
+                }}>
+                  Closest Ancestor
+                </span>
+                
+                {/* Level badge */}
+                <span style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase',
+                  backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                  color: '#1e40af'
+                }}>
+                  {ancestorPriorityInfo.levelDescription}
+                </span>
+                
+                {/* Type badge */}
+                <span style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  borderRadius: '4px',
+                  backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                  color: '#6b21a8'
+                }}>
+                  {ancestorPriorityInfo.sourceType}
+                </span>
               </div>
-              <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate">
+              
+              {/* Content */}
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#1e40af',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                marginBottom: '4px'
+              }}>
+                <span style={{
+                  fontSize: '24px',
+                  fontWeight: '700',
+                  color: '#2563eb',
+                }}>
+                  {ancestorPriorityInfo.priority} 
+                </span> &nbsp; &nbsp;
                 {ancestorPriorityInfo.ancestorName}
               </div>
             </div>
