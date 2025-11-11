@@ -11,7 +11,7 @@ import { safeRemTextToString } from '../lib/pdfUtils';
 import { getCardPriority } from '../lib/cardPriority';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
-import { updateCardPriorityInCache } from '../lib/cache'; // <-- 1. IMPORT ADDED
+import { updateCardPriorityCache } from '../lib/cache'; // <-- 1. IMPORT ADDED
 
 interface RemWithPriority {
   remId: string;
@@ -293,7 +293,7 @@ function BatchCardPriority() {
             ]);
 
             // <-- 2. CALL CACHE UPDATE HERE -->
-            await updateCardPriorityInCache(plugin, remData.remId);
+            await updateCardPriorityCache(plugin, remData.remId);
 
             appliedCount++;
           })

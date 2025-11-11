@@ -8,7 +8,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { updateIncrementalRemCache, removeIncrementalRemFromCache } from '../lib/cache';
+import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/cache';
 import { 
   getCardPriority, 
   setCardPriority, 
@@ -31,7 +31,7 @@ import {
   alwaysUseLightModeOnMobileId 
 } from '../lib/consts';
 import { IncrementalRem } from '../lib/types';
-import { updateCardPriorityInCache, flushLightCacheUpdates } from '../lib/cache';
+import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import * as _ from 'remeda';
@@ -377,7 +377,7 @@ function Priority() {
     if (performanceMode === 'full') {
         const numCardsRemaining = await plugin.queue.getNumRemainingCards();
         const isInQueueNow = numCardsRemaining !== undefined;
-        await updateCardPriorityInCache(plugin, rem._id, isInQueueNow);
+        await updateCardPriorityCache(plugin, rem._id, isInQueueNow);
         
         await flushLightCacheUpdates(plugin);
         
@@ -473,7 +473,7 @@ function Priority() {
   const removeFromIncremental = useCallback(async () => {
     if (!rem) return;
     await rem.removePowerup(powerupCode);
-    await removeIncrementalRemFromCache(plugin, rem._id);
+    await removeIncrementalRemCache(plugin, rem._id);
     await plugin.app.toast('Removed from Incremental Queue');
     plugin.widget.closePopup();
   }, [plugin, rem]);
@@ -483,7 +483,7 @@ function Priority() {
     await rem.removePowerup('cardPriority');
     // 🔌 Conditionally update cache
     if (performanceMode === 'full') {
-        await updateCardPriorityInCache(plugin, rem._id);
+        await updateCardPriorityCache(plugin, rem._id);
     }
     await plugin.app.toast('Card Priority for inheritance removed.');
     plugin.widget.closePopup();

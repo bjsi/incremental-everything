@@ -22,7 +22,7 @@ import {
   alwaysUseLightModeOnMobileId
 } from '../lib/consts';
 import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
-import { removeIncrementalRemFromCache } from '../lib/cache';
+import { removeIncrementalRemCache } from '../lib/cache';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
@@ -462,7 +462,7 @@ export function AnswerButtons() {
                   await handleCardPriorityInheritance(plugin, rem, incRemInfo);
 
                   // 2. Proceed with the final, destructive Done button logic
-                  await removeIncrementalRemFromCache(plugin, rem._id);
+                  await removeIncrementalRemCache(plugin, rem._id);
                   await plugin.queue.removeCurrentCardFromQueue(true);
                   await rem.removePowerup(powerupCode);
               }}

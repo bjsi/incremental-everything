@@ -13,7 +13,7 @@ import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInf
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
 import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority'; // Aliased to avoid name clash
-import { updateCardPriorityInCache } from '../lib/cache';
+import { updateCardPriorityCache } from '../lib/cache';
 
 
 export function PriorityEditor() {
@@ -134,7 +134,7 @@ export function PriorityEditor() {
     const newPriority = Math.max(0, Math.min(100, currentPriority + delta));
     
     await setCardPriority(plugin, rem, newPriority, 'manual');
-    await updateCardPriorityInCache(plugin, rem._id);
+    await updateCardPriorityCache(plugin, rem._id);
   };
 
   const buttonStyle: React.CSSProperties = {

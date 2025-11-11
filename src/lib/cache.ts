@@ -1,10 +1,11 @@
 // in lib/cache.ts
 
-import { RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { allCardPriorityInfoKey, allIncrementalRemKey } from './consts';
+import { RNPlugin, RemId, ReactRNPlugin } from '@remnote/plugin-sdk';
+import { allCardPriorityInfoKey, allIncrementalRemKey, powerupCode } from './consts';
 import { CardPriorityInfo, getCardPriority } from './cardPriority';
 import { IncrementalRem } from './types';
 import * as _ from 'remeda';
+import { getIncrementalRemInfo } from './incremental_rem';
 
 let cacheUpdateTimer: NodeJS.Timeout | null = null;
 let pendingUpdates = new Map<RemId, { info: CardPriorityInfo | null; isLight: boolean }>();
@@ -54,7 +55,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
 }
 
 // Add a new 'isLightUpdate' parameter
-export async function updateCardPriorityInCache(plugin: RNPlugin, remId: RemId, isLightUpdate = false) {
+export async function updateCardPriorityCache(plugin: RNPlugin, remId: RemId, isLightUpdate = false) {
   try {
     console.log(`CACHE-UPDATE: Queuing ${isLightUpdate ? 'light' : 'heavy'} update for RemId: ${remId}`);
     
@@ -134,7 +135,7 @@ export async function updateIncrementalRemCache(
  * @param remId The ID of the rem to remove from cache
  * @returns Promise that resolves when the cache is updated
  */
-export async function removeIncrementalRemFromCache(
+export async function removeIncrementalRemCache(
   plugin: RNPlugin,
   remId: string
 ): Promise<void> {
@@ -142,4 +143,48 @@ export async function removeIncrementalRemFromCache(
     (await plugin.storage.getSession(allIncrementalRemKey)) || [];
   const updatedAllRems = allRems.filter((r) => r.remId !== remId);
   await plugin.storage.setSession(allIncrementalRemKey, updatedAllRems);
+}
+
+/**
+ * Loads all Rems tagged with the Incremental powerup and caches them in session storage.
+ *
+ * Processes rems in batches to avoid overwhelming the API. Invalid rems are filtered out.
+ *
+ * @param plugin Plugin instance with powerup/rem/storage access
+ * @param batchSize Number of rems to process per batch (default: 500)
+ * @param batchDelayMs Delay in milliseconds between batches (default: 100)
+ * @returns Array of successfully loaded IncrementalRem objects
+ */
+export async function loadIncrementalRemCache(
+  plugin: ReactRNPlugin,
+  batchSize: number = 500,
+  batchDelayMs: number = 100
+): Promise<IncrementalRem[]> {
+  console.log('TRACKER: Incremental Rem tracker starting...');
+
+  const powerup = await plugin.powerup.getPowerupByCode(powerupCode);
+  const taggedRem = (await powerup?.taggedRem()) || [];
+  console.log(`TRACKER: Found ${taggedRem.length} Incremental Rems. Starting batch processing...`);
+
+  const updatedAllRem: IncrementalRem[] = [];
+  const numBatches = Math.ceil(taggedRem.length / batchSize);
+
+  for (let i = 0; i < taggedRem.length; i += batchSize) {
+    const batch = taggedRem.slice(i, i + batchSize);
+    console.log(`TRACKER: Processing IncRem batch ${Math.floor(i / batchSize) + 1} of ${numBatches}...`);
+
+    const batchInfos = (
+      await Promise.all(batch.map((rem) => getIncrementalRemInfo(plugin, rem)))
+    ).filter(Boolean) as IncrementalRem[];
+
+    updatedAllRem.push(...batchInfos);
+
+    await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
+  }
+
+  console.log(`TRACKER: Processing complete. Final IncRem cache size is ${updatedAllRem.length}.`);
+  await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+  console.log('TRACKER: Incremental Rem cache has been saved.');
+
+  return updatedAllRem;
 }

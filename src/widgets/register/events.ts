@@ -30,7 +30,7 @@ import {
   getCardPriority,
 } from '../../lib/cardPriority';
 import { IncrementalRem } from '../../lib/types';
-import { flushCacheUpdatesNow, updateCardPriorityInCache } from '../../lib/cache';
+import { flushCacheUpdatesNow, updateCardPriorityCache } from '../../lib/cache';
 import { setCurrentIncrementalRem } from '../../lib/remHelpers';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priorityReviewDocument';
 
@@ -634,8 +634,8 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
         recentlyProcessedCards.add(remId);
         setTimeout(() => recentlyProcessedCards.delete(remId), 2000);
 
-        console.log('LISTENER: Calling LIGHT updateCardPriorityInCache...');
-        await updateCardPriorityInCache(plugin, remId, true);
+        console.log('LISTENER: Calling LIGHT updateCardPriorityCache...');
+        await updateCardPriorityCache(plugin, remId, true);
       } else {
         console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
       }
@@ -692,7 +692,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           }
         }
 
-        await updateCardPriorityInCache(plugin, data.remId);
+        await updateCardPriorityCache(plugin, data.remId);
         console.log('LISTENER: (Debounced) Finished processing event.');
       }, 1000);
     }
