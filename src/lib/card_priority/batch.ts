@@ -5,7 +5,7 @@ import {
   documentCardPriorityShieldHistoryKey,
   seenCardInSessionKey,
 } from '../consts';
-import { CardPriorityInfo, CARD_PRIORITY_CODE } from './types';
+import { CardPriorityInfo } from './types';
 import { calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
 
