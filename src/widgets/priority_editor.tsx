@@ -7,10 +7,10 @@ import {
 import { useMemo, useState } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { getCardPriority, setCardPriority, CardPriorityInfo, calculateRelativeCardPriority } from '../lib/card_priority';
+import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/utils'; // Aliased to avoid name clash
+import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
 
 
@@ -65,7 +65,7 @@ export function PriorityEditor() {
       if (!rem || !incRemInfo) return null;
       const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
       if (allIncRems.length === 0) return 50;
-      return calculateIncRemRelativePriority(allIncRems, rem._id);
+      return calculateRelativePercentile(allIncRems, rem._id);
     },
     [rem, incRemInfo]
   );

@@ -39,13 +39,14 @@ export function percentileToHslColor(percentile: number): string {
 }
 
 /**
- * Calculates the percentile rank of a Rem's priority within a list.
- * @param allItems The list of Rems to rank against.
- * @param currentRemId The ID of the Rem to find the rank for.
- * @returns A number from 1-100, or null if the Rem isn't in the list.
+ * Calculates the percentile rank of an item's priority within a list.
+ * Generic function that works with any type that has priority and remId properties.
+ * @param allItems The list of items to rank against.
+ * @param currentRemId The ID of the item to find the rank for.
+ * @returns A number from 1-100 (rounded to 1 decimal), or null if the item isn't in the list.
  */
-export function calculateRelativePriority(
-  allItems: IncrementalRem[],
+export function calculateRelativePercentile<T extends { priority: number; remId: string }>(
+  allItems: T[],
   currentRemId: RemId
 ): number | null {
   if (!allItems || allItems.length === 0) {
@@ -59,7 +60,6 @@ export function calculateRelativePriority(
     return null;
   }
 
-  const percentile = Math.round(((index + 1) / sortedItems.length) * 100);
-
-  return percentile;
+  const percentile = ((index + 1) / sortedItems.length) * 100;
+  return Math.round(percentile * 10) / 10;
 }

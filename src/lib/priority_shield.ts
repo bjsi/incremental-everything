@@ -8,7 +8,7 @@ import {
   nextRepDateSlotCode,
 } from './consts';
 import { IncrementalRem } from './incremental_rem';
-import { calculateRelativePriority } from './priority';
+import { calculateRelativePercentile } from './utils';
 import * as _ from 'remeda';
 import { CardPriorityInfo } from './card_priority';
 
@@ -38,19 +38,6 @@ export interface CardPriorityShieldStatus {
   } | null;
 }
 
-function calculateRelativeCardPriority(allItems: { priority: number; remId: string }[], currentRemId: RemId): number | null {
-  if (!allItems || allItems.length === 0) {
-    return null;
-  }
-  const sortedItems = _.sortBy(allItems, (x) => x.priority);
-  const index = sortedItems.findIndex((x) => x.remId === currentRemId);
-  if (index === -1) {
-    return null;
-  }
-  const percentile = ((index + 1) / sortedItems.length) * 100;
-  return Math.round(percentile * 10) / 10;
-}
-
 export async function calculateCardPriorityShield(
   plugin: RNPlugin,
   allPrioritizedCardInfo: CardPriorityInfo[],
@@ -67,7 +54,7 @@ export async function calculateCardPriorityShield(
   if (unreviewedDueKb.length > 0) {
     const topMissedInKb = _.minBy(unreviewedDueKb, (info) => info.priority);
     if (topMissedInKb) {
-      const percentile = calculateRelativeCardPriority(allPrioritizedCardInfo, topMissedInKb.remId);
+      const percentile = calculateRelativePercentile(allPrioritizedCardInfo, topMissedInKb.remId);
       
       status.kb = {
         absolute: topMissedInKb.priority,
@@ -147,7 +134,7 @@ export async function calculateCardPriorityShield(
       if (unreviewedDueDoc.length > 0) {
         const topMissedInDoc = _.minBy(unreviewedDueDoc, (info) => info.priority);
         if (topMissedInDoc) {
-          const percentile = calculateRelativeCardPriority(docPrioritizedCardInfo, topMissedInDoc.remId);
+          const percentile = calculateRelativePercentile(docPrioritizedCardInfo, topMissedInDoc.remId);
 
           status.doc = {
             absolute: topMissedInDoc.priority,
@@ -254,7 +241,7 @@ export async function calculatePriorityShield(
   const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
   if (topMissedInKb) {
     status.kb.absolute = topMissedInKb.priority;
-    status.kb.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
+    status.kb.percentile = calculateRelativePercentile(allRems, topMissedInKb.remId);
   }
 
   const scopeIds = docScopeRemIds;
@@ -274,7 +261,7 @@ export async function calculatePriorityShield(
       const topMissedInDoc = _.minBy(unreviewedDueInScope, (rem) => rem.priority);
       if (topMissedInDoc) {
         status.doc.absolute = topMissedInDoc.priority;
-        status.doc.percentile = calculateRelativePriority(scopedRems, topMissedInDoc.remId);
+        status.doc.percentile = calculateRelativePercentile(scopedRems, topMissedInDoc.remId);
       }
     }
   }

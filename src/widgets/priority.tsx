@@ -13,10 +13,9 @@ import {
   getCardPriority,
   setCardPriority,
   CardPriorityInfo,
-  calculateRelativeCardPriority,
   QueueSessionCache
 } from '../lib/card_priority';
-import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/utils';
+import { calculateRelativePercentile } from '../lib/utils';
 import { 
   allIncrementalRemKey, 
   powerupCode, 
@@ -186,8 +185,8 @@ function Priority() {
       const allCardsInScope = (scopeMode === 'all') ? allCardInfos : cardRemsInScope;
       finalPrioritySourceCounts = allCardsInScope.reduce((counts, rem) => ({...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0 });
       finalScopedCardRems = (cardScopeType === 'prioritized' ? allCardsInScope.filter(c => c.source !== 'default') : allCardsInScope);
-      finalIncRel = (scopeMode === 'document') ? sessionCache.incRemDocPercentiles[rem._id] : calculateIncRemRelativePriority(allIncRems, rem._id);
-      finalCardRel = (scopeMode === 'document') ? sessionCache.docPercentiles[rem._id] : calculateRelativeCardPriority(allCardInfos, rem._id);
+      finalIncRel = (scopeMode === 'document') ? sessionCache.incRemDocPercentiles[rem._id] : calculateRelativePercentile(allIncRems, rem._id);
+      finalCardRel = (scopeMode === 'document') ? sessionCache.docPercentiles[rem._id] : calculateRelativePercentile(allCardInfos, rem._id);
       
     } else {
       // --- OPTIMIZED ASYNC FALLBACK PATH WITH COMPREHENSIVE SCOPE ---
@@ -243,8 +242,8 @@ function Priority() {
         tempScopedCardRems = tempScopedCardRems.filter(c => c.source !== 'default');
       }
       finalScopedCardRems = tempScopedCardRems;
-      finalIncRel = calculateIncRemRelativePriority(finalScopedIncRems, rem._id);
-      finalCardRel = calculateRelativeCardPriority(finalScopedCardRems, rem._id);
+      finalIncRel = calculateRelativePercentile(finalScopedIncRems, rem._id);
+      finalCardRel = calculateRelativePercentile(finalScopedCardRems, rem._id);
     }    
     return { 
       scopedIncRems: finalScopedIncRems, 
@@ -323,7 +322,7 @@ function Priority() {
         ...derivedData.scopedIncRems.filter(r => r.remId !== rem._id),
         { remId: rem._id, priority: incAbsPriority } as IncrementalRem
       ];
-      const newRelPriority = calculateIncRemRelativePriority(hypotheticalRems, rem._id);
+      const newRelPriority = calculateRelativePercentile(hypotheticalRems, rem._id);
       if (newRelPriority !== null) setIncRelPriority(newRelPriority);
     }
   }, [incAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode
@@ -334,7 +333,7 @@ function Priority() {
         ...derivedData.scopedCardRems.filter(r => r.remId !== rem._id),
         { remId: rem._id, priority: cardAbsPriority, source: 'manual' } as CardPriorityInfo
       ];
-      const newRelPriority = calculateRelativeCardPriority(hypotheticalRems, rem._id);
+      const newRelPriority = calculateRelativePercentile(hypotheticalRems, rem._id);
       if (newRelPriority !== null) setCardRelPriority(newRelPriority);
     }
   }, [cardAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode

@@ -14,7 +14,7 @@ import {
   addPageToHistory
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
-import { percentileToHslColor, calculateRelativePriority } from '../lib/utils';
+import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemInfo, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -127,8 +127,8 @@ function PageRangeWidget() {
         if (remObj) {
           const incRemInfo = await getIncrementalRemInfo(plugin, remObj);
           if (incRemInfo) {
-            const percentile = remsForCalculation.length > 0 ? 
-              calculateRelativePriority(remsForCalculation, rem.remId) : null;
+            const percentile = remsForCalculation.length > 0 ?
+              calculateRelativePercentile(remsForCalculation, rem.remId) : null;
             priorities[rem.remId] = {
               absolute: incRemInfo.priority,
               percentile
@@ -732,7 +732,7 @@ function PageRangeWidget() {
                             })}
                             className="flex-1"
                             style={{ accentColor: percentileToHslColor(
-                              calculateRelativePriority(
+                              calculateRelativePercentile(
                                 allIncrementalRems || [], 
                                 item.remId
                               ) || 50

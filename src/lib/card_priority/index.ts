@@ -102,31 +102,6 @@ export async function getCardPriority(
   }
 }
 
-export function calculateRelativeCardPriority(
-  allItems: CardPriorityInfo[],
-  currentRemId: RemId
-): number | null {
-  if (!allItems || !currentRemId) {
-    return null;
-  }
-
-  const validItems = allItems.filter((item) => item && typeof item === 'object' && item.remId);
-
-  if (validItems.length === 0) {
-    return null;
-  }
-
-  const sortedItems = [...validItems].sort((a, b) => a.priority - b.priority);
-  const index = sortedItems.findIndex((x) => x.remId === currentRemId);
-
-  if (index === -1) {
-    return null;
-  }
-
-  const percentile = ((index + 1) / sortedItems.length) * 100;
-  return Math.round(percentile * 10) / 10;
-}
-
 /**
  * Set card priority
  */

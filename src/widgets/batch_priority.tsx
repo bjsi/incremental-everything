@@ -15,7 +15,7 @@ import {
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { percentileToHslColor, calculateRelativePriority } from '../lib/utils';
+import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { remToActionItemType } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import dayjs from 'dayjs';
@@ -166,8 +166,8 @@ useEffect(() => {
                 path: path,
                 pathIds: pathIds,
                 isChecked: true,
-                percentile: allIncrementalRems ? 
-                  calculateRelativePriority(allIncrementalRems, rem._id) : null
+                percentile: allIncrementalRems ?
+                  calculateRelativePercentile(allIncrementalRems, rem._id) : null
               });
             } else {
               console.log(`     ⚠️ Could not get incremental info for rem:`, rem._id);

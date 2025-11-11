@@ -24,7 +24,7 @@ import {
 import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePriority } from '../lib/utils';
+import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
@@ -323,7 +323,7 @@ export function AnswerButtons() {
     return {
       kb: topMissedInKb ? {
         absolute: topMissedInKb.priority,
-        percentile: calculateRelativePriority(allIncRems, topMissedInKb.remId),
+        percentile: calculateRelativePercentile(allIncRems, topMissedInKb.remId),
       } : null,
       doc: topMissedInDoc ? {
         absolute: topMissedInDoc.priority,
@@ -337,7 +337,7 @@ export function AnswerButtons() {
     if (!coreData) return { kb: null, doc: null };
     
     const { allIncRems, incRemInfo, sessionCache } = coreData;
-    const kbPercentile = calculateRelativePriority(allIncRems, incRemInfo.remId);
+    const kbPercentile = calculateRelativePercentile(allIncRems, incRemInfo.remId);
     const docPercentile = sessionCache?.incRemDocPercentiles?.[incRemInfo.remId] ?? null;
     
     return { kb: kbPercentile, doc: docPercentile };

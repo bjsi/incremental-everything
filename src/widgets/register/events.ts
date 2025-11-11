@@ -23,7 +23,6 @@ import {
 } from '../../lib/consts';
 import {
   CardPriorityInfo,
-  calculateRelativeCardPriority,
   QueueSessionCache,
   autoAssignCardPriority,
   getCardPriority,
@@ -32,7 +31,7 @@ import { IncrementalRem } from '../../lib/incremental_rem';
 import { flushCacheUpdatesNow, updateCardPriorityCache } from '../../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../../lib/remHelpers';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priorityReviewDocument';
-import { calculateRelativePriority } from '../../lib/utils';
+import { calculateRelativePercentile } from '../../lib/utils';
 
 type ResetSessionItemCounter = () => void;
 
@@ -158,7 +157,7 @@ export function registerQueueExitListener(
           const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
           if (topMissedInKb) {
             kbFinalStatus.absolute = topMissedInKb.priority;
-            kbFinalStatus.percentile = calculateRelativePriority(allRems, topMissedInKb.remId);
+            kbFinalStatus.percentile = calculateRelativePercentile(allRems, topMissedInKb.remId);
           }
         }
         
@@ -189,7 +188,7 @@ export function registerQueueExitListener(
             const topMissedInDoc = _.minBy(unreviewedDueInScope, (rem) => rem.priority);
             if (topMissedInDoc) {
               docFinalStatus.absolute = topMissedInDoc.priority;
-              docFinalStatus.percentile = calculateRelativePriority(scopedRems, topMissedInDoc.remId);
+              docFinalStatus.percentile = calculateRelativePercentile(scopedRems, topMissedInDoc.remId);
               console.log('[QueueExit] IncRem doc shield - Priority:', docFinalStatus.absolute, 'Percentile:', docFinalStatus.percentile + '%', 'Universe: ', docFinalStatus.universeSize);
             }
           }
@@ -230,7 +229,7 @@ export function registerQueueExitListener(
               const topMissed = _.minBy(unreviewedDueKb, c => c.priority);
               if (topMissed) {
                   kbCardFinalStatus.absolute = topMissed.priority;
-                  kbCardFinalStatus.percentile = calculateRelativeCardPriority(allCardInfos, topMissed.remId);
+                  kbCardFinalStatus.percentile = calculateRelativePercentile(allCardInfos, topMissed.remId);
               }
           }
           const cardKbHistory =
@@ -259,7 +258,7 @@ export function registerQueueExitListener(
                   const topMissed = _.minBy(unreviewedDueDoc, c => c.priority);
                   if (topMissed) {
                       docCardFinalStatus.absolute = topMissed.priority;
-                      docCardFinalStatus.percentile = calculateRelativeCardPriority(docCardInfos, topMissed.remId);
+                      docCardFinalStatus.percentile = calculateRelativePercentile(docCardInfos, topMissed.remId);
                       console.log('[QueueExit] Doc card shield - Priority:', docCardFinalStatus.absolute, 'Percentile:', docCardFinalStatus.percentile + '%', 'Universe: ', docCardFinalStatus.universeSize);
                   }
               }
