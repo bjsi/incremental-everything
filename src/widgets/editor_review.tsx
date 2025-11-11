@@ -6,10 +6,10 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, updateIncrementalRemCache } from '../lib/incremental_rem';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
-import { IncrementalRem, IncrementalRep } from '../lib/types';
+import { powerupCode, prioritySlotCode } from '../lib/consts';
+import { IncrementalRep } from '../lib/types';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -58,12 +58,7 @@ async function handleEditorReview(
 
   const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
   if (updatedIncRem) {
-    const allRem: IncrementalRem[] =
-      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-    const updatedAllRem = allRem
-      .filter((r) => r.remId !== updatedIncRem.remId)
-      .concat(updatedIncRem);
-    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+    await updateIncrementalRemCache(plugin, updatedIncRem);
   }
 
   return { rem, newNextRepDate };

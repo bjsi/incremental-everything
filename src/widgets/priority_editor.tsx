@@ -6,7 +6,7 @@ import {
   PluginRem,
 } from '@remnote/plugin-sdk';
 import { useMemo, useState } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, updateIncrementalRemCache } from '../lib/incremental_rem';
 import { getCardPriority, setCardPriority, CardPriorityInfo, calculateRelativeCardPriority } from '../lib/cardPriority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/types';
@@ -119,6 +119,12 @@ export function PriorityEditor() {
     if (!incRemInfo || !rem) return;
     const newPriority = Math.max(0, Math.min(100, incRemInfo.priority + delta));
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+
+    // Update the incremental rem cache
+    const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+    if (updatedIncRem) {
+      await updateIncrementalRemCache(plugin, updatedIncRem);
+    }
   };
 
   const quickUpdateCardPriority = async (delta: number) => {

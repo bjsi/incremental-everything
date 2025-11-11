@@ -7,7 +7,7 @@ import {
   RemId,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, updateIncrementalRemCache, removeIncrementalRemFromCache } from '../lib/incremental_rem';
 import { 
   getCardPriority, 
   setCardPriority, 
@@ -351,11 +351,7 @@ function Priority() {
     // Get the updated IncRem info and update allIncrementalRemKey
     const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
     if (updatedIncRem) {
-      const allIncRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-      const updatedAllIncRems = allIncRems
-        .filter((r) => r.remId !== updatedIncRem.remId)
-        .concat(updatedIncRem);
-      await plugin.storage.setSession(allIncrementalRemKey, updatedAllIncRems);
+      await updateIncrementalRemCache(plugin, updatedIncRem);
     }
     
     // 🔌 Conditionally update session cache
@@ -476,9 +472,7 @@ function Priority() {
   const removeFromIncremental = useCallback(async () => {
     if (!rem) return;
     await rem.removePowerup(powerupCode);
-    const currentIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-    const updated = currentIncRems.filter(r => r.remId !== rem._id);
-    await plugin.storage.setSession(allIncrementalRemKey, updated);
+    await removeIncrementalRemFromCache(plugin, rem._id);
     await plugin.app.toast('Removed from Incremental Queue');
     plugin.widget.closePopup();
   }, [plugin, rem]);

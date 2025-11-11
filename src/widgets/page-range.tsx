@@ -18,7 +18,7 @@ import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/cons
 import { percentileToHslColor } from '../lib/color';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
-import { getIncrementalRemInfo, initIncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, initIncrementalRem, updateIncrementalRemCache } from '../lib/incremental_rem';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
@@ -105,11 +105,7 @@ function PageRangeWidget() {
         // Update the incremental rem list
         const incRemInfo = await getIncrementalRemInfo(plugin, rem);
         if (incRemInfo) {
-          const currentAllRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-          const updatedAllRems = currentAllRems
-            .filter((x) => x.remId !== remId)
-            .concat(incRemInfo);
-          await plugin.storage.setSession(allIncrementalRemKey, updatedAllRems);
+          await updateIncrementalRemCache(plugin, incRemInfo);
         }
         
         setEditingPriorityRemId(null);

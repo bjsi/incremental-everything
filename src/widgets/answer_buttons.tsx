@@ -21,7 +21,7 @@ import {
   isMobileDeviceKey,
   alwaysUseLightModeOnMobileId
 } from '../lib/consts';
-import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem, removeIncrementalRemFromCache } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
@@ -459,10 +459,9 @@ export function AnswerButtons() {
           onClick={async () => {
                   // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
                   await handleCardPriorityInheritance(plugin, rem, incRemInfo);
-                  
+
                   // 2. Proceed with the final, destructive Done button logic
-                  const updatedAllRem = allIncRems.filter((r) => r.remId !== rem._id);
-                  await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+                  await removeIncrementalRemFromCache(plugin, rem._id);
                   await plugin.queue.removeCurrentCardFromQueue(true);
                   await rem.removePowerup(powerupCode);
               }}

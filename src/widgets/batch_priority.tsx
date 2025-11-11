@@ -14,7 +14,7 @@ import {
   allIncrementalRemKey 
 } from '../lib/consts';
 import { IncrementalRem, ActionItemType } from '../lib/types';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, updateIncrementalRemCache } from '../lib/incremental_rem';
 import { calculateRelativePriority } from '../lib/priority';
 import { percentileToHslColor } from '../lib/color';
 import { remToActionItemType } from '../lib/actionItems';
@@ -414,21 +414,13 @@ useEffect(() => {
       
       // Update the session storage with new incremental rem data
       console.log('📊 BatchPriority: Updating session storage');
-      const updatedAllRems: IncrementalRem[] = [];
       for (const remData of toUpdate) {
         const updatedIncRem = await getIncrementalRemInfo(plugin, remData.rem);
         if (updatedIncRem) {
-          updatedAllRems.push(updatedIncRem);
+          await updateIncrementalRemCache(plugin, updatedIncRem);
         }
       }
-      
-      if (allIncrementalRems) {
-        const remIdsToUpdate = new Set(toUpdate.map(r => r.remId));
-        const unchangedRems = allIncrementalRems.filter(r => !remIdsToUpdate.has(r.remId));
-        const finalAllRems = [...unchangedRems, ...updatedAllRems];
-        await plugin.storage.setSession(allIncrementalRemKey, finalAllRems);
-        console.log('   - Updated session storage with', finalAllRems.length, 'total rems');
-      }
+      console.log('   - Updated session storage for', toUpdate.length, 'rems');
       
       console.log('✅ BatchPriority: Successfully applied all changes');
       await plugin.app.toast(`Successfully updated priority for ${toUpdate.length} rem(s)`);
