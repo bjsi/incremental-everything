@@ -179,3 +179,47 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
     await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
   }
 }
+
+/**
+ * Loads all Rems tagged with the Incremental powerup and caches them in session storage.
+ *
+ * Processes rems in batches to avoid overwhelming the API. Invalid rems are filtered out.
+ *
+ * @param plugin Plugin instance with powerup/rem/storage access
+ * @param batchSize Number of rems to process per batch (default: 500)
+ * @param batchDelayMs Delay in milliseconds between batches (default: 100)
+ * @returns Array of successfully loaded IncrementalRem objects
+ */
+export async function loadAllIncrementalRems(
+  plugin: ReactRNPlugin,
+  batchSize: number = 500,
+  batchDelayMs: number = 100
+): Promise<IncrementalRem[]> {
+  console.log('TRACKER: Incremental Rem tracker starting...');
+
+  const powerup = await plugin.powerup.getPowerupByCode(powerupCode);
+  const taggedRem = (await powerup?.taggedRem()) || [];
+  console.log(`TRACKER: Found ${taggedRem.length} Incremental Rems. Starting batch processing...`);
+
+  const updatedAllRem: IncrementalRem[] = [];
+  const numBatches = Math.ceil(taggedRem.length / batchSize);
+
+  for (let i = 0; i < taggedRem.length; i += batchSize) {
+    const batch = taggedRem.slice(i, i + batchSize);
+    console.log(`TRACKER: Processing IncRem batch ${Math.floor(i / batchSize) + 1} of ${numBatches}...`);
+
+    const batchInfos = (
+      await Promise.all(batch.map((rem) => getIncrementalRemInfo(plugin, rem)))
+    ).filter(Boolean) as IncrementalRem[];
+
+    updatedAllRem.push(...batchInfos);
+
+    await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
+  }
+
+  console.log(`TRACKER: Processing complete. Final IncRem cache size is ${updatedAllRem.length}.`);
+  await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+  console.log('TRACKER: Incremental Rem cache has been saved.');
+
+  return updatedAllRem;
+}
