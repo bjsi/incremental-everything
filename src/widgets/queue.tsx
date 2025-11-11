@@ -20,7 +20,7 @@ import {
   currentIncrementalRemTypeKey,
   activeHighlightIdKey,
 } from '../lib/consts';
-import { setCurrentIncrementalRem } from '../lib/currentRem';
+import { setCurrentIncrementalRem } from '../lib/remHelpers';
 
 console.log('QUEUE.TSX FILE LOADED');
 

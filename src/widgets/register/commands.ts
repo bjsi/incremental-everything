@@ -13,7 +13,7 @@ import {
   alwaysUseLightModeOnWebId,
 } from '../../lib/consts';
 import { initIncrementalRem } from './powerups';
-import { getCurrentIncrementalRem } from '../../lib/currentRem';
+import { getCurrentIncrementalRem } from '../../lib/remHelpers';
 import { getIncrementalRemInfo, handleHextRepetitionClick } from '../../lib/incremental_rem';
 import { findPDFinRem, safeRemTextToString } from '../../lib/pdfUtils';
 import {

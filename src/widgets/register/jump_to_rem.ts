@@ -1,43 +1,15 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
+import { jumpToRemById } from '../../lib/remHelpers';
 
+/**
+ * Registers the jumpToRemById helper function globally on the window object
+ * for easy access from the browser console during development.
+ */
 export function registerJumpToRemHelper(plugin: ReactRNPlugin) {
-  const jumpToRemByIdFunction = async (remId: string) => {
-    const trimmedId = typeof remId === 'string' ? remId.trim() : '';
-    if (!trimmedId) {
-      console.error('❌ Invalid RemId provided');
-      console.log("Usage: jumpToRemById('your-rem-id-here')");
-      console.log("Example: jumpToRemById('abc123xyz')");
-      return;
-    }
+  // Expose the function globally with plugin context captured
+  (window as any).jumpToRemById = (remId: string) => jumpToRemById(plugin, remId);
 
-    try {
-      console.log(`🔍 Searching for rem: ${trimmedId}...`);
-      const rem = await plugin.rem.findOne(trimmedId);
-
-      if (!rem) {
-        console.error(`❌ Rem not found: ${remId}`);
-        console.log('💡 Possible reasons:');
-        console.log('   • The rem was deleted');
-        console.log('   • The RemId is incorrect');
-        console.log('   • The rem is from a different knowledge base');
-        return;
-      }
-
-      const remText = await rem.text;
-      const textPreview = remText ? (typeof remText === 'string' ? remText : '[Complex content]') : '[No text]';
-      const preview = textPreview.length > 100 ? `${textPreview.substring(0, 100)}...` : textPreview;
-
-      console.log(`✅ Found rem: "${preview}"`);
-      console.log('📍 Opening rem in RemNote...');
-      await plugin.window.openRem(rem);
-    } catch (error) {
-      console.error('❌ Error finding rem:', error);
-      console.log('💡 Try reloading the plugin if this error persists.');
-    }
-  };
-
-  (window as any).jumpToRemById = jumpToRemByIdFunction;
-
+  // Print usage instructions
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('💡 Jump to Rem by ID - Available Methods:');
   console.log('');
@@ -49,8 +21,6 @@ export function registerJumpToRemHelper(plugin: ReactRNPlugin) {
   console.log('   ADVANCED: Console function (iframe context only)');
   console.log('   • Only works if console context is set to plugin iframe');
   console.log("   • Usage: jumpToRemById('your-rem-id-here')");
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log("   Usage: jumpToRemById('your-rem-id-here')");
-  console.log("   Example: jumpToRemById('abc123xyz')");
+  console.log("   • Example: jumpToRemById('abc123xyz')");
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }

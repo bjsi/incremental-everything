@@ -31,7 +31,7 @@ import {
 } from '../../lib/cardPriority';
 import { IncrementalRem } from '../../lib/types';
 import { flushCacheUpdatesNow, updateCardPriorityInCache } from '../../lib/cache';
-import { setCurrentIncrementalRem } from '../../lib/currentRem';
+import { setCurrentIncrementalRem } from '../../lib/remHelpers';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priorityReviewDocument';
 
 type ResetSessionItemCounter = () => void;
