@@ -1,5 +1,5 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
-import { jumpToRemById } from '../../lib/remHelpers';
+import { jumpToRemById } from '../lib/remHelpers';
 
 /**
  * Registers the jumpToRemById helper function globally on the window object

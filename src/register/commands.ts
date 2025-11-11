@@ -11,10 +11,10 @@ import {
   noIncRemTimerKey,
   alwaysUseLightModeOnMobileId,
   alwaysUseLightModeOnWebId,
-} from '../../lib/consts';
+} from '../lib/consts';
 import { initIncrementalRem } from './powerups';
-import { getIncrementalRemFromRem, handleHextRepetitionClick, getCurrentIncrementalRem } from '../../lib/incremental_rem';
-import { findPDFinRem, safeRemTextToString } from '../../lib/pdfUtils';
+import { getIncrementalRemFromRem, handleHextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
+import { findPDFinRem, safeRemTextToString } from '../lib/pdfUtils';
 import {
   getOperatingSystem,
   getPlatform,
@@ -25,12 +25,12 @@ import {
   getFriendlyOSName,
   getFriendlyPlatformName,
   handleMobileDetectionOnStartup,
-} from '../../lib/mobileUtils';
+} from '../lib/mobileUtils';
 import {
   removeAllCardPriorityTags,
   precomputeAllCardPriorities,
-} from '../../lib/card_priority';
-import { loadCardPriorityCache } from '../../lib/card_priority/cache';
+} from '../lib/card_priority';
+import { loadCardPriorityCache } from '../lib/card_priority/cache';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async () => {

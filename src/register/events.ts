@@ -20,18 +20,18 @@ import {
   scrollToHighlightId,
   collapseTopBarId,
   hideIncEverythingId,
-} from '../../lib/consts';
+} from '../lib/consts';
 import {
   CardPriorityInfo,
   QueueSessionCache,
   autoAssignCardPriority,
   getCardPriority,
-} from '../../lib/card_priority';
-import { IncrementalRem } from '../../lib/incremental_rem';
-import { flushCacheUpdatesNow, updateCardPriorityCache } from '../../lib/card_priority/cache';
-import { setCurrentIncrementalRem } from '../../lib/incremental_rem';
-import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priority_review_document';
-import { calculateRelativePercentile } from '../../lib/utils';
+} from '../lib/card_priority';
+import { IncrementalRem } from '../lib/incremental_rem';
+import { flushCacheUpdatesNow, updateCardPriorityCache } from '../lib/card_priority/cache';
+import { setCurrentIncrementalRem } from '../lib/incremental_rem';
+import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../lib/priority_review_document';
+import { calculateRelativePercentile } from '../lib/utils';
 
 type ResetSessionItemCounter = () => void;
 

@@ -6,15 +6,15 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
-import { registerEventListeners } from './register/events';
-import { registerPluginPowerups } from './register/powerups';
-import { registerPluginSettings } from './register/settings';
-import { registerWidgets } from './register/widgets';
-import { registerMenus } from './register/menus';
-import { registerCommands } from './register/commands';
-import { registerCallbacks, resetSessionItemCounter } from './register/callbacks';
-import { registerIncrementalRemTracker } from './register/tracker';
-import { registerJumpToRemHelper } from './register/window';
+import { registerEventListeners } from '../register/events';
+import { registerPluginPowerups } from '../register/powerups';
+import { registerPluginSettings } from '../register/settings';
+import { registerWidgets } from '../register/widgets';
+import { registerMenus } from '../register/menus';
+import { registerCommands } from '../register/commands';
+import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
+import { registerIncrementalRemTracker } from '../register/tracker';
+import { registerJumpToRemHelper } from '../register/window';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {

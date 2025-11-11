@@ -8,8 +8,8 @@ import {
   prioritySlotCode,
   nextRepDateSlotCode,
   repHistorySlotCode,
-} from '../../lib/consts';
-import { initIncrementalRem } from '../../lib/incremental_rem';
+} from '../lib/consts';
+import { initIncrementalRem } from '../lib/incremental_rem';
 
 // Re-export for backwards compatibility
 export { initIncrementalRem };

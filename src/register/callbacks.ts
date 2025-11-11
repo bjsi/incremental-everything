@@ -13,9 +13,9 @@ import {
   queueLayoutFixId,
   seenRemInSessionKey,
   noIncRemTimerKey,
-} from '../../lib/consts';
-import { getIncrementalRemFromRem, IncrementalRem } from '../../lib/incremental_rem';
-import { getCardsPerRem, getSortingRandomness } from '../../lib/sorting';
+} from '../lib/consts';
+import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
+import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
 
 const QUEUE_LAYOUT_FIX_CSS = `
   .rn-queue {
