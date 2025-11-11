@@ -1,8 +1,9 @@
 // in lib/cache.ts
 
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { allCardPriorityInfoKey } from './consts';
+import { allCardPriorityInfoKey, allIncrementalRemKey } from './consts';
 import { CardPriorityInfo, getCardPriority } from './cardPriority';
+import { IncrementalRem } from './types';
 import * as _ from 'remeda';
 
 let cacheUpdateTimer: NodeJS.Timeout | null = null;
@@ -95,4 +96,50 @@ export async function flushLightCacheUpdates(plugin: RNPlugin) {
   }
   // Call without the 'true' flag to perform a light flush if possible.
   await flushCacheUpdates(plugin);
+}
+
+// ========== INCREMENTAL REM CACHE ==========
+
+/**
+ * Updates the incremental rem cache in session storage.
+ *
+ * This helper function updates a single rem in the cache by:
+ * 1. Reading the current cache
+ * 2. Filtering out the old version of the rem
+ * 3. Adding the new version
+ * 4. Writing back to storage
+ *
+ * @param plugin Plugin instance
+ * @param updatedIncRem The updated incremental rem to add/update in cache
+ * @returns Promise that resolves when the cache is updated
+ */
+export async function updateIncrementalRemCache(
+  plugin: RNPlugin,
+  updatedIncRem: IncrementalRem
+): Promise<void> {
+  const allRems: IncrementalRem[] =
+    (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+  const updatedAllRems = allRems
+    .filter((r) => r.remId !== updatedIncRem.remId)
+    .concat(updatedIncRem);
+  await plugin.storage.setSession(allIncrementalRemKey, updatedAllRems);
+}
+
+/**
+ * Removes an incremental rem from the session cache.
+ *
+ * Use this when a rem is no longer incremental (powerup removed) or deleted.
+ *
+ * @param plugin Plugin instance
+ * @param remId The ID of the rem to remove from cache
+ * @returns Promise that resolves when the cache is updated
+ */
+export async function removeIncrementalRemFromCache(
+  plugin: RNPlugin,
+  remId: string
+): Promise<void> {
+  const allRems: IncrementalRem[] =
+    (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+  const updatedAllRems = allRems.filter((r) => r.remId !== remId);
+  await plugin.storage.setSession(allIncrementalRemKey, updatedAllRems);
 }

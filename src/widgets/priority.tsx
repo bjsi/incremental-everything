@@ -7,7 +7,8 @@ import {
   RemId,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { getIncrementalRemInfo, updateIncrementalRemCache, removeIncrementalRemFromCache } from '../lib/incremental_rem';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { updateIncrementalRemCache, removeIncrementalRemFromCache } from '../lib/cache';
 import { 
   getCardPriority, 
   setCardPriority, 

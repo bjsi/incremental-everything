@@ -18,7 +18,8 @@ import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/cons
 import { percentileToHslColor } from '../lib/color';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
-import { getIncrementalRemInfo, initIncrementalRem, updateIncrementalRemCache } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, initIncrementalRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/cache';
 
 function PageRangeWidget() {
   const plugin = usePlugin();

@@ -6,7 +6,8 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef } from 'react';
-import { getIncrementalRemInfo, updateIncrementalRemCache } from '../lib/incremental_rem';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode } from '../lib/consts';
 import { IncrementalRep } from '../lib/types';

@@ -5,7 +5,8 @@ import {
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useState } from 'react';
-import { getIncrementalRemInfo, updateIncrementalRemCache } from '../lib/incremental_rem';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/cache';
 import { updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode } from '../lib/consts';
 import { IncrementalRep } from '../lib/types';

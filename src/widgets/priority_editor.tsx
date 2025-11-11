@@ -6,7 +6,8 @@ import {
   PluginRem,
 } from '@remnote/plugin-sdk';
 import { useMemo, useState } from 'react';
-import { getIncrementalRemInfo, updateIncrementalRemCache } from '../lib/incremental_rem';
+import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo, calculateRelativeCardPriority } from '../lib/cardPriority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/types';

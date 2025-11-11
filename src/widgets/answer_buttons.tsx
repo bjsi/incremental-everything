@@ -21,7 +21,8 @@ import {
   isMobileDeviceKey,
   alwaysUseLightModeOnMobileId
 } from '../lib/consts';
-import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem, removeIncrementalRemFromCache } from '../lib/incremental_rem';
+import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
+import { removeIncrementalRemFromCache } from '../lib/cache';
 import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/types';
 import { percentileToHslColor } from '../lib/color';
