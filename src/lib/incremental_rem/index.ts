@@ -13,6 +13,7 @@ import {
   repHistorySlotCode,
   initialIntervalId,
   defaultPriorityId,
+  currentIncRemKey,
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
@@ -189,6 +190,28 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
     await updateIncrementalRemCache(plugin, newIncRem);
   }
 }
+
+/**
+ * Gets the current Incremental Rem from session storage.
+ *
+ * @param plugin - RemNote plugin instance
+ * @returns The current PluginRem, or undefined if not found or not set
+ */
+export const getCurrentIncrementalRem = async (plugin: RNPlugin) => {
+  const remId = await plugin.storage.getSession<string>(currentIncRemKey);
+  const rem = await plugin.rem.findOne(remId);
+  return rem;
+};
+
+/**
+ * Sets the current Incremental Rem in session storage.
+ *
+ * @param plugin - RemNote plugin instance
+ * @param remId - The rem ID to set as current, or undefined to clear
+ */
+export const setCurrentIncrementalRem = async (plugin: RNPlugin, remId: string | undefined) => {
+  return await plugin.storage.setSession(currentIncRemKey, remId);
+};
 
 export * from './types';
 export * from './cache';

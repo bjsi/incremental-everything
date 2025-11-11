@@ -29,7 +29,7 @@ import {
 } from '../../lib/card_priority';
 import { IncrementalRem } from '../../lib/incremental_rem';
 import { flushCacheUpdatesNow, updateCardPriorityCache } from '../../lib/card_priority/cache';
-import { setCurrentIncrementalRem } from '../../lib/remHelpers';
+import { setCurrentIncrementalRem } from '../../lib/incremental_rem';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priorityReviewDocument';
 import { calculateRelativePercentile } from '../../lib/utils';
 
