@@ -3,7 +3,7 @@ import {
   usePlugin,
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { noIncRemTimerKey } from '../lib/consts';
 
 function NoIncTimerIndicator() {

@@ -2,7 +2,6 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useState } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';

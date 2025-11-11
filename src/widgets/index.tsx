@@ -7,7 +7,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { registerEventListeners } from './register/events';
-import { registerPluginPowerups, initIncrementalRem } from './register/powerups';
+import { registerPluginPowerups } from './register/powerups';
 import { registerPluginSettings } from './register/settings';
 import { registerWidgets } from './register/widgets';
 import { registerMenus } from './register/menus';

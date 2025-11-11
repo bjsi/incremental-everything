@@ -3,7 +3,6 @@ import {
   usePlugin,
   useRunAsync,
   useTrackerPlugin,
-  PluginRem,
 } from '@remnote/plugin-sdk';
 import { useMemo, useState } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';

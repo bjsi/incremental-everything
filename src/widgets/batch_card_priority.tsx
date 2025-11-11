@@ -4,7 +4,6 @@ import {
   usePlugin,
   useTrackerPlugin,
   PluginRem,
-  RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';

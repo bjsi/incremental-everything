@@ -12,7 +12,6 @@ import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/inc
 import { 
   getCardPriority, 
   setCardPriority, 
-  PrioritySource, 
   CardPriorityInfo, 
   calculateRelativeCardPriority, 
   QueueSessionCache 

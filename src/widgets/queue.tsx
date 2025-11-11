@@ -1,5 +1,4 @@
 import {
-  DocumentViewer,
   renderWidget,
   usePlugin,
   useRunAsync,

@@ -12,8 +12,6 @@ import {
   queueSessionCacheKey,
   cardPriorityCacheRefreshKey,
   displayPriorityShieldId,
-  isMobileDeviceKey,
-  alwaysUseLightModeOnMobileId
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { percentileToHslColor } from '../lib/color';

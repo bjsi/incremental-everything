@@ -5,7 +5,6 @@ import {
   useTrackerPlugin,
   PluginRem,
   RNPlugin,
-  BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
