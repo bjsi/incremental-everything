@@ -52,6 +52,57 @@ type QueueScopeResolution = {
 };
 
 /**
+ * Builds a comprehensive scope for a given rem by gathering all related rems.
+ *
+ * This includes:
+ * - The rem itself
+ * - All descendants
+ * - All rems in the same document or portal
+ * - All folder queue rems
+ * - All sources
+ * - All rems referencing this rem (excluding nextRepDate slot references)
+ *
+ * @param plugin Plugin instance to access the RemNote API
+ * @param scopeRemId RemId of the rem to build the scope for
+ * @returns Set of RemIds that belong to this comprehensive scope
+ */
+async function buildComprehensiveScope(
+  plugin: ReactRNPlugin,
+  scopeRemId: RemId
+): Promise<Set<RemId>> {
+  const scopeRem = await plugin.rem.findOne(scopeRemId);
+  if (!scopeRem) return new Set();
+
+  const descendants = await scopeRem.getDescendants();
+  const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+  const folderQueueRems = await scopeRem.allRemInFolderQueue();
+  const sources = await scopeRem.getSources();
+
+  const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+    powerupCode,
+    nextRepDateSlotCode
+  );
+
+  const referencingRems = ((await scopeRem.remsReferencingThis()) || [])
+    .map((rem) => {
+      if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+        return rem.parent;
+      }
+      return rem._id;
+    })
+    .filter((id): id is RemId => id !== null && id !== undefined);
+
+  return new Set<RemId>([
+    scopeRem._id,
+    ...descendants.map(r => r._id),
+    ...allRemsInContext.map(r => r._id),
+    ...folderQueueRems.map(r => r._id),
+    ...sources.map(r => r._id),
+    ...referencingRems
+  ]);
+}
+
+/**
  * Determines which scope IDs should be used for item selection and priority
  * calculations when entering the queue.
  *
@@ -370,84 +421,15 @@ export function registerQueueEnterListener(
 
     if (scopeForItemSelection) {
       console.log('QUEUE ENTER: Setting up scopes...');
-      
-      let itemSelectionScope: Set<RemId> = new Set<RemId>();
-      
-      if (isPriorityReviewDoc) {
-        const reviewDocRem = await plugin.rem.findOne(scopeForItemSelection);
-        if (reviewDocRem) {
-          const startTime = Date.now();
-          
-          const descendants = await reviewDocRem.getDescendants();
-          const allRemsInContext = await reviewDocRem.allRemInDocumentOrPortal();
-          const folderQueueRems = await reviewDocRem.allRemInFolderQueue();
-          const sources = await reviewDocRem.getSources();
-          
-          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-            powerupCode,
-            nextRepDateSlotCode
-          );
-          
-          const referencingRems = ((await reviewDocRem.remsReferencingThis()) || []).map((rem) => {
-            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-              return rem.parent;
-            } else {
-              return rem._id;
-            }
-          }).filter(id => id !== null && id !== undefined) as RemId[];
-          
-          itemSelectionScope = new Set<RemId>([
-            reviewDocRem._id,
-            ...descendants.map(r => r._id),
-            ...allRemsInContext.map(r => r._id),
-            ...folderQueueRems.map(r => r._id),
-            ...sources.map(r => r._id),
-            ...referencingRems
-          ]);
-          
-          const elapsed = Date.now() - startTime;
-          console.log(`QUEUE ENTER: Priority Review Doc scope: ${itemSelectionScope.size} items for selection (${elapsed}ms)`);
-          
-          await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
-        }
-      } else {
-        const scopeRem = await plugin.rem.findOne(scopeForItemSelection);
-        if (scopeRem) {
-          const startTime = Date.now();
-          
-          const descendants = await scopeRem.getDescendants();
-          const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-          const folderQueueRems = await scopeRem.allRemInFolderQueue();
-          const sources = await scopeRem.getSources();
-          
-          const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-            powerupCode,
-            nextRepDateSlotCode
-          );
-          
-          const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
-            if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-              return rem.parent;
-            } else {
-              return rem._id;
-            }
-          }).filter(id => id !== null && id !== undefined) as RemId[];
-          
-          itemSelectionScope = new Set<RemId>([
-            scopeRem._id,
-            ...descendants.map(r => r._id),
-            ...allRemsInContext.map(r => r._id),
-            ...folderQueueRems.map(r => r._id),
-            ...sources.map(r => r._id),
-            ...referencingRems
-          ]);
-          
-          const elapsed = Date.now() - startTime;
-          console.log(`QUEUE ENTER: Regular document comprehensive scope: ${itemSelectionScope.size} items (${elapsed}ms)`);
-          
-          await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
-        }
-      }
+
+      const startTime = Date.now();
+      const itemSelectionScope = await buildComprehensiveScope(plugin, scopeForItemSelection);
+      const elapsed = Date.now() - startTime;
+
+      const scopeType = isPriorityReviewDoc ? 'Priority Review Doc' : 'Regular document comprehensive';
+      console.log(`QUEUE ENTER: ${scopeType} scope: ${itemSelectionScope.size} items (${elapsed}ms)`);
+
+      await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
       
       let priorityCalcScope: Set<RemId> = new Set<RemId>();
       
@@ -460,37 +442,7 @@ export function registerQueueEnterListener(
           priorityCalcScope = new Set<RemId>(fullKbIds);
           console.log(`QUEUE ENTER: Priority Review Doc using FULL KB for priority calculations (${priorityCalcScope.size} rems).`);
         } else {
-          const originalScopeRem = await plugin.rem.findOne(scopeForPriorityCalc);
-          if (originalScopeRem) {
-            const descendants = await originalScopeRem.getDescendants();
-            const allRemsInContext = await originalScopeRem.allRemInDocumentOrPortal();
-            const folderQueueRems = await originalScopeRem.allRemInFolderQueue();
-            const sources = await originalScopeRem.getSources();
-            
-            const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-              powerupCode,
-              nextRepDateSlotCode
-            );
-            
-            const referencingRems = ((await originalScopeRem.remsReferencingThis()) || []).map((rem) => {
-              if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-                return rem.parent;
-              } else {
-                return rem._id;
-              }
-            }).filter(id => id !== null && id !== undefined) as RemId[];
-            
-            priorityCalcScope = new Set<RemId>([
-              originalScopeRem._id,
-              ...descendants.map(r => r._id),
-              ...allRemsInContext.map(r => r._id),
-              ...folderQueueRems.map(r => r._id),
-              ...sources.map(r => r._id),
-              ...referencingRems
-            ]);
-          } else {
-            priorityCalcScope = new Set<RemId>();
-          }
+          priorityCalcScope = await buildComprehensiveScope(plugin, scopeForPriorityCalc);
         }
       } else {
         priorityCalcScope = itemSelectionScope || new Set<RemId>();
