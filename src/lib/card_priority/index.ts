@@ -1,6 +1,5 @@
 import { PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemInfo } from '../incremental_rem';
-import { safeRemTextToString } from '../pdfUtils';
 import {
   allCardPriorityInfoKey,
   powerupCode,
