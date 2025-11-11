@@ -174,3 +174,4 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
 
 export * from './types';
 export * from './cache';
+export * from './action_items';

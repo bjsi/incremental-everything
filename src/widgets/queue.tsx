@@ -11,7 +11,7 @@ import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { NativeVideoViewer } from '../components/NativeVideoViewer';
 import { ExtractViewer } from '../components/ExtractViewer';
-import { remToActionItemType } from '../lib/actionItems';
+import { remToActionItemType } from '../lib/incremental_rem';
 import {
   collapseQueueTopBar,
   collapseTopBarKey,
