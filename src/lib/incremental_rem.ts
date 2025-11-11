@@ -3,6 +3,7 @@ import {
   PluginRem,
   RichTextElementRemInterface,
   RNPlugin,
+  ReactRNPlugin,
 } from '@remnote/plugin-sdk';
 import dayjs from 'dayjs';
 import {
@@ -10,10 +11,15 @@ import {
   nextRepDateSlotCode,
   prioritySlotCode,
   repHistorySlotCode,
+  initialIntervalId,
+  defaultPriorityId,
+  allIncrementalRemKey,
 } from './consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from './scheduler';
 import { IncrementalRem } from './types';
 import { tryParseJson } from './utils';
+import { getDailyDocReferenceForDate } from './date';
+import { getInitialPriority } from './priority_inheritance';
 
 // --- NEW CORE FUNCTION ---
 /**
@@ -129,3 +135,47 @@ export const getIncrementalRemInfo = async (
     return null;
   }
 };
+
+/**
+ * Ensures the provided Rem is initialized as an Incremental Rem with defaults.
+ *
+ * @param plugin ReactRNPlugin used for settings/storage access.
+ * @param rem PluginRem to initialize.
+ * @returns Promise that resolves after the Rem is initialized or skipped if already incremental.
+ */
+export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) {
+  const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
+
+  if (!isAlreadyIncremental) {
+    const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
+
+    const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
+    const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
+
+    const initialPriority = await getInitialPriority(plugin, rem, defaultPriority);
+
+    await rem.addPowerup(powerupCode);
+
+    const nextRepDate = new Date(Date.now() + (initialInterval * 24 * 60 * 60 * 1000));
+    const dateRef = await getDailyDocReferenceForDate(plugin, nextRepDate);
+    if (!dateRef) {
+      return;
+    }
+
+    await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
+    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]);
+    await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify([])]);
+
+    const newIncRem = await getIncrementalRemInfo(plugin, rem);
+    if (!newIncRem) {
+      return;
+    }
+
+    const allIncrementalRem: IncrementalRem[] =
+      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+    const updatedAllRem = allIncrementalRem
+      .filter((x) => x.remId !== newIncRem.remId)
+      .concat(newIncRem);
+    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+  }
+}
