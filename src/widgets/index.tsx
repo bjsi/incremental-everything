@@ -14,7 +14,7 @@ import { registerMenus } from './register/menus';
 import { registerCommands } from './register/commands';
 import { registerCallbacks, resetSessionItemCounter } from './register/callbacks';
 import { registerIncrementalRemTracker } from './register/tracker';
-import { registerJumpToRemHelper } from './register/jump_to_rem';
+import { registerJumpToRemHelper } from './register/window';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
