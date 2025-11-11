@@ -5,7 +5,7 @@ import { allCardPriorityInfoKey } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
-import { cacheAllCardPriorities } from '../lib/cardPriority';
+import { loadCardPriorityCache } from '../lib/cache';
 import { registerEventListeners } from './register/events';
 import { registerPluginPowerups, initIncrementalRem } from './register/powerups';
 import { registerPluginSettings } from './register/settings';
@@ -48,7 +48,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   const useLightMode = await shouldUseLightMode(plugin);
   if (!useLightMode) {
     // Run the full, expensive cache build
-    cacheAllCardPriorities(plugin);
+    loadCardPriorityCache(plugin);
   } else {
     // In 'light' mode, just set an empty cache.
     console.log('CACHE: Light mode enabled. Skipping card priority cache build.');

@@ -28,10 +28,10 @@ import {
   handleMobileDetectionOnStartup,
 } from '../../lib/mobileUtils';
 import {
-  cacheAllCardPriorities,
   removeAllCardPriorityTags,
   precomputeAllCardPriorities,
 } from '../../lib/cardPriority';
+import { loadCardPriorityCache } from '../../lib/cache';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async () => {
@@ -392,7 +392,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'refresh-card-priority-cache',
     name: 'Refresh Card Priority Cache',
     action: async () => {
-      await cacheAllCardPriorities(plugin);
+      await loadCardPriorityCache(plugin);
     },
   });
 
