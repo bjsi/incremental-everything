@@ -30,7 +30,7 @@ import {
 import { IncrementalRem } from '../../lib/incremental_rem';
 import { flushCacheUpdatesNow, updateCardPriorityCache } from '../../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../../lib/incremental_rem';
-import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priorityReviewDocument';
+import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priority_review_document';
 import { calculateRelativePercentile } from '../../lib/utils';
 
 type ResetSessionItemCounter = () => void;
