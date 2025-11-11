@@ -1,7 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
-import { allIncrementalRemKey, powerupCode } from '../lib/consts';
-import { IncrementalRem } from '../lib/types';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { allIncrementalRemKey, powerupCode } from '../../lib/consts';
+import { IncrementalRem } from '../../lib/types';
+import { getIncrementalRemInfo } from '../../lib/incremental_rem';
 
 const BATCH_SIZE = 500;
 const BATCH_DELAY_MS = 100;

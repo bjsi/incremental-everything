@@ -9,7 +9,7 @@ import {
   alwaysUseLightModeOnWebId,
   remnoteEnvironmentId,
   pdfHighlightColorId,
-} from '../lib/consts';
+} from '../../lib/consts';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
 const HIDE_CARD_PRIORITY_CSS = `

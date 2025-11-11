@@ -12,11 +12,11 @@ import {
   initialIntervalId,
   defaultPriorityId,
   allIncrementalRemKey,
-} from '../lib/consts';
-import { getDailyDocReferenceForDate } from '../lib/date';
-import { getInitialPriority } from '../lib/priority_inheritance';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { IncrementalRem } from '../lib/types';
+} from '../../lib/consts';
+import { getDailyDocReferenceForDate } from '../../lib/date';
+import { getInitialPriority } from '../../lib/priority_inheritance';
+import { getIncrementalRemInfo } from '../../lib/incremental_rem';
+import { IncrementalRem } from '../../lib/types';
 
 /**
  * Registers the Incremental Everything powerups (and card priority powerup) with RemNote.

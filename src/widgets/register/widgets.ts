@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, powerupCode } from '../lib/consts';
+import { pageRangeWidgetId, powerupCode } from '../../lib/consts';
 
 export function registerWidgets(plugin: ReactRNPlugin) {
   // Priority widget registration to handle both IncRem and Cards

@@ -9,8 +9,8 @@ import {
   pdfHighlightColorId,
   noIncRemMenuItemId,
   noIncRemTimerKey,
-} from '../lib/consts';
-import { safeRemTextToString } from '../lib/pdfUtils';
+} from '../../lib/consts';
+import { safeRemTextToString } from '../../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
 
 export async function registerMenus(plugin: ReactRNPlugin) {
