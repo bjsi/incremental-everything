@@ -14,8 +14,7 @@ import {
   addPageToHistory
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
-import { percentileToHslColor } from '../lib/color';
-import { calculateRelativePriority } from '../lib/priority';
+import { percentileToHslColor, calculateRelativePriority } from '../lib/utils';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemInfo, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';

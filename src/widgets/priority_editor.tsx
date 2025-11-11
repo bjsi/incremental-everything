@@ -10,8 +10,7 @@ import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo, calculateRelativeCardPriority } from '../lib/card_priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor } from '../lib/color';
-import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority'; // Aliased to avoid name clash
+import { percentileToHslColor, calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/utils'; // Aliased to avoid name clash
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
 
 

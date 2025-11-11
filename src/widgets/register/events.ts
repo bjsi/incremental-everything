@@ -21,7 +21,6 @@ import {
   collapseTopBarId,
   hideIncEverythingId,
 } from '../../lib/consts';
-import { calculateRelativePriority } from '../../lib/priority';
 import {
   CardPriorityInfo,
   calculateRelativeCardPriority,
@@ -33,6 +32,7 @@ import { IncrementalRem } from '../../lib/incremental_rem';
 import { flushCacheUpdatesNow, updateCardPriorityCache } from '../../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../../lib/remHelpers';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priorityReviewDocument';
+import { calculateRelativePriority } from '../../lib/utils';
 
 type ResetSessionItemCounter = () => void;
 

@@ -5,7 +5,7 @@ import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemInfo } from './incremental_rem';
-import { getDailyDocReferenceForDate } from './date';
+import { getDailyDocReferenceForDate } from './utils';
 dayjs.extend(relativeTime);
 
 function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {

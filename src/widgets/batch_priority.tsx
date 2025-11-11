@@ -15,8 +15,7 @@ import {
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { calculateRelativePriority } from '../lib/priority';
-import { percentileToHslColor } from '../lib/color';
+import { percentileToHslColor, calculateRelativePriority } from '../lib/utils';
 import { remToActionItemType } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import dayjs from 'dayjs';

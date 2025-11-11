@@ -16,8 +16,7 @@ import {
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
-import { tryParseJson } from '../utils';
-import { getDailyDocReferenceForDate } from '../date';
+import { tryParseJson, getDailyDocReferenceForDate } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 

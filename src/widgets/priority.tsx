@@ -9,14 +9,14 @@ import {
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { 
-  getCardPriority, 
-  setCardPriority, 
-  CardPriorityInfo, 
-  calculateRelativeCardPriority, 
-  QueueSessionCache 
+import {
+  getCardPriority,
+  setCardPriority,
+  CardPriorityInfo,
+  calculateRelativeCardPriority,
+  QueueSessionCache
 } from '../lib/card_priority';
-import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority';
+import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/utils';
 import { 
   allIncrementalRemKey, 
   powerupCode, 

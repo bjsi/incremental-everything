@@ -23,9 +23,8 @@ import {
 } from '../lib/consts';
 import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { calculateRelativePriority } from '../lib/priority';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor } from '../lib/color';
+import { percentileToHslColor, calculateRelativePriority } from '../lib/utils';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';

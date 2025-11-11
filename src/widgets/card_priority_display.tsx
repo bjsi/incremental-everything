@@ -14,7 +14,7 @@ import {
   displayPriorityShieldId,
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
-import { percentileToHslColor } from '../lib/color';
+import { percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import * as _ from 'remeda';
 
