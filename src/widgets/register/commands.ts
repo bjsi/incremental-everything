@@ -14,7 +14,7 @@ import {
 } from '../../lib/consts';
 import { initIncrementalRem } from './powerups';
 import { getCurrentIncrementalRem } from '../../lib/remHelpers';
-import { getIncrementalRemInfo, handleHextRepetitionClick } from '../../lib/incremental_rem';
+import { getIncrementalRemFromRem, handleHextRepetitionClick } from '../../lib/incremental_rem';
 import { findPDFinRem, safeRemTextToString } from '../../lib/pdfUtils';
 import {
   getOperatingSystem,
@@ -70,7 +70,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem || !url.includes('/flashcards')) {
         return;
       }
-      const incRem = await getIncrementalRemInfo(plugin, rem);
+      const incRem = await getIncrementalRemFromRem(plugin, rem);
       if (!incRem) {
         return;
       }
@@ -202,7 +202,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       // Verify it's actually an Incremental Rem with valid data
-      const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (!incRemInfo) {
         console.log('Reschedule: Could not get Incremental Rem info. Aborting.');
         await plugin.app.toast('Could not retrieve Incremental Rem information.');

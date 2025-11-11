@@ -16,7 +16,7 @@ import {
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { getIncrementalRemInfo, initIncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 
 function PageRangeWidget() {
@@ -68,7 +68,7 @@ function PageRangeWidget() {
       await reloadRelatedRems();
 
       const remName = rem.text ? await plugin.richText.toString(rem.text) : 'Rem';
-      const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (incRemInfo) {
         await plugin.app.toast(`Made "${remName}" incremental with priority ${incRemInfo.priority}`);
       }
@@ -82,7 +82,7 @@ function PageRangeWidget() {
   const startEditingPriority = async (remId: string) => {
     const rem = await plugin.rem.findOne(remId);
     if (rem) {
-      const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (incRemInfo) {
         setEditingPriorityRemId(remId);
         setEditingPriorities({
@@ -102,7 +102,7 @@ function PageRangeWidget() {
         await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
         
         // Update the incremental rem list
-        const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+        const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
         if (incRemInfo) {
           await updateIncrementalRemCache(plugin, incRemInfo);
         }
@@ -125,7 +125,7 @@ function PageRangeWidget() {
       if (rem.isIncremental) {
         const remObj = await plugin.rem.findOne(rem.remId);
         if (remObj) {
-          const incRemInfo = await getIncrementalRemInfo(plugin, remObj);
+          const incRemInfo = await getIncrementalRemFromRem(plugin, remObj);
           if (incRemInfo) {
             const percentile = remsForCalculation.length > 0 ?
               calculateRelativePercentile(remsForCalculation, rem.remId) : null;

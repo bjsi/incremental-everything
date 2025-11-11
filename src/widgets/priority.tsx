@@ -7,7 +7,7 @@ import {
   RemId,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import {
   getCardPriority,
@@ -116,7 +116,7 @@ function Priority() {
   
   const inQueue = !!queueSubQueueId;
 
-  const incRemInfo = useTrackerPlugin(async (plugin) => rem ? await getIncrementalRemInfo(plugin, rem) : null, [rem?._id]);
+  const incRemInfo = useTrackerPlugin(async (plugin) => rem ? await getIncrementalRemFromRem(plugin, rem) : null, [rem?._id]);
   const cardInfo = useTrackerPlugin(async (plugin) => rem ? await getCardPriority(plugin, rem) : null, [rem?._id]);
   const hasCards = useTrackerPlugin(async (plugin) => rem ? (await rem.getCards()).length > 0 : false, [rem?._id]);
 
@@ -348,7 +348,7 @@ function Priority() {
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
     
     // Get the updated IncRem info and update allIncrementalRemKey
-    const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (updatedIncRem) {
       await updateIncrementalRemCache(plugin, updatedIncRem);
     }

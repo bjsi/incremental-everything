@@ -21,7 +21,7 @@ import {
   isMobileDeviceKey,
   alwaysUseLightModeOnMobileId
 } from '../lib/consts';
-import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
@@ -139,7 +139,7 @@ const handleReviewAndOpenRem = async (
     }
   }
 
-  const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+  const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
   await reviewRem(plugin, incRemInfo ?? undefined);
   await plugin.window.openRem(rem);
 };
@@ -266,7 +266,7 @@ export function AnswerButtons() {
     const rem = await rp.rem.findOne(ctx.remId);
     if (!rem) return null;
 
-    const incRemInfo = await getIncrementalRemInfo(rp, rem);
+    const incRemInfo = await getIncrementalRemFromRem(rp, rem);
     if (!incRemInfo) return null;
 
     // 🔌 Conditionally fetch sessionCache based on effective performanceMode

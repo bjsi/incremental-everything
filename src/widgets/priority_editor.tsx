@@ -5,7 +5,7 @@ import {
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
 import { useMemo, useState } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
@@ -32,7 +32,7 @@ export function PriorityEditor() {
   const incRemInfo = useTrackerPlugin(
     async (plugin) => {
       if (!rem) return null;
-      return await getIncrementalRemInfo(plugin, rem);
+      return await getIncrementalRemFromRem(plugin, rem);
     },
     [rem]
   );
@@ -120,7 +120,7 @@ export function PriorityEditor() {
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
 
     // Update the incremental rem cache
-    const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (updatedIncRem) {
       await updateIncrementalRemCache(plugin, updatedIncRem);
     }

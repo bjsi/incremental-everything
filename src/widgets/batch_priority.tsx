@@ -13,7 +13,7 @@ import {
   allIncrementalRemKey 
 } from '../lib/consts';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { remToActionItemType } from '../lib/incremental_rem';
@@ -140,7 +140,7 @@ useEffect(() => {
           if (hasIncremental) {
             console.log(`   ✓ Found incremental rem:`, rem._id);
             
-            const incInfo = await getIncrementalRemInfo(plugin, rem);
+            const incInfo = await getIncrementalRemFromRem(plugin, rem);
             if (incInfo) {
               const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled';
               console.log(`     - Name: ${remText}, Priority: ${incInfo.priority}`);
@@ -414,7 +414,7 @@ useEffect(() => {
       // Update the session storage with new incremental rem data
       console.log('📊 BatchPriority: Updating session storage');
       for (const remData of toUpdate) {
-        const updatedIncRem = await getIncrementalRemInfo(plugin, remData.rem);
+        const updatedIncRem = await getIncrementalRemFromRem(plugin, remData.rem);
         if (updatedIncRem) {
           await updateIncrementalRemCache(plugin, updatedIncRem);
         }

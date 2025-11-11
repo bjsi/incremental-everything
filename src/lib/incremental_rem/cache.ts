@@ -1,7 +1,7 @@
 import { ReactRNPlugin, RNPlugin } from '@remnote/plugin-sdk';
 import { allIncrementalRemKey, powerupCode } from '../consts';
 import { IncrementalRem } from './types';
-import { getIncrementalRemInfo } from './index';
+import { getIncrementalRemFromRem } from './index';
 
 /**
  * Updates the incremental rem cache in session storage.
@@ -76,7 +76,7 @@ export async function loadIncrementalRemCache(
     console.log(`TRACKER: Processing IncRem batch ${Math.floor(i / batchSize) + 1} of ${numBatches}...`);
 
     const batchInfos = (
-      await Promise.all(batch.map((rem) => getIncrementalRemInfo(plugin, rem)))
+      await Promise.all(batch.map((rem) => getIncrementalRemFromRem(plugin, rem)))
     ).filter(Boolean) as IncrementalRem[];
 
     updatedAllRem.push(...batchInfos);

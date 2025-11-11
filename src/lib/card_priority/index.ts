@@ -1,5 +1,5 @@
 import { PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { getIncrementalRemInfo } from '../incremental_rem';
+import { getIncrementalRemFromRem } from '../incremental_rem';
 import {
   allCardPriorityInfoKey,
   powerupCode,
@@ -28,7 +28,7 @@ async function findClosestAncestorWithPriority(
     const parent = await plugin.rem.findOne(current.parent);
     if (!parent) break;
 
-    const parentIncInfo = await getIncrementalRemInfo(plugin, parent);
+    const parentIncInfo = await getIncrementalRemFromRem(plugin, parent);
     if (parentIncInfo) {
       return { priority: parentIncInfo.priority, source: 'incremental' };
     }
@@ -131,7 +131,7 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
     return existingPriority.priority;
   }
 
-  const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+  const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
   if (incRemInfo) {
     await setCardPriority(plugin, rem, incRemInfo.priority, 'inherited');
     return incRemInfo.priority;
@@ -166,7 +166,7 @@ export async function calculateNewPriority(
     return { priority: existingPriority.priority, source: 'manual' };
   }
 
-  const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+  const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
   if (incRemInfo) {
     return { priority: incRemInfo.priority, source: 'inherited' };
   }
@@ -197,7 +197,7 @@ export async function updateInheritedPriorities(
   const descendants = await parentRem.getDescendants();
 
   for (const descendant of descendants) {
-    const descendantIncInfo = await getIncrementalRemInfo(plugin, descendant);
+    const descendantIncInfo = await getIncrementalRemFromRem(plugin, descendant);
     if (descendantIncInfo) {
       continue;
     }
@@ -555,7 +555,7 @@ export async function batchUpdateInheritedPriorities(
 
     await Promise.all(
       batch.map(async (descendant) => {
-        const incInfo = await getIncrementalRemInfo(plugin, descendant);
+        const incInfo = await getIncrementalRemFromRem(plugin, descendant);
         if (incInfo) return;
 
         const cardInfo = await getCardPriority(plugin, descendant);

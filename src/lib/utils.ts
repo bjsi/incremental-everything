@@ -1,6 +1,5 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
-import { IncrementalRem } from './incremental_rem';
 
 export const tryParseJson = (x: any) => {
   try {

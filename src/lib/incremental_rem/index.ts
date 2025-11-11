@@ -20,10 +20,22 @@ import { tryParseJson, getDailyDocReferenceForDate } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 
-// --- NEW CORE FUNCTION ---
 /**
- * This is the new, fundamental function that only handles reviewing/rescheduling.
- * It does NOT advance the queue, making it reusable for different buttons.
+ * Processes the review of an Incremental Rem and reschedules it for the next repetition.
+ *
+ * This function:
+ * 1. Calculates how long the user spent reviewing the rem
+ * 2. Determines the next review date based on the SRS algorithm
+ * 3. Updates the repetition history with the review time
+ * 4. Persists the new scheduling data to the rem
+ *
+ * NOTE: This function does NOT advance the queue - that's the caller's responsibility.
+ * This design allows different UI buttons to reuse this logic and control queue advancement independently.
+ *
+ * @param plugin - RemNote plugin instance
+ * @param incRem - The incremental rem being reviewed
+ * @param queueMode - Current queue mode (affects scheduling algorithm)
+ * @returns The updated spacing data with new history, or null if review cannot be processed
  */
 export async function reviewRem(
   plugin: RNPlugin,
@@ -65,12 +77,19 @@ export async function handleHextRepetitionClick(
   await plugin.queue.removeCurrentCardFromQueue();
 }
 
-// --- UNCHANGED ORIGINAL FUNCTION ---
 /**
- * This function is essential and remains unchanged. It reads the raw
- * powerup data from a Rem and converts it into a structured object.
+ * Constructs an IncrementalRem object from a PluginRem by reading and parsing its powerup properties.
+ *
+ * This function acts as a factory/constructor that:
+ * 1. Reads the raw powerup data (next rep date, priority, history) from the rem
+ * 2. Parses and validates the data
+ * 3. Returns a structured IncrementalRem object
+ *
+ * @param plugin - RemNote plugin instance
+ * @param r - The PluginRem to convert into an IncrementalRem
+ * @returns The constructed IncrementalRem object, or null if the rem is not incremental or data is invalid
  */
-export const getIncrementalRemInfo = async (
+export const getIncrementalRemFromRem = async (
   plugin: RNPlugin,
   r: PluginRem | undefined
 ): Promise<IncrementalRem | null> => {
@@ -162,7 +181,7 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]);
     await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify([])]);
 
-    const newIncRem = await getIncrementalRemInfo(plugin, rem);
+    const newIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (!newIncRem) {
       return;
     }

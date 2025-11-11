@@ -8,7 +8,7 @@ import {
 import React, { useState, useEffect } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { getCardPriority } from '../lib/card_priority';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
 import { updateCardPriorityCache } from '../lib/card_priority/cache'; // <-- 1. IMPORT ADDED
 
@@ -124,7 +124,7 @@ function BatchCardPriority() {
             let incRemPriority = null;
 
             if (hasIncremental) {
-              const incInfo = await getIncrementalRemInfo(plugin, rem);
+              const incInfo = await getIncrementalRemFromRem(plugin, rem);
               console.log(`IncRem detected for "${remText}":`, { hasIncremental, incInfo });
               if (incInfo && incInfo.priority !== undefined) {
                 incRemPriority = incInfo.priority;
