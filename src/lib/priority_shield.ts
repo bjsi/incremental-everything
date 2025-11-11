@@ -1,7 +1,6 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
 import {
   allIncrementalRemKey,
-  currentScopeRemIdsKey,
   seenRemInSessionKey,
   currentSubQueueIdKey,
   seenCardInSessionKey,

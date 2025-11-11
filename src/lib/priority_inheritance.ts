@@ -1,7 +1,6 @@
 import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
-import { powerupCode, prioritySlotCode } from './consts';
+import { powerupCode } from './consts';
 import { getIncrementalRemInfo } from './incremental_rem';
-import { getCardPriority } from './card_priority';
 import { safeRemTextToString } from './pdfUtils';
 
 export interface AncestorPriorityInfo {
