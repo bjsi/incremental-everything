@@ -1,6 +1,6 @@
 import { RemId } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
-import { IncrementalRem } from './types';
+import { IncrementalRem } from './incremental_rem';
 
 /**
  * Calculates the percentile rank of a Rem's priority within a list.

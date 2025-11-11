@@ -28,9 +28,9 @@ import {
   QueueSessionCache,
   autoAssignCardPriority,
   getCardPriority,
-} from '../../lib/cardPriority';
-import { IncrementalRem } from '../../lib/types';
-import { flushCacheUpdatesNow, updateCardPriorityCache } from '../../lib/cache';
+} from '../../lib/card_priority';
+import { IncrementalRem } from '../../lib/incremental_rem';
+import { flushCacheUpdatesNow, updateCardPriorityCache } from '../../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../../lib/remHelpers';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../../lib/priorityReviewDocument';
 

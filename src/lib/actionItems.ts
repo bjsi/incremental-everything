@@ -4,7 +4,7 @@ import {
   BuiltInPowerupCodes,
   RichTextElementRemInterface,
 } from '@remnote/plugin-sdk';
-import { RemAndType } from './types';
+import { RemAndType } from './incremental_rem';
 import { safeRemTextToString } from './pdfUtils';
 
 export const remToActionItemType = async (

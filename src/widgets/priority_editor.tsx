@@ -7,13 +7,13 @@ import {
 } from '@remnote/plugin-sdk';
 import { useMemo, useState } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/cache';
-import { getCardPriority, setCardPriority, CardPriorityInfo, calculateRelativeCardPriority } from '../lib/cardPriority';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { getCardPriority, setCardPriority, CardPriorityInfo, calculateRelativeCardPriority } from '../lib/card_priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
-import { IncrementalRem } from '../lib/types';
+import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor } from '../lib/color';
 import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority'; // Aliased to avoid name clash
-import { updateCardPriorityCache } from '../lib/cache';
+import { updateCardPriorityCache } from '../lib/card_priority/cache';
 
 
 export function PriorityEditor() {

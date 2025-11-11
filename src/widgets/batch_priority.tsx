@@ -13,9 +13,9 @@ import {
   prioritySlotCode,
   allIncrementalRemKey 
 } from '../lib/consts';
-import { IncrementalRem, ActionItemType } from '../lib/types';
+import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/cache';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { calculateRelativePriority } from '../lib/priority';
 import { percentileToHslColor } from '../lib/color';
 import { remToActionItemType } from '../lib/actionItems';

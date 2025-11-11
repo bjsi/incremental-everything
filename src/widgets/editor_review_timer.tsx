@@ -6,10 +6,10 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useState } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/cache';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode } from '../lib/consts';
-import { IncrementalRep } from '../lib/types';
+import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 

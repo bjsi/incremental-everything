@@ -8,10 +8,10 @@ import {
   powerupCode,
   nextRepDateSlotCode,
 } from './consts';
-import { IncrementalRem } from './types';
+import { IncrementalRem } from './incremental_rem';
 import { calculateRelativePriority } from './priority';
 import * as _ from 'remeda';
-import { CardPriorityInfo } from './cardPriority';
+import { CardPriorityInfo } from './card_priority';
 
 export interface PriorityShieldStatus {
   kb: {

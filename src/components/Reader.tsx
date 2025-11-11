@@ -13,7 +13,7 @@ import {
   PDFActionItem,
   PDFHighlightActionItem,
   RemActionItem, // Added RemActionItem for type clarity
-} from '../lib/types';
+} from '../lib/incremental_rem';
 import {
   getIncrementalReadingPosition,
   getIncrementalPageRange,

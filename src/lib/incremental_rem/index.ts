@@ -13,12 +13,12 @@ import {
   repHistorySlotCode,
   initialIntervalId,
   defaultPriorityId,
-} from './consts';
-import { getNextSpacingDateForRem, updateSRSDataForRem } from './scheduler';
+} from '../consts';
+import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
-import { tryParseJson } from './utils';
-import { getDailyDocReferenceForDate } from './date';
-import { getInitialPriority } from './priority_inheritance';
+import { tryParseJson } from '../utils';
+import { getDailyDocReferenceForDate } from '../date';
+import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 
 // --- NEW CORE FUNCTION ---
@@ -27,41 +27,38 @@ import { updateIncrementalRemCache } from './cache';
  * It does NOT advance the queue, making it reusable for different buttons.
  */
 export async function reviewRem(
-  plugin: RNPlugin, 
+  plugin: RNPlugin,
   incRem: IncrementalRem | undefined,
   queueMode?: 'srs' | 'practice-all' | 'in-order' | 'editor'
 ) {
   if (!incRem) {
     return null;
   }
-  
-  // Calculate review time
+
   const startTime = await plugin.storage.getSession<number>('increm-review-start-time');
   const reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
-  
+
   const inLookbackMode = !!(await plugin.queue.inLookbackMode());
   const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode, queueMode);
   if (!nextSpacing) {
     return null;
   }
-  
-  // Add review time to the last history entry
+
   const newHistory = [...nextSpacing.newHistory];
   const lastEntry = newHistory[newHistory.length - 1];
   if (lastEntry && reviewTimeSeconds !== undefined) {
     lastEntry.reviewTimeSeconds = reviewTimeSeconds;
   }
-  
+
   await updateSRSDataForRem(plugin, incRem.remId, nextSpacing.newNextRepDate, newHistory);
-  
-  // Clear the start time
+
   await plugin.storage.setSession('increm-review-start-time', null);
-  
+
   return { ...nextSpacing, newHistory };
 }
 
 export async function handleHextRepetitionClick(
-  plugin: RNPlugin, 
+  plugin: RNPlugin,
   incRem: IncrementalRem | undefined,
   queueMode?: 'srs' | 'practice-all' | 'in-order'
 ) {
@@ -175,3 +172,5 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
   }
 }
 
+export * from './types';
+export * from './cache';

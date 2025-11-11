@@ -30,8 +30,8 @@ import {
 import {
   removeAllCardPriorityTags,
   precomputeAllCardPriorities,
-} from '../../lib/cardPriority';
-import { loadCardPriorityCache } from '../../lib/cache';
+} from '../../lib/card_priority';
+import { loadCardPriorityCache } from '../../lib/card_priority/cache';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async () => {

@@ -3,7 +3,7 @@ import React from 'react';
 import ReactPlayer from 'react-player/youtube';
 import { Resizable } from 're-resizable';
 import { useSyncedStorageState } from '@remnote/plugin-sdk';
-import { YoutubeActionItem } from '../lib/types';
+import { YoutubeActionItem } from '../lib/incremental_rem';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;

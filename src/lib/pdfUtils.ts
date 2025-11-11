@@ -1,7 +1,7 @@
 // lib/pdfUtils.ts
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, allIncrementalRemKey } from './consts';
-import { IncrementalRem } from './types';
+import { IncrementalRem } from './incremental_rem';
 
 export interface PageRangeContext {
   incrementalRemId: RemId;

@@ -22,12 +22,12 @@ import {
   alwaysUseLightModeOnMobileId
 } from '../lib/consts';
 import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
-import { removeIncrementalRemCache } from '../lib/cache';
+import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { calculateRelativePriority } from '../lib/priority';
-import { IncrementalRem } from '../lib/types';
+import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor } from '../lib/color';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
-import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/cardPriority';
+import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 
 const MAX_DEPTH_CHECK = 3;

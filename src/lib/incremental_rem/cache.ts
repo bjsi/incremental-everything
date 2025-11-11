@@ -1,7 +1,7 @@
 import { ReactRNPlugin, RNPlugin } from '@remnote/plugin-sdk';
 import { allIncrementalRemKey, powerupCode } from '../consts';
-import { IncrementalRem } from '../types';
-import { getIncrementalRemInfo } from '../incremental_rem';
+import { IncrementalRem } from './types';
+import { getIncrementalRemInfo } from './index';
 
 /**
  * Updates the incremental rem cache in session storage.

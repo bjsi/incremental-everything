@@ -8,7 +8,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/cache';
+import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { 
   getCardPriority, 
   setCardPriority, 
@@ -16,7 +16,7 @@ import {
   CardPriorityInfo, 
   calculateRelativeCardPriority, 
   QueueSessionCache 
-} from '../lib/cardPriority';
+} from '../lib/card_priority';
 import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority';
 import { 
   allIncrementalRemKey, 
@@ -30,8 +30,8 @@ import {
   isMobileDeviceKey,          
   alwaysUseLightModeOnMobileId 
 } from '../lib/consts';
-import { IncrementalRem } from '../lib/types';
-import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/cache';
+import { IncrementalRem } from '../lib/incremental_rem';
+import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import * as _ from 'remeda';

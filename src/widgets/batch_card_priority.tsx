@@ -8,10 +8,10 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { getCardPriority } from '../lib/cardPriority';
+import { getCardPriority } from '../lib/card_priority';
 import { getIncrementalRemInfo } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
-import { updateCardPriorityCache } from '../lib/cache'; // <-- 1. IMPORT ADDED
+import { updateCardPriorityCache } from '../lib/card_priority/cache'; // <-- 1. IMPORT ADDED
 
 interface RemWithPriority {
   remId: string;

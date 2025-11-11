@@ -1,6 +1,6 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 import { multiplierId, nextRepDateSlotCode, powerupCode, repHistorySlotCode } from './consts';
-import { IncrementalRep } from './types';
+import { IncrementalRep } from './incremental_rem';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';

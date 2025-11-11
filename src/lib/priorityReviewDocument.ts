@@ -1,7 +1,7 @@
 import { RNPlugin, PluginRem, RichTextInterface } from '@remnote/plugin-sdk';
-import { IncrementalRem } from './types';
+import { IncrementalRem } from './incremental_rem';
 import { getCardRandomness, getSortingRandomness, applySortingCriteria } from './sorting';
-import { getDueCardsWithPriorities } from './cardPriority';
+import { getDueCardsWithPriorities } from './card_priority';
 import { allIncrementalRemKey } from './consts';
 
 

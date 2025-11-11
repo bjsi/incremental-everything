@@ -1,6 +1,7 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey } from '../consts';
-import { CardPriorityInfo, getCardPriority } from '../cardPriority';
+import { CardPriorityInfo } from './types';
+import { getCardPriority, autoAssignCardPriority } from './index';
 import * as _ from 'remeda';
 
 let cacheUpdateTimer: NodeJS.Timeout | null = null;
@@ -9,14 +10,15 @@ let pendingUpdates = new Map<RemId, { info: CardPriorityInfo | null; isLight: bo
 async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   if (pendingUpdates.size === 0) return;
 
-  const needsHeavyRecalc = forceHeavyRecalc || Array.from(pendingUpdates.values()).some(update => !update.isLight);
+  const needsHeavyRecalc =
+    forceHeavyRecalc || Array.from(pendingUpdates.values()).some((update) => !update.isLight);
 
   console.log(`CACHE-FLUSH: Writing ${pendingUpdates.size} batched updates. Heavy Recalc: ${needsHeavyRecalc}`);
 
   const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
 
   for (const [remId, update] of pendingUpdates.entries()) {
-    const index = cache.findIndex(info => info.remId === remId);
+    const index = cache.findIndex((info) => info.remId === remId);
     if (index > -1) {
       if (update.info) {
         const oldPercentile = cache[index].kbPercentile;
@@ -62,9 +64,8 @@ export async function updateCardPriorityCache(plugin: RNPlugin, remId: RemId, is
       await flushCacheUpdates(plugin);
       cacheUpdateTimer = null;
     }, 200);
-
-  } catch(e) {
-    console.error("Error updating card priority cache for Rem:", remId, e);
+  } catch (e) {
+    console.error('Error updating card priority cache for Rem:', remId, e);
   }
 }
 
@@ -275,8 +276,6 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
   const batchSize = 30;
   const delayBetweenBatches = 100;
 
-  const { autoAssignCardPriority } = await import('../cardPriority');
-
   try {
     for (let i = 0; i < untaggedRemIds.length; i += batchSize) {
       const batch = untaggedRemIds.slice(i, i + batchSize);
@@ -307,8 +306,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
       );
 
       if (newPriorities.length > 0) {
-        const currentCache =
-          (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+        const currentCache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
         const mergedCache = [...currentCache, ...newPriorities];
 
         const sortedMergedCache = _.sortBy(mergedCache, (info) => info.priority);
