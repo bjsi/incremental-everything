@@ -24,7 +24,7 @@ import {
 import { getIncrementalRemFromRem, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
+import { percentileToHslColor, calculateRelativePercentile, DEFAULT_PERFORMANCE_MODE, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
@@ -242,7 +242,7 @@ export function AnswerButtons() {
   const performanceModeSetting = useTrackerPlugin(
     (rp) => rp.settings.getSetting<string>('performanceMode'),
     []
-  ) || 'full';
+  ) || DEFAULT_PERFORMANCE_MODE;
 
   const isMobile = useTrackerPlugin(
     async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
@@ -255,7 +255,7 @@ export function AnswerButtons() {
   );
 
   // ✅ Calculate effective mode (synchronous!)
-  const useLightMode = performanceModeSetting === 'light' || 
+  const useLightMode = performanceModeSetting === PERFORMANCE_MODE_LIGHT || 
                        (isMobile && alwaysUseLightOnMobile !== false);
   
   // Consolidate core data into a single tracker

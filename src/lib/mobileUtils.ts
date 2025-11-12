@@ -1,5 +1,6 @@
 import { RNPlugin, Platform } from '@remnote/plugin-sdk';
 import { alwaysUseLightModeOnMobileId, lastDetectedOSKey, isMobileDeviceKey, alwaysUseLightModeOnWebId, isWebPlatformKey, lastDetectedPlatformKey } from './consts';
+import { getPerformanceMode, isLightPerformanceMode } from './utils';
 
 /**
  * Get the operating system name
@@ -78,10 +79,8 @@ export function getFriendlyPlatformName(platform: Platform): string {
  * This is the key function - use this everywhere instead of just checking performanceMode setting
  */
 export async function shouldUseLightMode(plugin: RNPlugin): Promise<boolean> {
-  const performanceModeSetting = await plugin.settings.getSetting<string>('performanceMode');
-  
   // If setting is already light, return true
-  if (performanceModeSetting === 'light') {
+  if (await isLightPerformanceMode(plugin)) {
     return true;
   }
   
@@ -134,7 +133,7 @@ export async function handleMobileDetectionOnStartup(plugin: RNPlugin): Promise<
   // Get settings
   const alwaysUseLightOnMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
   const alwaysUseLightOnWeb = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnWebId);
-  const performanceModeSetting = await plugin.settings.getSetting<string>('performanceMode');
+  const performanceModeSetting = await getPerformanceMode(plugin);
   
   // Get last detected OS and platform (for tracking changes across sessions)
   const lastOS = await plugin.storage.getSynced<string>(lastDetectedOSKey);

@@ -14,7 +14,7 @@ import {
   displayPriorityShieldId,
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
-import { percentileToHslColor } from '../lib/utils';
+import { percentileToHslColor, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import * as _ from 'remeda';
 
@@ -27,7 +27,7 @@ export function CardPriorityDisplay() {
     []
   );
 
-  const useLightMode = effectiveMode === 'light';
+  const useLightMode = effectiveMode === PERFORMANCE_MODE_LIGHT;
 
   // ✅ Get the display priority shield setting
   const displayPriorityShield = useTrackerPlugin(

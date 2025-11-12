@@ -1,6 +1,39 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
 
+// Performance mode constants
+export const PERFORMANCE_MODE_FULL = 'full';
+export const PERFORMANCE_MODE_LIGHT = 'light';
+export const DEFAULT_PERFORMANCE_MODE = PERFORMANCE_MODE_FULL;
+export type PerformanceMode = typeof PERFORMANCE_MODE_FULL | typeof PERFORMANCE_MODE_LIGHT;
+
+/**
+ * Gets the current performance mode setting with a default fallback.
+ * @param plugin Plugin instance to access settings.
+ * @returns The current performance mode ('full' or 'light').
+ */
+export async function getPerformanceMode(plugin: RNPlugin): Promise<PerformanceMode> {
+  return (await plugin.settings.getSetting<PerformanceMode>('performanceMode')) || DEFAULT_PERFORMANCE_MODE;
+}
+
+/**
+ * Checks if the plugin is running in full performance mode.
+ * @param plugin Plugin instance to access settings.
+ * @returns True if in full mode, false otherwise.
+ */
+export async function isFullPerformanceMode(plugin: RNPlugin): Promise<boolean> {
+  return (await getPerformanceMode(plugin)) === PERFORMANCE_MODE_FULL;
+}
+
+/**
+ * Checks if the plugin is running in light performance mode.
+ * @param plugin Plugin instance to access settings.
+ * @returns True if in light mode, false otherwise.
+ */
+export async function isLightPerformanceMode(plugin: RNPlugin): Promise<boolean> {
+  return (await getPerformanceMode(plugin)) === PERFORMANCE_MODE_LIGHT;
+}
+
 export const tryParseJson = (x: any) => {
   try {
     return JSON.parse(x);

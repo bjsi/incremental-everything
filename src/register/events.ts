@@ -26,7 +26,11 @@ import { IncrementalRem } from '../lib/incremental_rem';
 import { flushCacheUpdatesNow, updateCardPriorityCache } from '../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../lib/priority_review_document';
-import { calculateAllPercentiles } from '../lib/utils';
+import {
+  calculateAllPercentiles,
+  isFullPerformanceMode,
+  isLightPerformanceMode,
+} from '../lib/utils';
 import {
   saveKBShield,
   saveDocumentShield,
@@ -35,6 +39,10 @@ import {
 } from '../lib/shield_history';
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
+
+// Debounce/timeout constants
+const CARD_PROCESSING_DEBOUNCE_MS = 2000;
+const REM_CHANGE_DEBOUNCE_MS = 1000;
 
 type ResetSessionItemCounter = () => void;
 
@@ -179,9 +187,7 @@ export function registerQueueExitListener(
     console.log('[QueueExit] Priority calculation scope:', priorityCalcScopeRemIds?.length || 0, 'rems');
     console.log('[QueueExit] Original scope ID for history:', originalScopeId);
 
-    const performanceMode = await plugin.settings.getSetting('performanceMode') || 'full';
-
-    if (performanceMode === 'full') {
+    if (await isFullPerformanceMode(plugin)) {
       console.log('[QueueExit] Full mode. Saving Priority Shield history...');
 
       const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
@@ -276,15 +282,13 @@ export function registerQueueEnterListener(
     await plugin.storage.setSession('originalScopeId', originalScopeId);
     await plugin.storage.setSession('isPriorityReviewDoc', isPriorityReviewDoc);
 
-    const performanceMode = await plugin.settings.getSetting('performanceMode') || 'full';
-
     const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
-    
+
     if (allCardInfos.length === 0) {
       console.warn('QUEUE ENTER: Card priority cache is empty! Flashcard calculations will be skipped.');
     }
 
-    const dueCardsInKB = (performanceMode === 'full') ? allCardInfos.filter(info => info.dueCards > 0) : [];
+    const dueCardsInKB = (await isFullPerformanceMode(plugin)) ? allCardInfos.filter(info => info.dueCards > 0) : [];
 
     let docPercentiles: Record<RemId, number> = {};
     let dueCardsInScope: CardPriorityInfo[] = [];
@@ -332,7 +336,7 @@ export function registerQueueEnterListener(
         
         await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
         
-        if (performanceMode === 'full') {
+        if (await isFullPerformanceMode(plugin)) {
           console.log('QUEUE ENTER: Full mode. Calculating session cache...');
 
           const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
@@ -395,8 +399,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
     AppEvents.QueueCompleteCard,
     undefined,
     async (data: { cardId: RemId }) => {
-      const performanceMode = (await plugin.settings.getSetting('performanceMode')) || 'light';
-      if (performanceMode !== 'full') {
+      if (await isLightPerformanceMode(plugin)) {
         return;
       }
 
@@ -416,7 +419,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
 
       if (remId) {
         recentlyProcessedCards.add(remId);
-        setTimeout(() => recentlyProcessedCards.delete(remId), 2000);
+        setTimeout(() => recentlyProcessedCards.delete(remId), CARD_PROCESSING_DEBOUNCE_MS);
 
         console.log('LISTENER: Calling LIGHT updateCardPriorityCache...');
         await updateCardPriorityCache(plugin, remId, true);
@@ -450,8 +453,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           return;
         }
 
-        const performanceMode = (await plugin.settings.getSetting('performanceMode')) || 'light';
-        if (performanceMode !== 'full') {
+        if (await isLightPerformanceMode(plugin)) {
           console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping (Light Mode).');
           return;
         }
@@ -478,7 +480,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
 
         await updateCardPriorityCache(plugin, data.remId);
         console.log('LISTENER: (Debounced) Finished processing event.');
-      }, 1000);
+      }, REM_CHANGE_DEBOUNCE_MS);
     }
   );
 }

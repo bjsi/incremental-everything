@@ -31,6 +31,7 @@ import {
   precomputeAllCardPriorities,
 } from '../lib/card_priority';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
+import { getPerformanceMode } from '../lib/utils';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async () => {
@@ -529,7 +530,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const effective = await getEffectivePerformanceMode(plugin);
 
       // Get settings
-      const setting = await plugin.settings.getSetting<string>('performanceMode');
+      const setting = await getPerformanceMode(plugin);
       const autoSwitchMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
       const autoSwitchWeb = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnWebId);
 
