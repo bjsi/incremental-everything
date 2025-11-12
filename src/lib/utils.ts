@@ -62,3 +62,26 @@ export function calculateRelativePercentile<T extends { priority: number; remId:
   const percentile = ((index + 1) / sortedItems.length) * 100;
   return Math.round(percentile * 10) / 10;
 }
+
+/**
+ * Calculates percentiles for all items in a list at once.
+ * More efficient than calling calculateRelativePercentile repeatedly.
+ * @param items The list of items to calculate percentiles for.
+ * @returns A map of remId to percentile (1-100, rounded to whole number).
+ */
+export function calculateAllPercentiles<T extends { priority: number; remId: string }>(
+  items: T[]
+): Record<string, number> {
+  if (!items || items.length === 0) {
+    return {};
+  }
+
+  const sortedItems = _.sortBy(items, (x) => x.priority);
+  const percentiles: Record<string, number> = {};
+
+  sortedItems.forEach((item, index) => {
+    percentiles[item.remId] = Math.round(((index + 1) / sortedItems.length) * 100);
+  });
+
+  return percentiles;
+}
