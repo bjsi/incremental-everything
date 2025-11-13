@@ -30,6 +30,7 @@ import {
   calculateAllPercentiles,
   isFullPerformanceMode,
   isLightPerformanceMode,
+  getPerformanceMode,
 } from '../lib/utils';
 import {
   saveKBShield,
@@ -372,6 +373,7 @@ export function registerQueueEnterListener(
     await plugin.storage.setSession(queueSessionCacheKey, sessionCache);
     console.log('QUEUE ENTER: Pre-calculation complete. Session cache has been saved.');
 
+    const performanceMode = await getPerformanceMode(plugin);
     const dueIncRemCount = await calculateDueIncRemCount(
       plugin,
       allIncRems,
