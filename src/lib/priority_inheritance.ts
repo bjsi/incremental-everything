@@ -1,7 +1,6 @@
 import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
-import { powerupCode, prioritySlotCode } from './consts';
-import { getIncrementalRemInfo } from './incremental_rem';
-import { getCardPriority } from './cardPriority';
+import { powerupCode } from './consts';
+import { getIncrementalRemFromRem } from './incremental_rem';
 import { safeRemTextToString } from './pdfUtils';
 
 export interface AncestorPriorityInfo {
@@ -37,7 +36,7 @@ export async function findClosestIncrementalAncestor(
       
       if (hasIncrementalPowerup) {
         // Get the priority of this incremental ancestor
-        const incRemInfo = await getIncrementalRemInfo(plugin, currentRem);
+        const incRemInfo = await getIncrementalRemFromRem(plugin, currentRem);
         
         if (incRemInfo && incRemInfo.priority !== undefined) {
           // Get the name/text of the ancestor for display
@@ -133,7 +132,7 @@ export async function findClosestAncestorWithAnyPriority(
     currentLevel++; // Increment level for each parent we check
 
     // Check for Incremental Rem priority first
-    const parentIncInfo = await getIncrementalRemInfo(plugin, parent);
+    const parentIncInfo = await getIncrementalRemFromRem(plugin, parent);
     if (parentIncInfo) {
       const parentName = await safeRemTextToString(plugin, parent.text);
       const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');

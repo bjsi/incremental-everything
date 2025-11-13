@@ -7,16 +7,15 @@ import {
   RemId,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { 
-  getCardPriority, 
-  setCardPriority, 
-  PrioritySource, 
-  CardPriorityInfo, 
-  calculateRelativeCardPriority, 
-  QueueSessionCache 
-} from '../lib/cardPriority';
-import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
+import {
+  getCardPriority,
+  setCardPriority,
+  CardPriorityInfo,
+  QueueSessionCache
+} from '../lib/card_priority';
+import { calculateRelativePercentile, DEFAULT_PERFORMANCE_MODE, PERFORMANCE_MODE_FULL, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { 
   allIncrementalRemKey, 
   powerupCode, 
@@ -29,8 +28,8 @@ import {
   isMobileDeviceKey,          
   alwaysUseLightModeOnMobileId 
 } from '../lib/consts';
-import { IncrementalRem } from '../lib/types';
-import { updateCardPriorityInCache, flushLightCacheUpdates } from '../lib/cache';
+import { IncrementalRem } from '../lib/incremental_rem';
+import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import * as _ from 'remeda';
@@ -46,9 +45,9 @@ function Priority() {
 
   // ✅ Track the values that determine effective mode
   const performanceModeSetting = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<string>('performanceMode'), 
+    (rp) => rp.settings.getSetting<string>('performanceMode'),
     []
-  ) || 'full';
+  ) || DEFAULT_PERFORMANCE_MODE;
 
   const isMobile = useTrackerPlugin(
     async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
@@ -61,7 +60,7 @@ function Priority() {
   );
 
   // ✅ Calculate effective mode
-  const performanceMode = performanceModeSetting === 'light' || 
+  const performanceMode = performanceModeSetting === PERFORMANCE_MODE_LIGHT || 
                           (isMobile && alwaysUseLightOnMobile !== false) 
                           ? 'light' : 'full';
 
@@ -89,7 +88,7 @@ function Priority() {
 
   // 🔌 Conditionally fetch cache based on performance mode
   const sessionCache = useTrackerPlugin(
-    (rp) => (performanceMode === 'full') 
+    (rp) => (performanceMode === PERFORMANCE_MODE_FULL) 
       ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey) 
       : Promise.resolve(null), 
   [performanceMode]);
@@ -97,7 +96,7 @@ function Priority() {
   const allIncRems = useTrackerPlugin(async (plugin) => await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [], []);
   
   const allCardInfos = useTrackerPlugin(async (plugin) => 
-    (performanceMode === 'full')
+    (performanceMode === PERFORMANCE_MODE_FULL)
       ? await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [] 
       : Promise.resolve([]), 
   [performanceMode]);
@@ -117,7 +116,7 @@ function Priority() {
   
   const inQueue = !!queueSubQueueId;
 
-  const incRemInfo = useTrackerPlugin(async (plugin) => rem ? await getIncrementalRemInfo(plugin, rem) : null, [rem?._id]);
+  const incRemInfo = useTrackerPlugin(async (plugin) => rem ? await getIncrementalRemFromRem(plugin, rem) : null, [rem?._id]);
   const cardInfo = useTrackerPlugin(async (plugin) => rem ? await getCardPriority(plugin, rem) : null, [rem?._id]);
   const hasCards = useTrackerPlugin(async (plugin) => rem ? (await rem.getCards()).length > 0 : false, [rem?._id]);
 
@@ -135,7 +134,7 @@ function Priority() {
     // Calculate descendant card count (needed for "Set Card Priority" button)
     // We fetch this in both modes, but it's much faster in 'light' mode.
     let finalDescendantCardCount = 0;
-    if (performanceMode === 'full') {
+    if (performanceMode === PERFORMANCE_MODE_FULL) {
         const remDescendants = await rem.getDescendants();
         const remDescendantIds = new Set(remDescendants.map(d => d._id));
         finalDescendantCardCount = _.sumBy(
@@ -151,7 +150,7 @@ function Priority() {
     }
 
     // 🔌 Check performance mode
-    if (performanceMode === 'light') {
+    if (performanceMode === PERFORMANCE_MODE_LIGHT) {
       // In light mode, we only return the descendant count and empty arrays
       return { 
         scopedIncRems: [], 
@@ -186,8 +185,8 @@ function Priority() {
       const allCardsInScope = (scopeMode === 'all') ? allCardInfos : cardRemsInScope;
       finalPrioritySourceCounts = allCardsInScope.reduce((counts, rem) => ({...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0 });
       finalScopedCardRems = (cardScopeType === 'prioritized' ? allCardsInScope.filter(c => c.source !== 'default') : allCardsInScope);
-      finalIncRel = (scopeMode === 'document') ? sessionCache.incRemDocPercentiles[rem._id] : calculateIncRemRelativePriority(allIncRems, rem._id);
-      finalCardRel = (scopeMode === 'document') ? sessionCache.docPercentiles[rem._id] : calculateRelativeCardPriority(allCardInfos, rem._id);
+      finalIncRel = (scopeMode === 'document') ? sessionCache.incRemDocPercentiles[rem._id] : calculateRelativePercentile(allIncRems, rem._id);
+      finalCardRel = (scopeMode === 'document') ? sessionCache.docPercentiles[rem._id] : calculateRelativePercentile(allCardInfos, rem._id);
       
     } else {
       // --- OPTIMIZED ASYNC FALLBACK PATH WITH COMPREHENSIVE SCOPE ---
@@ -243,8 +242,8 @@ function Priority() {
         tempScopedCardRems = tempScopedCardRems.filter(c => c.source !== 'default');
       }
       finalScopedCardRems = tempScopedCardRems;
-      finalIncRel = calculateIncRemRelativePriority(finalScopedIncRems, rem._id);
-      finalCardRel = calculateRelativeCardPriority(finalScopedCardRems, rem._id);
+      finalIncRel = calculateRelativePercentile(finalScopedIncRems, rem._id);
+      finalCardRel = calculateRelativePercentile(finalScopedCardRems, rem._id);
     }    
     return { 
       scopedIncRems: finalScopedIncRems, 
@@ -266,7 +265,7 @@ function Priority() {
   
   // This tracker is fast and only runs in 'full' mode, so it's fine.
   useTrackerPlugin(async (plugin) => {
-    if (!rem || performanceMode === 'light') return; // 🔌 Skip in light mode
+    if (!rem || performanceMode === PERFORMANCE_MODE_LIGHT) return; // 🔌 Skip in light mode
     const ancestors: PluginRem[] = [];
     let current: PluginRem | undefined = rem;
     while (current?.parent) {
@@ -283,7 +282,7 @@ function Priority() {
   // --- MODIFIED: Initialize scope with original scope for Priority Review Documents ---
   useEffect(() => {
     const initializeScope = async () => {
-      if (inQueue && queueSubQueueId && performanceMode === 'full') { // 🔌 Skip in light mode
+      if (inQueue && queueSubQueueId && performanceMode === PERFORMANCE_MODE_FULL) { // 🔌 Skip in light mode
         // Use originalScopeId if available (Priority Review Document case)
         const effectiveScopeId = originalScopeId || queueSubQueueId;
         const scopeRem = await plugin.rem.findOne(effectiveScopeId);
@@ -318,23 +317,23 @@ function Priority() {
 
   // This effect calculates hypothetical relative priority, skip in 'light' mode
   useEffect(() => {
-    if (performanceMode === 'full' && derivedData && rem) {
+    if (performanceMode === PERFORMANCE_MODE_FULL && derivedData && rem) {
       const hypotheticalRems = [
         ...derivedData.scopedIncRems.filter(r => r.remId !== rem._id),
         { remId: rem._id, priority: incAbsPriority } as IncrementalRem
       ];
-      const newRelPriority = calculateIncRemRelativePriority(hypotheticalRems, rem._id);
+      const newRelPriority = calculateRelativePercentile(hypotheticalRems, rem._id);
       if (newRelPriority !== null) setIncRelPriority(newRelPriority);
     }
   }, [incAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode
 
   useEffect(() => {
-    if (performanceMode === 'full' && derivedData && rem) {
+    if (performanceMode === PERFORMANCE_MODE_FULL && derivedData && rem) {
       const hypotheticalRems = [
         ...derivedData.scopedCardRems.filter(r => r.remId !== rem._id),
         { remId: rem._id, priority: cardAbsPriority, source: 'manual' } as CardPriorityInfo
       ];
-      const newRelPriority = calculateRelativeCardPriority(hypotheticalRems, rem._id);
+      const newRelPriority = calculateRelativePercentile(hypotheticalRems, rem._id);
       if (newRelPriority !== null) setCardRelPriority(newRelPriority);
     }
   }, [cardAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode
@@ -349,17 +348,13 @@ function Priority() {
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
     
     // Get the updated IncRem info and update allIncrementalRemKey
-    const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (updatedIncRem) {
-      const allIncRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-      const updatedAllIncRems = allIncRems
-        .filter((r) => r.remId !== updatedIncRem.remId)
-        .concat(updatedIncRem);
-      await plugin.storage.setSession(allIncrementalRemKey, updatedAllIncRems);
+      await updateIncrementalRemCache(plugin, updatedIncRem);
     }
     
     // 🔌 Conditionally update session cache
-    if (performanceMode === 'full' && sessionCache && originalScopeId) {
+    if (performanceMode === PERFORMANCE_MODE_FULL && sessionCache && originalScopeId) {
       const newIncRemDocPercentiles = { ...sessionCache.incRemDocPercentiles };
       delete newIncRemDocPercentiles[rem._id];
       
@@ -377,10 +372,10 @@ function Priority() {
     await setCardPriority(plugin, rem, priority, 'manual');
 
     // 🔌 Only do cache updates in 'full' mode
-    if (performanceMode === 'full') {
+    if (performanceMode === PERFORMANCE_MODE_FULL) {
         const numCardsRemaining = await plugin.queue.getNumRemainingCards();
         const isInQueueNow = numCardsRemaining !== undefined;
-        await updateCardPriorityInCache(plugin, rem._id, isInQueueNow);
+        await updateCardPriorityCache(plugin, rem._id, isInQueueNow);
         
         await flushLightCacheUpdates(plugin);
         
@@ -476,9 +471,7 @@ function Priority() {
   const removeFromIncremental = useCallback(async () => {
     if (!rem) return;
     await rem.removePowerup(powerupCode);
-    const currentIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-    const updated = currentIncRems.filter(r => r.remId !== rem._id);
-    await plugin.storage.setSession(allIncrementalRemKey, updated);
+    await removeIncrementalRemCache(plugin, rem._id);
     await plugin.app.toast('Removed from Incremental Queue');
     plugin.widget.closePopup();
   }, [plugin, rem]);
@@ -487,8 +480,8 @@ function Priority() {
     if (!rem) return;
     await rem.removePowerup('cardPriority');
     // 🔌 Conditionally update cache
-    if (performanceMode === 'full') {
-        await updateCardPriorityInCache(plugin, rem._id);
+    if (performanceMode === PERFORMANCE_MODE_FULL) {
+        await updateCardPriorityCache(plugin, rem._id);
     }
     await plugin.app.toast('Card Priority for inheritance removed.');
     plugin.widget.closePopup();
@@ -573,7 +566,7 @@ function Priority() {
       <h2 className="text-xl font-bold">Priority Settings</h2>
 
       {/* 🔌 Conditionally render scope UI */}
-      {performanceMode === 'full' && (
+      {performanceMode === PERFORMANCE_MODE_FULL && (
         <>
           {isPriorityReviewDoc && originalScopeId && scopeMode === 'document' && (
             <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-center">
@@ -630,7 +623,7 @@ function Priority() {
             <input type="range" min="0" max="100" value={incAbsPriority} onChange={(e) => setIncAbsPriority(Number(e.target.value))} className="w-full" />
             
             {/* 🔌 Conditionally render relative priority */}
-            {performanceMode === 'full' && (
+            {performanceMode === PERFORMANCE_MODE_FULL && (
               <>
                 <div className="flex justify-between items-center mt-2">
                   <label className="font-medium">Relative Priority:</label>
@@ -669,7 +662,7 @@ function Priority() {
           )}
 
           {/* 🔌 Conditionally render ancestor info */}
-          {performanceMode === 'full' && ancestorPriorityInfo && (
+          {performanceMode === PERFORMANCE_MODE_FULL && ancestorPriorityInfo && (
             <div style={{
               marginTop: '16px',
               padding: '12px',
@@ -774,7 +767,7 @@ function Priority() {
               {hasCards && cardInfo && (
                 <>
                   {/* 🔌 Conditionally render statistics */}
-                  {performanceMode === 'full' && (
+                  {performanceMode === PERFORMANCE_MODE_FULL && (
                     <div className="text-xs text-center mt-2 flex justify-around p-1 bg-gray-100 dark:bg-gray-800 rounded-sm" style={secondaryTextStyle}>
                       <span>Manual: {prioritySourceCounts.manual.toLocaleString()}</span>
                       <span>Inherited: {prioritySourceCounts.inherited.toLocaleString()}</span>
@@ -794,7 +787,7 @@ function Priority() {
                   </div>
                   
                   {/* 🔌 Conditionally render scope type radio buttons */}
-                  {performanceMode === 'full' && (
+                  {performanceMode === PERFORMANCE_MODE_FULL && (
                     <div className="mt-4 pt-2 border-t dark:border-gray-600">
                         <label className="text-sm font-medium">Calculate Relative To:</label>
                         <div className="flex gap-4 mt-1">
@@ -811,7 +804,7 @@ function Priority() {
                   )}
 
                                 {/* 🔌 Conditionally render relative priority */}
-              {performanceMode === 'full' && (
+              {performanceMode === PERFORMANCE_MODE_FULL && (
                 <>
                   <div className="flex justify-between items-center mt-2">
                     <label className="font-medium">Relative Priority:</label>
@@ -828,7 +821,7 @@ function Priority() {
               )}
               
               {/* 🔌 Conditionally render ancestor info */}
-              {performanceMode === 'full' && ancestorPriorityInfo && (
+              {performanceMode === PERFORMANCE_MODE_FULL && ancestorPriorityInfo && (
                 <div style={{
                   marginTop: '16px',
                   padding: '12px',
@@ -940,7 +933,7 @@ function Priority() {
               <input type="range" min="0" max="100" value={cardAbsPriority} onChange={(e) => setCardAbsPriority(Number(e.target.value))} className="w-full" />
               
               {/* 🔌 Conditionally render relative priority */}
-              {performanceMode === 'full' && (
+              {performanceMode === PERFORMANCE_MODE_FULL && (
                 <>
                   <div className="flex justify-between items-center mt-2">
                     <label className="font-medium">Relative Priority:</label>

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import React from 'react';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
-import { IncrementalRem } from '../lib/types';
+import { IncrementalRem } from '../lib/incremental_rem';
 dayjs.extend(duration);
 
 export interface NextRepTimeProps {

@@ -13,8 +13,7 @@ import {
   alwaysUseLightModeOnWebId,
 } from '../lib/consts';
 import { initIncrementalRem } from './powerups';
-import { getCurrentIncrementalRem } from '../lib/currentRem';
-import { getIncrementalRemInfo, handleHextRepetitionClick } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, handleHextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { findPDFinRem, safeRemTextToString } from '../lib/pdfUtils';
 import {
   getOperatingSystem,
@@ -28,10 +27,11 @@ import {
   handleMobileDetectionOnStartup,
 } from '../lib/mobileUtils';
 import {
-  cacheAllCardPriorities,
   removeAllCardPriorityTags,
   precomputeAllCardPriorities,
-} from '../lib/cardPriority';
+} from '../lib/card_priority';
+import { loadCardPriorityCache } from '../lib/card_priority/cache';
+import { getPerformanceMode } from '../lib/utils';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async () => {
@@ -70,7 +70,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem || !url.includes('/flashcards')) {
         return;
       }
-      const incRem = await getIncrementalRemInfo(plugin, rem);
+      const incRem = await getIncrementalRemFromRem(plugin, rem);
       if (!incRem) {
         return;
       }
@@ -202,7 +202,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       // Verify it's actually an Incremental Rem with valid data
-      const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (!incRemInfo) {
         console.log('Reschedule: Could not get Incremental Rem info. Aborting.');
         await plugin.app.toast('Could not retrieve Incremental Rem information.');
@@ -392,7 +392,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'refresh-card-priority-cache',
     name: 'Refresh Card Priority Cache',
     action: async () => {
-      await cacheAllCardPriorities(plugin);
+      await loadCardPriorityCache(plugin);
     },
   });
 
@@ -530,7 +530,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const effective = await getEffectivePerformanceMode(plugin);
 
       // Get settings
-      const setting = await plugin.settings.getSetting<string>('performanceMode');
+      const setting = await getPerformanceMode(plugin);
       const autoSwitchMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
       const autoSwitchWeb = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnWebId);
 

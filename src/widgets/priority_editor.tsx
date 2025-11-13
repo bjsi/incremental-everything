@@ -3,16 +3,15 @@ import {
   usePlugin,
   useRunAsync,
   useTrackerPlugin,
-  PluginRem,
 } from '@remnote/plugin-sdk';
 import { useMemo, useState } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { getCardPriority, setCardPriority, CardPriorityInfo, calculateRelativeCardPriority } from '../lib/cardPriority';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
-import { IncrementalRem } from '../lib/types';
-import { percentileToHslColor } from '../lib/color';
-import { calculateRelativePriority as calculateIncRemRelativePriority } from '../lib/priority'; // Aliased to avoid name clash
-import { updateCardPriorityInCache } from '../lib/cache';
+import { IncrementalRem } from '../lib/incremental_rem';
+import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
+import { updateCardPriorityCache } from '../lib/card_priority/cache';
 
 
 export function PriorityEditor() {
@@ -33,7 +32,7 @@ export function PriorityEditor() {
   const incRemInfo = useTrackerPlugin(
     async (plugin) => {
       if (!rem) return null;
-      return await getIncrementalRemInfo(plugin, rem);
+      return await getIncrementalRemFromRem(plugin, rem);
     },
     [rem]
   );
@@ -66,7 +65,7 @@ export function PriorityEditor() {
       if (!rem || !incRemInfo) return null;
       const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
       if (allIncRems.length === 0) return 50;
-      return calculateIncRemRelativePriority(allIncRems, rem._id);
+      return calculateRelativePercentile(allIncRems, rem._id);
     },
     [rem, incRemInfo]
   );
@@ -119,6 +118,12 @@ export function PriorityEditor() {
     if (!incRemInfo || !rem) return;
     const newPriority = Math.max(0, Math.min(100, incRemInfo.priority + delta));
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+
+    // Update the incremental rem cache
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
+    if (updatedIncRem) {
+      await updateIncrementalRemCache(plugin, updatedIncRem);
+    }
   };
 
   const quickUpdateCardPriority = async (delta: number) => {
@@ -127,7 +132,7 @@ export function PriorityEditor() {
     const newPriority = Math.max(0, Math.min(100, currentPriority + delta));
     
     await setCardPriority(plugin, rem, newPriority, 'manual');
-    await updateCardPriorityInCache(plugin, rem._id);
+    await updateCardPriorityCache(plugin, rem._id);
   };
 
   const buttonStyle: React.CSSProperties = {

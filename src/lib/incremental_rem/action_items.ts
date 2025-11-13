@@ -5,7 +5,7 @@ import {
   RichTextElementRemInterface,
 } from '@remnote/plugin-sdk';
 import { RemAndType } from './types';
-import { safeRemTextToString } from './pdfUtils';
+import { safeRemTextToString } from '../pdfUtils';
 
 export const remToActionItemType = async (
   plugin: RNPlugin,

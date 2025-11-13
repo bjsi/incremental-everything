@@ -21,12 +21,12 @@ import {
   isMobileDeviceKey,
   alwaysUseLightModeOnMobileId
 } from '../lib/consts';
-import { getIncrementalRemInfo, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
-import { calculateRelativePriority } from '../lib/priority';
-import { IncrementalRem } from '../lib/types';
-import { percentileToHslColor } from '../lib/color';
+import { getIncrementalRemFromRem, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
+import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { IncrementalRem } from '../lib/incremental_rem';
+import { percentileToHslColor, calculateRelativePercentile, DEFAULT_PERFORMANCE_MODE, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
-import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/cardPriority';
+import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 
 const MAX_DEPTH_CHECK = 3;
@@ -139,7 +139,7 @@ const handleReviewAndOpenRem = async (
     }
   }
 
-  const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+  const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
   await reviewRem(plugin, incRemInfo ?? undefined);
   await plugin.window.openRem(rem);
 };
@@ -242,7 +242,7 @@ export function AnswerButtons() {
   const performanceModeSetting = useTrackerPlugin(
     (rp) => rp.settings.getSetting<string>('performanceMode'),
     []
-  ) || 'full';
+  ) || DEFAULT_PERFORMANCE_MODE;
 
   const isMobile = useTrackerPlugin(
     async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
@@ -255,7 +255,7 @@ export function AnswerButtons() {
   );
 
   // ✅ Calculate effective mode (synchronous!)
-  const useLightMode = performanceModeSetting === 'light' || 
+  const useLightMode = performanceModeSetting === PERFORMANCE_MODE_LIGHT || 
                        (isMobile && alwaysUseLightOnMobile !== false);
   
   // Consolidate core data into a single tracker
@@ -266,7 +266,7 @@ export function AnswerButtons() {
     const rem = await rp.rem.findOne(ctx.remId);
     if (!rem) return null;
 
-    const incRemInfo = await getIncrementalRemInfo(rp, rem);
+    const incRemInfo = await getIncrementalRemFromRem(rp, rem);
     if (!incRemInfo) return null;
 
     // 🔌 Conditionally fetch sessionCache based on effective performanceMode
@@ -323,7 +323,7 @@ export function AnswerButtons() {
     return {
       kb: topMissedInKb ? {
         absolute: topMissedInKb.priority,
-        percentile: calculateRelativePriority(allIncRems, topMissedInKb.remId),
+        percentile: calculateRelativePercentile(allIncRems, topMissedInKb.remId),
       } : null,
       doc: topMissedInDoc ? {
         absolute: topMissedInDoc.priority,
@@ -337,7 +337,7 @@ export function AnswerButtons() {
     if (!coreData) return { kb: null, doc: null };
     
     const { allIncRems, incRemInfo, sessionCache } = coreData;
-    const kbPercentile = calculateRelativePriority(allIncRems, incRemInfo.remId);
+    const kbPercentile = calculateRelativePercentile(allIncRems, incRemInfo.remId);
     const docPercentile = sessionCache?.incRemDocPercentiles?.[incRemInfo.remId] ?? null;
     
     return { kb: kbPercentile, doc: docPercentile };
@@ -459,10 +459,9 @@ export function AnswerButtons() {
           onClick={async () => {
                   // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
                   await handleCardPriorityInheritance(plugin, rem, incRemInfo);
-                  
+
                   // 2. Proceed with the final, destructive Done button logic
-                  const updatedAllRem = allIncRems.filter((r) => r.remId !== rem._id);
-                  await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+                  await removeIncrementalRemCache(plugin, rem._id);
                   await plugin.queue.removeCurrentCardFromQueue(true);
                   await rem.removePowerup(powerupCode);
               }}

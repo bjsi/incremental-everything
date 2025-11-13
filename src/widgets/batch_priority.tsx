@@ -5,7 +5,6 @@ import {
   useTrackerPlugin,
   PluginRem,
   RNPlugin,
-  BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
@@ -13,11 +12,11 @@ import {
   prioritySlotCode,
   allIncrementalRemKey 
 } from '../lib/consts';
-import { IncrementalRem, ActionItemType } from '../lib/types';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
-import { calculateRelativePriority } from '../lib/priority';
-import { percentileToHslColor } from '../lib/color';
-import { remToActionItemType } from '../lib/actionItems';
+import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
+import { remToActionItemType } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import dayjs from 'dayjs';
 
@@ -141,7 +140,7 @@ useEffect(() => {
           if (hasIncremental) {
             console.log(`   ✓ Found incremental rem:`, rem._id);
             
-            const incInfo = await getIncrementalRemInfo(plugin, rem);
+            const incInfo = await getIncrementalRemFromRem(plugin, rem);
             if (incInfo) {
               const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled';
               console.log(`     - Name: ${remText}, Priority: ${incInfo.priority}`);
@@ -167,8 +166,8 @@ useEffect(() => {
                 path: path,
                 pathIds: pathIds,
                 isChecked: true,
-                percentile: allIncrementalRems ? 
-                  calculateRelativePriority(allIncrementalRems, rem._id) : null
+                percentile: allIncrementalRems ?
+                  calculateRelativePercentile(allIncrementalRems, rem._id) : null
               });
             } else {
               console.log(`     ⚠️ Could not get incremental info for rem:`, rem._id);
@@ -414,21 +413,13 @@ useEffect(() => {
       
       // Update the session storage with new incremental rem data
       console.log('📊 BatchPriority: Updating session storage');
-      const updatedAllRems: IncrementalRem[] = [];
       for (const remData of toUpdate) {
-        const updatedIncRem = await getIncrementalRemInfo(plugin, remData.rem);
+        const updatedIncRem = await getIncrementalRemFromRem(plugin, remData.rem);
         if (updatedIncRem) {
-          updatedAllRems.push(updatedIncRem);
+          await updateIncrementalRemCache(plugin, updatedIncRem);
         }
       }
-      
-      if (allIncrementalRems) {
-        const remIdsToUpdate = new Set(toUpdate.map(r => r.remId));
-        const unchangedRems = allIncrementalRems.filter(r => !remIdsToUpdate.has(r.remId));
-        const finalAllRems = [...unchangedRems, ...updatedAllRems];
-        await plugin.storage.setSession(allIncrementalRemKey, finalAllRems);
-        console.log('   - Updated session storage with', finalAllRems.length, 'total rems');
-      }
+      console.log('   - Updated session storage for', toUpdate.length, 'rems');
       
       console.log('✅ BatchPriority: Successfully applied all changes');
       await plugin.app.toast(`Successfully updated priority for ${toUpdate.length} rem(s)`);

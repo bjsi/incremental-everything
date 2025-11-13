@@ -5,16 +5,16 @@ import { allCardPriorityInfoKey } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
-import { cacheAllCardPriorities } from '../lib/cardPriority';
-import { registerEventListeners } from './events';
-import { registerPluginPowerups, initIncrementalRem } from './powerups';
-import { registerPluginSettings } from './settings';
-import { registerWidgets } from './widgets';
-import { registerMenus } from './menus';
-import { registerCommands } from './commands';
-import { registerCallbacks, resetSessionItemCounter } from './callbacks';
-import { registerIncrementalRemTracker } from './tracker';
-import { registerJumpToRemHelper } from './jump_to_rem';
+import { loadCardPriorityCache } from '../lib/card_priority/cache';
+import { registerEventListeners } from '../register/events';
+import { registerPluginPowerups } from '../register/powerups';
+import { registerPluginSettings } from '../register/settings';
+import { registerWidgets } from '../register/widgets';
+import { registerMenus } from '../register/menus';
+import { registerCommands } from '../register/commands';
+import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
+import { registerIncrementalRemTracker } from '../register/tracker';
+import { registerJumpToRemHelper } from '../register/window';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -48,7 +48,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   const useLightMode = await shouldUseLightMode(plugin);
   if (!useLightMode) {
     // Run the full, expensive cache build
-    cacheAllCardPriorities(plugin);
+    loadCardPriorityCache(plugin);
   } else {
     // In 'light' mode, just set an empty cache.
     console.log('CACHE: Light mode enabled. Skipping card priority cache build.');

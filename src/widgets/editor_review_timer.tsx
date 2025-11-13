@@ -2,13 +2,13 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useEffect, useState } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { updateSRSDataForRem } from '../lib/scheduler';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
-import { IncrementalRem, IncrementalRep } from '../lib/types';
+import { powerupCode, prioritySlotCode } from '../lib/consts';
+import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
@@ -69,7 +69,7 @@ function EditorReviewTimer() {
       return;
     }
 
-    const incRem = await getIncrementalRemInfo(plugin, rem);
+    const incRem = await getIncrementalRemFromRem(plugin, rem);
     if (!incRem) {
       await plugin.app.toast('Error: Not an Incremental Rem');
       return;
@@ -105,14 +105,9 @@ function EditorReviewTimer() {
     
     await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
 
-    const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (updatedIncRem) {
-      const allRem: IncrementalRem[] =
-        (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-      const updatedAllRem = allRem
-        .filter((r) => r.remId !== updatedIncRem.remId)
-        .concat(updatedIncRem);
-      await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+      await updateIncrementalRemCache(plugin, updatedIncRem);
     }
 
     // Clear timer data

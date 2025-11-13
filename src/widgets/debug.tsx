@@ -5,7 +5,7 @@ import {
   useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
@@ -38,7 +38,7 @@ function Debug() {
       if (!rem) {
         return null;
       }
-      const incrementalRem = await getIncrementalRemInfo(plugin, rem);
+      const incrementalRem = await getIncrementalRemFromRem(plugin, rem);
       return incrementalRem;
     },
     [remId]

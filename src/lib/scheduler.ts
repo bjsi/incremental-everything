@@ -1,11 +1,11 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 import { multiplierId, nextRepDateSlotCode, powerupCode, repHistorySlotCode } from './consts';
-import { IncrementalRep } from './types';
+import { IncrementalRep } from './incremental_rem';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { getIncrementalRemInfo } from './incremental_rem';
-import { getDailyDocReferenceForDate } from './date';
+import { getIncrementalRemFromRem } from './incremental_rem';
+import { getDailyDocReferenceForDate } from './utils';
 dayjs.extend(relativeTime);
 
 function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
@@ -64,7 +64,7 @@ export async function getNextSpacingDateForRem(
   if (!rem) {
     return;
   }
-  const incrementalRemInfo = await getIncrementalRemInfo(plugin, rem);
+  const incrementalRemInfo = await getIncrementalRemFromRem(plugin, rem);
   if (!incrementalRemInfo) {
     return;
   }

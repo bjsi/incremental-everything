@@ -3,24 +3,21 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { 
-  getPageRangeKey, 
+import {
+  getPageRangeKey,
   getPageHistory,
   getAllIncrementsForPDF,
   getIncrementalPageRange,
-  setIncrementalReadingPosition, // <-- Import new function
-  addPageToHistory               // <-- Import new function
+  setIncrementalReadingPosition,
+  addPageToHistory
 } from '../lib/pdfUtils';
-import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, defaultPriorityId, allIncrementalRemKey } from '../lib/consts';
-import { getDailyDocReferenceForDate } from '../lib/date';
-import { getInitialPriority } from '../lib/priority_inheritance';
-import { percentileToHslColor } from '../lib/color';
-import { calculateRelativePriority } from '../lib/priority';
-import { IncrementalRem } from '../lib/types';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
+import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
+import { IncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
@@ -61,50 +58,19 @@ function PageRangeWidget() {
   const [editingHistoryRemId, setEditingHistoryRemId] = useState<string | null>(null);
   const [editingHistoryPage, setEditingHistoryPage] = useState<number>(0);
 
-  // Initialize an incremental rem
-  const initIncrementalRem = async (remId: string) => {
+  const handleInitIncrementalRem = async (remId: string) => {
     try {
       const rem = await plugin.rem.findOne(remId);
       if (!rem) return;
-      
-      const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
-      if (!isAlreadyIncremental) {
-        // Get default priority from settings
-        const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
-        const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
-        
-        // Try to inherit priority from closest incremental ancestor
-        const initialPriority = await getInitialPriority(plugin, rem, defaultPriority);
-        
-        // Add powerup
-        await rem.addPowerup(powerupCode);
-        
-        // Set initial interval (using 1 day as default)
-        const nextRepDate = new Date(Date.now() + (1 * 24 * 60 * 60 * 1000));
-        const dateRef = await getDailyDocReferenceForDate(plugin, nextRepDate);
-        if (dateRef) {
-          await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
-        }
-        
-        // Set priority
-        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]);
-        
-        // Initialize history
-        await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify([])]);
-        
-        // Update the all incremental rems list
-        const newIncRem = await getIncrementalRemInfo(plugin, rem);
-        if (newIncRem) {
-          const currentAllRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-          const updatedAllRems = [...currentAllRems, newIncRem];
-          await plugin.storage.setSession(allIncrementalRemKey, updatedAllRems);
-        }
-        
-        // Reload the related rems list
-        await reloadRelatedRems();
-        
-        const remName = rem.text ? await plugin.richText.toString(rem.text) : 'Rem';
-        await plugin.app.toast(`Made "${remName}" incremental with priority ${initialPriority}`);
+
+      await initIncrementalRem(plugin, rem);
+
+      await reloadRelatedRems();
+
+      const remName = rem.text ? await plugin.richText.toString(rem.text) : 'Rem';
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+      if (incRemInfo) {
+        await plugin.app.toast(`Made "${remName}" incremental with priority ${incRemInfo.priority}`);
       }
     } catch (error) {
       console.error('Error initializing incremental rem:', error);
@@ -116,7 +82,7 @@ function PageRangeWidget() {
   const startEditingPriority = async (remId: string) => {
     const rem = await plugin.rem.findOne(remId);
     if (rem) {
-      const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (incRemInfo) {
         setEditingPriorityRemId(remId);
         setEditingPriorities({
@@ -136,13 +102,9 @@ function PageRangeWidget() {
         await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
         
         // Update the incremental rem list
-        const incRemInfo = await getIncrementalRemInfo(plugin, rem);
+        const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
         if (incRemInfo) {
-          const currentAllRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-          const updatedAllRems = currentAllRems
-            .filter((x) => x.remId !== remId)
-            .concat(incRemInfo);
-          await plugin.storage.setSession(allIncrementalRemKey, updatedAllRems);
+          await updateIncrementalRemCache(plugin, incRemInfo);
         }
         
         setEditingPriorityRemId(null);
@@ -163,10 +125,10 @@ function PageRangeWidget() {
       if (rem.isIncremental) {
         const remObj = await plugin.rem.findOne(rem.remId);
         if (remObj) {
-          const incRemInfo = await getIncrementalRemInfo(plugin, remObj);
+          const incRemInfo = await getIncrementalRemFromRem(plugin, remObj);
           if (incRemInfo) {
-            const percentile = remsForCalculation.length > 0 ? 
-              calculateRelativePriority(remsForCalculation, rem.remId) : null;
+            const percentile = remsForCalculation.length > 0 ?
+              calculateRelativePercentile(remsForCalculation, rem.remId) : null;
             priorities[rem.remId] = {
               absolute: incRemInfo.priority,
               percentile
@@ -648,7 +610,7 @@ function PageRangeWidget() {
                     <div className="flex gap-2 mb-2 flex-wrap">
                       {!item.isIncremental ? (
                         <button
-                          onClick={() => initIncrementalRem(item.remId)}
+                          onClick={() => handleInitIncrementalRem(item.remId)}
                           className="px-3 py-1 text-xs rounded"
                           style={{
                             backgroundColor: '#10B981',
@@ -770,7 +732,7 @@ function PageRangeWidget() {
                             })}
                             className="flex-1"
                             style={{ accentColor: percentileToHslColor(
-                              calculateRelativePriority(
+                              calculateRelativePercentile(
                                 allIncrementalRems || [], 
                                 item.remId
                               ) || 50

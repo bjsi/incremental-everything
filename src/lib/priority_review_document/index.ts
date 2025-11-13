@@ -1,8 +1,8 @@
 import { RNPlugin, PluginRem, RichTextInterface } from '@remnote/plugin-sdk';
-import { IncrementalRem } from './types';
-import { getCardRandomness, getSortingRandomness, applySortingCriteria } from './sorting';
-import { getDueCardsWithPriorities } from './cardPriority';
-import { allIncrementalRemKey } from './consts';
+import { IncrementalRem } from '../incremental_rem';
+import { getCardRandomness, getSortingRandomness, applySortingCriteria } from '../sorting';
+import { getDueCardsWithPriorities } from '../card_priority';
+import { allIncrementalRemKey } from '../consts';
 
 
 // Helper function to find or create a tag

@@ -1,5 +1,4 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
-import React from 'react';
 import {
   LineChart,
   Line,

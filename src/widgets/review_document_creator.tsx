@@ -2,10 +2,9 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { createPriorityReviewDocument } from '../lib/priorityReviewDocument';
+import { createPriorityReviewDocument } from '../lib/priority_review_document';
 import { getCardsPerRem } from '../lib/sorting';
 
 function ReviewDocumentCreator() {

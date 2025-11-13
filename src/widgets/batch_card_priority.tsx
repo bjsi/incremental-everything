@@ -4,14 +4,13 @@ import {
   usePlugin,
   useTrackerPlugin,
   PluginRem,
-  RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { getCardPriority } from '../lib/cardPriority';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getCardPriority } from '../lib/card_priority';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
-import { updateCardPriorityInCache } from '../lib/cache'; // <-- 1. IMPORT ADDED
+import { updateCardPriorityCache } from '../lib/card_priority/cache'; // <-- 1. IMPORT ADDED
 
 interface RemWithPriority {
   remId: string;
@@ -125,7 +124,7 @@ function BatchCardPriority() {
             let incRemPriority = null;
 
             if (hasIncremental) {
-              const incInfo = await getIncrementalRemInfo(plugin, rem);
+              const incInfo = await getIncrementalRemFromRem(plugin, rem);
               console.log(`IncRem detected for "${remText}":`, { hasIncremental, incInfo });
               if (incInfo && incInfo.priority !== undefined) {
                 incRemPriority = incInfo.priority;
@@ -293,7 +292,7 @@ function BatchCardPriority() {
             ]);
 
             // <-- 2. CALL CACHE UPDATE HERE -->
-            await updateCardPriorityInCache(plugin, remData.remId);
+            await updateCardPriorityCache(plugin, remData.remId);
 
             appliedCount++;
           })

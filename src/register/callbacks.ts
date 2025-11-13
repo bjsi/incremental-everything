@@ -14,8 +14,7 @@ import {
   seenRemInSessionKey,
   noIncRemTimerKey,
 } from '../lib/consts';
-import { IncrementalRem } from '../lib/types';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
 
 const QUEUE_LAYOUT_FIX_CSS = `
@@ -200,7 +199,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         console.log('✅ Filtered has items, selecting first IncRem');
         let first = filtered[0];
 
-        while (!(await getIncrementalRemInfo(plugin, await plugin.rem.findOne(first.remId)))) {
+        while (!(await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(first.remId)))) {
           filtered.shift();
           if (filtered.length === 0) {
             console.log('❌ All filtered items were invalid after verification - Returning null');

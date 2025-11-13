@@ -1,5 +1,4 @@
 import {
-  DocumentViewer,
   renderWidget,
   usePlugin,
   useRunAsync,
@@ -11,7 +10,7 @@ import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { NativeVideoViewer } from '../components/NativeVideoViewer';
 import { ExtractViewer } from '../components/ExtractViewer';
-import { remToActionItemType } from '../lib/actionItems';
+import { remToActionItemType } from '../lib/incremental_rem';
 import {
   collapseQueueTopBar,
   collapseTopBarKey,
@@ -20,7 +19,7 @@ import {
   currentIncrementalRemTypeKey,
   activeHighlightIdKey,
 } from '../lib/consts';
-import { setCurrentIncrementalRem } from '../lib/currentRem';
+import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 
 console.log('QUEUE.TSX FILE LOADED');
 

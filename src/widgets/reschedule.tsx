@@ -6,10 +6,11 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef } from 'react';
-import { getIncrementalRemInfo } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode } from '../lib/consts';
-import { IncrementalRem, IncrementalRep } from '../lib/types';
+import { powerupCode, prioritySlotCode } from '../lib/consts';
+import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 
@@ -22,7 +23,7 @@ async function handleRescheduleAndPriorityUpdate(
   const rem = await plugin.rem.findOne(remId);
   if (!rem) return;
 
-  const incRem = await getIncrementalRemInfo(plugin, rem);
+  const incRem = await getIncrementalRemFromRem(plugin, rem);
   if (!incRem) return;
 
   await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
@@ -61,14 +62,9 @@ async function handleRescheduleAndPriorityUpdate(
   
   await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
 
-  const updatedIncRem = await getIncrementalRemInfo(plugin, rem);
+  const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
   if (updatedIncRem) {
-    const allRem: IncrementalRem[] =
-      (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-    const updatedAllRem = allRem
-      .filter((r) => r.remId !== updatedIncRem.remId)
-      .concat(updatedIncRem);
-    await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
+    await updateIncrementalRemCache(plugin, updatedIncRem);
   }
 
   // Clear the start time (same as Next button does)
@@ -131,7 +127,7 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
     const fetchInitialData = async () => {
       const inLookbackMode = !!(await plugin.queue.inLookbackMode());
       const scheduleData = await getNextSpacingDateForRem(plugin, remId, inLookbackMode);
-      const incRemData = await getIncrementalRemInfo(plugin, await plugin.rem.findOne(remId));
+      const incRemData = await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(remId));
 
       setDays(String(scheduleData?.newInterval || 1));
       setPriority(incRemData?.priority ?? 10);
