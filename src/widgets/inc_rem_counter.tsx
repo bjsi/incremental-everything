@@ -8,8 +8,6 @@ function IncRemCounter() {
   const counterData = useTrackerPlugin(
     async (rp) => {
       try {
-        console.log('INC REM COUNTER WIDGET: Starting calculation');
-
         // Listen to URL changes via storage (makes it reactive)
         await rp.storage.getSession(currentDocumentIdKey);
 
@@ -17,83 +15,58 @@ function IncRemCounter() {
         const ctx = await plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
         const documentId = ctx?.documentId;
 
-        console.log('INC REM COUNTER WIDGET: Document ID', documentId);
-
         // Get all incRems from storage (this makes it reactive to incRem changes)
         const allIncRems = (await rp.storage.getSession(allIncrementalRemKey)) || [];
-        console.log('INC REM COUNTER WIDGET: Got allIncRems', allIncRems.length);
 
         // If no document, show all incRems
         if (!documentId) {
-          console.log('INC REM COUNTER WIDGET: No document found, showing all incRems');
           const now = Date.now();
-          const pendingIncRems = allIncRems.filter((incRem) => incRem.nextRepDate <= now);
-          const result = {
-            pending: pendingIncRems.length,
+          const dueIncRems = allIncRems.filter((incRem) => incRem.nextRepDate <= now);
+          return {
+            due: dueIncRems.length,
             total: allIncRems.length,
           };
-          console.log('INC REM COUNTER WIDGET: Returning result (no doc)', result);
-          return result;
         }
 
         const now = Date.now();
 
         // Get all descendants of the current document
-        console.log('INC REM COUNTER WIDGET: Finding document', documentId);
         const currentDoc = await rp.rem.findOne(documentId);
         if (!currentDoc) {
-          console.log('INC REM COUNTER WIDGET: Document not found', documentId);
-          return { pending: 0, total: 0 };
+          return { due: 0, total: 0 };
         }
 
-        console.log('INC REM COUNTER WIDGET: Getting descendants...');
         const descendants = await currentDoc.getDescendants();
-        console.log('INC REM COUNTER WIDGET: Got descendants', descendants.length);
-
         const descendantIds = new Set([documentId, ...descendants.map((d) => d._id)]);
 
         // Filter incRems that belong to this document
         const docIncRems = allIncRems.filter((incRem) => descendantIds.has(incRem.remId));
-        const pendingIncRems = docIncRems.filter((incRem) => incRem.nextRepDate <= now);
+        const dueIncRems = docIncRems.filter((incRem) => incRem.nextRepDate <= now);
 
-        const result = {
-          pending: pendingIncRems.length,
+        return {
+          due: dueIncRems.length,
           total: docIncRems.length,
         };
-
-        console.log('INC REM COUNTER WIDGET: Loaded for document', {
-          documentId: documentId,
-          result,
-          allIncRems: allIncRems.length,
-        });
-
-        return result;
       } catch (error) {
         console.error('INC REM COUNTER WIDGET: Error', error);
-        return { pending: 0, total: 0 };
+        return { due: 0, total: 0 };
       }
     },
     []
   );
 
-  console.log('INC REM COUNTER WIDGET: Rendering', counterData);
-
   // Don't render if loading or no incRems
   if (!counterData) {
-    console.log('INC REM COUNTER WIDGET: Still loading...');
     return null;
   }
 
   if (counterData.total === 0) {
-    console.log('INC REM COUNTER WIDGET: Not rendering (no incRems)');
     return null;
   }
 
   const handleClick = async () => {
     const ctx = await plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
     const documentId = ctx?.documentId;
-
-    console.log('INC REM COUNTER: Opening popup with documentId', documentId);
 
     // Store the documentId in session storage so the popup can read it
     await plugin.storage.setSession('popup_document_id', documentId || null);
@@ -121,7 +94,7 @@ function IncRemCounter() {
         📚 Incremental Rems:
       </span>
       <span style={{ fontWeight: 500 }}>
-        {counterData.pending} pending / {counterData.total} total
+        {counterData.due} due / {counterData.total} total
       </span>
     </div>
   );

@@ -19,70 +19,52 @@ export function IncRemList() {
   const counterData = useTrackerPlugin(
     async (rp) => {
       try {
-        console.log('INC REM LIST: Starting calculation');
-
         // Get the documentId from session storage (set by the counter widget)
         const documentId = await rp.storage.getSession('popup_document_id');
 
-        console.log('INC REM LIST: Document ID from session storage', documentId);
-
         // Get all incRems from storage
         const allIncRems = (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-        console.log('INC REM LIST: Got allIncRems', allIncRems.length);
 
         const now = Date.now();
 
         // If no document, show all incRems
         if (!documentId) {
-          console.log('INC REM LIST: No document found, showing all incRems');
-          const pendingIncRems = allIncRems.filter((incRem) => incRem.nextRepDate <= now);
+          const dueIncRems = allIncRems.filter((incRem) => incRem.nextRepDate <= now);
 
           // Load details for all incRems
           loadIncRemDetails(allIncRems);
 
           return {
-            pending: pendingIncRems.length,
+            due: dueIncRems.length,
             total: allIncRems.length,
             incRems: allIncRems,
           };
         }
 
         // Get all descendants of the current document
-        console.log('INC REM LIST: Finding document', documentId);
         const currentDoc = await rp.rem.findOne(documentId);
         if (!currentDoc) {
-          console.log('INC REM LIST: Document not found', documentId);
-          return { pending: 0, total: 0, incRems: [] };
+          return { due: 0, total: 0, incRems: [] };
         }
 
-        console.log('INC REM LIST: Getting descendants...');
         const descendants = await currentDoc.getDescendants();
-        console.log('INC REM LIST: Got descendants', descendants.length);
-
         const descendantIds = new Set([documentId, ...descendants.map((d) => d._id)]);
 
         // Filter incRems that belong to this document
         const docIncRems = allIncRems.filter((incRem) => descendantIds.has(incRem.remId));
-        const pendingIncRems = docIncRems.filter((incRem) => incRem.nextRepDate <= now);
+        const dueIncRems = docIncRems.filter((incRem) => incRem.nextRepDate <= now);
 
         // Load details for document incRems
         loadIncRemDetails(docIncRems);
 
-        const result = {
-          pending: pendingIncRems.length,
+        return {
+          due: dueIncRems.length,
           total: docIncRems.length,
           incRems: docIncRems,
         };
-
-        console.log('INC REM LIST: Loaded for document', {
-          documentId: documentId,
-          result,
-        });
-
-        return result;
       } catch (error) {
         console.error('INC REM LIST: Error', error);
-        return { pending: 0, total: 0, incRems: [] };
+        return { due: 0, total: 0, incRems: [] };
       }
     },
     []
@@ -159,8 +141,8 @@ export function IncRemList() {
   };
 
   const now = Date.now();
-  const pendingRems = incRemsWithDetails.filter((incRem) => incRem.nextRepDate <= now);
-  const futureRems = incRemsWithDetails.filter((incRem) => incRem.nextRepDate > now);
+  const dueRems = incRemsWithDetails.filter((incRem) => incRem.nextRepDate <= now);
+  const scheduledRems = incRemsWithDetails.filter((incRem) => incRem.nextRepDate > now);
 
   return (
     <div className="flex flex-col h-full" style={{
@@ -181,7 +163,7 @@ export function IncRemList() {
               </h2>
               {counterData && (
                 <div className="text-sm mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                  <span className="font-semibold" style={{ color: '#f97316' }}>{counterData.pending}</span> pending
+                  <span className="font-semibold" style={{ color: '#f97316' }}>{counterData.due}</span> due
                   {' • '}
                   <span className="font-semibold" style={{ color: '#3b82f6' }}>{counterData.total}</span> total
                 </div>
@@ -216,16 +198,16 @@ export function IncRemList() {
           <div className="text-center py-8" style={{ color: 'var(--rn-clr-content-secondary)' }}>No incremental rems found</div>
         ) : (
           <div className="flex flex-col gap-4">
-            {pendingRems.length > 0 && (
+            {dueRems.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <h3 className="font-bold text-sm px-2 py-1" style={{ color: '#f97316' }}>
-                    ⚠️ Pending ({pendingRems.length})
+                    ⚠️ Due ({dueRems.length})
                   </h3>
                   <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }}></div>
                 </div>
                 <div className="flex flex-col gap-3">
-                  {pendingRems.map((incRem) => (
+                  {dueRems.map((incRem) => (
                     <div
                       key={incRem.remId}
                       onClick={() => handleRemClick(incRem.remId)}
@@ -273,16 +255,16 @@ export function IncRemList() {
               </div>
             )}
 
-            {futureRems.length > 0 && (
+            {scheduledRems.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <h3 className="font-bold text-sm px-2 py-1" style={{ color: '#3b82f6' }}>
-                    📅 Scheduled ({futureRems.length})
+                    📅 Scheduled ({scheduledRems.length})
                   </h3>
                   <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }}></div>
                 </div>
                 <div className="flex flex-col gap-3">
-                  {futureRems.map((incRem) => (
+                  {scheduledRems.map((incRem) => (
                     <div
                       key={incRem.remId}
                       onClick={() => handleRemClick(incRem.remId)}
