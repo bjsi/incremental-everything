@@ -89,8 +89,21 @@ function IncRemCounter() {
     return null;
   }
 
+  const handleClick = async () => {
+    const ctx = await plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
+    const documentId = ctx?.documentId;
+
+    console.log('INC REM COUNTER: Opening popup with documentId', documentId);
+
+    // Store the documentId in session storage so the popup can read it
+    await plugin.storage.setSession('popup_document_id', documentId || null);
+
+    await plugin.widget.openPopup('inc_rem_list');
+  };
+
   return (
     <div
+      onClick={handleClick}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -101,6 +114,7 @@ function IncRemCounter() {
         borderBottom: '1px solid var(--rn-clr-border-primary)',
         fontSize: '14px',
         color: 'var(--rn-clr-content-secondary)',
+        cursor: 'pointer',
       }}
     >
       <span style={{ fontWeight: 600, color: 'var(--rn-clr-content-primary)' }}>
