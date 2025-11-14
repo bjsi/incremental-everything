@@ -4,7 +4,7 @@ import {
   useRunAsync,
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
@@ -13,6 +13,24 @@ import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
 
+// Move styles outside component to avoid recreation on every render
+const buttonStyle: React.CSSProperties = {
+  backgroundColor: 'var(--rn-clr-bg-secondary)',
+  border: '1px solid var(--rn-clr-border-primary)',
+  padding: '4px 8px',
+  borderRadius: '4px',
+  fontSize: '12px',
+  cursor: 'pointer',
+  color: 'var(--rn-clr-content-primary)',
+};
+
+const priorityPillStyle: React.CSSProperties = {
+  color: 'white',
+  padding: '2px 6px',
+  borderRadius: '4px',
+  display: 'inline-block',
+  lineHeight: '1.2',
+};
 
 export function PriorityEditor() {
   const plugin = usePlugin();
@@ -27,95 +45,113 @@ export function PriorityEditor() {
     []
   );
 
-  const rem = useTrackerPlugin(
+  // SUPER OPTIMIZED: Combine ALL data fetching into a single hook
+  // This reduces the render cascade from ~9 renders to ~3 renders
+  const remData = useTrackerPlugin(
     async (plugin) => {
       if (!remId) return null;
-      return await plugin.rem.findOne(remId);
-    },
-    [remId]
-  );
 
-  const incRemInfo = useTrackerPlugin(
-    async (plugin) => {
-      if (!rem) return null;
-      return await getIncrementalRemFromRem(plugin, rem);
-    },
-    [rem]
-  );
-
-  const cardInfo = useTrackerPlugin(
-    async (plugin) => {
-      if (!rem) return null;
-      return await getCardPriority(plugin, rem);
-    },
-    [rem, refreshSignal]
-  );
-
-  // Optimized: Combine both card-related queries into a single useTrackerPlugin
-  const cardMetadata = useTrackerPlugin(
-    async (plugin) => {
+      const rem = await plugin.rem.findOne(remId);
       if (!rem) return null;
 
-      // Execute both queries in parallel for better performance
-      const [cards, hasPowerup] = await Promise.all([
+      // Execute ALL queries in parallel for maximum performance
+      const [incRemInfo, cardInfo, cards, hasPowerup, allIncRems, allPrioritizedCardInfo, displayMode] = await Promise.all([
+        getIncrementalRemFromRem(plugin, rem),
+        getCardPriority(plugin, rem),
         rem.getCards(),
-        rem.hasPowerup('cardPriority')
+        rem.hasPowerup('cardPriority'),
+        plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+        plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
+        plugin.settings.getSetting<string>('priorityEditorDisplayMode')
       ]);
 
+      // Calculate relative priorities inline
+      const incRemRelativePriority = (incRemInfo && allIncRems && allIncRems.length > 0)
+        ? calculateRelativePercentile(allIncRems, rem._id)
+        : 50;
+
+      // Calculate card relative priority inline using pre-calculated kbPercentile
+      const cardPriorityInfo = allPrioritizedCardInfo?.find(info => info.remId === rem._id);
+      const cardRelativePriority = cardPriorityInfo?.kbPercentile ?? null;
+
       return {
+        rem,
+        incRemInfo,
+        cardInfo,
         hasCards: cards && cards.length > 0,
-        hasPowerup
+        hasPowerup,
+        incRemRelativePriority,
+        cardRelativePriority,
+        allPrioritizedCardInfo: allPrioritizedCardInfo || [],
+        displayMode: displayMode || 'all'
       };
     },
-    [rem, refreshSignal]
+    [remId, refreshSignal]
   );
 
-  const hasCards = cardMetadata?.hasCards ?? false;
-  const hasCardPriorityPowerup = cardMetadata?.hasPowerup ?? false;
+  const rem = remData?.rem ?? null;
+  const incRemInfo = remData?.incRemInfo ?? null;
+  const cardInfo = remData?.cardInfo ?? null;
+  const hasCards = remData?.hasCards ?? false;
+  const hasCardPriorityPowerup = remData?.hasPowerup ?? false;
+  const incRemRelativePriority = remData?.incRemRelativePriority ?? null;
+  const cardRelativePriority = remData?.cardRelativePriority ?? null;
+  const allPrioritizedCardInfo = remData?.allPrioritizedCardInfo ?? [];
+  const displayMode = remData?.displayMode ?? 'all';
 
-  const incRemRelativePriority = useTrackerPlugin(
-    async (plugin) => {
-      if (!rem || !incRemInfo) return null;
-      const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-      if (allIncRems.length === 0) return 50;
-      return calculateRelativePercentile(allIncRems, rem._id);
-    },
-    [rem, incRemInfo]
-  );
-
-  const allPrioritizedCardInfo = useTrackerPlugin(
-    (rp) => rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-    [refreshSignal]
-  );
-
-  // --- 1. GET THE NEW SETTING ---
-  const displayMode = useTrackerPlugin(
-    async (plugin) =>
-      (await plugin.settings.getSetting<string>('priorityEditorDisplayMode')) || 'all',
-    []
-  );
-
-  const cardRelativePriority = useMemo(() => {
-    if (!rem || !allPrioritizedCardInfo) return null;
-
-    // Use pre-calculated kbPercentile from cache for consistency
-    const cardInfo = allPrioritizedCardInfo.find(info => info.remId === rem._id);
-    return cardInfo?.kbPercentile ?? null;
-  }, [rem, allPrioritizedCardInfo]);
-
-
-  // --- 2. UPDATED RENDER LOGIC ---
-
+  // IMPORTANT: All hooks must be called unconditionally BEFORE any early returns
   // Optimized: Use useMemo to avoid recalculating these conditions on every render
   const canShowIncRem = useMemo(() => !!incRemInfo, [incRemInfo]);
   const canShowCard = useMemo(() => hasCards || hasCardPriorityPowerup, [hasCards, hasCardPriorityPowerup]);
 
+  // Memoize callback functions to avoid recreation on every render
+  const quickUpdateIncPriority = useCallback(async (delta: number) => {
+    if (!incRemInfo || !rem) return;
+    const newPriority = Math.max(0, Math.min(100, incRemInfo.priority + delta));
+    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+
+    // Update the incremental rem cache
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
+    if (updatedIncRem) {
+      await updateIncrementalRemCache(plugin, updatedIncRem);
+    }
+  }, [incRemInfo, rem, plugin]);
+
+  const quickUpdateCardPriority = useCallback(async (delta: number) => {
+    if (!rem) return;
+    const currentPriority = cardInfo?.priority ?? 50;
+    const newPriority = Math.max(0, Math.min(100, currentPriority + delta));
+
+    await setCardPriority(plugin, rem, newPriority, 'manual');
+    await updateCardPriorityCache(plugin, rem._id);
+  }, [rem, cardInfo, plugin]);
+
+  // Memoize calculated colors
+  const incRemColor = useMemo(
+    () => incRemRelativePriority ? percentileToHslColor(incRemRelativePriority) : undefined,
+    [incRemRelativePriority]
+  );
+
+  const cardColor = useMemo(
+    () => cardRelativePriority ? percentileToHslColor(cardRelativePriority) : undefined,
+    [cardRelativePriority]
+  );
+
+  const cardPriorityFontWeight = useMemo(
+    () => cardInfo?.source === 'manual' ? 'bold' : 'normal',
+    [cardInfo?.source]
+  );
+
+  // Memoize computed values
+  const showCardEditor = useMemo(
+    () => (displayMode === 'all') && (hasCards || hasCardPriorityPowerup),
+    [displayMode, hasCards, hasCardPriorityPowerup]
+  );
+
+  // --- RENDER LOGIC (after all hooks) ---
+
   // Optimized: Check if we're still loading critical data before making visibility decisions
-  // We need ALL of these to make correct visibility decisions:
-  // 1. rem - the target rem object
-  // 2. displayMode - the user's display preference setting
-  // 3. cardMetadata - information about cards and powerups
-  const isLoadingCriticalData = !rem || displayMode === undefined || cardMetadata === undefined;
+  const isLoadingCriticalData = !rem || remData === undefined;
 
   if (isLoadingCriticalData) {
     return null; // Still loading, don't render yet
@@ -134,58 +170,6 @@ export function PriorityEditor() {
   if (displayMode === 'all' && !canShowIncRem && !canShowCard) {
     return null; // Mode is 'all' but this is neither an IncRem nor a Card
   }
-  
-  // --- END OF UPDATED RENDER LOGIC ---
-
-
-  const quickUpdateIncPriority = async (delta: number) => {
-    if (!incRemInfo || !rem) return;
-    const newPriority = Math.max(0, Math.min(100, incRemInfo.priority + delta));
-    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
-
-    // Update the incremental rem cache
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-    if (updatedIncRem) {
-      await updateIncrementalRemCache(plugin, updatedIncRem);
-    }
-  };
-
-  const quickUpdateCardPriority = async (delta: number) => {
-    if (!rem) return;
-    const currentPriority = cardInfo?.priority ?? 50; // Use ?? instead of || to handle 0 correctly
-    const newPriority = Math.max(0, Math.min(100, currentPriority + delta));
-    
-    await setCardPriority(plugin, rem, newPriority, 'manual');
-    await updateCardPriorityCache(plugin, rem._id);
-  };
-
-  const buttonStyle: React.CSSProperties = {
-    backgroundColor: 'var(--rn-clr-bg-secondary)',
-    border: '1px solid var(--rn-clr-border-primary)',
-    padding: '4px 8px',
-    borderRadius: '4px',
-    fontSize: '12px',
-    cursor: 'pointer',
-    color: 'var(--rn-clr-content-primary)',
-  };
-  
-  const incRemColor = incRemRelativePriority ? percentileToHslColor(incRemRelativePriority) : undefined;
-  
-  const cardColor = cardRelativePriority ? percentileToHslColor(cardRelativePriority) : undefined;
-
-  const cardPriorityFontWeight = cardInfo?.source === 'manual' ? 'bold' : 'normal';
-
-
-  const priorityPillStyle: React.CSSProperties = {
-    color: 'white',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    display: 'inline-block',
-    lineHeight: '1.2',
-  };
-
-  // --- 3. CONDITIONALLY SHOW CARD EDITOR ---
-  const showCardEditor = (displayMode === 'all') && (hasCards || hasCardPriorityPowerup);
 
   return (
     <div
