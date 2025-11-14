@@ -7,7 +7,7 @@ import {
   RemId,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import {
   getCardPriority,
@@ -344,25 +344,30 @@ function Priority() {
   
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
-    if (!incRemInfo) await rem.addPowerup(powerupCode);
+
+    // Use initIncrementalRem to ensure proper initialization if not already an IncRem
+    if (!incRemInfo) {
+      await initIncrementalRem(plugin, rem);
+    }
+
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
-    
+
     // Get the updated IncRem info and update allIncrementalRemKey
     const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (updatedIncRem) {
       await updateIncrementalRemCache(plugin, updatedIncRem);
     }
-    
+
     // 🔌 Conditionally update session cache
     if (performanceMode === PERFORMANCE_MODE_FULL && sessionCache && originalScopeId) {
       const newIncRemDocPercentiles = { ...sessionCache.incRemDocPercentiles };
       delete newIncRemDocPercentiles[rem._id];
-      
+
       const updatedCache = {
         ...sessionCache,
         incRemDocPercentiles: newIncRemDocPercentiles
       };
-      
+
       await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
     }
   }, [rem, incRemInfo, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode

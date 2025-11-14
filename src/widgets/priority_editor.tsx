@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey } from '../lib/consts';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
@@ -20,6 +20,12 @@ export function PriorityEditor() {
   const remId = widgetContext?.remId;
 
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Listen for cache refresh signal to force re-evaluation of all data
+  const refreshSignal = useTrackerPlugin(
+    (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
+    []
+  );
 
   const rem = useTrackerPlugin(
     async (plugin) => {
@@ -42,23 +48,30 @@ export function PriorityEditor() {
       if (!rem) return null;
       return await getCardPriority(plugin, rem);
     },
-    [rem]
+    [rem, refreshSignal]
   );
 
-  const hasCards = useTrackerPlugin(
+  // Optimized: Combine both card-related queries into a single useTrackerPlugin
+  const cardMetadata = useTrackerPlugin(
     async (plugin) => {
-      if (!rem) return false;
-      const cards = await rem.getCards();
-      return cards && cards.length > 0;
+      if (!rem) return null;
+
+      // Execute both queries in parallel for better performance
+      const [cards, hasPowerup] = await Promise.all([
+        rem.getCards(),
+        rem.hasPowerup('cardPriority')
+      ]);
+
+      return {
+        hasCards: cards && cards.length > 0,
+        hasPowerup
+      };
     },
-    [rem]
+    [rem, refreshSignal]
   );
 
-  // NEW: Tracker to check if the Rem has the cardPriority powerup.
-  const hasCardPriorityPowerup = useTrackerPlugin(async (plugin) => {
-    if (!rem) return false;
-    return await rem.hasPowerup('cardPriority');
-  }, [rem]);
+  const hasCards = cardMetadata?.hasCards ?? false;
+  const hasCardPriorityPowerup = cardMetadata?.hasPowerup ?? false;
 
   const incRemRelativePriority = useTrackerPlugin(
     async (plugin) => {
@@ -72,7 +85,7 @@ export function PriorityEditor() {
 
   const allPrioritizedCardInfo = useTrackerPlugin(
     (rp) => rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-    []
+    [refreshSignal]
   );
 
   // --- 1. GET THE NEW SETTING ---
@@ -84,7 +97,7 @@ export function PriorityEditor() {
 
   const cardRelativePriority = useMemo(() => {
     if (!rem || !allPrioritizedCardInfo) return null;
-    
+
     // Use pre-calculated kbPercentile from cache for consistency
     const cardInfo = allPrioritizedCardInfo.find(info => info.remId === rem._id);
     return cardInfo?.kbPercentile ?? null;
@@ -93,12 +106,23 @@ export function PriorityEditor() {
 
   // --- 2. UPDATED RENDER LOGIC ---
 
-  // Determine what we *can* show based on the rem's properties
-  const canShowIncRem = !!incRemInfo;
-  const canShowCard = hasCards || hasCardPriorityPowerup;
+  // Optimized: Use useMemo to avoid recalculating these conditions on every render
+  const canShowIncRem = useMemo(() => !!incRemInfo, [incRemInfo]);
+  const canShowCard = useMemo(() => hasCards || hasCardPriorityPowerup, [hasCards, hasCardPriorityPowerup]);
 
-  // Handle loading and disabled states first
-  if (!rem || !displayMode || displayMode === 'disable') {
+  // Optimized: Check if we're still loading critical data before making visibility decisions
+  // We need ALL of these to make correct visibility decisions:
+  // 1. rem - the target rem object
+  // 2. displayMode - the user's display preference setting
+  // 3. cardMetadata - information about cards and powerups
+  const isLoadingCriticalData = !rem || displayMode === undefined || cardMetadata === undefined;
+
+  if (isLoadingCriticalData) {
+    return null; // Still loading, don't render yet
+  }
+
+  // Handle disabled state
+  if (displayMode === 'disable') {
     return null;
   }
 
@@ -186,7 +210,7 @@ export function PriorityEditor() {
           className="cursor-pointer p-1 text-center"
           title="Click to expand priority controls"
         >
-          {incRemInfo && ( // This is already conditional
+          {incRemInfo && (
             <div className="mb-1" title={`Inc Priority: ${incRemInfo.priority} (${incRemRelativePriority}%)`}>
               <span style={{ ...priorityPillStyle, backgroundColor: incRemColor, fontSize: '11px' }}>
                 I:{incRemInfo.priority}
@@ -216,7 +240,7 @@ export function PriorityEditor() {
               Priority Control
             </div>
 
-            {incRemInfo && ( // This is already conditional
+            {incRemInfo && (
               <div className="mb-3">
                 <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-blue-600)' }}>
                   Inc Rem ({incRemRelativePriority}%)
