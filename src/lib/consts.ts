@@ -79,3 +79,6 @@ export const editorReviewTimerPriorityKey = 'editor-review-timer-priority';
 export const editorReviewTimerRemNameKey = 'editor-review-timer-rem-name';
 
 export const pdfHighlightColorId = 'pdf-highlight-color'; // Incremental PDF highlight color
+
+// Inc Rem Counter
+export const currentDocumentIdKey = 'current-document-id'; // Tracks the current document ID for the widget
