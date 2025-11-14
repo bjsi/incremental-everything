@@ -1,6 +1,6 @@
 import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
-import { allIncrementalRemKey } from '../lib/consts';
+import { allIncrementalRemKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -20,7 +20,7 @@ export function IncRemList() {
     async (rp) => {
       try {
         // Get the documentId from session storage (set by the counter widget)
-        const documentId = await rp.storage.getSession('popup_document_id');
+        const documentId = await rp.storage.getSession(popupDocumentIdKey);
 
         // Get all incRems from storage
         const allIncRems = (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];

@@ -1,6 +1,6 @@
 import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React from 'react';
-import { allIncrementalRemKey, currentDocumentIdKey } from '../lib/consts';
+import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
 
 function IncRemCounter() {
   const plugin = usePlugin();
@@ -8,11 +8,11 @@ function IncRemCounter() {
   const counterData = useTrackerPlugin(
     async (rp) => {
       try {
-        // Listen to URL changes via storage (makes it reactive)
+        // Trigger reactivity when URL changes (documentId is updated in events.ts)
         await rp.storage.getSession(currentDocumentIdKey);
 
         // Get widget context to determine current document
-        const ctx = await plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
+        const ctx = await rp.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
         const documentId = ctx?.documentId;
 
         // Get all incRems from storage (this makes it reactive to incRem changes)
@@ -69,7 +69,7 @@ function IncRemCounter() {
     const documentId = ctx?.documentId;
 
     // Store the documentId in session storage so the popup can read it
-    await plugin.storage.setSession('popup_document_id', documentId || null);
+    await plugin.storage.setSession(popupDocumentIdKey, documentId || null);
 
     await plugin.widget.openPopup('inc_rem_list');
   };

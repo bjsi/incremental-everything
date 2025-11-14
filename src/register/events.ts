@@ -253,11 +253,12 @@ export function registerURLChangeListener(plugin: ReactRNPlugin) {
       await setCurrentIncrementalRem(plugin, undefined);
     }
 
-    // Update current document ID for the inc rem counter widget
+    // Trigger inc rem counter widget reactivity by updating current document ID
     try {
       const { currentDocumentIdKey } = await import('../lib/consts');
-      // Force a counter update by updating the timestamp
-      await plugin.storage.setSession(currentDocumentIdKey, Date.now());
+      const focusedRem = await plugin.focus.getFocusedRem();
+      const documentId = focusedRem?._id || null;
+      await plugin.storage.setSession(currentDocumentIdKey, documentId);
     } catch (error) {
       console.error('Failed to update document ID for counter:', error);
     }
