@@ -2,7 +2,6 @@ import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sd
 import { pageRangeWidgetId, powerupCode } from '../lib/consts';
 
 export function registerWidgets(plugin: ReactRNPlugin) {
-  // Priority widget registration to handle both IncRem and Cards
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {
     dimensions: {
       width: '500px',
@@ -10,17 +9,12 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // Register the priority editor widget for the right side of editor
-  console.log('Attempting to register priority_editor widget...');
-
   plugin.app.registerWidget('priority_editor', WidgetLocation.RightSideOfEditor, {
     dimensions: {
       height: 'auto',
       width: 'auto',
     },
   });
-
-  console.log('SUCCESS: priority_editor widget registered.');
 
   plugin.app.registerWidget('batch_priority', WidgetLocation.Popup, {
     dimensions: {
@@ -65,12 +59,6 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
     queueItemTypeFilter: QueueItemType.Plugin,
   });
-  console.log(
-    '✅ Widget registered with powerupFilter:',
-    powerupCode,
-    'queueItemTypeFilter:',
-    QueueItemType.Plugin
-  );
 
   plugin.app.registerWidget('answer_buttons', WidgetLocation.FlashcardAnswerButtons, {
     powerupFilter: powerupCode,
@@ -95,7 +83,6 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // No Inc Rem Timer indicator
   plugin.app.registerWidget('no_inc_timer_indicator', WidgetLocation.QueueToolbar, {
     dimensions: {
       width: 'auto',
@@ -133,12 +120,10 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // Register editor review popup
   plugin.app.registerWidget('editor_review', WidgetLocation.Popup, {
     dimensions: { height: 'auto', width: '500px' },
   });
 
-  // Register editor review timer widget
   plugin.app.registerWidget('editor_review_timer', WidgetLocation.DocumentAboveToolbar, {
     dimensions: { height: 'auto', width: '100%' },
   });

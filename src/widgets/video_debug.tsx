@@ -6,7 +6,6 @@ import {
   WidgetLocation,
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
-import React from 'react';
 
 function VideoDebug() {
   const plugin = usePlugin();
