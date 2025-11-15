@@ -1,6 +1,7 @@
 import {
   PluginCommandMenuLocation,
   ReactRNPlugin,
+  BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -9,8 +10,9 @@ import {
   pdfHighlightColorId,
   noIncRemMenuItemId,
   noIncRemTimerKey,
+  pageRangeWidgetId,
 } from '../lib/consts';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
 
 export async function registerMenus(plugin: ReactRNPlugin) {
@@ -168,6 +170,42 @@ export async function registerMenus(plugin: ReactRNPlugin) {
       });
 
       await plugin.widget.openPopup('review_document_creator');
+    },
+  });
+
+  plugin.app.registerMenuItem({
+    id: 'pdf_control_panel_menuitem',
+    location: PluginCommandMenuLocation.DocumentMenu,
+    name: 'PDF Control Panel',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) return;
+
+      const pdfRem = await findPDFinRem(plugin, rem);
+
+      if (!pdfRem) {
+        await plugin.app.toast('No PDF found in this rem or its sources');
+        return;
+      }
+
+      const incrementalRem = await findIncrementalRemForPDF(plugin, pdfRem, false);
+
+      if (!incrementalRem) {
+        await plugin.app.toast('No incremental rem found for this PDF');
+        return;
+      }
+
+      const context = {
+        incrementalRemId: incrementalRem._id,
+        pdfRemId: pdfRem._id,
+        totalPages: 0,
+        currentPage: 1
+      };
+
+      await plugin.storage.setSession('pageRangeContext', context);
+      await plugin.storage.setSession('pageRangePopupOpen', true);
+
+      await plugin.widget.openPopup(pageRangeWidgetId);
     },
   });
 

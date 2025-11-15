@@ -222,13 +222,98 @@ export const addPageToHistory = async (
 };
 
 /**
+ * Finds the incremental rem associated with a PDF.
+ * Searches in this order:
+ * 1. Check if the PDF itself is incremental
+ * 2. Check widget context (if available)
+ * 3. Check parent rem
+ * 4. Search all incremental rems to find one that contains this PDF
+ *
+ * @param plugin - The RemNote plugin instance
+ * @param pdfRem - The PDF rem to find the incremental rem for
+ * @param checkWidgetContext - Whether to check widget context (default: false, use true in Reader)
+ * @returns The incremental rem, or null if not found
+ */
+export const findIncrementalRemForPDF = async (
+  plugin: RNPlugin,
+  pdfRem: PluginRem,
+  checkWidgetContext: boolean = false
+): Promise<PluginRem | null> => {
+  if (await pdfRem.hasPowerup(powerupCode)) {
+    console.log(`[findIncrementalRemForPDF] PDF itself is incremental (${pdfRem._id})`);
+    return pdfRem;
+  }
+
+  if (checkWidgetContext) {
+    try {
+      const widgetContext = await plugin.widget.getWidgetContext();
+      const contextRemId =
+        widgetContext && 'remId' in widgetContext && widgetContext.remId
+          ? widgetContext.remId
+          : null;
+
+      if (contextRemId && contextRemId !== pdfRem._id) {
+        const contextRem = await plugin.rem.findOne(contextRemId);
+        if (contextRem && (await contextRem.hasPowerup(powerupCode))) {
+          console.log(`[findIncrementalRemForPDF] Found via widget context (${contextRem._id})`);
+          return contextRem;
+        }
+      }
+    } catch (e) {
+      console.error('[findIncrementalRemForPDF] Error checking widget context:', e);
+    }
+  }
+
+  if (pdfRem.parent) {
+    try {
+      const parentRem = await plugin.rem.findOne(pdfRem.parent);
+      if (parentRem && (await parentRem.hasPowerup(powerupCode))) {
+        console.log(`[findIncrementalRemForPDF] Found via parent (${parentRem._id})`);
+        return parentRem;
+      }
+    } catch (e) {
+      console.error('[findIncrementalRemForPDF] Error checking parent:', e);
+    }
+  }
+
+  try {
+    const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
+    if (incPowerup) {
+      const allIncRems = await incPowerup.taggedRem();
+      for (const candidateRem of allIncRems) {
+        const foundPDF = await findPDFinRem(plugin, candidateRem, pdfRem._id);
+        if (foundPDF) {
+          console.log(`[findIncrementalRemForPDF] Found via sources search (${candidateRem._id})`);
+          return candidateRem;
+        }
+
+        try {
+          const descendants = await candidateRem.getDescendants();
+          if (descendants.some((desc) => desc._id === pdfRem._id)) {
+            console.log(`[findIncrementalRemForPDF] Found via descendants search (${candidateRem._id})`);
+            return candidateRem;
+          }
+        } catch (e) {
+          // Continue searching other candidates
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[findIncrementalRemForPDF] Error searching incremental rems:', e);
+  }
+
+  console.log(`[findIncrementalRemForPDF] No incremental rem found for PDF ${pdfRem._id}`);
+  return null;
+};
+
+/**
  * Finds a specific PDF Rem within a given Rem or its sources.
  * If targetPdfId is provided, searches for that specific PDF.
  * If not provided, returns the first PDF found.
  */
 export const findPDFinRem = async (
-  plugin: RNPlugin, 
-  rem: PluginRem, 
+  plugin: RNPlugin,
+  rem: PluginRem,
   targetPdfId?: string
 ): Promise<PluginRem | null> => {
   const isUploadedPdf = async (r: PluginRem): Promise<boolean> => {

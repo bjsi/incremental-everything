@@ -21,6 +21,7 @@ import {
   addPageToHistory,
   safeRemTextToString,
   PageRangeContext,
+  findIncrementalRemForPDF,
 } from '../lib/pdfUtils';
 
 interface ReaderProps {
@@ -331,61 +332,7 @@ export function Reader(props: ReaderProps) {
     setCriticalContext(null);
 
     const loadCriticalData = async () => {
-      // 1. Find Incremental Rem (the slow search logic)
-      let incrementalRem = null;
-      
-      // 0. Check if the PDF Rem IS the Incremental Rem.
-      if (await pdfRem.hasPowerup(powerupCode)) {
-        incrementalRem = pdfRem;
-      }
-      
-      // 1-3. Ancestor/Context/KB search (time consuming!)
-      if (!incrementalRem) {
-        // Try to get from widget context / parent
-        try {
-          const widgetContext = await plugin.widget.getWidgetContext();
-          const contextRemId =
-            widgetContext && 'remId' in widgetContext && widgetContext.remId
-              ? (widgetContext.remId as RemId)
-              : null;
-
-          if (contextRemId && contextRemId !== pdfRem._id) {
-            const contextRem = await plugin.rem.findOne(contextRemId);
-            if (contextRem && (await contextRem.hasPowerup(powerupCode))) {
-              incrementalRem = contextRem;
-            }
-          }
-        } catch (e) {}
-        
-        if (!incrementalRem && pdfRem.parent) {
-          try {
-            const parentRem = await plugin.rem.findOne(pdfRem.parent);
-            if (parentRem && (await parentRem.hasPowerup(powerupCode))) {
-              incrementalRem = parentRem;
-            }
-          } catch (e) {}
-        }
-
-        // Search descendants of IncRems in KB (slowest part)
-        if (!incrementalRem) {
-          try {
-            const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
-            if (incPowerup) {
-              const allIncRems = await incPowerup.taggedRem();
-              for (const candidateRem of allIncRems) {
-                // Yield thread periodically during this heavy search
-                if (Math.random() < 0.05) await new Promise(resolve => setTimeout(resolve, 1));
-                
-                const descendants = await candidateRem.getDescendants();
-                if (descendants.some((desc) => desc._id === pdfRem._id)) {
-                  incrementalRem = candidateRem;
-                  break; 
-                }
-              }
-            }
-          } catch (e) {}
-        }
-      }
+      const incrementalRem = await findIncrementalRemForPDF(plugin, pdfRem, true);
 
       const rem = incrementalRem || pdfRem;
       const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled Rem';
