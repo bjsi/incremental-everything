@@ -438,59 +438,166 @@ function PageRangeWidget() {
   });
   
   return (
-    <div 
-      className="flex flex-col p-4 gap-4"
-      style={{ minWidth: '550px', maxWidth: '700px', maxHeight: '95vh', overflowY: 'auto' }}
+    <div
+      className="flex flex-col h-full"
+      style={{
+        minWidth: '600px',
+        maxWidth: '750px',
+        maxHeight: '95vh',
+        backgroundColor: 'var(--rn-clr-background-primary)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+      }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) { 
-          e.preventDefault(); 
-          handleSave(); 
+        if (e.key === 'Enter' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) {
+          e.preventDefault();
+          handleSave();
         }
-        if (e.key === 'Escape' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) { 
-          e.preventDefault(); 
-          handleClose(); 
+        if (e.key === 'Escape' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) {
+          e.preventDefault();
+          handleClose();
         }
       }}
     >
-      <div className="text-2xl font-bold">📄 PDF Control Panel</div>
-      
-      <div className="text-sm rn-clr-content-secondary">
-        Current rem: 
-        <span className="font-semibold"> {currentRemName || '...'}</span>
-        {isCurrentRemIncremental && <span className="ml-2" title="Incremental Rem">⚡</span>}
+      {/* Header */}
+      <div className="px-7 py-6" style={{
+        borderBottom: '1px solid var(--rn-clr-border-primary)',
+        backgroundColor: 'var(--rn-clr-background-secondary)',
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
+      }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="text-4xl" style={{ lineHeight: '1' }}>📄</div>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight" style={{
+                color: 'var(--rn-clr-content-primary)',
+                letterSpacing: '-0.02em'
+              }}>
+                PDF Control Panel
+              </h2>
+              <div className="text-sm mt-1.5 flex items-center gap-2" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                <span className="font-medium">{currentRemName || '...'}</span>
+                {isCurrentRemIncremental && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{
+                      backgroundColor: '#dbeafe',
+                      color: '#1e40af'
+                    }}
+                    title="Incremental Rem"
+                  >
+                    ⚡ Incremental
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-2.5 rounded-xl transition-all"
+            style={{
+              color: 'var(--rn-clr-content-secondary)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title="Close"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto px-7 py-5"
+        style={{ backgroundColor: 'var(--rn-clr-background-primary)' }}
+      >
+
       {/* Current Rem Settings */}
-      <div className="p-3 border rounded dark:border-gray-600">
-        <div className="font-semibold mb-2">Quick Edit - Current Rem Page Range</div>
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-4">
-            <div className="flex items-center gap-2">
-              <label>Start:</label>
+      <div className="p-5 rounded-xl mb-5" style={{
+        backgroundColor: 'var(--rn-clr-background-secondary)',
+        border: '1px solid var(--rn-clr-border-primary)',
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)'
+      }}>
+        <div className="font-bold mb-4 text-base" style={{ color: 'var(--rn-clr-content-primary)' }}>
+          Quick Edit - Current Rem Page Range
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-5">
+            <div className="flex items-center gap-2.5">
+              <label className="font-medium text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start:</label>
               <input
-                ref={inputStartRef} type="number" min="1"
+                ref={inputStartRef}
+                type="number"
+                min="1"
                 value={pageRangeStart}
                 onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
-                className="w-20 text-center p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                className="w-24 text-center p-2 rounded-lg transition-all"
+                style={{
+                  border: '1.5px solid var(--rn-clr-border-primary)',
+                  backgroundColor: 'var(--rn-clr-background-primary)',
+                  color: 'var(--rn-clr-content-primary)',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
             </div>
-            <div className="flex items-center gap-2">
-              <label>End:</label>
+            <div className="flex items-center gap-2.5">
+              <label className="font-medium text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>End:</label>
               <input
-                type="number" min={pageRangeStart}
+                type="number"
+                min={pageRangeStart}
                 value={pageRangeEnd || ''}
                 onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
                 placeholder="No limit"
-                className="w-20 text-center p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                className="w-24 text-center p-2 rounded-lg transition-all"
+                style={{
+                  border: '1.5px solid var(--rn-clr-border-primary)',
+                  backgroundColor: 'var(--rn-clr-background-primary)',
+                  color: 'var(--rn-clr-content-primary)',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
             </div>
           </div>
           {pageRangeStart > 1 || pageRangeEnd > 0 ? (
-            <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-              Range: Pages {pageRangeStart}-{pageRangeEnd || '∞'}
+            <div className="text-sm font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-2" style={{
+              backgroundColor: '#dbeafe',
+              color: '#1e40af',
+              width: 'fit-content'
+            }}>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+              </svg>
+              Pages {pageRangeStart}-{pageRangeEnd || '∞'}
             </div>
           ) : (
-            <div className="text-sm text-gray-700 dark:text-gray-300">No restrictions</div>
+            <div className="text-sm px-3 py-1.5" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              No page range restrictions
+            </div>
           )}
         </div>
       </div>
@@ -499,97 +606,174 @@ function PageRangeWidget() {
       {(() => {
         const unassignedRanges = getUnassignedRanges();
         return unassignedRanges.length > 0 ? (
-          <div className="p-2 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-            <div className="text-sm text-yellow-700 dark:text-yellow-300">
-              <div className="font-semibold">Available page ranges:</div>
-              {/* ** START OF FIX ** */}
-              <div className="text-xs mt-1">
-                {unassignedRanges.map((range, idx) => {
-                  // Determine the end page display value.
-                  const endPageDisplay =
-                    range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
-                  return (
-                    <span key={idx}>
-                      {range.start}-{endPageDisplay}
-                      {idx < unassignedRanges.length - 1 && ', '}
-                    </span>
-                  );
-                })}
-              </div>
-              {/* ** END OF FIX ** */}
+          <div className="p-4 rounded-xl mb-5" style={{
+            backgroundColor: '#fefce8',
+            border: '1.5px solid #fde047',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+          }}>
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-4 h-4" style={{ color: '#ca8a04' }} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <div className="font-bold text-sm" style={{ color: '#92400e' }}>Available page ranges</div>
+            </div>
+            <div className="text-sm font-medium flex flex-wrap gap-2" style={{ color: '#713f12' }}>
+              {unassignedRanges.map((range, idx) => {
+                const endPageDisplay =
+                  range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
+                return (
+                  <span key={idx} className="px-2.5 py-1 rounded-lg" style={{
+                    backgroundColor: '#fef9c3',
+                    color: '#854d0e',
+                    border: '1px solid #fde047'
+                  }}>
+                    {range.start}-{endPageDisplay}
+                  </span>
+                );
+              })}
             </div>
           </div>
         ) : (
-          <div className="p-2 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-            <div className="text-sm text-red-700 dark:text-red-300">
-              ⚠ All pages have been assigned
+          <div className="p-4 rounded-xl mb-5 flex items-center gap-2" style={{
+            backgroundColor: '#fee2e2',
+            border: '1.5px solid #fca5a5',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+          }}>
+            <svg className="w-5 h-5" style={{ color: '#dc2626' }} fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div className="text-sm font-semibold" style={{ color: '#991b1b' }}>
+              All pages have been assigned
             </div>
           </div>
         );
       })()}
 
-      <hr className="dark:border-gray-700" />
+      <div className="flex items-center gap-3 mb-5">
+        <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }}></div>
+        <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+          All Rems
+        </span>
+        <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }}></div>
+      </div>
 
       {/* All Rems Using This PDF (including current) */}
-      <div className="flex flex-col gap-2">
-        <div className="font-semibold">All Rems Using This PDF ({sortedRelatedRems.length})</div>
-        <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <div className="text-2xl">📑</div>
+          <h3 className="font-bold text-base" style={{ color: 'var(--rn-clr-content-primary)' }}>
+            All Rems Using This PDF
+          </h3>
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold" style={{
+            backgroundColor: 'var(--rn-clr-background-tertiary)',
+            color: 'var(--rn-clr-content-secondary)'
+          }}>
+            {sortedRelatedRems.length}
+          </span>
+        </div>
+        <div className="flex flex-col gap-3 max-h-96 overflow-y-auto pr-1">
           {sortedRelatedRems.map((item) => {
             const isCurrentRem = item.remId === contextData?.incrementalRemId;
             const priorityInfo = remPriorities[item.remId];
-            const priorityColor = priorityInfo?.percentile ? 
+            const priorityColor = priorityInfo?.percentile ?
               percentileToHslColor(priorityInfo.percentile) : 'transparent';
-            
+
+            const borderLeftColor = isCurrentRem ? '#10b981' : (item.isIncremental ? '#3b82f6' : 'var(--rn-clr-border-primary)');
+
             return (
-              <div key={item.remId} className={`rounded ${
-                isCurrentRem 
-                  ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700'
-                  : item.isIncremental 
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
-                    : 'bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600'
-              }`}>
+              <div key={item.remId} className="rounded-xl transition-all" style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+                borderLeft: `4px solid ${borderLeftColor}`,
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+              >
                 {/* Main Rem Info - Clickable */}
-                <div 
-                  className="p-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                <div
+                  className="p-4 cursor-pointer transition-all"
                   onClick={() => toggleExpanded(item.remId)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs">{expandedRems.has(item.remId) ? '▼' : '▶'}</span>
-                    {item.isIncremental && <span title="Incremental Rem">⚡</span>}
-                    <div className={`font-medium flex-1 text-sm ${!item.isIncremental ? 'text-gray-700 dark:text-gray-300' : ''}`}>
+                  <div className="flex items-center gap-2.5 mb-2.5">
+                    <span className="text-sm font-medium transition-transform" style={{
+                      color: 'var(--rn-clr-content-secondary)',
+                      transform: expandedRems.has(item.remId) ? 'rotate(90deg)' : 'rotate(0deg)'
+                    }}>
+                      ▶
+                    </span>
+                    {item.isIncremental && <span className="text-base" title="Incremental Rem">⚡</span>}
+                    <div className="font-semibold flex-1 text-base" style={{ color: 'var(--rn-clr-content-primary)' }}>
                       {item.name}
-                      {isCurrentRem && <span className="ml-2 text-xs text-green-600 dark:text-green-400">(current)</span>}
+                      {isCurrentRem && (
+                        <span className="ml-2 text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold" style={{
+                          backgroundColor: '#d1fae5',
+                          color: '#065f46'
+                        }}>
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Current
+                        </span>
+                      )}
                     </div>
                     {/* Priority Badge with Color */}
                     {item.isIncremental && priorityInfo && (
-                      <div 
-                        className="px-2 py-0.5 rounded text-xs font-semibold text-white"
+                      <div
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow-sm"
                         style={{ backgroundColor: priorityColor }}
                         title={`Priority: ${priorityInfo.absolute} (${priorityInfo.percentile}% of KB)`}
                       >
-                        P:{priorityInfo.absolute} ({priorityInfo.percentile}%)
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        {priorityInfo.absolute} <span className="opacity-75">({priorityInfo.percentile}%)</span>
                       </div>
                     )}
                   </div>
                   {item.range ? (
-                    <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                      Pages: {item.range.start} - {item.range.end || '∞'}
+                    <div className="text-sm flex flex-wrap items-center gap-2.5 ml-7" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                      <span className="inline-flex items-center gap-1.5 font-medium">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2a1 1 0 000 2h6a1 1 0 100-2H7zm6 7a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1zm-3 3a1 1 0 100 2h.01a1 1 0 100-2H10zm-4 1a1 1 0 011-1h.01a1 1 0 110 2H7a1 1 0 01-1-1zm1-4a1 1 0 100 2h.01a1 1 0 100-2H7zm2 1a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zm4-4a1 1 0 100 2h.01a1 1 0 100-2H13zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zM7 8a1 1 0 000 2h.01a1 1 0 000-2H7z" clipRule="evenodd" />
+                        </svg>
+                        Pages {item.range.start} - {item.range.end || '∞'}
+                      </span>
                       {item.isIncremental && item.currentPage && (
                         <>
-                          {` • At: ${item.currentPage}`}
+                          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
+                          <span className="font-medium">At: {item.currentPage}</span>
                           {remHistories[item.remId] && (() => {
                             const lastEntry = remHistories[item.remId][remHistories[item.remId].length - 1];
                             if (lastEntry && lastEntry.timestamp) {
                               const date = new Date(lastEntry.timestamp);
-                              return ` (${date.toLocaleDateString('en-US', { 
-                                month: 'numeric', 
-                                day: 'numeric', 
-                                year: '2-digit' 
-                              })}, ${date.toLocaleTimeString('en-US', { 
-                                hour: 'numeric', 
-                                minute: '2-digit',
-                                hour12: true 
-                              })})`;
+                              return (
+                                <span className="text-xs px-2 py-0.5 rounded" style={{
+                                  backgroundColor: 'var(--rn-clr-background-tertiary)',
+                                  color: 'var(--rn-clr-content-tertiary)'
+                                }}>
+                                  {date.toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })} {date.toLocaleTimeString('en-US', {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                  })}
+                                </span>
+                              );
                             }
                             return '';
                           })()}
@@ -597,7 +781,7 @@ function PageRangeWidget() {
                       )}
                     </div>
                   ) : (
-                    <div className={`text-xs mt-1 ${!item.isIncremental ? 'text-gray-600 dark:text-gray-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <div className="text-sm ml-7" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
                       No page range set
                     </div>
                   )}
@@ -605,13 +789,15 @@ function PageRangeWidget() {
                 
                 {/* Expanded Content */}
                 {expandedRems.has(item.remId) && (
-                  <div className="border-t border-gray-300 dark:border-gray-600 p-2">
+                  <div className="pt-3 px-3 pb-3" style={{
+                    borderTop: '1px solid var(--rn-clr-border-primary)'
+                  }}>
                     {/* Action Buttons */}
-                    <div className="flex gap-2 mb-2 flex-wrap">
+                    <div className="flex gap-2 mb-3 flex-wrap">
                       {!item.isIncremental ? (
                         <button
                           onClick={() => handleInitIncrementalRem(item.remId)}
-                          className="px-3 py-1 text-xs rounded"
+                          className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                           style={{
                             backgroundColor: '#10B981',
                             color: 'white',
@@ -625,7 +811,7 @@ function PageRangeWidget() {
                             <>
                               <button
                                 onClick={() => saveRemRange(item.remId)}
-                                className="px-3 py-1 text-xs rounded"
+                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                                 style={{
                                   backgroundColor: '#3B82F6',
                                   color: 'white',
@@ -635,7 +821,7 @@ function PageRangeWidget() {
                               </button>
                               <button
                                 onClick={() => setEditingRemId(null)}
-                                className="px-3 py-1 text-xs rounded"
+                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                                 style={{
                                   backgroundColor: '#6B7280',
                                   color: 'white',
@@ -647,7 +833,7 @@ function PageRangeWidget() {
                           ) : editingPriorityRemId === item.remId ? (
                             <button
                               onClick={() => setEditingPriorityRemId(null)}
-                              className="px-3 py-1 text-xs rounded"
+                              className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                               style={{
                                 backgroundColor: '#6B7280',
                                 color: 'white',
@@ -658,7 +844,7 @@ function PageRangeWidget() {
                           ) : editingHistoryRemId === item.remId ? (
                             <button
                               onClick={() => setEditingHistoryRemId(null)}
-                              className="px-3 py-1 text-xs rounded"
+                              className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                               style={{
                                 backgroundColor: '#6B7280',
                                 color: 'white',
@@ -670,7 +856,7 @@ function PageRangeWidget() {
                             <>
                               <button
                                 onClick={() => startEditingRem(item.remId)}
-                                className="px-3 py-1 text-xs rounded"
+                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                                 style={{
                                   backgroundColor: '#3B82F6',
                                   color: 'white',
@@ -680,7 +866,7 @@ function PageRangeWidget() {
                               </button>
                               <button
                                 onClick={() => startEditingPriority(item.remId)}
-                                className="px-3 py-1 text-xs rounded"
+                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                                 style={{
                                   backgroundColor: '#8B5CF6',
                                   color: 'white',
@@ -688,10 +874,9 @@ function PageRangeWidget() {
                               >
                                 Edit Priority
                               </button>
-                              {/* --- NEW BUTTON --- */}
                               <button
                                 onClick={() => startEditingHistory(item.remId, item.currentPage)}
-                                className="px-3 py-1 text-xs rounded"
+                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                                 style={{
                                   backgroundColor: '#10B981',
                                   color: 'white',
@@ -707,9 +892,12 @@ function PageRangeWidget() {
                     
                     {/* Inline Priority Editor */}
                     {editingPriorityRemId === item.remId && (
-                      <div className="flex flex-col gap-2 mb-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
+                      <div className="flex flex-col gap-2 mb-3 p-3 rounded" style={{
+                        backgroundColor: '#f3e8ff',
+                        border: '1px solid #c084fc'
+                      }}>
                         <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold">Priority:</label>
+                          <label className="text-xs font-semibold" style={{ color: '#6b21a8' }}>Priority:</label>
                           <input
                             type="number"
                             min={0}
@@ -719,7 +907,12 @@ function PageRangeWidget() {
                               ...editingPriorities,
                               [item.remId]: Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
                             })}
-                            className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                            className="w-16 text-xs p-1.5 rounded"
+                            style={{
+                              border: '1px solid var(--rn-clr-border-primary)',
+                              backgroundColor: 'var(--rn-clr-background-primary)',
+                              color: 'var(--rn-clr-content-primary)'
+                            }}
                           />
                           <input
                             type="range"
@@ -733,19 +926,19 @@ function PageRangeWidget() {
                             className="flex-1"
                             style={{ accentColor: percentileToHslColor(
                               calculateRelativePercentile(
-                                allIncrementalRems || [], 
+                                allIncrementalRems || [],
                                 item.remId
                               ) || 50
                             )}}
                           />
                         </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                        <div className="text-xs" style={{ color: '#7c3aed' }}>
                           Lower values = higher priority (0 is highest, 100 is lowest)
                         </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => savePriority(item.remId)}
-                            className="px-3 py-1 text-xs rounded"
+                            className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                             style={{
                               backgroundColor: '#8B5CF6',
                               color: 'white',
@@ -755,7 +948,7 @@ function PageRangeWidget() {
                           </button>
                           <button
                             onClick={() => setEditingPriorityRemId(null)}
-                            className="px-3 py-1 text-xs rounded"
+                            className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                             style={{
                               backgroundColor: '#6B7280',
                               color: 'white',
@@ -769,7 +962,11 @@ function PageRangeWidget() {
                     
                     {/* Page Range Editor */}
                     {editingRemId === item.remId && editingRanges[item.remId] && (
-                      <div className="flex gap-2 mb-2">
+                      <div className="flex gap-2 mb-3 items-center p-3 rounded" style={{
+                        backgroundColor: '#dbeafe',
+                        border: '1px solid #60a5fa'
+                      }}>
+                        <label className="text-xs font-semibold" style={{ color: '#1e40af' }}>Pages:</label>
                         <input
                           ref={(el) => {
                             if (!pageRangeInputRefs.current[item.remId]) {
@@ -801,10 +998,15 @@ function PageRangeWidget() {
                               pageRangeInputRefs.current[item.remId]?.end?.focus();
                             }
                           }}
-                          className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                          className="w-20 text-xs p-1.5 rounded"
+                          style={{
+                            border: '1px solid var(--rn-clr-border-primary)',
+                            backgroundColor: 'var(--rn-clr-background-primary)',
+                            color: 'var(--rn-clr-content-primary)'
+                          }}
                           placeholder="Start"
                         />
-                        <span className="text-xs self-center">to</span>
+                        <span className="text-xs" style={{ color: '#1e40af' }}>to</span>
                         <input
                           ref={(el) => {
                             if (!pageRangeInputRefs.current[item.remId]) {
@@ -836,17 +1038,25 @@ function PageRangeWidget() {
                               pageRangeInputRefs.current[item.remId]?.start?.focus();
                             }
                           }}
-                          className="w-16 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                          className="w-20 text-xs p-1.5 rounded"
+                          style={{
+                            border: '1px solid var(--rn-clr-border-primary)',
+                            backgroundColor: 'var(--rn-clr-background-primary)',
+                            color: 'var(--rn-clr-content-primary)'
+                          }}
                           placeholder="End"
                         />
                       </div>
                     )}
 
-                    {/* --- NEW: Inline History Editor --- */}
+                    {/* Inline History Editor */}
                     {editingHistoryRemId === item.remId && (
-                      <div className="flex flex-col gap-2 mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                      <div className="flex flex-col gap-2 mb-3 p-3 rounded" style={{
+                        backgroundColor: '#d1fae5',
+                        border: '1px solid #34d399'
+                      }}>
                         <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold">End Page:</label>
+                          <label className="text-xs font-semibold" style={{ color: '#065f46' }}>End Page:</label>
                           <input
                             type="number"
                             min={1}
@@ -862,7 +1072,12 @@ function PageRangeWidget() {
                                 setEditingHistoryRemId(null);
                               }
                             }}
-                            className="w-20 text-xs p-1 border rounded dark:bg-gray-700 dark:border-gray-600"
+                            className="w-20 text-xs p-1.5 rounded"
+                            style={{
+                              border: '1px solid var(--rn-clr-border-primary)',
+                              backgroundColor: 'var(--rn-clr-background-primary)',
+                              color: 'var(--rn-clr-content-primary)'
+                            }}
                             placeholder="e.g., 42"
                             autoFocus
                           />
@@ -870,7 +1085,7 @@ function PageRangeWidget() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => saveReadingHistory(item.remId)}
-                            className="px-3 py-1 text-xs rounded"
+                            className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                             style={{
                               backgroundColor: '#10B981',
                               color: 'white',
@@ -880,7 +1095,7 @@ function PageRangeWidget() {
                           </button>
                           <button
                             onClick={() => setEditingHistoryRemId(null)}
-                            className="px-3 py-1 text-xs rounded"
+                            className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
                             style={{
                               backgroundColor: '#6B7280',
                               color: 'white',
@@ -895,13 +1110,20 @@ function PageRangeWidget() {
                     {/* Reading History */}
                     {remHistories[item.remId] && remHistories[item.remId].length > 0 && (
                       <div className="mt-2">
-                        <div className="text-xs font-semibold mb-1">Reading History</div>
-                        <div className="grid grid-cols-3 gap-1 max-h-32 overflow-y-auto">
+                        <div className="text-xs font-semibold mb-2" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                          Reading History
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
                           {remHistories[item.remId].slice(-12).reverse().map((entry, idx) => (
-                            <div key={idx} className="p-1 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                              <div className="text-xs font-semibold">Page {entry.page}</div>
-                              <div className="text-xs text-gray-500">
-                                {new Date(entry.timestamp).toLocaleDateString([], { 
+                            <div key={idx} className="p-2 rounded" style={{
+                              backgroundColor: 'var(--rn-clr-background-primary)',
+                              border: '1px solid var(--rn-clr-border-primary)'
+                            }}>
+                              <div className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                                Page {entry.page}
+                              </div>
+                              <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                                {new Date(entry.timestamp).toLocaleDateString([], {
                                   month: 'numeric',
                                   day: 'numeric'
                                 })} {new Date(entry.timestamp).toLocaleTimeString([], {
@@ -921,52 +1143,97 @@ function PageRangeWidget() {
           })}
         </div>
       </div>
-
-      <hr className="dark:border-gray-700" />
-
-      {/* Actions */}
-      <div className="flex gap-2 pt-2">
-        <button
-          onClick={handleSave}
-          className="flex-1 px-4 py-2 font-semibold rounded"
-          style={{
-            backgroundColor: '#3B82F6',
-            color: 'white',
-            border: 'none',
-          }}
-        >
-          Save Current Rem
-        </button>
-        
-        {(pageRangeStart > 1 || pageRangeEnd > 0) && (
-          <button
-            onClick={handleClear}
-            className="px-4 py-2 font-semibold rounded"
-            style={{
-              backgroundColor: '#E5E7EB',
-              color: '#374151',
-              border: 'none',
-            }}
-          >
-            Clear
-          </button>
-        )}
-        
-        <button
-          onClick={handleClose}
-          className="px-4 py-2 font-semibold rounded"
-          style={{
-            backgroundColor: '#E5E7EB',
-            color: '#374151',
-            border: 'none',
-          }}
-        >
-          Close
-        </button>
       </div>
 
-      <div className="text-xs rn-clr-content-secondary text-center">
-        Press Enter to save current rem, Escape to close
+      {/* Footer Actions */}
+      <div className="px-7 py-5" style={{
+        borderTop: '1px solid var(--rn-clr-border-primary)',
+        backgroundColor: 'var(--rn-clr-background-secondary)',
+        boxShadow: '0 -1px 3px 0 rgba(0, 0, 0, 0.05)'
+      }}>
+        <div className="flex gap-3 mb-3">
+          <button
+            onClick={handleSave}
+            className="flex-1 px-5 py-3 font-bold rounded-xl transition-all shadow-sm"
+            style={{
+              backgroundColor: '#3B82F6',
+              color: 'white',
+              border: 'none',
+              fontSize: '14px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#2563eb';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(59, 130, 246, 0.3), 0 2px 4px -1px rgba(59, 130, 246, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#3B82F6';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+            }}
+          >
+            <span className="inline-flex items-center gap-2">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+              </svg>
+              Save Current Rem
+            </span>
+          </button>
+
+          {(pageRangeStart > 1 || pageRangeEnd > 0) && (
+            <button
+              onClick={handleClear}
+              className="px-5 py-3 font-bold rounded-xl transition-all"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-tertiary)',
+                color: 'var(--rn-clr-content-primary)',
+                border: '1.5px solid var(--rn-clr-border-primary)',
+                fontSize: '14px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)';
+                e.currentTarget.style.borderColor = '#dc2626';
+                e.currentTarget.style.color = '#dc2626';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+                e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary)';
+                e.currentTarget.style.color = 'var(--rn-clr-content-primary)';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <span className="inline-flex items-center gap-2">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Clear
+              </span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center justify-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+          <kbd className="px-2 py-1 rounded font-mono font-semibold" style={{
+            backgroundColor: 'var(--rn-clr-background-tertiary)',
+            border: '1px solid var(--rn-clr-border-primary)',
+            fontSize: '11px'
+          }}>
+            Enter
+          </kbd>
+          <span>to save</span>
+          <span>•</span>
+          <kbd className="px-2 py-1 rounded font-mono font-semibold" style={{
+            backgroundColor: 'var(--rn-clr-background-tertiary)',
+            border: '1px solid var(--rn-clr-border-primary)',
+            fontSize: '11px'
+          }}>
+            Esc
+          </kbd>
+          <span>to close</span>
+        </div>
       </div>
     </div>
   );
