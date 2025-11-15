@@ -79,3 +79,6 @@ export const editorReviewTimerPriorityKey = 'editor-review-timer-priority';
 export const editorReviewTimerRemNameKey = 'editor-review-timer-rem-name';
 
 export const pdfHighlightColorId = 'pdf-highlight-color'; // Incremental PDF highlight color
+
+export const currentDocumentIdKey = 'current-document-id';
+export const popupDocumentIdKey = 'popup-document-id';

@@ -127,4 +127,14 @@ export function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('editor_review_timer', WidgetLocation.DocumentAboveToolbar, {
     dimensions: { height: 'auto', width: '100%' },
   });
+
+  // Register incremental rem counter widget below document title
+  plugin.app.registerWidget('inc_rem_counter', WidgetLocation.DocumentBelowTitle, {
+    dimensions: { height: 'auto', width: '100%' },
+  });
+
+  // Register incremental rem list popup
+  plugin.app.registerWidget('inc_rem_list', WidgetLocation.Popup, {
+    dimensions: { height: '600px', width: '800px' },
+  });
 }
