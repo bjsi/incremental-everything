@@ -56,11 +56,7 @@ async function handleEditorReview(
   ];
   
   await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
-
-  const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-  if (updatedIncRem) {
-    await updateIncrementalRemCache(plugin, updatedIncRem);
-  }
+  // Note: updateSRSDataForRem now updates the cache automatically
 
   return { rem, newNextRepDate };
 }

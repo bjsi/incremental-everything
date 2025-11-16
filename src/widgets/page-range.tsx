@@ -17,7 +17,7 @@ import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/cons
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { updateIncrementalRemCache, getIncrementalRemFromCache, getAllIncrementalRemsFromCache } from '../lib/incremental_rem/cache';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
@@ -34,7 +34,7 @@ function PageRangeWidget() {
   );
 
   const allIncrementalRems = useTrackerPlugin(
-    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+    (rp) => getAllIncrementalRemsFromCache(rp),
     []
   );
 
@@ -118,8 +118,8 @@ function PageRangeWidget() {
   const calculatePriorities = async (rems: any[], allRems?: IncrementalRem[]) => {
     const priorities: Record<string, {absolute: number, percentile: number | null}> = {};
     
-    // Use passed allRems or fetch from storage
-    const remsForCalculation = allRems || (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    // Use passed allRems or fetch from cache
+    const remsForCalculation = allRems || await getAllIncrementalRemsFromCache(plugin);
     
     for (const rem of rems) {
       if (rem.isIncremental) {
@@ -149,7 +149,7 @@ function PageRangeWidget() {
     setRelatedRems(related);
     
     // Ensure we have the latest all incremental rems data
-    const allRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+    const allRems = await getAllIncrementalRemsFromCache(plugin);
     
     // Calculate priorities with the fetched data
     await calculatePriorities(related, allRems);
@@ -262,7 +262,8 @@ function PageRangeWidget() {
         const currentRem = await plugin.rem.findOne(incrementalRemId);
         if (currentRem) {
           const remText = currentRem.text ? await plugin.richText.toString(currentRem.text) : 'Untitled';
-          const isIncremental = await currentRem.hasPowerup(powerupCode);
+          const incInfo = await getIncrementalRemFromCache(plugin, incrementalRemId);
+          const isIncremental = incInfo !== null;
           setCurrentRemName(remText);
           setIsCurrentRemIncremental(isIncremental);
         }

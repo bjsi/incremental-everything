@@ -5,9 +5,9 @@ import {
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
-import { 
-  powerupCode, 
-  seenCardInSessionKey, 
+import {
+  powerupCode,
+  seenCardInSessionKey,
   allCardPriorityInfoKey,
   queueSessionCacheKey,
   cardPriorityCacheRefreshKey,
@@ -16,6 +16,7 @@ import {
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { percentileToHslColor, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
+import { isIncrementalRem } from '../lib/incremental_rem/cache';
 import * as _ from 'remeda';
 
 export function CardPriorityDisplay() {
@@ -49,11 +50,11 @@ export function CardPriorityDisplay() {
     return (await rp.rem.findOne(ctx.remId)) ?? null;
   }, []);
 
-  const isIncRem = useTrackerPlugin(async (_rp) => {
+  const isIncRem = useTrackerPlugin(async (rp) => {
     if (!rem) {
       return false;
     }
-    return rem.hasPowerup(powerupCode);
+    return isIncrementalRem(rp, rem._id);
   }, [rem]);
 
 

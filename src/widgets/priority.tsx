@@ -8,7 +8,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
-import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { updateIncrementalRemCache, removeIncrementalRemCache, getAllIncrementalRemsFromCache } from '../lib/incremental_rem/cache';
 import {
   getCardPriority,
   setCardPriority,
@@ -93,7 +93,7 @@ function Priority() {
       : Promise.resolve(null), 
   [performanceMode]);
   
-  const allIncRems = useTrackerPlugin(async (plugin) => await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [], []);
+  const allIncRems = useTrackerPlugin(async (plugin) => await getAllIncrementalRemsFromCache(plugin), []);
   
   const allCardInfos = useTrackerPlugin(async (plugin) => 
     (performanceMode === PERFORMANCE_MODE_FULL)

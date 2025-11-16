@@ -1,6 +1,7 @@
 import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { powerupCode } from './consts';
 import { getIncrementalRemFromRem } from './incremental_rem';
+import { getIncrementalRemFromCache } from './incremental_rem/cache';
 import { safeRemTextToString } from './pdfUtils';
 
 export interface AncestorPriorityInfo {
@@ -24,33 +25,28 @@ export async function findClosestIncrementalAncestor(
   try {
     // Get the parent ID of the current rem
     let currentParentId = rem.parent;
-    
+
     // Walk up the ancestor chain
     while (currentParentId) {
       // Get the parent rem
       const currentRem = await plugin.rem.findOne(currentParentId);
       if (!currentRem) break;
-      
-      // Check if this ancestor is an incremental rem
-      const hasIncrementalPowerup = await currentRem.hasPowerup(powerupCode);
-      
-      if (hasIncrementalPowerup) {
-        // Get the priority of this incremental ancestor
-        const incRemInfo = await getIncrementalRemFromRem(plugin, currentRem);
-        
-        if (incRemInfo && incRemInfo.priority !== undefined) {
-          // Get the name/text of the ancestor for display
-          const ancestorText = await safeRemTextToString(plugin, currentRem.text);
-          const ancestorName = ancestorText.slice(0, 50) + (ancestorText.length > 50 ? '...' : '');
-          
-          return {
-            priority: incRemInfo.priority,
-            ancestorRem: currentRem,
-            ancestorName: ancestorName
-          };
-        }
+
+      // Check if this ancestor is an incremental rem using cache
+      const incRemInfo = await getIncrementalRemFromCache(plugin, currentParentId);
+
+      if (incRemInfo && incRemInfo.priority !== undefined) {
+        // Get the name/text of the ancestor for display
+        const ancestorText = await safeRemTextToString(plugin, currentRem.text);
+        const ancestorName = ancestorText.slice(0, 50) + (ancestorText.length > 50 ? '...' : '');
+
+        return {
+          priority: incRemInfo.priority,
+          ancestorRem: currentRem,
+          ancestorName: ancestorName
+        };
       }
-      
+
       // Move up to the next ancestor
       currentParentId = currentRem.parent;
     }
@@ -131,15 +127,15 @@ export async function findClosestAncestorWithAnyPriority(
     
     currentLevel++; // Increment level for each parent we check
 
-    // Check for Incremental Rem priority first
-    const parentIncInfo = await getIncrementalRemFromRem(plugin, parent);
+    // Check for Incremental Rem priority first using cache
+    const parentIncInfo = await getIncrementalRemFromCache(plugin, parent._id);
     if (parentIncInfo) {
       const parentName = await safeRemTextToString(plugin, parent.text);
       const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
-      
-      return { 
-        priority: parentIncInfo.priority, 
-        ancestorName: truncatedName, 
+
+      return {
+        priority: parentIncInfo.priority,
+        ancestorName: truncatedName,
         sourceType: 'IncRem',
         level: currentLevel,
         levelDescription: getLevelDescription(currentLevel)

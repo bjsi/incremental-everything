@@ -2,6 +2,7 @@
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, allIncrementalRemKey } from './consts';
 import { IncrementalRem } from './incremental_rem';
+import { isIncrementalRem, getAllIncrementalRemsFromCache } from './incremental_rem/cache';
 
 export interface PageRangeContext {
   incrementalRemId: RemId;
@@ -239,7 +240,7 @@ export const findIncrementalRemForPDF = async (
   pdfRem: PluginRem,
   checkWidgetContext: boolean = false
 ): Promise<PluginRem | null> => {
-  if (await pdfRem.hasPowerup(powerupCode)) {
+  if (await isIncrementalRem(plugin, pdfRem._id)) {
     console.log(`[findIncrementalRemForPDF] PDF itself is incremental (${pdfRem._id})`);
     return pdfRem;
   }
@@ -254,7 +255,7 @@ export const findIncrementalRemForPDF = async (
 
       if (contextRemId && contextRemId !== pdfRem._id) {
         const contextRem = await plugin.rem.findOne(contextRemId);
-        if (contextRem && (await contextRem.hasPowerup(powerupCode))) {
+        if (contextRem && (await isIncrementalRem(plugin, contextRemId))) {
           console.log(`[findIncrementalRemForPDF] Found via widget context (${contextRem._id})`);
           return contextRem;
         }
@@ -267,7 +268,7 @@ export const findIncrementalRemForPDF = async (
   if (pdfRem.parent) {
     try {
       const parentRem = await plugin.rem.findOne(pdfRem.parent);
-      if (parentRem && (await parentRem.hasPowerup(powerupCode))) {
+      if (parentRem && (await isIncrementalRem(plugin, parentRem._id))) {
         console.log(`[findIncrementalRemForPDF] Found via parent (${parentRem._id})`);
         return parentRem;
       }
@@ -277,25 +278,26 @@ export const findIncrementalRemForPDF = async (
   }
 
   try {
-    const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
-    if (incPowerup) {
-      const allIncRems = await incPowerup.taggedRem();
-      for (const candidateRem of allIncRems) {
-        const foundPDF = await findPDFinRem(plugin, candidateRem, pdfRem._id);
-        if (foundPDF) {
-          console.log(`[findIncrementalRemForPDF] Found via sources search (${candidateRem._id})`);
+    // Use cache instead of taggedRem()
+    const allIncRemsData = await getAllIncrementalRemsFromCache(plugin);
+    for (const incRemData of allIncRemsData) {
+      const candidateRem = await plugin.rem.findOne(incRemData.remId);
+      if (!candidateRem) continue;
+
+      const foundPDF = await findPDFinRem(plugin, candidateRem, pdfRem._id);
+      if (foundPDF) {
+        console.log(`[findIncrementalRemForPDF] Found via sources search (${candidateRem._id})`);
+        return candidateRem;
+      }
+
+      try {
+        const descendants = await candidateRem.getDescendants();
+        if (descendants.some((desc) => desc._id === pdfRem._id)) {
+          console.log(`[findIncrementalRemForPDF] Found via descendants search (${candidateRem._id})`);
           return candidateRem;
         }
-
-        try {
-          const descendants = await candidateRem.getDescendants();
-          if (descendants.some((desc) => desc._id === pdfRem._id)) {
-            console.log(`[findIncrementalRemForPDF] Found via descendants search (${candidateRem._id})`);
-            return candidateRem;
-          }
-        } catch (e) {
-          // Continue searching other candidates
-        }
+      } catch (e) {
+        // Continue searching other candidates
       }
     }
   } catch (e) {
@@ -493,12 +495,12 @@ export const getAllIncrementsForPDF = async (
       }
       
       if (foundPDF && foundPDF._id === pdfRemId) {
-        const isIncremental = await rem.hasPowerup(powerupCode);
-        
+        const isIncremental = await isIncrementalRem(plugin, rem._id);
+
         const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
-        const currentPage = isIncremental ? 
+        const currentPage = isIncremental ?
           await getIncrementalReadingPosition(plugin, rem._id, pdfRemId) : null;
-        
+
         result.push({
           remId: rem._id,
           name: remText,
@@ -506,7 +508,7 @@ export const getAllIncrementsForPDF = async (
           currentPage,
           isIncremental
         });
-        
+
         console.log(`✓ ADDED: "${remText}" (Incremental: ${isIncremental}, Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
       }
     }
@@ -561,18 +563,18 @@ export const getAllIncrementsForPDF = async (
     
     for (const remId of knownRemIds) {
       if (processedRemIds.has(remId)) continue;
-      
+
       const rem = await plugin.rem.findOne(remId);
       if (rem) {
-        const isIncremental = await rem.hasPowerup(powerupCode);
+        const isIncremental = await isIncrementalRem(plugin, rem._id);
         const remText = await safeRemTextToString(plugin, rem.text); // FIXED
-        
+
         const foundPDF = await findPDFinRem(plugin, rem);
         if (foundPDF && foundPDF._id === pdfRemId) {
           const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
-          const currentPage = isIncremental ? 
+          const currentPage = isIncremental ?
             await getIncrementalReadingPosition(plugin, rem._id, pdfRemId) : null;
-          
+
           result.push({
             remId: rem._id,
             name: remText,
@@ -581,7 +583,7 @@ export const getAllIncrementsForPDF = async (
             isIncremental
           });
           processedRemIds.add(rem._id);
-          
+
           console.log(`Found known rem: "${remText}" (Incremental: ${isIncremental})`);
         }
       }

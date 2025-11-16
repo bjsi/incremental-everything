@@ -10,7 +10,8 @@ import { safeRemTextToString } from '../lib/pdfUtils';
 import { getCardPriority } from '../lib/card_priority';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
-import { updateCardPriorityCache } from '../lib/card_priority/cache'; // <-- 1. IMPORT ADDED
+import { updateCardPriorityCache } from '../lib/card_priority/cache';
+import { getIncrementalRemFromCache } from '../lib/incremental_rem/cache';
 
 interface RemWithPriority {
   remId: string;
@@ -119,14 +120,14 @@ function BatchCardPriority() {
             // Check if it's manually set (not inherited or default)
             const hasManualCardPriority = hasCardPriority && cardPrioritySource === 'manual';
 
-            // Check for Incremental Rem powerup directly
-            const hasIncremental = await rem.hasPowerup(powerupCode);
+            // Check for Incremental Rem using cache
+            const incInfo = await getIncrementalRemFromCache(plugin, rem._id);
+            const hasIncremental = incInfo !== null;
             let incRemPriority = null;
 
-            if (hasIncremental) {
-              const incInfo = await getIncrementalRemFromRem(plugin, rem);
+            if (hasIncremental && incInfo) {
               console.log(`IncRem detected for "${remText}":`, { hasIncremental, incInfo });
-              if (incInfo && incInfo.priority !== undefined) {
+              if (incInfo.priority !== undefined) {
                 incRemPriority = incInfo.priority;
               }
             }

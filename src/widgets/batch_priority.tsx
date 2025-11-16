@@ -7,14 +7,14 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  powerupCode, 
+import {
+  powerupCode,
   prioritySlotCode,
-  allIncrementalRemKey 
+  allIncrementalRemKey
 } from '../lib/consts';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { updateIncrementalRemCache, getIncrementalRemFromCache, getAllIncrementalRemsFromCache } from '../lib/incremental_rem/cache';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { remToActionItemType } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -82,8 +82,8 @@ function BatchPriority() {
   // Get all incremental rems from storage
   const allIncrementalRems = useTrackerPlugin(
     (rp) => {
-      console.log('📊 BatchPriority: Fetching all incremental rems from storage');
-      return rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);
+      console.log('📊 BatchPriority: Fetching all incremental rems from cache');
+      return getAllIncrementalRemsFromCache(rp);
     },
     []
   );
@@ -129,49 +129,45 @@ useEffect(() => {
       console.log('   - Total rems to check:', allRemsToCheck.length);
       
       const incrementalData: IncrementalRemData[] = [];
-      
-      // Check each rem for incremental powerup - process ALL rems in the hierarchy
-      console.log('🔎 BatchPriority: Checking each rem for incremental powerup...');
-      
+
+      // Check each rem for incremental powerup using cache - process ALL rems in the hierarchy
+      console.log('🔎 BatchPriority: Checking each rem for incremental powerup (using cache)...');
+
       for (const rem of allRemsToCheck) {
         try {
-          const hasIncremental = await rem.hasPowerup(powerupCode);
-          
-          if (hasIncremental) {
+          // Use cache instead of hasPowerup API call
+          const incInfo = await getIncrementalRemFromCache(plugin, rem._id);
+
+          if (incInfo) {
             console.log(`   ✓ Found incremental rem:`, rem._id);
-            
-            const incInfo = await getIncrementalRemFromRem(plugin, rem);
-            if (incInfo) {
-              const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled';
-              console.log(`     - Name: ${remText}, Priority: ${incInfo.priority}`);
-              
-              // Calculate depth and path for hierarchy display
-              const { path, pathIds } = await getRemPathWithIds(plugin, rem, focusedRemId);
-              const depth = rem._id === focusedRemId ? 0 : path.length - 1;
-              
-              // Determine type using the existing remToActionItemType function
-              const actionItem = await remToActionItemType(plugin, rem);
-              const remType = actionItem?.type || 'rem';
-              
-              incrementalData.push({
-                remId: rem._id,
-                rem: rem,
-                name: remText,
-                currentPriority: incInfo.priority,
-                newPriority: null,
-                type: remType,
-                nextRepDate: incInfo.nextRepDate,
-                repetitions: incInfo.history?.length || 0,
-                depth: depth,
-                path: path,
-                pathIds: pathIds,
-                isChecked: true,
-                percentile: allIncrementalRems ?
-                  calculateRelativePercentile(allIncrementalRems, rem._id) : null
-              });
-            } else {
-              console.log(`     ⚠️ Could not get incremental info for rem:`, rem._id);
-            }
+
+            const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled';
+            console.log(`     - Name: ${remText}, Priority: ${incInfo.priority}`);
+
+            // Calculate depth and path for hierarchy display
+            const { path, pathIds } = await getRemPathWithIds(plugin, rem, focusedRemId);
+            const depth = rem._id === focusedRemId ? 0 : path.length - 1;
+
+            // Determine type using the existing remToActionItemType function
+            const actionItem = await remToActionItemType(plugin, rem);
+            const remType = actionItem?.type || 'rem';
+
+            incrementalData.push({
+              remId: rem._id,
+              rem: rem,
+              name: remText,
+              currentPriority: incInfo.priority,
+              newPriority: null,
+              type: remType,
+              nextRepDate: incInfo.nextRepDate,
+              repetitions: incInfo.history?.length || 0,
+              depth: depth,
+              path: path,
+              pathIds: pathIds,
+              isChecked: true,
+              percentile: allIncrementalRems ?
+                calculateRelativePercentile(allIncrementalRems, rem._id) : null
+            });
           }
         } catch (remError) {
           console.error(`   ❌ Error checking rem:`, remError);

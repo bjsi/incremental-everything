@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PluginRem, RNPlugin, DocumentViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
 import { powerupCode } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { isIncrementalRem } from '../lib/incremental_rem/cache';
 
 interface ExtractViewerProps {
   rem: PluginRem;
@@ -119,7 +120,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
           const batchResults = await Promise.all(
               batch.map(async (r) => ({
                   remId: r._id,
-                  isIncremental: await r.hasPowerup(powerupCode),
+                  isIncremental: await isIncrementalRem(plugin, r._id),
                   cards: await r.getCards(),
               }))
           );

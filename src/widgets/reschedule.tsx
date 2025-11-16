@@ -61,11 +61,7 @@ async function handleRescheduleAndPriorityUpdate(
   ];
   
   await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
-
-  const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-  if (updatedIncRem) {
-    await updateIncrementalRemCache(plugin, updatedIncRem);
-  }
+  // Note: updateSRSDataForRem now updates the cache automatically
 
   // Clear the start time (same as Next button does)
   await plugin.storage.setSession('increm-review-start-time', null);
