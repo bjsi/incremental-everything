@@ -2,6 +2,15 @@ import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remn
 import React from 'react';
 import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
 
+// Inject CSS for hover effects
+const style = document.createElement('style');
+style.textContent = `
+  .inc-rem-view-all-button:hover {
+    background-color: var(--rn-clr-background-primary) !important;
+  }
+`;
+document.head.appendChild(style);
+
 function IncRemCounter() {
   const plugin = usePlugin();
 
@@ -74,28 +83,60 @@ function IncRemCounter() {
     await plugin.widget.openPopup('inc_rem_list');
   };
 
+  const handleMainViewClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await plugin.widget.openPopup('inc_rem_main_view');
+  };
+
   return (
     <div
-      onClick={handleClick}
       style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         gap: '8px',
         padding: '8px 16px',
         backgroundColor: 'var(--rn-clr-background-secondary)',
         borderBottom: '1px solid var(--rn-clr-border-primary)',
         fontSize: '14px',
         color: 'var(--rn-clr-content-secondary)',
-        cursor: 'pointer',
       }}
     >
-      <span style={{ fontWeight: 600, color: 'var(--rn-clr-content-primary)' }}>
-        📚 Incremental Rems:
-      </span>
-      <span style={{ fontWeight: 500 }}>
-        {counterData.due} due / {counterData.total} total
-      </span>
+      <div
+        onClick={handleClick}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          flex: 1,
+        }}
+      >
+        <span style={{ fontWeight: 600, color: 'var(--rn-clr-content-primary)' }}>
+          📚 Incremental Rems:
+        </span>
+        <span style={{ fontWeight: 500 }}>
+          {counterData.due} due / {counterData.total} total
+        </span>
+      </div>
+      <button
+        onClick={handleMainViewClick}
+        className="inc-rem-view-all-button"
+        style={{
+          padding: '4px 12px',
+          fontSize: '13px',
+          fontWeight: 500,
+          borderRadius: '4px',
+          backgroundColor: 'var(--rn-clr-background-tertiary)',
+          color: 'var(--rn-clr-content-primary)',
+          border: '1px solid var(--rn-clr-border-primary)',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        }}
+        title="Open main view with filters (Opt+Shift+I)"
+      >
+        📊 View All
+      </button>
     </div>
   );
 }
