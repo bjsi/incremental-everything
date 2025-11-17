@@ -518,6 +518,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerCommand({
+    id: 'open-inc-rem-main-view',
+    name: 'Open Incremental Rems Main View',
+    keyboardShortcut: 'opt+shift+i',
+    action: async () => {
+      await plugin.widget.openPopup('inc_rem_main_view');
+    },
+  });
+
+  plugin.app.registerCommand({
     id: 'test-mobile-detection',
     name: '🧪 Test Mobile & Platform Detection',
     action: async () => {

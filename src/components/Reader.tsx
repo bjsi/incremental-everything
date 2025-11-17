@@ -5,7 +5,7 @@ import {
   BuiltInPowerupCodes,
   RemId,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { activeHighlightIdKey, powerupCode, pageRangeWidgetId } from '../lib/consts';
 import {
   HTMLActionItem,
