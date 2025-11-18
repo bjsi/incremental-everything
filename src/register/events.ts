@@ -1,4 +1,4 @@
-import { AppEvents, ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
+import { AppEvents, ReactRNPlugin, RemId, BuiltInPowerupCodes, RichTextElementRemInterface } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
@@ -40,6 +40,7 @@ import {
 } from '../lib/shield_history';
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
+import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -95,13 +96,20 @@ async function buildComprehensiveScope(
     })
     .filter((id): id is RemId => id !== null && id !== undefined);
 
+  // Collect PDF sources from scopeRem and all descendants
+  const { pdfSourceIds } = await collectPdfSourcesFromRems([scopeRem, ...descendants]);
+
+  // Find PDF extracts that belong to PDF sources
+  const pdfExtractIds = await findPdfExtractIds(plugin, pdfSourceIds);
+
   return new Set<RemId>([
     scopeRem._id,
     ...descendants.map(r => r._id),
     ...allRemsInContext.map(r => r._id),
     ...folderQueueRems.map(r => r._id),
     ...sources.map(r => r._id),
-    ...referencingRems
+    ...referencingRems,
+    ...pdfExtractIds
   ]);
 }
 
