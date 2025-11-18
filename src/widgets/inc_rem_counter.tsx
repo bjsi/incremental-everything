@@ -1,6 +1,7 @@
 import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React from 'react';
 import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
+import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
 
 // Inject CSS for hover effects
 const style = document.createElement('style');
@@ -47,6 +48,13 @@ function IncRemCounter() {
 
         const descendants = await currentDoc.getDescendants();
         const descendantIds = new Set([documentId, ...descendants.map((d) => d._id)]);
+
+        // Collect PDF sources from document and descendants, then find their extracts
+        const { pdfSourceIds } = await collectPdfSourcesFromRems([currentDoc, ...descendants]);
+        const pdfExtractIds = await findPdfExtractIds(rp, pdfSourceIds);
+
+        // Add PDF extract IDs to the set
+        pdfExtractIds.forEach(id => descendantIds.add(id));
 
         // Filter incRems that belong to this document
         const docIncRems = allIncRems.filter((incRem) => descendantIds.has(incRem.remId));

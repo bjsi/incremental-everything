@@ -16,6 +16,7 @@ import {
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
+import { buildQuickScope } from '../lib/scope_helpers';
 
 const QUEUE_LAYOUT_FIX_CSS = `
   .rn-queue {
@@ -86,17 +87,15 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       if (queueInfo.subQueueId && docScopeRemIds === null) {
         console.log('⚠️ GetNextCard: Session cache not ready yet. Calculating scope on-the-fly...');
 
-        const scopeRem = await plugin.rem.findOne(queueInfo.subQueueId);
-        if (!scopeRem) {
-          console.log('❌ GetNextCard: Could not find scope Rem. Returning null.');
+        const itemSelectionScope = await buildQuickScope(plugin, queueInfo.subQueueId);
+
+        if (itemSelectionScope.size === 0) {
+          console.log('❌ GetNextCard: Could not build scope. Returning null.');
           return null;
         }
 
-        const descendants = await scopeRem.getDescendants();
-        const itemSelectionScope = new Set<RemId>([scopeRem._id, ...descendants.map((r) => r._id)]);
-
         docScopeRemIds = Array.from(itemSelectionScope);
-        console.log(`✅ GetNextCard: Calculated on-the-fly scope with ${docScopeRemIds.length} items`);
+        console.log(`✅ GetNextCard: Calculated on-the-fly scope with ${docScopeRemIds.length} items (including PDF extracts)`);
       }
 
       const cardsPerRem = await getCardsPerRem(plugin);

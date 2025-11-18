@@ -2,6 +2,7 @@ import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remn
 import React, { useState } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
+import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
@@ -49,6 +50,13 @@ export function IncRemList() {
 
         const descendants = await currentDoc.getDescendants();
         const descendantIds = new Set([documentId, ...descendants.map((d) => d._id)]);
+
+        // Collect PDF sources from document and descendants, then find their extracts
+        const { pdfSourceIds } = await collectPdfSourcesFromRems([currentDoc, ...descendants]);
+        const pdfExtractIds = await findPdfExtractIds(rp, pdfSourceIds);
+
+        // Add PDF extract IDs to the set
+        pdfExtractIds.forEach(id => descendantIds.add(id));
 
         // Filter incRems that belong to this document
         const docIncRems = allIncRems.filter((incRem) => descendantIds.has(incRem.remId));
