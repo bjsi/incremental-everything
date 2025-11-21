@@ -2,6 +2,8 @@ import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remn
 import React from 'react';
 import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
 import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
+import '../style.css';
+import '../App.css';
 
 // Inject CSS for hover effects
 const style = document.createElement('style');
