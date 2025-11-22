@@ -20,6 +20,13 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 - Stay tunned and see the latest changes in the [Changelog](https://github.com/bjsi/incremental-everything/wiki/Changelog).
 - For more information, please see the [User's Manual in the project wiki](https://github.com/bjsi/incremental-everything/wiki).
 
+### 🎥 Videos about the basics
+
+- **Introductory Video**: [Incremental Reading in RemNote](https://youtu.be/SL7wjgntrbg?si=MwsqzyCeI3LwY9Ag)
+
+- **What is Incremental Reading?**: [Incremental Journey - Incremental Reading in Simple Terms](https://youtu.be/V4xEziM8mco?si=PlL1Qs-26wuh0YyS)
+
+
 
 ## Usage
 
