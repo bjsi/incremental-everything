@@ -5,6 +5,7 @@ import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemFromRem } from './incremental_rem';
+import { updateIncrementalRemCache } from './incremental_rem/cache';
 import { getDailyDocReferenceForDate } from './utils';
 dayjs.extend(relativeTime);
 
@@ -132,4 +133,13 @@ export async function updateSRSDataForRem(
   }
   await rem?.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateReference);
   await rem?.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(newHistory)]);
+
+  // Update cache with fresh data
+  if (rem) {
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
+    if (updatedIncRem) {
+      await updateIncrementalRemCache(plugin, updatedIncRem);
+      console.log('✅ Cache updated for rem', remId);
+    }
+  }
 }

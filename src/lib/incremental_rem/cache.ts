@@ -4,6 +4,60 @@ import { IncrementalRem } from './types';
 import { getIncrementalRemFromRem } from './index';
 
 /**
+ * Checks if a rem is in the incremental cache (i.e., is an incremental rem).
+ *
+ * This is the preferred way to check if a rem has the incremental powerup,
+ * as it uses the cache instead of making API calls.
+ *
+ * @param plugin Plugin instance
+ * @param remId The ID of the rem to check
+ * @returns Promise that resolves to true if the rem is incremental, false otherwise
+ */
+export async function isIncrementalRem(
+  plugin: RNPlugin,
+  remId: string | undefined
+): Promise<boolean> {
+  if (!remId) return false;
+  const allRems: IncrementalRem[] =
+    (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+  return allRems.some((r) => r.remId === remId);
+}
+
+/**
+ * Gets all incremental rems from the cache.
+ *
+ * This is the preferred way to get all incremental rem data,
+ * as it uses the cache instead of making API calls.
+ *
+ * @param plugin Plugin instance
+ * @returns Promise that resolves to array of all IncrementalRem objects
+ */
+export async function getAllIncrementalRemsFromCache(
+  plugin: RNPlugin
+): Promise<IncrementalRem[]> {
+  return (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+}
+
+/**
+ * Gets an incremental rem from the cache.
+ *
+ * This is the preferred way to get incremental rem data,
+ * as it uses the cache instead of making API calls.
+ *
+ * @param plugin Plugin instance
+ * @param remId The ID of the rem to get
+ * @returns Promise that resolves to the IncrementalRem if found, null otherwise
+ */
+export async function getIncrementalRemFromCache(
+  plugin: RNPlugin,
+  remId: string | undefined
+): Promise<IncrementalRem | null> {
+  if (!remId) return null;
+  const allRems = await getAllIncrementalRemsFromCache(plugin);
+  return allRems.find((r) => r.remId === remId) || null;
+}
+
+/**
  * Updates the incremental rem cache in session storage.
  *
  * This helper function updates a single rem in the cache by:
