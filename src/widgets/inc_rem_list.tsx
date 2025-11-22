@@ -5,6 +5,8 @@ import { IncrementalRem } from '../lib/incremental_rem';
 import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import '../style.css';
+import '../App.css';
 
 dayjs.extend(relativeTime);
 
