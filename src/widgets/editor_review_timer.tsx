@@ -104,11 +104,7 @@ function EditorReviewTimer() {
     ];
     
     await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
-
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-    if (updatedIncRem) {
-      await updateIncrementalRemCache(plugin, updatedIncRem);
-    }
+    // Note: updateSRSDataForRem now updates the cache automatically
 
     // Clear timer data
     await plugin.storage.setSession('editor-review-timer-rem-id', null);

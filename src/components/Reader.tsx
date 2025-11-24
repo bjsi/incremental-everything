@@ -23,6 +23,7 @@ import {
   PageRangeContext,
   findIncrementalRemForPDF,
 } from '../lib/pdfUtils';
+import { isIncrementalRem } from '../lib/incremental_rem/cache';
 
 interface ReaderProps {
   actionItem: PDFActionItem | PDFHighlightActionItem | HTMLActionItem | HTMLHighlightActionItem;
@@ -417,7 +418,7 @@ export function Reader(props: ReaderProps) {
         const batchResults = await Promise.all(
           batch.map(async (r) => ({
             remId: r._id,
-            isIncremental: await r.hasPowerup(powerupCode),
+            isIncremental: await isIncrementalRem(plugin, r._id),
             cards: await r.getCards(),
           }))
         );

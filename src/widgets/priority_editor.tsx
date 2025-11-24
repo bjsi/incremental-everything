@@ -6,7 +6,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { useMemo, useState, useCallback } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { updateIncrementalRemCache, getAllIncrementalRemsFromCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
@@ -60,7 +60,7 @@ export function PriorityEditor() {
         getCardPriority(plugin, rem),
         rem.getCards(),
         rem.hasPowerup('cardPriority'),
-        plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+        getAllIncrementalRemsFromCache(plugin),
         plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
         plugin.settings.getSetting<string>('priorityEditorDisplayMode')
       ]);
