@@ -224,7 +224,21 @@ function PageRangeWidget() {
   const startEditingHistory = (remId: string, currentPage: number | null) => {
     setEditingHistoryRemId(remId);
     // Pre-fill with the current page to make it easier to increment
-    setEditingHistoryPage(currentPage || 0); 
+    // If currentPage is not set, try to get the last page from history
+    if (currentPage && currentPage > 0) {
+      setEditingHistoryPage(currentPage);
+    } else {
+      // Check if we have history for this rem
+      const history = remHistories[remId];
+      if (history && history.length > 0) {
+        // Use the last recorded page from history
+        const lastEntry = history[history.length - 1];
+        setEditingHistoryPage(lastEntry.page);
+      } else {
+        // Default to 1 if no history exists
+        setEditingHistoryPage(1);
+      }
+    }
   };
   
   // --- NEW: Save reading history record ---
