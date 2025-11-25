@@ -2,7 +2,7 @@ import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remn
 import React, { useState } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
+import { buildDocumentScope } from '../lib/scope_helpers';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import '../style.css';
@@ -44,24 +44,14 @@ export function IncRemList() {
           };
         }
 
-        // Get all descendants of the current document
-        const currentDoc = await rp.rem.findOne(documentId);
-        if (!currentDoc) {
+        // Build document scope (includes descendants, PDF sources, PDF highlights, PDF descendants)
+        const documentScope = await buildDocumentScope(rp, documentId);
+        if (documentScope.size === 0) {
           return { due: 0, total: 0, incRems: [] };
         }
 
-        const descendants = await currentDoc.getDescendants();
-        const descendantIds = new Set([documentId, ...descendants.map((d) => d._id)]);
-
-        // Collect PDF sources from document and descendants, then find their extracts
-        const { pdfSourceIds } = await collectPdfSourcesFromRems([currentDoc, ...descendants]);
-        const pdfExtractIds = await findPdfExtractIds(rp, pdfSourceIds);
-
-        // Add PDF extract IDs to the set
-        pdfExtractIds.forEach(id => descendantIds.add(id));
-
         // Filter incRems that belong to this document
-        const docIncRems = allIncRems.filter((incRem) => descendantIds.has(incRem.remId));
+        const docIncRems = allIncRems.filter((incRem) => documentScope.has(incRem.remId));
         const dueIncRems = docIncRems.filter((incRem) => incRem.nextRepDate <= now);
 
         // Load details for document incRems

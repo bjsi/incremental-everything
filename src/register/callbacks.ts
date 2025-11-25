@@ -16,7 +16,7 @@ import {
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
-import { buildQuickScope } from '../lib/scope_helpers';
+import { buildDocumentScope } from '../lib/scope_helpers';
 
 const QUEUE_LAYOUT_FIX_CSS = `
   .rn-queue {
@@ -87,7 +87,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       if (queueInfo.subQueueId && docScopeRemIds === null) {
         console.log('⚠️ GetNextCard: Session cache not ready yet. Calculating scope on-the-fly...');
 
-        const itemSelectionScope = await buildQuickScope(plugin, queueInfo.subQueueId);
+        const itemSelectionScope = await buildDocumentScope(plugin, queueInfo.subQueueId);
 
         if (itemSelectionScope.size === 0) {
           console.log('❌ GetNextCard: Could not build scope. Returning null.');
