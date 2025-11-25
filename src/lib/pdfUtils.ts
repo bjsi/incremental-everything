@@ -612,8 +612,7 @@ export const getAllIncrementsForPDF = async (
         const isIncremental = await rem.hasPowerup(powerupCode);
         
         const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
-        const currentPage = isIncremental ? 
-          await getIncrementalReadingPosition(plugin, rem._id, pdfRemId) : null;
+        const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
         
         result.push({
           remId: rem._id,
@@ -686,8 +685,7 @@ export const getAllIncrementsForPDF = async (
         const foundPDF = await findPDFinRem(plugin, rem);
         if (foundPDF && foundPDF._id === pdfRemId) {
           const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
-          const currentPage = isIncremental ? 
-            await getIncrementalReadingPosition(plugin, rem._id, pdfRemId) : null;
+          const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
           
           result.push({
             remId: rem._id,

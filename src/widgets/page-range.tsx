@@ -11,13 +11,38 @@ import {
   getAllIncrementsForPDF,
   getIncrementalPageRange,
   setIncrementalReadingPosition,
-  addPageToHistory
+  addPageToHistory,
+  getReadingStatistics,
+  PageHistoryEntry
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+
+/**
+ * Format seconds into a human-readable duration string
+ */
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds === 0) return '';
+  
+  if (seconds < 60) {
+    return `${seconds}s`;
+  } else if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return remainingSeconds > 0 
+      ? `${minutes}m ${remainingSeconds}s`
+      : `${minutes}m`;
+  } else {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return minutes > 0
+      ? `${hours}h ${minutes}m`
+      : `${hours}h`;
+  }
+}
 
 function PageRangeWidget() {
   const plugin = usePlugin();
@@ -42,21 +67,21 @@ function PageRangeWidget() {
   const [pageRangeEnd, setPageRangeEnd] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [relatedRems, setRelatedRems] = useState<any[]>([]);
-  const [pageHistory, setPageHistory] = useState<Array<{page: number, timestamp: number}>>([]);
+  const [pageHistory, setPageHistory] = useState<PageHistoryEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [currentRemName, setCurrentRemName] = useState<string>('');
   const [isCurrentRemIncremental, setIsCurrentRemIncremental] = useState<boolean>(false);
-  const [remHistories, setRemHistories] = useState<Record<string, Array<{page: number, timestamp: number}>>>({});
+  const [remHistories, setRemHistories] = useState<Record<string, PageHistoryEntry[]>>({});
   const [expandedRems, setExpandedRems] = useState<Set<string>>(new Set());
   const [editingRemId, setEditingRemId] = useState<string | null>(null);
   const [editingRanges, setEditingRanges] = useState<Record<string, {start: number, end: number}>>({});
   const [remPriorities, setRemPriorities] = useState<Record<string, {absolute: number, percentile: number | null}>>({});
   const [editingPriorityRemId, setEditingPriorityRemId] = useState<string | null>(null);
   const [editingPriorities, setEditingPriorities] = useState<Record<string, number>>({});
-  
-  // --- NEW: State for the history editor ---
   const [editingHistoryRemId, setEditingHistoryRemId] = useState<string | null>(null);
   const [editingHistoryPage, setEditingHistoryPage] = useState<number>(0);
+  const [remStatistics, setRemStatistics] = useState<Record<string, any>>({});
+  const [totalPdfReadingTime, setTotalPdfReadingTime] = useState<number>(0);
 
   const handleInitIncrementalRem = async (remId: string) => {
     try {
@@ -141,8 +166,7 @@ function PageRangeWidget() {
     setRemPriorities(priorities);
   };
 
-  // Reload the related rems list
-  const reloadRelatedRems = async () => {
+    const reloadRelatedRems = async () => {
     if (!contextData?.pdfRemId) return;
     
     const related = await getAllIncrementsForPDF(plugin, contextData.pdfRemId);
@@ -154,18 +178,29 @@ function PageRangeWidget() {
     // Calculate priorities with the fetched data
     await calculatePriorities(related, allRems);
     
-    // Fetch reading histories for each related rem
-    const histories: Record<string, Array<{page: number, timestamp: number}>> = {};
+    // Fetch reading histories and statistics for each related rem
+    const histories: Record<string, PageHistoryEntry[]> = {}; // CHANGED TYPE
+    const statistics: Record<string, any> = {}; // ADD THIS LINE
+    let totalTime = 0; // ADD THIS LINE
+    
     for (const item of related) {
-      if (item.currentPage) {
+        // Always fetch stats if it's a related rem
         const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
         if (history.length > 0) {
-          histories[item.remId] = history;
+            histories[item.remId] = history;
         }
-      }
+        
+        // ADD THESE LINES
+        const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
+        statistics[item.remId] = stats;
+        totalTime += stats.totalTimeSeconds;
+        
     }
+    
     setRemHistories(histories);
-  };
+    setRemStatistics(statistics); // ADD THIS LINE
+    setTotalPdfReadingTime(totalTime); // ADD THIS LINE
+    };
 
   // Toggle expanded state for a rem
   const toggleExpanded = (remId: string) => {
@@ -223,8 +258,21 @@ function PageRangeWidget() {
   // --- NEW: Start editing history ---
   const startEditingHistory = (remId: string, currentPage: number | null) => {
     setEditingHistoryRemId(remId);
-    // Pre-fill with the current page to make it easier to increment
-    setEditingHistoryPage(currentPage || 0); 
+    // If currentPage is not set, try to get the last page from history
+    if (currentPage && currentPage > 0) {
+      setEditingHistoryPage(currentPage);
+    } else {
+      // Check if we have history for this rem
+      const history = remHistories[remId];
+      if (history && history.length > 0) {
+        // Use the last recorded page from history
+        const lastEntry = history[history.length - 1];
+        setEditingHistoryPage(lastEntry.page);
+      } else {
+        // Default to 1 if no history exists
+        setEditingHistoryPage(1);
+      }
+    }
   };
   
   // --- NEW: Save reading history record ---
@@ -236,7 +284,7 @@ function PageRangeWidget() {
   
     // Update both the current reading position (for the queue) and the history log
     await setIncrementalReadingPosition(plugin, remId, contextData.pdfRemId, editingHistoryPage);
-    await addPageToHistory(plugin, remId, contextData.pdfRemId, editingHistoryPage);
+    await addPageToHistory(plugin, remId, contextData.pdfRemId, editingHistoryPage, false);
   
     await plugin.app.toast(`Updated reading position to page ${editingHistoryPage}`);
     
@@ -245,6 +293,8 @@ function PageRangeWidget() {
     setEditingHistoryPage(0);
     await reloadRelatedRems();
   };
+
+
 
   // Load data effect
   useEffect(() => {
@@ -379,7 +429,7 @@ function PageRangeWidget() {
   // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
     const assignedRanges = relatedRems
-      .filter((item) => item.isIncremental && item.range)
+      .filter((item) => item.range)
       .map((item) => item.range)
       .filter(Boolean)
       .sort((a, b) => a.start - b.start);
@@ -443,7 +493,7 @@ function PageRangeWidget() {
       style={{
         minWidth: '600px',
         maxWidth: '750px',
-        maxHeight: '95vh',
+        maxHeight: '100vh',
         backgroundColor: 'var(--rn-clr-background-primary)',
         borderRadius: '12px',
         overflow: 'hidden',
@@ -461,13 +511,13 @@ function PageRangeWidget() {
       }}
     >
       {/* Header */}
-      <div className="px-7 py-6" style={{
+      <div className="px-5 py-3" style={{
         borderBottom: '1px solid var(--rn-clr-border-primary)',
         backgroundColor: 'var(--rn-clr-background-secondary)',
         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
       }}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="text-4xl" style={{ lineHeight: '1' }}>📄</div>
             <div>
               <h2 className="text-2xl font-bold tracking-tight" style={{
@@ -515,35 +565,36 @@ function PageRangeWidget() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-7 py-5"
+      <div className="flex-1 overflow-y-auto px-5 py-3"
         style={{ backgroundColor: 'var(--rn-clr-background-primary)' }}
       >
 
       {/* Current Rem Settings */}
-      <div className="p-5 rounded-xl mb-5" style={{
+      <div className="p-3 rounded-xl mb-3" style={{
         backgroundColor: 'var(--rn-clr-background-secondary)',
         border: '1px solid var(--rn-clr-border-primary)',
         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)'
       }}>
-        <div className="font-bold mb-4 text-base" style={{ color: 'var(--rn-clr-content-primary)' }}>
+        <div className="font-bold mb-2 text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>
           Quick Edit - Current Rem Page Range
         </div>
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-5">
-            <div className="flex items-center gap-2.5">
-              <label className="font-medium text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start:</label>
+        <div className="flex flex-row items-center justify-between gap-3">
+          <div className="flex gap-3">
+            <div className="flex items-center gap-2">
+              <label className="font-medium text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start:</label>
+              {/* CHANGE: Reduced input padding (p-2 -> p-1) and font size */}
               <input
                 ref={inputStartRef}
                 type="number"
                 min="1"
                 value={pageRangeStart}
                 onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
-                className="w-24 text-center p-2 rounded-lg transition-all"
+                className="w-20 text-center p-1 rounded-lg transition-all"
                 style={{
                   border: '1.5px solid var(--rn-clr-border-primary)',
                   backgroundColor: 'var(--rn-clr-background-primary)',
                   color: 'var(--rn-clr-content-primary)',
-                  fontSize: '14px',
+                  fontSize: '13px', // Reduced font size
                   fontWeight: '500'
                 }}
                 onFocus={(e) => {
@@ -556,20 +607,20 @@ function PageRangeWidget() {
                 }}
               />
             </div>
-            <div className="flex items-center gap-2.5">
-              <label className="font-medium text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>End:</label>
+            <div className="flex items-center gap-2">
+              <label className="font-medium text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>End:</label>
               <input
                 type="number"
                 min={pageRangeStart}
                 value={pageRangeEnd || ''}
                 onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
                 placeholder="No limit"
-                className="w-24 text-center p-2 rounded-lg transition-all"
+                className="w-20 text-center p-1 rounded-lg transition-all"
                 style={{
                   border: '1.5px solid var(--rn-clr-border-primary)',
                   backgroundColor: 'var(--rn-clr-background-primary)',
                   color: 'var(--rn-clr-content-primary)',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: '500'
                 }}
                 onFocus={(e) => {
@@ -584,7 +635,7 @@ function PageRangeWidget() {
             </div>
           </div>
           {pageRangeStart > 1 || pageRangeEnd > 0 ? (
-            <div className="text-sm font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-2" style={{
+            <div className="text-xs font-semibold px-2 py-1 rounded-lg inline-flex items-center gap-2" style={{
               backgroundColor: '#dbeafe',
               color: '#1e40af',
               width: 'fit-content'
@@ -595,7 +646,7 @@ function PageRangeWidget() {
               Pages {pageRangeStart}-{pageRangeEnd || '∞'}
             </div>
           ) : (
-            <div className="text-sm px-3 py-1.5" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            <div className="text-xs px-2 py-1" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               No page range restrictions
             </div>
           )}
@@ -606,18 +657,18 @@ function PageRangeWidget() {
       {(() => {
         const unassignedRanges = getUnassignedRanges();
         return unassignedRanges.length > 0 ? (
-          <div className="p-4 rounded-xl mb-5" style={{
+          <div className="p-2 rounded-xl mb-3 flex items-center gap-3" style={{
             backgroundColor: '#fefce8',
             border: '1.5px solid #fde047',
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
           }}>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 whitespace-nowrap">
               <svg className="w-4 h-4" style={{ color: '#ca8a04' }} fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
-              <div className="font-bold text-sm" style={{ color: '#92400e' }}>Available page ranges</div>
+              <div className="font-bold text-xs" style={{ color: '#92400e' }}>Available page ranges</div>
             </div>
-            <div className="text-sm font-medium flex flex-wrap gap-2" style={{ color: '#713f12' }}>
+            <div className="text-xs font-medium flex flex-wrap gap-1" style={{ color: '#713f12' }}>
               {unassignedRanges.map((range, idx) => {
                 const endPageDisplay =
                   range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
@@ -649,13 +700,28 @@ function PageRangeWidget() {
         );
       })()}
 
-      <div className="flex items-center gap-3 mb-5">
-        <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }}></div>
-        <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-          All Rems
-        </span>
-        <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }}></div>
-      </div>
+      {/* Total PDF Reading Time */}
+        {totalPdfReadingTime > 0 && (
+        <div className="p-2 rounded-xl mb-3" style={{
+            backgroundColor: '#f0fdf4',
+            border: '1px solid #86efac',
+        }}>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="font-bold text-xs" style={{ color: '#166534' }}>
+                    Total PDF Time:
+                    </div>
+                    {/* CHANGE: Removed newline/div, made it a span inline */}
+                    <span className="text-xs" style={{ color: '#15803d' }}>
+                    (All IncRems)
+                    </span>
+                </div>
+                <div className="text-sm font-bold" style={{ color: '#166534' }}>
+                   ⏱️ {formatDuration(totalPdfReadingTime)}
+                </div>
+            </div>
+        </div>
+        )}
 
       {/* All Rems Using This PDF (including current) */}
       <div className="flex flex-col gap-4">
@@ -671,7 +737,7 @@ function PageRangeWidget() {
             {sortedRelatedRems.length}
           </span>
         </div>
-        <div className="flex flex-col gap-3 max-h-96 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-3">
           {sortedRelatedRems.map((item) => {
             const isCurrentRem = item.remId === contextData?.incrementalRemId;
             const priorityInfo = remPriorities[item.remId];
@@ -751,7 +817,7 @@ function PageRangeWidget() {
                         </svg>
                         Pages {item.range.start} - {item.range.end || '∞'}
                       </span>
-                      {item.isIncremental && item.currentPage && (
+                      {(item.isIncremental || item.currentPage || (remHistories[item.remId] && remHistories[item.remId].length > 0)) && (
                         <>
                           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
                           <span className="font-medium">At: {item.currentPage}</span>
@@ -777,6 +843,11 @@ function PageRangeWidget() {
                             }
                             return '';
                           })()}
+                          {remStatistics[item.remId] && remStatistics[item.remId].totalTimeSeconds > 0 && (
+                            <span style={{ color: '#10B981', fontWeight: '500' }}>
+                                📖 {formatDuration(remStatistics[item.remId].totalTimeSeconds)}
+                            </span>
+                          )}
                         </>
                       )}
                     </div>
@@ -1109,32 +1180,49 @@ function PageRangeWidget() {
                     
                     {/* Reading History */}
                     {remHistories[item.remId] && remHistories[item.remId].length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-xs font-semibold mb-2" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                          Reading History
+                    <div className="mt-2">
+                        <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                            Reading History
+                        </div>
+                        {/* Show reading statistics if available */}
+                        {remStatistics[item.remId] && remStatistics[item.remId].totalTimeSeconds > 0 && (
+                            <div className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                            Total: {formatDuration(remStatistics[item.remId].totalTimeSeconds)} | 
+                            Sessions: {remStatistics[item.remId].sessionsWithTime}
+                            </div>
+                        )}
                         </div>
                         <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                          {remHistories[item.remId].slice(-12).reverse().map((entry, idx) => (
+                        {remHistories[item.remId].slice(-12).reverse().map((entry, idx) => (
                             <div key={idx} className="p-2 rounded" style={{
-                              backgroundColor: 'var(--rn-clr-background-primary)',
-                              border: '1px solid var(--rn-clr-border-primary)'
+                            backgroundColor: 'var(--rn-clr-background-primary)',
+                            border: '1px solid var(--rn-clr-border-primary)'
                             }}>
-                              <div className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                            <div className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
                                 Page {entry.page}
-                              </div>
-                              <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-                                {new Date(entry.timestamp).toLocaleDateString([], {
+                            </div>
+                            <div className="flex items-center justify-between mt-0.5">
+                              <div className="text-xs truncate" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                                  {new Date(entry.timestamp).toLocaleDateString([], {
                                   month: 'numeric',
                                   day: 'numeric'
-                                })} {new Date(entry.timestamp).toLocaleTimeString([], {
+                                  })} {new Date(entry.timestamp).toLocaleTimeString([], {
                                   hour: 'numeric',
                                   minute: '2-digit'
-                                })}
+                                  })}
                               </div>
+                              
+                              {entry.sessionDuration && (
+                                  <div className="text-xs font-bold whitespace-nowrap ml-1" style={{ color: '#10B981' }}>
+                                  {formatDuration(entry.sessionDuration)}
+                                  </div>
+                              )}
                             </div>
-                          ))}
+                            </div>
+                        ))}
                         </div>
-                      </div>
+                    </div>
                     )}
                   </div>
                 )}

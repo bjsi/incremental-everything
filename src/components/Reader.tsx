@@ -64,15 +64,13 @@ export function Reader(props: ReaderProps) {
   const { actionItem } = props;
   const plugin = usePlugin();
 
-  // --- 1. ALL useRef and useState Hooks MUST BE HERE ---
-  
-  // useRef
-  const hasScrolled = React.useRef(false);
-  const pdfReaderRef = React.useRef<any>(null);
 
-  // useState (Main UI State)
+  // --- 1. useState Hooks (MUST come before useRef if refs use state) ---
   const [isReaderReady, setIsReaderReady] = React.useState(false);
+  
+  // ✅ Define currentPage FIRST
   const [currentPage, setCurrentPage] = React.useState<number>(1);
+  
   const [totalPages, setTotalPages] = React.useState<number>(0);
   const [pageInputValue, setPageInputValue] = React.useState<string>('1');
   const [pageRangeStart, setPageRangeStart] = React.useState<number>(1);
@@ -86,6 +84,13 @@ export function Reader(props: ReaderProps) {
   // useState (Deferred States)
   const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
   const [metadata, setMetadata] = useState<Metadata | null>(null);
+
+  // --- 2. useRef Hooks ---
+  const hasScrolled = React.useRef(false);
+  const pdfReaderRef = React.useRef<any>(null);
+  
+  // ✅ Now it works because currentPage is already defined
+  const currentPageRef = React.useRef(currentPage);
 
   // --- 2. useTrackerPlugin MUST BE HERE ---
 
@@ -492,28 +497,35 @@ export function Reader(props: ReaderProps) {
     }
   }, [actionItem.type]);
 
-// Save to history only once when leaving the card (THE FIX IS HERE)
   React.useEffect(() => {
-    // Capture the current context and page for the cleanup function
-    const incRemId = criticalContext?.incrementalRemId;
-    const finalPage = currentPage;
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
 
+  // Save to history ONLY when the component unmounts (or context changes)
+  React.useEffect(() => {
+    const incRemId = criticalContext?.incrementalRemId;
+    
     return () => {
-      // Use the captured local variables
+      // Read the LATEST value from the ref
+      const finalPage = currentPageRef.current;
+
+      // Only save if we have a valid Incremental ID and we are not on the default Page 1
+      // (unless the user actually read Page 1, which the duration check in pdfUtils will handle)
       if (incRemId && finalPage) {
         addPageToHistory(
           plugin,
           incRemId,
           actionItem.rem._id,
           finalPage
-        ).then(() => {
-          // Log is already in addPageToHistory
-        });
+        ).catch(console.error);
       }
     };
-  // Dependencies are incRemId (from criticalContext) and currentPage
-  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin, currentPage]);
+    // ❌ REMOVED 'currentPage' from dependencies to prevent auto-save on page turn
+    // This ensures it only runs when the card changes (actionItem.rem._id) or unmounts.
+  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin]);
  
+
+  
   // Page Range/Position Loader and Poller (Updated to use criticalContext)
   React.useEffect(() => {
     const incRemId = criticalContext?.incrementalRemId;
@@ -621,6 +633,8 @@ export function Reader(props: ReaderProps) {
     setIsReaderReady(false);
     hasScrolled.current = false;
   }, [actionItem.rem._id]);
+
+  
 
   // --- 5. RENDER START ---
   
