@@ -113,23 +113,27 @@ export function IsolatedCardViewer({
       }
 
       // Check if the content contains an image (PDF area highlight)
-      let hasImage = false;
+      let imageItem: any = null;
       for (const item of rem.text) {
         if (item && typeof item === 'object' && item.i === 'i') {
-          hasImage = true;
+          imageItem = item;
           break;
         }
       }
 
-      // Get the text representation (which contains the real URL for images)
-      const text = await safeRemTextToString(plugin, rem.text);
-
-      if (hasImage && text.startsWith('http')) {
-        // It's an image - the text is the actual URL
-        setContent({ type: 'image', value: text });
-      } else {
-        setContent({ type: 'text', value: text });
+      if (imageItem?.url) {
+        // For %LOCAL_FILE% URLs, resolve the actual S3 URL
+        // Call safeRemTextToString with only the image item to avoid concatenation issues
+        const resolvedUrl = await safeRemTextToString(plugin, [imageItem]);
+        if (resolvedUrl.startsWith('http')) {
+          setContent({ type: 'image', value: resolvedUrl });
+          return;
+        }
       }
+
+      // Fallback: Get the text representation
+      const text = await safeRemTextToString(plugin, rem.text);
+      setContent({ type: 'text', value: text });
     };
     loadRemContent();
   }, [rem._id, rem.text, plugin]);
