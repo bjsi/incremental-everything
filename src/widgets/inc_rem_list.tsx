@@ -5,6 +5,7 @@ import { IncrementalRem } from '../lib/incremental_rem';
 import { ActionItemType } from '../lib/incremental_rem/types';
 import { remToActionItemType } from '../lib/incremental_rem/action_items';
 import { buildDocumentScope } from '../lib/scope_helpers';
+import { percentileToHslColor } from '../lib/utils';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import '../style.css';
@@ -15,6 +16,7 @@ dayjs.extend(relativeTime);
 interface IncRemWithDetails extends IncrementalRem {
   remText?: string;
   incRemType?: ActionItemType;
+  percentile?: number;
 }
 
 // Type badge configuration
@@ -30,131 +32,114 @@ const TYPE_BADGES: Record<ActionItemType, { emoji: string; label: string; bgColo
   'unknown': { emoji: '❓', label: 'Unknown', bgColor: '#f3f4f6', textColor: '#6b7280', description: 'Unknown type' },
 };
 
-// Reusable components
-const StarIcon = () => (
-  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
-
+// Compact colored badge with emoji + short label, fixed width for alignment
 function TypeBadge({ type }: { type?: ActionItemType }) {
   if (!type) return null;
   const badge = TYPE_BADGES[type] || TYPE_BADGES['unknown'];
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
-      style={{ backgroundColor: badge.bgColor, color: badge.textColor }}
+      className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-xs shrink-0"
+      style={{ backgroundColor: badge.bgColor, color: badge.textColor, width: '90px' }}
       title={badge.description}
     >
       <span>{badge.emoji}</span>
-      <span>{badge.label}</span>
+      <span className="font-medium truncate">{badge.label}</span>
     </span>
   );
 }
 
-function PriorityBadge({ priority, variant }: { priority: number; variant: 'due' | 'scheduled' }) {
-  const colors = variant === 'due'
-    ? { bg: '#fed7aa', text: '#9a3412' }
-    : { bg: '#bfdbfe', text: '#1e3a8a' };
-
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-1 rounded"
-      style={{ backgroundColor: colors.bg, color: colors.text }}
-    >
-      <StarIcon />
-      {priority}
-    </span>
-  );
-}
-
-interface IncRemCardProps {
-  incRem: IncRemWithDetails;
-  variant: 'due' | 'scheduled';
-  onClick: () => void;
-}
-
-function IncRemCard({ incRem, variant, onClick }: IncRemCardProps) {
-  const borderColor = variant === 'due' ? '#f97316' : '#3b82f6';
+// Compact single-row card
+function IncRemRow({ incRem, onClick }: { incRem: IncRemWithDetails; onClick: () => void }) {
+  const isDue = incRem.nextRepDate <= Date.now();
 
   return (
     <div
       onClick={onClick}
-      className="group relative p-4 rounded cursor-pointer transition-all"
-      style={{
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        border: '1px solid var(--rn-clr-border-primary)',
-        borderLeft: `4px solid ${borderColor}`,
-      }}
+      className="flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-all group"
+      style={{ backgroundColor: 'var(--rn-clr-background-secondary)' }}
       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'; }}
     >
-      <div className="font-medium text-base mb-2 pr-6" style={{ color: 'var(--rn-clr-content-primary)' }}>
+      {/* Type badge */}
+      <TypeBadge type={incRem.incRemType} />
+
+      {/* Title - truncated */}
+      <div
+        className="flex-1 truncate text-sm"
+        style={{ color: 'var(--rn-clr-content-primary)' }}
+        title={incRem.remText}
+      >
         {incRem.remText || 'Loading...'}
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <TypeBadge type={incRem.incRemType} />
-        <PriorityBadge priority={incRem.priority} variant={variant} />
-        <span style={{ color: 'var(--rn-clr-content-secondary)' }}>
-          Due {dayjs(incRem.nextRepDate).fromNow()}
-        </span>
-      </div>
-      {incRem.history && incRem.history.length > 0 && (
-        <div
-          className="mt-2 pt-2 text-xs flex items-center gap-2"
-          style={{ borderTop: '1px solid var(--rn-clr-border-primary)', color: 'var(--rn-clr-content-tertiary)' }}
-        >
-          Last reviewed {dayjs(incRem.history[incRem.history.length - 1].date).fromNow()} • {incRem.history.length} review{incRem.history.length !== 1 ? 's' : ''}
+
+      {/* Priority pill - using percentile color, fixed width for alignment */}
+      <span
+        className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0 text-center tabular-nums"
+        style={{
+          backgroundColor: incRem.percentile ? percentileToHslColor(incRem.percentile) : '#6b7280',
+          color: 'white',
+          minWidth: '42px',
+        }}
+        title={`Priority: ${incRem.priority}${incRem.percentile ? ` (top ${incRem.percentile}%)` : ''}`}
+      >
+        ★{incRem.priority}
+      </span>
+
+      {/* Time - with context, fixed width for alignment */}
+      <span
+        className="text-xs shrink-0 text-right"
+        style={{ color: isDue ? '#ea580c' : 'var(--rn-clr-content-tertiary)', width: '75px' }}
+        title={dayjs(incRem.nextRepDate).format('DD MMM YYYY HH:mm')}
+      >
+        {isDue ? `${dayjs(incRem.nextRepDate).fromNow(true)} ago` : `in ${dayjs(incRem.nextRepDate).fromNow(true)}`}
+      </span>
+    </div>
+  );
+}
+
+// Collapsible section with compact header
+function IncRemSection({ title, count, color, rems, onRemClick }: {
+  title: string;
+  count: number;
+  color: string;
+  rems: IncRemWithDetails[];
+  onRemClick: (remId: string) => void;
+}) {
+  const [collapsed, setCollapsed] = React.useState(false);
+
+  if (rems.length === 0) return null;
+
+  return (
+    <div>
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="flex items-center gap-2 w-full text-left py-1 px-1 rounded transition-colors"
+        style={{ color }}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+      >
+        <span className="text-xs transition-transform" style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
+        <span className="font-semibold text-xs uppercase tracking-wide">{title}</span>
+        <span className="text-xs font-normal opacity-70">({count})</span>
+      </button>
+      {!collapsed && (
+        <div className="flex flex-col gap-1 mt-1">
+          {rems.map((incRem) => (
+            <IncRemRow key={incRem.remId} incRem={incRem} onClick={() => onRemClick(incRem.remId)} />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-interface IncRemSectionProps {
-  title: string;
-  emoji: string;
-  color: string;
-  rems: IncRemWithDetails[];
-  onRemClick: (remId: string) => void;
-  variant: 'due' | 'scheduled';
-}
-
-function IncRemSection({ title, emoji, color, rems, onRemClick, variant }: IncRemSectionProps) {
-  if (rems.length === 0) return null;
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <h3 className="font-bold text-sm px-2 py-1" style={{ color }}>
-          {emoji} {title} ({rems.length})
-        </h3>
-        <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }} />
-      </div>
-      <div className="flex flex-col gap-3">
-        {rems.map((incRem) => (
-          <IncRemCard
-            key={incRem.remId}
-            incRem={incRem}
-            variant={variant}
-            onClick={() => onRemClick(incRem.remId)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
+type SortOption = 'date' | 'priority';
 
 export function IncRemList() {
   const plugin = usePlugin();
   const [loadingRems, setLoadingRems] = useState(false);
   const [incRemsWithDetails, setIncRemsWithDetails] = useState<IncRemWithDetails[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>('date');
 
   const counterData = useTrackerPlugin(
     async (rp) => {
@@ -191,6 +176,13 @@ export function IncRemList() {
     if (loadingRems) return;
     setLoadingRems(true);
 
+    // Calculate percentiles for all items
+    const sortedByPriority = [...incRems].sort((a, b) => a.priority - b.priority);
+    const percentiles: Record<string, number> = {};
+    sortedByPriority.forEach((item, index) => {
+      percentiles[item.remId] = Math.round(((index + 1) / sortedByPriority.length) * 100);
+    });
+
     const remsWithDetails: IncRemWithDetails[] = [];
 
     for (const incRem of incRems) {
@@ -204,7 +196,12 @@ export function IncRemList() {
 
         const incRemType = await determineIncRemType(plugin, rem);
 
-        remsWithDetails.push({ ...incRem, remText: textStr || '[Empty rem]', incRemType });
+        remsWithDetails.push({
+          ...incRem,
+          remText: textStr || '[Empty rem]',
+          incRemType,
+          percentile: percentiles[incRem.remId],
+        });
       } catch (error) {
         console.error('Error loading rem details:', error);
       }
@@ -225,50 +222,94 @@ export function IncRemList() {
   };
 
   const now = Date.now();
-  const dueRems = incRemsWithDetails.filter((r) => r.nextRepDate <= now);
-  const scheduledRems = incRemsWithDetails.filter((r) => r.nextRepDate > now);
+
+  // Sort function based on current selection
+  const sortRems = (rems: IncRemWithDetails[]) => {
+    if (sortBy === 'priority') {
+      return [...rems].sort((a, b) => a.priority - b.priority);
+    }
+    // Default: sort by date (earliest first for due, soonest first for scheduled)
+    return [...rems].sort((a, b) => a.nextRepDate - b.nextRepDate);
+  };
+
+  const dueRems = sortRems(incRemsWithDetails.filter((r) => r.nextRepDate <= now));
+  const scheduledRems = sortRems(incRemsWithDetails.filter((r) => r.nextRepDate > now));
 
   return (
-    <div className="flex flex-col h-full" style={{ maxHeight: '600px', backgroundColor: 'var(--rn-clr-background-primary)' }}>
-      {/* Header */}
-      <div className="px-6 py-5" style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-3xl">📚</div>
-            <div>
-              <h2 className="text-2xl font-bold" style={{ color: 'var(--rn-clr-content-primary)' }}>Incremental Rems</h2>
-              {counterData && (
-                <div className="text-sm mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                  <span className="font-semibold" style={{ color: '#f97316' }}>{counterData.due}</span> due
-                  {' • '}
-                  <span className="font-semibold" style={{ color: '#3b82f6' }}>{counterData.total}</span> total
-                </div>
-              )}
-            </div>
+    <div
+      className="flex flex-col"
+      style={{
+        height: '100%',
+        width: '100%',
+        minHeight: '400px',
+        backgroundColor: 'var(--rn-clr-background-primary)',
+      }}
+    >
+      {/* Compact Header */}
+      <div
+        className="flex items-center justify-between px-4 py-2 shrink-0"
+        style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📚</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>Inc Rems</span>
+          {counterData && (
+            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              <span style={{ color: '#f97316' }}>{counterData.due}</span>
+              {' / '}
+              <span style={{ color: '#3b82f6' }}>{counterData.total}</span>
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Sort toggle */}
+          <div className="flex text-xs" style={{ backgroundColor: 'var(--rn-clr-background-primary)', borderRadius: '4px' }}>
+            <button
+              onClick={() => setSortBy('date')}
+              className="px-2 py-1 rounded-l transition-colors"
+              style={{
+                backgroundColor: sortBy === 'date' ? 'var(--rn-clr-background-tertiary)' : 'transparent',
+                color: sortBy === 'date' ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-tertiary)',
+              }}
+              title="Sort by date"
+            >
+              📅
+            </button>
+            <button
+              onClick={() => setSortBy('priority')}
+              className="px-2 py-1 rounded-r transition-colors"
+              style={{
+                backgroundColor: sortBy === 'priority' ? 'var(--rn-clr-background-tertiary)' : 'transparent',
+                color: sortBy === 'priority' ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-tertiary)',
+              }}
+              title="Sort by priority"
+            >
+              ★
+            </button>
           </div>
           <button
             onClick={handleClose}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: 'var(--rn-clr-content-secondary)' }}
+            className="p-1 rounded transition-colors text-xs"
+            style={{ color: 'var(--rn-clr-content-tertiary)' }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-            title="Close"
+            title="Close (Esc)"
           >
-            <CloseIcon />
+            ✕
           </button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      {/* Content - fills remaining space */}
+      <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
         {loadingRems ? (
-          <div className="text-center py-8" style={{ color: 'var(--rn-clr-content-secondary)' }}>Loading rems...</div>
+          <div className="text-center py-6 text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>Loading...</div>
         ) : incRemsWithDetails.length === 0 ? (
-          <div className="text-center py-8" style={{ color: 'var(--rn-clr-content-secondary)' }}>No incremental rems found</div>
+          <div className="text-center py-6 text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>No incremental rems</div>
         ) : (
-          <div className="flex flex-col gap-4">
-            <IncRemSection title="Due" emoji="⚠️" color="#f97316" rems={dueRems} onRemClick={handleRemClick} variant="due" />
-            <IncRemSection title="Scheduled" emoji="📅" color="#3b82f6" rems={scheduledRems} onRemClick={handleRemClick} variant="scheduled" />
+          <div className="flex flex-col gap-3">
+            <IncRemSection title="Due" count={dueRems.length} color="#f97316" rems={dueRems} onRemClick={handleRemClick} />
+            <IncRemSection title="Scheduled" count={scheduledRems.length} color="#3b82f6" rems={scheduledRems} onRemClick={handleRemClick} />
           </div>
         )}
       </div>
