@@ -1,7 +1,9 @@
-import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
+import { ActionItemType } from '../lib/incremental_rem/types';
+import { remToActionItemType } from '../lib/incremental_rem/action_items';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -12,6 +14,39 @@ dayjs.extend(relativeTime);
 
 interface IncRemWithDetails extends IncrementalRem {
   remText?: string;
+  incRemType?: ActionItemType;
+}
+
+// Type badge configuration
+const TYPE_BADGES: Record<ActionItemType, { emoji: string; label: string; bgColor: string; textColor: string }> = {
+  'pdf': { emoji: '📄', label: 'PDF', bgColor: '#fef3c7', textColor: '#92400e' },
+  'pdf-highlight': { emoji: '🖍️', label: 'PDF Extract', bgColor: '#fce7f3', textColor: '#9d174d' },
+  'pdf-note': { emoji: '📑', label: 'PDF Note', bgColor: '#e0e7ff', textColor: '#3730a3' },
+  'html': { emoji: '🌐', label: 'Web', bgColor: '#dbeafe', textColor: '#1e40af' },
+  'html-highlight': { emoji: '🔖', label: 'Web Extract', bgColor: '#d1fae5', textColor: '#065f46' },
+  'youtube': { emoji: '▶️', label: 'YouTube', bgColor: '#fee2e2', textColor: '#991b1b' },
+  'video': { emoji: '🎬', label: 'Video', bgColor: '#fae8ff', textColor: '#86198f' },
+  'rem': { emoji: '📝', label: 'Rem', bgColor: '#f3f4f6', textColor: '#374151' },
+  'unknown': { emoji: '❓', label: 'Unknown', bgColor: '#f3f4f6', textColor: '#6b7280' },
+};
+
+// Type badge component
+function TypeBadge({ type }: { type?: ActionItemType }) {
+  if (!type) return null;
+  const badge = TYPE_BADGES[type] || TYPE_BADGES['unknown'];
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+      style={{
+        backgroundColor: badge.bgColor,
+        color: badge.textColor,
+      }}
+      title={badge.label}
+    >
+      <span>{badge.emoji}</span>
+      <span>{badge.label}</span>
+    </span>
+  );
 }
 
 export function IncRemList() {
@@ -109,9 +144,40 @@ export function IncRemList() {
             textStr = textStr.substring(0, 200) + '...';
           }
 
+          // Determine the type of this incRem
+          let incRemType: ActionItemType = 'unknown';
+          try {
+            const actionItem = await remToActionItemType(plugin, rem);
+            if (actionItem) {
+              incRemType = actionItem.type;
+
+              // Check if it's a 'rem' type but actually inside a PDF (pdf-note)
+              if (incRemType === 'rem') {
+                // Check ancestors to see if any is an UploadedFile (PDF)
+                let currentRem = rem;
+                let isPdfNote = false;
+                for (let i = 0; i < 20; i++) { // Max 20 levels to prevent infinite loop
+                  const parent = await currentRem.getParentRem();
+                  if (!parent) break;
+                  if (await parent.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
+                    isPdfNote = true;
+                    break;
+                  }
+                  currentRem = parent;
+                }
+                if (isPdfNote) {
+                  incRemType = 'pdf-note';
+                }
+              }
+            }
+          } catch (typeError) {
+            console.error('Error determining rem type:', typeError);
+          }
+
           remsWithDetails.push({
             ...incRem,
             remText: textStr || '[Empty rem]',
+            incRemType,
           });
         }
       } catch (error) {
@@ -227,7 +293,8 @@ export function IncRemList() {
                       <div className="font-medium text-base mb-2 pr-6" style={{ color: 'var(--rn-clr-content-primary)' }}>
                         {incRem.remText || 'Loading...'}
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <TypeBadge type={incRem.incRemType} />
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded" style={{
                           backgroundColor: '#fed7aa',
                           color: '#9a3412'
@@ -284,7 +351,8 @@ export function IncRemList() {
                       <div className="font-medium text-base mb-2 pr-6" style={{ color: 'var(--rn-clr-content-primary)' }}>
                         {incRem.remText || 'Loading...'}
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <TypeBadge type={incRem.incRemType} />
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded" style={{
                           backgroundColor: '#bfdbfe',
                           color: '#1e3a8a'
