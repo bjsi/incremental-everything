@@ -1,25 +1,15 @@
-import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTrackerPlugin, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import React, { useState, useMemo } from 'react';
 import { allIncrementalRemKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-
-dayjs.extend(relativeTime);
-
-// Inject CSS for hover effects
-const style = document.createElement('style');
-style.textContent = `
-  .inc-rem-item:hover {
-    background-color: var(--rn-clr-background-tertiary) !important;
-  }
-`;
-document.head.appendChild(style);
-
-// Main view for all incremental rems with advanced filtering and sorting
+import { ActionItemType } from '../lib/incremental_rem/types';
+import { remToActionItemType } from '../lib/incremental_rem/action_items';
+import { IncRemRow, IncRemRowData } from '../components';
 
 interface IncRemWithDetails extends IncrementalRem {
   remText?: string;
+  incRemType?: ActionItemType;
+  percentile?: number;
 }
 
 type FilterStatus = 'all' | 'due' | 'scheduled';
@@ -31,7 +21,6 @@ export function IncRemMainView() {
   const [loadingRems, setLoadingRems] = useState<boolean>(false);
   const [incRemsWithDetails, setIncRemsWithDetails] = useState<IncRemWithDetails[]>([]);
 
-  // Filter states
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [priorityMin, setPriorityMin] = useState<number>(0);
   const [priorityMax, setPriorityMax] = useState<number>(100);
@@ -55,8 +44,13 @@ export function IncRemMainView() {
 
   const loadIncRemDetails = async (incRems: IncrementalRem[]) => {
     if (loadingRems) return;
-
     setLoadingRems(true);
+
+    const sortedByPriority = [...incRems].sort((a, b) => a.priority - b.priority);
+    const percentiles: Record<string, number> = {};
+    sortedByPriority.forEach((item, index) => {
+      percentiles[item.remId] = Math.round(((index + 1) / sortedByPriority.length) * 100);
+    });
 
     const remsWithDetails = await Promise.all(
       incRems.map(async (incRem) => {
@@ -65,35 +59,16 @@ export function IncRemMainView() {
           if (!rem) return null;
 
           const text = await rem.text;
-          let textStr: string;
+          let textStr = extractText(text);
+          if (textStr.length > 300) textStr = textStr.substring(0, 300) + '...';
 
-          if (typeof text === 'string') {
-            textStr = text;
-          } else if (Array.isArray(text)) {
-            textStr = text
-              .map((item: any) => {
-                if (typeof item === 'string') return item;
-                if (item?.text) return item.text;
-                if (item?.i === 'q') return '[Quote]';
-                if (item?.i === 'i') return '[Image]';
-                if (item?.url) return '[Link]';
-                return '';
-              })
-              .filter(Boolean)
-              .join(' ');
-
-            if (!textStr) textStr = '[Complex content]';
-          } else {
-            textStr = '[Complex content]';
-          }
-
-          if (textStr.length > 300) {
-            textStr = textStr.substring(0, 300) + '...';
-          }
+          const incRemType = await determineIncRemType(plugin, rem);
 
           return {
             ...incRem,
             remText: textStr || '[Empty rem]',
+            incRemType,
+            percentile: percentiles[incRem.remId],
           };
         } catch (error) {
           console.error('Error loading rem details:', error);
@@ -110,25 +85,17 @@ export function IncRemMainView() {
     const now = Date.now();
 
     let filtered = incRemsWithDetails.filter((rem) => {
-      // Status filter
       if (filterStatus === 'due' && rem.nextRepDate > now) return false;
       if (filterStatus === 'scheduled' && rem.nextRepDate <= now) return false;
-
-      // Priority filter
       if (rem.priority < priorityMin || rem.priority > priorityMax) return false;
-
-      // Search filter
       if (searchText && rem.remText && !rem.remText.toLowerCase().includes(searchText.toLowerCase())) {
         return false;
       }
-
       return true;
     });
 
-    // Sorting
     filtered.sort((a, b) => {
       let comparison = 0;
-
       if (sortBy === 'priority') {
         comparison = a.priority - b.priority;
       } else if (sortBy === 'date') {
@@ -138,7 +105,6 @@ export function IncRemMainView() {
         const bReviews = b.history?.length || 0;
         comparison = aReviews - bReviews;
       }
-
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
@@ -348,58 +314,66 @@ export function IncRemMainView() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {filteredAndSortedRems.map((incRem) => {
-              const isDue = incRem.nextRepDate <= now;
-              return (
-                <div
-                  key={incRem.remId}
-                  onClick={() => handleRemClick(incRem.remId)}
-                  className="inc-rem-item group relative p-4 rounded cursor-pointer transition-all"
-                  style={{
-                    backgroundColor: 'var(--rn-clr-background-secondary)',
-                    border: '1px solid var(--rn-clr-border-primary)',
-                    borderLeft: `4px solid ${isDue ? '#f97316' : '#3b82f6'}`,
-                  }}
-                >
-                  <div className="font-medium text-base mb-2 pr-6" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                    {incRem.remText || 'Loading...'}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded" style={{
-                      backgroundColor: isDue ? '#fed7aa' : '#bfdbfe',
-                      color: isDue ? '#9a3412' : '#1e3a8a'
-                    }}>
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      {incRem.priority}
-                    </span>
-                    <span style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                      {isDue ? '⚠️ ' : '📅 '}
-                      Due {dayjs(incRem.nextRepDate).fromNow()}
-                    </span>
-                    {incRem.history && incRem.history.length > 0 && (
-                      <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-                        • {incRem.history.length} review{incRem.history.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </div>
-                  {incRem.history && incRem.history.length > 0 && (
-                    <div className="mt-2 pt-2 text-xs" style={{
-                      borderTop: '1px solid var(--rn-clr-border-primary)',
-                      color: 'var(--rn-clr-content-tertiary)'
-                    }}>
-                      Last reviewed {dayjs(incRem.history[incRem.history.length - 1].date).fromNow()}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {filteredAndSortedRems.map((incRem) => (
+              <IncRemRow
+                key={incRem.remId}
+                incRem={{
+                  ...incRem,
+                  historyCount: incRem.history?.length,
+                } as IncRemRowData}
+                onClick={() => handleRemClick(incRem.remId)}
+                compact={false}
+              />
+            ))}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+function extractText(text: unknown): string {
+  if (typeof text === 'string') return text;
+  if (!Array.isArray(text)) return '[Complex content]';
+
+  const result = text
+    .map((item: any) => {
+      if (typeof item === 'string') return item;
+      if (item?.text) return item.text;
+      if (item?.i === 'q') return '[Quote]';
+      if (item?.i === 'i') return '[Image]';
+      if (item?.url) return '[Link]';
+      return '';
+    })
+    .filter(Boolean)
+    .join(' ');
+
+  return result || '[Complex content]';
+}
+
+async function determineIncRemType(plugin: any, rem: any): Promise<ActionItemType> {
+  try {
+    const actionItem = await remToActionItemType(plugin, rem);
+    if (!actionItem) return 'unknown';
+
+    let type: ActionItemType = actionItem.type;
+
+    if (type === 'rem') {
+      let currentRem = rem;
+      for (let i = 0; i < 20; i++) {
+        const parent = await currentRem.getParentRem();
+        if (!parent) break;
+        if (await parent.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
+          return 'pdf-note';
+        }
+        currentRem = parent;
+      }
+    }
+
+    return type;
+  } catch {
+    return 'unknown';
+  }
 }
 
 renderWidget(IncRemMainView);
