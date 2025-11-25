@@ -89,7 +89,7 @@ function IncRemRow({ incRem, onClick }: { incRem: IncRemWithDetails; onClick: ()
       <span
         className="text-xs shrink-0 text-right"
         style={{ color: isDue ? '#ea580c' : 'var(--rn-clr-content-tertiary)', width: '75px' }}
-        title={dayjs(incRem.nextRepDate).format('DD MMM YYYY HH:mm')}
+        title={dayjs(incRem.nextRepDate).format('DD MMM YYYY')}
       >
         {isDue ? `${dayjs(incRem.nextRepDate).fromNow(true)} ago` : `in ${dayjs(incRem.nextRepDate).fromNow(true)}`}
       </span>
