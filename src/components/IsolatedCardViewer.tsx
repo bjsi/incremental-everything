@@ -365,30 +365,32 @@ export function IsolatedCardViewer({
 
         {/* Footer with actions */}
         <div style={footerStyle}>
-          <button
-            style={buttonStyle}
-            onClick={handleCreateRem}
-            disabled={isCreatingRem}
-          >
-            <span>✏️</span>
-            <span>{isCreatingRem ? 'Creating...' : 'Create Rem'}</span>
-          </button>
-          <button
-            style={buttonStyle}
-            onClick={handleCreateIncrementalRem}
-            disabled={isCreatingRem}
-          >
-            <span>🔄</span>
-            <span>{isCreatingRem ? 'Creating...' : 'Create Inc Rem'}</span>
-          </button>
           {onViewInContext && (
-            <button
-              style={primaryButtonStyle}
-              onClick={onViewInContext}
-            >
-              <span>📖</span>
-              <span>View in Context</span>
-            </button>
+            <>
+              <button
+                style={buttonStyle}
+                onClick={handleCreateRem}
+                disabled={isCreatingRem}
+              >
+                <span>✏️</span>
+                <span>{isCreatingRem ? 'Creating...' : 'Create Rem'}</span>
+              </button>
+              <button
+                style={buttonStyle}
+                onClick={handleCreateIncrementalRem}
+                disabled={isCreatingRem}
+              >
+                <span>🔄</span>
+                <span>{isCreatingRem ? 'Creating...' : 'Create Inc Rem'}</span>
+              </button>
+              <button
+                style={primaryButtonStyle}
+                onClick={onViewInContext}
+              >
+                <span>📖</span>
+                <span>View in Context</span>
+              </button>
+            </>
           )}
         </div>
       </div>
