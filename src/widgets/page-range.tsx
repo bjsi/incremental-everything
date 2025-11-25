@@ -184,7 +184,7 @@ function PageRangeWidget() {
     let totalTime = 0; // ADD THIS LINE
     
     for (const item of related) {
-        if (item.isIncremental) { // CHANGED from item.currentPage --> VERIFY THIS!!!
+        if (item.currentPage) { // CHANGED from item.currentPage --> VERIFY THIS!!!
         const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
         if (history.length > 0) {
             histories[item.remId] = history;
