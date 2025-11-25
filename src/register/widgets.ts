@@ -40,7 +40,7 @@ export function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget(pageRangeWidgetId, WidgetLocation.Popup, {
     dimensions: {
       width: 600,
-      height: 900,
+      height: 1100,
     },
   });
 
