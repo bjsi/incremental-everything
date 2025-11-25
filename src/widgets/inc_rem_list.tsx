@@ -18,16 +18,16 @@ interface IncRemWithDetails extends IncrementalRem {
 }
 
 // Type badge configuration
-const TYPE_BADGES: Record<ActionItemType, { emoji: string; label: string; bgColor: string; textColor: string }> = {
-  'pdf': { emoji: '📄', label: 'PDF', bgColor: '#fef3c7', textColor: '#92400e' },
-  'pdf-highlight': { emoji: '🖍️', label: 'PDF Extract', bgColor: '#fce7f3', textColor: '#9d174d' },
-  'pdf-note': { emoji: '📑', label: 'PDF Note', bgColor: '#e0e7ff', textColor: '#3730a3' },
-  'html': { emoji: '🌐', label: 'Web', bgColor: '#dbeafe', textColor: '#1e40af' },
-  'html-highlight': { emoji: '🔖', label: 'Web Extract', bgColor: '#d1fae5', textColor: '#065f46' },
-  'youtube': { emoji: '▶️', label: 'YouTube', bgColor: '#fee2e2', textColor: '#991b1b' },
-  'video': { emoji: '🎬', label: 'Video', bgColor: '#fae8ff', textColor: '#86198f' },
-  'rem': { emoji: '📝', label: 'Rem', bgColor: '#f3f4f6', textColor: '#374151' },
-  'unknown': { emoji: '❓', label: 'Unknown', bgColor: '#f3f4f6', textColor: '#6b7280' },
+const TYPE_BADGES: Record<ActionItemType, { emoji: string; label: string; bgColor: string; textColor: string; description: string }> = {
+  'pdf': { emoji: '📄', label: 'PDF', bgColor: '#fef3c7', textColor: '#92400e', description: 'A PDF file added as incremental rem' },
+  'pdf-highlight': { emoji: '🖍️', label: 'PDF Extract', bgColor: '#fce7f3', textColor: '#9d174d', description: 'Text or area highlighted in a PDF' },
+  'pdf-note': { emoji: '📑', label: 'PDF Note', bgColor: '#e0e7ff', textColor: '#3730a3', description: 'A rem created inside a PDF (open PDF → Notes)' },
+  'html': { emoji: '🌐', label: 'Web', bgColor: '#dbeafe', textColor: '#1e40af', description: 'A web page added as incremental rem' },
+  'html-highlight': { emoji: '🔖', label: 'Web Extract', bgColor: '#d1fae5', textColor: '#065f46', description: 'Text highlighted from a web page' },
+  'youtube': { emoji: '▶️', label: 'YouTube', bgColor: '#fee2e2', textColor: '#991b1b', description: 'A YouTube video added as incremental rem' },
+  'video': { emoji: '🎬', label: 'Video', bgColor: '#fae8ff', textColor: '#86198f', description: 'A video file added as incremental rem' },
+  'rem': { emoji: '📝', label: 'Rem', bgColor: '#f3f4f6', textColor: '#374151', description: 'A regular rem added as incremental rem' },
+  'unknown': { emoji: '❓', label: 'Unknown', bgColor: '#f3f4f6', textColor: '#6b7280', description: 'Unknown type' },
 };
 
 // Type badge component
@@ -41,7 +41,7 @@ function TypeBadge({ type }: { type?: ActionItemType }) {
         backgroundColor: badge.bgColor,
         color: badge.textColor,
       }}
-      title={badge.label}
+      title={badge.description}
     >
       <span>{badge.emoji}</span>
       <span>{badge.label}</span>
