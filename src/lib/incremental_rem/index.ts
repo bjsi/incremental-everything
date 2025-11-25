@@ -17,7 +17,7 @@ import {
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
-import { tryParseJson, getDailyDocReferenceForDate } from '../utils';
+import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 
@@ -44,11 +44,18 @@ export async function reviewRem(
   queueMode?: 'srs' | 'practice-all' | 'in-order' | 'editor'
 ) {
   if (!incRem) {
+    console.log("❌ [reviewRem] No incRem provided!");
     return null;
   }
 
+  // 1. Calculate review time
   const startTime = await plugin.storage.getSession<number>('increm-review-start-time');
   const reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
+
+  // DEBUG LOGS
+  console.log(`🔍 [reviewRem] ID: ${incRem.remId}`);
+  console.log(`🔍 [reviewRem] Start Time: ${startTime}`);
+  console.log(`🔍 [reviewRem] Calculated Duration: ${reviewTimeSeconds}`);
 
   const inLookbackMode = !!(await plugin.queue.inLookbackMode());
   const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode, queueMode);
@@ -64,7 +71,9 @@ export async function reviewRem(
 
   await updateSRSDataForRem(plugin, incRem.remId, nextSpacing.newNextRepDate, newHistory);
 
-  await plugin.storage.setSession('increm-review-start-time', null);
+  // 🛑 REMOVED: Do NOT clear the start time here.
+  // Let it persist so pdfUtils can read it when the Reader unmounts.
+  // await plugin.storage.setSession('increm-review-start-time', null);
 
   return { ...nextSpacing, newHistory };
 }
@@ -75,6 +84,10 @@ export async function handleHextRepetitionClick(
   queueMode?: 'srs' | 'practice-all' | 'in-order'
 ) {
   await reviewRem(plugin, incRem, queueMode);
+    
+  // Keep the sleep to be safe, but it's less critical now
+  await sleep(150); 
+  
   await plugin.queue.removeCurrentCardFromQueue();
 }
 

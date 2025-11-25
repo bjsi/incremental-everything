@@ -17,6 +17,14 @@ const HIDE_CARD_PRIORITY_CSS = `
   display: none; }
 `;
 
+const showLeftBorderForIncRemsId = 'show-left-border-for-increms';
+const SHOW_LEFT_BORDER_CSS = `
+  .rem[data-rem-tags~="incremental"] {
+    border-left: 3px solid green;
+    padding-left: 5px;
+  }
+`;
+
 /**
  * Registers every plugin setting (numbers, dropdowns, toggles) and applies startup defaults (e.g. hiding CardPriority tags).
  * Settings covered:
@@ -63,6 +71,19 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   const shouldHide = await plugin.settings.getSetting('hideCardPriorityTag');
   if (shouldHide) {
     await plugin.app.registerCSS(hideCardPriorityTagId, HIDE_CARD_PRIORITY_CSS);
+  }
+
+  plugin.settings.registerBooleanSetting({
+    id: 'showLeftBorderForIncRems',
+    title: 'Show a greeb left Border for IncRems in Editor',
+    description:
+      'If enabled, this will show a green left border for IncRems in Editor, to make it easier to identify your "extracts".',
+    defaultValue: true,
+  });
+
+  const shouldShowLeftBorderForIncRems = await plugin.settings.getSetting('showLeftBorderForIncRems');
+  if (shouldShowLeftBorderForIncRems) {
+    await plugin.app.registerCSS(showLeftBorderForIncRemsId, SHOW_LEFT_BORDER_CSS);
   }
 
   plugin.settings.registerNumberSetting({
