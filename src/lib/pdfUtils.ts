@@ -1,13 +1,23 @@
 // lib/pdfUtils.ts
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, allIncrementalRemKey } from './consts';
-import { IncrementalRem } from './incremental_rem';
+import { IncrementalRem } from './types';
+import { getIncrementalRemFromRem } from './incremental_rem';
 
 export interface PageRangeContext {
   incrementalRemId: RemId;
   pdfRemId: RemId;
   totalPages: number;
   currentPage: number;
+}
+
+/**
+ * Enhanced structure for page history entries with duration tracking
+ */
+export interface PageHistoryEntry {
+  page: number;
+  timestamp: number;
+  sessionDuration?: number;   // Duration in seconds for this reading session
 }
 
 /**
@@ -172,7 +182,7 @@ export const getPageHistory = async (
   plugin: RNPlugin,
   incrementalRemId: string,
   pdfRemId: string
-): Promise<Array<{page: number, timestamp: number}>> => {
+): Promise<PageHistoryEntry[]> => {
   const historyKey = getPageHistoryKey(incrementalRemId, pdfRemId);
   const history = await plugin.storage.getSynced(historyKey);
   
@@ -183,34 +193,82 @@ export const getPageHistory = async (
         // Old format: just page number, no timestamp
         return { page: entry, timestamp: 0 };
       } else if (entry && typeof entry.page === 'number') {
-        // New format with timestamp
-        return entry;
+        // New format with timestamp and possibly duration
+        return {
+          page: entry.page,
+          timestamp: entry.timestamp || 0,
+          sessionDuration: entry.sessionDuration
+        };
       } else {
         // Invalid entry
         return null;
       }
-    }).filter(Boolean) as Array<{page: number, timestamp: number}>;
+    }).filter(Boolean) as PageHistoryEntry[];
   }
   
   return [];
 };
 
 /**
- * Add a page to the reading history with timestamp
+ * Add a page to the reading history with timestamp and session duration
+ * FIXED: Now properly uses the current page from the reading session
+ * 
+ * @param plugin - The RemNote plugin instance
+ * @param incrementalRemId - The incremental rem ID
+ * @param pdfRemId - The PDF rem ID  
+ * @param pageToRecord - Optional page number to record. If not provided, uses the current reading position
  */
 export const addPageToHistory = async (
   plugin: RNPlugin,
   incrementalRemId: string,
   pdfRemId: string,
-  page: number
+  pageToRecord?: number
 ): Promise<void> => {
+  console.log(`[addPageToHistory] Triggered for Rem: ${incrementalRemId}`);
+  
   const historyKey = getPageHistoryKey(incrementalRemId, pdfRemId);
+  
+  // Get the page to record - either provided or from current reading position
+  let page: number;
+  if (pageToRecord !== undefined) {
+    page = pageToRecord;
+  } else {
+    // Get the actual current reading position instead of defaulting to 1
+    const currentPage = await getIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId);
+    page = currentPage || 1; 
+  }
+  
+  let sessionDuration: number | undefined;
+  
+  // --- DIRECT CALCULATION LOGIC ---
+  try {
+    const startTime = await plugin.storage.getSession<number>('increm-review-start-time');
+    
+    if (startTime) {
+      const calculatedDuration = Math.round((Date.now() - startTime) / 1000);
+      
+      // ✅ FILTER: Only record meaningful sessions (> 2 seconds)
+      // This ignores the "0s" noise from React re-renders
+      if (calculatedDuration > 2) {
+        if (calculatedDuration > 14400) {
+           console.log(`[addPageToHistory] ⚠️ Duration too long (${calculatedDuration}s). Ignoring.`);
+        } else {
+           sessionDuration = calculatedDuration;
+           console.log(`[addPageToHistory] ✅ SAVED Duration: ${sessionDuration}s`);
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[addPageToHistory] Error calculating duration:", e);
+  }
+  // --------------------------------
+  
   const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
   
-  // Add timestamp with page number
-  const entry = {
+  const entry: PageHistoryEntry = {
     page,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    sessionDuration
   };
   
   history.push(entry);
@@ -219,6 +277,64 @@ export const addPageToHistory = async (
   const trimmedHistory = history.slice(-100);
   
   await plugin.storage.setSynced(historyKey, trimmedHistory);
+};
+
+/**
+ * Calculate total time spent reading for a specific rem/PDF combination
+ * Only counts sessions with recorded duration (from queue reading)
+ */
+export const getTotalReadingTime = async (
+  plugin: RNPlugin,
+  incrementalRemId: string,
+  pdfRemId: string
+): Promise<number> => {
+  const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
+  
+  return history.reduce((total, entry) => {
+    return total + (entry.sessionDuration || 0);
+  }, 0);
+};
+
+/**
+ * Get reading statistics for a rem/PDF combination
+ */
+export const getReadingStatistics = async (
+  plugin: RNPlugin,
+  incrementalRemId: string,
+  pdfRemId: string
+): Promise<{
+  totalSessions: number;
+  totalTimeSeconds: number;
+  totalTimeMinutes: number;
+  averageSessionSeconds: number;
+  lastSessionDate?: number;
+  lastSessionDuration?: number;
+  pagesRead: Set<number>;
+  sessionsWithTime: number;
+}> => {
+  const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
+  
+  const totalTimeSeconds = history.reduce((total, entry) => {
+    return total + (entry.sessionDuration || 0);
+  }, 0);
+  
+  const sessionsWithDuration = history.filter(entry => entry.sessionDuration);
+  const averageSessionSeconds = sessionsWithDuration.length > 0
+    ? totalTimeSeconds / sessionsWithDuration.length
+    : 0;
+  
+  const lastEntry = history[history.length - 1];
+  
+  return {
+    totalSessions: history.length,
+    totalTimeSeconds,
+    totalTimeMinutes: Math.round(totalTimeSeconds / 60),
+    averageSessionSeconds: Math.round(averageSessionSeconds),
+    lastSessionDate: lastEntry?.timestamp,
+    lastSessionDuration: lastEntry?.sessionDuration,
+    pagesRead: new Set(history.map(e => e.page)),
+    sessionsWithTime: sessionsWithDuration.length
+  };
 };
 
 /**
@@ -565,7 +681,7 @@ export const getAllIncrementsForPDF = async (
       const rem = await plugin.rem.findOne(remId);
       if (rem) {
         const isIncremental = await rem.hasPowerup(powerupCode);
-        const remText = await safeRemTextToString(plugin, rem.text); // FIXED
+        const remText = await safeRemTextToString(plugin, rem.text);
         
         const foundPDF = await findPDFinRem(plugin, rem);
         if (foundPDF && foundPDF._id === pdfRemId) {
