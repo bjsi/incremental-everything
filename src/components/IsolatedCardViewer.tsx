@@ -6,6 +6,7 @@ interface IsolatedCardViewerProps {
   rem: PluginRem;
   plugin: RNPlugin;
   sourceDocumentName?: string;
+  sourceDocumentId?: RemId;
   onViewInContext?: () => void;
 }
 
@@ -24,12 +25,14 @@ export function IsolatedCardViewer({
   rem,
   plugin,
   sourceDocumentName,
+  sourceDocumentId,
   onViewInContext
 }: IsolatedCardViewerProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [ancestors, setAncestors] = useState<AncestorBreadcrumb[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [content, setContent] = useState<RemContent>({ type: 'text', value: '' });
+  const [isCreatingRem, setIsCreatingRem] = useState(false);
 
   // Dark mode detection
   useEffect(() => {
@@ -134,6 +137,43 @@ export function IsolatedCardViewer({
       await plugin.window.openRem(ancestorRem);
     }
   }, [plugin]);
+
+  const handleCreateRem = useCallback(async () => {
+    if (isCreatingRem) return;
+
+    setIsCreatingRem(true);
+    try {
+      // Create a new rem with the content of the extract
+      const newRem = await plugin.rem.createRem();
+      if (newRem) {
+        // Build content with original extract content plus a pin reference to the source
+        // Using rem reference format with pin: true to show as icon
+        const sourceLink = {
+          i: 'q' as const,
+          _id: rem._id,
+          pin: true
+        };
+        const originalContent = rem.text || [];
+        const contentWithReference = [
+          ...originalContent,
+          ' ',
+          sourceLink
+        ];
+        await newRem.setText(contentWithReference);
+
+        // Set the new rem as a child of the source document (PDF) if available,
+        // otherwise as a child of the extract itself
+        const parentId = sourceDocumentId || rem._id;
+        await newRem.setParent(parentId);
+        // Open the new rem for editing
+        await plugin.window.openRem(newRem);
+      }
+    } catch (error) {
+      console.error('Error creating rem:', error);
+    } finally {
+      setIsCreatingRem(false);
+    }
+  }, [plugin, rem._id, rem.text, sourceDocumentId, isCreatingRem]);
 
   // Styles
   const containerStyle: React.CSSProperties = {
@@ -273,8 +313,16 @@ export function IsolatedCardViewer({
         </div>
 
         {/* Footer with actions */}
-        {onViewInContext && (
-          <div style={footerStyle}>
+        <div style={footerStyle}>
+          <button
+            style={buttonStyle}
+            onClick={handleCreateRem}
+            disabled={isCreatingRem}
+          >
+            <span>✏️</span>
+            <span>{isCreatingRem ? 'Creating...' : 'Create Rem'}</span>
+          </button>
+          {onViewInContext && (
             <button
               style={primaryButtonStyle}
               onClick={onViewInContext}
@@ -282,8 +330,8 @@ export function IsolatedCardViewer({
               <span>📖</span>
               <span>View in Context</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
