@@ -20,7 +20,7 @@ const HIDE_CARD_PRIORITY_CSS = `
 const showLeftBorderForIncRemsId = 'show-left-border-for-increms';
 const SHOW_LEFT_BORDER_CSS = `
   .rem[data-rem-tags~="incremental"] {
-    border-left: 3px solid blue;
+    border-left: 3px solid green;
     padding-left: 5px;
   }
 `;
@@ -75,9 +75,9 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
 
   plugin.settings.registerBooleanSetting({
     id: 'showLeftBorderForIncRems',
-    title: 'Show a blue left Border for IncRems in Editor',
+    title: 'Show a greeb left Border for IncRems in Editor',
     description:
-      'If enabled, this will show a blue left border for IncRems in Editor, to make it easier to identify your "extracts".',
+      'If enabled, this will show a green left border for IncRems in Editor, to make it easier to identify your "extracts".',
     defaultValue: true,
   });
 
