@@ -6,7 +6,7 @@ import {
   RNPlugin,
   PluginRem,
 } from '@remnote/plugin-sdk';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import * as _ from 'remeda';
 import { NextRepTime } from '../components/NextRepTime';
 import {
@@ -144,40 +144,43 @@ const handleReviewAndOpenRem = async (
   await plugin.window.openRem(rem);
 };
 
-// Enhanced button styles
-const buttonStyles = {
+// Dynamic button styles based on dark mode
+const getButtonStyles = (isDarkMode: boolean) => ({
   base: {
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '8px 12px',
-    borderRadius: '6px',
+    padding: '10px 16px',
+    borderRadius: '10px',
     border: 'none',
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
-    transition: 'all 0.15s ease',
-    gap: '2px',
-    minWidth: '90px',
-    height: '44px',
-    backgroundColor: 'white',
-    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    transition: 'all 0.2s ease',
+    gap: '3px',
+    minWidth: '95px',
+    height: '50px',
+    backgroundColor: isDarkMode ? '#334155' : '#ffffff',
+    color: isDarkMode ? '#e2e8f0' : '#374151',
+    boxShadow: isDarkMode
+      ? '0 2px 4px rgba(0, 0, 0, 0.3)'
+      : '0 2px 4px rgba(0, 0, 0, 0.08)',
   },
   primary: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    minWidth: '110px',
+    backgroundColor: isDarkMode ? '#3b82f6' : '#2563eb',
+    color: '#ffffff',
+    minWidth: '115px',
   },
   secondary: {
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    border: '1px solid #e5e7eb',
+    backgroundColor: isDarkMode ? '#475569' : '#f8fafc',
+    color: isDarkMode ? '#e2e8f0' : '#475569',
+    border: isDarkMode ? '1px solid #64748b' : '1px solid #e2e8f0',
   },
   danger: {
-    backgroundColor: '#fee2e2',
-    color: '#dc2626',
-    border: '1px solid #fecaca',
+    backgroundColor: isDarkMode ? '#7f1d1d' : '#fef2f2',
+    color: isDarkMode ? '#fca5a5' : '#dc2626',
+    border: isDarkMode ? '1px solid #991b1b' : '1px solid #fecaca',
   },
   label: {
     fontSize: '12px',
@@ -186,10 +189,16 @@ const buttonStyles = {
   },
   sublabel: {
     fontSize: '10px',
-    opacity: 0.9,
+    opacity: 0.85,
     fontWeight: 400,
-  }
-};
+  },
+  hoverShadow: isDarkMode
+    ? '0 6px 12px rgba(0, 0, 0, 0.4)'
+    : '0 6px 12px rgba(0, 0, 0, 0.12)',
+  defaultShadow: isDarkMode
+    ? '0 2px 4px rgba(0, 0, 0, 0.3)'
+    : '0 2px 4px rgba(0, 0, 0, 0.08)',
+});
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -198,13 +207,15 @@ interface ButtonProps {
   style?: React.CSSProperties;
   disabled?: boolean;
   className?: string;
+  isDarkMode?: boolean;
 }
 
-function Button({ children, onClick, variant = 'secondary', style, disabled, className }: ButtonProps) {
-  const variantStyles = variant === 'primary' ? buttonStyles.primary : 
-                        variant === 'danger' ? buttonStyles.danger : 
+function Button({ children, onClick, variant = 'secondary', style, disabled, className, isDarkMode = false }: ButtonProps) {
+  const buttonStyles = getButtonStyles(isDarkMode);
+  const variantStyles = variant === 'primary' ? buttonStyles.primary :
+                        variant === 'danger' ? buttonStyles.danger :
                         buttonStyles.secondary;
-  
+
   return (
     <button
       onClick={onClick}
@@ -218,13 +229,13 @@ function Button({ children, onClick, variant = 'secondary', style, disabled, cla
       }}
       onMouseEnter={(e) => {
         if (!disabled) {
-          e.currentTarget.style.transform = 'translateY(-1px)';
-          e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = buttonStyles.hoverShadow;
         }
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+        e.currentTarget.style.boxShadow = buttonStyles.defaultShadow;
       }}
       className={className}
     >
@@ -235,9 +246,42 @@ function Button({ children, onClick, variant = 'secondary', style, disabled, cla
 
 export function AnswerButtons() {
   const plugin = usePlugin();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Dark mode detection
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const htmlHasDark = document.documentElement.classList.contains('dark');
+      const bodyHasDark = document.body?.classList.contains('dark');
+
+      let parentHasDark = false;
+      try {
+        if (window.parent && window.parent !== window) {
+          parentHasDark = window.parent.document.documentElement.classList.contains('dark');
+        }
+      } catch (e) {}
+
+      const backgroundColor = window.getComputedStyle(document.body).backgroundColor;
+      let isDarkByColor = false;
+
+      if (backgroundColor && backgroundColor.startsWith('rgb')) {
+        const matches = backgroundColor.match(/\d+/g);
+        if (matches && matches.length >= 3) {
+          const [r, g, b] = matches.map(Number);
+          isDarkByColor = (r + g + b) / 3 < 128;
+        }
+      }
+
+      setIsDarkMode(Boolean(htmlHasDark || bodyHasDark || parentHasDark || isDarkByColor));
+    };
+
+    checkDarkMode();
+    const interval = setInterval(checkDarkMode, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ✅ ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP
-  
+
   // ✅ Track the values that determine effective mode
   const performanceModeSetting = useTrackerPlugin(
     (rp) => rp.settings.getSetting<string>('performanceMode'),
@@ -385,18 +429,21 @@ export function AnswerButtons() {
   };
 
   const priorityColor = percentiles.kb ? percentileToHslColor(percentiles.kb) : '#6b7280';
+  const buttonStyles = getButtonStyles(isDarkMode);
 
-  // Container styles
+  // Container styles with dark mode support
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
-    padding: '2px 6px 6px 6px',
+    gap: '8px',
+    padding: '8px 12px 12px 12px',
+    backgroundColor: isDarkMode ? '#1e293b' : 'transparent',
+    borderRadius: '12px',
   };
 
   const buttonRowStyle: React.CSSProperties = {
     display: 'flex',
-    gap: '6px',
+    gap: '8px',
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
@@ -404,22 +451,24 @@ export function AnswerButtons() {
 
   const dividerStyle: React.CSSProperties = {
     width: '1px',
-    height: '36px',
-    backgroundColor: '#e5e7eb',
-    margin: '0 4px',
+    height: '40px',
+    backgroundColor: isDarkMode ? '#475569' : '#e2e8f0',
+    margin: '0 6px',
   };
 
   const priorityBadgeStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '6px',
-    padding: '4px 10px',
-    borderRadius: '12px',
+    padding: '5px 12px',
+    borderRadius: '14px',
     fontSize: '12px',
     fontWeight: 600,
     color: 'white',
     backgroundColor: priorityColor,
-    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+    boxShadow: isDarkMode
+      ? '0 2px 4px rgba(0,0,0,0.3)'
+      : '0 2px 4px rgba(0,0,0,0.1)',
   };
 
   const infoBarStyle: React.CSSProperties = {
@@ -427,27 +476,28 @@ export function AnswerButtons() {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '16px',
-    padding: '6px 12px',
-    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-    borderRadius: '6px',
+    padding: '8px 16px',
+    backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.05)',
+    borderRadius: '10px',
     fontSize: '12px',
-    color: '#1e40af',
-    borderLeft: `3px solid ${priorityColor}`,
+    color: isDarkMode ? '#93c5fd' : '#1e40af',
+    borderLeft: `4px solid ${priorityColor}`,
   };
 
   return (
     <div style={containerStyle} className="incremental-everything-answer-buttons">
       {/* Single row of buttons */}
       <div style={buttonRowStyle}>
-        <Button variant="primary" onClick={handleNextClick}>
+        <Button variant="primary" onClick={handleNextClick} isDarkMode={isDarkMode}>
           <div style={buttonStyles.label}>Next</div>
           <div style={buttonStyles.sublabel}><NextRepTime rem={incRemInfo} /></div>
         </Button>
 
         <Button
           variant="secondary"
-          onClick={async () => { 
-            await plugin.widget.openPopup('reschedule', { remId: ctx.remId }); 
+          isDarkMode={isDarkMode}
+          onClick={async () => {
+            await plugin.widget.openPopup('reschedule', { remId: ctx.remId });
           }}
         >
           <div style={buttonStyles.label}>Reschedule</div>
@@ -456,6 +506,7 @@ export function AnswerButtons() {
 
         <Button
           variant="danger"
+          isDarkMode={isDarkMode}
           onClick={async () => {
                   // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
                   await handleCardPriorityInheritance(plugin, rem, incRemInfo);
@@ -475,14 +526,16 @@ export function AnswerButtons() {
 
         {/* Secondary Actions Group */}
         <Button
-          onClick={async () => { 
-            await plugin.widget.openPopup('priority', { remId: ctx.remId }); 
+          isDarkMode={isDarkMode}
+          onClick={async () => {
+            await plugin.widget.openPopup('priority', { remId: ctx.remId });
           }}
         >
           <div style={buttonStyles.label}>Change Priority</div>
         </Button>
 
         <Button
+          isDarkMode={isDarkMode}
           onClick={() => handleReviewAndOpenRem(plugin, rem, remType)}
         >
           <div style={buttonStyles.label}>Review & Open</div>
@@ -490,13 +543,14 @@ export function AnswerButtons() {
         </Button>
 
         <Button
+          isDarkMode={isDarkMode}
           onClick={async () => {
             try {
               const environment = await plugin.settings.getSetting<string>(remnoteEnvironmentId) || 'beta';
               const remnoteDomain = environment === 'beta' ? 'https://beta.remnote.com' : 'https://www.remnote.com';
               const newUrl = `${remnoteDomain}/document/${rem._id}`;
               const newWindow = window.open(newUrl, '_blank');
-              
+
               if (!newWindow || newWindow.closed) {
                 const link = document.createElement('a');
                 link.href = newUrl;
@@ -521,19 +575,20 @@ export function AnswerButtons() {
           <>
             <div style={dividerStyle} />
             <Button
+              isDarkMode={isDarkMode}
               onClick={async () => {
                 const highlightRem = await plugin.rem.findOne(activeHighlightId);
                 await highlightRem?.scrollToReaderHighlight();
               }}
               style={{
-                backgroundColor: '#fbbf24',
-                color: '#78350f',
-                border: '2px solid #f59e0b',
+                backgroundColor: isDarkMode ? '#d97706' : '#fbbf24',
+                color: isDarkMode ? '#fef3c7' : '#78350f',
+                border: isDarkMode ? '2px solid #f59e0b' : '2px solid #f59e0b',
                 animation: 'highlightPulse 2s ease-in-out 3',
                 fontWeight: 600,
               }}
             >
-              <div style={buttonStyles.label}>🔍 Scroll to</div>
+              <div style={buttonStyles.label}>Scroll to</div>
               <div style={buttonStyles.sublabel}>Highlight</div>
             </Button>
             <style>{`
@@ -556,8 +611,9 @@ export function AnswerButtons() {
           <>
             <div style={dividerStyle} />
             <Button
-              style={{ 
-                backgroundColor: '#f3f4f6',
+              isDarkMode={isDarkMode}
+              style={{
+                backgroundColor: isDarkMode ? '#334155' : '#f3f4f6',
                 cursor: 'default',
                 pointerEvents: 'none'
               }}
@@ -606,7 +662,7 @@ export function AnswerButtons() {
           {/* 🔌 Conditionally show Shield */}
           {!useLightMode && shouldDisplayShield && shieldStatusAsync && (
             <>
-              <span style={{ color: '#9ca3af' }}>|</span>
+              <span style={{ color: isDarkMode ? '#64748b' : '#9ca3af' }}>|</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontWeight: 600 }}>🛡️ Priority Shield</span>
                 <div style={{ display: 'flex', gap: '12px' }}>
