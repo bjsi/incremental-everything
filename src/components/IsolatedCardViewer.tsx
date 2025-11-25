@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
+import { PluginRem, RNPlugin, RemId, ReactRNPlugin } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { initIncrementalRem } from '../lib/incremental_rem';
+import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { powerupCode } from '../lib/consts';
 
 interface IsolatedCardViewerProps {
   rem: PluginRem;
@@ -165,11 +168,59 @@ export function IsolatedCardViewer({
         // otherwise as a child of the extract itself
         const parentId = sourceDocumentId || rem._id;
         await newRem.setParent(parentId);
+
+        // Remove incremental status from the original extract
+        await removeIncrementalRemCache(plugin, rem._id);
+        await rem.removePowerup(powerupCode);
+
         // Open the new rem for editing
         await plugin.window.openRem(newRem);
       }
     } catch (error) {
       console.error('Error creating rem:', error);
+    } finally {
+      setIsCreatingRem(false);
+    }
+  }, [plugin, rem._id, rem.text, sourceDocumentId, isCreatingRem]);
+
+  const handleCreateIncrementalRem = useCallback(async () => {
+    if (isCreatingRem) return;
+
+    setIsCreatingRem(true);
+    try {
+      // Create a new rem with the content of the extract
+      const newRem = await plugin.rem.createRem();
+      if (newRem) {
+        // Build content with original extract content plus a pin reference to the source
+        const sourceLink = {
+          i: 'q' as const,
+          _id: rem._id,
+          pin: true
+        };
+        const originalContent = rem.text || [];
+        const contentWithReference = [
+          ...originalContent,
+          ' ',
+          sourceLink
+        ];
+        await newRem.setText(contentWithReference);
+
+        // Set the new rem as a child of the source document (PDF) if available
+        const parentId = sourceDocumentId || rem._id;
+        await newRem.setParent(parentId);
+
+        // Make the new rem incremental BEFORE removing from original
+        await initIncrementalRem(plugin as ReactRNPlugin, newRem);
+
+        // Remove incremental status from the original extract
+        await removeIncrementalRemCache(plugin, rem._id);
+        await rem.removePowerup(powerupCode);
+
+        // Open the new rem for editing
+        await plugin.window.openRem(newRem);
+      }
+    } catch (error) {
+      console.error('Error creating incremental rem:', error);
     } finally {
       setIsCreatingRem(false);
     }
@@ -321,6 +372,14 @@ export function IsolatedCardViewer({
           >
             <span>✏️</span>
             <span>{isCreatingRem ? 'Creating...' : 'Create Rem'}</span>
+          </button>
+          <button
+            style={buttonStyle}
+            onClick={handleCreateIncrementalRem}
+            disabled={isCreatingRem}
+          >
+            <span>🔄</span>
+            <span>{isCreatingRem ? 'Creating...' : 'Create Inc Rem'}</span>
           </button>
           {onViewInContext && (
             <button
