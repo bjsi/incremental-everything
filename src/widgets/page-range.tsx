@@ -184,7 +184,7 @@ function PageRangeWidget() {
     let totalTime = 0; // ADD THIS LINE
     
     for (const item of related) {
-        if (item.currentPage) { // CHANGED from item.currentPage --> VERIFY THIS!!!
+        // Always fetch stats if it's a related rem
         const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
         if (history.length > 0) {
             histories[item.remId] = history;
@@ -194,7 +194,7 @@ function PageRangeWidget() {
         const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
         statistics[item.remId] = stats;
         totalTime += stats.totalTimeSeconds;
-        }
+        
     }
     
     setRemHistories(histories);
@@ -429,7 +429,7 @@ function PageRangeWidget() {
   // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
     const assignedRanges = relatedRems
-      .filter((item) => item.isIncremental && item.range)
+      .filter((item) => item.range)
       .map((item) => item.range)
       .filter(Boolean)
       .sort((a, b) => a.start - b.start);
@@ -817,7 +817,7 @@ function PageRangeWidget() {
                         </svg>
                         Pages {item.range.start} - {item.range.end || '∞'}
                       </span>
-                      {item.isIncremental && item.currentPage && (
+                      {(item.isIncremental || item.currentPage || (remHistories[item.remId] && remHistories[item.remId].length > 0)) && (
                         <>
                           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
                           <span className="font-medium">At: {item.currentPage}</span>
