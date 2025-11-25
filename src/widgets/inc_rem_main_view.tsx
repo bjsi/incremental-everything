@@ -127,193 +127,158 @@ export function IncRemMainView() {
   const dueCount = incRemsWithDetails.filter((r) => r.nextRepDate <= now).length;
   const totalCount = incRemsWithDetails.length;
 
+  const hasActiveFilters = filterStatus !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '';
+
   return (
     <div className="flex flex-col h-full" style={{
       backgroundColor: 'var(--rn-clr-background-primary)',
-      minHeight: '600px'
+      minHeight: '500px'
     }}>
       {/* Header */}
-      <div className="px-6 py-5" style={{
-        borderBottom: '1px solid var(--rn-clr-border-primary)',
-        backgroundColor: 'var(--rn-clr-background-secondary)'
-      }}>
-        <div className="flex items-center gap-3">
-          <div className="text-3xl">📊</div>
-          <div>
-            <h2 className="text-2xl font-bold" style={{ color: 'var(--rn-clr-content-primary)' }}>
-              All Incremental Rems
-            </h2>
-            <div className="text-sm mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-              <span className="font-semibold" style={{ color: '#f97316' }}>{dueCount}</span> due
-              {' • '}
-              <span className="font-semibold" style={{ color: '#3b82f6' }}>{totalCount}</span> total
-              {filteredAndSortedRems.length !== totalCount && (
-                <>
-                  {' • '}
-                  <span className="font-semibold">{filteredAndSortedRems.length}</span> filtered
-                </>
-              )}
-            </div>
+      <div
+        className="flex items-center justify-between px-4 py-2 shrink-0"
+        style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📊</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>All Inc Rems</span>
+          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            <span style={{ color: '#f97316' }}>{dueCount}</span>
+            {' / '}
+            <span style={{ color: '#3b82f6' }}>{totalCount}</span>
+            {filteredAndSortedRems.length !== totalCount && (
+              <span style={{ color: 'var(--rn-clr-content-tertiary)' }}> ({filteredAndSortedRems.length})</span>
+            )}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Status toggle */}
+          <div className="flex text-xs" style={{ backgroundColor: 'var(--rn-clr-background-primary)', borderRadius: '4px' }}>
+            {(['all', 'due', 'scheduled'] as FilterStatus[]).map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`px-2 py-1 transition-colors ${status === 'all' ? 'rounded-l' : status === 'scheduled' ? 'rounded-r' : ''}`}
+                style={{
+                  backgroundColor: filterStatus === status ? 'var(--rn-clr-background-tertiary)' : 'transparent',
+                  color: filterStatus === status ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-tertiary)',
+                }}
+              >
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </button>
+            ))}
           </div>
+
+          {/* Sort controls */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            className="px-2 py-1 text-xs rounded"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+              border: 'none',
+            }}
+          >
+            <option value="priority">Priority</option>
+            <option value="date">Date</option>
+            <option value="reviews">Reviews</option>
+          </select>
+          <button
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="px-2 py-1 text-xs rounded transition-colors"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+            }}
+            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </button>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="px-6 py-4" style={{
-        borderBottom: '1px solid var(--rn-clr-border-primary)',
-        backgroundColor: 'var(--rn-clr-background-secondary)'
-      }}>
-        <div className="flex flex-col gap-4">
-          {/* Row 1: Status and Sort */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                Status:
-              </label>
-              <div className="flex gap-1">
-                {(['all', 'due', 'scheduled'] as FilterStatus[]).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setFilterStatus(status)}
-                    className="px-3 py-1 text-sm rounded transition-all"
-                    style={{
-                      backgroundColor: filterStatus === status ? 'var(--rn-clr-background-tertiary)' : 'transparent',
-                      color: filterStatus === status ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-secondary)',
-                      border: filterStatus === status ? '1px solid var(--rn-clr-border-primary)' : '1px solid transparent',
-                      fontWeight: filterStatus === status ? 600 : 400
-                    }}
-                  >
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
+      {/* Filter Bar - compact */}
+      <div
+        className="flex items-center gap-3 px-4 py-2 shrink-0"
+        style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}
+      >
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Search..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="flex-1 px-2 py-1 text-xs rounded"
+          style={{
+            backgroundColor: 'var(--rn-clr-background-primary)',
+            color: 'var(--rn-clr-content-primary)',
+            border: 'none',
+          }}
+        />
 
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                Sort by:
-              </label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortBy)}
-                className="px-3 py-1 text-sm rounded"
-                style={{
-                  backgroundColor: 'var(--rn-clr-background-tertiary)',
-                  color: 'var(--rn-clr-content-primary)',
-                  border: '1px solid var(--rn-clr-border-primary)'
-                }}
-              >
-                <option value="priority">Priority</option>
-                <option value="date">Due Date</option>
-                <option value="reviews">Review Count</option>
-              </select>
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="px-3 py-1 text-sm rounded transition-all flex items-center gap-1"
-                style={{
-                  backgroundColor: 'var(--rn-clr-background-tertiary)',
-                  color: 'var(--rn-clr-content-primary)',
-                  border: '1px solid var(--rn-clr-border-primary)',
-                  cursor: 'pointer',
-                  fontWeight: 500
-                }}
-                title={`Click to sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-              >
-                {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
-              </button>
-            </div>
-          </div>
-
-          {/* Row 2: Priority Range */}
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-              Priority:
-            </label>
-            <div className="flex items-center gap-3 flex-1">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={priorityMin}
-                onChange={(e) => setPriorityMin(Number(e.target.value))}
-                className="w-16 px-2 py-1 text-sm rounded"
-                style={{
-                  backgroundColor: 'var(--rn-clr-background-tertiary)',
-                  color: 'var(--rn-clr-content-primary)',
-                  border: '1px solid var(--rn-clr-border-primary)'
-                }}
-              />
-              <span style={{ color: 'var(--rn-clr-content-secondary)' }}>to</span>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={priorityMax}
-                onChange={(e) => setPriorityMax(Number(e.target.value))}
-                className="w-16 px-2 py-1 text-sm rounded"
-                style={{
-                  backgroundColor: 'var(--rn-clr-background-tertiary)',
-                  color: 'var(--rn-clr-content-primary)',
-                  border: '1px solid var(--rn-clr-border-primary)'
-                }}
-              />
-            </div>
-
-            {/* Search */}
-            <div className="flex items-center gap-2 flex-1">
-              <label className="text-sm font-medium" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                Search:
-              </label>
-              <input
-                type="text"
-                placeholder="Filter by text..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="flex-1 px-3 py-1 text-sm rounded"
-                style={{
-                  backgroundColor: 'var(--rn-clr-background-tertiary)',
-                  color: 'var(--rn-clr-content-primary)',
-                  border: '1px solid var(--rn-clr-border-primary)'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Reset filters button */}
-          {(filterStatus !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '' || sortOrder !== 'asc') && (
-            <button
-              onClick={() => {
-                setFilterStatus('all');
-                setPriorityMin(0);
-                setPriorityMax(100);
-                setSearchText('');
-                setSortOrder('asc');
-              }}
-              className="self-start px-3 py-1 text-sm rounded transition-colors"
-              style={{
-                backgroundColor: 'var(--rn-clr-background-tertiary)',
-                color: 'var(--rn-clr-content-secondary)',
-                border: '1px solid var(--rn-clr-border-primary)'
-              }}
-            >
-              Reset Filters
-            </button>
-          )}
+        {/* Priority range */}
+        <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+          <span>★</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={priorityMin}
+            onChange={(e) => setPriorityMin(Number(e.target.value))}
+            className="w-12 px-1 py-1 text-xs rounded text-center"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+              border: 'none',
+            }}
+          />
+          <span>-</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={priorityMax}
+            onChange={(e) => setPriorityMax(Number(e.target.value))}
+            className="w-12 px-1 py-1 text-xs rounded text-center"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+              border: 'none',
+            }}
+          />
         </div>
+
+        {/* Reset button */}
+        {hasActiveFilters && (
+          <button
+            onClick={() => {
+              setFilterStatus('all');
+              setPriorityMin(0);
+              setPriorityMax(100);
+              setSearchText('');
+            }}
+            className="px-2 py-1 text-xs rounded transition-colors"
+            style={{ color: 'var(--rn-clr-content-tertiary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            title="Reset filters"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* Rem List */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
         {loadingRems ? (
-          <div className="text-center py-8" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-            Loading rems...
-          </div>
+          <div className="text-center py-6 text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>Loading...</div>
         ) : filteredAndSortedRems.length === 0 ? (
-          <div className="text-center py-8" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-            {incRemsWithDetails.length === 0 ? 'No incremental rems found' : 'No rems match the current filters'}
+          <div className="text-center py-6 text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+            {incRemsWithDetails.length === 0 ? 'No incremental rems' : 'No matches'}
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             {filteredAndSortedRems.map((incRem) => (
               <IncRemRow
                 key={incRem.remId}

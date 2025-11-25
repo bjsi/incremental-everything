@@ -39,12 +39,12 @@ export function TypeBadge({ type, compact = false }: TypeBadgeProps) {
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-sm"
-      style={{ backgroundColor: badge.bgColor, color: badge.textColor }}
+      className="inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded text-sm shrink-0"
+      style={{ backgroundColor: badge.bgColor, color: badge.textColor, width: '110px' }}
       title={badge.description}
     >
       <span>{badge.emoji}</span>
-      <span className="font-medium">{badge.label}</span>
+      <span className="font-medium truncate">{badge.label}</span>
     </span>
   );
 }

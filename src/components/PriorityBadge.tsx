@@ -28,15 +28,15 @@ export function PriorityBadge({ priority, percentile, compact = false }: Priorit
 
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-1 rounded text-sm font-medium"
+      className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded text-sm font-medium shrink-0 tabular-nums"
       style={{
         backgroundColor: bgColor,
         color: 'white',
+        minWidth: '52px',
       }}
       title={`Priority: ${priority}${percentile ? ` (top ${percentile}%)` : ''}`}
     >
-      <span>★</span>
-      <span className="tabular-nums">{priority}</span>
+      ★{priority}
     </span>
   );
 }

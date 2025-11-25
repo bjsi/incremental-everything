@@ -27,11 +27,11 @@ export function TimeBadge({ nextRepDate, compact = false }: TimeBadgeProps) {
 
   return (
     <span
-      className="text-sm"
-      style={{ color: isDue ? '#ea580c' : 'var(--rn-clr-content-secondary)' }}
+      className="text-sm shrink-0 text-right"
+      style={{ color: isDue ? '#ea580c' : 'var(--rn-clr-content-tertiary)', width: '90px' }}
       title={dayjs(nextRepDate).format('DD MMM YYYY')}
     >
-      {isDue ? `Due ${relativeTimeStr} ago` : `Due in ${relativeTimeStr}`}
+      {isDue ? `${relativeTimeStr} ago` : `in ${relativeTimeStr}`}
     </span>
   );
 }

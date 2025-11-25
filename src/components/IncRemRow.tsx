@@ -47,33 +47,32 @@ export function IncRemRow({ incRem, onClick, compact = true, showType = true }: 
     );
   }
 
-  const isDue = incRem.nextRepDate <= Date.now();
-
   return (
     <div
       onClick={onClick}
-      className="inc-rem-item group relative p-4 rounded cursor-pointer transition-all"
-      style={{
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        border: '1px solid var(--rn-clr-border-primary)',
-        borderLeft: `4px solid ${isDue ? '#f97316' : '#3b82f6'}`,
-      }}
+      className="flex items-center gap-4 px-4 py-3 rounded cursor-pointer transition-all"
+      style={{ backgroundColor: 'var(--rn-clr-background-secondary)' }}
       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'; }}
     >
-      <div className="font-medium text-base mb-2 pr-6" style={{ color: 'var(--rn-clr-content-primary)' }}>
-        {incRem.remText || 'Loading...'}
-      </div>
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        {showType && incRem.incRemType && <TypeBadge type={incRem.incRemType} />}
-        <PriorityBadge priority={incRem.priority} percentile={incRem.percentile} />
-        <TimeBadge nextRepDate={incRem.nextRepDate} />
+      {showType && <TypeBadge type={incRem.incRemType} />}
+
+      <div
+        className="flex-1 min-w-0 text-sm"
+        style={{ color: 'var(--rn-clr-content-primary)' }}
+      >
+        <div className="truncate" title={incRem.remText}>
+          {incRem.remText || 'Loading...'}
+        </div>
         {incRem.historyCount !== undefined && incRem.historyCount > 0 && (
-          <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-            • {incRem.historyCount} review{incRem.historyCount !== 1 ? 's' : ''}
-          </span>
+          <div className="text-xs mt-0.5" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            {incRem.historyCount} review{incRem.historyCount !== 1 ? 's' : ''}
+          </div>
         )}
       </div>
+
+      <PriorityBadge priority={incRem.priority} percentile={incRem.percentile} />
+      <TimeBadge nextRepDate={incRem.nextRepDate} />
     </div>
   );
 }
