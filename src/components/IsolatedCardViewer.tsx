@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PluginRem, RNPlugin, RemId, ReactRNPlugin, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { safeRemTextToString, findIncrementalRemForPDF } from '../lib/pdfUtils';
+import { safeRemTextToString, findIncrementalRemForPDF, getAllIncrementsForPDF } from '../lib/pdfUtils';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { powerupCode, parentSelectorWidgetId } from '../lib/consts';
@@ -150,62 +150,20 @@ export function IsolatedCardViewer({
     }
   }, [plugin]);
 
-  // Helper to find all incremental rems that have the PDF as a source
-  const findIncrementalRemsForPDF = useCallback(async (pdfRemId: RemId): Promise<Array<{remId: RemId; name: string; isIncremental: boolean}>> => {
-    const candidates: Array<{remId: RemId; name: string; isIncremental: boolean}> = [];
-    const processedIds = new Set<string>();
-
+  // Helper to find all rems (including non-incremental) that have the PDF as a source
+  // Uses the same function as PDF Control Panel to include Done/untagged rems
+  const findRemsForPDF = useCallback(async (pdfRemId: RemId): Promise<Array<{remId: RemId; name: string; isIncremental: boolean}>> => {
     try {
-      const pdfRem = await plugin.rem.findOne(pdfRemId);
-      if (!pdfRem) return candidates;
-
-      // Get the powerup to find all incremental rems
-      const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
-      if (!incPowerup) return candidates;
-
-      const allIncRems = await incPowerup.taggedRem();
-
-      for (const incRem of allIncRems) {
-        if (processedIds.has(incRem._id)) continue;
-
-        // Skip PDF highlights themselves - we want parent rems
-        const isPdfHighlight = await incRem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
-        if (isPdfHighlight) continue;
-
-        // Check if this rem has the PDF as a source
-        const sources = await incRem.getSources();
-        const hasPdfSource = sources.some(s => s._id === pdfRemId);
-
-        if (hasPdfSource) {
-          processedIds.add(incRem._id);
-          const name = await safeRemTextToString(plugin, incRem.text);
-          candidates.push({
-            remId: incRem._id,
-            name,
-            isIncremental: true
-          });
-        }
-
-        // Also check if PDF is a descendant of this rem
-        if (!hasPdfSource) {
-          const descendants = await incRem.getDescendants();
-          const hasPdfDescendant = descendants.some(d => d._id === pdfRemId);
-          if (hasPdfDescendant) {
-            processedIds.add(incRem._id);
-            const name = await safeRemTextToString(plugin, incRem.text);
-            candidates.push({
-              remId: incRem._id,
-              name,
-              isIncremental: true
-            });
-          }
-        }
-      }
+      const allRems = await getAllIncrementsForPDF(plugin, pdfRemId);
+      return allRems.map(r => ({
+        remId: r.remId,
+        name: r.name,
+        isIncremental: r.isIncremental
+      }));
     } catch (error) {
-      console.error('Error finding incremental rems for PDF:', error);
+      console.error('Error finding rems for PDF:', error);
+      return [];
     }
-
-    return candidates;
   }, [plugin]);
 
   // Core function to create rem with parent selection logic
@@ -214,8 +172,8 @@ export function IsolatedCardViewer({
 
     setIsCreatingRem(true);
     try {
-      // Find incremental rems that have this PDF as a source
-      const candidates = await findIncrementalRemsForPDF(sourceDocumentId);
+      // Find all rems that have this PDF as a source (including Done/untagged ones)
+      const candidates = await findRemsForPDF(sourceDocumentId);
 
       if (candidates.length === 0) {
         // No incremental rems found - fall back to original behavior (parent to PDF)
@@ -283,7 +241,7 @@ export function IsolatedCardViewer({
     } finally {
       setIsCreatingRem(false);
     }
-  }, [plugin, rem._id, rem.text, sourceDocumentId, isCreatingRem, findIncrementalRemsForPDF]);
+  }, [plugin, rem._id, rem.text, sourceDocumentId, isCreatingRem, findRemsForPDF]);
 
   const handleCreateRem = useCallback(async () => {
     await createRemWithParentSelection(false);
