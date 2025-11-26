@@ -112,12 +112,12 @@ function PageRangeWidget() {
   };
 
   // Calculate priority info for each incremental rem
-  const calculatePriorities = async (rems: any[], allRems?: IncrementalRem[]) => {
+  const calculatePriorities = async (rems: any[]) => {
     const priorities: Record<string, {absolute: number, percentile: number | null}> = {};
-    
-    // Use passed allRems or fetch from storage
-    const remsForCalculation = allRems || (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-    
+
+    // Use allIncrementalRems from tracker
+    const remsForCalculation = allIncrementalRems || [];
+
     for (const rem of rems) {
       if (rem.isIncremental) {
         const remObj = await plugin.rem.findOne(rem.remId);
@@ -143,17 +143,14 @@ function PageRangeWidget() {
     
     const related = await getAllIncrementsForPDF(plugin, contextData.pdfRemId);
     setRelatedRems(related);
-    
-    // Ensure we have the latest all incremental rems data
-    const allRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-    
-    // Calculate priorities with the fetched data
-    await calculatePriorities(related, allRems);
+
+    // Calculate priorities using tracker data
+    await calculatePriorities(related);
     
     // Fetch reading histories and statistics for each related rem
-    const histories: Record<string, PageHistoryEntry[]> = {}; // CHANGED TYPE
-    const statistics: Record<string, any> = {}; // ADD THIS LINE
-    let totalTime = 0; // ADD THIS LINE
+    const histories: Record<string, PageHistoryEntry[]> = {};
+    const statistics: Record<string, any> = {};
+    let totalTime = 0;
     
     for (const item of related) {
         // Always fetch stats if it's a related rem
@@ -162,7 +159,6 @@ function PageRangeWidget() {
             histories[item.remId] = history;
         }
         
-        // ADD THESE LINES
         const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
         statistics[item.remId] = stats;
         totalTime += stats.totalTimeSeconds;
@@ -170,9 +166,9 @@ function PageRangeWidget() {
     }
     
     setRemHistories(histories);
-    setRemStatistics(statistics); // ADD THIS LINE
-    setTotalPdfReadingTime(totalTime); // ADD THIS LINE
-    };
+    setRemStatistics(statistics);
+    setTotalPdfReadingTime(totalTime);
+  };
 
   // Toggle expanded state for a rem
   const toggleExpanded = (remId: string) => {
@@ -312,7 +308,14 @@ function PageRangeWidget() {
 
     loadData();
   }, [contextData?.incrementalRemId, contextData?.pdfRemId, plugin]);
-    
+
+  // Recalculate priorities when allIncrementalRems tracker updates
+  useEffect(() => {
+    if (relatedRems.length > 0 && allIncrementalRems && allIncrementalRems.length > 0) {
+      calculatePriorities(relatedRems);
+    }
+  }, [allIncrementalRems]);
+
   // Auto-focus main input on load
   useEffect(() => {
     if (!isLoading && contextData) {
@@ -393,7 +396,6 @@ function PageRangeWidget() {
   }
 
   
-  // ** START OF FIX **
   // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
     const assignedRanges = relatedRems
@@ -427,8 +429,7 @@ function PageRangeWidget() {
   
     return unassignedRanges;
   };
-  // ** END OF FIX **
-  
+
   // Sort related rems: current first, then by page range, then alphabetically
   const sortedRelatedRems = [...relatedRems].sort((a, b) => {
     // Current rem always first
