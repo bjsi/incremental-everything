@@ -23,6 +23,8 @@ import {
   PageRangeContext,
   findIncrementalRemForPDF,
 } from '../lib/pdfUtils';
+import { Breadcrumb, BreadcrumbItem } from './Breadcrumb';
+import { StatBadge } from './StatBadge';
 
 interface ReaderProps {
   actionItem: PDFActionItem | PDFHighlightActionItem | HTMLActionItem | HTMLHighlightActionItem;
@@ -239,21 +241,8 @@ export function Reader(props: ReaderProps) {
       display: 'flex',
       alignItems: 'center',
       gap: '20px',
-      fontSize: '11px',
-      color: 'var(--rn-clr-content-tertiary)',
       flex: '1 1 auto',
       justifyContent: 'center'
-    },
-    statItem: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-      whiteSpace: 'nowrap' as const,
-    },
-    statNumber: {
-      fontWeight: 600,
-      color: 'var(--rn-clr-content-primary)',
-      fontSize: '12px'
     },
     pageButton: {
       padding: '4px 8px',
@@ -654,31 +643,22 @@ export function Reader(props: ReaderProps) {
     <div className="pdf-reader-viewer" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       {/* Breadcrumb Section */}
-      <div className="breadcrumb-section" style={{
-        padding: '8px 12px',
-        borderBottom: '1px solid var(--rn-clr-border-primary)',
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        flexShrink: 0,
-        opacity: isContextLoading ? 0.2 : 1,
-        minHeight: '28px',
-      }}>
-        {!isContextLoading && ancestors.length > 0 && (
-          <div style={{
-            fontSize: '11px',
-            color: 'var(--rn-clr-content-tertiary)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
-            {ancestors.map((ancestor, index) => (
-              <span key={ancestor.id}>
-                {ancestor.text}
-                {index < ancestors.length - 1 && ' › '}
-              </span>
-            ))}
-          </div>
-        )}
-        {isContextLoading && <span style={{fontSize: '11px', color: 'var(--rn-clr-content-tertiary)'}}>Loading breadcrumbs...</span>}
+      <div
+        className="breadcrumb-section"
+        style={{
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--rn-clr-border-primary)',
+          backgroundColor: 'var(--rn-clr-background-secondary)',
+          flexShrink: 0,
+          opacity: isContextLoading ? 0.2 : 1,
+          minHeight: '28px',
+        }}
+      >
+        <Breadcrumb
+          items={ancestors as BreadcrumbItem[]}
+          isLoading={isContextLoading}
+          loadingText="Loading breadcrumbs..."
+        />
       </div>
       
       {/* PDF Reader Section (Renders INSTANTLY) */}
@@ -713,34 +693,23 @@ export function Reader(props: ReaderProps) {
         {/* Center: Stats */}
         <div style={metadataBarStyles.statsGroup}>
           {isMetadataLoading ? (
-            <span>Calculating statistics...</span>
+            <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>Calculating statistics...</span>
           ) : (
             <>
-              <div style={metadataBarStyles.statItem}>
-                <span style={metadataBarStyles.statNumber}>{childrenCount}</span>
-                <span>direct children</span>
-                {incrementalChildrenCount > 0 && (
-                  <span style={{ color: 'var(--rn-clr-blue, #3b82f6)' }}>({incrementalChildrenCount} inc)</span>
-                )}
-              </div>
-
-              <div style={metadataBarStyles.statItem}>
-                <span style={metadataBarStyles.statNumber}>{descendantsCount}</span>
-                <span>descendants</span>
-                {incrementalDescendantsCount > 0 && (
-                  <span style={{ color: 'var(--rn-clr-blue, #3b82f6)' }}>({incrementalDescendantsCount} inc)</span>
-                )}
-              </div>
-              
-              <div style={metadataBarStyles.statItem}>
-                <span style={metadataBarStyles.statNumber}>{flashcardCount}</span>
-                <span>cards</span>
-              </div>
-              
-              <div style={metadataBarStyles.statItem}>
-                <span style={metadataBarStyles.statNumber}>{pdfHighlightCount}</span>
-                <span>highlights</span>
-              </div>
+              <StatBadge
+                value={childrenCount}
+                label="children"
+                highlight={incrementalChildrenCount}
+                highlightLabel="inc"
+              />
+              <StatBadge
+                value={descendantsCount}
+                label="descendants"
+                highlight={incrementalDescendantsCount}
+                highlightLabel="inc"
+              />
+              <StatBadge value={flashcardCount} label="cards" />
+              <StatBadge value={pdfHighlightCount} label="highlights" />
             </>
           )}
         </div>
