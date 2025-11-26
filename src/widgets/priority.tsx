@@ -32,7 +32,7 @@ import { IncrementalRem } from '../lib/incremental_rem';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { PriorityBadge, PrioritySlider } from '../components';
+import { PriorityBadge, PrioritySlider, PrioritySliderRef } from '../components';
 import * as _ from 'remeda';
 
 type Scope = { remId: string | null; name: string; };
@@ -76,8 +76,8 @@ function Priority() {
   const [cardRelPriority, setCardRelPriority] = useState(50);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showInheritanceForIncRem, setShowInheritanceForIncRem] = useState(false);
-  const incInputRef = useRef<HTMLInputElement>(null);
-  const cardInputRef = useRef<HTMLInputElement>(null);
+  const incSliderRef = useRef<PrioritySliderRef>(null);
+  const cardSliderRef = useRef<PrioritySliderRef>(null);
 
   // Data Fetching Hooks
   const widgetContext = useRunAsync(async () => await plugin.widget.getWidgetContext<{ remId: string }>(), []);
@@ -306,12 +306,12 @@ function Priority() {
 
   useEffect(() => {
     setTimeout(() => {
-      if (incInputRef.current) {
-        incInputRef.current.focus();
-        incInputRef.current.select();
-      } else if (cardInputRef.current) {
-        cardInputRef.current.focus();
-        cardInputRef.current.select();
+      if (incSliderRef.current) {
+        incSliderRef.current.focus();
+        incSliderRef.current.select();
+      } else if (cardSliderRef.current) {
+        cardSliderRef.current.focus();
+        cardSliderRef.current.select();
       }
     }, 50);
   }, [incRemInfo, cardInfo]);
@@ -464,13 +464,19 @@ function Priority() {
 
   const handleTabCycle = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showIncSection || (!showCardSection && !showInheritanceSection) || e.key !== 'Tab' || e.shiftKey) return;
-    const incInput = incInputRef.current;
-    const cardInput = cardInputRef.current;
     e.preventDefault();
-    if (document.activeElement === incInput && cardInput) {
-        cardInput.focus(); cardInput.select();
-    } else if (document.activeElement === cardInput && incInput) {
-        incInput.focus(); incInput.select();
+    // Tab cycling between inc and card sliders
+    if (incSliderRef.current && cardSliderRef.current) {
+      // Simple toggle - if we're in the inc section, go to card, otherwise go to inc
+      const activeElement = document.activeElement;
+      const incSection = activeElement?.closest('[data-section="inc"]');
+      if (incSection) {
+        cardSliderRef.current.focus();
+        cardSliderRef.current.select();
+      } else {
+        incSliderRef.current.focus();
+        incSliderRef.current.select();
+      }
     }
   };
 
@@ -694,6 +700,7 @@ function Priority() {
       {showIncSection && (
         <div
           className="p-3 rounded-lg flex flex-col gap-3"
+          data-section="inc"
           style={{
             backgroundColor: 'var(--rn-clr-background-secondary)',
             border: '1px solid var(--rn-clr-border-primary)',
@@ -708,7 +715,7 @@ function Priority() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider value={incAbsPriority} onChange={setIncAbsPriority} />
+            <PrioritySlider ref={incSliderRef} value={incAbsPriority} onChange={setIncAbsPriority} />
 
             {performanceMode === PERFORMANCE_MODE_FULL && (
               <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
@@ -771,6 +778,7 @@ function Priority() {
       {showCardSection && (
         <div
           className="p-3 rounded-lg flex flex-col gap-3"
+          data-section="card"
           style={{
             backgroundColor: 'var(--rn-clr-background-secondary)',
             border: '1px solid var(--rn-clr-border-primary)',
@@ -785,7 +793,7 @@ function Priority() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider value={cardAbsPriority} onChange={setCardAbsPriority} />
+            <PrioritySlider ref={cardSliderRef} value={cardAbsPriority} onChange={setCardAbsPriority} />
 
             {hasCards && cardInfo && (
               <>
@@ -838,6 +846,7 @@ function Priority() {
       {showInheritanceSection && (
         <div
           className="p-3 rounded-lg flex flex-col gap-3"
+          data-section="card"
           style={{
             backgroundColor: 'var(--rn-clr-background-secondary)',
             border: '1px solid var(--rn-clr-border-primary)',
@@ -859,7 +868,7 @@ function Priority() {
           </p>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider value={cardAbsPriority} onChange={setCardAbsPriority} />
+            <PrioritySlider ref={!showCardSection ? cardSliderRef : undefined} value={cardAbsPriority} onChange={setCardAbsPriority} />
 
             {performanceMode === PERFORMANCE_MODE_FULL && (
               <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>

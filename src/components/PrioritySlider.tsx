@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { percentileToHslColor } from '../lib/utils';
 
 interface PrioritySliderProps {
@@ -10,15 +10,53 @@ interface PrioritySliderProps {
   disabled?: boolean;
 }
 
-export function PrioritySlider({
+export interface PrioritySliderRef {
+  focus: () => void;
+  select: () => void;
+}
+
+export const PrioritySlider = forwardRef<PrioritySliderRef, PrioritySliderProps>(function PrioritySlider({
   value,
   onChange,
   min = 0,
   max = 100,
   showValue = true,
   disabled = false,
-}: PrioritySliderProps) {
+}, ref) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [inputValue, setInputValue] = useState(value.toString());
+
+  useEffect(() => {
+    setInputValue(value.toString());
+  }, [value]);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+    select: () => inputRef.current?.select(),
+  }));
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newInputValue = e.target.value;
+    setInputValue(newInputValue);
+
+    const parsed = parseInt(newInputValue, 10);
+    if (!isNaN(parsed)) {
+      const clamped = Math.max(min, Math.min(max, parsed));
+      onChange(clamped);
+    }
+  };
+
+  const handleInputBlur = () => {
+    const parsed = parseInt(inputValue, 10);
+    if (isNaN(parsed)) {
+      setInputValue(value.toString());
+    } else {
+      const clamped = Math.max(min, Math.min(max, parsed));
+      setInputValue(clamped.toString());
+      onChange(clamped);
+    }
+  };
 
   const percentage = ((value - min) / (max - min)) * 100;
   const thumbColor = percentileToHslColor(percentage);
@@ -63,17 +101,22 @@ export function PrioritySlider({
   return (
     <div className="flex items-center gap-2 w-full">
       {showValue && (
-        <span
-          className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded shrink-0"
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          disabled={disabled}
+          className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded shrink-0 border-0 outline-none"
           style={{
             backgroundColor: thumbColor,
             color: 'white',
-            minWidth: '36px',
+            width: '40px',
             textAlign: 'center',
           }}
-        >
-          {value}
-        </span>
+        />
       )}
       <div
         ref={trackRef}
@@ -122,4 +165,4 @@ export function PrioritySlider({
       </div>
     </div>
   );
-}
+});
