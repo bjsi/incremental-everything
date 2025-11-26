@@ -715,7 +715,7 @@ function Priority() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider ref={incSliderRef} value={incAbsPriority} onChange={setIncAbsPriority} />
+            <PrioritySlider ref={incSliderRef} value={incAbsPriority} onChange={setIncAbsPriority} relativePriority={incRelPriority} />
 
             {performanceMode === PERFORMANCE_MODE_FULL && (
               <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
@@ -793,7 +793,7 @@ function Priority() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider ref={cardSliderRef} value={cardAbsPriority} onChange={setCardAbsPriority} />
+            <PrioritySlider ref={cardSliderRef} value={cardAbsPriority} onChange={setCardAbsPriority} relativePriority={cardRelPriority} />
 
             {hasCards && cardInfo && (
               <>
@@ -868,7 +868,7 @@ function Priority() {
           </p>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider ref={!showCardSection ? cardSliderRef : undefined} value={cardAbsPriority} onChange={setCardAbsPriority} />
+            <PrioritySlider ref={!showCardSection ? cardSliderRef : undefined} value={cardAbsPriority} onChange={setCardAbsPriority} relativePriority={cardRelPriority} />
 
             {performanceMode === PERFORMANCE_MODE_FULL && (
               <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>

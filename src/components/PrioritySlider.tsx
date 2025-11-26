@@ -8,6 +8,7 @@ interface PrioritySliderProps {
   max?: number;
   showValue?: boolean;
   disabled?: boolean;
+  relativePriority?: number;
 }
 
 export interface PrioritySliderRef {
@@ -22,6 +23,7 @@ export const PrioritySlider = forwardRef<PrioritySliderRef, PrioritySliderProps>
   max = 100,
   showValue = true,
   disabled = false,
+  relativePriority,
 }, ref) {
   const trackRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +61,9 @@ export const PrioritySlider = forwardRef<PrioritySliderRef, PrioritySliderProps>
   };
 
   const percentage = ((value - min) / (max - min)) * 100;
-  const thumbColor = percentileToHslColor(percentage);
+  // Use relative priority for color if provided, otherwise fall back to absolute position
+  const colorValue = relativePriority !== undefined ? relativePriority : percentage;
+  const thumbColor = percentileToHslColor(colorValue);
 
   const handleTrackClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
