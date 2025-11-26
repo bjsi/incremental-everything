@@ -17,6 +17,12 @@ interface PdfRemItemData {
   currentPage?: number | null;
 }
 
+export type EditingState =
+  | { type: 'none' }
+  | { type: 'range'; remId: string; start: number; end: number }
+  | { type: 'priority'; remId: string; value: number }
+  | { type: 'history'; remId: string; page: number };
+
 interface PdfRemItemProps {
   item: PdfRemItemData;
   isCurrentRem: boolean;
@@ -24,12 +30,7 @@ interface PdfRemItemProps {
   priorityInfo?: { absolute: number; percentile: number | null };
   statistics?: { totalTimeSeconds: number; sessionsWithTime: number };
   history?: PageHistoryEntry[];
-  editingRemId: string | null;
-  editingPriorityRemId: string | null;
-  editingHistoryRemId: string | null;
-  editingRanges: Record<string, { start: number; end: number }>;
-  editingPriorities: Record<string, number>;
-  editingHistoryPage: number;
+  editingState: EditingState;
   onToggleExpanded: (remId: string) => void;
   onInitIncremental: (remId: string) => void;
   onStartEditingRem: (remId: string) => void;
@@ -38,12 +39,8 @@ interface PdfRemItemProps {
   onSaveRemRange: (remId: string) => void;
   onSavePriority: (remId: string) => void;
   onSaveHistory: (remId: string) => void;
-  onCancelEditingRem: () => void;
-  onCancelEditingPriority: () => void;
-  onCancelEditingHistory: () => void;
-  onEditingRangesChange: (remId: string, field: 'start' | 'end', value: number) => void;
-  onEditingPrioritiesChange: (remId: string, value: number) => void;
-  onEditingHistoryPageChange: (value: number) => void;
+  onCancelEditing: () => void;
+  onEditingStateChange: (state: EditingState) => void;
   startInputRef?: React.RefCallback<HTMLInputElement>;
   endInputRef?: React.RefCallback<HTMLInputElement>;
 }
@@ -55,12 +52,7 @@ export function PdfRemItem({
   priorityInfo,
   statistics,
   history,
-  editingRemId,
-  editingPriorityRemId,
-  editingHistoryRemId,
-  editingRanges,
-  editingPriorities,
-  editingHistoryPage,
+  editingState,
   onToggleExpanded,
   onInitIncremental,
   onStartEditingRem,
@@ -69,18 +61,14 @@ export function PdfRemItem({
   onSaveRemRange,
   onSavePriority,
   onSaveHistory,
-  onCancelEditingRem,
-  onCancelEditingPriority,
-  onCancelEditingHistory,
-  onEditingRangesChange,
-  onEditingPrioritiesChange,
-  onEditingHistoryPageChange,
+  onCancelEditing,
+  onEditingStateChange,
   startInputRef,
   endInputRef,
 }: PdfRemItemProps) {
-  const isEditingRange = editingRemId === item.remId;
-  const isEditingPriority = editingPriorityRemId === item.remId;
-  const isEditingHistory = editingHistoryRemId === item.remId;
+  const isEditingRange = editingState.type === 'range' && editingState.remId === item.remId;
+  const isEditingPriority = editingState.type === 'priority' && editingState.remId === item.remId;
+  const isEditingHistory = editingState.type === 'history' && editingState.remId === item.remId;
 
   return (
     <div
@@ -146,12 +134,12 @@ export function PdfRemItem({
                 {isEditingRange ? (
                   <>
                     <button onClick={() => onSaveRemRange(item.remId)} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: '#3b82f6', color: 'white' }}>Save</button>
-                    <button onClick={onCancelEditingRem} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
+                    <button onClick={onCancelEditing} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
                   </>
                 ) : isEditingPriority ? (
-                  <button onClick={onCancelEditingPriority} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
+                  <button onClick={onCancelEditing} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
                 ) : isEditingHistory ? (
-                  <button onClick={onCancelEditingHistory} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
+                  <button onClick={onCancelEditing} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
                 ) : (
                   <>
                     <button
@@ -188,36 +176,36 @@ export function PdfRemItem({
           </div>
 
           {/* Inline Priority Editor */}
-          {isEditingPriority && (
+          {isEditingPriority && editingState.type === 'priority' && (
             <InlinePriorityEditor
-              value={editingPriorities[item.remId]}
-              onChange={(value) => onEditingPrioritiesChange(item.remId, value)}
+              value={editingState.value}
+              onChange={(value) => onEditingStateChange({ ...editingState, value })}
               onSave={() => onSavePriority(item.remId)}
-              onCancel={onCancelEditingPriority}
+              onCancel={onCancelEditing}
             />
           )}
 
           {/* Page Range Editor */}
-          {isEditingRange && editingRanges[item.remId] && (
+          {isEditingRange && editingState.type === 'range' && (
             <InlinePageRangeEditor
-              startValue={editingRanges[item.remId].start}
-              endValue={editingRanges[item.remId].end}
-              onStartChange={(value) => onEditingRangesChange(item.remId, 'start', value)}
-              onEndChange={(value) => onEditingRangesChange(item.remId, 'end', value)}
+              startValue={editingState.start}
+              endValue={editingState.end}
+              onStartChange={(value) => onEditingStateChange({ ...editingState, start: value })}
+              onEndChange={(value) => onEditingStateChange({ ...editingState, end: value })}
               onSave={() => onSaveRemRange(item.remId)}
-              onCancel={onCancelEditingRem}
+              onCancel={onCancelEditing}
               startInputRef={startInputRef}
               endInputRef={endInputRef}
             />
           )}
 
           {/* Inline History Editor */}
-          {isEditingHistory && (
+          {isEditingHistory && editingState.type === 'history' && (
             <InlineHistoryEditor
-              value={editingHistoryPage}
-              onChange={onEditingHistoryPageChange}
+              value={editingState.page}
+              onChange={(page) => onEditingStateChange({ ...editingState, page })}
               onSave={() => onSaveHistory(item.remId)}
-              onCancel={onCancelEditingHistory}
+              onCancel={onCancelEditing}
             />
           )}
 

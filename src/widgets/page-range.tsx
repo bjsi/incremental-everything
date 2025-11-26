@@ -17,7 +17,7 @@ import {
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
 import { calculateRelativePercentile, formatDuration } from '../lib/utils';
-import { PdfRemItem } from '../components';
+import { PdfRemItem, EditingState } from '../components';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -45,14 +45,10 @@ function PageRangeWidget() {
   const [isCurrentRemIncremental, setIsCurrentRemIncremental] = useState<boolean>(false);
   const [remHistories, setRemHistories] = useState<Record<string, PageHistoryEntry[]>>({});
   const [expandedRems, setExpandedRems] = useState<Set<string>>(new Set());
-  const [editingRemId, setEditingRemId] = useState<string | null>(null);
-  const [editingRanges, setEditingRanges] = useState<Record<string, {start: number, end: number}>>({});
   const [remPriorities, setRemPriorities] = useState<Record<string, {absolute: number, percentile: number | null}>>({});
-  const [editingPriorityRemId, setEditingPriorityRemId] = useState<string | null>(null);
-  const [editingPriorities, setEditingPriorities] = useState<Record<string, number>>({});
-  const [editingHistoryRemId, setEditingHistoryRemId] = useState<string | null>(null);
-  const [editingHistoryPage, setEditingHistoryPage] = useState<number>(0);
   const [remStatistics, setRemStatistics] = useState<Record<string, any>>({});
+
+  const [editingState, setEditingState] = useState<EditingState>({ type: 'none' });
   const [totalPdfReadingTime, setTotalPdfReadingTime] = useState<number>(0);
 
   const handleInitIncrementalRem = async (remId: string) => {
@@ -81,33 +77,29 @@ function PageRangeWidget() {
     if (rem) {
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (incRemInfo) {
-        setEditingPriorityRemId(remId);
-        setEditingPriorities({
-          ...editingPriorities,
-          [remId]: incRemInfo.priority
-        });
+        setEditingState({ type: 'priority', remId, value: incRemInfo.priority });
       }
     }
   };
 
   // Save priority inline
   const savePriority = async (remId: string) => {
-    const priority = editingPriorities[remId];
-    if (priority !== undefined) {
-      const rem = await plugin.rem.findOne(remId);
-      if (rem) {
-        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
-        
-        // Update the incremental rem list
-        const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-        if (incRemInfo) {
-          await updateIncrementalRemCache(plugin, incRemInfo);
-        }
-        
-        setEditingPriorityRemId(null);
-        await reloadRelatedRems();
-        await plugin.app.toast(`Priority updated to ${priority}`);
+    if (editingState.type !== 'priority') return;
+    const priority = editingState.value;
+
+    const rem = await plugin.rem.findOne(remId);
+    if (rem) {
+      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+
+      // Update the incremental rem list
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+      if (incRemInfo) {
+        await updateIncrementalRemCache(plugin, incRemInfo);
       }
+
+      setEditingState({ type: 'none' });
+      await reloadRelatedRems();
+      await plugin.app.toast(`Priority updated to ${priority}`);
     }
   };
 
@@ -184,81 +176,65 @@ function PageRangeWidget() {
   // Start editing page range for a specific rem
   const startEditingRem = async (remId: string) => {
     if (!contextData?.pdfRemId) return;
-    
-    setEditingRemId(remId);
-    
+
     // Load existing range for this rem
     const savedRange = await getIncrementalPageRange(plugin, remId, contextData.pdfRemId);
-    if (savedRange) {
-      setEditingRanges({
-        ...editingRanges,
-        [remId]: { start: savedRange.start || 1, end: savedRange.end || 0 }
-      });
-    } else {
-      setEditingRanges({
-        ...editingRanges,
-        [remId]: { start: 1, end: 0 }
-      });
-    }
+    const start = savedRange?.start || 1;
+    const end = savedRange?.end || 0;
+    setEditingState({ type: 'range', remId, start, end });
   };
 
   // Save page range for a specific rem
   const saveRemRange = async (remId: string) => {
-    if (!contextData?.pdfRemId) return;
-    
-    const range = editingRanges[remId];
-    if (!range) return;
-    
+    if (!contextData?.pdfRemId || editingState.type !== 'range') return;
+
+    const { start, end } = editingState;
     const rangeKey = getPageRangeKey(remId, contextData.pdfRemId);
-    
-    if (range.start > 1 || range.end > 0) {
-      await plugin.storage.setSynced(rangeKey, range);
-      await plugin.app.toast(`Saved page range: ${range.start}-${range.end || '∞'}`);
+
+    if (start > 1 || end > 0) {
+      await plugin.storage.setSynced(rangeKey, { start, end });
+      await plugin.app.toast(`Saved page range: ${start}-${end || '∞'}`);
     } else {
       await plugin.storage.setSynced(rangeKey, null);
       await plugin.app.toast('Cleared page range');
     }
-    
-    setEditingRemId(null);
+
+    setEditingState({ type: 'none' });
     await reloadRelatedRems();
   };
 
-  // --- NEW: Start editing history ---
+  // Start editing history
   const startEditingHistory = (remId: string, currentPage: number | null) => {
-    setEditingHistoryRemId(remId);
-    // If currentPage is not set, try to get the last page from history
+    let page = 1;
     if (currentPage && currentPage > 0) {
-      setEditingHistoryPage(currentPage);
+      page = currentPage;
     } else {
       // Check if we have history for this rem
       const history = remHistories[remId];
       if (history && history.length > 0) {
-        // Use the last recorded page from history
-        const lastEntry = history[history.length - 1];
-        setEditingHistoryPage(lastEntry.page);
-      } else {
-        // Default to 1 if no history exists
-        setEditingHistoryPage(1);
+        page = history[history.length - 1].page;
       }
     }
+    setEditingState({ type: 'history', remId, page });
   };
-  
-  // --- NEW: Save reading history record ---
+
+  // Save reading history record
   const saveReadingHistory = async (remId: string) => {
-    if (!contextData?.pdfRemId || !editingHistoryPage || editingHistoryPage <= 0) {
+    if (editingState.type !== 'history') return;
+    const page = editingState.page;
+
+    if (!contextData?.pdfRemId || !page || page <= 0) {
       await plugin.app.toast("Please enter a valid page number.");
       return;
     }
-  
+
     // Update both the current reading position (for the queue) and the history log
-    await setIncrementalReadingPosition(plugin, remId, contextData.pdfRemId, editingHistoryPage);
-    await addPageToHistory(plugin, remId, contextData.pdfRemId, editingHistoryPage, false);
-  
-    await plugin.app.toast(`Updated reading position to page ${editingHistoryPage}`);
-    
-    // Reset state and reload the list to show the new data
-    setEditingHistoryRemId(null);
-    setEditingHistoryPage(0);
+    await setIncrementalReadingPosition(plugin, remId, contextData.pdfRemId, page);
+    await addPageToHistory(plugin, remId, contextData.pdfRemId, page, false);
+
+    await plugin.app.toast(`Updated reading position to page ${page}`);
+
+    setEditingState({ type: 'none' });
     await reloadRelatedRems();
   };
 
@@ -328,14 +304,15 @@ function PageRangeWidget() {
 
   // Auto-focus page range editor when editing starts
   useEffect(() => {
-    if (editingRemId) {
+    if (editingState.type === 'range') {
+      const remId = editingState.remId;
       // Use a longer delay and retry mechanism for first render
       let attempts = 0;
       const maxAttempts = 10; // Try for up to 500ms (10 * 50ms)
-      
+
       const tryFocus = () => {
-        const inputElement = pageRangeInputRefs.current[editingRemId]?.start;
-        
+        const inputElement = pageRangeInputRefs.current[remId]?.start;
+
         if (inputElement) {
           inputElement.focus();
           inputElement.select();
@@ -344,11 +321,11 @@ function PageRangeWidget() {
           setTimeout(tryFocus, 50);
         }
       };
-      
+
       // Start trying after a small initial delay
       setTimeout(tryFocus, 50);
     }
-  }, [editingRemId]);
+  }, [editingState]);
 
   const handleSave = async () => {
     if (!contextData?.incrementalRemId || !contextData?.pdfRemId) return;
@@ -468,11 +445,11 @@ function PageRangeWidget() {
         backgroundColor: 'var(--rn-clr-background-primary)',
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) {
+        if (e.key === 'Enter' && editingState.type === 'none') {
           e.preventDefault();
           handleSave();
         }
-        if (e.key === 'Escape' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) {
+        if (e.key === 'Escape' && editingState.type === 'none') {
           e.preventDefault();
           handleClose();
         }
@@ -625,12 +602,7 @@ function PageRangeWidget() {
               priorityInfo={remPriorities[item.remId]}
               statistics={remStatistics[item.remId]}
               history={remHistories[item.remId]}
-              editingRemId={editingRemId}
-              editingPriorityRemId={editingPriorityRemId}
-              editingHistoryRemId={editingHistoryRemId}
-              editingRanges={editingRanges}
-              editingPriorities={editingPriorities}
-              editingHistoryPage={editingHistoryPage}
+              editingState={editingState}
               onToggleExpanded={toggleExpanded}
               onInitIncremental={handleInitIncrementalRem}
               onStartEditingRem={startEditingRem}
@@ -639,19 +611,8 @@ function PageRangeWidget() {
               onSaveRemRange={saveRemRange}
               onSavePriority={savePriority}
               onSaveHistory={saveReadingHistory}
-              onCancelEditingRem={() => setEditingRemId(null)}
-              onCancelEditingPriority={() => setEditingPriorityRemId(null)}
-              onCancelEditingHistory={() => setEditingHistoryRemId(null)}
-              onEditingRangesChange={(remId, field, value) => {
-                setEditingRanges({
-                  ...editingRanges,
-                  [remId]: { ...editingRanges[remId], [field]: value }
-                });
-              }}
-              onEditingPrioritiesChange={(remId, value) => {
-                setEditingPriorities({ ...editingPriorities, [remId]: value });
-              }}
-              onEditingHistoryPageChange={setEditingHistoryPage}
+              onCancelEditing={() => setEditingState({ type: 'none' })}
+              onEditingStateChange={setEditingState}
               startInputRef={(el) => {
                 if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
                 pageRangeInputRefs.current[item.remId].start = el;
