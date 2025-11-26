@@ -5,17 +5,18 @@ import {
   WidgetLocation,
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
-import { 
-  powerupCode, 
-  seenCardInSessionKey, 
+import {
+  powerupCode,
+  seenCardInSessionKey,
   allCardPriorityInfoKey,
   queueSessionCacheKey,
   cardPriorityCacheRefreshKey,
   displayPriorityShieldId,
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
-import { percentileToHslColor, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
+import { PriorityBadge } from '../components';
 import * as _ from 'remeda';
 
 export function CardPriorityDisplay() {
@@ -146,109 +147,60 @@ export function CardPriorityDisplay() {
 
   // KB percentile is read directly from the main cache, which is already fast.
   const kbPercentile = (!useLightMode && cardInfo) ? cardInfo.kbPercentile : undefined;
-  
-  // Use relative percentile for color in 'full' mode if available,
-  // otherwise fall back to the absolute priority.
-  const colorValue = (!useLightMode && kbPercentile !== undefined)
-    ? kbPercentile            // Use relative percentile (full mode)
-    : finalCardInfo.priority; // Use absolute priority (light mode or fallback)
-
-  const priorityColor = percentileToHslColor(colorValue);
-
-  // ... (style objects remain the same) ...
 
   const handleClick = async () => {
     if (!rem) return;
     await plugin.widget.openPopup('priority', { remId: rem._id });
   };
 
-  const infoBarStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '16px',
-    padding: '6px 12px',
-    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-    borderRadius: '6px',
-    fontSize: '12px',
-    color: '#1e40af',
-    borderLeft: `3px solid ${priorityColor}`,
-    margin: '4px 0',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s ease, transform 0.1s ease',
-  };
-
-  const priorityBadgeStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '4px 10px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: 600,
-    color: 'white',
-    backgroundColor: priorityColor,
-  };
-
   return (
-    <div 
-      style={infoBarStyle} 
-      className="card-priority-display dark:bg-gray-800 dark:text-gray-200"
+    <div
+      className="flex items-center justify-center gap-4 px-3 py-1.5 rounded-md cursor-pointer transition-all"
+      style={{
+        backgroundColor: 'var(--rn-clr-background-secondary)',
+        border: '1px solid var(--rn-clr-border-primary)',
+        margin: '4px 0',
+      }}
       onClick={handleClick}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-        e.currentTarget.style.transform = 'scale(1.01)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
-        e.currentTarget.style.transform = 'scale(1)';
-      }}
-      onTouchStart={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)';
-      }}
-      onTouchEnd={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
-      }}
+      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'; }}
       title="Click to set priority (Opt+P)"
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontWeight: 500 }}>🎴 Priority:</span>
-        <div style={priorityBadgeStyle}>
-          <span>{finalCardInfo.priority}</span> {/* 🔌 Show absolute priority */}
-          
-          {/* 🔌 Conditionally show percentiles */}
-          {!useLightMode && kbPercentile !== undefined && (
-            <span style={{ opacity: 0.9, fontSize: '11px' }}>
-              ({kbPercentile}% KB
-              {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
-            </span>
-          )}
-        </div>
-        {/*  🔌 Conditionally show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
+        <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact />
+        {!useLightMode && kbPercentile !== undefined && (
+          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            ({kbPercentile}% KB
+            {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
+          </span>
+        )}
         {!useLightMode && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
-
-          <span 
-            style={{ 
-              fontSize: '16px', 
-              opacity: 0.6,
-              cursor: 'help'
-            }}
+          <span
+            className="text-sm opacity-60 cursor-help"
             title="Doc percentile will be recalculated when you start a new queue session"
           >
             ⟳
           </span>
         )}
       </div>
-      
-      {/* 🔌 Conditionally show Shield display based on setting */}
+
       {displayPriorityShield && !useLightMode && (shieldStatus?.kb || shieldStatus?.doc) && (
         <>
-          <span style={{ color: '#9ca3af' }}>|</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontWeight: 600 }}>🛡️ Card Shield</span>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {shieldStatus.kb && <span>KB: <strong>{shieldStatus.kb.absolute}</strong> ({shieldStatus.kb.percentile}%)</span>}
-              {shieldStatus.doc && <span>Doc: <strong>{shieldStatus.doc.absolute}</strong> ({shieldStatus.doc.percentile}%)</span>}
+          <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Shield</span>
+            <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              {shieldStatus.kb && (
+                <span>
+                  KB: <PriorityBadge priority={shieldStatus.kb.absolute} percentile={shieldStatus.kb.percentile} compact />
+                </span>
+              )}
+              {shieldStatus.doc && (
+                <span>
+                  Doc: <PriorityBadge priority={shieldStatus.doc.absolute} percentile={shieldStatus.doc.percentile} compact />
+                </span>
+              )}
             </div>
           </div>
         </>

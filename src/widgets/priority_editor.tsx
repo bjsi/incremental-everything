@@ -10,8 +10,9 @@ import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
+import { calculateRelativePercentile } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
+import { PriorityBadge } from '../components';
 
 // Move styles outside component to avoid recreation on every render
 const buttonStyle: React.CSSProperties = {
@@ -22,14 +23,6 @@ const buttonStyle: React.CSSProperties = {
   fontSize: '12px',
   cursor: 'pointer',
   color: 'var(--rn-clr-content-primary)',
-};
-
-const priorityPillStyle: React.CSSProperties = {
-  color: 'white',
-  padding: '2px 6px',
-  borderRadius: '4px',
-  display: 'inline-block',
-  lineHeight: '1.2',
 };
 
 export function PriorityEditor() {
@@ -126,19 +119,9 @@ export function PriorityEditor() {
     await updateCardPriorityCache(plugin, rem._id);
   }, [rem, cardInfo, plugin]);
 
-  // Memoize calculated colors
-  const incRemColor = useMemo(
-    () => incRemRelativePriority ? percentileToHslColor(incRemRelativePriority) : undefined,
-    [incRemRelativePriority]
-  );
-
-  const cardColor = useMemo(
-    () => cardRelativePriority ? percentileToHslColor(cardRelativePriority) : undefined,
-    [cardRelativePriority]
-  );
-
-  const cardPriorityFontWeight = useMemo(
-    () => cardInfo?.source === 'manual' ? 'bold' : 'normal',
+  // Memoize whether card priority is manual (for visual indicator)
+  const isCardPriorityManual = useMemo(
+    () => cardInfo?.source === 'manual',
     [cardInfo?.source]
   );
 
@@ -191,22 +174,14 @@ export function PriorityEditor() {
       {!isExpanded ? (
         <div
           onClick={() => setIsExpanded(true)}
-          className="cursor-pointer p-1 text-center"
+          className="cursor-pointer p-1 flex flex-col items-center gap-1"
           title="Click to expand priority controls"
         >
           {incRemInfo && (
-            <div className="mb-1" title={`Inc Priority: ${incRemInfo.priority} (${incRemRelativePriority}%)`}>
-              <span style={{ ...priorityPillStyle, backgroundColor: incRemColor, fontSize: '11px' }}>
-                I:{incRemInfo.priority}
-              </span>
-            </div>
+            <PriorityBadge priority={incRemInfo.priority} percentile={incRemRelativePriority ?? undefined} compact />
           )}
-          {showCardEditor && ( // This now respects the new setting
-            <div title={`Card Priority: ${cardInfo?.priority ?? 'None'} (${cardRelativePriority}%)`}>
-              <span style={{ ...priorityPillStyle, backgroundColor: cardColor, fontSize: '11px' }}>
-                C:<span style={{ fontWeight: cardPriorityFontWeight }}>{cardInfo?.priority ?? '-'}</span>
-              </span>
-            </div>
+          {showCardEditor && (
+            <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact />
           )}
         </div>
       ) : (
@@ -226,36 +201,32 @@ export function PriorityEditor() {
 
             {incRemInfo && (
               <div className="mb-3">
-                <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-blue-600)' }}>
-                  Inc Rem ({incRemRelativePriority}%)
+                <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                  Inc Rem
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => quickUpdateIncPriority(-10)} style={buttonStyle}>-10</button>
                   <button onClick={() => quickUpdateIncPriority(-1)} style={buttonStyle}>-1</button>
-                  <span className="px-2 text-sm font-bold" style={{ ...priorityPillStyle, backgroundColor: incRemColor }}>
-                    {incRemInfo.priority}
-                  </span>
+                  <PriorityBadge priority={incRemInfo.priority} percentile={incRemRelativePriority ?? undefined} compact />
                   <button onClick={() => quickUpdateIncPriority(1)} style={buttonStyle}>+1</button>
                   <button onClick={() => quickUpdateIncPriority(10)} style={buttonStyle}>+10</button>
                 </div>
               </div>
             )}
 
-            {showCardEditor && ( // This now respects the new setting
+            {showCardEditor && (
               <div>
-                <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-green-600)' }}>
-                  Cards ({cardRelativePriority}%)
+                <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                  Cards {isCardPriorityManual && <span className="font-bold">(manual)</span>}
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => quickUpdateCardPriority(-10)} style={buttonStyle}>-10</button>
                   <button onClick={() => quickUpdateCardPriority(-1)} style={buttonStyle}>-1</button>
-                  <span className="px-2 text-sm" style={{ ...priorityPillStyle, backgroundColor: cardColor, fontWeight: cardPriorityFontWeight }}>
-                    {cardInfo?.priority ?? 50}
-                  </span>
+                  <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact />
                   <button onClick={() => quickUpdateCardPriority(1)} style={buttonStyle}>+1</button>
                   <button onClick={() => quickUpdateCardPriority(10)} style={buttonStyle}>+10</button>
                 </div>
-                <div className="text-xs mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                <div className="text-xs mt-1" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
                   {!hasCards && hasCardPriorityPowerup ? "Set for inheritance" : `Source: ${cardInfo?.source}`}
                 </div>
               </div>
