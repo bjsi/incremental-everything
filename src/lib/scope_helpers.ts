@@ -2,7 +2,7 @@ import { ReactRNPlugin, RemId, Rem, BuiltInPowerupCodes, RichTextElementRemInter
 import { allIncrementalRemKey } from './consts';
 
 /**
- * Collects PDF source IDs from a list of rems (scopeRem and its descendants).
+ * Collects PDF source IDs from a list of rems.
  * Returns both all source IDs and a filtered set of PDF-only source IDs.
  */
 export async function collectPdfSourcesFromRems(
@@ -29,7 +29,7 @@ export async function collectPdfSourcesFromRems(
 }
 
 /**
- * Finds all PDF extract IDs that belong to the given PDF sources.
+ * Finds all PDF extract IDs (highlights) that belong to the given PDF sources.
  * Returns an array of RemIds for PDF extracts that are incremental rems.
  */
 export async function findPdfExtractIds(
@@ -69,31 +69,80 @@ export async function findPdfExtractIds(
 }
 
 /**
- * Builds a quick scope for on-the-fly calculations in GetNextCard callback.
- * Includes descendants and PDF extracts from PDF sources.
- *
- * This is a simplified version that doesn't include all the comprehensive
- * scope features (allRemInDocumentOrPortal, folderQueueRems, etc.) for performance.
+ * Gets all descendant IDs from PDF sources.
+ * This includes notes/flashcards created inside PDFs.
  */
-export async function buildQuickScope(
+export async function getPdfDescendantIds(
   plugin: ReactRNPlugin,
-  scopeRemId: RemId
+  pdfSourceIds: Set<string>
+): Promise<RemId[]> {
+  if (pdfSourceIds.size === 0) {
+    return [];
+  }
+
+  const pdfDescendantIds: RemId[] = [];
+
+  for (const pdfId of pdfSourceIds) {
+    try {
+      const pdfRem = await plugin.rem.findOne(pdfId);
+      if (pdfRem) {
+        const descendants = await pdfRem.getDescendants();
+        for (const desc of descendants) {
+          pdfDescendantIds.push(desc._id);
+        }
+      }
+    } catch (error) {
+      // Skip if there's an error with this PDF
+    }
+  }
+
+  return pdfDescendantIds;
+}
+
+/**
+ * Builds a document scope containing all related rem IDs.
+ *
+ * This is the SINGLE SOURCE OF TRUTH for building document scopes.
+ * Use this function in:
+ * - inc_rem_counter.tsx (to count incRems in a document)
+ * - inc_rem_list.tsx (to list incRems in a document)
+ * - callbacks.ts (for on-the-fly scope calculation in GetNextCard)
+ *
+ * The scope includes:
+ * - The document itself
+ * - All descendants of the document
+ * - All sources referenced by the document and its descendants
+ * - All PDF highlights from PDFs that are sources
+ * - All descendants of PDFs that are sources (notes/flashcards inside PDFs)
+ *
+ * @param plugin Plugin instance to access the RemNote API
+ * @param documentId RemId of the document to build the scope for
+ * @returns Set of RemIds that belong to this document's scope
+ */
+export async function buildDocumentScope(
+  plugin: ReactRNPlugin,
+  documentId: RemId
 ): Promise<Set<RemId>> {
-  const scopeRem = await plugin.rem.findOne(scopeRemId);
-  if (!scopeRem) return new Set();
+  const document = await plugin.rem.findOne(documentId);
+  if (!document) return new Set();
 
-  const descendants = await scopeRem.getDescendants();
+  const descendants = await document.getDescendants();
+  const descendantIds = new Set<RemId>([documentId, ...descendants.map(d => d._id)]);
 
-  // Collect PDF sources from scope rem AND all its descendants
-  const { allSourceIds, pdfSourceIds } = await collectPdfSourcesFromRems([scopeRem, ...descendants]);
+  // Collect PDF sources from document and all its descendants
+  const { allSourceIds, pdfSourceIds } = await collectPdfSourcesFromRems([document, ...descendants]);
 
-  // Find PDF extracts that belong to PDF sources
+  // Find PDF extracts (highlights) that belong to PDF sources
   const pdfExtractIds = await findPdfExtractIds(plugin, pdfSourceIds);
 
-  return new Set<RemId>([
-    scopeRem._id,
-    ...descendants.map(r => r._id),
-    ...allSourceIds,
-    ...pdfExtractIds
-  ]);
+  // Find descendants of PDF sources (notes/flashcards inside PDFs)
+  const pdfDescendantIds = await getPdfDescendantIds(plugin, pdfSourceIds);
+
+  // Add all to the scope
+  allSourceIds.forEach(id => descendantIds.add(id));
+  pdfExtractIds.forEach(id => descendantIds.add(id));
+  pdfDescendantIds.forEach(id => descendantIds.add(id));
+
+  return descendantIds;
 }
+

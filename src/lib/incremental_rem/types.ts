@@ -8,7 +8,9 @@ export type ActionItemType =
   | 'video'
   | 'rem'
   | 'pdf-highlight'
-  | 'html-highlight';
+  | 'html-highlight'
+  | 'pdf-note'
+  | 'unknown';
 
 export type PDFActionItem = { type: 'pdf'; rem: PluginRem };
 export type HTMLActionItem = { type: 'html'; rem: PluginRem };

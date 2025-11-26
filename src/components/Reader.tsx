@@ -23,6 +23,8 @@ import {
   PageRangeContext,
   findIncrementalRemForPDF,
 } from '../lib/pdfUtils';
+import { Breadcrumb, BreadcrumbItem } from './Breadcrumb';
+import { StatBadge } from './StatBadge';
 
 interface ReaderProps {
   actionItem: PDFActionItem | PDFHighlightActionItem | HTMLActionItem | HTMLHighlightActionItem;
@@ -76,7 +78,6 @@ export function Reader(props: ReaderProps) {
   const [pageRangeStart, setPageRangeStart] = React.useState<number>(1);
   const [pageRangeEnd, setPageRangeEnd] = React.useState<number>(0);
   const [isInputFocused, setIsInputFocused] = React.useState<boolean>(false);
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
   const [canRenderPdf, setCanRenderPdf] = React.useState(
     !(isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight'))
   ); 
@@ -212,124 +213,108 @@ export function Reader(props: ReaderProps) {
     setPageInputValue('1');
   }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin]);
   
-  // Metadata Bar Styles (Stabilized)
-  const metadataBarStyles = useMemo(() => {
-    // ... (rest of styles logic)
-    const color = isDarkMode ? '#f9fafb' : '#111827';
-    const subColor = isDarkMode ? '#9ca3af' : '#6b7280';
-    const border = isDarkMode ? '#374151' : '#e5e7eb';
-    const bg = isDarkMode ? '#1f2937' : '#fafafa';
-    
-    return {
-      container: {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', 
-        borderTop: `1px solid ${border}`, backgroundColor: bg, minHeight: '28px', gap: '12px', 
-        flexWrap: 'nowrap' as const, overflow: 'hidden'
-      },
-      dividerColor: border,
-      title: {
-        fontSize: '12px', fontWeight: 600, color: color, whiteSpace: 'nowrap' as const, 
-        overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px'
-      },
-      statsGroup: {
-        display: 'flex', alignItems: 'center', gap: '16px', fontSize: '11px', 
-        color: subColor, flex: '1 1 auto', justifyContent: 'center'
-      },
-      statItem: {
-        display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' as const,
-      },
-      statNumber: { fontWeight: 600, color: color },
-      pageButton: {
-        padding: '2px 6px', fontSize: '11px', borderRadius: '4px', 
-        border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
-        backgroundColor: isDarkMode ? '#374151' : '#ffffff', color: isDarkMode ? '#f3f4f6' : '#111827',
-        cursor: 'pointer', transition: 'all 0.15s ease', fontWeight: 500
-      },
-      pageInput: {
-        width: '55px', padding: '2px 4px', fontSize: '11px', borderRadius: '4px', 
-        border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
-        textAlign: 'center' as const, backgroundColor: isDarkMode ? '#374151' : '#ffffff', 
-        color: isDarkMode ? '#f3f4f6' : '#111827',
-      },
-      pageLabel: { fontSize: '11px', color: subColor },
-      rangeButton: {
-        padding: '2px 8px', fontSize: '11px', borderRadius: '4px', 
-        border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
-        backgroundColor: isDarkMode ? '#374151' : '#ffffff', color: isDarkMode ? '#f3f4f6' : '#111827',
-        cursor: 'pointer', transition: 'all 0.15s ease', fontWeight: 500, display: 'flex', 
-        alignItems: 'center', gap: '4px'
-      },
-      clearButton: {
-        padding: '2px 6px', fontSize: '11px', color: isDarkMode ? '#f87171' : '#dc2626',
-        cursor: 'pointer', transition: 'opacity 0.15s ease', opacity: 0.7, border: 'none', background: 'none'
-      },
-      activeRangeButton: {
-        backgroundColor: isDarkMode ? '#1e3a8a' : '#eff6ff', borderColor: isDarkMode ? '#3b82f6' : '#3b82f6',
-        color: isDarkMode ? '#bfdbfe' : '#1e40af',
-      }
-    };
-  }, [isDarkMode]);
+  // Metadata Bar Styles using RemNote CSS variables
+  const metadataBarStyles = useMemo(() => ({
+    container: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '8px 16px',
+      borderTop: '1px solid var(--rn-clr-border-primary)',
+      backgroundColor: 'var(--rn-clr-background-secondary)',
+      minHeight: '40px',
+      gap: '16px',
+      flexWrap: 'nowrap' as const,
+      overflow: 'hidden'
+    },
+    dividerColor: 'var(--rn-clr-border-primary)',
+    title: {
+      fontSize: '13px',
+      fontWeight: 600,
+      color: 'var(--rn-clr-content-primary)',
+      whiteSpace: 'nowrap' as const,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      maxWidth: '280px'
+    },
+    statsGroup: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '20px',
+      flex: '1 1 auto',
+      justifyContent: 'center'
+    },
+    pageButton: {
+      padding: '4px 8px',
+      fontSize: '12px',
+      borderRadius: '6px',
+      border: '1px solid var(--rn-clr-border-primary)',
+      backgroundColor: 'var(--rn-clr-background-primary)',
+      color: 'var(--rn-clr-content-primary)',
+      cursor: 'pointer',
+      transition: 'all 0.15s ease',
+      fontWeight: 500
+    },
+    pageInput: {
+      width: '50px',
+      padding: '4px 6px',
+      fontSize: '12px',
+      borderRadius: '6px',
+      border: '1px solid var(--rn-clr-border-primary)',
+      textAlign: 'center' as const,
+      backgroundColor: 'var(--rn-clr-background-primary)',
+      color: 'var(--rn-clr-content-primary)',
+    },
+    pageLabel: {
+      fontSize: '11px',
+      color: 'var(--rn-clr-content-tertiary)'
+    },
+    rangeButton: {
+      padding: '4px 10px',
+      fontSize: '11px',
+      borderRadius: '6px',
+      border: '1px solid var(--rn-clr-border-primary)',
+      backgroundColor: 'var(--rn-clr-background-primary)',
+      color: 'var(--rn-clr-content-secondary)',
+      cursor: 'pointer',
+      transition: 'all 0.15s ease',
+      fontWeight: 500,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    },
+    clearButton: {
+      padding: '4px 8px',
+      fontSize: '11px',
+      color: 'var(--rn-clr-red, #dc2626)',
+      cursor: 'pointer',
+      transition: 'opacity 0.15s ease',
+      opacity: 0.7,
+      border: 'none',
+      background: 'none'
+    },
+    activeRangeButton: {
+      backgroundColor: 'var(--rn-clr-blue-light, #eff6ff)',
+      borderColor: 'var(--rn-clr-blue, #3b82f6)',
+      color: 'var(--rn-clr-blue, #1e40af)',
+    }
+  }), []);
 
   // Active range button style when a range is set
   const activeRangeButtonStyle = {
     ...metadataBarStyles.rangeButton,
     ...(pageRangeStart > 1 || pageRangeEnd > 0 ? metadataBarStyles.activeRangeButton : {}),
   };
+
+  // Handle breadcrumb click to navigate to ancestor
+  const handleBreadcrumbClick = React.useCallback(async (ancestorId: string) => {
+    const ancestorRem = await plugin.rem.findOne(ancestorId as RemId);
+    if (ancestorRem) {
+      await plugin.window.openRem(ancestorRem);
+    }
+  }, [plugin]);
   
   // --- 4. ALL useEffect Hooks MUST BE HERE ---
-
-// Dark Mode Detection Effect
-  React.useEffect(() => {
-    let lastKnownDarkMode = false;
-
-    const checkDarkMode = () => {
-      // Logic for checking dark mode...
-      const htmlHasDark = document.documentElement.classList.contains('dark');
-      const bodyHasDark = document.body?.classList.contains('dark');
-      
-      let parentHasDark = false;
-      try {
-        if (window.parent && window.parent !== window) {
-          parentHasDark = window.parent.document.documentElement.classList.contains('dark');
-        }
-      } catch (e) {
-        // Cross-origin iframe, can't access parent
-      }
-
-      const backgroundColor = window.getComputedStyle(document.body).backgroundColor;
-      let isDarkByColor = false;
-
-      if (backgroundColor && backgroundColor.startsWith('rgb')) {
-        const matches = backgroundColor.match(/\d+/g);
-        if (matches && matches.length >= 3) {
-          const [r, g, b] = matches.map(Number);
-          isDarkByColor = (r + g + b) / 3 < 128;
-        }
-      }
-
-      const isDark = Boolean(htmlHasDark || bodyHasDark || parentHasDark || isDarkByColor);
-      
-      if (isDark !== lastKnownDarkMode) {
-        lastKnownDarkMode = isDark;
-        setIsDarkMode(isDark);
-      }
-    };
-
-    const observer = new MutationObserver(() => { checkDarkMode(); });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    if (document.body) {
-      observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    }
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
-    
-    checkDarkMode();
-    const interval = setInterval(checkDarkMode, 2000);
-
-    return () => {
-      observer.disconnect();
-      clearInterval(interval);
-    };
-  }, []);
 
   // DEFERRED CRITICAL CONTEXT CALCULATION (NEW: Replaces slow tracker logic)
   React.useEffect(() => {
@@ -339,8 +324,15 @@ export function Reader(props: ReaderProps) {
     const loadCriticalData = async () => {
       const incrementalRem = await findIncrementalRemForPDF(plugin, pdfRem, true);
 
+      // rem is used for breadcrumbs and document powerup
       const rem = incrementalRem || pdfRem;
-      const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled Rem';
+
+      // For highlights, show the highlight's name (extract text), not the PDF name
+      const isHighlight = actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight';
+      const remForName = isHighlight
+        ? (actionItem as PDFHighlightActionItem | HTMLHighlightActionItem).extract
+        : rem;
+      const remText = remForName.text ? await safeRemTextToString(plugin, remForName.text) : 'Untitled Rem';
       const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
 
       // 2. Get Ancestors (also slow)
@@ -386,7 +378,7 @@ export function Reader(props: ReaderProps) {
 
     return () => clearTimeout(timeoutId);
     
-  }, [actionItem.rem._id, actionItem.rem.parent, plugin]);
+  }, [actionItem.rem._id, actionItem.rem.parent, actionItem.type, actionItem, plugin]);
 
 
   // DEFERRED METADATA CALCULATION (Statistics)
@@ -665,32 +657,24 @@ export function Reader(props: ReaderProps) {
   return (
     <div className="pdf-reader-viewer" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Breadcrumb Section (Placeholder until context loads) */}
-      <div className="breadcrumb-section" style={{
-        padding: '8px 12px',
-        borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb',
-        backgroundColor: isDarkMode ? '#111827' : '#f9fafb',
-        flexShrink: 0,
-        opacity: isContextLoading ? 0.2 : 1, // Dim while loading
-        minHeight: '28px', // Ensure a minimum height so layout doesn't jump
-      }}>
-        {!isContextLoading && ancestors.length > 0 && (
-          <div style={{
-            fontSize: '11px',
-            color: isDarkMode ? '#9ca3af' : '#6b7280',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>
-            {ancestors.map((ancestor, index) => (
-              <span key={ancestor.id}>
-                {ancestor.text}
-                {index < ancestors.length - 1 && ' › '}
-              </span>
-            ))}
-          </div>
-        )}
-        {isContextLoading && <span style={{fontSize: '11px'}}>Loading breadcrumbs...</span>}
+      {/* Breadcrumb Section */}
+      <div
+        className="breadcrumb-section"
+        style={{
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--rn-clr-border-primary)',
+          backgroundColor: 'var(--rn-clr-background-secondary)',
+          flexShrink: 0,
+          opacity: isContextLoading ? 0.2 : 1,
+          minHeight: '28px',
+        }}
+      >
+        <Breadcrumb
+          items={ancestors as BreadcrumbItem[]}
+          isLoading={isContextLoading}
+          loadingText="Loading breadcrumbs..."
+          onClick={handleBreadcrumbClick}
+        />
       </div>
       
       {/* PDF Reader Section (Renders INSTANTLY) */}
@@ -725,34 +709,23 @@ export function Reader(props: ReaderProps) {
         {/* Center: Stats */}
         <div style={metadataBarStyles.statsGroup}>
           {isMetadataLoading ? (
-            <span>Calculating statistics...</span>
+            <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>Calculating statistics...</span>
           ) : (
             <>
-              <div style={metadataBarStyles.statItem}>
-                <span style={metadataBarStyles.statNumber}>{childrenCount}</span>
-                <span>direct children</span>
-                {incrementalChildrenCount > 0 && (
-                  <span style={{ color: isDarkMode ? '#60a5fa' : '#3b82f6' }}>({incrementalChildrenCount} inc)</span>
-                )}
-              </div>
-              
-              <div style={metadataBarStyles.statItem}>
-                <span style={metadataBarStyles.statNumber}>{descendantsCount}</span>
-                <span>descendants</span>
-                {incrementalDescendantsCount > 0 && (
-                  <span style={{ color: isDarkMode ? '#60a5fa' : '#3b82f6' }}>({incrementalDescendantsCount} inc)</span>
-                )}
-              </div>
-              
-              <div style={metadataBarStyles.statItem}>
-                <span style={metadataBarStyles.statNumber}>{flashcardCount}</span>
-                <span>cards</span>
-              </div>
-              
-              <div style={metadataBarStyles.statItem}>
-                <span style={metadataBarStyles.statNumber}>{pdfHighlightCount}</span>
-                <span>highlights</span>
-              </div>
+              <StatBadge
+                value={childrenCount}
+                label="children"
+                highlight={incrementalChildrenCount}
+                highlightLabel="inc"
+              />
+              <StatBadge
+                value={descendantsCount}
+                label="descendants"
+                highlight={incrementalDescendantsCount}
+                highlightLabel="inc"
+              />
+              <StatBadge value={flashcardCount} label="cards" />
+              <StatBadge value={pdfHighlightCount} label="highlights" />
             </>
           )}
         </div>

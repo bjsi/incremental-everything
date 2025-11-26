@@ -40,7 +40,7 @@ import {
 } from '../lib/shield_history';
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
-import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
+import { collectPdfSourcesFromRems, findPdfExtractIds, getPdfDescendantIds } from '../lib/scope_helpers';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -99,8 +99,11 @@ async function buildComprehensiveScope(
   // Collect PDF sources from scopeRem and all descendants
   const { pdfSourceIds } = await collectPdfSourcesFromRems([scopeRem, ...descendants]);
 
-  // Find PDF extracts that belong to PDF sources
+  // Find PDF extracts (highlights) that belong to PDF sources
   const pdfExtractIds = await findPdfExtractIds(plugin, pdfSourceIds);
+
+  // Find descendants of PDF sources (notes/flashcards inside PDFs)
+  const pdfDescendantIds = await getPdfDescendantIds(plugin, pdfSourceIds);
 
   return new Set<RemId>([
     scopeRem._id,
@@ -109,7 +112,8 @@ async function buildComprehensiveScope(
     ...folderQueueRems.map(r => r._id),
     ...sources.map(r => r._id),
     ...referencingRems,
-    ...pdfExtractIds
+    ...pdfExtractIds,
+    ...pdfDescendantIds
   ]);
 }
 

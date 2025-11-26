@@ -10,26 +10,19 @@ import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
 import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
+import { calculateRelativePercentile } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
+import { PriorityBadge } from '../components';
 
 // Move styles outside component to avoid recreation on every render
-const buttonStyle: React.CSSProperties = {
-  backgroundColor: 'var(--rn-clr-bg-secondary)',
-  border: '1px solid var(--rn-clr-border-primary)',
-  padding: '4px 8px',
-  borderRadius: '4px',
-  fontSize: '12px',
+const adjustButtonStyle: React.CSSProperties = {
+  padding: '6px 10px',
+  borderRadius: '6px',
+  fontSize: '11px',
+  fontWeight: 600,
   cursor: 'pointer',
-  color: 'var(--rn-clr-content-primary)',
-};
-
-const priorityPillStyle: React.CSSProperties = {
-  color: 'white',
-  padding: '2px 6px',
-  borderRadius: '4px',
-  display: 'inline-block',
-  lineHeight: '1.2',
+  border: 'none',
+  transition: 'all 0.15s ease',
 };
 
 export function PriorityEditor() {
@@ -126,19 +119,9 @@ export function PriorityEditor() {
     await updateCardPriorityCache(plugin, rem._id);
   }, [rem, cardInfo, plugin]);
 
-  // Memoize calculated colors
-  const incRemColor = useMemo(
-    () => incRemRelativePriority ? percentileToHslColor(incRemRelativePriority) : undefined,
-    [incRemRelativePriority]
-  );
-
-  const cardColor = useMemo(
-    () => cardRelativePriority ? percentileToHslColor(cardRelativePriority) : undefined,
-    [cardRelativePriority]
-  );
-
-  const cardPriorityFontWeight = useMemo(
-    () => cardInfo?.source === 'manual' ? 'bold' : 'normal',
+  // Memoize whether card priority is manual (for visual indicator)
+  const isCardPriorityManual = useMemo(
+    () => cardInfo?.source === 'manual',
     [cardInfo?.source]
   );
 
@@ -177,95 +160,194 @@ export function PriorityEditor() {
       style={{
         position: 'sticky',
         top: '12px',
-        backgroundColor: 'var(--rn-clr-bg-primary)',
-        border: '1px solid var(--rn-clr-border-primary)',
+        backgroundColor: isExpanded ? 'var(--rn-clr-background-primary)' : 'transparent',
+        border: isExpanded ? '1px solid var(--rn-clr-border-primary)' : 'none',
         color: 'var(--rn-clr-content-primary)',
-        borderRadius: '8px',
-        padding: isExpanded ? '12px' : '8px',
-        boxShadow: 'var(--rn-box-shadow-modal)',
-        transition: 'all 0.3s ease',
-        minWidth: isExpanded ? '200px' : '40px',
+        borderRadius: '12px',
+        padding: isExpanded ? '16px' : '4px',
+        boxShadow: isExpanded ? '0 4px 20px rgba(0,0,0,0.15)' : 'none',
+        transition: 'all 0.2s ease',
+        minWidth: isExpanded ? '240px' : 'auto',
         zIndex: 1000,
       }}
     >
       {!isExpanded ? (
         <div
           onClick={() => setIsExpanded(true)}
-          className="cursor-pointer p-1 text-center"
+          className="cursor-pointer flex flex-col items-center gap-1.5"
           title="Click to expand priority controls"
         >
           {incRemInfo && (
-            <div className="mb-1" title={`Inc Priority: ${incRemInfo.priority} (${incRemRelativePriority}%)`}>
-              <span style={{ ...priorityPillStyle, backgroundColor: incRemColor, fontSize: '11px' }}>
-                I:{incRemInfo.priority}
-              </span>
-            </div>
+            <PriorityBadge priority={incRemInfo.priority} percentile={incRemRelativePriority ?? undefined} compact />
           )}
-          {showCardEditor && ( // This now respects the new setting
-            <div title={`Card Priority: ${cardInfo?.priority ?? 'None'} (${cardRelativePriority}%)`}>
-              <span style={{ ...priorityPillStyle, backgroundColor: cardColor, fontSize: '11px' }}>
-                C:<span style={{ fontWeight: cardPriorityFontWeight }}>{cardInfo?.priority ?? '-'}</span>
-              </span>
-            </div>
+          {showCardEditor && (
+            <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact />
           )}
         </div>
       ) : (
-        <div>
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="absolute top-1 right-1"
-            style={{ color: 'var(--rn-clr-content-secondary)', fontSize: '12px' }}
-          >
-            ✕
-          </button>
-
-          <div className="mb-3">
-            <div className="text-xs font-bold mb-2" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-              Priority Control
+        <div className="flex flex-col gap-3">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">⚡</span>
+              <span className="text-xs font-bold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                Quick Priority
+              </span>
             </div>
-
-            {incRemInfo && (
-              <div className="mb-3">
-                <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-blue-600)' }}>
-                  Inc Rem ({incRemRelativePriority}%)
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => quickUpdateIncPriority(-10)} style={buttonStyle}>-10</button>
-                  <button onClick={() => quickUpdateIncPriority(-1)} style={buttonStyle}>-1</button>
-                  <span className="px-2 text-sm font-bold" style={{ ...priorityPillStyle, backgroundColor: incRemColor }}>
-                    {incRemInfo.priority}
-                  </span>
-                  <button onClick={() => quickUpdateIncPriority(1)} style={buttonStyle}>+1</button>
-                  <button onClick={() => quickUpdateIncPriority(10)} style={buttonStyle}>+10</button>
-                </div>
-              </div>
-            )}
-
-            {showCardEditor && ( // This now respects the new setting
-              <div>
-                <div className="text-xs mb-1" style={{ color: 'var(--rn-clr-green-600)' }}>
-                  Cards ({cardRelativePriority}%)
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => quickUpdateCardPriority(-10)} style={buttonStyle}>-10</button>
-                  <button onClick={() => quickUpdateCardPriority(-1)} style={buttonStyle}>-1</button>
-                  <span className="px-2 text-sm" style={{ ...priorityPillStyle, backgroundColor: cardColor, fontWeight: cardPriorityFontWeight }}>
-                    {cardInfo?.priority ?? 50}
-                  </span>
-                  <button onClick={() => quickUpdateCardPriority(1)} style={buttonStyle}>+1</button>
-                  <button onClick={() => quickUpdateCardPriority(10)} style={buttonStyle}>+10</button>
-                </div>
-                <div className="text-xs mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                  {!hasCards && hasCardPriorityPowerup ? "Set for inheritance" : `Source: ${cardInfo?.source}`}
-                </div>
-              </div>
-            )}
-          </div>
             <button
+              onClick={() => setIsExpanded(false)}
+              className="w-5 h-5 flex items-center justify-center rounded-full transition-colors"
+              style={{
+                color: 'var(--rn-clr-content-tertiary)',
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'; }}
+            >
+              <span className="text-xs">✕</span>
+            </button>
+          </div>
+
+          {/* Inc Rem Section */}
+          {incRemInfo && (
+            <div
+              className="p-3 rounded-lg"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">📖</span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                    Inc Rem
+                  </span>
+                </div>
+                <PriorityBadge priority={incRemInfo.priority} percentile={incRemRelativePriority ?? undefined} compact />
+              </div>
+              <div className="flex items-center justify-center gap-1">
+                <button
+                  onClick={() => quickUpdateIncPriority(-10)}
+                  style={{ ...adjustButtonStyle, backgroundColor: '#ef4444', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  −10
+                </button>
+                <button
+                  onClick={() => quickUpdateIncPriority(-1)}
+                  style={{ ...adjustButtonStyle, backgroundColor: '#f97316', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  −1
+                </button>
+                <button
+                  onClick={() => quickUpdateIncPriority(1)}
+                  style={{ ...adjustButtonStyle, backgroundColor: '#22c55e', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  +1
+                </button>
+                <button
+                  onClick={() => quickUpdateIncPriority(10)}
+                  style={{ ...adjustButtonStyle, backgroundColor: '#3b82f6', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  +10
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Cards Section */}
+          {showCardEditor && (
+            <div
+              className="p-3 rounded-lg"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">🎴</span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                    Cards
+                  </span>
+                  {isCardPriorityManual && (
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                      style={{ backgroundColor: '#8b5cf6', color: 'white' }}
+                    >
+                      manual
+                    </span>
+                  )}
+                </div>
+                <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact />
+              </div>
+              <div className="flex items-center justify-center gap-1">
+                <button
+                  onClick={() => quickUpdateCardPriority(-10)}
+                  style={{ ...adjustButtonStyle, backgroundColor: '#ef4444', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  −10
+                </button>
+                <button
+                  onClick={() => quickUpdateCardPriority(-1)}
+                  style={{ ...adjustButtonStyle, backgroundColor: '#f97316', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  −1
+                </button>
+                <button
+                  onClick={() => quickUpdateCardPriority(1)}
+                  style={{ ...adjustButtonStyle, backgroundColor: '#22c55e', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  +1
+                </button>
+                <button
+                  onClick={() => quickUpdateCardPriority(10)}
+                  style={{ ...adjustButtonStyle, backgroundColor: '#3b82f6', color: 'white' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  +10
+                </button>
+              </div>
+              <div className="text-[10px] text-center mt-2" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                {!hasCards && hasCardPriorityPowerup ? "Set for inheritance" : `Source: ${cardInfo?.source}`}
+              </div>
+            </div>
+          )}
+
+          {/* Open Full Panel Button */}
+          <button
             onClick={() => plugin.widget.openPopup('priority', { remId })}
-            style={{...buttonStyle, width: '100%'}}
+            className="w-full py-2 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              border: '1px solid var(--rn-clr-border-primary)',
+              color: 'var(--rn-clr-content-secondary)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+              e.currentTarget.style.color = 'var(--rn-clr-content-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)';
+              e.currentTarget.style.color = 'var(--rn-clr-content-secondary)';
+            }}
           >
-            Open Full Priority Panel
+            Open Full Panel →
           </button>
         </div>
       )}

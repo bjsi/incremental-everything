@@ -16,33 +16,11 @@ import {
   PageHistoryEntry
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
-import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
+import { calculateRelativePercentile, formatDuration } from '../lib/utils';
+import { PdfRemItem, EditingState } from '../components';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-
-/**
- * Format seconds into a human-readable duration string
- */
-function formatDuration(seconds: number): string {
-  if (!seconds || seconds === 0) return '';
-  
-  if (seconds < 60) {
-    return `${seconds}s`;
-  } else if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return remainingSeconds > 0 
-      ? `${minutes}m ${remainingSeconds}s`
-      : `${minutes}m`;
-  } else {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return minutes > 0
-      ? `${hours}h ${minutes}m`
-      : `${hours}h`;
-  }
-}
 
 function PageRangeWidget() {
   const plugin = usePlugin();
@@ -50,11 +28,7 @@ function PageRangeWidget() {
   const inputStartRef = React.useRef<HTMLInputElement>(null);
   
   const contextData = useTrackerPlugin(
-    async (rp) => {
-      const data = await rp.storage.getSession('pageRangeContext');
-      console.log('PageRange: Context data from session:', data);
-      return data;
-    },
+    async (rp) => rp.storage.getSession('pageRangeContext'),
     []
   );
 
@@ -67,20 +41,14 @@ function PageRangeWidget() {
   const [pageRangeEnd, setPageRangeEnd] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [relatedRems, setRelatedRems] = useState<any[]>([]);
-  const [pageHistory, setPageHistory] = useState<PageHistoryEntry[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
   const [currentRemName, setCurrentRemName] = useState<string>('');
   const [isCurrentRemIncremental, setIsCurrentRemIncremental] = useState<boolean>(false);
   const [remHistories, setRemHistories] = useState<Record<string, PageHistoryEntry[]>>({});
   const [expandedRems, setExpandedRems] = useState<Set<string>>(new Set());
-  const [editingRemId, setEditingRemId] = useState<string | null>(null);
-  const [editingRanges, setEditingRanges] = useState<Record<string, {start: number, end: number}>>({});
   const [remPriorities, setRemPriorities] = useState<Record<string, {absolute: number, percentile: number | null}>>({});
-  const [editingPriorityRemId, setEditingPriorityRemId] = useState<string | null>(null);
-  const [editingPriorities, setEditingPriorities] = useState<Record<string, number>>({});
-  const [editingHistoryRemId, setEditingHistoryRemId] = useState<string | null>(null);
-  const [editingHistoryPage, setEditingHistoryPage] = useState<number>(0);
   const [remStatistics, setRemStatistics] = useState<Record<string, any>>({});
+
+  const [editingState, setEditingState] = useState<EditingState>({ type: 'none' });
   const [totalPdfReadingTime, setTotalPdfReadingTime] = useState<number>(0);
 
   const handleInitIncrementalRem = async (remId: string) => {
@@ -109,43 +77,39 @@ function PageRangeWidget() {
     if (rem) {
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (incRemInfo) {
-        setEditingPriorityRemId(remId);
-        setEditingPriorities({
-          ...editingPriorities,
-          [remId]: incRemInfo.priority
-        });
+        setEditingState({ type: 'priority', remId, value: incRemInfo.priority });
       }
     }
   };
 
   // Save priority inline
   const savePriority = async (remId: string) => {
-    const priority = editingPriorities[remId];
-    if (priority !== undefined) {
-      const rem = await plugin.rem.findOne(remId);
-      if (rem) {
-        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
-        
-        // Update the incremental rem list
-        const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-        if (incRemInfo) {
-          await updateIncrementalRemCache(plugin, incRemInfo);
-        }
-        
-        setEditingPriorityRemId(null);
-        await reloadRelatedRems();
-        await plugin.app.toast(`Priority updated to ${priority}`);
+    if (editingState.type !== 'priority') return;
+    const priority = editingState.value;
+
+    const rem = await plugin.rem.findOne(remId);
+    if (rem) {
+      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+
+      // Update the incremental rem list
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+      if (incRemInfo) {
+        await updateIncrementalRemCache(plugin, incRemInfo);
       }
+
+      setEditingState({ type: 'none' });
+      await reloadRelatedRems();
+      await plugin.app.toast(`Priority updated to ${priority}`);
     }
   };
 
   // Calculate priority info for each incremental rem
-  const calculatePriorities = async (rems: any[], allRems?: IncrementalRem[]) => {
+  const calculatePriorities = async (rems: any[]) => {
     const priorities: Record<string, {absolute: number, percentile: number | null}> = {};
-    
-    // Use passed allRems or fetch from storage
-    const remsForCalculation = allRems || (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-    
+
+    // Use allIncrementalRems from tracker
+    const remsForCalculation = allIncrementalRems || [];
+
     for (const rem of rems) {
       if (rem.isIncremental) {
         const remObj = await plugin.rem.findOne(rem.remId);
@@ -171,17 +135,14 @@ function PageRangeWidget() {
     
     const related = await getAllIncrementsForPDF(plugin, contextData.pdfRemId);
     setRelatedRems(related);
-    
-    // Ensure we have the latest all incremental rems data
-    const allRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-    
-    // Calculate priorities with the fetched data
-    await calculatePriorities(related, allRems);
+
+    // Calculate priorities using tracker data
+    await calculatePriorities(related);
     
     // Fetch reading histories and statistics for each related rem
-    const histories: Record<string, PageHistoryEntry[]> = {}; // CHANGED TYPE
-    const statistics: Record<string, any> = {}; // ADD THIS LINE
-    let totalTime = 0; // ADD THIS LINE
+    const histories: Record<string, PageHistoryEntry[]> = {};
+    const statistics: Record<string, any> = {};
+    let totalTime = 0;
     
     for (const item of related) {
         // Always fetch stats if it's a related rem
@@ -190,7 +151,6 @@ function PageRangeWidget() {
             histories[item.remId] = history;
         }
         
-        // ADD THESE LINES
         const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
         statistics[item.remId] = stats;
         totalTime += stats.totalTimeSeconds;
@@ -198,9 +158,9 @@ function PageRangeWidget() {
     }
     
     setRemHistories(histories);
-    setRemStatistics(statistics); // ADD THIS LINE
-    setTotalPdfReadingTime(totalTime); // ADD THIS LINE
-    };
+    setRemStatistics(statistics);
+    setTotalPdfReadingTime(totalTime);
+  };
 
   // Toggle expanded state for a rem
   const toggleExpanded = (remId: string) => {
@@ -216,81 +176,65 @@ function PageRangeWidget() {
   // Start editing page range for a specific rem
   const startEditingRem = async (remId: string) => {
     if (!contextData?.pdfRemId) return;
-    
-    setEditingRemId(remId);
-    
+
     // Load existing range for this rem
     const savedRange = await getIncrementalPageRange(plugin, remId, contextData.pdfRemId);
-    if (savedRange) {
-      setEditingRanges({
-        ...editingRanges,
-        [remId]: { start: savedRange.start || 1, end: savedRange.end || 0 }
-      });
-    } else {
-      setEditingRanges({
-        ...editingRanges,
-        [remId]: { start: 1, end: 0 }
-      });
-    }
+    const start = savedRange?.start || 1;
+    const end = savedRange?.end || 0;
+    setEditingState({ type: 'range', remId, start, end });
   };
 
   // Save page range for a specific rem
   const saveRemRange = async (remId: string) => {
-    if (!contextData?.pdfRemId) return;
-    
-    const range = editingRanges[remId];
-    if (!range) return;
-    
+    if (!contextData?.pdfRemId || editingState.type !== 'range') return;
+
+    const { start, end } = editingState;
     const rangeKey = getPageRangeKey(remId, contextData.pdfRemId);
-    
-    if (range.start > 1 || range.end > 0) {
-      await plugin.storage.setSynced(rangeKey, range);
-      await plugin.app.toast(`Saved page range: ${range.start}-${range.end || '∞'}`);
+
+    if (start > 1 || end > 0) {
+      await plugin.storage.setSynced(rangeKey, { start, end });
+      await plugin.app.toast(`Saved page range: ${start}-${end || '∞'}`);
     } else {
       await plugin.storage.setSynced(rangeKey, null);
       await plugin.app.toast('Cleared page range');
     }
-    
-    setEditingRemId(null);
+
+    setEditingState({ type: 'none' });
     await reloadRelatedRems();
   };
 
-  // --- NEW: Start editing history ---
+  // Start editing history
   const startEditingHistory = (remId: string, currentPage: number | null) => {
-    setEditingHistoryRemId(remId);
-    // If currentPage is not set, try to get the last page from history
+    let page = 1;
     if (currentPage && currentPage > 0) {
-      setEditingHistoryPage(currentPage);
+      page = currentPage;
     } else {
       // Check if we have history for this rem
       const history = remHistories[remId];
       if (history && history.length > 0) {
-        // Use the last recorded page from history
-        const lastEntry = history[history.length - 1];
-        setEditingHistoryPage(lastEntry.page);
-      } else {
-        // Default to 1 if no history exists
-        setEditingHistoryPage(1);
+        page = history[history.length - 1].page;
       }
     }
+    setEditingState({ type: 'history', remId, page });
   };
-  
-  // --- NEW: Save reading history record ---
+
+  // Save reading history record
   const saveReadingHistory = async (remId: string) => {
-    if (!contextData?.pdfRemId || !editingHistoryPage || editingHistoryPage <= 0) {
+    if (editingState.type !== 'history') return;
+    const page = editingState.page;
+
+    if (!contextData?.pdfRemId || !page || page <= 0) {
       await plugin.app.toast("Please enter a valid page number.");
       return;
     }
-  
+
     // Update both the current reading position (for the queue) and the history log
-    await setIncrementalReadingPosition(plugin, remId, contextData.pdfRemId, editingHistoryPage);
-    await addPageToHistory(plugin, remId, contextData.pdfRemId, editingHistoryPage, false);
-  
-    await plugin.app.toast(`Updated reading position to page ${editingHistoryPage}`);
-    
-    // Reset state and reload the list to show the new data
-    setEditingHistoryRemId(null);
-    setEditingHistoryPage(0);
+    await setIncrementalReadingPosition(plugin, remId, contextData.pdfRemId, page);
+    await addPageToHistory(plugin, remId, contextData.pdfRemId, page, false);
+
+    await plugin.app.toast(`Updated reading position to page ${page}`);
+
+    setEditingState({ type: 'none' });
     await reloadRelatedRems();
   };
 
@@ -329,11 +273,7 @@ function PageRangeWidget() {
         
         // Load related rems with priorities
         await reloadRelatedRems();
-        
-        // Load history for current rem
-        const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
-        setPageHistory(history || []);
-        
+
       } catch (error) {
         console.error('PageRange: Error loading data:', error);
         await plugin.app.toast(`Error loading data: ${error.message}`);
@@ -344,7 +284,14 @@ function PageRangeWidget() {
 
     loadData();
   }, [contextData?.incrementalRemId, contextData?.pdfRemId, plugin]);
-    
+
+  // Recalculate priorities when allIncrementalRems tracker updates
+  useEffect(() => {
+    if (relatedRems.length > 0 && allIncrementalRems && allIncrementalRems.length > 0) {
+      calculatePriorities(relatedRems);
+    }
+  }, [allIncrementalRems]);
+
   // Auto-focus main input on load
   useEffect(() => {
     if (!isLoading && contextData) {
@@ -356,15 +303,18 @@ function PageRangeWidget() {
   }, [isLoading, contextData]);
 
   // Auto-focus page range editor when editing starts
+  // Only trigger on type/remId change, not on value changes within the same edit session
+  const editingKey = editingState.type === 'range' ? `range-${editingState.remId}` : editingState.type;
   useEffect(() => {
-    if (editingRemId) {
+    if (editingState.type === 'range') {
+      const remId = editingState.remId;
       // Use a longer delay and retry mechanism for first render
       let attempts = 0;
       const maxAttempts = 10; // Try for up to 500ms (10 * 50ms)
-      
+
       const tryFocus = () => {
-        const inputElement = pageRangeInputRefs.current[editingRemId]?.start;
-        
+        const inputElement = pageRangeInputRefs.current[remId]?.start;
+
         if (inputElement) {
           inputElement.focus();
           inputElement.select();
@@ -373,11 +323,11 @@ function PageRangeWidget() {
           setTimeout(tryFocus, 50);
         }
       };
-      
+
       // Start trying after a small initial delay
       setTimeout(tryFocus, 50);
     }
-  }, [editingRemId]);
+  }, [editingKey]);
 
   const handleSave = async () => {
     if (!contextData?.incrementalRemId || !contextData?.pdfRemId) return;
@@ -425,7 +375,6 @@ function PageRangeWidget() {
   }
 
   
-  // ** START OF FIX **
   // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
     const assignedRanges = relatedRems
@@ -459,8 +408,7 @@ function PageRangeWidget() {
   
     return unassignedRanges;
   };
-  // ** END OF FIX **
-  
+
   // Sort related rems: current first, then by page range, then alphabetically
   const sortedRelatedRems = [...relatedRems].sort((a, b) => {
     // Current rem always first
@@ -489,194 +437,133 @@ function PageRangeWidget() {
   
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex flex-col"
       style={{
-        minWidth: '600px',
-        maxWidth: '750px',
-        maxHeight: '100vh',
+        height: '100%',
+        width: '100%',
+        minWidth: '550px',
+        maxWidth: '700px',
+        minHeight: '400px',
         backgroundColor: 'var(--rn-clr-background-primary)',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) {
+        if (e.key === 'Enter' && editingState.type === 'none') {
           e.preventDefault();
           handleSave();
         }
-        if (e.key === 'Escape' && !editingRemId && !editingPriorityRemId && !editingHistoryRemId) {
+        if (e.key === 'Escape' && editingState.type === 'none') {
           e.preventDefault();
           handleClose();
         }
       }}
     >
       {/* Header */}
-      <div className="px-5 py-3" style={{
-        borderBottom: '1px solid var(--rn-clr-border-primary)',
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
-      }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-4xl" style={{ lineHeight: '1' }}>📄</div>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight" style={{
-                color: 'var(--rn-clr-content-primary)',
-                letterSpacing: '-0.02em'
-              }}>
-                PDF Control Panel
-              </h2>
-              <div className="text-sm mt-1.5 flex items-center gap-2" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                <span className="font-medium">{currentRemName || '...'}</span>
-                {isCurrentRemIncremental && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                    style={{
-                      backgroundColor: '#dbeafe',
-                      color: '#1e40af'
-                    }}
-                    title="Incremental Rem"
-                  >
-                    ⚡ Incremental
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            className="p-2.5 rounded-xl transition-all"
-            style={{
-              color: 'var(--rn-clr-content-secondary)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            title="Close"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div
+        className="flex items-center justify-between px-4 py-2 shrink-0"
+        style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📄</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>PDF Control</span>
+          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            {currentRemName ? `· ${currentRemName.length > 30 ? currentRemName.substring(0, 30) + '...' : currentRemName}` : ''}
+          </span>
+          {isCurrentRemIncremental && (
+            <span className="text-xs" style={{ color: '#3b82f6' }} title="Incremental Rem">⚡</span>
+          )}
+          {totalPdfReadingTime > 0 && (
+            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              · ⏱️ {formatDuration(totalPdfReadingTime)}
+            </span>
+          )}
         </div>
+        <button
+          onClick={handleClose}
+          className="p-1 rounded transition-colors text-xs"
+          style={{ color: 'var(--rn-clr-content-tertiary)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+          title="Close (Esc)"
+        >
+          ✕
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-3"
-        style={{ backgroundColor: 'var(--rn-clr-background-primary)' }}
-      >
+      <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
 
-      {/* Current Rem Settings */}
-      <div className="p-3 rounded-xl mb-3" style={{
+      {/* Current Rem - Quick Edit */}
+      <div className="mb-3 p-3 rounded" style={{
         backgroundColor: 'var(--rn-clr-background-secondary)',
-        border: '1px solid var(--rn-clr-border-primary)',
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)'
+        border: '2px solid #3b82f6',
       }}>
-        <div className="font-bold mb-2 text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>
-          Quick Edit - Current Rem Page Range
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs">✏️</span>
+          <span className="font-semibold text-xs" style={{ color: '#3b82f6' }}>Quick Edit: Current Rem</span>
         </div>
-        <div className="flex flex-row items-center justify-between gap-3">
-          <div className="flex gap-3">
-            <div className="flex items-center gap-2">
-              <label className="font-medium text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start:</label>
-              {/* CHANGE: Reduced input padding (p-2 -> p-1) and font size */}
-              <input
-                ref={inputStartRef}
-                type="number"
-                min="1"
-                value={pageRangeStart}
-                onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
-                className="w-20 text-center p-1 rounded-lg transition-all"
-                style={{
-                  border: '1.5px solid var(--rn-clr-border-primary)',
-                  backgroundColor: 'var(--rn-clr-background-primary)',
-                  color: 'var(--rn-clr-content-primary)',
-                  fontSize: '13px', // Reduced font size
-                  fontWeight: '500'
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="font-medium text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>End:</label>
-              <input
-                type="number"
-                min={pageRangeStart}
-                value={pageRangeEnd || ''}
-                onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
-                placeholder="No limit"
-                className="w-20 text-center p-1 rounded-lg transition-all"
-                style={{
-                  border: '1.5px solid var(--rn-clr-border-primary)',
-                  backgroundColor: 'var(--rn-clr-background-primary)',
-                  color: 'var(--rn-clr-content-primary)',
-                  fontSize: '13px',
-                  fontWeight: '500'
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start page:</label>
+            <input
+              ref={inputStartRef}
+              type="number"
+              min="1"
+              value={pageRangeStart}
+              onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
+              className="w-16 text-center p-1.5 rounded text-xs"
+              style={{
+                border: '1px solid var(--rn-clr-border-primary)',
+                backgroundColor: 'var(--rn-clr-background-primary)',
+                color: 'var(--rn-clr-content-primary)',
+              }}
+            />
           </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>End page:</label>
+            <input
+              type="number"
+              min={pageRangeStart}
+              value={pageRangeEnd || ''}
+              onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
+              placeholder="∞"
+              className="w-16 text-center p-1.5 rounded text-xs"
+              style={{
+                border: '1px solid var(--rn-clr-border-primary)',
+                backgroundColor: 'var(--rn-clr-background-primary)',
+                color: 'var(--rn-clr-content-primary)',
+              }}
+            />
+          </div>
+          <div className="flex-1" />
           {pageRangeStart > 1 || pageRangeEnd > 0 ? (
-            <div className="text-xs font-semibold px-2 py-1 rounded-lg inline-flex items-center gap-2" style={{
-              backgroundColor: '#dbeafe',
-              color: '#1e40af',
-              width: 'fit-content'
-            }}>
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
-              </svg>
+            <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>
               Pages {pageRangeStart}-{pageRangeEnd || '∞'}
-            </div>
+            </span>
           ) : (
-            <div className="text-xs px-2 py-1" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-              No page range restrictions
-            </div>
+            <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-tertiary)' }}>
+              All pages
+            </span>
           )}
         </div>
       </div>
 
-      {/* Available Ranges */}
+      {/* Available Ranges - Hint */}
       {(() => {
         const unassignedRanges = getUnassignedRanges();
         return unassignedRanges.length > 0 ? (
-          <div className="p-2 rounded-xl mb-3 flex items-center gap-3" style={{
+          <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
             backgroundColor: '#fefce8',
-            border: '1.5px solid #fde047',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            border: '1px solid #fde047',
           }}>
-            <div className="flex items-center gap-2 whitespace-nowrap">
-              <svg className="w-4 h-4" style={{ color: '#ca8a04' }} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-              <div className="font-bold text-xs" style={{ color: '#92400e' }}>Available page ranges</div>
-            </div>
-            <div className="text-xs font-medium flex flex-wrap gap-1" style={{ color: '#713f12' }}>
+            <span className="text-xs">💡</span>
+            <span className="text-xs font-medium" style={{ color: '#92400e' }}>Available ranges:</span>
+            <div className="text-xs flex flex-wrap gap-1">
               {unassignedRanges.map((range, idx) => {
                 const endPageDisplay =
                   range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
                 return (
-                  <span key={idx} className="px-2.5 py-1 rounded-lg" style={{
+                  <span key={idx} className="px-1.5 py-0.5 rounded font-medium" style={{
                     backgroundColor: '#fef9c3',
                     color: '#854d0e',
-                    border: '1px solid #fde047'
                   }}>
                     {range.start}-{endPageDisplay}
                   </span>
@@ -685,642 +572,95 @@ function PageRangeWidget() {
             </div>
           </div>
         ) : (
-          <div className="p-4 rounded-xl mb-5 flex items-center gap-2" style={{
+          <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
             backgroundColor: '#fee2e2',
-            border: '1.5px solid #fca5a5',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            border: '1px solid #fca5a5',
           }}>
-            <svg className="w-5 h-5" style={{ color: '#dc2626' }} fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <div className="text-sm font-semibold" style={{ color: '#991b1b' }}>
-              All pages have been assigned
-            </div>
+            <span className="text-xs">⚠️</span>
+            <span className="text-xs" style={{ color: '#991b1b' }}>
+              All pages are already assigned to other rems
+            </span>
           </div>
         );
       })()}
 
-      {/* Total PDF Reading Time */}
-        {totalPdfReadingTime > 0 && (
-        <div className="p-2 rounded-xl mb-3" style={{
-            backgroundColor: '#f0fdf4',
-            border: '1px solid #86efac',
-        }}>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="font-bold text-xs" style={{ color: '#166534' }}>
-                    Total PDF Time:
-                    </div>
-                    {/* CHANGE: Removed newline/div, made it a span inline */}
-                    <span className="text-xs" style={{ color: '#15803d' }}>
-                    (All IncRems)
-                    </span>
-                </div>
-                <div className="text-sm font-bold" style={{ color: '#166534' }}>
-                   ⏱️ {formatDuration(totalPdfReadingTime)}
-                </div>
-            </div>
+      {/* All Rems Using This PDF */}
+      <div>
+        <div className="flex items-center justify-between py-1 px-1 mb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs">📑</span>
+            <span className="font-semibold text-xs" style={{ color: 'var(--rn-clr-content-primary)' }}>All Rems Using This PDF</span>
+            <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>{sortedRelatedRems.length}</span>
+          </div>
+          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>Click to expand</span>
         </div>
-        )}
-
-      {/* All Rems Using This PDF (including current) */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <div className="text-2xl">📑</div>
-          <h3 className="font-bold text-base" style={{ color: 'var(--rn-clr-content-primary)' }}>
-            All Rems Using This PDF
-          </h3>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold" style={{
-            backgroundColor: 'var(--rn-clr-background-tertiary)',
-            color: 'var(--rn-clr-content-secondary)'
-          }}>
-            {sortedRelatedRems.length}
-          </span>
-        </div>
-        <div className="flex flex-col gap-3">
-          {sortedRelatedRems.map((item) => {
-            const isCurrentRem = item.remId === contextData?.incrementalRemId;
-            const priorityInfo = remPriorities[item.remId];
-            const priorityColor = priorityInfo?.percentile ?
-              percentileToHslColor(priorityInfo.percentile) : 'transparent';
-
-            const borderLeftColor = isCurrentRem ? '#10b981' : (item.isIncremental ? '#3b82f6' : 'var(--rn-clr-border-primary)');
-
-            return (
-              <div key={item.remId} className="rounded-xl transition-all" style={{
-                backgroundColor: 'var(--rn-clr-background-secondary)',
-                border: '1px solid var(--rn-clr-border-primary)',
-                borderLeft: `4px solid ${borderLeftColor}`,
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+        <div className="flex flex-col gap-1">
+          {sortedRelatedRems.map((item) => (
+            <PdfRemItem
+              key={item.remId}
+              item={item}
+              isCurrentRem={item.remId === contextData?.incrementalRemId}
+              isExpanded={expandedRems.has(item.remId)}
+              priorityInfo={remPriorities[item.remId]}
+              statistics={remStatistics[item.remId]}
+              history={remHistories[item.remId]}
+              editingState={editingState}
+              onToggleExpanded={toggleExpanded}
+              onInitIncremental={handleInitIncrementalRem}
+              onStartEditingRem={startEditingRem}
+              onStartEditingPriority={startEditingPriority}
+              onStartEditingHistory={startEditingHistory}
+              onSaveRemRange={saveRemRange}
+              onSavePriority={savePriority}
+              onSaveHistory={saveReadingHistory}
+              onCancelEditing={() => setEditingState({ type: 'none' })}
+              onEditingStateChange={setEditingState}
+              startInputRef={(el) => {
+                if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                pageRangeInputRefs.current[item.remId].start = el;
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
+              endInputRef={(el) => {
+                if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                pageRangeInputRefs.current[item.remId].end = el;
               }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05)';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-              >
-                {/* Main Rem Info - Clickable */}
-                <div
-                  className="p-4 cursor-pointer transition-all"
-                  onClick={() => toggleExpanded(item.remId)}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <div className="flex items-center gap-2.5 mb-2.5">
-                    <span className="text-sm font-medium transition-transform" style={{
-                      color: 'var(--rn-clr-content-secondary)',
-                      transform: expandedRems.has(item.remId) ? 'rotate(90deg)' : 'rotate(0deg)'
-                    }}>
-                      ▶
-                    </span>
-                    {item.isIncremental && <span className="text-base" title="Incremental Rem">⚡</span>}
-                    <div className="font-semibold flex-1 text-base" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                      {item.name}
-                      {isCurrentRem && (
-                        <span className="ml-2 text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold" style={{
-                          backgroundColor: '#d1fae5',
-                          color: '#065f46'
-                        }}>
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          Current
-                        </span>
-                      )}
-                    </div>
-                    {/* Priority Badge with Color */}
-                    {item.isIncremental && priorityInfo && (
-                      <div
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow-sm"
-                        style={{ backgroundColor: priorityColor }}
-                        title={`Priority: ${priorityInfo.absolute} (${priorityInfo.percentile}% of KB)`}
-                      >
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                        {priorityInfo.absolute} <span className="opacity-75">({priorityInfo.percentile}%)</span>
-                      </div>
-                    )}
-                  </div>
-                  {item.range ? (
-                    <div className="text-sm flex flex-wrap items-center gap-2.5 ml-7" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                      <span className="inline-flex items-center gap-1.5 font-medium">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2a1 1 0 000 2h6a1 1 0 100-2H7zm6 7a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1zm-3 3a1 1 0 100 2h.01a1 1 0 100-2H10zm-4 1a1 1 0 011-1h.01a1 1 0 110 2H7a1 1 0 01-1-1zm1-4a1 1 0 100 2h.01a1 1 0 100-2H7zm2 1a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zm4-4a1 1 0 100 2h.01a1 1 0 100-2H13zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zM7 8a1 1 0 000 2h.01a1 1 0 000-2H7z" clipRule="evenodd" />
-                        </svg>
-                        Pages {item.range.start} - {item.range.end || '∞'}
-                      </span>
-                      {(item.isIncremental || item.currentPage || (remHistories[item.remId] && remHistories[item.remId].length > 0)) && (
-                        <>
-                          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
-                          <span className="font-medium">At: {item.currentPage}</span>
-                          {remHistories[item.remId] && (() => {
-                            const lastEntry = remHistories[item.remId][remHistories[item.remId].length - 1];
-                            if (lastEntry && lastEntry.timestamp) {
-                              const date = new Date(lastEntry.timestamp);
-                              return (
-                                <span className="text-xs px-2 py-0.5 rounded" style={{
-                                  backgroundColor: 'var(--rn-clr-background-tertiary)',
-                                  color: 'var(--rn-clr-content-tertiary)'
-                                }}>
-                                  {date.toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric'
-                                  })} {date.toLocaleTimeString('en-US', {
-                                    hour: 'numeric',
-                                    minute: '2-digit',
-                                    hour12: true
-                                  })}
-                                </span>
-                              );
-                            }
-                            return '';
-                          })()}
-                          {remStatistics[item.remId] && remStatistics[item.remId].totalTimeSeconds > 0 && (
-                            <span style={{ color: '#10B981', fontWeight: '500' }}>
-                                📖 {formatDuration(remStatistics[item.remId].totalTimeSeconds)}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-sm ml-7" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-                      No page range set
-                    </div>
-                  )}
-                </div>
-                
-                {/* Expanded Content */}
-                {expandedRems.has(item.remId) && (
-                  <div className="pt-3 px-3 pb-3" style={{
-                    borderTop: '1px solid var(--rn-clr-border-primary)'
-                  }}>
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 mb-3 flex-wrap">
-                      {!item.isIncremental ? (
-                        <button
-                          onClick={() => handleInitIncrementalRem(item.remId)}
-                          className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                          style={{
-                            backgroundColor: '#10B981',
-                            color: 'white',
-                          }}
-                        >
-                          Make Incremental
-                        </button>
-                      ) : (
-                        <>
-                          {editingRemId === item.remId ? (
-                            <>
-                              <button
-                                onClick={() => saveRemRange(item.remId)}
-                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                                style={{
-                                  backgroundColor: '#3B82F6',
-                                  color: 'white',
-                                }}
-                              >
-                                Save Range
-                              </button>
-                              <button
-                                onClick={() => setEditingRemId(null)}
-                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                                style={{
-                                  backgroundColor: '#6B7280',
-                                  color: 'white',
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : editingPriorityRemId === item.remId ? (
-                            <button
-                              onClick={() => setEditingPriorityRemId(null)}
-                              className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                              style={{
-                                backgroundColor: '#6B7280',
-                                color: 'white',
-                              }}
-                            >
-                              Cancel Priority Edit
-                            </button>
-                          ) : editingHistoryRemId === item.remId ? (
-                            <button
-                              onClick={() => setEditingHistoryRemId(null)}
-                              className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                              style={{
-                                backgroundColor: '#6B7280',
-                                color: 'white',
-                              }}
-                            >
-                              Cancel History Edit
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => startEditingRem(item.remId)}
-                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                                style={{
-                                  backgroundColor: '#3B82F6',
-                                  color: 'white',
-                                }}
-                              >
-                                Edit Page Range
-                              </button>
-                              <button
-                                onClick={() => startEditingPriority(item.remId)}
-                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                                style={{
-                                  backgroundColor: '#8B5CF6',
-                                  color: 'white',
-                                }}
-                              >
-                                Edit Priority
-                              </button>
-                              <button
-                                onClick={() => startEditingHistory(item.remId, item.currentPage)}
-                                className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                                style={{
-                                  backgroundColor: '#10B981',
-                                  color: 'white',
-                                }}
-                              >
-                                Add History Record
-                              </button>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    
-                    {/* Inline Priority Editor */}
-                    {editingPriorityRemId === item.remId && (
-                      <div className="flex flex-col gap-2 mb-3 p-3 rounded" style={{
-                        backgroundColor: '#f3e8ff',
-                        border: '1px solid #c084fc'
-                      }}>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold" style={{ color: '#6b21a8' }}>Priority:</label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={editingPriorities[item.remId]}
-                            onChange={(e) => setEditingPriorities({
-                              ...editingPriorities,
-                              [item.remId]: Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                            })}
-                            className="w-16 text-xs p-1.5 rounded"
-                            style={{
-                              border: '1px solid var(--rn-clr-border-primary)',
-                              backgroundColor: 'var(--rn-clr-background-primary)',
-                              color: 'var(--rn-clr-content-primary)'
-                            }}
-                          />
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            value={editingPriorities[item.remId]}
-                            onChange={(e) => setEditingPriorities({
-                              ...editingPriorities,
-                              [item.remId]: parseInt(e.target.value)
-                            })}
-                            className="flex-1"
-                            style={{ accentColor: percentileToHslColor(
-                              calculateRelativePercentile(
-                                allIncrementalRems || [],
-                                item.remId
-                              ) || 50
-                            )}}
-                          />
-                        </div>
-                        <div className="text-xs" style={{ color: '#7c3aed' }}>
-                          Lower values = higher priority (0 is highest, 100 is lowest)
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => savePriority(item.remId)}
-                            className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                            style={{
-                              backgroundColor: '#8B5CF6',
-                              color: 'white',
-                            }}
-                          >
-                            Save Priority
-                          </button>
-                          <button
-                            onClick={() => setEditingPriorityRemId(null)}
-                            className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                            style={{
-                              backgroundColor: '#6B7280',
-                              color: 'white',
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Page Range Editor */}
-                    {editingRemId === item.remId && editingRanges[item.remId] && (
-                      <div className="flex gap-2 mb-3 items-center p-3 rounded" style={{
-                        backgroundColor: '#dbeafe',
-                        border: '1px solid #60a5fa'
-                      }}>
-                        <label className="text-xs font-semibold" style={{ color: '#1e40af' }}>Pages:</label>
-                        <input
-                          ref={(el) => {
-                            if (!pageRangeInputRefs.current[item.remId]) {
-                              pageRangeInputRefs.current[item.remId] = { start: null, end: null };
-                            }
-                            pageRangeInputRefs.current[item.remId].start = el;
-                          }}
-                          type="number"
-                          min="1"
-                          value={editingRanges[item.remId].start}
-                          onChange={(e) => setEditingRanges({
-                            ...editingRanges,
-                            [item.remId]: {
-                              ...editingRanges[item.remId],
-                              start: parseInt(e.target.value) || 1
-                            }
-                          })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              saveRemRange(item.remId);
-                            }
-                            if (e.key === 'Escape') {
-                              e.preventDefault();
-                              setEditingRemId(null);
-                            }
-                            if (e.key === 'Tab' && e.shiftKey) {
-                              e.preventDefault();
-                              pageRangeInputRefs.current[item.remId]?.end?.focus();
-                            }
-                          }}
-                          className="w-20 text-xs p-1.5 rounded"
-                          style={{
-                            border: '1px solid var(--rn-clr-border-primary)',
-                            backgroundColor: 'var(--rn-clr-background-primary)',
-                            color: 'var(--rn-clr-content-primary)'
-                          }}
-                          placeholder="Start"
-                        />
-                        <span className="text-xs" style={{ color: '#1e40af' }}>to</span>
-                        <input
-                          ref={(el) => {
-                            if (!pageRangeInputRefs.current[item.remId]) {
-                              pageRangeInputRefs.current[item.remId] = { start: null, end: null };
-                            }
-                            pageRangeInputRefs.current[item.remId].end = el;
-                          }}
-                          type="number"
-                          min={editingRanges[item.remId].start}
-                          value={editingRanges[item.remId].end || ''}
-                          onChange={(e) => setEditingRanges({
-                            ...editingRanges,
-                            [item.remId]: {
-                              ...editingRanges[item.remId],
-                              end: parseInt(e.target.value) || 0
-                            }
-                          })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              saveRemRange(item.remId);
-                            }
-                            if (e.key === 'Escape') {
-                              e.preventDefault();
-                              setEditingRemId(null);
-                            }
-                            if (e.key === 'Tab' && !e.shiftKey) {
-                              e.preventDefault();
-                              pageRangeInputRefs.current[item.remId]?.start?.focus();
-                            }
-                          }}
-                          className="w-20 text-xs p-1.5 rounded"
-                          style={{
-                            border: '1px solid var(--rn-clr-border-primary)',
-                            backgroundColor: 'var(--rn-clr-background-primary)',
-                            color: 'var(--rn-clr-content-primary)'
-                          }}
-                          placeholder="End"
-                        />
-                      </div>
-                    )}
-
-                    {/* Inline History Editor */}
-                    {editingHistoryRemId === item.remId && (
-                      <div className="flex flex-col gap-2 mb-3 p-3 rounded" style={{
-                        backgroundColor: '#d1fae5',
-                        border: '1px solid #34d399'
-                      }}>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold" style={{ color: '#065f46' }}>End Page:</label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={editingHistoryPage || ''}
-                            onChange={(e) => setEditingHistoryPage(parseInt(e.target.value) || 0)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                saveReadingHistory(item.remId);
-                              }
-                              if (e.key === 'Escape') {
-                                e.preventDefault();
-                                setEditingHistoryRemId(null);
-                              }
-                            }}
-                            className="w-20 text-xs p-1.5 rounded"
-                            style={{
-                              border: '1px solid var(--rn-clr-border-primary)',
-                              backgroundColor: 'var(--rn-clr-background-primary)',
-                              color: 'var(--rn-clr-content-primary)'
-                            }}
-                            placeholder="e.g., 42"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => saveReadingHistory(item.remId)}
-                            className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                            style={{
-                              backgroundColor: '#10B981',
-                              color: 'white',
-                            }}
-                          >
-                            Save Record
-                          </button>
-                          <button
-                            onClick={() => setEditingHistoryRemId(null)}
-                            className="px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-80"
-                            style={{
-                              backgroundColor: '#6B7280',
-                              color: 'white',
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Reading History */}
-                    {remHistories[item.remId] && remHistories[item.remId].length > 0 && (
-                    <div className="mt-2">
-                        <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                            Reading History
-                        </div>
-                        {/* Show reading statistics if available */}
-                        {remStatistics[item.remId] && remStatistics[item.remId].totalTimeSeconds > 0 && (
-                            <div className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                            Total: {formatDuration(remStatistics[item.remId].totalTimeSeconds)} | 
-                            Sessions: {remStatistics[item.remId].sessionsWithTime}
-                            </div>
-                        )}
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                        {remHistories[item.remId].slice(-12).reverse().map((entry, idx) => (
-                            <div key={idx} className="p-2 rounded" style={{
-                            backgroundColor: 'var(--rn-clr-background-primary)',
-                            border: '1px solid var(--rn-clr-border-primary)'
-                            }}>
-                            <div className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                                Page {entry.page}
-                            </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <div className="text-xs truncate" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-                                  {new Date(entry.timestamp).toLocaleDateString([], {
-                                  month: 'numeric',
-                                  day: 'numeric'
-                                  })} {new Date(entry.timestamp).toLocaleTimeString([], {
-                                  hour: 'numeric',
-                                  minute: '2-digit'
-                                  })}
-                              </div>
-                              
-                              {entry.sessionDuration && (
-                                  <div className="text-xs font-bold whitespace-nowrap ml-1" style={{ color: '#10B981' }}>
-                                  {formatDuration(entry.sessionDuration)}
-                                  </div>
-                              )}
-                            </div>
-                            </div>
-                        ))}
-                        </div>
-                    </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+            />
+          ))}
         </div>
       </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="px-7 py-5" style={{
-        borderTop: '1px solid var(--rn-clr-border-primary)',
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        boxShadow: '0 -1px 3px 0 rgba(0, 0, 0, 0.05)'
-      }}>
-        <div className="flex gap-3 mb-3">
-          <button
-            onClick={handleSave}
-            className="flex-1 px-5 py-3 font-bold rounded-xl transition-all shadow-sm"
-            style={{
-              backgroundColor: '#3B82F6',
-              color: 'white',
-              border: 'none',
-              fontSize: '14px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#2563eb';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(59, 130, 246, 0.3), 0 2px 4px -1px rgba(59, 130, 246, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#3B82F6';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-            }}
-          >
-            <span className="inline-flex items-center gap-2">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
-              </svg>
-              Save Current Rem
-            </span>
-          </button>
-
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between px-3 py-2 shrink-0"
+        style={{ borderTop: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}
+      >
+        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+          <kbd className="px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', border: '1px solid var(--rn-clr-border-primary)', fontSize: '10px' }}>Enter</kbd>
+          <span>save</span>
+          <kbd className="px-1.5 py-0.5 rounded font-mono" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', border: '1px solid var(--rn-clr-border-primary)', fontSize: '10px' }}>Esc</kbd>
+          <span>close</span>
+        </div>
+        <div className="flex items-center gap-2">
           {(pageRangeStart > 1 || pageRangeEnd > 0) && (
             <button
               onClick={handleClear}
-              className="px-5 py-3 font-bold rounded-xl transition-all"
-              style={{
-                backgroundColor: 'var(--rn-clr-background-tertiary)',
-                color: 'var(--rn-clr-content-primary)',
-                border: '1.5px solid var(--rn-clr-border-primary)',
-                fontSize: '14px'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)';
-                e.currentTarget.style.borderColor = '#dc2626';
-                e.currentTarget.style.color = '#dc2626';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-                e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary)';
-                e.currentTarget.style.color = 'var(--rn-clr-content-primary)';
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
+              className="px-2 py-1 text-xs rounded transition-colors"
+              style={{ color: 'var(--rn-clr-content-tertiary)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#dc2626'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--rn-clr-content-tertiary)'; }}
             >
-              <span className="inline-flex items-center gap-2">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                Clear
-              </span>
+              Clear
             </button>
           )}
-        </div>
-
-        <div className="flex items-center justify-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-          <kbd className="px-2 py-1 rounded font-mono font-semibold" style={{
-            backgroundColor: 'var(--rn-clr-background-tertiary)',
-            border: '1px solid var(--rn-clr-border-primary)',
-            fontSize: '11px'
-          }}>
-            Enter
-          </kbd>
-          <span>to save</span>
-          <span>•</span>
-          <kbd className="px-2 py-1 rounded font-mono font-semibold" style={{
-            backgroundColor: 'var(--rn-clr-background-tertiary)',
-            border: '1px solid var(--rn-clr-border-primary)',
-            fontSize: '11px'
-          }}>
-            Esc
-          </kbd>
-          <span>to close</span>
+          <button
+            onClick={handleSave}
+            className="px-3 py-1 text-xs rounded transition-colors"
+            style={{ backgroundColor: '#3b82f6', color: 'white' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#3b82f6'; }}
+          >
+            Save
+          </button>
         </div>
       </div>
     </div>

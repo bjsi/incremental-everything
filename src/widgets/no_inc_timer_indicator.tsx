@@ -5,6 +5,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { useEffect, useState } from 'react';
 import { noIncRemTimerKey } from '../lib/consts';
+import { formatCountdown } from '../lib/utils';
 
 function NoIncTimerIndicator() {
   const plugin = usePlugin();
@@ -31,8 +32,6 @@ function NoIncTimerIndicator() {
 
   const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > currentTime;
   const timeRemainingMs = isTimerActive ? noIncRemTimerEnd - currentTime : 0;
-  const minutes = Math.floor(timeRemainingMs / 60000);
-  const seconds = Math.floor((timeRemainingMs % 60000) / 1000);
 
   // Auto-cleanup expired timer
   useEffect(() => {
@@ -74,7 +73,7 @@ function NoIncTimerIndicator() {
           color: '#78350f',
           fontVariantNumeric: 'tabular-nums' 
         }}>
-          {minutes}:{seconds.toString().padStart(2, '0')} remaining
+          {formatCountdown(timeRemainingMs)} remaining
         </div>
       </div>
       <button

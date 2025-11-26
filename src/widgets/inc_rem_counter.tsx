@@ -1,18 +1,9 @@
 import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React from 'react';
 import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
-import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
+import { buildDocumentScope } from '../lib/scope_helpers';
 import '../style.css';
 import '../App.css';
-
-// Inject CSS for hover effects
-const style = document.createElement('style');
-style.textContent = `
-  .inc-rem-view-all-button:hover {
-    background-color: var(--rn-clr-background-primary) !important;
-  }
-`;
-document.head.appendChild(style);
 
 function IncRemCounter() {
   const plugin = usePlugin();
@@ -20,17 +11,13 @@ function IncRemCounter() {
   const counterData = useTrackerPlugin(
     async (rp) => {
       try {
-        // Trigger reactivity when URL changes (documentId is updated in events.ts)
         await rp.storage.getSession(currentDocumentIdKey);
 
-        // Get widget context to determine current document
         const ctx = await rp.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
         const documentId = ctx?.documentId;
 
-        // Get all incRems from storage (this makes it reactive to incRem changes)
         const allIncRems = (await rp.storage.getSession(allIncrementalRemKey)) || [];
 
-        // If no document, show all incRems
         if (!documentId) {
           const now = Date.now();
           const dueIncRems = allIncRems.filter((incRem) => incRem.nextRepDate <= now);
@@ -42,24 +29,9 @@ function IncRemCounter() {
 
         const now = Date.now();
 
-        // Get all descendants of the current document
-        const currentDoc = await rp.rem.findOne(documentId);
-        if (!currentDoc) {
-          return { due: 0, total: 0 };
-        }
+        const documentScope = await buildDocumentScope(rp, documentId);
 
-        const descendants = await currentDoc.getDescendants();
-        const descendantIds = new Set([documentId, ...descendants.map((d) => d._id)]);
-
-        // Collect PDF sources from document and descendants, then find their extracts
-        const { pdfSourceIds } = await collectPdfSourcesFromRems([currentDoc, ...descendants]);
-        const pdfExtractIds = await findPdfExtractIds(rp, pdfSourceIds);
-
-        // Add PDF extract IDs to the set
-        pdfExtractIds.forEach(id => descendantIds.add(id));
-
-        // Filter incRems that belong to this document
-        const docIncRems = allIncRems.filter((incRem) => descendantIds.has(incRem.remId));
+        const docIncRems = allIncRems.filter((incRem) => documentScope.has(incRem.remId));
         const dueIncRems = docIncRems.filter((incRem) => incRem.nextRepDate <= now);
 
         return {
@@ -74,12 +46,7 @@ function IncRemCounter() {
     []
   );
 
-  // Don't render if loading or no incRems
-  if (!counterData) {
-    return null;
-  }
-
-  if (counterData.total === 0) {
+  if (!counterData || counterData.total === 0) {
     return null;
   }
 
@@ -87,9 +54,7 @@ function IncRemCounter() {
     const ctx = await plugin.widget.getWidgetContext<WidgetLocation.DocumentBelowTitle>();
     const documentId = ctx?.documentId;
 
-    // Store the documentId in session storage so the popup can read it
     await plugin.storage.setSession(popupDocumentIdKey, documentId || null);
-
     await plugin.widget.openPopup('inc_rem_list');
   };
 
@@ -99,54 +64,44 @@ function IncRemCounter() {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '8px',
-        padding: '8px 16px',
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        borderBottom: '1px solid var(--rn-clr-border-primary)',
-        fontSize: '14px',
-        color: 'var(--rn-clr-content-secondary)',
-      }}
-    >
+    <div style={{ padding: '8px 12px' }}>
       <div
-        onClick={handleClick}
+        className="flex items-center justify-between px-3 py-2 rounded-lg"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          cursor: 'pointer',
-          flex: 1,
-        }}
-      >
-        <span style={{ fontWeight: 600, color: 'var(--rn-clr-content-primary)' }}>
-          📚 Incremental Rems:
-        </span>
-        <span style={{ fontWeight: 500 }}>
-          {counterData.due} due / {counterData.total} total
-        </span>
-      </div>
-      <button
-        onClick={handleMainViewClick}
-        className="inc-rem-view-all-button"
-        style={{
-          padding: '4px 12px',
-          fontSize: '13px',
-          fontWeight: 500,
-          borderRadius: '4px',
-          backgroundColor: 'var(--rn-clr-background-tertiary)',
-          color: 'var(--rn-clr-content-primary)',
+          backgroundColor: 'var(--rn-clr-background-secondary)',
           border: '1px solid var(--rn-clr-border-primary)',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
         }}
-        title="Open main view with filters (Opt+Shift+I)"
       >
-        📊 View All
-      </button>
+        <div
+          onClick={handleClick}
+          className="flex items-center gap-2 cursor-pointer flex-1"
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+        >
+          <span className="text-base">📚</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>
+            Inc Rems
+          </span>
+          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            <span style={{ color: '#f97316' }}>{counterData.due}</span>
+            {' / '}
+            <span style={{ color: '#3b82f6' }}>{counterData.total}</span>
+          </span>
+        </div>
+        <button
+          onClick={handleMainViewClick}
+          className="px-2 py-1 text-xs rounded transition-colors"
+          style={{
+            backgroundColor: 'var(--rn-clr-background-primary)',
+            color: 'var(--rn-clr-content-tertiary)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)'; }}
+          title="View All (Opt+Shift+I)"
+        >
+          View All
+        </button>
+      </div>
     </div>
   );
 }

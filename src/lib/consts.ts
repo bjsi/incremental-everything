@@ -18,6 +18,7 @@ export const allCardPriorityInfoKey = 'all-card-priority-info-key';
 // widgets
 export const scrollToHighlightId = 'scroll-to-highlight';
 export const pageRangeWidgetId = 'page-range';
+export const parentSelectorWidgetId = 'parent_selector';
 
 // css
 export const collapseTopBarId = 'collapse-top-bar';

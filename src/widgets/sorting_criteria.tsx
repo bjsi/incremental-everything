@@ -13,6 +13,7 @@ import {
 } from '../lib/sorting';
 import { useState, useEffect } from 'react';
 import { noIncRemTimerKey } from '../lib/consts';
+import { formatCountdown } from '../lib/utils';
 
 const MAX_CARDS = 25;
 const ONLY_INC_VALUE = 0;
@@ -94,8 +95,6 @@ export function SortingCriteria() {
   // --- RENDER LOGIC ---
   const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > currentTime;
   const timeRemainingMs = isTimerActive ? noIncRemTimerEnd - currentTime : 0;
-  const minutes = Math.floor(timeRemainingMs / 60000);
-  const seconds = Math.floor((timeRemainingMs % 60000) / 1000);
 
 
   return (
@@ -113,7 +112,7 @@ export function SortingCriteria() {
             ⏱️ No Inc Rem Timer Active
           </div>
           <div style={{ fontSize: '13px', color: '#78350f', marginBottom: '8px' }}>
-            Only flashcards are being shown. Time remaining: {minutes}:{seconds.toString().padStart(2, '0')}
+            Only flashcards are being shown. Time remaining: {formatCountdown(timeRemainingMs)}
           </div>
           <div style={{ fontSize: '11px', color: '#92400e', fontStyle: 'italic' }}>
             Note: The settings below are temporarily overridden while this timer is active.

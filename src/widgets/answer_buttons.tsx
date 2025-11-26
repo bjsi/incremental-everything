@@ -144,40 +144,42 @@ const handleReviewAndOpenRem = async (
   await plugin.window.openRem(rem);
 };
 
-// Enhanced button styles
-const buttonStyles = {
+// Button styles using RemNote CSS variables
+const getButtonStyles = () => ({
   base: {
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '8px 12px',
-    borderRadius: '6px',
-    border: 'none',
+    padding: '10px 16px',
+    borderRadius: '10px',
+    border: '1px solid var(--rn-clr-border-primary)',
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
-    transition: 'all 0.15s ease',
-    gap: '2px',
-    minWidth: '90px',
-    height: '44px',
-    backgroundColor: 'white',
-    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    transition: 'all 0.2s ease',
+    gap: '3px',
+    minWidth: '95px',
+    height: '50px',
+    backgroundColor: 'var(--rn-clr-background-secondary)',
+    color: 'var(--rn-clr-content-primary)',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
   },
   primary: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    minWidth: '110px',
+    backgroundColor: 'var(--rn-clr-button-primary-bg, #3b82f6)',
+    color: 'var(--rn-clr-button-primary-text, #ffffff)',
+    border: '1px solid var(--rn-clr-button-primary-bg, #3b82f6)',
+    minWidth: '115px',
   },
   secondary: {
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    border: '1px solid #e5e7eb',
+    backgroundColor: 'var(--rn-clr-background-secondary)',
+    color: 'var(--rn-clr-content-secondary)',
+    border: '1px solid var(--rn-clr-border-primary)',
   },
   danger: {
-    backgroundColor: '#fee2e2',
-    color: '#dc2626',
-    border: '1px solid #fecaca',
+    backgroundColor: 'var(--rn-clr-background-secondary)',
+    color: 'var(--rn-clr-red, #dc2626)',
+    border: '1px solid var(--rn-clr-red, #dc2626)',
   },
   label: {
     fontSize: '12px',
@@ -186,10 +188,12 @@ const buttonStyles = {
   },
   sublabel: {
     fontSize: '10px',
-    opacity: 0.9,
+    opacity: 0.85,
     fontWeight: 400,
-  }
-};
+  },
+  hoverShadow: '0 6px 12px rgba(0, 0, 0, 0.12)',
+  defaultShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
+});
 
 interface ButtonProps {
   children: React.ReactNode;
@@ -201,10 +205,11 @@ interface ButtonProps {
 }
 
 function Button({ children, onClick, variant = 'secondary', style, disabled, className }: ButtonProps) {
-  const variantStyles = variant === 'primary' ? buttonStyles.primary : 
-                        variant === 'danger' ? buttonStyles.danger : 
+  const buttonStyles = getButtonStyles();
+  const variantStyles = variant === 'primary' ? buttonStyles.primary :
+                        variant === 'danger' ? buttonStyles.danger :
                         buttonStyles.secondary;
-  
+
   return (
     <button
       onClick={onClick}
@@ -218,13 +223,20 @@ function Button({ children, onClick, variant = 'secondary', style, disabled, cla
       }}
       onMouseEnter={(e) => {
         if (!disabled) {
-          e.currentTarget.style.transform = 'translateY(-1px)';
-          e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = buttonStyles.hoverShadow;
+          e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
         }
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+        e.currentTarget.style.boxShadow = buttonStyles.defaultShadow;
+        // Reset to variant-specific background
+        if (variant === 'primary') {
+          e.currentTarget.style.backgroundColor = 'var(--rn-clr-button-primary-bg, #3b82f6)';
+        } else {
+          e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)';
+        }
       }}
       className={className}
     >
@@ -237,7 +249,7 @@ export function AnswerButtons() {
   const plugin = usePlugin();
 
   // ✅ ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP
-  
+
   // ✅ Track the values that determine effective mode
   const performanceModeSetting = useTrackerPlugin(
     (rp) => rp.settings.getSetting<string>('performanceMode'),
@@ -385,18 +397,21 @@ export function AnswerButtons() {
   };
 
   const priorityColor = percentiles.kb ? percentileToHslColor(percentiles.kb) : '#6b7280';
+  const buttonStyles = getButtonStyles();
 
-  // Container styles
+  // Container styles using RemNote CSS variables
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
-    padding: '2px 6px 6px 6px',
+    gap: '8px',
+    padding: '8px 12px 12px 12px',
+    backgroundColor: 'var(--rn-clr-background-primary)',
+    borderRadius: '12px',
   };
 
   const buttonRowStyle: React.CSSProperties = {
     display: 'flex',
-    gap: '6px',
+    gap: '8px',
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
@@ -404,22 +419,22 @@ export function AnswerButtons() {
 
   const dividerStyle: React.CSSProperties = {
     width: '1px',
-    height: '36px',
-    backgroundColor: '#e5e7eb',
-    margin: '0 4px',
+    height: '40px',
+    backgroundColor: 'var(--rn-clr-border-primary)',
+    margin: '0 6px',
   };
 
   const priorityBadgeStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '6px',
-    padding: '4px 10px',
-    borderRadius: '12px',
+    padding: '5px 12px',
+    borderRadius: '14px',
     fontSize: '12px',
     fontWeight: 600,
     color: 'white',
     backgroundColor: priorityColor,
-    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
   };
 
   const infoBarStyle: React.CSSProperties = {
@@ -427,12 +442,12 @@ export function AnswerButtons() {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '16px',
-    padding: '6px 12px',
-    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-    borderRadius: '6px',
+    padding: '8px 16px',
+    backgroundColor: 'var(--rn-clr-background-secondary)',
+    borderRadius: '10px',
     fontSize: '12px',
-    color: '#1e40af',
-    borderLeft: `3px solid ${priorityColor}`,
+    color: 'var(--rn-clr-content-secondary)',
+    borderLeft: `4px solid ${priorityColor}`,
   };
 
   return (
@@ -446,8 +461,8 @@ export function AnswerButtons() {
 
         <Button
           variant="secondary"
-          onClick={async () => { 
-            await plugin.widget.openPopup('reschedule', { remId: ctx.remId }); 
+          onClick={async () => {
+            await plugin.widget.openPopup('reschedule', { remId: ctx.remId });
           }}
         >
           <div style={buttonStyles.label}>Reschedule</div>
@@ -475,8 +490,8 @@ export function AnswerButtons() {
 
         {/* Secondary Actions Group */}
         <Button
-          onClick={async () => { 
-            await plugin.widget.openPopup('priority', { remId: ctx.remId }); 
+          onClick={async () => {
+            await plugin.widget.openPopup('priority', { remId: ctx.remId });
           }}
         >
           <div style={buttonStyles.label}>Change Priority</div>
@@ -496,7 +511,7 @@ export function AnswerButtons() {
               const remnoteDomain = environment === 'beta' ? 'https://beta.remnote.com' : 'https://www.remnote.com';
               const newUrl = `${remnoteDomain}/document/${rem._id}`;
               const newWindow = window.open(newUrl, '_blank');
-              
+
               if (!newWindow || newWindow.closed) {
                 const link = document.createElement('a');
                 link.href = newUrl;
@@ -526,14 +541,14 @@ export function AnswerButtons() {
                 await highlightRem?.scrollToReaderHighlight();
               }}
               style={{
-                backgroundColor: '#fbbf24',
-                color: '#78350f',
-                border: '2px solid #f59e0b',
+                backgroundColor: 'var(--rn-clr-yellow, #fbbf24)',
+                color: 'var(--rn-clr-content-primary)',
+                border: '2px solid var(--rn-clr-yellow, #f59e0b)',
                 animation: 'highlightPulse 2s ease-in-out 3',
                 fontWeight: 600,
               }}
             >
-              <div style={buttonStyles.label}>🔍 Scroll to</div>
+              <div style={buttonStyles.label}>Scroll to</div>
               <div style={buttonStyles.sublabel}>Highlight</div>
             </Button>
             <style>{`
@@ -556,8 +571,8 @@ export function AnswerButtons() {
           <>
             <div style={dividerStyle} />
             <Button
-              style={{ 
-                backgroundColor: '#f3f4f6',
+              style={{
+                backgroundColor: 'var(--rn-clr-background-tertiary)',
                 cursor: 'default',
                 pointerEvents: 'none'
               }}
@@ -606,7 +621,7 @@ export function AnswerButtons() {
           {/* 🔌 Conditionally show Shield */}
           {!useLightMode && shouldDisplayShield && shieldStatusAsync && (
             <>
-              <span style={{ color: '#9ca3af' }}>|</span>
+              <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontWeight: 600 }}>🛡️ Priority Shield</span>
                 <div style={{ display: 'flex', gap: '12px' }}>

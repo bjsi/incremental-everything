@@ -1,80 +1,44 @@
-import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { collectPdfSourcesFromRems, findPdfExtractIds } from '../lib/scope_helpers';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
+import { buildDocumentScope } from '../lib/scope_helpers';
+import { extractText, determineIncRemType, getTotalTimeSpent } from '../lib/incRemHelpers';
+import { IncRemTable, IncRemWithDetails } from '../components';
 import '../style.css';
 import '../App.css';
 
-dayjs.extend(relativeTime);
-
-interface IncRemWithDetails extends IncrementalRem {
-  remText?: string;
-}
-
 export function IncRemList() {
   const plugin = usePlugin();
-  const [loadingRems, setLoadingRems] = useState<boolean>(false);
+  const [loadingRems, setLoadingRems] = useState(false);
   const [incRemsWithDetails, setIncRemsWithDetails] = useState<IncRemWithDetails[]>([]);
 
   const counterData = useTrackerPlugin(
     async (rp) => {
       try {
-        // Get the documentId from session storage (set by the counter widget)
         const documentId = await rp.storage.getSession(popupDocumentIdKey);
-
-        // Get all incRems from storage
         const allIncRems = (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-
         const now = Date.now();
 
-        // If no document, show all incRems
         if (!documentId) {
           const dueIncRems = allIncRems.filter((incRem) => incRem.nextRepDate <= now);
-
-          // Load details for all incRems
           loadIncRemDetails(allIncRems);
-
-          return {
-            due: dueIncRems.length,
-            total: allIncRems.length,
-            incRems: allIncRems,
-          };
+          return { due: dueIncRems.length, total: allIncRems.length };
         }
 
-        // Get all descendants of the current document
-        const currentDoc = await rp.rem.findOne(documentId);
-        if (!currentDoc) {
-          return { due: 0, total: 0, incRems: [] };
+        const documentScope = await buildDocumentScope(rp, documentId);
+        if (documentScope.size === 0) {
+          return { due: 0, total: 0 };
         }
 
-        const descendants = await currentDoc.getDescendants();
-        const descendantIds = new Set([documentId, ...descendants.map((d) => d._id)]);
-
-        // Collect PDF sources from document and descendants, then find their extracts
-        const { pdfSourceIds } = await collectPdfSourcesFromRems([currentDoc, ...descendants]);
-        const pdfExtractIds = await findPdfExtractIds(rp, pdfSourceIds);
-
-        // Add PDF extract IDs to the set
-        pdfExtractIds.forEach(id => descendantIds.add(id));
-
-        // Filter incRems that belong to this document
-        const docIncRems = allIncRems.filter((incRem) => descendantIds.has(incRem.remId));
+        const docIncRems = allIncRems.filter((incRem) => documentScope.has(incRem.remId));
         const dueIncRems = docIncRems.filter((incRem) => incRem.nextRepDate <= now);
-
-        // Load details for document incRems
         loadIncRemDetails(docIncRems);
 
-        return {
-          due: dueIncRems.length,
-          total: docIncRems.length,
-          incRems: docIncRems,
-        };
+        return { due: dueIncRems.length, total: docIncRems.length };
       } catch (error) {
         console.error('INC REM LIST: Error', error);
-        return { due: 0, total: 0, incRems: [] };
+        return { due: 0, total: 0 };
       }
     },
     []
@@ -82,48 +46,34 @@ export function IncRemList() {
 
   const loadIncRemDetails = async (incRems: IncrementalRem[]) => {
     if (loadingRems) return;
-
     setLoadingRems(true);
+
+    const sortedByPriority = [...incRems].sort((a, b) => a.priority - b.priority);
+    const percentiles: Record<string, number> = {};
+    sortedByPriority.forEach((item, index) => {
+      percentiles[item.remId] = Math.round(((index + 1) / sortedByPriority.length) * 100);
+    });
+
     const remsWithDetails: IncRemWithDetails[] = [];
 
     for (const incRem of incRems) {
       try {
         const rem = await plugin.rem.findOne(incRem.remId);
-        if (rem) {
-          const text = await rem.text;
-          let textStr: string;
+        if (!rem) continue;
 
-          if (typeof text === 'string') {
-            textStr = text;
-          } else if (Array.isArray(text)) {
-            // If text is an array of rich text elements, try to extract text from them
-            textStr = text
-              .map((item: any) => {
-                if (typeof item === 'string') return item;
-                if (item?.text) return item.text;
-                if (item?.i === 'q') return '[Quote]';
-                if (item?.i === 'i') return '[Image]';
-                if (item?.url) return '[Link]';
-                return '';
-              })
-              .filter(Boolean)
-              .join(' ');
+        const text = await rem.text;
+        let textStr = extractText(text);
+        if (textStr.length > 200) textStr = textStr.substring(0, 200) + '...';
 
-            if (!textStr) textStr = '[Complex content]';
-          } else {
-            textStr = '[Complex content]';
-          }
+        const incRemType = await determineIncRemType(plugin, rem);
 
-          // Truncate very long text
-          if (textStr.length > 200) {
-            textStr = textStr.substring(0, 200) + '...';
-          }
-
-          remsWithDetails.push({
-            ...incRem,
-            remText: textStr || '[Empty rem]',
-          });
-        }
+        remsWithDetails.push({
+          ...incRem,
+          remText: textStr || '[Empty rem]',
+          incRemType,
+          percentile: percentiles[incRem.remId],
+          totalTimeSpent: getTotalTimeSpent(incRem),
+        });
       } catch (error) {
         console.error('Error loading rem details:', error);
       }
@@ -133,198 +83,27 @@ export function IncRemList() {
     setLoadingRems(false);
   };
 
-  const handleClose = async () => {
-    await plugin.widget.closePopup();
-  };
+  const handleClose = () => plugin.widget.closePopup();
 
   const handleRemClick = async (remId: string) => {
-    try {
-      const rem = await plugin.rem.findOne(remId);
-      if (rem) {
-        await plugin.window.openRem(rem);
-        // Close the popup after opening the rem
-        await plugin.widget.closePopup();
-      }
-    } catch (error) {
-      console.error('Error opening rem:', error);
+    const rem = await plugin.rem.findOne(remId);
+    if (rem) {
+      await plugin.window.openRem(rem);
+      await plugin.widget.closePopup();
     }
   };
 
-  const now = Date.now();
-  const dueRems = incRemsWithDetails.filter((incRem) => incRem.nextRepDate <= now);
-  const scheduledRems = incRemsWithDetails.filter((incRem) => incRem.nextRepDate > now);
-
   return (
-    <div className="flex flex-col h-full" style={{
-      maxHeight: '600px',
-      backgroundColor: 'var(--rn-clr-background-primary)'
-    }}>
-      {/* Header */}
-      <div className="px-6 py-5" style={{
-        borderBottom: '1px solid var(--rn-clr-border-primary)',
-        backgroundColor: 'var(--rn-clr-background-secondary)'
-      }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-3xl">📚</div>
-            <div>
-              <h2 className="text-2xl font-bold" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                Incremental Rems
-              </h2>
-              {counterData && (
-                <div className="text-sm mt-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                  <span className="font-semibold" style={{ color: '#f97316' }}>{counterData.due}</span> due
-                  {' • '}
-                  <span className="font-semibold" style={{ color: '#3b82f6' }}>{counterData.total}</span> total
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              color: 'var(--rn-clr-content-secondary)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-            title="Close"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        {loadingRems ? (
-          <div className="text-center py-8" style={{ color: 'var(--rn-clr-content-secondary)' }}>Loading rems...</div>
-        ) : incRemsWithDetails.length === 0 ? (
-          <div className="text-center py-8" style={{ color: 'var(--rn-clr-content-secondary)' }}>No incremental rems found</div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {dueRems.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="font-bold text-sm px-2 py-1" style={{ color: '#f97316' }}>
-                    ⚠️ Due ({dueRems.length})
-                  </h3>
-                  <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }}></div>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {dueRems.map((incRem) => (
-                    <div
-                      key={incRem.remId}
-                      onClick={() => handleRemClick(incRem.remId)}
-                      className="group relative p-4 rounded cursor-pointer transition-all"
-                      style={{
-                        backgroundColor: 'var(--rn-clr-background-secondary)',
-                        border: '1px solid var(--rn-clr-border-primary)',
-                        borderLeft: '4px solid #f97316',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)';
-                      }}
-                    >
-                      <div className="font-medium text-base mb-2 pr-6" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                        {incRem.remText || 'Loading...'}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded" style={{
-                          backgroundColor: '#fed7aa',
-                          color: '#9a3412'
-                        }}>
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                          {incRem.priority}
-                        </span>
-                        <span style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                          Due {dayjs(incRem.nextRepDate).fromNow()}
-                        </span>
-                      </div>
-                      {incRem.history && incRem.history.length > 0 && (
-                        <div className="mt-2 pt-2 text-xs flex items-center gap-2" style={{
-                          borderTop: '1px solid var(--rn-clr-border-primary)',
-                          color: 'var(--rn-clr-content-tertiary)'
-                        }}>
-                          Last reviewed {dayjs(incRem.history[incRem.history.length - 1].date).fromNow()} • {incRem.history.length} review{incRem.history.length !== 1 ? 's' : ''}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {scheduledRems.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="font-bold text-sm px-2 py-1" style={{ color: '#3b82f6' }}>
-                    📅 Scheduled ({scheduledRems.length})
-                  </h3>
-                  <div className="flex-1 h-px" style={{ backgroundColor: 'var(--rn-clr-border-primary)' }}></div>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {scheduledRems.map((incRem) => (
-                    <div
-                      key={incRem.remId}
-                      onClick={() => handleRemClick(incRem.remId)}
-                      className="group relative p-4 rounded cursor-pointer transition-all"
-                      style={{
-                        backgroundColor: 'var(--rn-clr-background-secondary)',
-                        border: '1px solid var(--rn-clr-border-primary)',
-                        borderLeft: '4px solid #3b82f6',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)';
-                      }}
-                    >
-                      <div className="font-medium text-base mb-2 pr-6" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                        {incRem.remText || 'Loading...'}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded" style={{
-                          backgroundColor: '#bfdbfe',
-                          color: '#1e3a8a'
-                        }}>
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                          {incRem.priority}
-                        </span>
-                        <span style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                          Due {dayjs(incRem.nextRepDate).fromNow()}
-                        </span>
-                      </div>
-                      {incRem.history && incRem.history.length > 0 && (
-                        <div className="mt-2 pt-2 text-xs flex items-center gap-2" style={{
-                          borderTop: '1px solid var(--rn-clr-border-primary)',
-                          color: 'var(--rn-clr-content-tertiary)'
-                        }}>
-                          Last reviewed {dayjs(incRem.history[incRem.history.length - 1].date).fromNow()} • {incRem.history.length} review{incRem.history.length !== 1 ? 's' : ''}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+    <IncRemTable
+      title="Inc Rems in Scope"
+      icon="📚"
+      incRems={incRemsWithDetails}
+      loading={loadingRems}
+      dueCount={counterData?.due ?? 0}
+      totalCount={counterData?.total ?? 0}
+      onRemClick={handleRemClick}
+      onClose={handleClose}
+    />
   );
 }
 

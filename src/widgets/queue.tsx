@@ -5,11 +5,12 @@ import {
   useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { NativeVideoViewer } from '../components/NativeVideoViewer';
 import { ExtractViewer } from '../components/ExtractViewer';
+import { IsolatedCardViewer } from '../components/IsolatedCardViewer';
 import { remToActionItemType } from '../lib/incremental_rem';
 import {
   collapseQueueTopBar,
@@ -20,11 +21,16 @@ import {
   activeHighlightIdKey,
 } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
+import { safeRemTextToString } from '../lib/pdfUtils';
 
 console.log('QUEUE.TSX FILE LOADED');
 
+type ViewMode = 'isolated' | 'context';
+
 export function QueueComponent() {
   const plugin = usePlugin();
+  const [viewMode, setViewMode] = useState<ViewMode>('isolated');
+  const [sourceDocName, setSourceDocName] = useState<string | undefined>();
 
   console.log('🎬 QueueComponent RENDER START');
 
@@ -124,7 +130,27 @@ export function QueueComponent() {
       plugin.storage.setSession(shouldHideIncEverythingKey, false);
     };
   }, [remAndType?.type, shouldRenderEditorForRemType, plugin]);
-  
+
+  // Reset view mode when switching to a new rem
+  useEffect(() => {
+    setViewMode('isolated');
+    setSourceDocName(undefined);
+  }, [ctx?.remId]);
+
+  // Load source document name for highlights
+  useEffect(() => {
+    const loadSourceDocName = async () => {
+      if (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight') {
+        const docRem = remAndType.rem;
+        if (docRem?.text) {
+          const name = await safeRemTextToString(plugin, docRem.text);
+          setSourceDocName(name.slice(0, 50) + (name.length > 50 ? '...' : ''));
+        }
+      }
+    };
+    loadSourceDocName();
+  }, [remAndType, plugin]);
+
   // AFTER ALL HOOKS, NOW you can return early
   if (!ctx?.remId) {
     console.log('⛔ QueueComponent: No ctx.remId, returning null');
@@ -141,13 +167,40 @@ export function QueueComponent() {
   console.log('🎬 QueueComponent FINAL RENDER:', {
     remId: ctx?.remId,
     type: remAndType?.type,
+    viewMode,
     willRender: remAndType ? 'YES' : 'NO'
   });
+
+  // Helper to determine if we should show isolated view
+  // Only show isolated view for PDF/HTML highlights, NOT for regular rems
+  // Regular rems benefit from the rich ExtractViewer with descendants and metadata
+  const isHighlightType = remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight';
+  const shouldShowIsolated = viewMode === 'isolated' && isHighlightType;
+
+  // Get the rem to display in isolated view (only for highlights)
+  const getIsolatedRem = () => {
+    if (!remAndType) return null;
+    if (isHighlightType) {
+      return (remAndType as any).extract;
+    }
+    return null;
+  };
+
+  const isolatedRem = getIsolatedRem();
 
   return (
     <div className="incremental-everything-element" style={{ height: '100%' }}>
       <div className="box-border p-2" style={{ height: `100vh` }}>
-        {!remAndType ? null : remAndType.type === 'pdf' ||
+        {!remAndType ? null : shouldShowIsolated && isolatedRem ? (
+          <IsolatedCardViewer
+            rem={isolatedRem}
+            plugin={plugin}
+            sourceDocumentName={isHighlightType ? sourceDocName : undefined}
+            sourceDocumentId={isHighlightType ? remAndType.rem._id : undefined}
+            sourceType={remAndType.type}
+            onViewInContext={isHighlightType ? () => setViewMode('context') : undefined}
+          />
+        ) : remAndType.type === 'pdf' ||
           remAndType.type === 'html' ||
           remAndType.type === 'pdf-highlight' ||
           remAndType.type === 'html-highlight' ? (

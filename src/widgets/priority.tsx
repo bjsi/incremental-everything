@@ -16,22 +16,23 @@ import {
   QueueSessionCache
 } from '../lib/card_priority';
 import { calculateRelativePercentile, DEFAULT_PERFORMANCE_MODE, PERFORMANCE_MODE_FULL, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
-import { 
-  allIncrementalRemKey, 
-  powerupCode, 
-  nextRepDateSlotCode, 
-  prioritySlotCode, 
-  currentSubQueueIdKey, 
-  allCardPriorityInfoKey, 
-  cardPriorityCacheRefreshKey, 
+import {
+  allIncrementalRemKey,
+  powerupCode,
+  nextRepDateSlotCode,
+  prioritySlotCode,
+  currentSubQueueIdKey,
+  allCardPriorityInfoKey,
+  cardPriorityCacheRefreshKey,
   queueSessionCacheKey,
-  isMobileDeviceKey,          
-  alwaysUseLightModeOnMobileId 
+  isMobileDeviceKey,
+  alwaysUseLightModeOnMobileId
 } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { PriorityBadge, PrioritySlider, PrioritySliderRef } from '../components';
 import * as _ from 'remeda';
 
 type Scope = { remId: string | null; name: string; };
@@ -75,8 +76,8 @@ function Priority() {
   const [cardRelPriority, setCardRelPriority] = useState(50);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showInheritanceForIncRem, setShowInheritanceForIncRem] = useState(false);
-  const incInputRef = useRef<HTMLInputElement>(null);
-  const cardInputRef = useRef<HTMLInputElement>(null);
+  const incSliderRef = useRef<PrioritySliderRef>(null);
+  const cardSliderRef = useRef<PrioritySliderRef>(null);
 
   // Data Fetching Hooks
   const widgetContext = useRunAsync(async () => await plugin.widget.getWidgetContext<{ remId: string }>(), []);
@@ -305,12 +306,12 @@ function Priority() {
 
   useEffect(() => {
     setTimeout(() => {
-      if (incInputRef.current) {
-        incInputRef.current.focus();
-        incInputRef.current.select();
-      } else if (cardInputRef.current) {
-        cardInputRef.current.focus();
-        cardInputRef.current.select();
+      if (incSliderRef.current) {
+        incSliderRef.current.focus();
+        incSliderRef.current.select();
+      } else if (cardSliderRef.current) {
+        cardSliderRef.current.focus();
+        cardSliderRef.current.select();
       }
     }, 50);
   }, [incRemInfo, cardInfo]);
@@ -463,13 +464,19 @@ function Priority() {
 
   const handleTabCycle = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showIncSection || (!showCardSection && !showInheritanceSection) || e.key !== 'Tab' || e.shiftKey) return;
-    const incInput = incInputRef.current;
-    const cardInput = cardInputRef.current;
     e.preventDefault();
-    if (document.activeElement === incInput && cardInput) {
-        cardInput.focus(); cardInput.select();
-    } else if (document.activeElement === cardInput && incInput) {
-        incInput.focus(); incInput.select();
+    // Tab cycling between inc and card sliders
+    if (incSliderRef.current && cardSliderRef.current) {
+      // Simple toggle - if we're in the inc section, go to card, otherwise go to inc
+      const activeElement = document.activeElement;
+      const incSection = activeElement?.closest('[data-section="inc"]');
+      if (incSection) {
+        cardSliderRef.current.focus();
+        cardSliderRef.current.select();
+      } else {
+        incSliderRef.current.focus();
+        incSliderRef.current.select();
+      }
     }
   };
 
@@ -505,61 +512,87 @@ function Priority() {
   }
 
   const { scopedIncRems, scopedCardRems, descendantCardCount, prioritySourceCounts } = derivedData;
-  
+
   const showAddCardPriorityButton = showIncSection && !showCardSection && descendantCardCount > 0 && !showInheritanceSection;
 
-  if (!showIncSection && !showCardSection && !showInheritanceSection) { 
-    return <div className="p-4 text-center rn-clr-content-secondary">This rem is neither an Incremental Rem nor has flashcards.</div>; 
+  if (!showIncSection && !showCardSection && !showInheritanceSection) {
+    return (
+      <div
+        className="p-4 text-center text-sm"
+        style={{ color: 'var(--rn-clr-content-secondary)' }}
+      >
+        This rem is neither an Incremental Rem nor has flashcards.
+      </div>
+    );
   }
-  
-  const secondaryTextStyle = { color: 'rgba(255, 255, 255, 0.8)' };
   
   // --- FINAL JSX RENDER ---
   return (
-    <div className="p-4 flex flex-col gap-4 relative" onKeyDown={async (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        if (showConfirmation) {
-          await saveAndClose(incAbsPriority, cardAbsPriority);
-        } else {
-          await handleConfirmAndClose();
+    <div
+      className="flex flex-col gap-3 relative"
+      style={{
+        padding: '16px',
+        backgroundColor: 'var(--rn-clr-background-primary)',
+        color: 'var(--rn-clr-content-primary)',
+      }}
+      onKeyDown={async (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (showConfirmation) {
+            await saveAndClose(incAbsPriority, cardAbsPriority);
+          } else {
+            await handleConfirmAndClose();
+          }
+        } else if (e.key === 'Escape') {
+          plugin.widget.closePopup();
         }
-      } else if (e.key === 'Escape') {
-        plugin.widget.closePopup();
-      }
-    }}>
+      }}
+    >
       {showConfirmation && (
-        <div className="absolute inset-0 bg-white/80 dark:bg-black/80 flex items-center justify-center z-10 p-4 rounded-lg">
-          <div className="p-6 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col gap-4 text-center max-w-sm">
-            <h3 className="font-semibold text-lg">Priorities are different</h3>
-            <p className="text-sm rn-clr-content-secondary">
-              Incremental Rem ({incAbsPriority}) and Flashcard ({cardAbsPriority}) priorities do not match.  Please choose an option below.
+        <div
+          className="absolute inset-0 flex items-center justify-center z-10 p-4"
+          style={{ backgroundColor: 'var(--rn-clr-background-primary)', opacity: 0.98 }}
+        >
+          <div
+            className="p-5 rounded-lg flex flex-col gap-3 text-center max-w-sm"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              border: '1px solid var(--rn-clr-border-primary)',
+              boxShadow: 'var(--rn-box-shadow-modal)',
+            }}
+          >
+            <h3 className="font-semibold text-base" style={{ color: 'var(--rn-clr-content-primary)' }}>
+              Priorities are different
+            </h3>
+            <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+              Incremental Rem (<strong>{incAbsPriority}</strong>) and Flashcard (<strong>{cardAbsPriority}</strong>) priorities do not match.
             </p>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 mt-2">
               <button
+                className="px-3 py-2 rounded text-xs font-semibold transition-opacity hover:opacity-80"
                 style={{ backgroundColor: '#6B7280', color: 'white' }}
-                className="px-4 py-2 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-400"
                 onClick={() => saveAndClose(incAbsPriority, cardAbsPriority)}
               >
                 Save Both As-Is (Enter)
               </button>
               <button
+                className="px-3 py-2 rounded text-xs font-semibold transition-opacity hover:opacity-80"
                 style={{ backgroundColor: '#3B82F6', color: 'white' }}
-                className="px-4 py-2 rounded font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
                 onClick={() => saveAndClose(incAbsPriority, incAbsPriority)}
               >
                 Use IncRem Priority for Both ({incAbsPriority})
               </button>
               <button
+                className="px-3 py-2 rounded text-xs font-semibold transition-opacity hover:opacity-80"
                 style={{ backgroundColor: '#10B981', color: 'white' }}
-                className="px-4 py-2 rounded font-semibold focus:outline-none focus:ring-2 focus:ring-green-400"
                 onClick={() => saveAndClose(cardAbsPriority, cardAbsPriority)}
               >
                 Use Card Priority for Both ({cardAbsPriority})
               </button>
             </div>
             <button
-              className="text-sm text-gray-500 hover:underline mt-2"
+              className="text-xs mt-1 transition-opacity hover:opacity-70"
+              style={{ color: 'var(--rn-clr-content-tertiary)' }}
               onClick={() => setShowConfirmation(false)}
             >
               Go Back
@@ -568,414 +601,302 @@ function Priority() {
         </div>
       )}
 
-      <h2 className="text-xl font-bold">Priority Settings</h2>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+          Priority Settings
+        </h2>
+        <button
+          onClick={() => plugin.widget.closePopup()}
+          className="p-1 rounded transition-colors text-sm"
+          style={{ color: 'var(--rn-clr-content-tertiary)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+        >
+          ✕
+        </button>
+      </div>
 
-      {/* 🔌 Conditionally render scope UI */}
+      {/* Scope UI */}
       {performanceMode === PERFORMANCE_MODE_FULL && (
-        <>
+        <div className="flex flex-col gap-2">
           {isPriorityReviewDoc && originalScopeId && scopeMode === 'document' && (
-            <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-center">
-              📊 Scope: <span className="font-semibold">{scope.name}</span> (Original Document)
+            <div
+              className="px-2 py-1.5 rounded text-xs text-center"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+                color: 'var(--rn-clr-content-secondary)',
+              }}
+            >
+              📊 Scope: <span className="font-semibold">{scope.name}</span>
             </div>
           )}
 
-          <div className="flex justify-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
-            <label className={`cursor-pointer w-1/2 text-center text-sm py-1 px-3 rounded-md transition-colors ${
-                scopeMode === 'all'
-                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 font-semibold shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50 dark:hover:bg-gray-700'
-            }`}>
+          <div
+            className="flex p-0.5 rounded-md"
+            style={{ backgroundColor: 'var(--rn-clr-background-secondary)' }}
+          >
+            <label
+              className="cursor-pointer w-1/2 text-center text-xs py-1.5 px-2 rounded transition-all"
+              style={{
+                backgroundColor: scopeMode === 'all' ? 'var(--rn-clr-background-primary)' : 'transparent',
+                color: scopeMode === 'all' ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-tertiary)',
+                fontWeight: scopeMode === 'all' ? 600 : 400,
+              }}
+            >
               <input type="radio" name="scopeMode" value="all" checked={scopeMode === 'all'} onChange={() => { setScopeMode('all'); setScope({ remId: null, name: 'All KB' }); }} className="sr-only" />
               All KB
             </label>
-            <label className={`cursor-pointer w-1/2 text-center text-sm py-1 px-3 rounded-md transition-colors ${
-                scopeMode === 'document'
-                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 font-semibold shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50 dark:hover:bg-gray-700'
-            }`}>
+            <label
+              className="cursor-pointer w-1/2 text-center text-xs py-1.5 px-2 rounded transition-all"
+              style={{
+                backgroundColor: scopeMode === 'document' ? 'var(--rn-clr-background-primary)' : 'transparent',
+                color: scopeMode === 'document' ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-tertiary)',
+                fontWeight: scopeMode === 'document' ? 600 : 400,
+              }}
+            >
               <input type="radio" name="scopeMode" value="document" checked={scopeMode === 'document'} onChange={() => { setScopeMode('document'); if (currentDocumentScopeIndex === -1 && documentScopes.length > 0) { setScope(documentScopes[0]); } }} className="sr-only" />
               Document
             </label>
           </div>
 
           {scopeMode === 'document' && (
-            <div className="p-2 border rounded-md dark:border-gray-600 flex items-center justify-between mt-2">
-                <button onClick={() => { if (currentDocumentScopeIndex > 0) { setScope(documentScopes[currentDocumentScopeIndex - 1]); } }} disabled={currentDocumentScopeIndex <= 0} className="px-2 py-1 rounded disabled:opacity-20">↑</button>
-                <div className="text-sm font-semibold text-center truncate" title={scope.name}>{scope.name}</div>
-                <button onClick={() => { if (currentDocumentScopeIndex < documentScopes.length - 1) { setScope(documentScopes[currentDocumentScopeIndex + 1]); } }} disabled={currentDocumentScopeIndex >= documentScopes.length - 1} className="px-2 py-1 rounded disabled:opacity-20">↓</button>
+            <div
+              className="px-2 py-1.5 rounded flex items-center justify-between gap-2"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              <button
+                onClick={() => { if (currentDocumentScopeIndex > 0) { setScope(documentScopes[currentDocumentScopeIndex - 1]); } }}
+                disabled={currentDocumentScopeIndex <= 0}
+                className="px-1.5 py-0.5 rounded text-xs disabled:opacity-20"
+                style={{ color: 'var(--rn-clr-content-secondary)' }}
+              >
+                ↑
+              </button>
+              <div
+                className="text-xs font-medium text-center truncate flex-1"
+                style={{ color: 'var(--rn-clr-content-primary)' }}
+                title={scope.name}
+              >
+                {scope.name}
+              </div>
+              <button
+                onClick={() => { if (currentDocumentScopeIndex < documentScopes.length - 1) { setScope(documentScopes[currentDocumentScopeIndex + 1]); } }}
+                disabled={currentDocumentScopeIndex >= documentScopes.length - 1}
+                className="px-1.5 py-0.5 rounded text-xs disabled:opacity-20"
+                style={{ color: 'var(--rn-clr-content-secondary)' }}
+              >
+                ↓
+              </button>
             </div>
           )}
-        </>
+        </div>
       )}
       
       {showIncSection && (
-        <div className="p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex flex-col gap-4">
-          <h3 className="text-lg font-semibold flex items-center text-blue-800 dark:text-blue-200">
-            <span className="mr-2">📖</span>
-            Incremental Rem Priority
-          </h3>
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-center">
-              <label className="font-medium">Absolute Priority:</label>
-              <input ref={incInputRef} type="number" min={0} max={100} value={incAbsPriority} onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val)) setIncAbsPriority(Math.min(100, Math.max(0, val)));
-                    else if (e.target.value === '') setIncAbsPriority(0);
-                }} 
-                onKeyDown={handleTabCycle}
-                className="w-20 text-center p-1 border rounded dark:bg-gray-800 border-gray-300 dark:border-gray-600" />
-            </div>
-            <input type="range" min="0" max="100" value={incAbsPriority} onChange={(e) => setIncAbsPriority(Number(e.target.value))} className="w-full" />
-            
-            {/* 🔌 Conditionally render relative priority */}
+        <div
+          className="p-3 rounded-lg flex flex-col gap-3"
+          data-section="inc"
+          style={{
+            backgroundColor: 'var(--rn-clr-background-secondary)',
+            border: '1px solid var(--rn-clr-border-primary)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--rn-clr-content-primary)' }}>
+              <span>📖</span>
+              Incremental Rem
+            </h3>
+            <PriorityBadge priority={incAbsPriority} percentile={incRelPriority} />
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <PrioritySlider ref={incSliderRef} value={incAbsPriority} onChange={setIncAbsPriority} relativePriority={incRelPriority} />
+
             {performanceMode === PERFORMANCE_MODE_FULL && (
-              <>
-                <div className="flex justify-between items-center mt-2">
-                  <label className="font-medium">Relative Priority:</label>
-                  <span className="text-lg font-bold">{incRelPriority}%</span>
-                </div>
-                <div className="relative h-8 flex items-center">
-                  <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
-                  <input type="range" min="1" max="100" value={incRelPriority} onChange={(e) => handleIncRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
-                </div>
-                <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
-                  Universe: {scopedIncRems.length.toLocaleString()} Inc Rem
-                </div>
-              </>
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                <span>Relative: <strong>{incRelPriority}%</strong></span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedIncRems.length.toLocaleString()} items</span>
+              </div>
             )}
 
-            <div className="text-sm mt-2" style={secondaryTextStyle}>
-              Next review: {incRemInfo && new Date(incRemInfo.nextRepDate).toLocaleDateString()}
+            <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              Next: {incRemInfo && new Date(incRemInfo.nextRepDate).toLocaleDateString()}
             </div>
           </div>
 
           {showAddCardPriorityButton && (
-            <div className="pt-2 mt-2 border-t border-blue-200/50 dark:border-blue-800/50">
-              <p className="text-xs text-center text-blue-700 dark:text-blue-300 mb-2">
-                This Rem has {descendantCardCount} descendant flashcards.
+            <div className="pt-2 border-t" style={{ borderColor: 'var(--rn-clr-border-primary)' }}>
+              <p className="text-xs text-center mb-2" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                {descendantCardCount} descendant flashcards
               </p>
-              <button 
-                onClick={() => {
-                  setCardAbsPriority(incAbsPriority);
-                  setShowInheritanceForIncRem(true);
-                }}
-                className="w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 self-center font-semibold"
-                >
+              <button
+                onClick={() => { setCardAbsPriority(incAbsPriority); setShowInheritanceForIncRem(true); }}
+                className="w-full px-3 py-1.5 text-xs font-semibold rounded transition-opacity hover:opacity-80"
+                style={{ backgroundColor: '#eab308', color: 'white' }}
+              >
                 Set Card Priority for Inheritance
               </button>
             </div>
           )}
 
-          {/* 🔌 Conditionally render ancestor info */}
           {performanceMode === PERFORMANCE_MODE_FULL && ancestorPriorityInfo && (
-            <div style={{
-              marginTop: '16px',
-              padding: '12px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(155, 178, 215, 0.6)',
-              border: '1px solid rgba(59, 130, 246, 0.3)'
-            }}>
-              {/* Badges row */}
-              <div style={{ 
-                display: 'flex', 
-                gap: '8px', 
-                marginBottom: '12px',
-                flexWrap: 'wrap'
-              }}>
-                {/* Status badge - Note: IncRems don't have 'source', so we show "Closest Ancestor" */}
-                <span style={{
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  borderRadius: '4px',
-                  textTransform: 'uppercase',
-                  backgroundColor: 'rgba(124, 130, 141, 0.2)',
-                  color: '#374151'
-                }}>
-                  Closest Ancestor
-                </span>
-                
-                {/* Level badge */}
-                <span style={{
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  borderRadius: '4px',
-                  textTransform: 'uppercase',
-                  backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                  color: '#1e40af'
-                }}>
-                  {ancestorPriorityInfo.levelDescription}
-                </span>
-                
-                {/* Type badge */}
-                <span style={{
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: '500',
-                  borderRadius: '4px',
-                  backgroundColor: 'rgba(168, 85, 247, 0.2)',
-                  color: '#6b21a8'
-                }}>
-                  {ancestorPriorityInfo.sourceType}
-                </span>
-              </div>
-              
-              {/* Content */}
-              <div style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#1e40af',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                marginBottom: '4px'
-              }}>
-                <span style={{
-                  fontSize: '24px',
-                  fontWeight: '700',
-                  color: '#2563eb',
-                }}>
-                  {ancestorPriorityInfo.priority} 
-                </span> &nbsp; &nbsp;
-                {ancestorPriorityInfo.ancestorName}
+            <div
+              className="p-2 rounded flex items-center gap-3"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-primary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              <PriorityBadge priority={ancestorPriorityInfo.priority} compact />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs truncate" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                  {ancestorPriorityInfo.ancestorName}
+                </div>
+                <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                  {ancestorPriorityInfo.levelDescription} • {ancestorPriorityInfo.sourceType}
+                </div>
               </div>
             </div>
           )}
 
-          <button onClick={removeFromIncremental} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 self-center">
-            Remove from Incremental Queue
+          <button
+            onClick={removeFromIncremental}
+            className="px-3 py-1.5 text-xs rounded transition-opacity hover:opacity-80 self-center"
+            style={{ backgroundColor: '#ef4444', color: 'white' }}
+          >
+            Remove from Queue
           </button>
         </div>
       )}
       
       {showCardSection && (
-         <div className="p-4 border border-green-200 dark:border-green-800 rounded-lg bg-green-50 dark:bg-green-900/20 flex flex-col gap-4">
-          <h3 className="text-lg font-semibold flex items-center text-green-800 dark:text-green-200">
-            <span className="mr-2">🎴</span>
-            Flashcard Priority
-          </h3>
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center">
-                <label className="font-medium">Absolute Priority:</label>
-                <input ref={cardInputRef} type="number" min={0} max={100} value={cardAbsPriority} onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        if (!isNaN(val)) setCardAbsPriority(Math.min(100, Math.max(0, val)));
-                        else if (e.target.value === '') setCardAbsPriority(0);
-                    }}
-                    onKeyDown={handleTabCycle}
-                    className="w-20 text-center p-1 border rounded dark:bg-gray-800 border-gray-300 dark:border-gray-600" />
-              </div>
-              <input type="range" min="0" max="100" value={cardAbsPriority} onChange={(e) => setCardAbsPriority(Number(e.target.value))} className="w-full" />
-
-
-              {hasCards && cardInfo && (
-                <>
-                  {/* 🔌 Conditionally render statistics */}
-                  {performanceMode === PERFORMANCE_MODE_FULL && (
-                    <div className="text-xs text-center mt-2 flex justify-around p-1 bg-gray-100 dark:bg-gray-800 rounded-sm" style={secondaryTextStyle}>
-                      <span>Manual: {prioritySourceCounts.manual.toLocaleString()}</span>
-                      <span>Inherited: {prioritySourceCounts.inherited.toLocaleString()}</span>
-                      <span>Default: {prioritySourceCounts.default.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center text-sm mt-2" style={secondaryTextStyle}>
-                    <span><span className="font-medium">Source:</span> {cardInfo?.source}</span>
-                    {cardInfo?.source === 'inherited' && (
-                      <button onClick={() => saveCardPriority(cardInfo.priority)} className="text-blue-500 hover:underline">
-                        Convert to Manual
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-sm" style={secondaryTextStyle}>
-                    <span className="font-medium">Due Cards:</span> {cardInfo?.dueCards} / {cardInfo?.cardCount}
-                  </div>
-                  
-                  {/* 🔌 Conditionally render scope type radio buttons */}
-                  {performanceMode === PERFORMANCE_MODE_FULL && (
-                    <div className="mt-4 pt-2 border-t dark:border-gray-600">
-                        <label className="text-sm font-medium">Calculate Relative To:</label>
-                        <div className="flex gap-4 mt-1">
-                            <label className="flex items-center gap-2 text-sm">
-                                <input type="radio" name="cardScope" value="prioritized" checked={cardScopeType === 'prioritized'} onChange={() => setCardScopeType('prioritized')} />
-                                Prioritized Cards (Manual + Inherited)
-                            </label>
-                            <label className="flex items-center gap-2 text-sm">
-                                <input type="radio" name="cardScope" value="all" checked={cardScopeType === 'all'} onChange={() => setCardScopeType('all')} />
-                                All Cards
-                            </label>
-                        </div>
-                    </div>
-                  )}
-
-                                {/* 🔌 Conditionally render relative priority */}
-              {performanceMode === PERFORMANCE_MODE_FULL && (
-                <>
-                  <div className="flex justify-between items-center mt-2">
-                    <label className="font-medium">Relative Priority:</label>
-                    <span className="text-lg font-bold">{cardRelPriority}%</span>
-                  </div>
-                  <div className="relative h-8 flex items-center">
-                    <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
-                    <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
-                  </div>
-                  <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
-                      Universe: {scopedCardRems.length.toLocaleString()} flashcards
-                  </div>
-                </>
-              )}
-              
-              {/* 🔌 Conditionally render ancestor info */}
-              {performanceMode === PERFORMANCE_MODE_FULL && ancestorPriorityInfo && (
-                <div style={{
-                  marginTop: '16px',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(155, 178, 215, 0.6)',
-                  border: '1px solid rgba(59, 130, 246, 0.3)'
-                }}>
-                  {/* Badges row */}
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '8px', 
-                    marginBottom: '12px',
-                    flexWrap: 'wrap'
-                  }}>
-                    {/* Status badge */}
-                    <span style={{
-                      padding: '4px 8px',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      borderRadius: '4px',
-                      textTransform: 'uppercase',
-                      backgroundColor: cardInfo?.source === 'inherited' 
-                        ? 'rgba(34, 197, 94, 0.2)' 
-                        : 'rgba(124, 130, 141, 0.2)',
-                      color: cardInfo?.source === 'inherited' 
-                        ? '#15803d' 
-                        : '#374151'
-                    }}>
-                      {cardInfo?.source === 'inherited' ? 'Inherits from Ancestor' : 'Closest Ancestor'}
-                    </span>
-                    
-                    {/* Level badge */}
-                    <span style={{
-                      padding: '4px 8px',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      borderRadius: '4px',
-                      textTransform: 'uppercase',
-                      backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                      color: '#1e40af'
-                    }}>
-                      {ancestorPriorityInfo.levelDescription}
-                    </span>
-                    
-                    {/* Type badge */}
-                    <span style={{
-                      padding: '4px 8px',
-                      fontSize: '11px',
-                      fontWeight: '500',
-                      borderRadius: '4px',
-                      backgroundColor: 'rgba(168, 85, 247, 0.2)',
-                      color: '#6b21a8'
-                    }}>
-                      {ancestorPriorityInfo.sourceType}
-                    </span>
-                  </div>
-                  
-                  {/* Content */}
-                  <div style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#1e40af',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    marginBottom: '4px'
-                  }}>
-                    <span style={{
-                      fontSize: '24px',
-                      fontWeight: '700',
-                      color: '#2563eb',
-                    }}>
-                      {ancestorPriorityInfo.priority} 
-                    </span> &nbsp; &nbsp;
-                    {ancestorPriorityInfo.ancestorName}
-                  </div>
-
-                </div>
-              )}
-                </>
-              )}
-            </div>
+        <div
+          className="p-3 rounded-lg flex flex-col gap-3"
+          data-section="card"
+          style={{
+            backgroundColor: 'var(--rn-clr-background-secondary)',
+            border: '1px solid var(--rn-clr-border-primary)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--rn-clr-content-primary)' }}>
+              <span>🎴</span>
+              Flashcard Priority
+            </h3>
+            <PriorityBadge priority={cardAbsPriority} percentile={cardRelPriority} />
           </div>
+
+          <div className="flex flex-col gap-3">
+            <PrioritySlider ref={cardSliderRef} value={cardAbsPriority} onChange={setCardAbsPriority} relativePriority={cardRelPriority} />
+
+            {hasCards && cardInfo && (
+              <>
+                <div className="flex items-center justify-between text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                  <span>Source: <strong>{cardInfo?.source}</strong> • Due: {cardInfo?.dueCards}/{cardInfo?.cardCount}</span>
+                  {cardInfo?.source === 'inherited' && (
+                    <button
+                      onClick={() => saveCardPriority(cardInfo.priority)}
+                      className="text-xs hover:underline"
+                      style={{ color: '#3b82f6' }}
+                    >
+                      Convert to Manual
+                    </button>
+                  )}
+                </div>
+
+                {performanceMode === PERFORMANCE_MODE_FULL && (
+                  <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                    <span>Relative: <strong>{cardRelPriority}%</strong></span>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
+                  </div>
+                )}
+
+                {performanceMode === PERFORMANCE_MODE_FULL && ancestorPriorityInfo && (
+                  <div
+                    className="p-2 rounded flex items-center gap-3"
+                    style={{
+                      backgroundColor: 'var(--rn-clr-background-primary)',
+                      border: '1px solid var(--rn-clr-border-primary)',
+                    }}
+                  >
+                    <PriorityBadge priority={ancestorPriorityInfo.priority} compact />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs truncate" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                        {ancestorPriorityInfo.ancestorName}
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                        {cardInfo?.source === 'inherited' ? 'Inherits from' : 'Ancestor'} • {ancestorPriorityInfo.levelDescription}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {showInheritanceSection && (
-         <div className="p-4 border border-yellow-200 dark:border-yellow-800 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 flex flex-col gap-4">
-          <h3 className="text-lg font-semibold flex items-center text-yellow-800 dark:text-yellow-200">
-            <span className="mr-2">🌿</span>
-            Set Card Priority for Inheritance
-          </h3>
-          <p className="text-xs text-yellow-700 dark:text-yellow-300 -mt-2">
-            {showIncSection 
-              ? `This Incremental Rem has no cards, but you can set a card priority for its ${descendantCardCount} descendant flashcards to inherit.`
-              : `This Rem has no cards, but its descendants have ${descendantCardCount} ${descendantCardCount === 1 ? 'flashcard' : 'flashcards'}. You can set a priority here for them to inherit.`
+        <div
+          className="p-3 rounded-lg flex flex-col gap-3"
+          data-section="card"
+          style={{
+            backgroundColor: 'var(--rn-clr-background-secondary)',
+            border: '1px solid var(--rn-clr-border-primary)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--rn-clr-content-primary)' }}>
+              <span>🌿</span>
+              Inheritance Priority
+            </h3>
+            <PriorityBadge priority={cardAbsPriority} percentile={cardRelPriority} />
+          </div>
+
+          <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+            {showIncSection
+              ? `Set priority for ${descendantCardCount} descendant flashcards to inherit.`
+              : `${descendantCardCount} descendant ${descendantCardCount === 1 ? 'flashcard' : 'flashcards'} will inherit this priority.`
             }
-          </p> 
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center">
-                <label className="font-medium">Absolute Priority:</label>
-                <input ref={cardInputRef} type="number" min={0} max={100} value={cardAbsPriority} onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        if (!isNaN(val)) setCardAbsPriority(Math.min(100, Math.max(0, val)));
-                        else if (e.target.value === '') setCardAbsPriority(0);
-                    }}
-                    onKeyDown={handleTabCycle}
-                    className="w-20 text-center p-1 border rounded dark:bg-gray-800 border-gray-300 dark:border-gray-600" />
+          </p>
+
+          <div className="flex flex-col gap-3">
+            <PrioritySlider ref={!showCardSection ? cardSliderRef : undefined} value={cardAbsPriority} onChange={setCardAbsPriority} relativePriority={cardRelPriority} />
+
+            {performanceMode === PERFORMANCE_MODE_FULL && (
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                <span>Relative: <strong>{cardRelPriority}%</strong></span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
               </div>
-              <input type="range" min="0" max="100" value={cardAbsPriority} onChange={(e) => setCardAbsPriority(Number(e.target.value))} className="w-full" />
-              
-              {/* 🔌 Conditionally render relative priority */}
-              {performanceMode === PERFORMANCE_MODE_FULL && (
-                <>
-                  <div className="flex justify-between items-center mt-2">
-                    <label className="font-medium">Relative Priority:</label>
-                    <span className="text-lg font-bold">{cardRelPriority}%</span>
-                  </div>
-                  <div className="relative h-8 flex items-center">
-                    <div className="absolute w-full h-4 rounded-md" style={{ background: `linear-gradient(to right, hsl(0, 80%, 55%), hsl(60, 80%, 55%), hsl(120, 80%, 55%), hsl(240, 80%, 55%))` }}></div>
-                    <input type="range" min="1" max="100" value={cardRelPriority} onChange={(e) => handleCardRelativeSliderChange(Number(e.target.value))} className="absolute w-full custom-transparent-slider" />
-                  </div>
-                  <div className="text-xs text-center -mt-1" style={secondaryTextStyle}>
-                      Universe: {scopedCardRems.length.toLocaleString()} flashcards
-                  </div>
-                </>
-              )}
-            </div>
-            
-            {cardInfo?.source === 'manual' && (
-              <button 
-                onClick={removeCardPriority} 
-                className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 self-center"
-              >
-                Remove Card Priority
-              </button>
             )}
+          </div>
+
+          {cardInfo?.source === 'manual' && (
+            <button
+              onClick={removeCardPriority}
+              className="px-3 py-1.5 text-xs rounded transition-opacity hover:opacity-80 self-center"
+              style={{ backgroundColor: '#ef4444', color: 'white' }}
+            >
+              Remove Card Priority
+            </button>
+          )}
         </div>
       )}
-      
-      <button 
-        onClick={handleConfirmAndClose} 
-        className="mt-2 px-4 py-2 font-semibold rounded self-center"
-        style={{
-          backgroundColor: '#3B82F6',
-          color: 'white',
-          border: 'none',
-        }}
+
+      <button
+        onClick={handleConfirmAndClose}
+        className="px-4 py-2 text-sm font-semibold rounded transition-opacity hover:opacity-90 self-center"
+        style={{ backgroundColor: '#3B82F6', color: 'white' }}
       >
-        Close
+        Save & Close
       </button>
     </div>
   );
