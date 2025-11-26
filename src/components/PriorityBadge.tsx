@@ -13,30 +13,30 @@ export function PriorityBadge({ priority, percentile, compact = false }: Priorit
   if (compact) {
     return (
       <span
-        className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0 text-center tabular-nums"
+        className="text-xs px-1.5 py-0.5 rounded font-semibold shrink-0 text-center tabular-nums"
         style={{
           backgroundColor: bgColor,
           color: 'white',
-          minWidth: '42px',
+          minWidth: '36px',
         }}
         title={`Priority: ${priority}${percentile ? ` (top ${percentile}%)` : ''}`}
       >
-        ★{priority}
+        P{priority}
       </span>
     );
   }
 
   return (
     <span
-      className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded text-sm font-medium shrink-0 tabular-nums"
+      className="inline-flex items-center justify-center px-2 py-1 rounded text-sm font-semibold shrink-0 tabular-nums"
       style={{
         backgroundColor: bgColor,
         color: 'white',
-        minWidth: '52px',
+        minWidth: '44px',
       }}
       title={`Priority: ${priority}${percentile ? ` (top ${percentile}%)` : ''}`}
     >
-      ★{priority}
+      P{priority}
     </span>
   );
 }
