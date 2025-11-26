@@ -120,6 +120,17 @@ export function calculateAllPercentiles<T extends { priority: number; remId: str
 }
 
 /**
+ * Format milliseconds into a countdown string (MM:SS).
+ * @param ms The number of milliseconds remaining.
+ * @returns A formatted string like "2:30" or "0:05".
+ */
+export function formatCountdown(ms: number): string {
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+/**
  * Format seconds into a human-readable duration string.
  * @param seconds The number of seconds to format.
  * @returns A formatted string like "5s", "2m 30s", "1h 15m", or empty string if 0.
