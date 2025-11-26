@@ -60,9 +60,47 @@ export function InlinePageRangeEditor({
   startInputRef,
   endInputRef,
 }: InlinePageRangeEditorProps) {
+  // Use local string state to allow typing intermediate values (like clearing to type new number)
+  const [startInput, setStartInput] = React.useState(String(startValue));
+  const [endInput, setEndInput] = React.useState(endValue ? String(endValue) : '');
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') { e.preventDefault(); onSave(); }
     if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+  };
+
+  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setStartInput(val);
+    const parsed = parseInt(val);
+    if (!isNaN(parsed) && parsed >= 1) {
+      onStartChange(parsed);
+    }
+  };
+
+  const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setEndInput(val);
+    const parsed = parseInt(val);
+    if (val === '') {
+      onEndChange(0);
+    } else if (!isNaN(parsed) && parsed >= 0) {
+      onEndChange(parsed);
+    }
+  };
+
+  const handleStartBlur = () => {
+    const parsed = parseInt(startInput);
+    if (isNaN(parsed) || parsed < 1) {
+      setStartInput(String(startValue));
+    }
+  };
+
+  const handleEndBlur = () => {
+    const parsed = parseInt(endInput);
+    if (endInput !== '' && (isNaN(parsed) || parsed < 0)) {
+      setEndInput(endValue ? String(endValue) : '');
+    }
   };
 
   return (
@@ -72,8 +110,9 @@ export function InlinePageRangeEditor({
         ref={startInputRef}
         type="number"
         min="1"
-        value={startValue}
-        onChange={(e) => onStartChange(parseInt(e.target.value) || 1)}
+        value={startInput}
+        onChange={handleStartChange}
+        onBlur={handleStartBlur}
         onKeyDown={handleKeyDown}
         className="w-14 text-xs p-1 rounded text-center"
         style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)' }}
@@ -83,8 +122,9 @@ export function InlinePageRangeEditor({
         ref={endInputRef}
         type="number"
         min={startValue}
-        value={endValue || ''}
-        onChange={(e) => onEndChange(parseInt(e.target.value) || 0)}
+        value={endInput}
+        onChange={handleEndChange}
+        onBlur={handleEndBlur}
         onKeyDown={handleKeyDown}
         className="w-14 text-xs p-1 rounded text-center"
         style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)' }}

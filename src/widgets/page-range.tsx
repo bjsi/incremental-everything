@@ -303,6 +303,8 @@ function PageRangeWidget() {
   }, [isLoading, contextData]);
 
   // Auto-focus page range editor when editing starts
+  // Only trigger on type/remId change, not on value changes within the same edit session
+  const editingKey = editingState.type === 'range' ? `range-${editingState.remId}` : editingState.type;
   useEffect(() => {
     if (editingState.type === 'range') {
       const remId = editingState.remId;
@@ -325,7 +327,7 @@ function PageRangeWidget() {
       // Start trying after a small initial delay
       setTimeout(tryFocus, 50);
     }
-  }, [editingState]);
+  }, [editingKey]);
 
   const handleSave = async () => {
     if (!contextData?.incrementalRemId || !contextData?.pdfRemId) return;
