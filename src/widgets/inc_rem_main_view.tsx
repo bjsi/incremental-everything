@@ -3,17 +3,18 @@ import React, { useState, useMemo } from 'react';
 import { allIncrementalRemKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { ActionItemType } from '../lib/incremental_rem/types';
-import { extractText, determineIncRemType } from '../lib/incRemHelpers';
+import { extractText, determineIncRemType, getTotalTimeSpent } from '../lib/incRemHelpers';
 import { IncRemRow, IncRemRowData } from '../components';
 
 interface IncRemWithDetails extends IncrementalRem {
   remText?: string;
   incRemType?: ActionItemType;
   percentile?: number;
+  totalTimeSpent?: number;
 }
 
 type FilterStatus = 'all' | 'due' | 'scheduled';
-type SortBy = 'priority' | 'date' | 'reviews';
+type SortBy = 'priority' | 'date' | 'reviews' | 'time';
 type SortOrder = 'asc' | 'desc';
 
 export function IncRemMainView() {
@@ -69,6 +70,7 @@ export function IncRemMainView() {
             remText: textStr || '[Empty rem]',
             incRemType,
             percentile: percentiles[incRem.remId],
+            totalTimeSpent: getTotalTimeSpent(incRem),
           };
         } catch (error) {
           console.error('Error loading rem details:', error);
@@ -104,6 +106,10 @@ export function IncRemMainView() {
         const aReviews = a.history?.length || 0;
         const bReviews = b.history?.length || 0;
         comparison = aReviews - bReviews;
+      } else if (sortBy === 'time') {
+        const aTime = a.totalTimeSpent || 0;
+        const bTime = b.totalTimeSpent || 0;
+        comparison = aTime - bTime;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -183,6 +189,7 @@ export function IncRemMainView() {
             <option value="priority">Priority</option>
             <option value="date">Date</option>
             <option value="reviews">Reviews</option>
+            <option value="time">Time Spent</option>
           </select>
           <button
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -285,6 +292,7 @@ export function IncRemMainView() {
                 incRem={{
                   ...incRem,
                   historyCount: incRem.history?.length,
+                  totalTimeSpent: incRem.totalTimeSpent,
                 } as IncRemRowData}
                 onClick={() => handleRemClick(incRem.remId)}
                 compact={false}

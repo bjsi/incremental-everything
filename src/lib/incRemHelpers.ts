@@ -1,5 +1,5 @@
 import { BuiltInPowerupCodes, RNPlugin } from '@remnote/plugin-sdk';
-import { ActionItemType } from './incremental_rem/types';
+import { ActionItemType, IncrementalRem } from './incremental_rem/types';
 import { remToActionItemType } from './incremental_rem/action_items';
 
 /**
@@ -53,4 +53,13 @@ export async function determineIncRemType(plugin: RNPlugin, rem: any): Promise<A
   } catch {
     return 'unknown';
   }
+}
+
+/**
+ * Calculate the total time spent reviewing an incremental rem.
+ * Sums up reviewTimeSeconds from all sessions in history.
+ */
+export function getTotalTimeSpent(incRem: IncrementalRem): number {
+  if (!incRem.history || incRem.history.length === 0) return 0;
+  return incRem.history.reduce((total, rep) => total + (rep.reviewTimeSeconds || 0), 0);
 }
