@@ -160,14 +160,14 @@ export function PriorityEditor() {
       style={{
         position: 'sticky',
         top: '12px',
-        backgroundColor: 'var(--rn-clr-background-primary)',
-        border: '1px solid var(--rn-clr-border-primary)',
+        backgroundColor: isExpanded ? 'var(--rn-clr-background-primary)' : 'transparent',
+        border: isExpanded ? '1px solid var(--rn-clr-border-primary)' : 'none',
         color: 'var(--rn-clr-content-primary)',
         borderRadius: '12px',
-        padding: isExpanded ? '16px' : '8px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        padding: isExpanded ? '16px' : '4px',
+        boxShadow: isExpanded ? '0 4px 20px rgba(0,0,0,0.15)' : 'none',
         transition: 'all 0.2s ease',
-        minWidth: isExpanded ? '240px' : '48px',
+        minWidth: isExpanded ? '240px' : 'auto',
         zIndex: 1000,
       }}
     >
