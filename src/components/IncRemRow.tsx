@@ -19,36 +19,10 @@ export interface IncRemRowData {
 interface IncRemRowProps {
   incRem: IncRemRowData;
   onClick: () => void;
-  compact?: boolean;
   showType?: boolean;
 }
 
-export function IncRemRow({ incRem, onClick, compact = true, showType = true }: IncRemRowProps) {
-  if (compact) {
-    return (
-      <div
-        onClick={onClick}
-        className="flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-all group"
-        style={{ backgroundColor: 'var(--rn-clr-background-secondary)' }}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'; }}
-      >
-        {showType && <TypeBadge type={incRem.incRemType} compact />}
-
-        <div
-          className="flex-1 truncate text-sm"
-          style={{ color: 'var(--rn-clr-content-primary)' }}
-          title={incRem.remText}
-        >
-          {incRem.remText || 'Loading...'}
-        </div>
-
-        <PriorityBadge priority={incRem.priority} percentile={incRem.percentile} compact />
-        <TimeBadge nextRepDate={incRem.nextRepDate} compact />
-      </div>
-    );
-  }
-
+export function IncRemRow({ incRem, onClick, showType = true }: IncRemRowProps) {
   return (
     <div
       onClick={onClick}
