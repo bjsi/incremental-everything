@@ -172,18 +172,16 @@ export function QueueComponent() {
   });
 
   // Helper to determine if we should show isolated view
+  // Only show isolated view for PDF/HTML highlights, NOT for regular rems
+  // Regular rems benefit from the rich ExtractViewer with descendants and metadata
   const isHighlightType = remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight';
-  const isRemType = remAndType?.type === 'rem';
-  const shouldShowIsolated = viewMode === 'isolated' && (isHighlightType || isRemType);
+  const shouldShowIsolated = viewMode === 'isolated' && isHighlightType;
 
-  // Get the rem to display in isolated view
+  // Get the rem to display in isolated view (only for highlights)
   const getIsolatedRem = () => {
     if (!remAndType) return null;
     if (isHighlightType) {
       return (remAndType as any).extract;
-    }
-    if (isRemType) {
-      return remAndType.rem;
     }
     return null;
   };
