@@ -4,12 +4,15 @@ import { safeRemTextToString } from '../lib/pdfUtils';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { powerupCode } from '../lib/consts';
+import { ActionItemType } from '../lib/incremental_rem/types';
+import { TypeBadge } from './TypeBadge';
 
 interface IsolatedCardViewerProps {
   rem: PluginRem;
   plugin: RNPlugin;
   sourceDocumentName?: string;
   sourceDocumentId?: RemId;
+  sourceType?: ActionItemType;
   onViewInContext?: () => void;
 }
 
@@ -29,6 +32,7 @@ export function IsolatedCardViewer({
   plugin,
   sourceDocumentName,
   sourceDocumentId,
+  sourceType,
   onViewInContext
 }: IsolatedCardViewerProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -86,7 +90,7 @@ export function IsolatedCardViewer({
           const parentText = await safeRemTextToString(plugin, parentRem.text);
 
           ancestorList.unshift({
-            text: parentText.slice(0, 40) + (parentText.length > 40 ? '...' : ''),
+            text: parentText,
             id: currentParent
           });
 
@@ -270,14 +274,18 @@ export function IsolatedCardViewer({
     fontSize: '11px',
     color: cssVar('--rn-clr-content-tertiary', '#64748b', '#94a3b8'),
     marginBottom: sourceDocumentName ? '6px' : '0',
+    wordBreak: 'break-word',
+    lineHeight: '1.4',
   };
 
   const sourceStyle: React.CSSProperties = {
     fontSize: '11px',
     color: cssVar('--rn-clr-content-tertiary', '#94a3b8', '#64748b'),
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: '6px',
+    wordBreak: 'break-word',
+    lineHeight: '1.4',
   };
 
   const contentStyle: React.CSSProperties = {
@@ -299,12 +307,13 @@ export function IsolatedCardViewer({
     borderTop: `1px solid ${cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155')}`,
     backgroundColor: cssVar('--rn-clr-background-secondary', '#f8fafc', '#1e293b'),
     display: 'flex',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: '8px',
   };
 
   const buttonStyle: React.CSSProperties = {
-    padding: '8px 14px',
+    padding: '8px 12px',
     fontSize: '12px',
     fontWeight: 500,
     borderRadius: '6px',
@@ -312,17 +321,10 @@ export function IsolatedCardViewer({
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '5px',
     transition: 'all 0.15s ease',
     backgroundColor: cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b'),
     color: cssVar('--rn-clr-content-secondary', '#475569', '#94a3b8'),
-  };
-
-  const primaryButtonStyle: React.CSSProperties = {
-    ...buttonStyle,
-    backgroundColor: '#3b82f6',
-    border: 'none',
-    color: '#ffffff',
   };
 
   return (
@@ -346,8 +348,7 @@ export function IsolatedCardViewer({
           )}
           {sourceDocumentName && (
             <div style={sourceStyle}>
-              <span>📄</span>
-              <span>From: {sourceDocumentName}</span>
+              <span>{sourceDocumentName}</span>
             </div>
           )}
         </div>
@@ -376,12 +377,26 @@ export function IsolatedCardViewer({
 
         {/* Footer with actions */}
         <div style={footerStyle}>
+          {/* Left side - Type badge */}
+          <div>
+            {sourceType && <TypeBadge type={sourceType} mini />}
+          </div>
+
+          {/* Right side - Action buttons */}
           {onViewInContext && (
-            <>
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 style={buttonStyle}
                 onClick={handleCreateRem}
                 disabled={isCreatingRem}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-tertiary', '#f1f5f9', '#334155');
+                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-secondary', '#cbd5e1', '#475569');
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b');
+                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155');
+                }}
               >
                 <span>✏️</span>
                 <span>{isCreatingRem ? 'Creating...' : 'Create Rem'}</span>
@@ -390,18 +405,34 @@ export function IsolatedCardViewer({
                 style={buttonStyle}
                 onClick={handleCreateIncrementalRem}
                 disabled={isCreatingRem}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-tertiary', '#f1f5f9', '#334155');
+                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-secondary', '#cbd5e1', '#475569');
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b');
+                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155');
+                }}
               >
                 <span>🔄</span>
                 <span>{isCreatingRem ? 'Creating...' : 'Create Inc Rem'}</span>
               </button>
               <button
-                style={primaryButtonStyle}
+                style={buttonStyle}
                 onClick={onViewInContext}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-tertiary', '#f1f5f9', '#334155');
+                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-secondary', '#cbd5e1', '#475569');
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b');
+                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155');
+                }}
               >
                 <span>📖</span>
                 <span>View in Context</span>
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>

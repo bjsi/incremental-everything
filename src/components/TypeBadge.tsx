@@ -18,11 +18,25 @@ export { TYPE_BADGES };
 interface TypeBadgeProps {
   type?: ActionItemType;
   compact?: boolean;
+  mini?: boolean;
 }
 
-export function TypeBadge({ type, compact = false }: TypeBadgeProps) {
+export function TypeBadge({ type, compact = false, mini = false }: TypeBadgeProps) {
   if (!type) return null;
   const badge = TYPE_BADGES[type] || TYPE_BADGES['unknown'];
+
+  if (mini) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] shrink-0"
+        style={{ backgroundColor: badge.bgColor, color: badge.textColor }}
+        title={badge.description}
+      >
+        <span>{badge.emoji}</span>
+        <span className="font-medium">{badge.label}</span>
+      </span>
+    );
+  }
 
   if (compact) {
     return (

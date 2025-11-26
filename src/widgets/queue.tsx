@@ -199,6 +199,7 @@ export function QueueComponent() {
             plugin={plugin}
             sourceDocumentName={isHighlightType ? sourceDocName : undefined}
             sourceDocumentId={isHighlightType ? remAndType.rem._id : undefined}
+            sourceType={remAndType.type}
             onViewInContext={isHighlightType ? () => setViewMode('context') : undefined}
           />
         ) : remAndType.type === 'pdf' ||
