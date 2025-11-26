@@ -75,7 +75,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
 
   plugin.settings.registerBooleanSetting({
     id: 'showLeftBorderForIncRems',
-    title: 'Show a greeb left Border for IncRems in Editor',
+    title: 'Show a green left Border for IncRems in Editor',
     description:
       'If enabled, this will show a green left border for IncRems in Editor, to make it easier to identify your "extracts".',
     defaultValue: true,
