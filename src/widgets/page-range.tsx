@@ -16,40 +16,11 @@ import {
   PageHistoryEntry
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
-import { calculateRelativePercentile } from '../lib/utils';
-import {
-  PriorityBadge,
-  ReadingHistoryView,
-  InlinePriorityEditor,
-  InlinePageRangeEditor,
-  InlineHistoryEditor
-} from '../components';
+import { calculateRelativePercentile, formatDuration } from '../lib/utils';
+import { PdfRemItem } from '../components';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-
-/**
- * Format seconds into a human-readable duration string
- */
-function formatDuration(seconds: number): string {
-  if (!seconds || seconds === 0) return '';
-
-  if (seconds < 60) {
-    return `${seconds}s`;
-  } else if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return remainingSeconds > 0
-      ? `${minutes}m ${remainingSeconds}s`
-      : `${minutes}m`;
-  } else {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return minutes > 0
-      ? `${hours}h ${minutes}m`
-      : `${hours}h`;
-  }
-}
 
 function PageRangeWidget() {
   const plugin = usePlugin();
@@ -57,11 +28,7 @@ function PageRangeWidget() {
   const inputStartRef = React.useRef<HTMLInputElement>(null);
   
   const contextData = useTrackerPlugin(
-    async (rp) => {
-      const data = await rp.storage.getSession('pageRangeContext');
-      console.log('PageRange: Context data from session:', data);
-      return data;
-    },
+    async (rp) => rp.storage.getSession('pageRangeContext'),
     []
   );
 
@@ -74,8 +41,6 @@ function PageRangeWidget() {
   const [pageRangeEnd, setPageRangeEnd] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [relatedRems, setRelatedRems] = useState<any[]>([]);
-  const [pageHistory, setPageHistory] = useState<PageHistoryEntry[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
   const [currentRemName, setCurrentRemName] = useState<string>('');
   const [isCurrentRemIncremental, setIsCurrentRemIncremental] = useState<boolean>(false);
   const [remHistories, setRemHistories] = useState<Record<string, PageHistoryEntry[]>>({});
@@ -336,11 +301,7 @@ function PageRangeWidget() {
         
         // Load related rems with priorities
         await reloadRelatedRems();
-        
-        // Load history for current rem
-        const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
-        setPageHistory(history || []);
-        
+
       } catch (error) {
         console.error('PageRange: Error loading data:', error);
         await plugin.app.toast(`Error loading data: ${error.message}`);
@@ -654,169 +615,52 @@ function PageRangeWidget() {
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>Click to expand</span>
         </div>
         <div className="flex flex-col gap-1">
-          {sortedRelatedRems.map((item) => {
-            const isCurrentRem = item.remId === contextData?.incrementalRemId;
-            const priorityInfo = remPriorities[item.remId];
-
-            return (
-              <div
-                key={item.remId}
-                className="rounded p-2 cursor-pointer transition-colors"
-                style={{
-                  backgroundColor: isCurrentRem ? 'var(--rn-clr-background-tertiary)' : 'var(--rn-clr-background-secondary)',
-                  border: isCurrentRem ? '2px solid #10b981' : '1px solid var(--rn-clr-border-primary)',
-                }}
-                onClick={() => toggleExpanded(item.remId)}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isCurrentRem ? 'var(--rn-clr-background-tertiary)' : 'var(--rn-clr-background-secondary)'; }}
-              >
-                {/* Main Rem Info */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs transition-transform" style={{
-                    color: 'var(--rn-clr-content-secondary)',
-                    transform: expandedRems.has(item.remId) ? 'rotate(0deg)' : 'rotate(-90deg)'
-                  }}>▼</span>
-                  {item.isIncremental && <span className="text-xs" title="Incremental Rem">⚡</span>}
-                  <span className="text-sm flex-1 truncate" style={{ color: 'var(--rn-clr-content-primary)' }}>
-                    {item.name}
-                  </span>
-                  {isCurrentRem && (
-                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: '#d1fae5', color: '#065f46' }}>Current</span>
-                  )}
-                  {item.isIncremental && priorityInfo && (
-                    <PriorityBadge priority={priorityInfo.absolute} percentile={priorityInfo.percentile ?? undefined} compact />
-                  )}
-                  {item.range && (
-                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-secondary)' }} title="Page range">
-                      p.{item.range.start}-{item.range.end || '∞'}
-                    </span>
-                  )}
-                  {item.currentPage && (
-                    <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }} title="Current reading position">
-                      📖{item.currentPage}
-                    </span>
-                  )}
-                  {remStatistics[item.remId]?.totalTimeSeconds > 0 && (
-                    <span className="text-xs" style={{ color: '#10b981' }} title="Total reading time">
-                      ⏱️{formatDuration(remStatistics[item.remId].totalTimeSeconds)}
-                    </span>
-                  )}
-                </div>
-                
-                {/* Expanded Content */}
-                {expandedRems.has(item.remId) && (
-                  <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--rn-clr-border-primary)' }} onClick={(e) => e.stopPropagation()}>
-                    {/* Action Buttons */}
-                    <div className="flex gap-1 mb-2 flex-wrap">
-                      {!item.isIncremental ? (
-                        <button
-                          onClick={() => handleInitIncrementalRem(item.remId)}
-                          className="px-2 py-1 text-xs rounded transition-colors"
-                          style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#10b981' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#10b981'; e.currentTarget.style.color = 'white'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#10b981'; }}
-                        >
-                          Make Incremental
-                        </button>
-                      ) : (
-                        <>
-                          {editingRemId === item.remId ? (
-                            <>
-                              <button onClick={() => saveRemRange(item.remId)} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: '#3b82f6', color: 'white' }}>Save</button>
-                              <button onClick={() => setEditingRemId(null)} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
-                            </>
-                          ) : editingPriorityRemId === item.remId ? (
-                            <button onClick={() => setEditingPriorityRemId(null)} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
-                          ) : editingHistoryRemId === item.remId ? (
-                            <button onClick={() => setEditingHistoryRemId(null)} className="px-2 py-1 text-xs rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => startEditingRem(item.remId)}
-                                className="px-2 py-1 text-xs rounded transition-colors"
-                                style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#3b82f6' }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#3b82f6'; e.currentTarget.style.color = 'white'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#3b82f6'; }}
-                              >
-                                📄 Range
-                              </button>
-                              <button
-                                onClick={() => startEditingPriority(item.remId)}
-                                className="px-2 py-1 text-xs rounded transition-colors"
-                                style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#8b5cf6' }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#8b5cf6'; e.currentTarget.style.color = 'white'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#8b5cf6'; }}
-                              >
-                                ★ Priority
-                              </button>
-                              <button
-                                onClick={() => startEditingHistory(item.remId, item.currentPage)}
-                                className="px-2 py-1 text-xs rounded transition-colors"
-                                style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#10b981' }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#10b981'; e.currentTarget.style.color = 'white'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#10b981'; }}
-                              >
-                                📖 History
-                              </button>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    
-                    {/* Inline Priority Editor */}
-                    {editingPriorityRemId === item.remId && (
-                      <InlinePriorityEditor
-                        value={editingPriorities[item.remId]}
-                        onChange={(value) => setEditingPriorities({ ...editingPriorities, [item.remId]: value })}
-                        onSave={() => savePriority(item.remId)}
-                        onCancel={() => setEditingPriorityRemId(null)}
-                      />
-                    )}
-
-                    {/* Page Range Editor */}
-                    {editingRemId === item.remId && editingRanges[item.remId] && (
-                      <InlinePageRangeEditor
-                        startValue={editingRanges[item.remId].start}
-                        endValue={editingRanges[item.remId].end}
-                        onStartChange={(value) => setEditingRanges({ ...editingRanges, [item.remId]: { ...editingRanges[item.remId], start: value } })}
-                        onEndChange={(value) => setEditingRanges({ ...editingRanges, [item.remId]: { ...editingRanges[item.remId], end: value } })}
-                        onSave={() => saveRemRange(item.remId)}
-                        onCancel={() => setEditingRemId(null)}
-                        startInputRef={(el) => {
-                          if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
-                          pageRangeInputRefs.current[item.remId].start = el;
-                        }}
-                        endInputRef={(el) => {
-                          if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
-                          pageRangeInputRefs.current[item.remId].end = el;
-                        }}
-                      />
-                    )}
-
-                    {/* Inline History Editor */}
-                    {editingHistoryRemId === item.remId && (
-                      <InlineHistoryEditor
-                        value={editingHistoryPage}
-                        onChange={setEditingHistoryPage}
-                        onSave={() => saveReadingHistory(item.remId)}
-                        onCancel={() => setEditingHistoryRemId(null)}
-                      />
-                    )}
-                    
-                    {/* Reading History */}
-                    {remHistories[item.remId] && remHistories[item.remId].length > 0 && (
-                      <ReadingHistoryView
-                        history={remHistories[item.remId]}
-                        statistics={remStatistics[item.remId]}
-                        formatDuration={formatDuration}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {sortedRelatedRems.map((item) => (
+            <PdfRemItem
+              key={item.remId}
+              item={item}
+              isCurrentRem={item.remId === contextData?.incrementalRemId}
+              isExpanded={expandedRems.has(item.remId)}
+              priorityInfo={remPriorities[item.remId]}
+              statistics={remStatistics[item.remId]}
+              history={remHistories[item.remId]}
+              editingRemId={editingRemId}
+              editingPriorityRemId={editingPriorityRemId}
+              editingHistoryRemId={editingHistoryRemId}
+              editingRanges={editingRanges}
+              editingPriorities={editingPriorities}
+              editingHistoryPage={editingHistoryPage}
+              onToggleExpanded={toggleExpanded}
+              onInitIncremental={handleInitIncrementalRem}
+              onStartEditingRem={startEditingRem}
+              onStartEditingPriority={startEditingPriority}
+              onStartEditingHistory={startEditingHistory}
+              onSaveRemRange={saveRemRange}
+              onSavePriority={savePriority}
+              onSaveHistory={saveReadingHistory}
+              onCancelEditingRem={() => setEditingRemId(null)}
+              onCancelEditingPriority={() => setEditingPriorityRemId(null)}
+              onCancelEditingHistory={() => setEditingHistoryRemId(null)}
+              onEditingRangesChange={(remId, field, value) => {
+                setEditingRanges({
+                  ...editingRanges,
+                  [remId]: { ...editingRanges[remId], [field]: value }
+                });
+              }}
+              onEditingPrioritiesChange={(remId, value) => {
+                setEditingPriorities({ ...editingPriorities, [remId]: value });
+              }}
+              onEditingHistoryPageChange={setEditingHistoryPage}
+              startInputRef={(el) => {
+                if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                pageRangeInputRefs.current[item.remId].start = el;
+              }}
+              endInputRef={(el) => {
+                if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                pageRangeInputRefs.current[item.remId].end = el;
+              }}
+            />
+          ))}
         </div>
       </div>
       </div>

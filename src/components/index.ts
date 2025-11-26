@@ -10,3 +10,4 @@ export { StatBadge } from './StatBadge';
 export { ReadingHistoryView } from './ReadingHistoryView';
 export type { PageHistoryEntry } from './ReadingHistoryView';
 export { InlinePriorityEditor, InlinePageRangeEditor, InlineHistoryEditor } from './InlineEditors';
+export { PdfRemItem } from './PdfRemItem';
