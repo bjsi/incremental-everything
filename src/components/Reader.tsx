@@ -305,6 +305,14 @@ export function Reader(props: ReaderProps) {
     ...metadataBarStyles.rangeButton,
     ...(pageRangeStart > 1 || pageRangeEnd > 0 ? metadataBarStyles.activeRangeButton : {}),
   };
+
+  // Handle breadcrumb click to navigate to ancestor
+  const handleBreadcrumbClick = React.useCallback(async (ancestorId: string) => {
+    const ancestorRem = await plugin.rem.findOne(ancestorId as RemId);
+    if (ancestorRem) {
+      await plugin.window.openRem(ancestorRem);
+    }
+  }, [plugin]);
   
   // --- 4. ALL useEffect Hooks MUST BE HERE ---
 
@@ -665,6 +673,7 @@ export function Reader(props: ReaderProps) {
           items={ancestors as BreadcrumbItem[]}
           isLoading={isContextLoading}
           loadingText="Loading breadcrumbs..."
+          onClick={handleBreadcrumbClick}
         />
       </div>
       
