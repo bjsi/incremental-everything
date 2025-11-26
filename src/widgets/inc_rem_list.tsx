@@ -1,10 +1,10 @@
-import { renderWidget, usePlugin, useTrackerPlugin, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { ActionItemType } from '../lib/incremental_rem/types';
-import { remToActionItemType } from '../lib/incremental_rem/action_items';
 import { buildDocumentScope } from '../lib/scope_helpers';
+import { extractText, determineIncRemType } from '../lib/incRemHelpers';
 import { IncRemRow, IncRemRowData } from '../components';
 import '../style.css';
 import '../App.css';
@@ -231,50 +231,6 @@ export function IncRemList() {
       </div>
     </div>
   );
-}
-
-function extractText(text: unknown): string {
-  if (typeof text === 'string') return text;
-  if (!Array.isArray(text)) return '[Complex content]';
-
-  const result = text
-    .map((item: any) => {
-      if (typeof item === 'string') return item;
-      if (item?.text) return item.text;
-      if (item?.i === 'q') return '[Quote]';
-      if (item?.i === 'i') return '[Image]';
-      if (item?.url) return '[Link]';
-      return '';
-    })
-    .filter(Boolean)
-    .join(' ');
-
-  return result || '[Complex content]';
-}
-
-async function determineIncRemType(plugin: any, rem: any): Promise<ActionItemType> {
-  try {
-    const actionItem = await remToActionItemType(plugin, rem);
-    if (!actionItem) return 'unknown';
-
-    let type: ActionItemType = actionItem.type;
-
-    if (type === 'rem') {
-      let currentRem = rem;
-      for (let i = 0; i < 20; i++) {
-        const parent = await currentRem.getParentRem();
-        if (!parent) break;
-        if (await parent.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
-          return 'pdf-note';
-        }
-        currentRem = parent;
-      }
-    }
-
-    return type;
-  } catch {
-    return 'unknown';
-  }
 }
 
 renderWidget(IncRemList);
