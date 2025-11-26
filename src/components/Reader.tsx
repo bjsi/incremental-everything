@@ -316,8 +316,15 @@ export function Reader(props: ReaderProps) {
     const loadCriticalData = async () => {
       const incrementalRem = await findIncrementalRemForPDF(plugin, pdfRem, true);
 
+      // rem is used for breadcrumbs and document powerup
       const rem = incrementalRem || pdfRem;
-      const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled Rem';
+
+      // For highlights, show the highlight's name (extract text), not the PDF name
+      const isHighlight = actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight';
+      const remForName = isHighlight
+        ? (actionItem as PDFHighlightActionItem | HTMLHighlightActionItem).extract
+        : rem;
+      const remText = remForName.text ? await safeRemTextToString(plugin, remForName.text) : 'Untitled Rem';
       const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
 
       // 2. Get Ancestors (also slow)
@@ -363,7 +370,7 @@ export function Reader(props: ReaderProps) {
 
     return () => clearTimeout(timeoutId);
     
-  }, [actionItem.rem._id, actionItem.rem.parent, plugin]);
+  }, [actionItem.rem._id, actionItem.rem.parent, actionItem.type, actionItem, plugin]);
 
 
   // DEFERRED METADATA CALCULATION (Statistics)
