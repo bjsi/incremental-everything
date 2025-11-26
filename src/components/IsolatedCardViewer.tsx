@@ -230,7 +230,12 @@ export function IsolatedCardViewer({
     }
   }, [plugin, rem._id, rem.text, sourceDocumentId, isCreatingRem]);
 
-  // Styles
+  // Use CSS variables with fallbacks for isolated context
+  const cssVar = (varName: string, fallbackLight: string, fallbackDark: string) => {
+    return `var(${varName}, ${isDarkMode ? fallbackDark : fallbackLight})`;
+  };
+
+  // Styles using RemNote CSS variables
   const containerStyle: React.CSSProperties = {
     height: '100vh',
     display: 'flex',
@@ -238,18 +243,17 @@ export function IsolatedCardViewer({
     alignItems: 'center',
     justifyContent: 'center',
     padding: '24px',
-    backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+    backgroundColor: cssVar('--rn-clr-background-primary', '#f8fafc', '#0f172a'),
     overflow: 'hidden',
   };
 
   const cardStyle: React.CSSProperties = {
     maxWidth: '800px',
     width: '100%',
-    backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-    borderRadius: '16px',
-    boxShadow: isDarkMode
-      ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-      : '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+    backgroundColor: cssVar('--rn-clr-background-secondary', '#ffffff', '#1e293b'),
+    borderRadius: '12px',
+    border: `1px solid ${cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155')}`,
+    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
@@ -257,64 +261,67 @@ export function IsolatedCardViewer({
   };
 
   const headerStyle: React.CSSProperties = {
-    padding: '16px 24px',
-    borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
-    backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+    padding: '12px 16px',
+    borderBottom: `1px solid ${cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155')}`,
+    backgroundColor: cssVar('--rn-clr-background-secondary', '#f8fafc', '#1e293b'),
   };
 
   const breadcrumbStyle: React.CSSProperties = {
-    fontSize: '12px',
-    color: isDarkMode ? '#94a3b8' : '#64748b',
-    marginBottom: sourceDocumentName ? '8px' : '0',
+    fontSize: '11px',
+    color: cssVar('--rn-clr-content-tertiary', '#64748b', '#94a3b8'),
+    marginBottom: sourceDocumentName ? '6px' : '0',
   };
 
   const sourceStyle: React.CSSProperties = {
     fontSize: '11px',
-    color: isDarkMode ? '#64748b' : '#94a3b8',
+    color: cssVar('--rn-clr-content-tertiary', '#94a3b8', '#64748b'),
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
   };
 
   const contentStyle: React.CSSProperties = {
-    padding: '32px 24px',
+    padding: '24px 16px',
     flex: 1,
     overflow: 'auto',
     minHeight: 0,
+    backgroundColor: cssVar('--rn-clr-background-primary', '#ffffff', '#0f172a'),
   };
 
   const remViewerContainerStyle: React.CSSProperties = {
-    fontSize: '18px',
+    fontSize: '16px',
     lineHeight: '1.7',
-    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+    color: cssVar('--rn-clr-content-primary', '#1e293b', '#e2e8f0'),
   };
 
   const footerStyle: React.CSSProperties = {
-    padding: '12px 24px',
-    borderTop: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
-    backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+    padding: '12px 16px',
+    borderTop: `1px solid ${cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155')}`,
+    backgroundColor: cssVar('--rn-clr-background-secondary', '#f8fafc', '#1e293b'),
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '8px',
   };
 
   const buttonStyle: React.CSSProperties = {
-    padding: '8px 16px',
-    fontSize: '13px',
-    borderRadius: '8px',
-    border: 'none',
+    padding: '8px 14px',
+    fontSize: '12px',
+    fontWeight: 500,
+    borderRadius: '6px',
+    border: `1px solid ${cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155')}`,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
     transition: 'all 0.15s ease',
-    backgroundColor: isDarkMode ? '#334155' : '#e2e8f0',
-    color: isDarkMode ? '#e2e8f0' : '#475569',
+    backgroundColor: cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b'),
+    color: cssVar('--rn-clr-content-secondary', '#475569', '#94a3b8'),
   };
 
   const primaryButtonStyle: React.CSSProperties = {
     ...buttonStyle,
-    backgroundColor: isDarkMode ? '#3b82f6' : '#2563eb',
+    backgroundColor: '#3b82f6',
+    border: 'none',
     color: '#ffffff',
   };
 
