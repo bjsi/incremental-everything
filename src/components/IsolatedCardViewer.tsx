@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PluginRem, RNPlugin, RemId, ReactRNPlugin, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { safeRemTextToString, findIncrementalRemForPDF, getAllIncrementsForPDF } from '../lib/pdfUtils';
+import { safeRemTextToString, findIncrementalRemForPDF, findAllRemsForPDF } from '../lib/pdfUtils';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { powerupCode, parentSelectorWidgetId } from '../lib/consts';
@@ -151,15 +151,10 @@ export function IsolatedCardViewer({
   }, [plugin]);
 
   // Helper to find all rems (including non-incremental) that have the PDF as a source
-  // Uses the same function as PDF Control Panel to include Done/untagged rems
+  // Uses findAllRemsForPDF which doesn't depend on pageRangeContext
   const findRemsForPDF = useCallback(async (pdfRemId: RemId): Promise<Array<{remId: RemId; name: string; isIncremental: boolean}>> => {
     try {
-      const allRems = await getAllIncrementsForPDF(plugin, pdfRemId);
-      return allRems.map(r => ({
-        remId: r.remId,
-        name: r.name,
-        isIncremental: r.isIncremental
-      }));
+      return await findAllRemsForPDF(plugin, pdfRemId);
     } catch (error) {
       console.error('Error finding rems for PDF:', error);
       return [];

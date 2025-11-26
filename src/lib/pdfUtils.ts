@@ -722,6 +722,98 @@ export const getAllIncrementsForPDF = async (
 };
 
 /**
+ * Find all rems (incremental and non-incremental) that use a specific PDF.
+ * This version does NOT depend on pageRangeContext - it searches globally.
+ * Used by the parent selector when creating rems from PDF highlights.
+ */
+export const findAllRemsForPDF = async (
+  plugin: RNPlugin,
+  pdfRemId: string
+): Promise<Array<{
+  remId: string;
+  name: string;
+  isIncremental: boolean;
+}>> => {
+  try {
+    const result: Array<{
+      remId: string;
+      name: string;
+      isIncremental: boolean;
+    }> = [];
+
+    const processedRemIds = new Set<string>();
+
+    // PART 1: Search all incremental rems from cache
+    const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+
+    for (const incRemInfo of allIncrementalRems) {
+      if (processedRemIds.has(incRemInfo.remId)) continue;
+
+      const rem = await plugin.rem.findOne(incRemInfo.remId);
+      if (!rem) continue;
+
+      // Skip PDF highlights - we want parent rems only
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+      if (isPdfHighlight) continue;
+
+      // Check if this incremental rem has the target PDF
+      const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
+
+      if (foundPDF && foundPDF._id === pdfRemId) {
+        const remText = await safeRemTextToString(plugin, rem.text);
+        result.push({
+          remId: rem._id,
+          name: remText,
+          isIncremental: true
+        });
+        processedRemIds.add(rem._id);
+      }
+    }
+
+    // PART 2: Check known rems from storage (includes non-incremental rems)
+    const knownRemsKey = getKnownPdfRemsKey(pdfRemId);
+    const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
+
+    for (const remId of knownRemIds) {
+      if (processedRemIds.has(remId)) continue;
+
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) continue;
+
+      // Skip PDF highlights
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+      if (isPdfHighlight) continue;
+
+      const isIncremental = await rem.hasPowerup(powerupCode);
+      const remText = await safeRemTextToString(plugin, rem.text);
+
+      const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
+      if (foundPDF && foundPDF._id === pdfRemId) {
+        result.push({
+          remId: rem._id,
+          name: remText,
+          isIncremental
+        });
+        processedRemIds.add(rem._id);
+      }
+    }
+
+    // Sort: incremental first, then alphabetically
+    result.sort((a, b) => {
+      if (a.isIncremental !== b.isIncremental) {
+        return a.isIncremental ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error finding rems for PDF:', error);
+    return [];
+  }
+};
+
+/**
  * Clear all data for an incremental rem + PDF combination
  */
 export const clearIncrementalPDFData = async (
