@@ -7,3 +7,6 @@ export type { IncRemRowData } from './IncRemRow';
 export { Breadcrumb } from './Breadcrumb';
 export type { BreadcrumbItem } from './Breadcrumb';
 export { StatBadge } from './StatBadge';
+export { ReadingHistoryView } from './ReadingHistoryView';
+export type { PageHistoryEntry } from './ReadingHistoryView';
+export { InlinePriorityEditor, InlinePageRangeEditor, InlineHistoryEditor } from './InlineEditors';
