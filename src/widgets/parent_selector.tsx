@@ -142,6 +142,7 @@ function ParentSelectorWidget() {
       if (extractRem) {
         await removeIncrementalRemCache(plugin, extractRemId);
         await extractRem.removePowerup(powerupCode);
+        await extractRem.setHighlightColor('Yellow');
       }
 
       // Close popup - queue will advance to next card automatically

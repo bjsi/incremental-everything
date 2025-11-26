@@ -190,6 +190,7 @@ export function IsolatedCardViewer({
 
           await removeIncrementalRemCache(plugin, rem._id);
           await rem.removePowerup(powerupCode);
+          await rem.setHighlightColor('Yellow');
 
           const actionText = makeIncremental ? 'incremental rem' : 'rem';
           await plugin.app.toast(`Created ${actionText} under PDF`);
@@ -215,6 +216,7 @@ export function IsolatedCardViewer({
 
           await removeIncrementalRemCache(plugin, rem._id);
           await rem.removePowerup(powerupCode);
+          await rem.setHighlightColor('Yellow');
 
           const actionText = makeIncremental ? 'incremental rem' : 'rem';
           await plugin.app.toast(`Created ${actionText} under "${parentRem.name.slice(0, 30)}..."`);
