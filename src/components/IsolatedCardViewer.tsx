@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PluginRem, RNPlugin, RemId, ReactRNPlugin } from '@remnote/plugin-sdk';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import { PluginRem, RNPlugin, RemId, ReactRNPlugin, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
+import { safeRemTextToString, findIncrementalRemForPDF } from '../lib/pdfUtils';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { powerupCode } from '../lib/consts';
+import { powerupCode, parentSelectorWidgetId } from '../lib/consts';
 import { ActionItemType } from '../lib/incremental_rem/types';
 import { TypeBadge } from './TypeBadge';
+import { ParentSelectorContext } from '../widgets/parent_selector';
 
 interface IsolatedCardViewerProps {
   rem: PluginRem;
@@ -149,90 +150,148 @@ export function IsolatedCardViewer({
     }
   }, [plugin]);
 
-  const handleCreateRem = useCallback(async () => {
-    if (isCreatingRem) return;
+  // Helper to find all incremental rems that have the PDF as a source
+  const findIncrementalRemsForPDF = useCallback(async (pdfRemId: RemId): Promise<Array<{remId: RemId; name: string; isIncremental: boolean}>> => {
+    const candidates: Array<{remId: RemId; name: string; isIncremental: boolean}> = [];
+    const processedIds = new Set<string>();
+
+    try {
+      const pdfRem = await plugin.rem.findOne(pdfRemId);
+      if (!pdfRem) return candidates;
+
+      // Get the powerup to find all incremental rems
+      const incPowerup = await plugin.powerup.getPowerupByCode(powerupCode);
+      if (!incPowerup) return candidates;
+
+      const allIncRems = await incPowerup.taggedRem();
+
+      for (const incRem of allIncRems) {
+        if (processedIds.has(incRem._id)) continue;
+
+        // Skip PDF highlights themselves - we want parent rems
+        const isPdfHighlight = await incRem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
+        if (isPdfHighlight) continue;
+
+        // Check if this rem has the PDF as a source
+        const sources = await incRem.getSources();
+        const hasPdfSource = sources.some(s => s._id === pdfRemId);
+
+        if (hasPdfSource) {
+          processedIds.add(incRem._id);
+          const name = await safeRemTextToString(plugin, incRem.text);
+          candidates.push({
+            remId: incRem._id,
+            name,
+            isIncremental: true
+          });
+        }
+
+        // Also check if PDF is a descendant of this rem
+        if (!hasPdfSource) {
+          const descendants = await incRem.getDescendants();
+          const hasPdfDescendant = descendants.some(d => d._id === pdfRemId);
+          if (hasPdfDescendant) {
+            processedIds.add(incRem._id);
+            const name = await safeRemTextToString(plugin, incRem.text);
+            candidates.push({
+              remId: incRem._id,
+              name,
+              isIncremental: true
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error finding incremental rems for PDF:', error);
+    }
+
+    return candidates;
+  }, [plugin]);
+
+  // Core function to create rem with parent selection logic
+  const createRemWithParentSelection = useCallback(async (makeIncremental: boolean) => {
+    if (isCreatingRem || !sourceDocumentId) return;
 
     setIsCreatingRem(true);
     try {
-      // Create a new rem with the content of the extract
-      const newRem = await plugin.rem.createRem();
-      if (newRem) {
-        // Build content with original extract content plus a pin reference to the source
-        // Using rem reference format with pin: true to show as icon
-        const sourceLink = {
-          i: 'q' as const,
-          _id: rem._id,
-          pin: true
+      // Find incremental rems that have this PDF as a source
+      const candidates = await findIncrementalRemsForPDF(sourceDocumentId);
+
+      if (candidates.length === 0) {
+        // No incremental rems found - fall back to original behavior (parent to PDF)
+        const newRem = await plugin.rem.createRem();
+        if (newRem) {
+          const sourceLink = {
+            i: 'q' as const,
+            _id: rem._id,
+            pin: true
+          };
+          const originalContent = rem.text || [];
+          const contentWithReference = [...originalContent, ' ', sourceLink];
+          await newRem.setText(contentWithReference);
+          await newRem.setParent(sourceDocumentId);
+
+          if (makeIncremental) {
+            await initIncrementalRem(plugin as ReactRNPlugin, newRem);
+          }
+
+          await removeIncrementalRemCache(plugin, rem._id);
+          await rem.removePowerup(powerupCode);
+
+          const actionText = makeIncremental ? 'incremental rem' : 'rem';
+          await plugin.app.toast(`Created ${actionText} under PDF`);
+        }
+      } else if (candidates.length === 1) {
+        // Single incremental rem found - use it directly
+        const parentRem = candidates[0];
+        const newRem = await plugin.rem.createRem();
+        if (newRem) {
+          const sourceLink = {
+            i: 'q' as const,
+            _id: rem._id,
+            pin: true
+          };
+          const originalContent = rem.text || [];
+          const contentWithReference = [...originalContent, ' ', sourceLink];
+          await newRem.setText(contentWithReference);
+          await newRem.setParent(parentRem.remId);
+
+          if (makeIncremental) {
+            await initIncrementalRem(plugin as ReactRNPlugin, newRem);
+          }
+
+          await removeIncrementalRemCache(plugin, rem._id);
+          await rem.removePowerup(powerupCode);
+
+          const actionText = makeIncremental ? 'incremental rem' : 'rem';
+          await plugin.app.toast(`Created ${actionText} under "${parentRem.name.slice(0, 30)}..."`);
+        }
+      } else {
+        // Multiple incremental rems found - open selector popup
+        const context: ParentSelectorContext = {
+          pdfRemId: sourceDocumentId,
+          extractRemId: rem._id,
+          extractContent: rem.text || [],
+          candidates,
+          makeIncremental
         };
-        const originalContent = rem.text || [];
-        const contentWithReference = [
-          ...originalContent,
-          ' ',
-          sourceLink
-        ];
-        await newRem.setText(contentWithReference);
-
-        // Set the new rem as a child of the source document (PDF) if available,
-        // otherwise as a child of the extract itself
-        const parentId = sourceDocumentId || rem._id;
-        await newRem.setParent(parentId);
-
-        // Remove incremental status from the original extract
-        await removeIncrementalRemCache(plugin, rem._id);
-        await rem.removePowerup(powerupCode);
-
-        // Open the new rem for editing
-        await plugin.window.openRem(newRem);
+        await plugin.storage.setSession('parentSelectorContext', context);
+        await plugin.widget.openPopup(parentSelectorWidgetId);
       }
     } catch (error) {
       console.error('Error creating rem:', error);
     } finally {
       setIsCreatingRem(false);
     }
-  }, [plugin, rem._id, rem.text, sourceDocumentId, isCreatingRem]);
+  }, [plugin, rem._id, rem.text, sourceDocumentId, isCreatingRem, findIncrementalRemsForPDF]);
+
+  const handleCreateRem = useCallback(async () => {
+    await createRemWithParentSelection(false);
+  }, [createRemWithParentSelection]);
 
   const handleCreateIncrementalRem = useCallback(async () => {
-    if (isCreatingRem) return;
-
-    setIsCreatingRem(true);
-    try {
-      // Create a new rem with the content of the extract
-      const newRem = await plugin.rem.createRem();
-      if (newRem) {
-        // Build content with original extract content plus a pin reference to the source
-        const sourceLink = {
-          i: 'q' as const,
-          _id: rem._id,
-          pin: true
-        };
-        const originalContent = rem.text || [];
-        const contentWithReference = [
-          ...originalContent,
-          ' ',
-          sourceLink
-        ];
-        await newRem.setText(contentWithReference);
-
-        // Set the new rem as a child of the source document (PDF) if available
-        const parentId = sourceDocumentId || rem._id;
-        await newRem.setParent(parentId);
-
-        // Make the new rem incremental BEFORE removing from original
-        await initIncrementalRem(plugin as ReactRNPlugin, newRem);
-
-        // Remove incremental status from the original extract
-        await removeIncrementalRemCache(plugin, rem._id);
-        await rem.removePowerup(powerupCode);
-
-        // Open the new rem for editing
-        await plugin.window.openRem(newRem);
-      }
-    } catch (error) {
-      console.error('Error creating incremental rem:', error);
-    } finally {
-      setIsCreatingRem(false);
-    }
-  }, [plugin, rem._id, rem.text, sourceDocumentId, isCreatingRem]);
+    await createRemWithParentSelection(true);
+  }, [createRemWithParentSelection]);
 
   // Use CSS variables with fallbacks for isolated context
   const cssVar = (varName: string, fallbackLight: string, fallbackDark: string) => {
