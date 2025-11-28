@@ -18,7 +18,6 @@ import {
   getIncrementalReadingPosition,
   getIncrementalPageRange,
   clearIncrementalPDFData,
-  addPageToHistory,
   safeRemTextToString,
   PageRangeContext,
   findIncrementalRemForPDF,
@@ -493,28 +492,8 @@ export function Reader(props: ReaderProps) {
     currentPageRef.current = currentPage;
   }, [currentPage]);
 
-  // Save to history ONLY when the component unmounts (or context changes)
-  React.useEffect(() => {
-    const incRemId = criticalContext?.incrementalRemId;
-    
-    return () => {
-      // Read the LATEST value from the ref
-      const finalPage = currentPageRef.current;
-
-      // Only save if we have a valid Incremental ID and we are not on the default Page 1
-      // (unless the user actually read Page 1, which the duration check in pdfUtils will handle)
-      if (incRemId && finalPage) {
-        addPageToHistory(
-          plugin,
-          incRemId,
-          actionItem.rem._id,
-          finalPage
-        ).catch(console.error);
-      }
-    };
-    // ❌ REMOVED 'currentPage' from dependencies to prevent auto-save on page turn
-    // This ensures it only runs when the card changes (actionItem.rem._id) or unmounts.
-  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin]);
+  // NOTE: Session history is saved by the "Next" button handler in answer_buttons.tsx
+  // and by handleReviewAndOpenRem. We do NOT save on unmount to avoid duplicate entries.
  
 
   
