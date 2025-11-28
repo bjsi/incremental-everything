@@ -8,11 +8,20 @@ export interface IncRemWithDetails extends IncrementalRem {
   incRemType?: ActionItemType;
   percentile?: number;
   totalTimeSpent?: number;
+  documentId?: string;
+  documentName?: string;
 }
 
 type FilterStatus = 'all' | 'due' | 'scheduled';
 type SortBy = 'priority' | 'date' | 'reviews' | 'time';
 type SortOrder = 'asc' | 'desc';
+
+export interface DocumentInfo {
+  id: string;
+  name: string;
+  count: number;
+  dueCount: number;
+}
 
 interface IncRemTableProps {
   title: string;
@@ -23,6 +32,9 @@ interface IncRemTableProps {
   totalCount: number;
   onRemClick: (remId: string) => void;
   onClose?: () => void;
+  documents?: DocumentInfo[];
+  selectedDocumentId?: string | null;
+  onDocumentFilterChange?: (documentId: string | null) => void;
 }
 
 export function IncRemTable({
@@ -34,6 +46,9 @@ export function IncRemTable({
   totalCount,
   onRemClick,
   onClose,
+  documents,
+  selectedDocumentId,
+  onDocumentFilterChange,
 }: IncRemTableProps) {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [priorityMin, setPriorityMin] = useState<number>(0);
@@ -76,7 +91,7 @@ export function IncRemTable({
     return filtered;
   }, [incRems, filterStatus, priorityMin, priorityMax, searchText, sortBy, sortOrder]);
 
-  const hasActiveFilters = filterStatus !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '';
+  const hasActiveFilters = filterStatus !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '' || selectedDocumentId;
 
   return (
     <div className="flex flex-col h-full" style={{
@@ -183,6 +198,29 @@ export function IncRemTable({
           }}
         />
 
+        {/* Document filter */}
+        {documents && documents.length > 0 && onDocumentFilterChange && (
+          <select
+            value={selectedDocumentId || ''}
+            onChange={(e) => onDocumentFilterChange(e.target.value || null)}
+            className="px-2 py-1 text-xs rounded"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+              border: 'none',
+              maxWidth: '200px',
+            }}
+            title="Filter by document"
+          >
+            <option value="">All documents</option>
+            {documents.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.name} ({doc.dueCount}/{doc.count})
+              </option>
+            ))}
+          </select>
+        )}
+
         {/* Priority range */}
         <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
           <span>★</span>
@@ -223,6 +261,7 @@ export function IncRemTable({
               setPriorityMin(0);
               setPriorityMax(100);
               setSearchText('');
+              onDocumentFilterChange?.(null);
             }}
             className="px-2 py-1 text-xs rounded transition-colors"
             style={{ color: 'var(--rn-clr-content-tertiary)' }}
