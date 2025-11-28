@@ -8,7 +8,8 @@ interface PriorityBadgeProps {
 }
 
 export function PriorityBadge({ priority, percentile, compact = false }: PriorityBadgeProps) {
-  const bgColor = percentile ? percentileToHslColor(percentile) : '#6b7280';
+  // Use percentile for color if available (including 0), otherwise fallback to gray
+  const bgColor = percentile !== undefined ? percentileToHslColor(percentile) : '#6b7280';
 
   if (compact) {
     return (
