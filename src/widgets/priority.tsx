@@ -133,22 +133,11 @@ function Priority() {
     if (!rem) return undefined;
 
     // Calculate descendant card count (needed for "Set Card Priority" button)
-    // We fetch this in both modes, but it's much faster in 'light' mode.
-    let finalDescendantCardCount = 0;
-    if (performanceMode === PERFORMANCE_MODE_FULL) {
-        const remDescendants = await rem.getDescendants();
-        const remDescendantIds = new Set(remDescendants.map(d => d._id));
-        finalDescendantCardCount = _.sumBy(
-          allCardInfos.filter(info => remDescendantIds.has(info.remId)), 
-          c => c.cardCount
-        );
-    } else {
-        // Light mode: a faster, less accurate (but still useful) check
-        const descendants = await rem.getDescendants();
-        // This is a rough proxy but avoids loading the allCardInfos cache
-        const cardsInDescendants = await Promise.all(descendants.map(d => d.getCards()));
-        finalDescendantCardCount = cardsInDescendants.flat().length;
-    }
+    // We always use direct card fetching now for accuracy, since the cache
+    // may not include all cards (especially during deferred loading).
+    const descendants = await rem.getDescendants();
+    const cardsInDescendants = await Promise.all(descendants.map(d => d.getCards()));
+    const finalDescendantCardCount = cardsInDescendants.flat().length;
 
     // 🔌 Check performance mode
     if (performanceMode === PERFORMANCE_MODE_LIGHT) {
