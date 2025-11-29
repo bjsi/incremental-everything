@@ -63,3 +63,27 @@ export function getTotalTimeSpent(incRem: IncrementalRem): number {
   if (!incRem.history || incRem.history.length === 0) return 0;
   return incRem.history.reduce((total, rep) => total + (rep.reviewTimeSeconds || 0), 0);
 }
+
+/**
+ * Find the top-level document (root ancestor) for a rem.
+ * Walks up the parent chain until finding a rem with no parent.
+ */
+export async function getTopLevelDocument(plugin: RNPlugin, rem: any): Promise<{ id: string; name: string } | null> {
+  try {
+    let current = rem;
+    const maxDepth = 100;
+
+    for (let i = 0; i < maxDepth; i++) {
+      const parent = await current.getParentRem();
+      if (!parent) {
+        const text = await current.text;
+        const name = extractText(text) || 'Untitled';
+        return { id: current._id, name: name.length > 50 ? name.substring(0, 50) + '...' : name };
+      }
+      current = parent;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

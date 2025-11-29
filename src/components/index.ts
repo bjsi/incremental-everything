@@ -14,4 +14,4 @@ export { InlinePriorityEditor, InlinePageRangeEditor, InlineHistoryEditor } from
 export { PdfRemItem } from './PdfRemItem';
 export type { EditingState } from './PdfRemItem';
 export { IncRemTable } from './IncRemTable';
-export type { IncRemWithDetails } from './IncRemTable';
+export type { IncRemWithDetails, DocumentInfo } from './IncRemTable';
