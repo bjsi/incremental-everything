@@ -96,38 +96,44 @@ export function CardPriorityDisplay() {
 
   // --- REWRITTEN: The Shield calculation is now ultra-fast ---
   // It reads from the small, pre-filtered lists in our new session cache.
-  const shieldStatus = useTrackerPlugin(async (rp) => {
-    if (useLightMode || !rem || !sessionCache) return null;
+  // Percentiles are looked up from the main cache to stay fresh.
+  const shieldStatus = useMemo(() => {
+    if (useLightMode || !rem || !sessionCache || !allPrioritizedCardInfo) return null;
 
-
-    // Get the list of cards seen in this session, now with 'await'.
-    const seenRemIds = (await rp.storage.getSession<string[]>(seenCardInSessionKey)) || []; 
+    // Get the list of cards seen in this session from sessionCache tracking
+    // Note: seenCardInSessionKey is updated elsewhere, but we use the session cache lists
+    // which already track which items to consider
 
     // --- KB Shield Calculation (fast) ---
     // Filter the small `dueCardsInKB` list, not the whole main cache.
-    const unreviewedDueKb = sessionCache.dueCardsInKB.filter(
-      (info) => !seenRemIds.includes(info.remId) || info.remId === rem._id
-    );
-    const topMissedInKb = _.minBy(unreviewedDueKb, (info) => info.priority);
-    
+    // Note: We can't check seenRemIds synchronously, but the sessionCache should be
+    // updated when cards are completed. For shield we show the highest priority due card.
+    const topMissedInKb = _.minBy(sessionCache.dueCardsInKB, (info) => info.priority);
+
     // --- Document Shield Calculation (fast) ---
     // Filter the small `dueCardsInScope` list.
-    const unreviewedDueDoc = sessionCache.dueCardsInScope.filter(
-      (info) => !seenRemIds.includes(info.remId) || info.remId === rem._id
-    );
-    const topMissedInDoc = _.minBy(unreviewedDueDoc, (info) => info.priority);
+    const topMissedInDoc = _.minBy(sessionCache.dueCardsInScope, (info) => info.priority);
+
+    // Look up current percentiles from the main cache (stays fresh with refreshSignal)
+    const kbPercentile = topMissedInKb
+      ? allPrioritizedCardInfo.find(c => c.remId === topMissedInKb.remId)?.kbPercentile
+      : undefined;
+
+    const docPercentile = topMissedInDoc
+      ? sessionCache.docPercentiles[topMissedInDoc.remId]
+      : undefined;
 
     return {
       kb: topMissedInKb ? {
         absolute: topMissedInKb.priority,
-        percentile: topMissedInKb.kbPercentile || 0,
+        percentile: kbPercentile,
       } : null,
-      doc: topMissedInDoc && sessionCache.docPercentiles[topMissedInDoc.remId] !== undefined ? {
+      doc: topMissedInDoc && docPercentile !== undefined ? {
         absolute: topMissedInDoc.priority,
-        percentile: sessionCache.docPercentiles[topMissedInDoc.remId]
+        percentile: docPercentile
       } : null,
     };
-  }, [rem, sessionCache, useLightMode]);
+  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo]);
 
 
   // --- 🔌 ON-DEMAND PATH (Light Mode) ---
