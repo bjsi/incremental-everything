@@ -1,29 +1,12 @@
 // components/Reader.tsx
-import {
-  PDFWebReader,
-  usePlugin,
-  BuiltInPowerupCodes,
-  RemId,
-} from '@remnote/plugin-sdk';
-import React, { useState, useMemo } from 'react';
-import { activeHighlightIdKey, powerupCode, pageRangeWidgetId } from '../lib/consts';
-import {
-  HTMLActionItem,
-  HTMLHighlightActionItem,
-  PDFActionItem,
-  PDFHighlightActionItem,
-  RemActionItem, // Added RemActionItem for type clarity
-} from '../lib/incremental_rem';
-import {
-  getIncrementalReadingPosition,
-  getIncrementalPageRange,
-  clearIncrementalPDFData,
-  safeRemTextToString,
-  PageRangeContext,
-  findIncrementalRemForPDF,
-} from '../lib/pdfUtils';
+import { usePlugin, RemId } from '@remnote/plugin-sdk';
+import React, { useMemo } from 'react';
+import { activeHighlightIdKey, pageRangeWidgetId } from '../lib/consts';
+import { HTMLActionItem, HTMLHighlightActionItem, PDFActionItem, PDFHighlightActionItem, RemActionItem } from '../lib/incremental_rem';
+import { getIncrementalReadingPosition, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
 import { Breadcrumb, BreadcrumbItem } from './Breadcrumb';
-import { StatBadge } from './StatBadge';
+import { useCriticalContext, useMetadataStats } from './reader/hooks';
+import { MemoizedPdfReader, PageControls, StatsGroup } from './reader/ui';
 
 interface ReaderProps {
   actionItem: PDFActionItem | PDFHighlightActionItem | HTMLActionItem | HTMLHighlightActionItem;
@@ -31,40 +14,18 @@ interface ReaderProps {
 
 const isIOS = /iPhone|iPod/.test(navigator.userAgent) && !/iPad/.test(navigator.userAgent);
 
-const sharedProps = {
-  height: isIOS ? '100vh' : '100%',
-  width: '100%',
-  initOnlyShowReader: false,
-};
-
-// Define the critical context structure
-type AncestorBreadcrumb = { text: string; id: RemId };
-
-interface CriticalContext {
-  ancestors: AncestorBreadcrumb[];
-  remDisplayName: string;
-  incrementalRemId: RemId | null;
-  pdfRemId: RemId;
-  hasDocumentPowerup: boolean;
-}
-
-// Define the metadata structure for deferred calculation
-interface Metadata {
-  childrenCount: number;
-  incrementalChildrenCount: number;
-  descendantsCount: number;
-  incrementalDescendantsCount: number;
-  flashcardCount: number;
-  pdfHighlightCount: number;
-}
-
-const BATCH_SIZE = 50;
-const BATCH_DELAY_MS = 10;
-
 export function Reader(props: ReaderProps) {
   const { actionItem } = props;
   const plugin = usePlugin();
 
+  const pdfRemId = actionItem.rem._id;
+  const pdfParentId = actionItem.rem.parent;
+  const actionType = actionItem.type;
+  const highlightExtract =
+    actionType === 'pdf-highlight' || actionType === 'html-highlight'
+      ? (actionItem as PDFHighlightActionItem | HTMLHighlightActionItem).extract
+      : null;
+  const highlightExtractId = highlightExtract?._id;
 
   // --- 1. useState Hooks (MUST come before useRef if refs use state) ---
   const [isReaderReady, setIsReaderReady] = React.useState(false);
@@ -78,12 +39,12 @@ export function Reader(props: ReaderProps) {
   const [pageRangeEnd, setPageRangeEnd] = React.useState<number>(0);
   const [isInputFocused, setIsInputFocused] = React.useState<boolean>(false);
   const [canRenderPdf, setCanRenderPdf] = React.useState(
-    !(isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight'))
+    !(isIOS && (actionType === 'pdf' || actionType === 'pdf-highlight'))
   ); 
   
   // useState (Deferred States)
-  const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
-  const [metadata, setMetadata] = useState<Metadata | null>(null);
+  const criticalContext = useCriticalContext(plugin, pdfRemId, pdfParentId, actionType, highlightExtractId || undefined);
+  const metadata = useMetadataStats(plugin, criticalContext, pdfRemId);
 
   // --- 2. useRef Hooks ---
   const hasScrolled = React.useRef(false);
@@ -103,10 +64,10 @@ export function Reader(props: ReaderProps) {
     const incRemId = criticalContext?.incrementalRemId;
     if (!incRemId) return;
     
-    const pageKey = `incremental_current_page_${incRemId}_${actionItem.rem._id}`;
+    const pageKey = `incremental_current_page_${incRemId}_${pdfRemId}`;
     await plugin.storage.setSynced(pageKey, page);
   // Dependencies MUST include criticalContext
-  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin]);
+  }, [criticalContext?.incrementalRemId, pdfRemId, plugin]);
 
   // Handle page navigation (UPDATED TO USE saveCurrentPage)
   const incrementPage = React.useCallback(() => {
@@ -204,13 +165,13 @@ export function Reader(props: ReaderProps) {
     await clearIncrementalPDFData(
       plugin,
       incRemId,
-      actionItem.rem._id
+      pdfRemId
     );
     setPageRangeStart(1);
     setPageRangeEnd(0);
     setCurrentPage(1);
     setPageInputValue('1');
-  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin]);
+  }, [criticalContext?.incrementalRemId, pdfRemId, plugin]);
   
   // Metadata Bar Styles using RemNote CSS variables
   const metadataBarStyles = useMemo(() => ({
@@ -299,12 +260,6 @@ export function Reader(props: ReaderProps) {
     }
   }), []);
 
-  // Active range button style when a range is set
-  const activeRangeButtonStyle = {
-    ...metadataBarStyles.rangeButton,
-    ...(pageRangeStart > 1 || pageRangeEnd > 0 ? metadataBarStyles.activeRangeButton : {}),
-  };
-
   // Handle breadcrumb click to navigate to ancestor
   const handleBreadcrumbClick = React.useCallback(async (ancestorId: string) => {
     const ancestorRem = await plugin.rem.findOne(ancestorId as RemId);
@@ -314,179 +269,15 @@ export function Reader(props: ReaderProps) {
   }, [plugin]);
   
   // --- 4. ALL useEffect Hooks MUST BE HERE ---
-
-  // DEFERRED CRITICAL CONTEXT CALCULATION (NEW: Replaces slow tracker logic)
-  React.useEffect(() => {
-    const pdfRem = actionItem.rem;
-    setCriticalContext(null);
-
-    const loadCriticalData = async () => {
-      const incrementalRem = await findIncrementalRemForPDF(plugin, pdfRem, true);
-
-      // rem is used for breadcrumbs and document powerup
-      const rem = incrementalRem || pdfRem;
-
-      // For highlights, show the highlight's name (extract text), not the PDF name
-      const isHighlight = actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight';
-      const remForName = isHighlight
-        ? (actionItem as PDFHighlightActionItem | HTMLHighlightActionItem).extract
-        : rem;
-      const remText = remForName.text ? await safeRemTextToString(plugin, remForName.text) : 'Untitled Rem';
-      const hasDocumentPowerup = await rem.hasPowerup(BuiltInPowerupCodes.Document);
-
-      // 2. Get Ancestors (also slow)
-      const ancestorList: CriticalContext['ancestors'] = [];
-      let currentParent = rem.parent;
-      let depth = 0;
-      const maxDepth = 10;
-
-      while (currentParent && depth < maxDepth) {
-        if (depth % 2 === 0) await new Promise(resolve => setTimeout(resolve, 1));
-
-        try {
-          const parentRem = await plugin.rem.findOne(currentParent);
-          if (!parentRem || !parentRem.text) break;
-
-          const parentText = await safeRemTextToString(plugin, parentRem.text);
-
-          ancestorList.unshift({
-            text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),
-            id: currentParent,
-          });
-
-          currentParent = parentRem.parent;
-          depth++;
-        } catch (error) {
-          break;
-        }
-      }
-
-      setCriticalContext({
-        ancestors: ancestorList,
-        remDisplayName: remText,
-        incrementalRemId: incrementalRem?._id || null,
-        pdfRemId: pdfRem._id,
-        hasDocumentPowerup: hasDocumentPowerup,
-      });
-    };
-    
-    // Execute after a short delay to ensure initial render is not blocked
-    const timeoutId = setTimeout(() => {
-      loadCriticalData().catch(console.error);
-    }, 50); 
-
-    return () => clearTimeout(timeoutId);
-    
-  }, [actionItem.rem._id, actionItem.rem.parent, actionItem.type, actionItem, plugin]);
-
-
-  // DEFERRED METADATA CALCULATION (Statistics)
-  React.useEffect(() => {
-    if (!criticalContext) return;
-    
-    // Reset metadata when context changes
-    setMetadata(null); 
-    
-    const calculateMetadata = async () => {
-      // Find the correct rem to calculate stats on (the Incremental Rem or the PDF itself)
-      const rem = criticalContext.incrementalRemId 
-        ? await plugin.rem.findOne(criticalContext.incrementalRemId) 
-        : actionItem.rem;
-        
-      if (!rem) return;
-
-      // START OF HEAVY I/O (Time-sliced)
-      const descendants = await rem.getDescendants();
-      const descendantsCount = descendants.length;
-      const children = await rem.getChildrenRem();
-      const childrenCount = children.length;
-
-      const remsToProcess = [rem, ...descendants];
-      
-      let incrementalDescendantsCount = 0;
-      let flashcardCount = 0;
-      let incrementalChildrenCount = 0;
-      
-      for (let i = 0; i < remsToProcess.length; i += BATCH_SIZE) {
-        const batch = remsToProcess.slice(i, i + BATCH_SIZE);
-        
-        const batchResults = await Promise.all(
-          batch.map(async (r) => ({
-            remId: r._id,
-            isIncremental: await r.hasPowerup(powerupCode),
-            cards: await r.getCards(),
-          }))
-        );
-        
-        for (const result of batchResults) {
-          if (result.isIncremental) {
-              incrementalDescendantsCount++;
-          }
-          if (result.cards.length > 0) {
-              flashcardCount += result.cards.length;
-          }
-          if (children.some(c => c._id === result.remId) && result.isIncremental) {
-              incrementalChildrenCount++;
-          }
-        }
-        
-        // Yield thread
-        if (i + BATCH_SIZE < remsToProcess.length) await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-      }
-      
-      // Get highlight count (Time-sliced)
-      let pdfHighlightCount = 0;
-      try {
-        const pdfRem = actionItem.rem;
-        const pdfChildren = await pdfRem.getChildrenRem();
-        const pdfDescendants = await pdfRem.getDescendants();
-        const allPdfRems = [...pdfChildren, ...pdfDescendants];
-        
-        const highlightBatchSize = 100;
-        for (let i = 0; i < allPdfRems.length; i += highlightBatchSize) {
-          const highlightBatch = allPdfRems.slice(i, i + highlightBatchSize);
-          
-          const highlightChecks = await Promise.all(
-            highlightBatch.map((child) => child.hasPowerup(BuiltInPowerupCodes.PDFHighlight))
-          );
-          pdfHighlightCount += highlightChecks.filter(Boolean).length;
-          
-          // Yield thread
-          if (i + highlightBatchSize < allPdfRems.length) await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-        }
-
-      } catch (highlightError) {
-        console.error('[READER DEBUG] Error counting PDF highlights:', highlightError);
-      }
-      // END OF HEAVY I/O
-
-      setMetadata({
-        childrenCount,
-        incrementalChildrenCount,
-        descendantsCount,
-        incrementalDescendantsCount,
-        flashcardCount,
-        pdfHighlightCount
-      });
-    };
-
-    const timeoutId = setTimeout(() => {
-        calculateMetadata().catch(console.error);
-    }, 50); 
-    
-    return () => clearTimeout(timeoutId);
-    
-  }, [criticalContext, actionItem.rem._id, plugin]);
-  
   // iOS PDF Render Effect
   React.useEffect(() => {
-    if (isIOS && (actionItem.type === 'pdf' || actionItem.type === 'pdf-highlight')) {
+    if (isIOS && (actionType === 'pdf' || actionType === 'pdf-highlight')) {
       const timer = setTimeout(() => {
         setCanRenderPdf(true);
       }, 250);
       return () => clearTimeout(timer);
     }
-  }, [actionItem.type]);
+  }, [actionType]);
 
   React.useEffect(() => {
     currentPageRef.current = currentPage;
@@ -506,12 +297,12 @@ export function Reader(props: ReaderProps) {
       const savedPagePromise = getIncrementalReadingPosition(
         plugin,
         incRemId,
-        actionItem.rem._id
+        pdfRemId
       );
       const rangePromise = getIncrementalPageRange(
         plugin,
         incRemId,
-        actionItem.rem._id
+        pdfRemId
       );
       // ... (rest of load logic)
       const [savedPage, range] = await Promise.all([savedPagePromise, rangePromise]);
@@ -536,7 +327,7 @@ export function Reader(props: ReaderProps) {
         const range = await getIncrementalPageRange(
           plugin,
           incRemId,
-          actionItem.rem._id
+          pdfRemId
         );
         
         const newStart = range?.start || 1;
@@ -568,27 +359,26 @@ export function Reader(props: ReaderProps) {
       
     return () => clearInterval(interval);
   
-  }, [criticalContext?.incrementalRemId, actionItem.rem._id, plugin, totalPages, pageRangeStart, pageRangeEnd, saveCurrentPage]);
+  }, [criticalContext?.incrementalRemId, pdfRemId, plugin, totalPages, pageRangeStart, pageRangeEnd, saveCurrentPage]);
 
   // Handle highlights
   React.useEffect(() => {
-    const isHighlight =
-      actionItem.type === 'pdf-highlight' || actionItem.type === 'html-highlight';
+    const isHighlight = actionType === 'pdf-highlight' || actionType === 'html-highlight';
 
     if (isHighlight && !hasScrolled.current && isReaderReady) {
       setTimeout(() => {
-        actionItem.extract.scrollToReaderHighlight();
+        highlightExtract?.scrollToReaderHighlight();
         hasScrolled.current = true;
       }, 100);
     }
 
-    const extractId = isHighlight ? actionItem.extract._id : null;
+    const extractId = isHighlight ? highlightExtractId : null;
     plugin.storage.setSession(activeHighlightIdKey, extractId);
 
     return () => {
       plugin.storage.setSession(activeHighlightIdKey, null);
     };
-  }, [actionItem, plugin, isReaderReady]);
+  }, [actionType, highlightExtractId, plugin, isReaderReady]);
 
   // Initialize reader
   React.useEffect(() => {
@@ -597,20 +387,15 @@ export function Reader(props: ReaderProps) {
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [actionItem.rem._id]);
+  }, [pdfRemId]);
 
   // Reset state when switching documents
   React.useEffect(() => {
     setIsReaderReady(false);
     hasScrolled.current = false;
-  }, [actionItem.rem._id]);
-
+  }, [pdfRemId]);
   
-
   // --- 5. RENDER START ---
-  
-  // Use remId from props immediately for Document Viewer
-  const pdfRemId = actionItem.rem._id;
   
   // Use state variables for rendering
   const isContextLoading = !criticalContext;
@@ -659,10 +444,10 @@ export function Reader(props: ReaderProps) {
       {/* PDF Reader Section (Renders INSTANTLY) */}
       <div className="pdf-reader-section flex-1 overflow-hidden">
         {canRenderPdf ? (
-          <PDFWebReader 
+          <MemoizedPdfReader
             ref={pdfReaderRef}
-            remId={pdfRemId} 
-            {...sharedProps}
+            remId={pdfRemId}
+            height={isIOS ? '100vh' : '100%'}
             key={pdfRemId} // Ensure key is the PDF rem ID
           />
         ) : (
@@ -687,111 +472,35 @@ export function Reader(props: ReaderProps) {
 
         {/* Center: Stats */}
         <div style={metadataBarStyles.statsGroup}>
-          {isMetadataLoading ? (
-            <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>Calculating statistics...</span>
-          ) : (
-            <>
-              <StatBadge
-                value={childrenCount}
-                label="children"
-                highlight={incrementalChildrenCount}
-                highlightLabel="inc"
-              />
-              <StatBadge
-                value={descendantsCount}
-                label="descendants"
-                highlight={incrementalDescendantsCount}
-                highlightLabel="inc"
-              />
-              <StatBadge value={flashcardCount} label="cards" />
-              <StatBadge value={pdfHighlightCount} label="highlights" />
-            </>
-          )}
+          <StatsGroup
+            isLoading={isMetadataLoading}
+            childrenCount={childrenCount}
+            incrementalChildrenCount={incrementalChildrenCount}
+            descendantsCount={descendantsCount}
+            incrementalDescendantsCount={incrementalDescendantsCount}
+            flashcardCount={flashcardCount}
+            pdfHighlightCount={pdfHighlightCount}
+          />
         </div>
 
         {/* Right: Page Controls */}
-        {incrementalRemId && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            flex: '0 0 auto'
-          }}>
-            <button 
-              onClick={decrementPage}
-              style={{
-                ...metadataBarStyles.pageButton,
-                opacity: currentPage <= Math.max(1, pageRangeStart) ? 0.4 : 1,
-                cursor: currentPage <= Math.max(1, pageRangeStart) ? 'not-allowed' : 'pointer'
-              }}
-              disabled={currentPage <= Math.max(1, pageRangeStart)}
-            >
-              ←
-            </button>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={metadataBarStyles.pageLabel}>Page</span>
-              <input
-                type="number"
-                min={Math.max(1, pageRangeStart)}
-                max={pageRangeEnd > 0 ? Math.min(pageRangeEnd, totalPages || Infinity) : (totalPages || undefined)}
-                value={pageInputValue}
-                onChange={handlePageInputChange}
-                onBlur={handlePageInputBlur}
-                onFocus={() => setIsInputFocused(true)}
-                onKeyDown={handlePageInputKeyDown}
-                style={metadataBarStyles.pageInput}
-              />
-              {totalPages > 0 && (
-                <span style={metadataBarStyles.pageLabel}>
-                  / {totalPages}
-                </span>
-              )}
-            </div>
-            
-            <button 
-              onClick={incrementPage}
-              style={{
-                ...metadataBarStyles.pageButton,
-                opacity: (totalPages > 0 && currentPage >= Math.min(pageRangeEnd > 0 ? pageRangeEnd : Infinity, totalPages)) ? 0.4 : 1,
-                cursor: (totalPages > 0 && currentPage >= Math.min(pageRangeEnd > 0 ? pageRangeEnd : Infinity, totalPages)) ? 'not-allowed' : 'pointer'
-              }}
-              disabled={totalPages > 0 && currentPage >= Math.min(pageRangeEnd > 0 ? pageRangeEnd : Infinity, totalPages)}
-            >
-              →
-            </button>
-            
-            <div
-              style={{
-                width: '1px',
-                height: '16px',
-                backgroundColor: metadataBarStyles.dividerColor,
-                margin: '0 4px',
-              }}
-            />
-            
-            <button
-              onClick={handleSetPageRange}
-              style={activeRangeButtonStyle}
-              title={pageRangeStart > 1 || pageRangeEnd > 0 ? `Current range: ${pageRangeStart}-${pageRangeEnd || '∞'}` : "Set page range"}
-            >
-              <span>📄</span>
-              <span>{pageRangeStart > 1 || pageRangeEnd > 0 ? `${pageRangeStart}-${pageRangeEnd || '∞'}` : 'Range'}</span>
-            </button>
-            
-            {(pageRangeStart > 1 || pageRangeEnd > 0) && (
-              <button
-                onClick={handleClearPageRange}
-                style={metadataBarStyles.clearButton}
-                title="Clear page range"
-                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
-                onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        )}
+        <PageControls
+          incrementalRemId={incrementalRemId}
+          currentPage={currentPage}
+          pageRangeStart={pageRangeStart}
+          pageRangeEnd={pageRangeEnd}
+          totalPages={totalPages}
+          pageInputValue={pageInputValue}
+          metadataBarStyles={metadataBarStyles}
+          onDecrement={decrementPage}
+          onIncrement={incrementPage}
+          onInputChange={handlePageInputChange}
+          onInputBlur={handlePageInputBlur}
+          onInputFocus={() => setIsInputFocused(true)}
+          onInputKeyDown={handlePageInputKeyDown}
+          onSetRange={handleSetPageRange}
+          onClearRange={handleClearPageRange}
+        />
       </div>
     </div>
   );
