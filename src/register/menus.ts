@@ -96,7 +96,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
   plugin.app.registerMenuItem({
     id: 'create_inc_rem_highlight',
     location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
-    name: 'Create Incremental Rem',
+    name: '✨ Create Incremental Rem',
     action: async (args: { remId: string }) => {
       const highlight = await plugin.rem.findOne(args.remId);
       if (!highlight) return;
