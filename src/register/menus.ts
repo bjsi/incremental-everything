@@ -97,6 +97,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
     id: 'create_inc_rem_highlight',
     location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
     name: '✨ Create Incremental Rem',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2728.svg',
     action: async (args: { remId: string }) => {
       const highlight = await plugin.rem.findOne(args.remId);
       if (!highlight) return;
