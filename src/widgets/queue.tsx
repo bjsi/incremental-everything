@@ -31,6 +31,7 @@ export function QueueComponent() {
   const plugin = usePlugin();
   const [viewMode, setViewMode] = useState<ViewMode>('isolated');
   const [sourceDocName, setSourceDocName] = useState<string | undefined>();
+  const [showSpark, setShowSpark] = useState(false);
 
   console.log('🎬 QueueComponent RENDER START');
 
@@ -151,6 +152,22 @@ export function QueueComponent() {
     loadSourceDocName();
   }, [remAndType, plugin]);
 
+  // Helper to determine if we should show isolated view
+  // Only show isolated view for PDF/HTML highlights, NOT for regular rems
+  // Regular rems benefit from the rich ExtractViewer with descendants and metadata
+  const isHighlightType = remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight';
+  const shouldShowIsolated = viewMode === 'isolated' && isHighlightType;
+
+  // Trigger a single spark when entering context view for highlights
+  useEffect(() => {
+    if (viewMode === 'context' && isHighlightType) {
+      setShowSpark(true);
+      const timer = setTimeout(() => setShowSpark(false), 1800);
+      return () => clearTimeout(timer);
+    }
+    setShowSpark(false);
+  }, [viewMode, isHighlightType]);
+
   // AFTER ALL HOOKS, NOW you can return early
   if (!ctx?.remId) {
     console.log('⛔ QueueComponent: No ctx.remId, returning null');
@@ -171,12 +188,6 @@ export function QueueComponent() {
     willRender: remAndType ? 'YES' : 'NO'
   });
 
-  // Helper to determine if we should show isolated view
-  // Only show isolated view for PDF/HTML highlights, NOT for regular rems
-  // Regular rems benefit from the rich ExtractViewer with descendants and metadata
-  const isHighlightType = remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight';
-  const shouldShowIsolated = viewMode === 'isolated' && isHighlightType;
-
   // Get the rem to display in isolated view (only for highlights)
   const getIsolatedRem = () => {
     if (!remAndType) return null;
@@ -190,7 +201,57 @@ export function QueueComponent() {
 
   return (
     <div className="incremental-everything-element" style={{ height: '100%' }}>
-      <div className="box-border p-2" style={{ height: `100vh` }}>
+      <div className="box-border p-2" style={{ height: `100vh`, position: 'relative' }}>
+        {viewMode === 'context' && isHighlightType && (
+          <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
+            <style>{`
+              .inc-back-btn {
+                --inc-spark-strong: rgba(96, 165, 250, 0.50);
+                --inc-spark-faint: rgba(96, 165, 250, 0);
+              }
+              @media (prefers-color-scheme: dark) {
+                .inc-back-btn {
+                  --inc-spark-strong: rgba(110, 231, 183, 0.70);
+                  --inc-spark-faint: rgba(110, 231, 183, 0);
+                  color: var(--rn-clr-content-primary, #e2e8f0);
+                  border-color: var(--rn-clr-border-primary, #334155);
+                  background-color: var(--rn-clr-background-secondary, #0f172a);
+                }
+              }
+              @keyframes incSpark {
+                0% { box-shadow: 0 0 0 0 var(--inc-spark-strong, rgba(96,165,250,0.45)); }
+                70% { box-shadow: 0 0 0 14px var(--inc-spark-faint, rgba(96,165,250,0)); }
+                100% { box-shadow: 0 0 0 0 var(--inc-spark-faint, rgba(96,165,250,0)); }
+              }
+            `}</style>
+            <button
+              className="inc-back-btn"
+              onClick={() => setViewMode('isolated')}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                border: `1px solid var(--rn-clr-border-primary, #e2e8f0)`,
+                backgroundColor: 'var(--rn-clr-background-primary, #ffffff)',
+                color: 'var(--rn-clr-content-secondary, #475569)',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                animation: showSpark ? 'incSpark 1.5s ease-out 1' : 'none'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary, #f1f5f9)';
+                e.currentTarget.style.borderColor = 'var(--rn-clr-border-secondary, #cbd5e1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary, #ffffff)';
+                e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary, #e2e8f0)';
+              }}
+            >
+              ← Back to isolated view
+            </button>
+          </div>
+        )}
         {!remAndType ? null : shouldShowIsolated && isolatedRem ? (
           <IsolatedCardViewer
             rem={isolatedRem}
@@ -218,4 +279,3 @@ export function QueueComponent() {
 }
 
 renderWidget(QueueComponent);
-
