@@ -14,6 +14,7 @@ import {
 } from '../lib/consts';
 import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
+import { createRemFromHighlight } from '../lib/highlightActions';
 
 export async function registerMenus(plugin: ReactRNPlugin) {
   plugin.app.registerMenuItem({
@@ -89,6 +90,23 @@ export async function registerMenus(plugin: ReactRNPlugin) {
           remId: rem._id,
         });
       }
+    },
+  });
+
+  plugin.app.registerMenuItem({
+    id: 'create_inc_rem_highlight',
+    location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
+    name: 'Create Incremental Rem',
+    iconUrl: plugin.rootURL.endsWith('/')
+      ? `${plugin.rootURL}highlight-sparkles.png`
+      : `${plugin.rootURL}/highlight-sparkles.png`,
+    action: async (args: { remId: string }) => {
+      const highlight = await plugin.rem.findOne(args.remId);
+      if (!highlight) return;
+
+      await createRemFromHighlight(plugin, highlight, {
+        makeIncremental: true,
+      });
     },
   });
 
