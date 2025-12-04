@@ -56,10 +56,6 @@ export const IncrementalRep = z.object({
    * Negative = early, Positive = late, 0 = on time
    */
   daysEarlyOrLate: z.number().optional(),
-  /**
-   * The queue mode when this review was done
-   */
-  queueMode: z.enum(['srs', 'practice-all', 'in-order', 'editor']).optional(),
 });
 
 export type IncrementalRep = z.infer<typeof IncrementalRep>;

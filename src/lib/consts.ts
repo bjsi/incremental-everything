@@ -14,6 +14,7 @@ export const defaultPriorityId = 'default-priority'; //New
 export const allIncrementalRemKey = 'all-incremental-rem';
 export const currentIncRemKey = 'current-inc-rem';
 export const allCardPriorityInfoKey = 'all-card-priority-info-key';
+export const incremReviewStartTimeKey = 'increm-review-start-time';
 
 // widgets
 export const scrollToHighlightId = 'scroll-to-highlight';

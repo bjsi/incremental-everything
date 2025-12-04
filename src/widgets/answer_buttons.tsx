@@ -9,6 +9,9 @@ import {
 import React, { useMemo } from 'react';
 import * as _ from 'remeda';
 import { NextRepTime } from '../components/NextRepTime';
+import { DraggableButton } from '../components/buttons/DraggableButton';
+import { Button } from '../components/buttons/Button';
+import { getButtonStyles } from '../components/buttons/styles';
 import {
   allIncrementalRemKey,
   powerupCode,
@@ -17,16 +20,14 @@ import {
   displayPriorityShieldId,
   seenRemInSessionKey,
   remnoteEnvironmentId,
-  queueSessionCacheKey,
-  isMobileDeviceKey,
-  alwaysUseLightModeOnMobileId
+  queueSessionCacheKey
 } from '../lib/consts';
-import { getIncrementalRemFromRem, handleHextRepetitionClick, reviewRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetitionManualOffset, updateReviewRemData } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePercentile, DEFAULT_PERFORMANCE_MODE, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
+import { percentileToHslColor, calculateRelativePercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
-import { QueueSessionCache, setCardPriority, getCardPriority } from '../lib/card_priority';
+import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 
 const MAX_DEPTH_CHECK = 3;
@@ -140,168 +141,29 @@ const handleReviewAndOpenRem = async (
   }
 
   const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-  await reviewRem(plugin, incRemInfo ?? undefined);
+  await updateReviewRemData(plugin, incRemInfo ?? undefined);
   await plugin.window.openRem(rem);
 };
-
-// Button styles using RemNote CSS variables
-const getButtonStyles = () => ({
-  base: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '10px 16px',
-    borderRadius: '10px',
-    border: '1px solid var(--rn-clr-border-primary)',
-    fontSize: '13px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    gap: '3px',
-    minWidth: '95px',
-    height: '50px',
-    backgroundColor: 'var(--rn-clr-background-secondary)',
-    color: 'var(--rn-clr-content-primary)',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
-  },
-  primary: {
-    backgroundColor: 'var(--rn-clr-button-primary-bg, #3b82f6)',
-    color: 'var(--rn-clr-button-primary-text, #ffffff)',
-    border: '1px solid var(--rn-clr-button-primary-bg, #3b82f6)',
-    minWidth: '115px',
-  },
-  secondary: {
-    backgroundColor: 'var(--rn-clr-background-secondary)',
-    color: 'var(--rn-clr-content-secondary)',
-    border: '1px solid var(--rn-clr-border-primary)',
-  },
-  danger: {
-    backgroundColor: 'var(--rn-clr-background-secondary)',
-    color: 'var(--rn-clr-red, #dc2626)',
-    border: '1px solid var(--rn-clr-red, #dc2626)',
-  },
-  label: {
-    fontSize: '12px',
-    fontWeight: 600,
-    lineHeight: '1.2',
-  },
-  sublabel: {
-    fontSize: '10px',
-    opacity: 0.85,
-    fontWeight: 400,
-  },
-  hoverShadow: '0 6px 12px rgba(0, 0, 0, 0.12)',
-  defaultShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
-});
-
-interface ButtonProps {
-  children: React.ReactNode;
-  onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'danger';
-  style?: React.CSSProperties;
-  disabled?: boolean;
-  className?: string;
-}
-
-function Button({ children, onClick, variant = 'secondary', style, disabled, className }: ButtonProps) {
-  const buttonStyles = getButtonStyles();
-  const variantStyles = variant === 'primary' ? buttonStyles.primary :
-                        variant === 'danger' ? buttonStyles.danger :
-                        buttonStyles.secondary;
-
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        ...buttonStyles.base,
-        ...variantStyles,
-        ...style,
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = buttonStyles.hoverShadow;
-          e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = buttonStyles.defaultShadow;
-        // Reset to variant-specific background
-        if (variant === 'primary') {
-          e.currentTarget.style.backgroundColor = 'var(--rn-clr-button-primary-bg, #3b82f6)';
-        } else {
-          e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)';
-        }
-      }}
-      className={className}
-    >
-      {children}
-    </button>
-  );
-}
 
 export function AnswerButtons() {
   const plugin = usePlugin();
 
-  // ✅ ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP
-
-  // ✅ Track the values that determine effective mode
-  const performanceModeSetting = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<string>('performanceMode'),
-    []
-  ) || DEFAULT_PERFORMANCE_MODE;
-
-  const isMobile = useTrackerPlugin(
-    async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
-    []
-  );
-
-  const alwaysUseLightOnMobile = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId),
-    []
-  );
-
-  // ✅ Calculate effective mode (synchronous!)
-  const useLightMode = performanceModeSetting === PERFORMANCE_MODE_LIGHT || 
-                       (isMobile && alwaysUseLightOnMobile !== false);
-  
-  // Consolidate core data into a single tracker
-  const coreData = useTrackerPlugin(async (rp) => {
-    const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
-    if (!ctx?.remId) return null;
-
-    const rem = await rp.rem.findOne(ctx.remId);
-    if (!rem) return null;
-
-    const incRemInfo = await getIncrementalRemFromRem(rp, rem);
-    if (!incRemInfo) return null;
-
-    // 🔌 Conditionally fetch sessionCache based on effective performanceMode
-    const [allIncRems, sessionCache, shouldDisplayShield] = await Promise.all([
-      rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
-      (!useLightMode)
-        ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey)
-        : Promise.resolve(null), // In 'light' mode, resolve to null
-      rp.settings.getSetting<boolean>(displayPriorityShieldId),
-    ]);
-
-    return {
-      ctx,
-      rem,
-      incRemInfo,
-      allIncRems: allIncRems || [],
-      sessionCache, // This will be null in 'light' mode
-      shouldDisplayShield: shouldDisplayShield ?? true,
-      useLightMode: useLightMode, // Pass the mode to the component
-    };
-  }, [useLightMode]); 
-
   // Separate lightweight trackers for UI state
+  const useLightMode = useTrackerPlugin(
+    async (rp) => await shouldUseLightMode(rp),
+    []
+  ) || false;
+
+  const allIncRems = useTrackerPlugin(
+    (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+    []
+  ) || [];
+
+  const shouldDisplayShield = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
+    []
+  ) ?? true;
+
   const activeHighlightId = useTrackerPlugin(
     (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey), 
     []
@@ -311,15 +173,39 @@ export function AnswerButtons() {
     (rp) => rp.storage.getSession<string | null>(currentIncrementalRemTypeKey),
     []
   );
+  
+  const baseData = useTrackerPlugin(async (rp) => {
+    const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
+    if (!ctx?.remId) return null;
 
-  // Async shield calculation
+    const rem = await rp.rem.findOne(ctx.remId);
+    if (!rem) return null;
+
+    const incRemInfo = await getIncrementalRemFromRem(rp, rem);
+    if (!incRemInfo) return null;
+
+    return {
+      ctx,
+      rem,
+      incRemInfo,
+    };
+  }, []);
+
+  const sessionCacheData = useTrackerPlugin(async (rp) => {
+    if (useLightMode || !baseData?.rem) {
+      return null;
+    }
+    return await rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey);
+  }, [useLightMode, baseData?.rem?._id]);
+
+  const coreData = baseData ? { ...baseData, sessionCache: sessionCacheData } : null;
+
   const shieldStatusAsync = useTrackerPlugin(async (rp) => {
-    // 🔌 Add check for light mode
-    if (useLightMode || !coreData?.shouldDisplayShield || !coreData?.sessionCache) return null;
+    if (useLightMode || !shouldDisplayShield || !coreData?.sessionCache) return null;
 
     const seenRemIds = (await rp.storage.getSession<string[]>(seenRemInSessionKey)) || [];
     
-    const { sessionCache, allIncRems, rem } = coreData;
+    const { sessionCache, rem } = coreData;
     const dueKb = sessionCache.dueIncRemsInKB || [];
     const unreviewedDueKb = dueKb.filter(
       (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
@@ -342,18 +228,18 @@ export function AnswerButtons() {
         percentile: sessionCache.incRemDocPercentiles?.[topMissedInDoc.remId] ?? null,
       } : null,
     };
-  }, [coreData?.shouldDisplayShield, coreData?.sessionCache, coreData?.allIncRems, coreData?.rem._id, useLightMode]);
+  }, [shouldDisplayShield, coreData?.sessionCache, allIncRems, coreData?.rem?._id, useLightMode]);
 
   // ✅ MEMOIZE CALCULATIONS (but they must run every render, not conditionally)
   const percentiles = useMemo(() => {
     if (!coreData) return { kb: null, doc: null };
     
-    const { allIncRems, incRemInfo, sessionCache } = coreData;
+    const { incRemInfo, sessionCache } = coreData;
     const kbPercentile = calculateRelativePercentile(allIncRems, incRemInfo.remId);
     const docPercentile = sessionCache?.incRemDocPercentiles?.[incRemInfo.remId] ?? null;
     
     return { kb: kbPercentile, doc: docPercentile };
-  }, [coreData]);
+  }, [coreData, allIncRems]);
 
   // ✅ NOW we can do early returns AFTER all hooks are called
   if (!coreData) {
@@ -371,9 +257,8 @@ export function AnswerButtons() {
     );
   }
 
-  const { ctx, rem, incRemInfo, allIncRems, sessionCache, shouldDisplayShield } = coreData;
+  const { ctx, rem, incRemInfo, sessionCache } = coreData;
 
-  // Event handlers
   const handleNextClick = async () => {
     if (remType === 'pdf') {
       const pdfRem = await findPDFinRem(plugin, rem);
@@ -387,13 +272,12 @@ export function AnswerButtons() {
       }
     }
 
-    const queueMode = await plugin.storage.getSession<string>('current-queue-mode');
-    // Map RemNote's mode to your enum
-    const mappedMode = queueMode === 'practice-all' ? 'practice-all' 
-      : queueMode === 'in-order' ? 'in-order' 
-      : 'srs';
+    await handleNextRepetitionClick(plugin, incRemInfo);
+  };
 
-    await handleHextRepetitionClick(plugin, incRemInfo, mappedMode);
+  const runManualNext = async (mode: 'today' | 'tomorrow') => {
+    const offset = mode === 'tomorrow' ? 1 : 0;
+    await handleNextRepetitionManualOffset(plugin, incRemInfo, offset);
   };
 
   const priorityColor = percentiles.kb ? percentileToHslColor(percentiles.kb) : '#6b7280';
@@ -454,10 +338,18 @@ export function AnswerButtons() {
     <div style={containerStyle} className="incremental-everything-answer-buttons">
       {/* Single row of buttons */}
       <div style={buttonRowStyle}>
-        <Button variant="primary" onClick={handleNextClick}>
+        <DraggableButton
+          variant="primary"
+          onClick={handleNextClick}
+          onDragUp={() => runManualNext('tomorrow')}
+          onDragDown={() => runManualNext('today')}
+          overlayUpText="Repeat tomorrow"
+          overlayDownText="Repeat today"
+          dragThreshold={12}
+        >
           <div style={buttonStyles.label}>Next</div>
           <div style={buttonStyles.sublabel}><NextRepTime rem={incRemInfo} /></div>
-        </Button>
+        </DraggableButton>
 
         <Button
           variant="secondary"

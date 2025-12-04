@@ -13,7 +13,7 @@ import {
   alwaysUseLightModeOnWebId,
 } from '../lib/consts';
 import { initIncrementalRem } from './powerups';
-import { getIncrementalRemFromRem, handleHextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { findPDFinRem, safeRemTextToString } from '../lib/pdfUtils';
 import {
   getOperatingSystem,
@@ -74,7 +74,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!incRem) {
         return;
       }
-      await handleHextRepetitionClick(plugin, incRem);
+      await handleNextRepetitionClick(plugin, incRem);
     },
   });
 

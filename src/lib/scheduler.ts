@@ -57,8 +57,7 @@ export const removeLastInteraction = (history: IncrementalRep[]): IncrementalRep
 export async function getNextSpacingDateForRem(
   plugin: RNPlugin,
   remId: string,
-  inLookbackMode: boolean,
-    queueMode?: 'srs' | 'practice-all' | 'in-order' | 'editor' // NEW parameter
+  inLookbackMode: boolean
 ) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) {
@@ -103,7 +102,6 @@ export async function getNextSpacingDateForRem(
       interval: newInterval,
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
-      queueMode: queueMode,
       // reviewTimeSeconds will be added by reviewRem()
     },
   ];

@@ -9,7 +9,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
-import { powerupCode, prioritySlotCode } from '../lib/consts';
+import { powerupCode, prioritySlotCode, incremReviewStartTimeKey } from '../lib/consts';
 import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
@@ -37,14 +37,8 @@ async function handleRescheduleAndPriorityUpdate(
   const wasEarly = daysDifference < 0;
   const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
   
-  // Get queue mode (same as Next button does)
-  const queueMode = await plugin.storage.getSession<string>('current-queue-mode');
-  const mappedMode = queueMode === 'practice-all' ? 'practice-all' 
-    : queueMode === 'in-order' ? 'in-order' 
-    : 'srs';
-  
   // Calculate review time (same as Next button does)
-  const startTime = await plugin.storage.getSession<number>('increm-review-start-time');
+  const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
   const reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
   
   const newHistory: IncrementalRep[] = [
@@ -55,7 +49,6 @@ async function handleRescheduleAndPriorityUpdate(
       interval: intervalDays,
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
-      queueMode: mappedMode, // Use the actual queue mode
       reviewTimeSeconds: reviewTimeSeconds, // Track review time
     },
   ];
@@ -68,7 +61,7 @@ async function handleRescheduleAndPriorityUpdate(
   }
 
   // Clear the start time (same as Next button does)
-  await plugin.storage.setSession('increm-review-start-time', null);
+  await plugin.storage.setSession(incremReviewStartTimeKey, null);
 
   await plugin.queue.removeCurrentCardFromQueue();
   await plugin.widget.closePopup();

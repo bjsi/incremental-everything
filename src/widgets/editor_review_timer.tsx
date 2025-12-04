@@ -98,7 +98,6 @@ function EditorReviewTimer() {
         interval: timerData.interval,
         wasEarly: wasEarly,
         daysEarlyOrLate: daysEarlyOrLate,
-        queueMode: 'editor',
         reviewTimeSeconds: reviewTimeSeconds,
       },
     ];

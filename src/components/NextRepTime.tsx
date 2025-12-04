@@ -31,6 +31,7 @@ function numberWithLabel(number: number, label: string) {
 export function NextRepTime(props: NextRepTimeProps): React.ReactElement {
   const [nextTime, setNextTime] = React.useState<number>();
   const plugin = usePlugin();
+
   React.useEffect(() => {
     const effect = async () => {
       const inLookbackMode = !!(await plugin.queue.inLookbackMode());
@@ -41,6 +42,7 @@ export function NextRepTime(props: NextRepTimeProps): React.ReactElement {
     };
     effect();
   }, [props.rem.remId]);
+
   const duration = dayjs.duration(dayjs(nextTime).diff(dayjs()));
   const longVersion = durationToHumanReadable(duration);
   const shortVersion = longVersion.replace(/mins/g, 'min').replace(/hours/g, 'hrs');
