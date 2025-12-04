@@ -35,6 +35,7 @@ export function DraggableButton({
   const isPointerDown = React.useRef(false);
   const skipNextClick = React.useRef(false);
   const isMounted = React.useRef(true);
+  const [showNudge, setShowNudge] = React.useState(true);
   // Fallback to clear drag mode if pointer state is lost
   React.useEffect(() => {
     if (dragMode && !isPointerDown.current) {
@@ -166,9 +167,33 @@ export function DraggableButton({
         {dragMode ? (
           <span style={{ fontWeight: 700, fontSize: '12px' }}>{activeContent}</span>
         ) : (
-          children
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            {children}
+            <span
+              aria-hidden
+              style={{
+                fontSize: '11px',
+                opacity: 0.6,
+                animation: 'bobDragHint 900ms ease-in-out infinite',
+              }}
+            >
+              ↕
+            </span>
+          </span>
         )}
       </button>
+
+      <style>
+        {`
+        @keyframes bobDragHint {
+          0% { transform: translateY(0); }
+          25% { transform: translateY(-2px); }
+          50% { transform: translateY(2px); }
+          75% { transform: translateY(-1px); }
+          100% { transform: translateY(0); }
+        }
+        `}
+      </style>
 
     </div>
   );
