@@ -50,7 +50,6 @@ async function handleEditorReview(
       interval: intervalDays,
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
-      queueMode: 'editor', // Editor-based review
       reviewTimeSeconds: reviewTimeSeconds,
     },
   ];

@@ -13,6 +13,7 @@ import {
   queueLayoutFixId,
   seenRemInSessionKey,
   noIncRemTimerKey,
+  incremReviewStartTimeKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
@@ -209,8 +210,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
         await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
 
-        await plugin.storage.setSession('current-queue-mode', queueInfo.mode);
-        await plugin.storage.setSession('increm-review-start-time', Date.now());
+        await plugin.storage.setSession(incremReviewStartTimeKey, Date.now());
 
         console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
         sessionItemCounter++;
@@ -220,11 +220,15 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           pluginId: 'incremental-everything',
         };
       } else {
+        const moduloDenominator: number =
+          typeof intervalBetweenIncRem === 'number'
+            ? intervalBetweenIncRem
+            : Number(intervalBetweenIncRem);
         console.log('🎴 FLASHCARD TURN:', {
           sessionItemCounter,
           intervalBetweenIncRem,
           calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${
-            (sessionItemCounter + 1) % intervalBetweenIncRem
+            (sessionItemCounter + 1) % moduloDenominator
           }`,
           nextIncRemAt:
             typeof intervalBetweenIncRem === 'number'
