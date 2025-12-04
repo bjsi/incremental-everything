@@ -14,6 +14,7 @@ import {
   initialIntervalId,
   defaultPriorityId,
   currentIncRemKey,
+  incremReviewStartTimeKey,
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
@@ -21,27 +22,41 @@ import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 
+type ReviewOverrideOptions = {
+  /**
+   * If provided, force the next repetition to this timestamp (ms).
+   */
+  overrideNextRepDate?: number;
+  /**
+   * If provided, override the interval stored in history (in days).
+   * Use together with overrideNextRepDate to keep metadata consistent.
+   */
+  overrideIntervalDays?: number;
+};
+
 /**
- * Processes the review of an Incremental Rem and reschedules it for the next repetition.
+ * Persists the results of reviewing an incremental rem.
  *
- * This function:
- * 1. Calculates how long the user spent reviewing the rem
- * 2. Determines the next review date based on the SRS algorithm
- * 3. Updates the repetition history with the review time
- * 4. Persists the new scheduling data to the rem
+ * Steps performed:
+ * 1. Reads the session start time to calculate how long the review took (rounded seconds).
+ * 2. Runs the scheduler to obtain the next repetition date plus a provisional history entry.
+ * 3. Annotates that history entry with the measured review time and any manual overrides.
+ * 4. Writes the updated next repetition reference + history back to the rem powerup slots.
  *
- * NOTE: This function does NOT advance the queue - that's the caller's responsibility.
- * This design allows different UI buttons to reuse this logic and control queue advancement independently.
+ * The session start time is intentionally left untouched so that other features (e.g. pdfUtils)
+ * can still inspect it after this helper runs. Queue advancement is also left to the caller so
+ * that different UI buttons can reuse this logic.
  *
- * @param plugin - RemNote plugin instance
- * @param incRem - The incremental rem being reviewed
- * @param queueMode - Current queue mode (affects scheduling algorithm)
- * @returns The updated spacing data with new history, or null if review cannot be processed
+ * @param plugin RNPlugin instance used for storage, queue, and rem updates.
+ * @param incRem Incremental rem being reviewed; if undefined the function logs and returns null.
+ * @param overrideOptions Allows UI gestures (drag-to-today/tomorrow) to force either the interval
+ *                        stored in history or the exact next repetition timestamp.
+ * @returns Next-spacing payload + final history array, or null when the rem could not be processed.
  */
-export async function reviewRem(
+export async function updateReviewRemData(
   plugin: RNPlugin,
   incRem: IncrementalRem | undefined,
-  queueMode?: 'srs' | 'practice-all' | 'in-order' | 'editor'
+  overrideOptions?: ReviewOverrideOptions
 ) {
   if (!incRem) {
     console.log("❌ [reviewRem] No incRem provided!");
@@ -49,8 +64,8 @@ export async function reviewRem(
   }
 
   // 1. Calculate review time
-  const startTime = await plugin.storage.getSession<number>('increm-review-start-time');
-  const reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
+  const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+  const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : undefined;
 
   // DEBUG LOGS
   console.log(`🔍 [reviewRem] ID: ${incRem.remId}`);
@@ -58,7 +73,7 @@ export async function reviewRem(
   console.log(`🔍 [reviewRem] Calculated Duration: ${reviewTimeSeconds}`);
 
   const inLookbackMode = !!(await plugin.queue.inLookbackMode());
-  const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode, queueMode);
+  const nextSpacing = await getNextSpacingDateForRem(plugin, incRem.remId, inLookbackMode);
   if (!nextSpacing) {
     return null;
   }
@@ -69,25 +84,59 @@ export async function reviewRem(
     lastEntry.reviewTimeSeconds = reviewTimeSeconds;
   }
 
-  await updateSRSDataForRem(plugin, incRem.remId, nextSpacing.newNextRepDate, newHistory);
+  // Apply manual overrides when provided (used by drag-to-next/today UX)
+  if (overrideOptions?.overrideIntervalDays !== undefined && lastEntry) {
+    lastEntry.interval = overrideOptions.overrideIntervalDays;
+  }
+  const nextRepDateToUse =
+    overrideOptions?.overrideNextRepDate !== undefined
+      ? overrideOptions.overrideNextRepDate
+      : nextSpacing.newNextRepDate;
 
-  // 🛑 REMOVED: Do NOT clear the start time here.
-  // Let it persist so pdfUtils can read it when the Reader unmounts.
-  // await plugin.storage.setSession('increm-review-start-time', null);
+  await updateSRSDataForRem(plugin, incRem.remId, nextRepDateToUse, newHistory);
 
   return { ...nextSpacing, newHistory };
 }
 
-export async function handleHextRepetitionClick(
+export async function handleNextRepetitionClick(
   plugin: RNPlugin,
-  incRem: IncrementalRem | undefined,
-  queueMode?: 'srs' | 'practice-all' | 'in-order'
+  incRem: IncrementalRem | undefined
 ) {
-  await reviewRem(plugin, incRem, queueMode);
+  await updateReviewRemData(plugin, incRem);
     
   // Keep the sleep to be safe, but it's less critical now
   await sleep(150); 
   
+  await plugin.queue.removeCurrentCardFromQueue();
+}
+
+/**
+ * Same as handleNextRepetitionClick but allows forcing the next repetition
+ * to a specific day offset (e.g., Today or Tomorrow) for the drag gesture UX.
+ */
+export async function handleNextRepetitionManualOffset(
+  plugin: RNPlugin,
+  incRem: IncrementalRem | undefined,
+  offsetDays: number
+) {
+  if (!incRem) {
+    console.log('[handleNextRepetitionManualOffset] No incRem provided');
+    return;
+  }
+
+  // Simple: set next rep date to today or tomorrow without multiplier math
+  const targetDay = dayjs().startOf('day').add(Math.max(offsetDays, 0), 'day').valueOf();
+
+  const newHistory = [
+    ...(incRem.history || []),
+    {
+      date: Date.now(),
+      scheduled: targetDay,
+      interval: Math.max(offsetDays, 0),
+    },
+  ];
+
+  await updateSRSDataForRem(plugin, incRem.remId, targetDay, newHistory);
   await plugin.queue.removeCurrentCardFromQueue();
 }
 
