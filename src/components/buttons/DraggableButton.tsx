@@ -35,6 +35,12 @@ export function DraggableButton({
   const isPointerDown = React.useRef(false);
   const skipNextClick = React.useRef(false);
   const isMounted = React.useRef(true);
+  // Fallback to clear drag mode if pointer state is lost
+  React.useEffect(() => {
+    if (dragMode && !isPointerDown.current) {
+      setDragMode(null);
+    }
+  }, [dragMode]);
 
   React.useEffect(() => {
     return () => {
@@ -90,10 +96,13 @@ export function DraggableButton({
   };
 
   const handlePointerLeave: React.PointerEventHandler<HTMLButtonElement> = () => {
-    if (!isPointerDown.current) {
-      skipNextClick.current = false;
-      resetDragState();
-    }
+    skipNextClick.current = false;
+    resetDragState();
+  };
+
+  const handlePointerCancel: React.PointerEventHandler<HTMLButtonElement> = () => {
+    skipNextClick.current = false;
+    resetDragState();
   };
 
   const styles = getButtonStyles();
@@ -104,8 +113,35 @@ export function DraggableButton({
       ? styles.danger
       : styles.secondary;
 
+  // Visual feedback + inline text change while dragging
+  const dragFeedbackStyle: React.CSSProperties =
+    dragMode === 'up'
+      ? {
+          transform: 'translateY(-4px)',
+          boxShadow: '0 8px 18px rgba(59,130,246,0.25)',
+          borderColor: 'var(--rn-clr-blue, #3b82f6)',
+          backgroundColor: 'var(--rn-clr-blue-light, #e0ecff)',
+          color: 'var(--rn-clr-blue-dark, #1e3a8a)',
+        }
+      : dragMode === 'down'
+      ? {
+          transform: 'translateY(4px)',
+          boxShadow: '0 8px 18px rgba(16,185,129,0.18)',
+          borderColor: 'var(--rn-clr-green, #10b981)',
+          backgroundColor: 'var(--rn-clr-green-light, #dcfce7)',
+          color: 'var(--rn-clr-green-dark, #064e3b)',
+        }
+      : {};
+
+  const activeContent =
+    dragMode === 'up'
+      ? overlayUpText
+      : dragMode === 'down'
+      ? overlayDownText
+      : null;
+
   return (
-    <div style={{ position: 'relative', display: 'inline-flex' }}>
+    <div style={{ position: 'relative', display: 'inline-flex', overflow: 'visible', zIndex: 1 }}>
       <button
         onClick={async () => {
           if (skipNextClick.current) {
@@ -118,39 +154,22 @@ export function DraggableButton({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
+        onPointerCancel={handlePointerCancel}
         style={{
           ...styles.base,
           ...variantStyles,
+          ...dragFeedbackStyle,
           userSelect: 'none',
           ...style,
         }}
       >
-        {children}
+        {dragMode ? (
+          <span style={{ fontWeight: 700, fontSize: '12px' }}>{activeContent}</span>
+        ) : (
+          children
+        )}
       </button>
 
-      {dragMode && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '52px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            padding: '6px 10px',
-            borderRadius: '10px',
-            backgroundColor: 'var(--rn-clr-background-secondary)',
-            border: '1px solid var(--rn-clr-border-primary)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-            zIndex: 15,
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--rn-clr-content-primary)',
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {dragMode === 'up' ? overlayUpText : overlayDownText}
-        </div>
-      )}
     </div>
   );
 }
