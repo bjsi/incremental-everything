@@ -47,6 +47,12 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
           const rem = await plugin.rem.findOne(currentRemId);
           if (!rem) {
+            // Rem was deleted while in the queue -> skip it and move on.
+            await plugin.queue.removeCurrentCardFromQueue(true);
+            if (intervalId) {
+              clearInterval(intervalId);
+              intervalId = null;
+            }
             return;
           }
 
