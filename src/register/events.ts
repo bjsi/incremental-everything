@@ -447,6 +447,23 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
 
         console.log('LISTENER: Calling LIGHT updateCardPriorityCache...');
         await updateCardPriorityCache(plugin, remId, true);
+
+        // Mark card as seen for this session (used by Shield)
+        const seenCards = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
+        if (!seenCards.includes(remId)) {
+          await plugin.storage.setSession(seenCardInSessionKey, [...seenCards, remId]);
+        }
+
+        // Keep session cache in sync so Shield updates immediately
+        const sessionCache = await plugin.storage.getSession<QueueSessionCache>(queueSessionCacheKey);
+        if (sessionCache) {
+          const updatedCache: QueueSessionCache = {
+            ...sessionCache,
+            dueCardsInKB: sessionCache.dueCardsInKB.filter((c) => c.remId !== remId),
+            dueCardsInScope: sessionCache.dueCardsInScope.filter((c) => c.remId !== remId),
+          };
+          await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+        }
       } else {
         console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
       }

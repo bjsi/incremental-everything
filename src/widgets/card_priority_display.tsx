@@ -7,17 +7,72 @@ import {
 import React, { useMemo } from 'react';
 import {
   powerupCode,
-  seenCardInSessionKey,
   allCardPriorityInfoKey,
   queueSessionCacheKey,
   cardPriorityCacheRefreshKey,
   displayPriorityShieldId,
+  seenCardInSessionKey,
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge } from '../components';
 import * as _ from 'remeda';
+
+type ShieldSlice = {
+  absolute: number;
+  percentile: number | undefined;
+};
+
+type ShieldStatus = {
+  kb: ShieldSlice | null;
+  doc: ShieldSlice | null;
+} | null;
+
+/**
+ * Compute the shield status using pre-filtered session cache data.
+ * Falls back to the main cache only when percentiles are missing.
+ */
+function computeShieldStatus(
+  remId: string | undefined,
+  sessionCache: QueueSessionCache | null,
+  allPrioritizedCardInfo: CardPriorityInfo[] | null,
+  seenRemIds: string[]
+): ShieldStatus {
+  if (!remId || !sessionCache) return null;
+
+  const filterUnreviewed = (list: CardPriorityInfo[]) =>
+    list.filter((info) => !seenRemIds.includes(info.remId) || info.remId === remId);
+
+  const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.dueCardsInKB), (info) => info.priority);
+  const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.dueCardsInScope), (info) => info.priority);
+
+  const kbPercentile =
+    topMissedInKb?.kbPercentile ??
+    (topMissedInKb
+      ? allPrioritizedCardInfo?.find((c) => c.remId === topMissedInKb.remId)?.kbPercentile
+      : undefined);
+
+  const docPercentile = topMissedInDoc
+    ? sessionCache.docPercentiles[topMissedInDoc.remId]
+    : undefined;
+
+  return {
+    kb: topMissedInKb
+      ? {
+          absolute: topMissedInKb.priority,
+          percentile: kbPercentile,
+        }
+      : null,
+    doc:
+      topMissedInDoc && docPercentile !== undefined
+        ? {
+            absolute: topMissedInDoc.priority,
+            percentile: docPercentile,
+          }
+        : null,
+  };
+}
 
 export function CardPriorityDisplay() {
   const plugin = usePlugin();
@@ -41,6 +96,11 @@ export function CardPriorityDisplay() {
     (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
     []
   );
+
+  const seenCardIds = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string[]>(seenCardInSessionKey),
+    [refreshSignal]
+  ) ?? [];
 
   const rem = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
@@ -98,42 +158,9 @@ export function CardPriorityDisplay() {
   // It reads from the small, pre-filtered lists in our new session cache.
   // Percentiles are looked up from the main cache to stay fresh.
   const shieldStatus = useMemo(() => {
-    if (useLightMode || !rem || !sessionCache || !allPrioritizedCardInfo) return null;
-
-    // Get the list of cards seen in this session from sessionCache tracking
-    // Note: seenCardInSessionKey is updated elsewhere, but we use the session cache lists
-    // which already track which items to consider
-
-    // --- KB Shield Calculation (fast) ---
-    // Filter the small `dueCardsInKB` list, not the whole main cache.
-    // Note: We can't check seenRemIds synchronously, but the sessionCache should be
-    // updated when cards are completed. For shield we show the highest priority due card.
-    const topMissedInKb = _.minBy(sessionCache.dueCardsInKB, (info) => info.priority);
-
-    // --- Document Shield Calculation (fast) ---
-    // Filter the small `dueCardsInScope` list.
-    const topMissedInDoc = _.minBy(sessionCache.dueCardsInScope, (info) => info.priority);
-
-    // Look up current percentiles from the main cache (stays fresh with refreshSignal)
-    const kbPercentile = topMissedInKb
-      ? allPrioritizedCardInfo.find(c => c.remId === topMissedInKb.remId)?.kbPercentile
-      : undefined;
-
-    const docPercentile = topMissedInDoc
-      ? sessionCache.docPercentiles[topMissedInDoc.remId]
-      : undefined;
-
-    return {
-      kb: topMissedInKb ? {
-        absolute: topMissedInKb.priority,
-        percentile: kbPercentile,
-      } : null,
-      doc: topMissedInDoc && docPercentile !== undefined ? {
-        absolute: topMissedInDoc.priority,
-        percentile: docPercentile
-      } : null,
-    };
-  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo]);
+    if (useLightMode || !rem || !sessionCache) return null;
+    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds);
+  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds]);
 
 
   // --- 🔌 ON-DEMAND PATH (Light Mode) ---
