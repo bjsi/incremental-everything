@@ -9,6 +9,7 @@ export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';
 export const collapseQueueTopBar = 'collapse-queue-top-bar';
 export const defaultPriorityId = 'default-priority'; //New
+export const showRemsAsIsolatedInQueueId = 'show-rems-as-isolated-in-queue';
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
