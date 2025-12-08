@@ -19,6 +19,7 @@ import {
   shouldHideIncEverythingKey,
   currentIncrementalRemTypeKey,
   activeHighlightIdKey,
+  showRemsAsIsolatedInQueueId,
 } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -82,6 +83,11 @@ export function QueueComponent() {
 
   const shouldCollapseTopBar = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(collapseQueueTopBar),
+    []
+  );
+
+  const showRemsAsIsolated = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(showRemsAsIsolatedInQueueId),
     []
   );
 
@@ -156,17 +162,18 @@ export function QueueComponent() {
   // Only show isolated view for PDF/HTML highlights, NOT for regular rems
   // Regular rems benefit from the rich ExtractViewer with descendants and metadata
   const isHighlightType = remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight';
-  const shouldShowIsolated = viewMode === 'isolated' && isHighlightType;
+  const isRemType = remAndType?.type === 'rem';
+  const shouldShowIsolated = viewMode === 'isolated' && (isHighlightType || (isRemType && showRemsAsIsolated));
 
-  // Trigger a single spark when entering context view for highlights
+  // Trigger a single spark when entering context view for highlights or isolated-rem mode
   useEffect(() => {
-    if (viewMode === 'context' && isHighlightType) {
+    if (viewMode === 'context' && (isHighlightType || (isRemType && showRemsAsIsolated))) {
       setShowSpark(true);
       const timer = setTimeout(() => setShowSpark(false), 1800);
       return () => clearTimeout(timer);
     }
     setShowSpark(false);
-  }, [viewMode, isHighlightType]);
+  }, [viewMode, isHighlightType, isRemType, showRemsAsIsolated]);
 
   // AFTER ALL HOOKS, NOW you can return early
   if (!ctx?.remId) {
@@ -188,11 +195,14 @@ export function QueueComponent() {
     willRender: remAndType ? 'YES' : 'NO'
   });
 
-  // Get the rem to display in isolated view (only for highlights)
+  // Get the rem to display in isolated view (highlights and optionally rems)
   const getIsolatedRem = () => {
     if (!remAndType) return null;
     if (isHighlightType) {
       return (remAndType as any).extract;
+    }
+    if (isRemType && showRemsAsIsolated) {
+      return remAndType.rem;
     }
     return null;
   };
@@ -202,7 +212,7 @@ export function QueueComponent() {
   return (
     <div className="incremental-everything-element" style={{ height: '100%' }}>
       <div className="box-border p-2" style={{ height: `100vh`, position: 'relative' }}>
-        {viewMode === 'context' && isHighlightType && (
+        {viewMode === 'context' && (isHighlightType || (isRemType && showRemsAsIsolated)) && (
           <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10 }}>
             <style>{`
               .inc-back-btn {
@@ -259,7 +269,7 @@ export function QueueComponent() {
             sourceDocumentName={isHighlightType ? sourceDocName : undefined}
             sourceDocumentId={isHighlightType ? remAndType.rem._id : undefined}
             sourceType={remAndType.type}
-            onViewInContext={isHighlightType ? () => setViewMode('context') : undefined}
+            onViewInContext={(isHighlightType || (isRemType && showRemsAsIsolated)) ? () => setViewMode('context') : undefined}
           />
         ) : remAndType.type === 'pdf' ||
           remAndType.type === 'html' ||

@@ -9,6 +9,7 @@ import {
   alwaysUseLightModeOnWebId,
   remnoteEnvironmentId,
   pdfHighlightColorId,
+  showRemsAsIsolatedInQueueId,
 } from '../lib/consts';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
@@ -58,6 +59,14 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     description:
       'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
     defaultValue: true,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: showRemsAsIsolatedInQueueId,
+    title: 'Show regular Rems in isolated view (Queue)',
+    description:
+      'When enabled, incremental Rems that are plain Rems will use the isolated card view in the queue instead of the full document context. Switch back to context with the button in the queue.',
+    defaultValue: false,
   });
 
   plugin.settings.registerBooleanSetting({

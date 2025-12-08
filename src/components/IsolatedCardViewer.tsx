@@ -322,38 +322,42 @@ export function IsolatedCardViewer({
           {/* Right side - Action buttons */}
           {onViewInContext && (
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                style={buttonStyle}
-                onClick={handleCreateRem}
-                disabled={isCreatingRem}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-tertiary', '#f1f5f9', '#334155');
-                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-secondary', '#cbd5e1', '#475569');
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b');
-                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155');
-                }}
-              >
-                <span>✏️</span>
-                <span>{isCreatingRem ? 'Creating...' : 'Create Rem'}</span>
-              </button>
-              <button
-                style={buttonStyle}
-                onClick={handleCreateIncrementalRem}
-                disabled={isCreatingRem}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-tertiary', '#f1f5f9', '#334155');
-                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-secondary', '#cbd5e1', '#475569');
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b');
-                  e.currentTarget.style.borderColor = cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155');
-                }}
-              >
-                <span>🔄</span>
-                <span>{isCreatingRem ? 'Creating...' : 'Create Inc Rem'}</span>
-              </button>
+              {sourceDocumentId && (
+                <>
+                  <button
+                    style={buttonStyle}
+                    onClick={handleCreateRem}
+                    disabled={isCreatingRem}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-tertiary', '#f1f5f9', '#334155');
+                      e.currentTarget.style.borderColor = cssVar('--rn-clr-border-secondary', '#cbd5e1', '#475569');
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b');
+                      e.currentTarget.style.borderColor = cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155');
+                    }}
+                  >
+                    <span>✏️</span>
+                    <span>{isCreatingRem ? 'Creating...' : 'Create Rem'}</span>
+                  </button>
+                  <button
+                    style={buttonStyle}
+                    onClick={handleCreateIncrementalRem}
+                    disabled={isCreatingRem}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-tertiary', '#f1f5f9', '#334155');
+                      e.currentTarget.style.borderColor = cssVar('--rn-clr-border-secondary', '#cbd5e1', '#475569');
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = cssVar('--rn-clr-background-primary', '#ffffff', '#1e293b');
+                      e.currentTarget.style.borderColor = cssVar('--rn-clr-border-primary', '#e2e8f0', '#334155');
+                    }}
+                  >
+                    <span>🔄</span>
+                    <span>{isCreatingRem ? 'Creating...' : 'Create Inc Rem'}</span>
+                  </button>
+                </>
+              )}
               <button
                 style={buttonStyle}
                 onClick={onViewInContext}
