@@ -222,7 +222,7 @@ export function CardPriorityDisplay() {
         <>
           <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>🛡️ Shield:</span>
+            <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>🛡️ Card Shield:</span>
             <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               {shieldStatus.kb && (
                 <span>
