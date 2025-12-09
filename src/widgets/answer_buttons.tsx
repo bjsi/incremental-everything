@@ -482,7 +482,7 @@ export function AnswerButtons() {
         <div style={infoBarStyle}>
           {/* Priority Display */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontWeight: 500 }}>Priority:</span>
+            <span style={{ fontWeight: 600 }}>Priority:</span>
             <div style={priorityBadgeStyle}>
               <span>{incRemInfo.priority}</span>
               {/* Show KB percentile (always current). Doc percentile removed from cache after priority change. */}
@@ -515,7 +515,7 @@ export function AnswerButtons() {
             <>
               <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontWeight: 600 }}>🛡️ Priority Shield</span>
+                <span style={{ fontWeight: 600 }}>🛡️ IncRem Shield:</span>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   {shieldStatusAsync.kb ? (
                     <span>
