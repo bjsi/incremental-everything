@@ -200,7 +200,7 @@ export function CardPriorityDisplay() {
       title="Click to set priority (Opt+P)"
     >
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
+        <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
         <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact />
         {!useLightMode && kbPercentile !== undefined && (
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
@@ -222,16 +222,18 @@ export function CardPriorityDisplay() {
         <>
           <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Shield</span>
+            <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>🛡️ Shield:</span>
             <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               {shieldStatus.kb && (
                 <span>
                   KB: <PriorityBadge priority={shieldStatus.kb.absolute} percentile={shieldStatus.kb.percentile} compact />
+                  {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile}%)`}
                 </span>
               )}
               {shieldStatus.doc && (
                 <span>
                   Doc: <PriorityBadge priority={shieldStatus.doc.absolute} percentile={shieldStatus.doc.percentile} compact />
+                  {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile}%)`}
                 </span>
               )}
             </div>
