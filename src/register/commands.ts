@@ -585,4 +585,20 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await handleMobileDetectionOnStartup(plugin);
     },
   });
+
+  // NEW: A robust command to open the priority popup that survives widget closure
+  plugin.app.registerCommand({
+    id: 'force-open-priority',
+    name: 'Force Open Priority Popup',
+    action: async (args: { remId: string }) => {
+      // Small safety delay to ensure previous UI operations (like closing parent selector) have settled
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      if (args && args.remId) {
+        await plugin.widget.openPopup('priority', {
+          remId: args.remId,
+        });
+      }
+    },
+  });
 }

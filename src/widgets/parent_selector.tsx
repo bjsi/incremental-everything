@@ -459,15 +459,17 @@ function ParentSelectorWidget() {
         );
 
         // Show priority popup if needed (for new incremental rems created directly)
+        // If we need to show the priority popup, we open it DIRECTLY.
+        // Opening a new popup in the same location replaces the current one.
+        // We do NOT call closePopup() here, as that kills this script execution.
         if (showPriorityPopup && makeIncremental) {
-          console.log('[ParentSelector:Widget] Showing priority popup for new rem:', newRem._id);
-          // Small delay to let the parent selector popup close first
-          setTimeout(async () => {
-            // Open priority popup with remId passed directly
-            await plugin.widget.openPopup('priority', {
-              remId: newRem._id,
-            });
-          }, 300);
+          console.log('[ParentSelector:Widget] Transitioning to priority popup for:', newRem._id);
+          await plugin.widget.openPopup('priority', {
+            remId: newRem._id,
+          });
+        } else {
+          // Only close explicitly if we are NOT opening another popup
+          plugin.widget.closePopup();
         }
       } catch (error) {
         console.error('[ParentSelector:Widget] Error creating rem:', error);
