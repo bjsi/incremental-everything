@@ -1,5 +1,6 @@
 // widgets/parent_selector.tsx
-// FIXED VERSION - handles allIncrementalRems timing issue
+// IMPROVED VERSION - Adds inline child creation capability
+// When viewing a node, press '+' or 'n' to create a new child, or click the + button
 
 import {
   renderWidget,
@@ -8,7 +9,7 @@ import {
   RemId,
   ReactRNPlugin,
 } from '@remnote/plugin-sdk';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
 import { calculateRelativePercentile, percentileToHslColor } from '../lib/utils';
 import { IncrementalRem, initIncrementalRem } from '../lib/incremental_rem';
@@ -23,6 +24,7 @@ import {
   saveLastSelectedDestination,
   expandToLastDestination,
   flattenTreeForDisplay,
+  createTreeNode,
 } from '../lib/hierarchical_parent_selector/treeHelpers';
 
 // ============================================================================
@@ -113,6 +115,48 @@ const ExpandButton: React.FC<ExpandButtonProps> = ({
   );
 };
 
+interface AddChildButtonProps {
+  onClick: (e: React.MouseEvent) => void;
+  isVisible: boolean;
+}
+
+const AddChildButton: React.FC<AddChildButtonProps> = ({ onClick, isVisible }) => {
+  if (!isVisible) return null;
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '20px',
+        height: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: 'none',
+        background: 'transparent',
+        cursor: 'pointer',
+        borderRadius: '4px',
+        color: 'var(--rn-clr-content-tertiary)',
+        fontSize: '14px',
+        fontWeight: 'bold',
+        transition: 'all 0.15s ease',
+        marginLeft: '4px',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+        e.currentTarget.style.color = '#22c55e';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'transparent';
+        e.currentTarget.style.color = 'var(--rn-clr-content-tertiary)';
+      }}
+      title="Add child rem (press + or n)"
+    >
+      +
+    </button>
+  );
+};
+
 interface PriorityBadgeProps {
   priority: number | null;
   percentile: number | null;
@@ -155,6 +199,7 @@ interface TreeNodeRowProps {
   onSelect: () => void;
   onToggleExpand: () => void;
   onMouseEnter: () => void;
+  onAddChild: () => void;
 }
 
 const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
@@ -164,6 +209,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   onSelect,
   onToggleExpand,
   onMouseEnter,
+  onAddChild,
 }) => {
   const indentPadding = 16 + node.depth * 20;
 
@@ -216,11 +262,139 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
         {node.name.length > 50 ? `${node.name.slice(0, 50)}...` : node.name}
       </span>
 
+      <AddChildButton 
+        onClick={(e) => {
+          e.stopPropagation();
+          onAddChild();
+        }} 
+        isVisible={isSelected} 
+      />
+
       <PriorityBadge
         priority={node.priority}
         percentile={node.percentile}
         isIncremental={node.isIncremental}
       />
+    </div>
+  );
+};
+
+// ============================================================================
+// NEW CHILD INPUT COMPONENT
+// ============================================================================
+
+interface NewChildInputRowProps {
+  depth: number;
+  parentName: string;
+  isCreating: boolean;
+  onConfirm: (name: string) => void;
+  onCancel: () => void;
+}
+
+const NewChildInputRow: React.FC<NewChildInputRowProps> = ({
+  depth,
+  parentName,
+  isCreating,
+  onConfirm,
+  onCancel,
+}) => {
+  const [inputValue, setInputValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const indentPadding = 16 + (depth + 1) * 20; // Indent one level deeper than parent
+
+  useEffect(() => {
+    // Focus the input when mounted
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      e.preventDefault();
+      e.stopPropagation();
+      onConfirm(inputValue.trim());
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+    }
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: `8px 16px 8px ${indentPadding}px`,
+        backgroundColor: 'var(--rn-clr-background-secondary)',
+        borderLeft: '3px solid #22c55e',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span style={{ width: '20px', display: 'inline-block' }} /> {/* Placeholder for expand button */}
+      
+      <span style={{ fontSize: '12px', color: '#22c55e' }}>+</span>
+      
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={`New child for "${parentName.slice(0, 20)}..."`}
+        disabled={isCreating}
+        style={{
+          flex: 1,
+          fontSize: '13px',
+          padding: '4px 8px',
+          border: '1px solid var(--rn-clr-border-primary)',
+          borderRadius: '4px',
+          backgroundColor: 'var(--rn-clr-background-primary)',
+          color: 'var(--rn-clr-content-primary)',
+          outline: 'none',
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = '#22c55e';
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary)';
+        }}
+      />
+      
+      <button
+        onClick={() => inputValue.trim() && onConfirm(inputValue.trim())}
+        disabled={!inputValue.trim() || isCreating}
+        style={{
+          padding: '4px 8px',
+          fontSize: '11px',
+          borderRadius: '4px',
+          backgroundColor: isCreating ? '#9ca3af' : '#22c55e',
+          border: 'none',
+          color: 'white',
+          cursor: isCreating ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {isCreating ? '...' : 'Create'}
+      </button>
+      
+      <button
+        onClick={onCancel}
+        disabled={isCreating}
+        style={{
+          padding: '4px 8px',
+          fontSize: '11px',
+          borderRadius: '4px',
+          backgroundColor: 'transparent',
+          border: '1px solid var(--rn-clr-border-primary)',
+          color: 'var(--rn-clr-content-secondary)',
+          cursor: 'pointer',
+        }}
+      >
+        Cancel
+      </button>
     </div>
   );
 };
@@ -239,6 +413,10 @@ function ParentSelectorWidget() {
   const [isCreating, setIsCreating] = useState(false);
   const [loadingNodeId, setLoadingNodeId] = useState<RemId | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // NEW: State for inline child creation
+  const [creatingChildForNodeId, setCreatingChildForNodeId] = useState<RemId | null>(null);
+  const [isCreatingChild, setIsCreatingChild] = useState(false);
 
   // Auto-focus the container when the popup opens
   useEffect(() => {
@@ -393,11 +571,125 @@ function ParentSelectorWidget() {
     [displayList, loadingNodeId, plugin, allIncrementalRems]
   );
 
+  // NEW: Handler to start creating a child for the selected node
+  const handleStartAddChild = useCallback(() => {
+    if (!selectedNode || isCreating || isCreatingChild) return;
+    
+    console.log('[ParentSelector:Widget] Starting add child for:', selectedNode.name);
+    
+    // If the node is not expanded and has children, expand it first
+    if (selectedNode.hasChildren && !selectedNode.isExpanded) {
+      handleToggleExpand(selectedNode.remId);
+    }
+    
+    setCreatingChildForNodeId(selectedNode.remId);
+  }, [selectedNode, isCreating, isCreatingChild, handleToggleExpand]);
+
+  // NEW: Handler to create the child rem
+  const handleCreateChild = useCallback(
+    async (childName: string) => {
+      if (!creatingChildForNodeId || isCreatingChild) return;
+
+      const parentNode = displayList.find((n) => n.remId === creatingChildForNodeId);
+      if (!parentNode) {
+        setCreatingChildForNodeId(null);
+        return;
+      }
+
+      console.log('[ParentSelector:Widget] Creating child rem:', childName, 'under:', parentNode.name);
+      setIsCreatingChild(true);
+
+      try {
+        // Create the new rem
+        const newRem = await plugin.rem.createRem();
+        if (!newRem) {
+          await plugin.app.toast('Failed to create rem');
+          setIsCreatingChild(false);
+          return;
+        }
+
+        // Set the text and parent
+        await newRem.setText([childName]);
+        await newRem.setParent(creatingChildForNodeId);
+
+        console.log('[ParentSelector:Widget] Child rem created:', newRem._id);
+
+        // Create a tree node for the new child using the helper function
+        // Note: We need to fetch the rem again to get the full PluginRem object
+        const createdRem = await plugin.rem.findOne(newRem._id);
+        if (!createdRem) {
+          await plugin.app.toast('Failed to find created rem');
+          setIsCreatingChild(false);
+          return;
+        }
+
+        const newChildNode: ParentTreeNode = await createTreeNode(
+          plugin,
+          createdRem,
+          allIncrementalRems || [],
+          parentNode.depth + 1,
+          creatingChildForNodeId
+        );
+
+        // Store the new rem id for selecting it after state update
+        const newRemId = newRem._id;
+        const parentNodeId = creatingChildForNodeId;
+
+        // Update the tree: add the new child and mark parent as having children
+        setTree((prevTree) => {
+          const updatedTree = updateNodeInTree(prevTree, parentNodeId, (node) => ({
+            ...node,
+            hasChildren: true,
+            childrenLoaded: true,
+            isExpanded: true,
+            children: [...node.children, newChildNode],
+          }));
+
+          // Calculate the new display list and find the index of the new child
+          const newDisplayList = flattenTreeForDisplay(updatedTree);
+          const newChildIndex = newDisplayList.findIndex((n) => n.remId === newRemId);
+          
+          console.log('[ParentSelector:Widget] New child index in updated tree:', newChildIndex);
+          
+          // Schedule the selection update
+          setTimeout(() => {
+            if (newChildIndex >= 0) {
+              setSelectedIndex(newChildIndex);
+            }
+            // Re-focus the container
+            containerRef.current?.focus();
+          }, 50);
+
+          return updatedTree;
+        });
+
+        await plugin.app.toast(`Created "${childName}"`);
+        
+      } catch (error) {
+        console.error('[ParentSelector:Widget] Error creating child rem:', error);
+        await plugin.app.toast('Error creating rem');
+      } finally {
+        setIsCreatingChild(false);
+        setCreatingChildForNodeId(null);
+      }
+    },
+    [creatingChildForNodeId, isCreatingChild, displayList, plugin, allIncrementalRems]
+  );
+
+  // NEW: Handler to cancel child creation
+  const handleCancelAddChild = useCallback(() => {
+    setCreatingChildForNodeId(null);
+    // Re-focus the container after canceling
+    setTimeout(() => {
+      containerRef.current?.focus();
+    }, 50);
+  }, []);
+
   const handleSelect = useCallback(
     async (node: ParentTreeNode) => {
-      if (!contextData || isCreating) return;
+      if (!contextData || isCreating || creatingChildForNodeId) return;
 
-      console.log('[ParentSelector:Widget] ========== HANDLE SELECT ==========');
+      console.log('[ParentSelector:Widget] ======== HANDLE SELECT ==========');
       console.log('[ParentSelector:Widget] Selected node:', node.name, node.remId);
       console.log('[ParentSelector:Widget] Context pdfRemId:', contextData.pdfRemId);
       console.log('[ParentSelector:Widget] Context contextRemId:', contextData.contextRemId);
@@ -477,7 +769,7 @@ function ParentSelectorWidget() {
         setIsCreating(false);
       }
     },
-    [contextData, isCreating, plugin]
+    [contextData, isCreating, creatingChildForNodeId, plugin]
   );
 
   const handleClose = useCallback(() => {
@@ -490,6 +782,8 @@ function ParentSelectorWidget() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If we're in child creation mode, don't handle keyboard events here
+      if (creatingChildForNodeId) return;
       if (isLoading || isCreating) return;
 
       switch (e.key) {
@@ -536,6 +830,15 @@ function ParentSelectorWidget() {
           e.preventDefault();
           handleClose();
           break;
+
+        // NEW: '+' or 'n' to add a child to the selected node
+        case '+':
+        case '=': // Handle both + and = (without shift)
+        case 'n':
+        case 'N':
+          e.preventDefault();
+          handleStartAddChild();
+          break;
       }
     };
 
@@ -546,9 +849,11 @@ function ParentSelectorWidget() {
     selectedNode,
     isLoading,
     isCreating,
+    creatingChildForNodeId,
     handleToggleExpand,
     handleSelect,
     handleClose,
+    handleStartAddChild,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -603,6 +908,112 @@ function ParentSelectorWidget() {
     ? 'Create Incremental Rem'
     : 'Create Rem';
 
+  // Build the display list with the new child input row if active
+  const renderTreeWithInput = () => {
+    const elements: React.ReactNode[] = [];
+    let inputRendered = false;
+
+    for (let index = 0; index < displayList.length; index++) {
+      const node = displayList[index];
+      
+      // Render the node row
+      elements.push(
+        <TreeNodeRow
+          key={`${node.remId}-${node.depth}`}
+          node={node}
+          isSelected={index === selectedIndex && !creatingChildForNodeId}
+          isLoadingChildren={loadingNodeId === node.remId}
+          onSelect={() => handleSelect(node)}
+          onToggleExpand={() => handleToggleExpand(node.remId)}
+          onMouseEnter={() => !creatingChildForNodeId && setSelectedIndex(index)}
+          onAddChild={() => {
+            setSelectedIndex(index);
+            setCreatingChildForNodeId(node.remId);
+          }}
+        />
+      );
+
+      // If this node is the one we're creating a child for, render the input row
+      // The input should appear after this node and all its visible children
+      if (creatingChildForNodeId === node.remId && !inputRendered) {
+        // Find the last visible descendant of this node
+        let lastDescendantIndex = index;
+        if (node.isExpanded && node.children.length > 0) {
+          // Traverse to find the last visible descendant
+          for (let j = index + 1; j < displayList.length; j++) {
+            if (displayList[j].depth > node.depth) {
+              lastDescendantIndex = j;
+            } else {
+              break;
+            }
+          }
+        }
+
+        // Render the input after the last descendant (or immediately after if collapsed/no children)
+        if (index === lastDescendantIndex) {
+          elements.push(
+            <NewChildInputRow
+              key={`new-child-input-${node.remId}`}
+              depth={node.depth}
+              parentName={node.name}
+              isCreating={isCreatingChild}
+              onConfirm={handleCreateChild}
+              onCancel={handleCancelAddChild}
+            />
+          );
+          inputRendered = true;
+        }
+      }
+
+      // Check if we just passed the last descendant of the node we're creating a child for
+      if (creatingChildForNodeId && !inputRendered) {
+        const parentNode = displayList.find((n) => n.remId === creatingChildForNodeId);
+        if (parentNode) {
+          // Check if the next node (if exists) is not a descendant
+          const nextNode = displayList[index + 1];
+          const currentIsDescendant = node.parentId === creatingChildForNodeId || 
+            (displayList.slice(displayList.findIndex(n => n.remId === creatingChildForNodeId) + 1, index + 1)
+              .some(n => n.remId === node.parentId));
+          
+          const nextIsNotDescendant = !nextNode || nextNode.depth <= parentNode.depth;
+          
+          if (currentIsDescendant && nextIsNotDescendant) {
+            elements.push(
+              <NewChildInputRow
+                key={`new-child-input-${creatingChildForNodeId}`}
+                depth={parentNode.depth}
+                parentName={parentNode.name}
+                isCreating={isCreatingChild}
+                onConfirm={handleCreateChild}
+                onCancel={handleCancelAddChild}
+              />
+            );
+            inputRendered = true;
+          }
+        }
+      }
+    }
+
+    // If input still not rendered (edge case - parent is last item), render it at the end
+    if (creatingChildForNodeId && !inputRendered) {
+      const parentNode = displayList.find((n) => n.remId === creatingChildForNodeId);
+      if (parentNode) {
+        elements.push(
+          <NewChildInputRow
+            key={`new-child-input-${creatingChildForNodeId}`}
+            depth={parentNode.depth}
+            parentName={parentNode.name}
+            isCreating={isCreatingChild}
+            onConfirm={handleCreateChild}
+            onCancel={handleCancelAddChild}
+          />
+        );
+      }
+    }
+
+    return elements;
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -626,33 +1037,17 @@ function ParentSelectorWidget() {
         <button
           onClick={handleClose}
           style={{
-            padding: '4px 8px',
             border: 'none',
             background: 'transparent',
+            fontSize: '18px',
             cursor: 'pointer',
-            color: 'var(--rn-clr-content-tertiary)',
-            fontSize: '12px',
+            color: 'var(--rn-clr-content-secondary)',
+            padding: '4px',
             borderRadius: '4px',
           }}
-          title="Close (Esc)"
         >
-          ✕
+          ×
         </button>
-      </div>
-
-      {/* DEBUG INFO - Remove this in production */}
-      <div style={{ 
-        padding: '8px 16px', 
-        backgroundColor: '#fef3c7', 
-        fontSize: '10px',
-        fontFamily: 'monospace',
-        borderBottom: '1px solid var(--rn-clr-border-primary)',
-      }}>
-        <div><strong>DEBUG INFO:</strong></div>
-        <div>pdfRemId: {contextData.pdfRemId?.slice(0, 8)}...</div>
-        <div>contextRemId: {contextData.contextRemId ? `${contextData.contextRemId.slice(0, 8)}...` : 'null'}</div>
-        <div>lastDest: {contextData.lastSelectedDestination ? `${contextData.lastSelectedDestination.slice(0, 8)}...` : 'null'}</div>
-        <div>allIncRems: {allIncrementalRems?.length ?? 'null'}</div>
       </div>
 
       {/* Instructions */}
@@ -677,23 +1072,14 @@ function ParentSelectorWidget() {
         >
           Use <kbd style={kbdStyle}>↑</kbd>/<kbd style={kbdStyle}>↓</kbd> to navigate,{' '}
           <kbd style={kbdStyle}>→</kbd> to expand, <kbd style={kbdStyle}>←</kbd> to collapse,{' '}
-          <kbd style={kbdStyle}>Enter</kbd> to select
+          <kbd style={kbdStyle}>Enter</kbd> to select,{' '}
+          <kbd style={kbdStyle}>+</kbd>/<kbd style={kbdStyle}>n</kbd> to add child
         </p>
       </div>
 
       {/* Tree List */}
       <div style={listContainerStyle}>
-        {displayList.map((node, index) => (
-          <TreeNodeRow
-            key={`${node.remId}-${node.depth}`}
-            node={node}
-            isSelected={index === selectedIndex}
-            isLoadingChildren={loadingNodeId === node.remId}
-            onSelect={() => handleSelect(node)}
-            onToggleExpand={() => handleToggleExpand(node.remId)}
-            onMouseEnter={() => setSelectedIndex(index)}
-          />
-        ))}
+        {renderTreeWithInput()}
       </div>
 
       {/* Footer */}
@@ -717,16 +1103,16 @@ function ParentSelectorWidget() {
         </span>
         <button
           onClick={() => selectedNode && handleSelect(selectedNode)}
-          disabled={!selectedNode || isCreating}
+          disabled={!selectedNode || isCreating || !!creatingChildForNodeId}
           style={{
             padding: '8px 16px',
             fontSize: '12px',
             fontWeight: 600,
             borderRadius: '6px',
-            backgroundColor: isCreating ? '#9ca3af' : '#3b82f6',
+            backgroundColor: isCreating || creatingChildForNodeId ? '#9ca3af' : '#3b82f6',
             border: 'none',
             color: 'white',
-            cursor: isCreating ? 'not-allowed' : 'pointer',
+            cursor: isCreating || creatingChildForNodeId ? 'not-allowed' : 'pointer',
             transition: 'background-color 0.15s ease',
           }}
         >
