@@ -1,3 +1,6 @@
+// lib/hierarchical_parent_selector/treeHelpers.ts
+// UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
+
 import {
   RNPlugin,
   ReactRNPlugin,
@@ -10,10 +13,16 @@ import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../consts';
 import { IncrementalRem } from '../incremental_rem';
 import { safeRemTextToString, findPDFinRem } from '../pdfUtils';
 import { calculateRelativePercentile } from '../utils';
+import { 
+  filterOutPowerupSlots, 
+  getChildrenExcludingSlots 
+} from '../powerupSlotFilter';
 
 /**
  * Creates a ParentTreeNode from a PluginRem.
  * Checks if the rem has children and enriches with priority data if incremental.
+ * 
+ * UPDATED: Now excludes powerup slots when determining hasChildren
  */
 export async function createTreeNode(
   plugin: RNPlugin,
@@ -26,7 +35,8 @@ export async function createTreeNode(
   const isIncremental = await rem.hasPowerup(powerupCode);
   
   // Check if has children (for expand indicator)
-  const children = await rem.getChildrenRem();
+  // UPDATED: Filter out powerup slots from children count
+  const children = await getChildrenExcludingSlots(plugin, rem);
   const hasChildren = children.length > 0;
   
   // Get priority data if incremental
@@ -61,6 +71,8 @@ export async function createTreeNode(
 /**
  * Loads children for a specific node.
  * Returns the children as ParentTreeNode array, preserving editor order.
+ * 
+ * UPDATED: Now filters out powerup slots (Incremental, CardPriority)
  */
 export async function loadChildrenForNode(
   plugin: RNPlugin,
@@ -72,7 +84,8 @@ export async function loadChildrenForNode(
   if (!parentRem) return [];
   
   // getChildrenRem() returns children in document order (as shown in editor)
-  const children = await parentRem.getChildrenRem();
+  // UPDATED: Filter out powerup slots
+  const children = await getChildrenExcludingSlots(plugin, parentRem);
   const childNodes: ParentTreeNode[] = [];
   
   for (const child of children) {

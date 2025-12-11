@@ -1,7 +1,15 @@
+// components/reader/hooks.ts
+// UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
+
 import { BuiltInPowerupCodes, ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
 import { useEffect, useState } from 'react';
 import { powerupCode } from '../../lib/consts';
 import { findIncrementalRemForPDF, safeRemTextToString } from '../../lib/pdfUtils';
+import { 
+  getChildrenExcludingSlots, 
+  getDescendantsExcludingSlots,
+  filterOutPowerupSlots 
+} from '../../lib/powerupSlotFilter';
 
 export type AncestorBreadcrumb = { text: string; id: RemId };
 
@@ -140,18 +148,24 @@ export function useMetadataStats(
         
       if (!rem || cancelled) return;
 
-      const descendants = await rem.getDescendants();
+      // UPDATED: Filter out powerup slots from descendants and children
+      const descendants = await getDescendantsExcludingSlots(plugin, rem);
       if (cancelled) return;
       const descendantsCount = descendants.length;
-      const children = await rem.getChildrenRem();
+      
+      const children = await getChildrenExcludingSlots(plugin, rem);
       if (cancelled) return;
       const childrenCount = children.length;
 
+      // Process descendants (already filtered)
       const remsToProcess = [rem, ...descendants];
       
       let incrementalDescendantsCount = 0;
       let flashcardCount = 0;
       let incrementalChildrenCount = 0;
+      
+      // Create a Set of children IDs for quick lookup
+      const childrenIds = new Set(children.map(c => c._id));
       
       for (let i = 0; i < remsToProcess.length; i += BATCH_SIZE) {
         if (cancelled) return;
@@ -172,20 +186,26 @@ export function useMetadataStats(
           if (result.cards.length > 0) {
               flashcardCount += result.cards.length;
           }
-          if (children.some(c => c._id === result.remId) && result.isIncremental) {
+          // Use the Set for O(1) lookup instead of Array.some
+          if (childrenIds.has(result.remId) && result.isIncremental) {
               incrementalChildrenCount++;
           }
         }
         
-        if (i + BATCH_SIZE < remsToProcess.length) await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+        if (i + BATCH_SIZE < remsToProcess.length) {
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+        }
       }
       
+      // Count PDF highlights (these are different from powerup slots, so we count normally)
       let pdfHighlightCount = 0;
       try {
         const pdfRem = await plugin.rem.findOne(pdfRemId);
         if (!pdfRem) {
           throw new Error('PDF rem not found while counting highlights');
         }
+        
+        // Get all PDF children and descendants (without filtering - we want highlights)
         const pdfChildren = await pdfRem.getChildrenRem();
         const pdfDescendants = await pdfRem.getDescendants();
         const allPdfRems = [...pdfChildren, ...pdfDescendants];
@@ -200,7 +220,9 @@ export function useMetadataStats(
           );
           pdfHighlightCount += highlightChecks.filter(Boolean).length;
           
-          if (i + highlightBatchSize < allPdfRems.length) await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+          if (i + highlightBatchSize < allPdfRems.length) {
+            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+          }
         }
 
       } catch (highlightError) {
