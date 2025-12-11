@@ -1,7 +1,14 @@
+// components/ExtractViewer.tsx
+// UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { PluginRem, RNPlugin, DocumentViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
 import { powerupCode } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { 
+  getChildrenExcludingSlots, 
+  getDescendantsExcludingSlots 
+} from '../lib/powerupSlotFilter';
 
 interface ExtractViewerProps {
   rem: PluginRem;
@@ -92,7 +99,8 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   }, [rem._id, plugin]);
   
   // -----------------------------------------------------------
-  // 2. EFFECT FOR DEFERRED METADATA CALCULATION (Statistics) (Unchanged)
+  // 2. EFFECT FOR DEFERRED METADATA CALCULATION (Statistics)
+  // UPDATED: Now filters out powerup slots from children and descendants
   // -----------------------------------------------------------
   useEffect(() => {
     setMetadata(null); 
@@ -100,13 +108,18 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
     const calculateMetadata = async () => {
       console.log("[ExtractViewer] Starting heavy metadata calculation...");
       
-      const descendants = await rem.getDescendants();
+      // UPDATED: Filter out powerup slots from descendants
+      const descendants = await getDescendantsExcludingSlots(plugin, rem);
       const descendantsCount = descendants.length;
       
-      const children = await rem.getChildrenRem();
+      // UPDATED: Filter out powerup slots from children
+      const children = await getChildrenExcludingSlots(plugin, rem);
       const childrenCount = children.length;
 
       const remsToProcess = [rem, ...descendants];
+      
+      // Create a Set of children IDs for quick lookup
+      const childrenIds = new Set(children.map(c => c._id));
       
       let incrementalDescendantsCount = 0;
       let flashcardCount = 0;
@@ -131,7 +144,8 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
               if (result.cards.length > 0) {
                   flashcardCount += result.cards.length;
               }
-              if (children.some(c => c._id === result.remId) && result.isIncremental) {
+              // Use the Set for O(1) lookup instead of Array.some
+              if (childrenIds.has(result.remId) && result.isIncremental) {
                   incrementalChildrenCount++;
               }
           }
