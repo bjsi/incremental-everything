@@ -1,3 +1,19 @@
+/**
+ * FIXED: highlightActions.ts
+ * 
+ * This is a patch file showing the fixes for:
+ * 1. Priority popup not opening (using await instead of setTimeout)
+ * 2. Parent selector should always open when called from Editor (with showPriorityPopupIfNew: true)
+ *    even if there are no candidates other than the PDF itself
+ * 
+ * CHANGES:
+ * - Fixed createRemUnderParent to properly await the priority popup
+ * - Changed Case A logic: when called from Editor (showPriorityPopupIfNew: true), 
+ *   always show the parent selector with the PDF as the only option
+ * - The "create directly under PDF without asking" behavior only applies 
+ *   when called from the Queue (showPriorityPopupIfNew: false/undefined)
+ */
+
 import {
   BuiltInPowerupCodes,
   PluginRem,
@@ -18,24 +34,15 @@ import {
   getLastSelectedDestination,
   saveLastSelectedDestination,
 } from './hierarchical_parent_selector/treeHelpers';
+import { safeRemTextToString } from './pdfUtils';
 
 type CreateRemFromHighlightOptions = {
   makeIncremental: boolean;
   sourceDocumentId?: RemId;
-  contextRemId?: RemId | null; // The IncRem being reviewed (e.g., "Chapter 1"), null/undefined if PDF itself
-  /**
-   * If true, check if the highlight is already incremental.
-   * - If already incremental: skip priority popup (user already set priority via Toggle Incremental)
-   * - If not incremental: show priority popup after creating the rem
-   * 
-   * This is used when calling from the PDF highlight menu's "Create Incremental Rem" button.
-   * When called from the queue (where highlight is already incremental), this can be false or
-   * we can detect it automatically.
-   */
+  contextRemId?: RemId | null;
   showPriorityPopupIfNew?: boolean;
 };
 
-// Extended context that includes info about showing priority popup
 interface ExtendedParentSelectorContext extends ParentSelectorContext {
   showPriorityPopupAfterCreate: boolean;
   highlightWasAlreadyIncremental: boolean;
@@ -122,8 +129,6 @@ const resolveSourceDocument = async (
 
 /**
  * Shows the priority popup for a rem.
- * This should be called after creating a new incremental rem when the user
- * uses "Create Incremental Rem" directly (not via Toggle Incremental first).
  */
 export const showPriorityPopupForRem = async (
   plugin: ReactRNPlugin,
@@ -137,9 +142,11 @@ export const showPriorityPopupForRem = async (
 };
 
 /**
- * Creates a new rem under the specified parent with highlight content.
+ * FIXED: Creates a new rem under the specified parent with highlight content.
  * 
- * @returns The created rem's ID, or null if creation failed
+ * Changes:
+ * - Removed setTimeout and properly await the priority popup
+ * - The popup is now shown synchronously after the rem is created
  */
 export const createRemUnderParent = async (
   plugin: ReactRNPlugin,
@@ -186,12 +193,13 @@ export const createRemUnderParent = async (
   const parentSuffix = parentName ? ` under "${parentName.slice(0, 30)}..."` : ' under source';
   await plugin.app.toast(`Created ${actionText}${parentSuffix}`);
 
-  // Show priority popup if requested (for new incremental rems)
+  // FIXED: Show priority popup if requested (for new incremental rems)
+  // Use direct await instead of setTimeout which can fail in plugin context
   if (showPriorityPopup && makeIncremental) {
-    // Small delay to let the toast show first
-    setTimeout(async () => {
-      await showPriorityPopupForRem(plugin, newRem._id);
-    }, 300);
+    console.log('[ParentSelector:HighlightActions] Opening priority popup for new rem:', newRem._id);
+    // Small delay to let toast appear, but use proper async/await
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await showPriorityPopupForRem(plugin, newRem._id);
   }
 
   return newRem._id;
@@ -205,7 +213,38 @@ const anyNodeHasChildren = (nodes: ParentTreeNode[]): boolean => {
 };
 
 /**
- * Main function to create a rem from a PDF highlight.
+ * Helper to create a tree node for the PDF itself
+ */
+const createPdfTreeNode = async (
+  plugin: ReactRNPlugin,
+  pdfRem: PluginRem
+): Promise<ParentTreeNode> => {
+  const pdfName = await safeRemTextToString(plugin, pdfRem.text);
+  const children = await pdfRem.getChildrenRem();
+  
+  return {
+    remId: pdfRem._id,
+    name: pdfName || 'PDF Document',
+    priority: null,
+    percentile: null,
+    isIncremental: false,
+    hasChildren: children.length > 0,
+    isExpanded: false,
+    children: [],
+    childrenLoaded: false,
+    depth: 0,
+    parentId: null,
+  };
+};
+
+/**
+ * FIXED: Main function to create a rem from a PDF highlight.
+ * 
+ * Changes:
+ * - Case A (no candidates): When called from Editor (showPriorityPopupIfNew: true),
+ *   always show the parent selector with the PDF itself as an option.
+ *   This gives the user a chance to choose where to place the IncRem and set priority.
+ * - Only auto-create under PDF when called from Queue (showPriorityPopupIfNew: false/undefined)
  */
 export const createRemFromHighlight = async (
   plugin: ReactRNPlugin,
@@ -229,16 +268,17 @@ export const createRemFromHighlight = async (
   console.log('[ParentSelector:HighlightActions] Highlight is already incremental:', highlightIsAlreadyIncremental);
 
   // Determine if we should show priority popup after creating the rem
-  // Only show if:
-  // 1. showPriorityPopupIfNew is true (caller wants this behavior)
-  // 2. The highlight is NOT already incremental (if it was, user already set priority)
-  // 3. We're making it incremental
   const shouldShowPriorityPopup = 
     showPriorityPopupIfNew === true && 
     !highlightIsAlreadyIncremental && 
     makeIncremental;
   
   console.log('[ParentSelector:HighlightActions] Should show priority popup:', shouldShowPriorityPopup);
+
+  // Determine if this is being called from the Editor (vs Queue)
+  // When called from Editor, we want to always show the parent selector
+  const calledFromEditor = showPriorityPopupIfNew === true;
+  console.log('[ParentSelector:HighlightActions] Called from Editor:', calledFromEditor);
 
   // Step 1: Resolve the source document (PDF)
   const sourceDocument = await resolveSourceDocument(plugin, highlightRem, sourceDocumentId);
@@ -285,9 +325,40 @@ export const createRemFromHighlight = async (
 
   // Step 5: Decision logic
   
-  // Case A: No candidates found
+  // FIXED Case A: No candidates found
   if (rootCandidates.length === 0) {
-    console.log('[ParentSelector:HighlightActions] DECISION: No candidates, creating under PDF');
+    console.log('[ParentSelector:HighlightActions] DECISION: No candidates found');
+    
+    // FIXED: When called from Editor, always show the parent selector
+    // with the PDF itself as an option, so user can see the priority popup
+    if (calledFromEditor) {
+      console.log('[ParentSelector:HighlightActions] Called from Editor - showing parent selector with PDF as option');
+      
+      // Create a node for the PDF itself
+      const pdfNode = await createPdfTreeNode(plugin, sourceDocument);
+      const rootCandidatesWithPdf = [pdfNode];
+      
+      const context = buildContextForSelector(
+        sourceDocument._id,
+        highlightRem,
+        rootCandidatesWithPdf,
+        makeIncremental,
+        normalizedContextRemId,
+        lastSelectedDestination,
+        shouldShowPriorityPopup,
+        highlightIsAlreadyIncremental
+      );
+      
+      console.log('[ParentSelector:HighlightActions] Storing context in session...');
+      await plugin.storage.setSession('parentSelectorContext', context);
+      
+      console.log('[ParentSelector:HighlightActions] Opening parent selector popup...');
+      await plugin.widget.openPopup(parentSelectorWidgetId);
+      return;
+    }
+    
+    // When called from Queue (not Editor), create directly under PDF
+    console.log('[ParentSelector:HighlightActions] Called from Queue - creating directly under PDF');
     await createRemUnderParent(
       plugin,
       highlightRem,
@@ -301,13 +372,15 @@ export const createRemFromHighlight = async (
     return;
   }
 
-  // Case B: Single candidate WITHOUT children AND no saved destination
+  // Case B: Single candidate WITHOUT children AND no saved destination AND NOT from Editor
+  // When called from Editor, always show the selector so user can set priority
   if (
     rootCandidates.length === 1 &&
     !rootCandidates[0].hasChildren &&
-    !lastSelectedDestination
+    !lastSelectedDestination &&
+    !calledFromEditor
   ) {
-    console.log('[ParentSelector:HighlightActions] DECISION: Single candidate without children, using directly');
+    console.log('[ParentSelector:HighlightActions] DECISION: Single candidate without children (Queue mode), using directly');
     const [parent] = rootCandidates;
     await createRemUnderParent(
       plugin,
@@ -322,13 +395,24 @@ export const createRemFromHighlight = async (
     return;
   }
 
-  // Case C: Show popup
+  // Case C: Show popup (multiple candidates, has children, saved destination, or called from Editor)
   console.log('[ParentSelector:HighlightActions] DECISION: Showing hierarchical popup');
+  
+  // ENHANCEMENT: Add the PDF itself as an option if it's not already in the list
+  const pdfInCandidates = rootCandidates.some(c => c.remId === sourceDocument._id);
+  let finalCandidates = rootCandidates;
+  
+  if (!pdfInCandidates) {
+    const pdfNode = await createPdfTreeNode(plugin, sourceDocument);
+    // Add PDF at the end as it's usually not the preferred destination
+    finalCandidates = [...rootCandidates, pdfNode];
+    console.log('[ParentSelector:HighlightActions] Added PDF itself to candidates');
+  }
   
   const context = buildContextForSelector(
     sourceDocument._id,
     highlightRem,
-    rootCandidates,
+    finalCandidates,
     makeIncremental,
     normalizedContextRemId,
     lastSelectedDestination,

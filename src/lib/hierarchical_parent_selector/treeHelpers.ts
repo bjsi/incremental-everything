@@ -103,8 +103,10 @@ export async function loadChildrenForNode(
 }
 
 /**
- * Finds all root-level rems associated with a PDF and creates tree nodes.
- * Enhanced version of findAllRemsForPDF that returns a tree structure.
+ * ENHANCED: Find all root-level rems associated with a PDF and creates tree nodes.
+ * 
+ * This version adds a THIRD search method: checking backlinks to the PDF
+ * to find non-incremental rems that have the PDF as a source/linked document.
  */
 export async function findAllRemsForPDFAsTree(
   plugin: RNPlugin,
@@ -119,6 +121,7 @@ export async function findAllRemsForPDFAsTree(
   console.log('[ParentSelector:TreeHelpers] Found', allIncrementalRems.length, 'incremental rems in cache');
 
   // PART 1: Search all incremental rems from cache
+  console.log('[ParentSelector:TreeHelpers] ===== PART 1: Searching incremental rems from cache =====');
   for (const incRemInfo of allIncrementalRems) {
     if (processedRemIds.has(incRemInfo.remId)) continue;
 
@@ -139,6 +142,7 @@ export async function findAllRemsForPDFAsTree(
   }
 
   // PART 2: Check known rems from storage
+  console.log('[ParentSelector:TreeHelpers] ===== PART 2: Checking known rems from storage =====');
   const knownRemsKey = `known_pdf_rems_${pdfRemId}`;
   const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
   console.log('[ParentSelector:TreeHelpers] Found', knownRemIds.length, 'known rems in storage');
@@ -161,7 +165,61 @@ export async function findAllRemsForPDFAsTree(
     }
   }
 
-  // Sort
+  // NEW PART 3: Search for rems that reference this PDF (have it as a source/linked document)
+  // This catches non-incremental rems like "Tug Use" that have the PDF in their sources
+  // Uses remsReferencingThis() which finds all rems that contain a direct reference to this rem
+  console.log('[ParentSelector:TreeHelpers] ===== PART 3: Searching rems referencing PDF =====');
+  
+  const pdfRem = await plugin.rem.findOne(pdfRemId);
+  if (pdfRem) {
+    try {
+      // Get all rems that reference this PDF using the SDK method
+      const referencingRems = await pdfRem.remsReferencingThis();
+      console.log('[ParentSelector:TreeHelpers] Found', referencingRems.length, 'rems referencing PDF');
+      
+      for (const referencingRem of referencingRems) {
+        if (processedRemIds.has(referencingRem._id)) {
+          console.log('[ParentSelector:TreeHelpers] Skipping already processed rem:', referencingRem._id);
+          continue;
+        }
+        
+        // Skip PDF highlights - we want parent/container rems only
+        const isPdfHighlight = await referencingRem.hasPowerup(BuiltInPowerupCodes.Highlight);
+        if (isPdfHighlight) {
+          console.log('[ParentSelector:TreeHelpers] Skipping PDF highlight');
+          continue;
+        }
+        
+        // Skip if this is the PDF itself
+        if (referencingRem._id === pdfRemId) {
+          console.log('[ParentSelector:TreeHelpers] Skipping PDF itself');
+          continue;
+        }
+        
+        // Verify this rem actually has the PDF as a source (not just any reference)
+        const sources = await referencingRem.getSources();
+        const hasPdfSource = sources.some(s => s._id === pdfRemId);
+        
+        if (hasPdfSource) {
+          const node = await createTreeNode(plugin, referencingRem, allIncrementalRems, 0, null);
+          result.push(node);
+          processedRemIds.add(referencingRem._id);
+          console.log('[ParentSelector:TreeHelpers] Added root candidate (referencing rem with PDF source):', node.name, '- isIncremental:', node.isIncremental);
+        }
+      }
+    } catch (error) {
+      console.error('[ParentSelector:TreeHelpers] Error getting referencing rems:', error);
+    }
+  }
+
+  // Update the known rems storage with all found rems for future lookups
+  const allFoundRemIds = Array.from(processedRemIds);
+  if (allFoundRemIds.length > 0) {
+    await plugin.storage.setSynced(knownRemsKey, allFoundRemIds);
+    console.log('[ParentSelector:TreeHelpers] Updated known_pdf_rems with', allFoundRemIds.length, 'rems');
+  }
+
+  // Sort: incremental first, then by priority, then alphabetically
   result.sort((a, b) => {
     if (a.isIncremental !== b.isIncremental) {
       return a.isIncremental ? -1 : 1;
