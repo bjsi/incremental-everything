@@ -27,8 +27,7 @@ type CreateRemFromHighlightOptions = {
    * If true, check if the highlight is already incremental.
    * - If already incremental: skip priority popup (user already set priority via Toggle Incremental)
    * - If not incremental: show priority popup after creating the rem
-   * 
-   * This is used when calling from the PDF highlight menu's "Create Incremental Rem" button.
+   * * This is used when calling from the PDF highlight menu's "Create Incremental Rem" button.
    * When called from the queue (where highlight is already incremental), this can be false or
    * we can detect it automatically.
    */
@@ -138,8 +137,7 @@ export const showPriorityPopupForRem = async (
 
 /**
  * Creates a new rem under the specified parent with highlight content.
- * 
- * @returns The created rem's ID, or null if creation failed
+ * * @returns The created rem's ID, or null if creation failed
  */
 export const createRemUnderParent = async (
   plugin: ReactRNPlugin,
@@ -272,7 +270,28 @@ export const createRemFromHighlight = async (
   // Step 3: Find all rems for this PDF as a tree structure
   console.log('[ParentSelector:HighlightActions] Finding all rems for PDF as tree...');
   const rootCandidates = await findAllRemsForPDFAsTree(plugin, sourceDocument._id);
-  console.log('[ParentSelector:HighlightActions] Root candidates found:', rootCandidates.length);
+  
+  // FIX: If no candidates found, add the PDF itself as the root so the user can select it
+  // or create a child under it (fixing Case A issue).
+  if (rootCandidates.length === 0) {
+    console.log('[ParentSelector:HighlightActions] No candidates found, adding PDF as root candidate');
+    const pdfText = await plugin.richText.toString(sourceDocument.text || []) || 'PDF Document';
+    rootCandidates.push({
+      remId: sourceDocument._id,
+      name: pdfText,
+      priority: null,
+      percentile: null,
+      isIncremental: false,
+      hasChildren: false,
+      isExpanded: true,
+      children: [],
+      childrenLoaded: true,
+      depth: 0,
+      parentId: null
+    });
+  }
+
+  console.log('[ParentSelector:HighlightActions] Root candidates found (or added):', rootCandidates.length);
 
   // Step 4: Get last selected destination for this context
   console.log('[ParentSelector:HighlightActions] Getting last selected destination...');
@@ -285,42 +304,9 @@ export const createRemFromHighlight = async (
 
   // Step 5: Decision logic
   
-  // Case A: No candidates found
-  if (rootCandidates.length === 0) {
-    console.log('[ParentSelector:HighlightActions] DECISION: No candidates, creating under PDF');
-    await createRemUnderParent(
-      plugin,
-      highlightRem,
-      sourceDocument._id,
-      makeIncremental,
-      sourceDocument._id,
-      normalizedContextRemId,
-      undefined,
-      shouldShowPriorityPopup
-    );
-    return;
-  }
-
-  // Case B: Single candidate WITHOUT children AND no saved destination
-  if (
-    rootCandidates.length === 1 &&
-    !rootCandidates[0].hasChildren &&
-    !lastSelectedDestination
-  ) {
-    console.log('[ParentSelector:HighlightActions] DECISION: Single candidate without children, using directly');
-    const [parent] = rootCandidates;
-    await createRemUnderParent(
-      plugin,
-      highlightRem,
-      parent.remId,
-      makeIncremental,
-      sourceDocument._id,
-      normalizedContextRemId,
-      parent.name,
-      shouldShowPriorityPopup
-    );
-    return;
-  }
+  // Case A (No candidates) and Case B (Single candidate) have been effectively removed/merged.
+  // We now ALWAYS proceed to Case C (Show popup) unless it wasn't a PDF source (handled in Step 2).
+  // Even if there is only 1 candidate (the PDF itself), we show the popup so user can use "+" button.
 
   // Case C: Show popup
   console.log('[ParentSelector:HighlightActions] DECISION: Showing hierarchical popup');
