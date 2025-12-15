@@ -1,6 +1,6 @@
 // lib/powerupSlotFilter.ts
 // Utility functions to filter out powerup slot rems from children and descendants
-// These slots (Priority, Next Rep Date, Sources, etc.) add clutter and aren't meant to be parent holders
+// These slots (Priority, Next Rep Date, Sources, PDF Metadata, View Modes, etc.) add clutter.
 
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode } from './consts';
@@ -22,7 +22,7 @@ const PLUGIN_POWERUP_SLOT_CONFIGS = [
 
 /**
  * Built-in RemNote powerup codes and their slot codes to filter
- * These are standard RemNote features like Sources
+ * These are standard RemNote features like Sources, PDF metadata, Highlights, Search Portals, etc.
  */
 const BUILTIN_POWERUP_SLOT_CONFIGS: Array<{
   powerupCode: BuiltInPowerupCodes;
@@ -31,6 +31,69 @@ const BUILTIN_POWERUP_SLOT_CONFIGS: Array<{
   {
     powerupCode: BuiltInPowerupCodes.Sources,
     slotCodes: ['Sources'] // The "Sources" slot that appears when you add a source to a rem
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.UploadedFile, // PDF/File metadata
+    slotCodes: [
+      'Type', 
+      'URL', 
+      'Name', 
+      'Authors', 
+      'Keywords', 
+      'Title', 
+      'ViewerData', 
+      'ReadPercent', 
+      'LastReadDate', 
+      'HasNoTextLayer', 
+      'Theme',
+      // Text Reader / HTML View specific slots
+      'ShouldOpenInTextReader',
+      'ViewInHTMLMode'
+    ]
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.PDFHighlight, // PDF Highlights
+    slotCodes: ['Data', 'PdfId']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.HTMLHighlight, // HTML Highlights
+    slotCodes: ['Data', 'HTMLId']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.WebHighlight, // Web Highlights
+    slotCodes: ['Data', 'Url']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.Link, // URL/Link metadata
+    slotCodes: ['URL', 'Title', 'ReadPercent', 'LastReadDate', 'FileURL']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.Aliases, // Aliases
+    slotCodes: ['Aliases']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.Todo, // Checkbox status
+    slotCodes: ['Status']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.SearchPortal, // Search Portals
+    slotCodes: ['Query', 'Filter', 'AutomaticBacklinkSearchPortalFor', 'DontIncludeNestedDescendants']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.Header, // Header sizes
+    slotCodes: ['Size']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.AutoSort, // Auto sort configuration
+    slotCodes: ['SortDirection']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.UsedAsTag, // Tag configuration
+    slotCodes: ['AutoActivate', 'Pinned', 'CollapseConfigure', 'PrimaryColumnName']
+  },
+  {
+    powerupCode: BuiltInPowerupCodes.Document, // Document status
+    slotCodes: ['Status', 'DeprecatedSource']
   }
 ];
 
@@ -71,10 +134,9 @@ export async function initPowerupSlotIdsCache(plugin: RNPlugin): Promise<void> {
         if (slotRem) {
           const cacheKey = `builtin:${config.powerupCode}:${slotCode}`;
           powerupSlotIdsCache.set(cacheKey, slotRem._id);
-          console.log(`[PowerupSlotFilter] Cached built-in slot "${slotCode}" for powerup "${config.powerupCode}": ${slotRem._id}`);
         }
       } catch (error) {
-        console.warn(`[PowerupSlotFilter] Failed to get built-in slot "${slotCode}" for powerup "${config.powerupCode}":`, error);
+        // Suppress warnings for built-ins
       }
     }
   }
@@ -96,17 +158,9 @@ export async function getAllPowerupSlotIds(plugin: RNPlugin): Promise<Set<RemId>
 
 /**
  * Checks if a rem is a powerup property child
- * 
- * When a rem is tagged with a powerup (like Incremental or has Sources), RemNote creates child rems
+ * * When a rem is tagged with a powerup (like Incremental or has Sources), RemNote creates child rems
  * for each property slot. These children are TAGGED with the slot definition rem.
- * 
- * For example, under an Incremental Rem, you'll see:
- * - "Priority" (tagged with the Priority slot definition)
- * - "Next Rep Date" (tagged with the Next Rep Date slot definition)
- * - "History" (tagged with the History slot definition)
- * - "Sources" (tagged with the Sources slot definition, if a source was added)
- * 
- * This function checks if a rem is one of these property children by checking
+ * * This function checks if a rem is one of these property children by checking
  * if any of its tags match our cached slot definition IDs.
  */
 export async function isPowerupPropertyChild(plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
@@ -139,39 +193,93 @@ export async function isPowerupPropertyChildByName(plugin: RNPlugin, rem: Plugin
   // Known slot names from both plugin powerups and built-in powerups
   const knownSlotNames = new Set([
     // Incremental powerup slots
-    'Priority',
-    'Next Rep Date', 
-    'History',
+    'Priority', 'Next Rep Date', 'History',
     // CardPriority powerup slots
-    'Priority Source',
-    'Last Updated',
-    // Built-in RemNote slots
-    'Sources',
-    'Source'
+    'Priority Source', 'Last Updated',
+    // Built-in RemNote slots (Sources, Aliases, etc)
+    'Sources', 'Source', 'Aliases', 'Status',
+    // PDF / File Metadata
+    'Type', 'URL', 'Name', 'Authors', 'Keywords', 'Title', 'ViewerData', 
+    'ReadPercent', 'LastReadDate', 'HasNoTextLayer', 'Theme',
+    // Text Reader / View Mode Metadata
+    'ShouldOpenInTextReader', 'ViewInHTMLMode',
+    // Highlights
+    'Data', 'PdfId', 'HTMLId', 'Url', 'FileURL',
+    // Search Portal
+    'Query', 'Filter', 'AutomaticBacklinkSearchPortalFor', 'DontIncludeNestedDescendants',
+    // Header
+    'Size',
+    // AutoSort
+    'SortDirection',
+    // Tag Config
+    'AutoActivate', 'Pinned', 'CollapseConfigure', 'PrimaryColumnName',
+    // PDF Structural/State Rems
+    'Pages', 
+    'Highlights', 
+    'Last Zoom Workspace Point',
+    // Generic Query catch (lowercase/uppercase)
+    'query',
+    // Explicit Untitled
+    'Untitled'
   ]);
   
   try {
     const remText = await plugin.richText.toString(rem.text);
-    if (remText && knownSlotNames.has(remText.trim())) {
+    const text = remText ? remText.trim() : '';
+    
+    // Check 1: Empty text, "Untitled", Exact Match, or "Starts With Query"
+    const isNameMatch = text === '' ||
+                        text === 'Untitled' ||
+                        knownSlotNames.has(text) || 
+                        text.toLowerCase().startsWith('query') || 
+                        text === 'Automatic Backlink Search Portal';
+
+    if (isNameMatch) {
       // Additional check: verify parent has a relevant powerup or has sources
+      // This prevents filtering valid empty/untitled rems that are just user notes
       if (rem.parent) {
         const parent = await plugin.rem.findOne(rem.parent);
         if (parent) {
-          // Check for plugin powerups
+          // 1. Check for plugin powerups
           const hasIncremental = await parent.hasPowerup(powerupCode);
           const hasCardPriority = await parent.hasPowerup(CARD_PRIORITY_CODE);
-          
-          // Check for sources (built-in)
-          let hasSources = false;
-          try {
-            const sources = await parent.getSources();
-            hasSources = sources.length > 0;
-          } catch {
-            // Ignore errors when checking sources
+          if (hasIncremental || hasCardPriority) return true;
+
+          // 2. Check for Built-in Powerups that generate these slots
+          const builtInPowerupsToCheck = [
+            BuiltInPowerupCodes.UploadedFile,
+            BuiltInPowerupCodes.PDFHighlight,
+            BuiltInPowerupCodes.HTMLHighlight,
+            BuiltInPowerupCodes.WebHighlight,
+            BuiltInPowerupCodes.Link,
+            BuiltInPowerupCodes.Aliases,
+            BuiltInPowerupCodes.Todo,
+            BuiltInPowerupCodes.SearchPortal,
+            BuiltInPowerupCodes.Header,
+            BuiltInPowerupCodes.AutoSort,
+            BuiltInPowerupCodes.UsedAsTag,
+            BuiltInPowerupCodes.Document
+          ];
+
+          for (const code of builtInPowerupsToCheck) {
+            if (await parent.hasPowerup(code)) return true;
           }
           
-          if (hasIncremental || hasCardPriority || hasSources) {
+          // 3. Special Case: Filter Search Portals (Backlinks) under PDFs
+          // If the child rem ITSELF is a Search Portal and parent is a PDF, it's metadata.
+          if (await rem.hasPowerup(BuiltInPowerupCodes.SearchPortal) && 
+              (await parent.hasPowerup(BuiltInPowerupCodes.UploadedFile))) {
             return true;
+          }
+          
+          // 4. Check for sources (special case)
+          try {
+            const sources = await parent.getSources();
+            if (sources.length > 0 && (text === 'Sources' || text === 'Source')) {
+              return true;
+            }
+          } catch {
+            // Ignore errors when checking sources
           }
         }
       }
