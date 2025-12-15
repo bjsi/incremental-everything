@@ -41,6 +41,11 @@ type CardScopeType = 'prioritized' | 'all';
 
 function Priority() {
   const plugin = usePlugin();
+  
+  // Render counter for debugging
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  console.log(`[Priority] ========== RENDER #${renderCount.current} ==========`);
 
   // --- ALL HOOKS DECLARED UNCONDITIONALLY AT THE TOP ---
 
@@ -80,11 +85,22 @@ function Priority() {
   const cardSliderRef = useRef<PrioritySliderRef>(null);
 
   // Data Fetching Hooks
-  const widgetContext = useRunAsync(async () => await plugin.widget.getWidgetContext<{ remId: string }>(), []);
+  const widgetContext = useRunAsync(async () => {
+    const ctx = await plugin.widget.getWidgetContext<{ remId: string }>();
+    console.log('[Priority] 📋 widgetContext loaded:', ctx?.contextData?.remId);
+    return ctx;
+  }, []);
+  
   const rem = useTrackerPlugin(async (plugin) => {
     const remId = widgetContext?.contextData?.remId;
-    if (!remId) return null;
-    return await plugin.rem.findOne(remId);
+    console.log('[Priority] 📦 rem hook called, remId from context:', remId);
+    if (!remId) {
+      console.log('[Priority] 📦 rem: No remId, returning null');
+      return null;
+    }
+    const foundRem = await plugin.rem.findOne(remId);
+    console.log('[Priority] 📦 rem found:', foundRem ? foundRem._id : 'null');
+    return foundRem;
   }, [widgetContext?.contextData?.remId]);
 
   // 🔌 Conditionally fetch cache based on performance mode
@@ -117,9 +133,60 @@ function Priority() {
   
   const inQueue = !!queueSubQueueId;
 
-  const incRemInfo = useTrackerPlugin(async (plugin) => rem ? await getIncrementalRemFromRem(plugin, rem) : null, [rem?._id]);
-  const cardInfo = useTrackerPlugin(async (plugin) => rem ? await getCardPriority(plugin, rem) : null, [rem?._id]);
-  const hasCards = useTrackerPlugin(async (plugin) => rem ? (await rem.getCards()).length > 0 : false, [rem?._id]);
+  const incRemInfo = useTrackerPlugin(async (plugin) => {
+    console.log('[Priority] 🔍 incRemInfo hook called, rem?._id:', rem?._id);
+    if (!rem) {
+      console.log('[Priority] 🔍 incRemInfo: rem is null/undefined, returning null');
+      return null;
+    }
+    const result = await getIncrementalRemFromRem(plugin, rem);
+    console.log('[Priority] 🔍 incRemInfo result:', result ? `Found (priority: ${result.priority})` : 'null');
+    return result;
+  }, [rem?._id]);
+
+  // Replace the separate hasCards, cardInfo hooks with a combined one:
+  const cardData = useTrackerPlugin(
+    async (plugin) => {
+      console.log('[Priority] 🃏 cardData hook called, rem?._id:', rem?._id);
+      if (!rem) {
+        console.log('[Priority] 🃏 cardData: rem is null/undefined, returning undefined');
+        return undefined;
+      }
+      
+      console.log('[Priority] 🃏 cardData: Fetching cards, cardPriorityInfo, and powerup status...');
+      const [cards, cardPriorityInfo, hasPowerup] = await Promise.all([
+        rem.getCards(),
+        getCardPriority(plugin, rem),
+        rem.hasPowerup('cardPriority')
+      ]);
+      
+      console.log('[Priority] 🃏 cardData results:', {
+        cardsCount: cards.length,
+        hasCards: cards.length > 0,
+        hasCardPriorityPowerup: hasPowerup,
+        cardPriorityInfo: cardPriorityInfo ? `Found (priority: ${cardPriorityInfo.priority}, source: ${cardPriorityInfo.source}, cardCount: ${cardPriorityInfo.cardCount})` : 'null'
+      });
+      
+      return {
+        hasCards: cards.length > 0,
+        cardInfo: cardPriorityInfo,
+        hasCardPriorityPowerup: hasPowerup
+      };
+    },
+    [rem?._id]
+  );
+
+  // Then use:
+  const hasCards = cardData?.hasCards ?? undefined;
+  const cardInfo = cardData?.cardInfo ?? undefined;
+  const hasCardPriorityPowerup = cardData?.hasCardPriorityPowerup ?? false;
+  
+  // Log the derived values
+  console.log('[Priority] 📊 Derived values:', {
+    cardData: cardData === undefined ? 'undefined' : JSON.stringify(cardData),
+    hasCards,
+    cardInfo: cardInfo ? `priority: ${cardInfo.priority}, source: ${cardInfo.source}` : String(cardInfo)
+  });
 
   // This tracker is fast (direct Rem lookup) so it can run in both modes,
   // but we will conditionally *show* the UI in 'full' mode only.
@@ -329,8 +396,19 @@ function Priority() {
   }, [cardAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode
 
   // Event Handlers
-  const showIncSection = incRemInfo !== null;
-  const showCardSection = hasCards || (cardInfo && cardInfo.cardCount > 0);
+  const showIncSection = !!incRemInfo; // Converts to boolean - undefined/null become false
+  const showCardSection = hasCards === true || hasCardPriorityPowerup || (cardInfo && cardInfo.cardCount > 0);
+  
+  // Log section visibility calculations
+  console.log('[Priority] 👁️ Section visibility:', {
+    incRemInfo: incRemInfo === undefined ? 'undefined' : (incRemInfo === null ? 'null' : `Found (priority: ${incRemInfo.priority})`),
+    showIncSection,
+    hasCards,
+    hasCardPriorityPowerup,
+    cardInfo: cardInfo ? `cardCount: ${cardInfo.cardCount}` : String(cardInfo),
+    'cardInfo && cardInfo.cardCount > 0': cardInfo && cardInfo.cardCount > 0,
+    showCardSection
+  });
   
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
@@ -403,6 +481,15 @@ function Priority() {
     (!showIncSection && !showCardSection && derivedData?.descendantCardCount > 0) ||
     (showIncSection && !hasCards && cardInfo?.source === 'manual') ||
     showInheritanceForIncRem;
+
+  // Log inheritance section calculation
+  console.log('[Priority] 🌿 Inheritance section:', {
+    'derivedData?.descendantCardCount': derivedData?.descendantCardCount,
+    'condition1: !showIncSection && !showCardSection && descendantCardCount > 0': !showIncSection && !showCardSection && derivedData?.descendantCardCount > 0,
+    'condition2: showIncSection && !hasCards && cardInfo?.source === manual': showIncSection && !hasCards && cardInfo?.source === 'manual',
+    'condition3: showInheritanceForIncRem': showInheritanceForIncRem,
+    showInheritanceSection
+  });
 
   const saveAndClose = useCallback(async (incP: number, cardP: number) => {
     if (showIncSection) await saveIncPriority(incP);
@@ -489,13 +576,34 @@ function Priority() {
   }, [plugin, rem, performanceMode]); // 🔌 Add performanceMode
   
   // --- EARLY RETURNS & FINAL DATA DE-STRUCTURING ---
-  if (!widgetContext || !rem) { return <div className="p-4">Loading Rem Data...</div>; }
+  console.log('[Priority] 🚦 Early return checks:', {
+    widgetContext: !!widgetContext,
+    rem: rem ? rem._id : 'null/undefined',
+  });
   
-  if (!derivedData) {
+  if (!widgetContext || !rem) { 
+    console.log('[Priority] ⏸️ EARLY RETURN: Loading Rem Data (widgetContext or rem missing)');
+    return <div className="p-4">Loading Rem Data...</div>; 
+  }
+
+  // Check if critical card/incRem data is still loading
+  // cardData === undefined means the useTrackerPlugin hasn't resolved yet
+  // incRemInfo === undefined means getIncrementalRemFromRem hasn't resolved yet
+  const isCardDataLoading = cardData === undefined;
+  const isIncRemInfoLoading = incRemInfo === undefined;
+
+  console.log('[Priority] 🚦 Data loading checks:', {
+    isCardDataLoading,
+    isIncRemInfoLoading,
+    derivedData: derivedData ? 'loaded' : 'undefined/null',
+  });
+
+  if (isCardDataLoading || isIncRemInfoLoading || !derivedData) {
+    console.log('[Priority] ⏸️ EARLY RETURN: Loading... (cardData, incRemInfo, or derivedData not ready)');
     return (
       <div className="p-4 flex flex-col gap-4 relative items-center justify-center">
         <h2 className="text-xl font-bold">Priority Settings</h2>
-        <div className="text-lg">Calculating...</div>
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }
@@ -504,7 +612,15 @@ function Priority() {
 
   const showAddCardPriorityButton = showIncSection && !showCardSection && descendantCardCount > 0 && !showInheritanceSection;
 
+  console.log('[Priority] 🎯 FINAL DECISION:', {
+    showIncSection,
+    showCardSection,
+    showInheritanceSection,
+    'willShowNeitherMessage': !showIncSection && !showCardSection && !showInheritanceSection
+  });
+
   if (!showIncSection && !showCardSection && !showInheritanceSection) {
+    console.log('[Priority] ❌ RENDERING: "Neither" message - rem has no IncRem, no flashcards, and no descendants with cards');
     return (
       <div
         className="p-4 text-center text-sm"
@@ -514,6 +630,8 @@ function Priority() {
       </div>
     );
   }
+  
+  console.log('[Priority] ✅ RENDERING: Full priority UI');
   
   // --- FINAL JSX RENDER ---
   return (
