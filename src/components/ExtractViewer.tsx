@@ -3,12 +3,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { PluginRem, RNPlugin, DocumentViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
-import { powerupCode } from '../lib/consts';
+import { powerupCode, allCardPriorityInfoKey } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { 
   getChildrenExcludingSlots, 
   getDescendantsExcludingSlots 
 } from '../lib/powerupSlotFilter';
+import { CardPriorityInfo } from '../lib/card_priority';
 
 interface ExtractViewerProps {
   rem: PluginRem;
@@ -98,81 +99,120 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
     
   }, [rem._id, plugin]);
   
-  // -----------------------------------------------------------
-  // 2. EFFECT FOR DEFERRED METADATA CALCULATION (Statistics)
-  // UPDATED: Now filters out powerup slots from children and descendants
-  // -----------------------------------------------------------
-  useEffect(() => {
-    setMetadata(null); 
-    
-    const calculateMetadata = async () => {
-      console.log("[ExtractViewer] Starting heavy metadata calculation...");
-      
-      // UPDATED: Filter out powerup slots from descendants
-      const descendants = await getDescendantsExcludingSlots(plugin, rem);
-      const descendantsCount = descendants.length;
-      
-      // UPDATED: Filter out powerup slots from children
-      const children = await getChildrenExcludingSlots(plugin, rem);
-      const childrenCount = children.length;
+/**
+ * OPTIMIZED METADATA CALCULATION FOR ExtractViewer.tsx
+ * 
+ * Replace the existing useEffect for metadata calculation with this optimized version.
+ * 
+ * Key optimization: Uses allCardPriorityInfoKey cache instead of per-rem getCards() calls.
+ * This avoids the SDK inconsistency where rem.getCards() sometimes returns [] for valid flashcards.
+ * 
+ * Performance improvement:
+ * - Before: N API calls (one per rem in remsToProcess)
+ * - After: 1 session storage read + in-memory filtering
+ */
 
-      const remsToProcess = [rem, ...descendants];
-      
-      // Create a Set of children IDs for quick lookup
-      const childrenIds = new Set(children.map(c => c._id));
-      
-      let incrementalDescendantsCount = 0;
-      let flashcardCount = 0;
-      let incrementalChildrenCount = 0;
-      let processedCount = 0;
-      
-      for (let i = 0; i < remsToProcess.length; i += BATCH_SIZE) {
-          const batch = remsToProcess.slice(i, i + BATCH_SIZE);
-          
-          const batchResults = await Promise.all(
-              batch.map(async (r) => ({
-                  remId: r._id,
-                  isIncremental: await r.hasPowerup(powerupCode),
-                  cards: await r.getCards(),
-              }))
-          );
-          
-          for (const result of batchResults) {
-              if (result.isIncremental) {
-                  incrementalDescendantsCount++;
-              }
-              if (result.cards.length > 0) {
-                  flashcardCount += result.cards.length;
-              }
-              // Use the Set for O(1) lookup instead of Array.some
-              if (childrenIds.has(result.remId) && result.isIncremental) {
-                  incrementalChildrenCount++;
-              }
-          }
-          processedCount += batch.length;
-          
-          if (i + BATCH_SIZE < remsToProcess.length) {
-              await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-          }
+// Add this import at the top of the file:
+// import { allCardPriorityInfoKey } from '../lib/consts';
+// import { CardPriorityInfo } from '../lib/card_priority';
+
+// -----------------------------------------------------------
+// 2. EFFECT FOR DEFERRED METADATA CALCULATION (Statistics)
+// OPTIMIZED: Uses allCardPriorityInfoKey cache instead of per-rem getCards()
+// -----------------------------------------------------------
+useEffect(() => {
+  setMetadata(null); 
+  
+  const calculateMetadata = async () => {
+    console.log("[ExtractViewer] Starting OPTIMIZED metadata calculation (using cache)...");
+    const startTime = Date.now();
+    
+    // UPDATED: Filter out powerup slots from descendants
+    const descendants = await getDescendantsExcludingSlots(plugin, rem);
+    const descendantsCount = descendants.length;
+    
+    // UPDATED: Filter out powerup slots from children
+    const children = await getChildrenExcludingSlots(plugin, rem);
+    const childrenCount = children.length;
+
+    const remsToProcess = [rem, ...descendants];
+    
+    // Create a Set of children IDs for quick lookup
+    const childrenIds = new Set(children.map(c => c._id));
+    
+    // Create a Set of all rem IDs we're processing for fast lookup
+    const remsToProcessIds = new Set(remsToProcess.map(r => r._id));
+    
+    // OPTIMIZATION: Use the pre-built cache instead of calling rem.getCards() for each rem
+    // The cache already contains cardCount for each rem
+    const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
+    
+    // Build a map of remId -> card count for rems in our scope
+    const cardCountByRemId = new Map<string, number>();
+    for (const cardInfo of allCardInfos) {
+      if (remsToProcessIds.has(cardInfo.remId)) {
+        cardCountByRemId.set(cardInfo.remId, cardInfo.cardCount);
       }
-
-      setMetadata({
-        childrenCount,
-        incrementalChildrenCount,
-        descendantsCount,
-        incrementalDescendantsCount,
-        flashcardCount,
-      });
-      console.log(`[ExtractViewer] Metadata calculation complete. Processed ${processedCount} rems.`);
-    };
-
-    const timeoutId = setTimeout(() => {
-        calculateMetadata().catch(console.error);
-    }, 50); 
+    }
+    console.log(`[ExtractViewer] Found ${cardCountByRemId.size} rems with cards in scope (from cache)`);
     
-    return () => clearTimeout(timeoutId);
+    let incrementalDescendantsCount = 0;
+    let flashcardCount = 0;
+    let incrementalChildrenCount = 0;
+    let processedCount = 0;
     
-  }, [rem._id, plugin]); 
+    // Process in batches - but now we only need to check hasPowerup, not getCards
+    for (let i = 0; i < remsToProcess.length; i += BATCH_SIZE) {
+      const batch = remsToProcess.slice(i, i + BATCH_SIZE);
+      
+      const batchResults = await Promise.all(
+        batch.map(async (r) => ({
+          remId: r._id,
+          isIncremental: await r.hasPowerup(powerupCode),
+          // Use the pre-built map instead of calling getCards()
+          cardCount: cardCountByRemId.get(r._id) || 0,
+        }))
+      );
+      
+      for (const result of batchResults) {
+        if (result.isIncremental) {
+          incrementalDescendantsCount++;
+        }
+        // Use the card count from our map
+        flashcardCount += result.cardCount;
+        
+        // Use the Set for O(1) lookup instead of Array.some
+        if (childrenIds.has(result.remId) && result.isIncremental) {
+          incrementalChildrenCount++;
+        }
+      }
+      processedCount += batch.length;
+      
+      if (i + BATCH_SIZE < remsToProcess.length) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+      }
+    }
+
+    setMetadata({
+      childrenCount,
+      incrementalChildrenCount,
+      descendantsCount,
+      incrementalDescendantsCount,
+      flashcardCount,
+    });
+    
+    const elapsedTime = Date.now() - startTime;
+    console.log(`[ExtractViewer] OPTIMIZED metadata calculation complete. Processed ${processedCount} rems in ${elapsedTime}ms.`);
+  };
+
+  const timeoutId = setTimeout(() => {
+    calculateMetadata().catch(console.error);
+  }, 50); 
+  
+  return () => clearTimeout(timeoutId);
+  
+}, [rem._id, plugin]);
+
 
   // -----------------------------------------------------------
   // 3. MAIN RENDER LOGIC
