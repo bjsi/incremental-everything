@@ -3,13 +3,14 @@
 
 import { BuiltInPowerupCodes, ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
 import { useEffect, useState } from 'react';
-import { powerupCode } from '../../lib/consts';
+import { powerupCode, allCardPriorityInfoKey } from '../../lib/consts';
 import { findIncrementalRemForPDF, safeRemTextToString } from '../../lib/pdfUtils';
 import { 
   getChildrenExcludingSlots, 
   getDescendantsExcludingSlots,
   filterOutPowerupSlots 
 } from '../../lib/powerupSlotFilter';
+import { CardPriorityInfo } from '../../lib/card_priority';
 
 export type AncestorBreadcrumb = { text: string; id: RemId };
 
@@ -130,6 +131,23 @@ export function useCriticalContext(
   return criticalContext;
 }
 
+/**
+ * OPTIMIZED useMetadataStats HOOK FOR components/reader/hooks.ts
+ * 
+ * Replace the existing useMetadataStats function with this optimized version.
+ * 
+ * Key optimization: Uses allCardPriorityInfoKey cache instead of per-rem getCards() calls.
+ * This avoids the SDK inconsistency where rem.getCards() sometimes returns [] for valid flashcards.
+ * 
+ * Performance improvement:
+ * - Before: N API calls (one per rem in remsToProcess)
+ * - After: 1 session storage read + in-memory filtering
+ */
+
+// Add these imports at the top of the file:
+// import { allCardPriorityInfoKey } from '../../lib/consts';
+// import { CardPriorityInfo } from '../../lib/card_priority';
+
 export function useMetadataStats(
   plugin: ReactRNPlugin,
   criticalContext: CriticalContext | null,
@@ -142,6 +160,9 @@ export function useMetadataStats(
     let cancelled = false;
     
     const calculateMetadata = async () => {
+      console.log("[Reader] Starting OPTIMIZED metadata calculation (using cache)...");
+      const startTime = Date.now();
+      
       const rem = criticalContext.incrementalRemId 
         ? await plugin.rem.findOne(criticalContext.incrementalRemId) 
         : await plugin.rem.findOne(pdfRemId);
@@ -160,13 +181,31 @@ export function useMetadataStats(
       // Process descendants (already filtered)
       const remsToProcess = [rem, ...descendants];
       
+      // Create a Set of children IDs for quick lookup
+      const childrenIds = new Set(children.map(c => c._id));
+      
+      // Create a Set of all rem IDs we're processing for fast lookup
+      const remsToProcessIds = new Set(remsToProcess.map(r => r._id));
+      
+      // OPTIMIZATION: Use the pre-built cache instead of calling rem.getCards() for each rem
+      // The cache already contains cardCount for each rem
+      const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
+      if (cancelled) return;
+      
+      // Build a map of remId -> card count for rems in our scope
+      const cardCountByRemId = new Map<string, number>();
+      for (const cardInfo of allCardInfos) {
+        if (remsToProcessIds.has(cardInfo.remId)) {
+          cardCountByRemId.set(cardInfo.remId, cardInfo.cardCount);
+        }
+      }
+      console.log(`[Reader] Found ${cardCountByRemId.size} rems with cards in scope (from cache)`);
+      
       let incrementalDescendantsCount = 0;
       let flashcardCount = 0;
       let incrementalChildrenCount = 0;
       
-      // Create a Set of children IDs for quick lookup
-      const childrenIds = new Set(children.map(c => c._id));
-      
+      // Process in batches - but now we only need to check hasPowerup, not getCards
       for (let i = 0; i < remsToProcess.length; i += BATCH_SIZE) {
         if (cancelled) return;
         const batch = remsToProcess.slice(i, i + BATCH_SIZE);
@@ -175,20 +214,21 @@ export function useMetadataStats(
           batch.map(async (r) => ({
             remId: r._id,
             isIncremental: await r.hasPowerup(powerupCode),
-            cards: await r.getCards(),
+            // Use the pre-built map instead of calling getCards()
+            cardCount: cardCountByRemId.get(r._id) || 0,
           }))
         );
         
         for (const result of batchResults) {
           if (result.isIncremental) {
-              incrementalDescendantsCount++;
+            incrementalDescendantsCount++;
           }
-          if (result.cards.length > 0) {
-              flashcardCount += result.cards.length;
-          }
+          // Use the card count from our map
+          flashcardCount += result.cardCount;
+          
           // Use the Set for O(1) lookup instead of Array.some
           if (childrenIds.has(result.remId) && result.isIncremental) {
-              incrementalChildrenCount++;
+            incrementalChildrenCount++;
           }
         }
         
@@ -198,6 +238,7 @@ export function useMetadataStats(
       }
       
       // Count PDF highlights (these are different from powerup slots, so we count normally)
+      // This part remains unchanged - PDF highlights don't have the same SDK inconsistency
       let pdfHighlightCount = 0;
       try {
         const pdfRem = await plugin.rem.findOne(pdfRemId);
@@ -226,7 +267,7 @@ export function useMetadataStats(
         }
 
       } catch (highlightError) {
-        console.error('[READER DEBUG] Error counting PDF highlights:', highlightError);
+        console.error('[Reader] Error counting PDF highlights:', highlightError);
       }
 
       if (cancelled) return;
@@ -254,10 +295,13 @@ export function useMetadataStats(
         }
         return nextMetadata;
       });
+      
+      const elapsedTime = Date.now() - startTime;
+      console.log(`[Reader] OPTIMIZED metadata calculation complete in ${elapsedTime}ms.`);
     };
 
     const timeoutId = setTimeout(() => {
-        calculateMetadata().catch(console.error);
+      calculateMetadata().catch(console.error);
     }, 50); 
     
     return () => {
@@ -269,3 +313,4 @@ export function useMetadataStats(
 
   return metadata;
 }
+
