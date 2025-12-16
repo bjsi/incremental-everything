@@ -11,7 +11,7 @@ import {
 import { ParentTreeNode, getLastDestinationKey } from './types';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../consts';
 import { IncrementalRem } from '../incremental_rem';
-import { safeRemTextToString, findPDFinRem } from '../pdfUtils';
+import { safeRemTextToString, findPDFinRem, findHTMLinRem, getKnownHtmlRemsKey } from '../pdfUtils';
 import { calculateRelativePercentile } from '../utils';
 import { 
   filterOutPowerupSlots, 
@@ -177,6 +177,90 @@ export async function findAllRemsForPDFAsTree(
   console.log('[ParentSelector:TreeHelpers] Total root candidates:', result.length);
   return result;
 }
+
+/**
+ * Finds all root-level rems associated with an HTML page and creates tree nodes.
+ * Similar to findAllRemsForPDFAsTree but for HTML/Link sources.
+ * 
+ * This searches:
+ * 1. All incremental rems from cache that have this HTML as a source
+ * 2. Known rems from storage that were previously associated with this HTML
+ */
+export async function findAllRemsForHTMLAsTree(
+  plugin: RNPlugin,
+  htmlRemId: string
+): Promise<ParentTreeNode[]> {
+  console.log('[ParentSelector:TreeHelpers] findAllRemsForHTMLAsTree called with htmlRemId:', htmlRemId);
+  
+  const result: ParentTreeNode[] = [];
+  const processedRemIds = new Set<string>();
+  
+  const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+  console.log('[ParentSelector:TreeHelpers] Found', allIncrementalRems.length, 'incremental rems in cache');
+
+  // PART 1: Search all incremental rems from cache
+  for (const incRemInfo of allIncrementalRems) {
+    if (processedRemIds.has(incRemInfo.remId)) continue;
+
+    const rem = await plugin.rem.findOne(incRemInfo.remId);
+    if (!rem) continue;
+
+    // Skip HTML highlights - we want parent rems only
+    const isHtmlHighlight = await rem.hasPowerup(BuiltInPowerupCodes.HTMLHighlight);
+    if (isHtmlHighlight) continue;
+
+    // Check if this incremental rem has the target HTML as a source
+    const foundHTML = await findHTMLinRem(plugin, rem, htmlRemId);
+
+    if (foundHTML && foundHTML._id === htmlRemId) {
+      const node = await createTreeNode(plugin, rem, allIncrementalRems, 0, null);
+      result.push(node);
+      processedRemIds.add(rem._id);
+      console.log('[ParentSelector:TreeHelpers] Added root candidate (incremental):', node.name);
+    }
+  }
+
+  // PART 2: Check known rems from storage
+  const knownRemsKey = getKnownHtmlRemsKey(htmlRemId);
+  const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
+  console.log('[ParentSelector:TreeHelpers] Found', knownRemIds.length, 'known HTML rems in storage');
+
+  for (const remId of knownRemIds) {
+    if (processedRemIds.has(remId)) continue;
+
+    const rem = await plugin.rem.findOne(remId);
+    if (!rem) continue;
+
+    // Skip HTML highlights
+    const isHtmlHighlight = await rem.hasPowerup(BuiltInPowerupCodes.HTMLHighlight);
+    if (isHtmlHighlight) continue;
+
+    const foundHTML = await findHTMLinRem(plugin, rem, htmlRemId);
+    if (foundHTML && foundHTML._id === htmlRemId) {
+      const node = await createTreeNode(plugin, rem, allIncrementalRems, 0, null);
+      result.push(node);
+      processedRemIds.add(rem._id);
+      console.log('[ParentSelector:TreeHelpers] Added root candidate (known):', node.name);
+    }
+  }
+
+  // Sort: incremental first, then by priority, then alphabetically
+  result.sort((a, b) => {
+    if (a.isIncremental !== b.isIncremental) {
+      return a.isIncremental ? -1 : 1;
+    }
+    if (a.priority !== null && b.priority !== null) {
+      return a.priority - b.priority;
+    }
+    if (a.priority !== null) return -1;
+    if (b.priority !== null) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  console.log('[ParentSelector:TreeHelpers] Total HTML root candidates:', result.length);
+  return result;
+}
+
 
 /**
  * Retrieves the last selected destination for a given context.

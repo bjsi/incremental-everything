@@ -743,26 +743,35 @@ function ParentSelectorWidget() {
           await extractRem.setHighlightColor('Yellow');
         }
 
-        plugin.widget.closePopup();
-
+        // ====================================================================
+        // CRITICAL FIX: Handle priority popup BEFORE any closePopup call
+        // Opening a popup replaces the current one, so we don't need closePopup
+        // ====================================================================
+        
         const actionText = makeIncremental ? 'incremental rem' : 'rem';
-        await plugin.app.toast(
-          `Created ${actionText} under "${node.name.slice(0, 30)}..."`
-        );
-
-        // Show priority popup if needed (for new incremental rems created directly)
-        // If we need to show the priority popup, we open it DIRECTLY.
-        // Opening a new popup in the same location replaces the current one.
-        // We do NOT call closePopup() here, as that kills this script execution.
+        
         if (showPriorityPopup && makeIncremental) {
-          console.log('[ParentSelector:Widget] Transitioning to priority popup for:', newRem._id);
+          // Show toast first
+          await plugin.app.toast(
+            `Created ${actionText} under "${node.name.slice(0, 30)}..."`
+          );
+          
+          // Open the priority popup - this replaces the current popup
+          // DO NOT call closePopup() here as it terminates the script
+          console.log('[ParentSelector:Widget] Opening priority popup for:', newRem._id);
           await plugin.widget.openPopup('priority', {
             remId: newRem._id,
           });
+          // Note: The script may continue or not after openPopup, 
+          // but the popup will definitely open
         } else {
-          // Only close explicitly if we are NOT opening another popup
+          // No priority popup needed - close this popup and show toast
           plugin.widget.closePopup();
+          await plugin.app.toast(
+            `Created ${actionText} under "${node.name.slice(0, 30)}..."`
+          );
         }
+        
       } catch (error) {
         console.error('[ParentSelector:Widget] Error creating rem:', error);
         await plugin.app.toast('Error creating rem');
