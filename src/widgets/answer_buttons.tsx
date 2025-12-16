@@ -5,6 +5,7 @@ import {
   WidgetLocation,
   RNPlugin,
   PluginRem,
+  BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import * as _ from 'remeda';
@@ -29,6 +30,7 @@ import { percentileToHslColor, calculateRelativePercentile, PERFORMANCE_MODE_LIG
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
+import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 
 const MAX_DEPTH_CHECK = 3;
 
@@ -229,6 +231,17 @@ export function AnswerButtons() {
       } : null,
     };
   }, [shouldDisplayShield, coreData?.sessionCache, allIncRems, coreData?.rem?._id, useLightMode]);
+
+  const htmlSourceUrl = useTrackerPlugin(async (rp) => {
+    console.log('[htmlSourceUrl] rem:', baseData?.rem?._id, 'remType:', remType);
+    if (!baseData?.rem) return null;
+    const type = await rp.storage.getSession<string | null>(currentIncrementalRemTypeKey);
+    console.log('[htmlSourceUrl] type from session:', type);
+    if (type !== 'html' && type !== 'html-highlight') return null;
+    const url = await getHtmlSourceUrl(rp, baseData.rem, type);
+    console.log('[htmlSourceUrl] found URL:', url);
+    return url;
+  }, [baseData?.rem?._id, remType]);
 
   // ✅ MEMOIZE CALCULATIONS (but they must run every render, not conditionally)
   const percentiles = useMemo(() => {
@@ -453,6 +466,94 @@ export function AnswerButtons() {
                   transform: translateY(-2px) scale(1.05);
                   box-shadow: 0 6px 12px rgba(251, 191, 36, 0.5);
                 }
+              }
+            `}</style>
+          </>
+        )}
+
+        {/* Open URL for Clipper - Only for HTML type rems */}
+        {(remType === 'html' || remType === 'html-highlight') && htmlSourceUrl && (
+          <>
+            <div style={dividerStyle} />
+            <Button
+              onClick={async () => {
+                try {
+                  // Open the URL in a new tab
+                  const newWindow = window.open(htmlSourceUrl, '_blank');
+                  
+                  // Fallback if popup was blocked
+                  if (!newWindow || newWindow.closed) {
+                    const link = document.createElement('a');
+                    link.href = htmlSourceUrl;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    document.body.appendChild(link);
+                    link.click();
+                    setTimeout(() => document.body.removeChild(link), 100);
+                  }
+                  
+                  // Show a helpful toast
+                  await plugin.app.toast('📎 URL opened! Use RemNote Clipper in the browser to take notes.');
+                } catch (error) {
+                  console.error('Error opening URL:', error);
+                  await plugin.app.toast('Error opening URL');
+                }
+              }}
+              className="clipper-button"
+              style={{
+                backgroundColor: 'var(--rn-clr-blue-light, #dbeafe)',
+                color: 'var(--rn-clr-blue-dark, #1e40af)',
+                border: '2px solid var(--rn-clr-blue, #3b82f6)',
+                animation: 'clipperPulse 2.5s ease-in-out infinite',
+                fontWeight: 600,
+                minWidth: '110px',
+              }}
+            >
+              <div style={{ ...buttonStyles.label, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span>📎</span>
+                <span>Open URL</span>
+              </div>
+              <div style={buttonStyles.sublabel}>Use Clipper</div>
+            </Button>
+            <style>{`
+              @keyframes clipperPulse {
+                0%, 100% {
+                  transform: translateY(0) scale(1);
+                  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+                }
+                50% {
+                  transform: translateY(-2px) scale(1.02);
+                  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+                }
+              }
+              @keyframes clipperShine {
+                0% {
+                  background-position: -200% center;
+                }
+                100% {
+                  background-position: 200% center;
+                }
+              }
+              .clipper-button {
+                position: relative;
+                overflow: hidden;
+              }
+              .clipper-button::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(
+                  90deg,
+                  transparent 0%,
+                  rgba(255, 255, 255, 0.2) 50%,
+                  transparent 100%
+                );
+                background-size: 200% 100%;
+                animation: clipperShine 3s ease-in-out infinite;
+                pointer-events: none;
               }
             `}</style>
           </>
