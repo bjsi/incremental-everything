@@ -1,4 +1,4 @@
-import { BuiltInPowerupCodes, RNPlugin } from '@remnote/plugin-sdk';
+import { BuiltInPowerupCodes, RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { ActionItemType, IncrementalRem } from './incremental_rem/types';
 import { remToActionItemType } from './incremental_rem/action_items';
 
@@ -87,3 +87,121 @@ export async function getTopLevelDocument(plugin: RNPlugin, rem: any): Promise<{
     return null;
   }
 }
+
+/**
+ * Retrieves the source URL from an HTML type incremental rem.
+ * 
+ * HTML rems can have URLs in several places:
+ * 1. Directly on the rem via Link powerup
+ * 2. On a Source rem (when clipped via RemNote Clipper)
+ * 3. For html-highlight, on the parent HTML document
+ * 
+ * @param plugin - RNPlugin instance
+ * @param rem - The current rem being displayed
+ * @param remType - The type of the rem ('html', 'html-highlight', etc.)
+ * @returns The URL string or null if not found
+ */
+export const getHtmlSourceUrl = async (
+  plugin: RNPlugin,
+  rem: PluginRem | undefined,
+  remType: string | null | undefined
+): Promise<string | null> => {
+  if (!rem) return null;
+  
+  try {
+    // Helper function to extract URL from a rem that has the Link powerup
+    const getUrlFromRem = async (r: PluginRem): Promise<string | null> => {
+      const hasLink = await r.hasPowerup(BuiltInPowerupCodes.Link);
+      if (hasLink) {
+        const url = await r.getPowerupProperty<BuiltInPowerupCodes.Link>(
+          BuiltInPowerupCodes.Link,
+          'URL'
+        );
+        if (url && typeof url === 'string') {
+          return url;
+        }
+      }
+      return null;
+    };
+
+    // For direct HTML type rems
+    if (remType === 'html') {
+      // 1. First, check if the rem itself has the Link powerup
+      const directUrl = await getUrlFromRem(rem);
+      if (directUrl) {
+        console.log('[getHtmlSourceUrl] Found URL directly on rem');
+        return directUrl;
+      }
+      
+      // 2. Check Sources - RemNote Clipper stores the URL on a source rem
+      const sources = await rem.getSources();
+      console.log('[getHtmlSourceUrl] Checking sources, count:', sources.length);
+      
+      for (const source of sources) {
+        const sourceUrl = await getUrlFromRem(source);
+        if (sourceUrl) {
+          console.log('[getHtmlSourceUrl] Found URL on source rem');
+          return sourceUrl;
+        }
+      }
+      
+      // 3. Check parent rem (sometimes the structure nests differently)
+      const parent = await rem.getParentRem();
+      if (parent) {
+        const parentUrl = await getUrlFromRem(parent);
+        if (parentUrl) {
+          console.log('[getHtmlSourceUrl] Found URL on parent rem');
+          return parentUrl;
+        }
+        
+        // Also check parent's sources
+        const parentSources = await parent.getSources();
+        for (const source of parentSources) {
+          const sourceUrl = await getUrlFromRem(source);
+          if (sourceUrl) {
+            console.log('[getHtmlSourceUrl] Found URL on parent source rem');
+            return sourceUrl;
+          }
+        }
+      }
+    }
+    
+    // For HTML highlights, we need to get the URL from the source HTML document
+    if (remType === 'html-highlight') {
+      // The source HTML rem is stored via the HTMLId property
+      const htmlIdRichText = await rem.getPowerupPropertyAsRichText<BuiltInPowerupCodes.HTMLHighlight>(
+        BuiltInPowerupCodes.HTMLHighlight,
+        'HTMLId'
+      );
+      
+      // Extract the rem ID from the rich text (it's a reference)
+      const htmlRemId = (htmlIdRichText?.[0] as any)?._id;
+      
+      if (htmlRemId) {
+        const htmlRem = await plugin.rem.findOne(htmlRemId);
+        if (htmlRem) {
+          // Try to get URL from the HTML rem itself
+          const directUrl = await getUrlFromRem(htmlRem);
+          if (directUrl) {
+            return directUrl;
+          }
+          
+          // Check sources of the HTML rem
+          const sources = await htmlRem.getSources();
+          for (const source of sources) {
+            const sourceUrl = await getUrlFromRem(source);
+            if (sourceUrl) {
+              return sourceUrl;
+            }
+          }
+        }
+      }
+    }
+    
+    console.log('[getHtmlSourceUrl] No URL found after checking all locations');
+    return null;
+  } catch (error) {
+    console.error('[getHtmlSourceUrl] Error:', error);
+    return null;
+  }
+};
