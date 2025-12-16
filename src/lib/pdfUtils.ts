@@ -828,3 +828,101 @@ export const clearIncrementalPDFData = async (
   await plugin.storage.setSynced(rangeKey, null);
   await plugin.storage.setSynced(historyKey, null);
 };
+
+/**
+ * Generate key for storing a persistent list of rems known to be associated with an HTML page.
+ */
+export const getKnownHtmlRemsKey = (htmlRemId: string) => `known_html_rems_${htmlRemId}`;
+
+/**
+ * Finds a specific HTML/Link Rem within a given Rem or its sources.
+ * Similar to findPDFinRem but for HTML/Link sources.
+ * 
+ * If targetHtmlId is provided, searches for that specific HTML rem.
+ * If not provided, returns the first HTML link found.
+ * 
+ * NOTE: Excludes YouTube URLs since they are handled separately as 'youtube' type.
+ */
+export const findHTMLinRem = async (
+  plugin: RNPlugin,
+  rem: PluginRem,
+  targetHtmlId?: string
+): Promise<PluginRem | null> => {
+  const isHtmlLink = async (r: PluginRem): Promise<boolean> => {
+    const hasLink = await r.hasPowerup(BuiltInPowerupCodes.Link);
+    if (!hasLink) return false;
+    try {
+      const url = await r.getPowerupProperty<BuiltInPowerupCodes.Link>(
+        BuiltInPowerupCodes.Link,
+        'URL'
+      );
+      // Check if it's a valid URL and not a YouTube URL
+      if (url && typeof url === 'string') {
+        const isYouTube = ['youtube', 'youtu.be'].some(x => url.toLowerCase().includes(x));
+        return !isYouTube;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Check if rem itself is an HTML link
+  if (await isHtmlLink(rem)) {
+    if (!targetHtmlId || rem._id === targetHtmlId) {
+      console.log(`    [findHTMLinRem] Rem itself is an HTML link (${rem._id})`);
+      return rem;
+    }
+  }
+
+  // Check sources
+  const sources = await rem.getSources();
+  console.log(`    [findHTMLinRem] Checking ${sources.length} sources`);
+  
+  const foundHtmlLinks: PluginRem[] = [];
+  
+  for (const source of sources) {
+    if (await isHtmlLink(source)) {
+      const sourceText = await safeRemTextToString(plugin, source.text);
+      console.log(`    [findHTMLinRem] Found HTML link in source: "${sourceText}" (${source._id})`);
+      foundHtmlLinks.push(source);
+      
+      // If we're looking for a specific HTML and found it, return immediately
+      if (targetHtmlId && source._id === targetHtmlId) {
+        console.log(`    [findHTMLinRem] ✓ MATCH! This is the target HTML`);
+        return source;
+      }
+    }
+  }
+  
+  // If we have a target HTML but didn't find it, return null
+  if (targetHtmlId) {
+    console.log(`    [findHTMLinRem] Found ${foundHtmlLinks.length} HTML link(s) but none matched target ${targetHtmlId}`);
+    return null;
+  }
+  
+  // If no target specified, return the first HTML link found (backward compatibility)
+  return foundHtmlLinks.length > 0 ? foundHtmlLinks[0] : null;
+};
+
+/**
+ * Check if a rem is an HTML source (has Link powerup with non-YouTube URL)
+ */
+export const isHtmlSource = async (rem: PluginRem): Promise<boolean> => {
+  const hasLink = await rem.hasPowerup(BuiltInPowerupCodes.Link);
+  if (!hasLink) return false;
+  
+  try {
+    const url = await rem.getPowerupProperty<BuiltInPowerupCodes.Link>(
+      BuiltInPowerupCodes.Link,
+      'URL'
+    );
+    if (url && typeof url === 'string') {
+      const isYouTube = ['youtube', 'youtu.be'].some(x => url.toLowerCase().includes(x));
+      return !isYouTube;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+};

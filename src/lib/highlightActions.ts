@@ -15,9 +15,11 @@ import {
 } from './hierarchical_parent_selector/types';
 import {
   findAllRemsForPDFAsTree,
+  findAllRemsForHTMLAsTree,
   getLastSelectedDestination,
   saveLastSelectedDestination,
 } from './hierarchical_parent_selector/treeHelpers';
+import { isHtmlSource } from './pdfUtils';
 
 type CreateRemFromHighlightOptions = {
   makeIncremental: boolean;
@@ -203,7 +205,7 @@ const anyNodeHasChildren = (nodes: ParentTreeNode[]): boolean => {
 };
 
 /**
- * Main function to create a rem from a PDF highlight.
+ * Main function to create a rem from a PDF or HTML highlight.
  */
 export const createRemFromHighlight = async (
   plugin: ReactRNPlugin,
@@ -227,10 +229,6 @@ export const createRemFromHighlight = async (
   console.log('[ParentSelector:HighlightActions] Highlight is already incremental:', highlightIsAlreadyIncremental);
 
   // Determine if we should show priority popup after creating the rem
-  // Only show if:
-  // 1. showPriorityPopupIfNew is true (caller wants this behavior)
-  // 2. The highlight is NOT already incremental (if it was, user already set priority)
-  // 3. We're making it incremental
   const shouldShowPriorityPopup = 
     showPriorityPopupIfNew === true && 
     !highlightIsAlreadyIncremental && 
@@ -238,7 +236,7 @@ export const createRemFromHighlight = async (
   
   console.log('[ParentSelector:HighlightActions] Should show priority popup:', shouldShowPriorityPopup);
 
-  // Step 1: Resolve the source document (PDF)
+  // Step 1: Resolve the source document (PDF or HTML)
   const sourceDocument = await resolveSourceDocument(plugin, highlightRem, sourceDocumentId);
   if (!sourceDocument) {
     console.log('[ParentSelector:HighlightActions] ERROR: Could not find source document');
@@ -248,12 +246,17 @@ export const createRemFromHighlight = async (
   
   console.log('[ParentSelector:HighlightActions] Source document resolved:', sourceDocument._id);
 
+  // Check source type: PDF or HTML
   const isPdfSource = await sourceDocument.hasPowerup(BuiltInPowerupCodes.UploadedFile);
-  console.log('[ParentSelector:HighlightActions] Is PDF source:', isPdfSource);
+  const isHtmlSourceDoc = await isHtmlSource(sourceDocument);
   
-  // Step 2: If not a PDF, create directly under source
-  if (!isPdfSource) {
-    console.log('[ParentSelector:HighlightActions] Not a PDF, creating directly under source');
+  console.log('[ParentSelector:HighlightActions] Is PDF source:', isPdfSource);
+  console.log('[ParentSelector:HighlightActions] Is HTML source:', isHtmlSourceDoc);
+  
+  // Step 2: If not a PDF or HTML, create directly under source
+  // This handles YouTube videos, regular rems, etc.
+  if (!isPdfSource && !isHtmlSourceDoc) {
+    console.log('[ParentSelector:HighlightActions] Not a PDF or HTML, creating directly under source');
     await createRemUnderParent(
       plugin,
       highlightRem,
@@ -267,18 +270,26 @@ export const createRemFromHighlight = async (
     return;
   }
 
-  // Step 3: Find all rems for this PDF as a tree structure
-  console.log('[ParentSelector:HighlightActions] Finding all rems for PDF as tree...');
-  const rootCandidates = await findAllRemsForPDFAsTree(plugin, sourceDocument._id);
+  // Step 3: Find all rems for this source as a tree structure
+  // Use appropriate function based on source type
+  let rootCandidates: ParentTreeNode[];
   
-  // FIX: If no candidates found, add the PDF itself as the root so the user can select it
-  // or create a child under it (fixing Case A issue).
+  if (isPdfSource) {
+    console.log('[ParentSelector:HighlightActions] Finding all rems for PDF as tree...');
+    rootCandidates = await findAllRemsForPDFAsTree(plugin, sourceDocument._id);
+  } else {
+    console.log('[ParentSelector:HighlightActions] Finding all rems for HTML as tree...');
+    rootCandidates = await findAllRemsForHTMLAsTree(plugin, sourceDocument._id);
+  }
+  
+  // FIX: If no candidates found, add the source document itself as the root
+  // so the user can select it or create a child under it
   if (rootCandidates.length === 0) {
-    console.log('[ParentSelector:HighlightActions] No candidates found, adding PDF as root candidate');
-    const pdfText = await plugin.richText.toString(sourceDocument.text || []) || 'PDF Document';
+    console.log('[ParentSelector:HighlightActions] No candidates found, adding source document as root candidate');
+    const sourceText = await plugin.richText.toString(sourceDocument.text || []) || (isPdfSource ? 'PDF Document' : 'HTML Document');
     rootCandidates.push({
       remId: sourceDocument._id,
-      name: pdfText,
+      name: sourceText,
       priority: null,
       percentile: null,
       isIncremental: false,
@@ -302,17 +313,13 @@ export const createRemFromHighlight = async (
   );
   console.log('[ParentSelector:HighlightActions] Last selected destination:', lastSelectedDestination);
 
-  // Step 5: Decision logic
+  // Step 5: Decision logic - Always show popup for PDF and HTML sources
+  // This allows users to choose where to place the new rem
   
-  // Case A (No candidates) and Case B (Single candidate) have been effectively removed/merged.
-  // We now ALWAYS proceed to Case C (Show popup) unless it wasn't a PDF source (handled in Step 2).
-  // Even if there is only 1 candidate (the PDF itself), we show the popup so user can use "+" button.
-
-  // Case C: Show popup
   console.log('[ParentSelector:HighlightActions] DECISION: Showing hierarchical popup');
   
   const context = buildContextForSelector(
-    sourceDocument._id,
+    sourceDocument._id,  // This is used as "pdfRemId" but works for HTML too
     highlightRem,
     rootCandidates,
     makeIncremental,
