@@ -1,5 +1,6 @@
 import { PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
+import { findClosestAncestorWithAnyPriority } from '../priority_inheritance';
 import {
   allCardPriorityInfoKey,
   powerupCode,
@@ -17,31 +18,20 @@ import * as _ from 'remeda';
 
 /**
  * Find the closest ancestor with priority (either Incremental or CardPriority)
+ * UPDATED: Uses the shared logic from priority_inheritance to ensure
+ * Manual Card Priority > Inc Rem Priority > Inherited Card Priority
  */
 async function findClosestAncestorWithPriority(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<{ priority: number; source: 'incremental' | 'card' } | null> {
-  let current = rem;
+  const result = await findClosestAncestorWithAnyPriority(plugin, rem);
 
-  while (current.parent) {
-    const parent = await plugin.rem.findOne(current.parent);
-    if (!parent) break;
-
-    const parentIncInfo = await getIncrementalRemFromRem(plugin, parent);
-    if (parentIncInfo) {
-      return { priority: parentIncInfo.priority, source: 'incremental' };
-    }
-
-    const parentCardPriorityValue = await parent.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
-    if (parentCardPriorityValue) {
-      const priority = parseInt(parentCardPriorityValue);
-      if (!isNaN(priority)) {
-        return { priority: priority, source: 'card' };
-      }
-    }
-
-    current = parent;
+  if (result) {
+    return {
+      priority: result.priority,
+      source: result.sourceType === 'IncRem' ? 'incremental' : 'card'
+    };
   }
 
   return null;
