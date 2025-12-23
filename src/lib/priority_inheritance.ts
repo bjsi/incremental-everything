@@ -96,10 +96,10 @@ function getOrdinalSuffix(num: number): string {
  * Find the closest ancestor with either an Incremental Rem priority or a Card priority
  *
  * IMPROVED - Handles both manual and orphaned inherited priorities
- * 
- * This version:
- * 1. Prefers showing the ancestor with manual priority (the true source)
- * 2. Falls back to showing the highest inherited priority (orphaned cases)
+ * * This version:
+ * 1. Prefers showing the ancestor with manual Card Priority (if exists)
+ * 2. Then checks for Incremental Rem priority
+ * 3. Falls back to showing the highest inherited priority (orphaned cases) if no IncRem found
  */
 export async function findClosestAncestorWithAnyPriority(
   plugin: RNPlugin,
@@ -131,7 +131,30 @@ export async function findClosestAncestorWithAnyPriority(
     
     currentLevel++; // Increment level for each parent we check
 
-    // Check for Incremental Rem priority first
+    // Fetch Card Priority details first
+    const parentCardPriorityValue = await parent.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+    const parentCardSource = await parent.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
+    
+    // 1. Check for MANUAL CardPriority (Highest Precedence)
+    // If source is "manual", we use this priority immediately, overriding any IncRem priority on the same node.
+    if (parentCardPriorityValue && parentCardSource === 'manual') {
+      const priority = parseInt(parentCardPriorityValue);
+      if (!isNaN(priority)) {
+        const parentName = await safeRemTextToString(plugin, parent.text);
+        const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
+        
+        return { 
+          priority: priority, 
+          ancestorName: truncatedName, 
+          sourceType: 'Card',
+          level: currentLevel,
+          levelDescription: getLevelDescription(currentLevel)
+        };
+      }
+    }
+
+    // 2. Check for Incremental Rem priority (Medium Precedence)
+    // If source was not "manual", we check for IncRem. This overrides "inherited" or "default" Card Priorities.
     const parentIncInfo = await getIncrementalRemFromRem(plugin, parent);
     if (parentIncInfo) {
       const parentName = await safeRemTextToString(plugin, parent.text);
@@ -146,27 +169,12 @@ export async function findClosestAncestorWithAnyPriority(
       };
     }
     
-    // Check for CardPriority powerup
-    const parentCardPriorityValue = await parent.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
-    const parentCardSource = await parent.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-    
+    // 3. Check for INHERITED CardPriority (Lowest Precedence - Fallback)
+    // If we haven't found a Manual Card Priority or an IncRem Priority, we track this as a potential candidate.
     if (parentCardPriorityValue) {
       const priority = parseInt(parentCardPriorityValue);
       if (!isNaN(priority)) {
-        
-        if (parentCardSource === 'manual') {
-          // Found the true source! Return immediately
-          const parentName = await safeRemTextToString(plugin, parent.text);
-          const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
-          
-          return { 
-            priority: priority, 
-            ancestorName: truncatedName, 
-            sourceType: 'Card',
-            level: currentLevel,
-            levelDescription: getLevelDescription(currentLevel)
-          };
-        } else if (parentCardSource === 'inherited' && !highestInheritedAncestor) {
+        if (parentCardSource === 'inherited' && !highestInheritedAncestor) {
           // Track the highest inherited ancestor (closest to current rem)
           highestInheritedAncestor = { parent, priority, level: currentLevel };
         }
@@ -176,7 +184,7 @@ export async function findClosestAncestorWithAnyPriority(
     current = parent;
   }
   
-  // No manual priority found, but we have an orphaned inherited priority
+  // No manual priority or IncRem found, but we have an orphaned inherited priority
   if (highestInheritedAncestor) {
     const parentName = await safeRemTextToString(plugin, highestInheritedAncestor.parent.text);
     const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
@@ -192,36 +200,6 @@ export async function findClosestAncestorWithAnyPriority(
   
   return null;
 }
-
-
-/**
- * EXAMPLES OF HOW THIS WORKS:
- * 
- * CASE 1: Normal inheritance (manual source exists)
- * Test Document (priority 44, manual)
- *   └── Inc Rem 1 (priority 44, inherited)  ← Tracked but not used
- *         └── Flashcard
- * Result: Returns "Test Document" ✅
- * 
- * CASE 2: Orphaned inheritance (manual source deleted/untagged)
- * Test Document (NO priority - untagged)
- *   └── Inc Rem 1 (priority 44, inherited)  ← Highest inherited, return this!
- *         └── Flashcard (priority 44, inherited)
- * Result: Returns "Inc Rem 1" ✅
- * 
- * CASE 3: Multiple inherited levels (orphaned)
- * Test Document (NO priority)
- *   └── Level 1 (priority 44, inherited)  ← Highest, return this!
- *         └── Level 2 (priority 44, inherited)
- *               └── Flashcard (priority 44, inherited)
- * Result: Returns "Level 1" ✅
- * 
- * CASE 4: No priorities anywhere
- * Test Document (NO priority)
- *   └── Inc Rem 1 (NO priority)
- *         └── Flashcard (priority 44, default)
- * Result: Returns null ✅
- */
 
 
 /**
