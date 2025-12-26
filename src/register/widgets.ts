@@ -145,6 +145,6 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
   // Register parent selector popup for creating rems under incremental rems
   plugin.app.registerWidget(parentSelectorWidgetId, WidgetLocation.Popup, {
-    dimensions: { height: 'auto', width: '400px' },
+    dimensions: { height: '850px', width: '400px' },
   });
 }

@@ -15,6 +15,7 @@ import { registerCommands } from '../register/commands';
 import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerJumpToRemHelper } from '../register/window';
+import { registerQueueHidingCSS } from '../lib/ui_helpers';
 dayjs.extend(relativeTime);
 
 async function onActivate(plugin: ReactRNPlugin) {
@@ -37,6 +38,8 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   registerCallbacks(plugin);
   registerWidgets(plugin);
+  
+  await registerQueueHidingCSS(plugin);
 
   await registerCommands(plugin);
   await registerMenus(plugin);

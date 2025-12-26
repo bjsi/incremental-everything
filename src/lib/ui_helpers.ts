@@ -31,6 +31,22 @@ export function registerQueueCounter(plugin: ReactRNPlugin, count: number): void
   console.log(`QUEUE ENTER: Queue counter updated to show ${count} due IncRems`);
 }
 
+export async function registerQueueHidingCSS(plugin: ReactRNPlugin) {
+  
+  const css = `
+      /* Hide Priority and Priority Source Slots  */
+      [data-rem-property~="priority"],
+      [data-rem-container-property~="priority"],
+      [data-rem-property~="priority-source"],
+      [data-rem-container-property~="priority-source"] {
+        display: none !important; 
+      }
+  `;
+
+  await plugin.app.registerCSS('hide-priority-in-queue', css);
+
+}
+
 /**
  * Clears all queue-specific UI elements (menu items and CSS).
  * Called when the user navigates away from the flashcards view.
