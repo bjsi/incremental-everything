@@ -8,6 +8,7 @@ import {
   prioritySlotCode,
   nextRepDateSlotCode,
   repHistorySlotCode,
+  priorityGraphPowerupCode,
 } from '../lib/consts';
 import { initIncrementalRem } from '../lib/incremental_rem';
 
@@ -77,5 +78,14 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
         }
       ],
     },
+  });
+
+  await plugin.app.registerPowerup({
+    name: 'Priority Review Graph',
+    code: priorityGraphPowerupCode,
+    description: 'Displays a distribution graph of priorities for items in this document.',
+    options: {
+      slots: [] // No special slots needed, we just use the tag as a trigger
+    }
   });
 }

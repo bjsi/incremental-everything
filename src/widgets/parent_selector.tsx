@@ -49,7 +49,7 @@ const headerStyle: React.CSSProperties = {
 };
 
 const listContainerStyle: React.CSSProperties = {
-  maxHeight: '400px',
+  maxHeight: '600px',
   overflowY: 'auto',
   padding: '8px 0',
 };
