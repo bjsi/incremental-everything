@@ -2,8 +2,10 @@ import { RNPlugin, PluginRem, RichTextInterface } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem';
 import { getCardRandomness, getSortingRandomness, applySortingCriteria } from '../sorting';
 import { getDueCardsWithPriorities } from '../card_priority';
-import { allIncrementalRemKey } from '../consts';
+import { allIncrementalRemKey, priorityGraphPowerupCode, GRAPH_DATA_KEY_PREFIX } from '../consts';
 
+export const PRIORITY_GRAPH_POWERUP = 'priority_review_graph';
+export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';
 
 // Helper function to find or create a tag
 async function findOrCreateTag(plugin: RNPlugin, tagName: string): Promise<PluginRem | undefined> {
@@ -168,8 +170,9 @@ export async function createPriorityReviewDocument(
   const sortedIncRems = applySortingCriteria(dueIncRems, incRemRandomness);
   const sortedCards = applySortingCriteria(cardsWithPriority, cardRandomness);
   
-  // 6. Mix according to ratio - FIXED LOGIC
-  const mixedItems: Array<{ rem: PluginRem; type: 'incremental' | 'flashcard' }> = [];
+  // 6. Mix according to ratio
+  // UPDATED: Include priority in the stored item
+  const mixedItems: Array<{ rem: PluginRem; type: 'incremental' | 'flashcard'; priority: number }> = [];
   let incRemIndex = 0;
   let cardIndex = 0;
 
@@ -179,9 +182,10 @@ export async function createPriorityReviewDocument(
       
       // Try to add one incremental rem
       if (incRemIndex < sortedIncRems.length) {
-        const rem = await plugin.rem.findOne(sortedIncRems[incRemIndex].remId);
+        const item = sortedIncRems[incRemIndex];
+        const rem = await plugin.rem.findOne(item.remId);
         if (rem) {
-          mixedItems.push({ rem, type: 'incremental' });
+          mixedItems.push({ rem, type: 'incremental', priority: item.priority });
           addedThisCycle = true;
         }
         incRemIndex++;
@@ -190,7 +194,8 @@ export async function createPriorityReviewDocument(
       // Try to add flashcards according to ratio
       for (let i = 0; i < cardRatio && mixedItems.length < itemCount; i++) {
         if (cardIndex < sortedCards.length) {
-          mixedItems.push({ rem: sortedCards[cardIndex].rem, type: 'flashcard' });
+          const item = sortedCards[cardIndex];
+          mixedItems.push({ rem: item.rem, type: 'flashcard', priority: item.priority });
           cardIndex++;
           addedThisCycle = true;
         }
@@ -207,13 +212,13 @@ export async function createPriorityReviewDocument(
       const item = sortedIncRems[i];
       const rem = await plugin.rem.findOne(item.remId);
       if (rem) {
-        mixedItems.push({ rem, type: 'incremental' });
+        mixedItems.push({ rem, type: 'incremental', priority: item.priority });
       }
     }
   } else {
     for (let i = 0; i < itemCount && i < sortedCards.length; i++) {
       const item = sortedCards[i];
-      mixedItems.push({ rem: item.rem, type: 'flashcard' });
+      mixedItems.push({ rem: item.rem, type: 'flashcard', priority: item.priority });
     }
   }
   
@@ -248,8 +253,14 @@ export async function createPriorityReviewDocument(
     const scopeName = scopeRemId 
     ? (await plugin.rem.findOne(scopeRemId))?.text?.join('') || 'Document'
     : 'Full Knowledge Base';
+    
+  // Format randomness as percentage
+  const incRemRandPct = Math.round(incRemRandomness * 100);
+  const cardRandPct = Math.round(cardRandomness * 100);
+
   const metadataText = `Scope: ${scopeName}
 Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} incremental, ${mixedItems.filter(i => i.type === 'flashcard').length} flashcards)
+Randomness: IncRem ${incRemRandPct}%, Cards ${cardRandPct}%
 Created: ${timestamp}`;
 
   // Create a code block with metadata
@@ -258,6 +269,52 @@ Created: ${timestamp}`;
     await metadataRem.setText([metadataText]);
     await metadataRem.setIsCode(true);
     await metadataRem.setParent(reviewDoc);
+  }
+
+  // 9. Generate Graph Data and Insert Graph Widget
+  
+  // Initialize bins (0-5, 5-10, ... 95-100)
+  const bins = Array(20).fill(0).map((_, i) => ({
+    range: `${i * 5}-${(i + 1) * 5}`,
+    incRem: 0,
+    card: 0,
+    start: i * 5, // numeric start for potential sorting
+  }));
+
+  // Populate bins
+  for (const item of mixedItems) {
+    const p = Math.max(0, Math.min(100, item.priority));
+    // Calculate bucket index: 0-4 -> 0, 5-9 -> 1, ... 95-99 -> 19, 100 -> 19 (cap at last bucket)
+    const binIndex = Math.min(Math.floor(p / 5), 19);
+    
+    if (item.type === 'incremental') {
+      bins[binIndex].incRem++;
+    } else {
+      bins[binIndex].card++;
+    }
+  }
+
+  // Create the Rem for the graph
+  const graphRem = await plugin.rem.createRem();
+  if (graphRem) {
+    await graphRem.setParent(reviewDoc);
+    await graphRem.setText(["Priority Distribution Graph"]);
+    
+    // CRITICAL FIX: Add the Powerup explicitly by Code
+    await graphRem.addPowerup(priorityGraphPowerupCode);
+    
+    // Save the graph data in storage associated with this Rem
+    // We use synced storage so it persists across sessions
+    // UPDATED: Save object with bins AND stats
+    const graphData = {
+      bins: bins,
+      stats: {
+        incRem: incRemRandPct,
+        card: cardRandPct
+      }
+    };
+    
+    await plugin.storage.setSynced(GRAPH_DATA_KEY_PREFIX + graphRem._id, graphData);
   }
   
   return reviewDoc;

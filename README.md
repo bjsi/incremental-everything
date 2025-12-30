@@ -23,7 +23,7 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 ### 🎥 Videos about the basics
 
 - **Introductory Videos**: 
-  * [ncremental Reading Web Pages in RemNote](https://youtu.be/eXRlfCTOQNw)
+  * [Incremental Reading Web Pages in RemNote](https://youtu.be/eXRlfCTOQNw)
   * [Incremental Reading in RemNote](https://youtu.be/SL7wjgntrbg)
   
 

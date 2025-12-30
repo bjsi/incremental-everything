@@ -85,3 +85,7 @@ export const pdfHighlightColorId = 'pdf-highlight-color'; // Incremental PDF hig
 
 export const currentDocumentIdKey = 'current-document-id';
 export const popupDocumentIdKey = 'popup-document-id';
+
+// Priority Review Graph
+export const priorityGraphPowerupCode = 'priority_review_graph';
+export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';

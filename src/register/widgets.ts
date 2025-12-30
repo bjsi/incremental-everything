@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode } from '../lib/consts';
 
 export function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {
@@ -146,5 +146,13 @@ export function registerWidgets(plugin: ReactRNPlugin) {
   // Register parent selector popup for creating rems under incremental rems
   plugin.app.registerWidget(parentSelectorWidgetId, WidgetLocation.Popup, {
     dimensions: { height: '850px', width: '400px' },
+  });
+
+  plugin.app.registerWidget('priority_review_graph', WidgetLocation.UnderRemEditor, {
+    powerupFilter: priorityGraphPowerupCode,
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
   });
 }
