@@ -14,7 +14,6 @@ import {
   queueSessionCacheKey,
   currentScopeRemIdsKey,
   powerupCode,
-  nextRepDateSlotCode,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -40,7 +39,7 @@ import {
 } from '../lib/shield_history';
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
-import { collectPdfSourcesFromRems, findPdfExtractIds, getPdfDescendantIds } from '../lib/scope_helpers';
+import { buildComprehensiveScope } from '../lib/scope_helpers';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -55,67 +54,6 @@ type QueueScopeResolution = {
   isPriorityReviewDoc: boolean;
 };
 
-/**
- * Builds a comprehensive scope for a given rem by gathering all related rems.
- *
- * This includes:
- * - The rem itself
- * - All descendants
- * - All rems in the same document or portal
- * - All folder queue rems
- * - All sources
- * - All rems referencing this rem (excluding nextRepDate slot references)
- *
- * @param plugin Plugin instance to access the RemNote API
- * @param scopeRemId RemId of the rem to build the scope for
- * @returns Set of RemIds that belong to this comprehensive scope
- */
-async function buildComprehensiveScope(
-  plugin: ReactRNPlugin,
-  scopeRemId: RemId
-): Promise<Set<RemId>> {
-  const scopeRem = await plugin.rem.findOne(scopeRemId);
-  if (!scopeRem) return new Set();
-
-  const descendants = await scopeRem.getDescendants();
-  const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-  const folderQueueRems = await scopeRem.allRemInFolderQueue();
-  const sources = await scopeRem.getSources();
-
-  const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-    powerupCode,
-    nextRepDateSlotCode
-  );
-
-  const referencingRems = ((await scopeRem.remsReferencingThis()) || [])
-    .map((rem) => {
-      if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-        return rem.parent;
-      }
-      return rem._id;
-    })
-    .filter((id): id is RemId => id !== null && id !== undefined);
-
-  // Collect PDF sources from scopeRem and all descendants
-  const { pdfSourceIds } = await collectPdfSourcesFromRems([scopeRem, ...descendants]);
-
-  // Find PDF extracts (highlights) that belong to PDF sources
-  const pdfExtractIds = await findPdfExtractIds(plugin, pdfSourceIds);
-
-  // Find descendants of PDF sources (notes/flashcards inside PDFs)
-  const pdfDescendantIds = await getPdfDescendantIds(plugin, pdfSourceIds);
-
-  return new Set<RemId>([
-    scopeRem._id,
-    ...descendants.map(r => r._id),
-    ...allRemsInContext.map(r => r._id),
-    ...folderQueueRems.map(r => r._id),
-    ...sources.map(r => r._id),
-    ...referencingRems,
-    ...pdfExtractIds,
-    ...pdfDescendantIds
-  ]);
-}
 
 /**
  * Determines which scope IDs should be used for item selection and priority

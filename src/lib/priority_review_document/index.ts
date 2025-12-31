@@ -2,10 +2,16 @@ import { RNPlugin, PluginRem, RichTextInterface } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem';
 import { getCardRandomness, getSortingRandomness, applySortingCriteria } from '../sorting';
 import { getDueCardsWithPriorities } from '../card_priority';
-import { allIncrementalRemKey, priorityGraphPowerupCode, GRAPH_DATA_KEY_PREFIX } from '../consts';
-
-export const PRIORITY_GRAPH_POWERUP = 'priority_review_graph';
-export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';
+import { 
+  allIncrementalRemKey, 
+  priorityGraphPowerupCode, 
+  GRAPH_DATA_KEY_PREFIX,
+  allCardPriorityInfoKey
+} from '../consts';
+import { CardPriorityInfo } from '../card_priority';
+import { calculateAllPercentiles } from '../utils';
+import { buildComprehensiveScope } from '../scope_helpers';
+import * as _ from 'remeda'; // Ensure remeda is imported for uniqBy if available, or use custom
 
 // Helper function to find or create a tag
 async function findOrCreateTag(plugin: RNPlugin, tagName: string): Promise<PluginRem | undefined> {
@@ -137,92 +143,152 @@ export async function createPriorityReviewDocument(
   await reviewDoc.setText(docNameContent);
   await reviewDoc.setIsDocument(true);
   
-  // 2. Get scope rem if specified
+  // 2. Fetch Data
+  const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+  const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+
+  // 3. Get DUE items (Fresh calculation)
   const scopeRem = scopeRemId ? (await plugin.rem.findOne(scopeRemId)) ?? null : null;
-  
-  // 3. Get all incremental rems (filtered by scope and due status)
-  const allIncrementalRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-  
-  // Filter by scope
-  let scopedIncRems = allIncrementalRems;
-  if (scopeRem) {
-    const descendantIds = (await scopeRem.getDescendants()).map(d => d._id);
-    scopedIncRems = allIncrementalRems.filter(
-      rem => rem.remId === scopeRemId || descendantIds.includes(rem.remId)
-    );
-  }
-  
-  // Filter by due date
   const now = Date.now();
+  
+  // IncRems
+  let scopedIncRems = allIncRems;
+  if (scopeRem) {
+    // Also use comprehensive scope for IncRems to catch portals/tables
+    const comprehensiveScopeIds = await buildComprehensiveScope(plugin, scopeRem._id);
+    scopedIncRems = allIncRems.filter(r => comprehensiveScopeIds.has(r.remId));
+  }
   const dueIncRems = scopedIncRems.filter(rem => rem.nextRepDate <= now);
   
-  // 4. Get all flashcards (filtered by scope and due status)
+  // Cards
+  // This fetches the actual cards we will use. 
+  // It might find cards NOT present in allCardInfos if the cache is stale.
   const cardsWithPriority = await getDueCardsWithPriorities(
     plugin,
     scopeRem,
-    true  // Include non-prioritized cards
+    true
   );
+
+  // --- DEBUG & FIX START ---
   
-  // 5. Apply sorting criteria to create ordered lists
+  // 3b. Establish "Universe" for Percentiles
+  // We start with the cached data (allCardInfos) filtered by scope
+  let universeCardInfos = allCardInfos;
+  if (scopeRem) {
+    // FIX: Use comprehensive scope to capture portal contents
+    const comprehensiveScopeIds = await buildComprehensiveScope(plugin, scopeRem._id);
+    universeCardInfos = allCardInfos.filter(c => comprehensiveScopeIds.has(c.remId));
+  }
+
+  // Safety merge: Identify cards that are Due but missing from the Universe Cache
+  // This handles edge cases where getDueCardsWithPriorities logic differs slightly
+  const universeRemIds = new Set(universeCardInfos.map(c => c.remId));
+  const missingCards = cardsWithPriority.filter(c => !universeRemIds.has(c.remId));
+
+  if (missingCards.length > 0) {
+    console.warn(`[PriorityGraph] Found ${missingCards.length} due cards missing from cache. Merging them into universe for accurate percentile calculation.`);
+    // Merge missing cards into the universe so they get a rank
+    universeCardInfos = [...universeCardInfos, ...missingCards];
+  } else {
+    console.log(`[PriorityGraph] All ${cardsWithPriority.length} due cards are present in cache.`);
+  }
+
+  // Calculate "Relative Percentiles" maps: { [remId]: percentile (0-100) }
+  // scopedIncRems is already filtered above
+  const incRemPercentiles = calculateAllPercentiles(scopedIncRems);
+  
+  // Use the SAFE universe list that definitely includes our due cards
+  const cardPercentiles = calculateAllPercentiles(universeCardInfos);
+
+  // --- DEBUG & FIX END ---
+  
+  // 4. Apply sorting criteria (Randomness)
   const incRemRandomness = await getSortingRandomness(plugin);
   const cardRandomness = await getCardRandomness(plugin);
   
   const sortedIncRems = applySortingCriteria(dueIncRems, incRemRandomness);
   const sortedCards = applySortingCriteria(cardsWithPriority, cardRandomness);
   
-  // 6. Mix according to ratio
-  // UPDATED: Include priority in the stored item
-  const mixedItems: Array<{ rem: PluginRem; type: 'incremental' | 'flashcard'; priority: number }> = [];
+  // 5. Mix Items & Attach Pre-calculated Percentiles
+  interface MixedItem {
+    rem: PluginRem;
+    type: 'incremental' | 'flashcard';
+    priority: number;
+    percentile: number;
+  }
+
+  const mixedItems: MixedItem[] = [];
   let incRemIndex = 0;
   let cardIndex = 0;
+
+  const addIncRem = async (idx: number) => {
+    if (idx >= sortedIncRems.length) return false;
+    const item = sortedIncRems[idx];
+    const rem = await plugin.rem.findOne(item.remId);
+    if (rem) {
+      // Lookup the percentile relative to the entire scope universe
+      // Fallback to 100 (lowest rank) if not found
+      const percentile = incRemPercentiles[item.remId] ?? 100;
+      
+      mixedItems.push({ 
+        rem, 
+        type: 'incremental', 
+        priority: item.priority,
+        percentile: percentile 
+      });
+      return true;
+    }
+    return false;
+  };
+
+  const addCard = (idx: number) => {
+    if (idx >= sortedCards.length) return false;
+    const item = sortedCards[idx];
+    
+    // Lookup percentile with debug log if missing
+    let percentile = cardPercentiles[item.rem._id];
+    
+    if (percentile === undefined) {
+      console.warn(`[PriorityGraph] Percentile missing for Card Rem: ${item.rem._id}. Fallback to 100.`);
+      percentile = 100;
+    }
+    
+    mixedItems.push({ 
+      rem: item.rem, 
+      type: 'flashcard', 
+      priority: item.priority,
+      percentile: percentile
+    });
+    return true;
+  };
 
   if (typeof cardRatio === 'number') {
     while (mixedItems.length < itemCount) {
       let addedThisCycle = false;
-      
-      // Try to add one incremental rem
       if (incRemIndex < sortedIncRems.length) {
-        const item = sortedIncRems[incRemIndex];
-        const rem = await plugin.rem.findOne(item.remId);
-        if (rem) {
-          mixedItems.push({ rem, type: 'incremental', priority: item.priority });
-          addedThisCycle = true;
-        }
-        incRemIndex++;
+        if (await addIncRem(incRemIndex)) { incRemIndex++; addedThisCycle = true; }
       }
 
-      // Try to add flashcards according to ratio
       for (let i = 0; i < cardRatio && mixedItems.length < itemCount; i++) {
         if (cardIndex < sortedCards.length) {
-          const item = sortedCards[cardIndex];
-          mixedItems.push({ rem: item.rem, type: 'flashcard', priority: item.priority });
-          cardIndex++;
-          addedThisCycle = true;
+          if (addCard(cardIndex)) { cardIndex++; addedThisCycle = true; }
         }
       }
       
-      // If we couldn't add anything this cycle, we're done
-      if (!addedThisCycle) {
-        break;
-      }
+      if (!addedThisCycle) break;
     }
 
   } else if (cardRatio === 'no-cards') {
     for (let i = 0; i < itemCount && i < sortedIncRems.length; i++) {
-      const item = sortedIncRems[i];
-      const rem = await plugin.rem.findOne(item.remId);
-      if (rem) {
-        mixedItems.push({ rem, type: 'incremental', priority: item.priority });
-      }
+      await addIncRem(i);
     }
   } else {
     for (let i = 0; i < itemCount && i < sortedCards.length; i++) {
-      const item = sortedCards[i];
-      mixedItems.push({ rem: item.rem, type: 'flashcard', priority: item.priority });
+      addCard(i);
     }
   }
   
-  // 7. Create portals in the document
+  // 6. Create portals in the document
   const reviewQueueTag = await findOrCreateTag(plugin, 'Priority Review Queue');
   if (reviewQueueTag) { await reviewDoc.addTag(reviewQueueTag); }
 
@@ -249,7 +315,7 @@ export async function createPriorityReviewDocument(
     if (typeTag) { await childRem.addTag(typeTag); }
   }
   
-  // 8. Add metadata to document
+  // 7. Add metadata to document
     const scopeName = scopeRemId 
     ? (await plugin.rem.findOne(scopeRemId))?.text?.join('') || 'Document'
     : 'Full Knowledge Base';
@@ -258,8 +324,12 @@ export async function createPriorityReviewDocument(
   const incRemRandPct = Math.round(incRemRandomness * 100);
   const cardRandPct = Math.round(cardRandomness * 100);
 
-  const metadataText = `Scope: ${scopeName}
-Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} incremental, ${mixedItems.filter(i => i.type === 'flashcard').length} flashcards)
+  // Total Cards: Use the safe universe list which is more accurate now
+  const totalCardsInScope = universeCardInfos.reduce((sum, info) => sum + (info.cardCount || 0), 0);
+
+  const metadataText = `Scope: ${scopeName} 
+Scope Size: ${scopedIncRems.length} IncRems, ${universeCardInfos.length} Rems with Cards, ${totalCardsInScope} Cards
+Selected Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} IncRems, ${mixedItems.filter(i => i.type === 'flashcard').length} Rems with Cards)
 Randomness: IncRem ${incRemRandPct}%, Cards ${cardRandPct}%
 Created: ${timestamp}`;
 
@@ -271,26 +341,33 @@ Created: ${timestamp}`;
     await metadataRem.setParent(reviewDoc);
   }
 
-  // 9. Generate Graph Data and Insert Graph Widget
+  // 8. Generate Graph Data and Insert Graph Widget
   
   // Initialize bins (0-5, 5-10, ... 95-100)
-  const bins = Array(20).fill(0).map((_, i) => ({
+  const createBins = () => Array(20).fill(0).map((_, i) => ({
     range: `${i * 5}-${(i + 1) * 5}`,
     incRem: 0,
     card: 0,
-    start: i * 5, // numeric start for potential sorting
   }));
 
-  // Populate bins
+  const binsAbsolute = createBins();
+  const binsRelative = createBins();
+
   for (const item of mixedItems) {
-    const p = Math.max(0, Math.min(100, item.priority));
-    // Calculate bucket index: 0-4 -> 0, 5-9 -> 1, ... 95-99 -> 19, 100 -> 19 (cap at last bucket)
-    const binIndex = Math.min(Math.floor(p / 5), 19);
+    // Fill Absolute Bins
+    const pAbs = Math.max(0, Math.min(100, item.priority));
+    const absIndex = Math.min(Math.floor(pAbs / 5), 19);
     
+    // Fill Relative Bins
+    const pRel = Math.max(0, Math.min(100, item.percentile));
+    const relIndex = Math.min(Math.floor(pRel / 5), 19);
+
     if (item.type === 'incremental') {
-      bins[binIndex].incRem++;
+      binsAbsolute[absIndex].incRem++;
+      binsRelative[relIndex].incRem++;
     } else {
-      bins[binIndex].card++;
+      binsAbsolute[absIndex].card++;
+      binsRelative[relIndex].card++;
     }
   }
 
@@ -307,7 +384,8 @@ Created: ${timestamp}`;
     // We use synced storage so it persists across sessions
     // UPDATED: Save object with bins AND stats
     const graphData = {
-      bins: bins,
+      bins: binsAbsolute,
+      binsRelative: binsRelative,
       stats: {
         incRem: incRemRandPct,
         card: cardRandPct

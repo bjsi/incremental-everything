@@ -1,4 +1,5 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
+import React, { useState } from 'react';
 import {
   BarChart,
   Bar,
@@ -22,11 +23,15 @@ interface GraphStats {
   card: number;
 }
 
-// Union type to handle backward compatibility (if old data exists as just array)
-type GraphStorageData = GraphDataPoint[] | { bins: GraphDataPoint[]; stats: GraphStats };
+interface FullGraphData {
+  bins: GraphDataPoint[];
+  binsRelative?: GraphDataPoint[];
+  stats: GraphStats | null;
+}
 
 function PriorityReviewGraph() {
   const plugin = usePlugin();
+  const [viewMode, setViewMode] = useState<'absolute' | 'relative'>('absolute');
   
   // Get the Rem ID this widget is attached to
   const context = useTrackerPlugin(async (rp) => {
@@ -36,41 +41,75 @@ function PriorityReviewGraph() {
   const remId = context?.remId;
 
   // Fetch the data and parse it
-  const { data, stats } = useRunAsync(async () => {
-    if (!remId) return { data: [], stats: null };
+  const graphData = useRunAsync(async () => {
+    if (!remId) return null;
+    const stored = await plugin.storage.getSynced(GRAPH_DATA_KEY_PREFIX + remId) as any;
     
-    const stored = await plugin.storage.getSynced(GRAPH_DATA_KEY_PREFIX + remId) as GraphStorageData;
-    
-    if (!stored) return { data: [], stats: null };
+    if (!stored) return null;
 
+    // Handle legacy format (just array)
     if (Array.isArray(stored)) {
-      // Old format compatibility
-      return { data: stored, stats: null };
-    } else {
-      // New format with stats
-      return { data: stored.bins || [], stats: stored.stats || null };
+      return { bins: stored, binsRelative: undefined, stats: null };
     }
-  }, [remId]) || { data: [], stats: null };
+    
+    // Handle new format
+    return {
+      bins: stored.bins || [],
+      binsRelative: stored.binsRelative, // May be undefined for older docs created before this update
+      stats: stored.stats || null
+    };
+  }, [remId]);
 
-  if (!data || data.length === 0) {
-    // If no data is found, we don't render anything or render a placeholder
-    // This avoids cluttering empty Rems if the tag is added accidentally
-    return null; 
+  if (!graphData || !graphData.bins || graphData.bins.length === 0) {
+    return null;
   }
+
+  // Determine which data to show
+  const activeData = viewMode === 'relative' && graphData.binsRelative 
+    ? graphData.binsRelative 
+    : graphData.bins;
+
+  const hasRelativeData = !!graphData.binsRelative;
 
   return (
     <div className="w-full flex flex-col items-center p-4 bg-white rounded-lg border border-gray-200 shadow-sm mt-2">
-      <h4 className="text-sm font-semibold mb-2 text-gray-700">Priority Distribution of Items</h4>
+      <div className="flex justify-between items-center w-full mb-4 px-4">
+        <h4 className="text-sm font-semibold text-gray-700">
+          Priority Distribution
+        </h4>
+        
+        {/* View Mode Toggle */}
+        {hasRelativeData && (
+          <div className="flex bg-gray-100 p-1 rounded-md">
+            <button
+              onClick={() => setViewMode('absolute')}
+              className={`px-3 py-1 text-xs rounded-sm transition-all ${
+                viewMode === 'absolute' 
+                  ? 'bg-white text-blue-600 shadow-sm font-medium' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Absolute Priority
+            </button>
+            <button
+              onClick={() => setViewMode('relative')}
+              className={`px-3 py-1 text-xs rounded-sm transition-all ${
+                viewMode === 'relative' 
+                  ? 'bg-white text-blue-600 shadow-sm font-medium' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Relative Percentile
+            </button>
+          </div>
+        )}
+      </div>
+
       <div style={{ width: '100%', height: 300 }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={100}>
           <BarChart
-            data={data}
-            margin={{
-              top: 5,
-              right: 10,
-              left: 0,
-              bottom: 5,
-            }}
+            data={activeData}
+            margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis 
@@ -115,11 +154,13 @@ function PriorityReviewGraph() {
       
       <div className="flex flex-col items-center mt-2">
         <div className="text-xs text-gray-500 mb-1">
-          X-Axis: Priority Range (0-100) | Y-Axis: Left (IncRem) / Right (Cards)
+          {viewMode === 'absolute' 
+            ? 'X-Axis: Absolute Priority (0-100)' 
+            : 'X-Axis: Relative Percentile in scope Priority Queue (0-100%)'}
         </div>
-        {stats && (
-          <div className="text-sm font-medium text-gray-700 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">
-            Randomness: IncRem {stats.incRem}%, Cards {stats.card}%
+        {graphData.stats && (
+          <div className="text-sm font-medium text-gray-700 bg-gray-50 px-3 py-1 rounded-full border border-gray-200 mt-1">
+            Randomness: IncRem {graphData.stats.incRem}%, Cards {graphData.stats.card}%
           </div>
         )}
       </div>
