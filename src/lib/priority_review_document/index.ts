@@ -183,16 +183,27 @@ export async function createPriorityReviewDocument(
   // Safety merge: Identify cards that are Due but missing from the Universe Cache
   // This handles edge cases where getDueCardsWithPriorities logic differs slightly
   const universeRemIds = new Set(universeCardInfos.map(c => c.remId));
-  const missingCards = cardsWithPriority.filter(c => !universeRemIds.has(c.remId));
+  const missingCards = cardsWithPriority.filter(c => !universeRemIds.has(c.rem._id));
 
   if (missingCards.length > 0) {
     // 2. Deduplicate missing items by RemId so we don't add the same Rem multiple times
-    const uniqueMissingRems = _.uniqBy(missingCards, c => c.remId);
+    const uniqueMissingRems = _.uniqBy(missingCards, c => c.rem._id);
     
     console.warn(`[PriorityGraph] Found ${missingCards.length} due cards missing from cache. Merged ${uniqueMissingRems.length} unique Rems into universe.`);
     
-    // 3. Merge unique Rems only
-    universeCardInfos = [...universeCardInfos, ...uniqueMissingRems];
+    // Note: You might also need to map these to match the CardPriorityInfo shape 
+    // depending on your type definitions, but fixing the filter prevents the false alarm.
+    const missingCardInfos = uniqueMissingRems.map(item => ({
+      remId: item.rem._id,
+      priority: item.priority,
+      source: item.source,
+      // You may need to fill other CardPriorityInfo fields like cardCount/dueCards/lastUpdated with defaults
+      cardCount: 1, 
+      dueCards: 1,
+      lastUpdated: Date.now()
+    }));
+
+    universeCardInfos = [...universeCardInfos, ...missingCardInfos];
   } else {
     console.log(`[PriorityGraph] All ${cardsWithPriority.length} due cards are present in cache.`);
   }
