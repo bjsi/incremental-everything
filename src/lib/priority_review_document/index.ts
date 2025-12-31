@@ -145,7 +145,6 @@ export async function createPriorityReviewDocument(
   
   // 2. Fetch Data
   const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-  const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
 
   // 3. Get DUE items (Fresh calculation)
   const scopeRem = scopeRemId ? (await plugin.rem.findOne(scopeRemId)) ?? null : null;
@@ -173,6 +172,7 @@ export async function createPriorityReviewDocument(
   
   // 3b. Establish "Universe" for Percentiles
   // We start with the cached data (allCardInfos) filtered by scope
+  const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
   let universeCardInfos = allCardInfos;
   if (scopeRem) {
     // FIX: Use comprehensive scope to capture portal contents
@@ -186,9 +186,13 @@ export async function createPriorityReviewDocument(
   const missingCards = cardsWithPriority.filter(c => !universeRemIds.has(c.remId));
 
   if (missingCards.length > 0) {
-    console.warn(`[PriorityGraph] Found ${missingCards.length} due cards missing from cache. Merging them into universe for accurate percentile calculation.`);
-    // Merge missing cards into the universe so they get a rank
-    universeCardInfos = [...universeCardInfos, ...missingCards];
+    // 2. Deduplicate missing items by RemId so we don't add the same Rem multiple times
+    const uniqueMissingRems = _.uniqBy(missingCards, c => c.remId);
+    
+    console.warn(`[PriorityGraph] Found ${missingCards.length} due cards missing from cache. Merged ${uniqueMissingRems.length} unique Rems into universe.`);
+    
+    // 3. Merge unique Rems only
+    universeCardInfos = [...universeCardInfos, ...uniqueMissingRems];
   } else {
     console.log(`[PriorityGraph] All ${cardsWithPriority.length} due cards are present in cache.`);
   }
@@ -324,8 +328,13 @@ export async function createPriorityReviewDocument(
   const incRemRandPct = Math.round(incRemRandomness * 100);
   const cardRandPct = Math.round(cardRandomness * 100);
 
-  // Total Cards: Use the safe universe list which is more accurate now
-  const totalCardsInScope = universeCardInfos.reduce((sum, info) => sum + (info.cardCount || 0), 0);
+  // Total Cards: 
+  // - If cardCount is defined (cached item), use it (even if 0).
+  // - If cardCount is missing (merged from due list), assume 1 (since it is due, it must have cards).
+  const totalCardsInScope = universeCardInfos.reduce((sum, info) => {
+    const count = typeof info.cardCount === 'number' ? info.cardCount : 1;
+    return sum + count;
+  }, 0);
 
   const metadataText = `Scope: ${scopeName} 
 Scope Size: ${scopedIncRems.length} IncRems, ${universeCardInfos.length} Rems with Cards, ${totalCardsInScope} Cards
