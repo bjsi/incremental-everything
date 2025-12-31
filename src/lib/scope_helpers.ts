@@ -1,5 +1,5 @@
 import { ReactRNPlugin, RemId, Rem, BuiltInPowerupCodes, RichTextElementRemInterface } from '@remnote/plugin-sdk';
-import { allIncrementalRemKey } from './consts';
+import { allIncrementalRemKey, powerupCode, nextRepDateSlotCode } from './consts';
 
 /**
  * Collects PDF source IDs from a list of rems.
@@ -146,3 +146,66 @@ export async function buildDocumentScope(
   return descendantIds;
 }
 
+/**
+ * Builds a comprehensive scope for a given rem by gathering all related rems.
+ * * This includes:
+ * - The rem itself
+ * - All descendants
+ * - All rems in the same document or portal (CRITICAL for Tables/Portals)
+ * - All folder queue rems
+ * - All sources
+ * - All rems referencing this rem (excluding nextRepDate slot references)
+ * - PDF Extracts and their descendants
+ * * @param plugin Plugin instance
+ * @param scopeRemId RemId to build scope for
+ */
+export async function buildComprehensiveScope(
+  plugin: ReactRNPlugin,
+  scopeRemId: RemId
+): Promise<Set<RemId>> {
+  const scopeRem = await plugin.rem.findOne(scopeRemId);
+  if (!scopeRem) return new Set();
+
+  const descendants = await scopeRem.getDescendants();
+  
+  // This captures items inside Portals and Tables
+  const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
+  
+  const folderQueueRems = await scopeRem.allRemInFolderQueue();
+  const sources = await scopeRem.getSources();
+
+  const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+    powerupCode,
+    nextRepDateSlotCode
+  );
+
+  const referencingRems = ((await scopeRem.remsReferencingThis()) || [])
+    .map((rem) => {
+      // Filter out technical slot references
+      if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
+        return rem.parent;
+      }
+      return rem._id;
+    })
+    .filter((id): id is RemId => id !== null && id !== undefined);
+
+  // Collect PDF sources from scopeRem and all descendants
+  const { pdfSourceIds } = await collectPdfSourcesFromRems([scopeRem, ...descendants]);
+
+  // Find PDF extracts (highlights) that belong to PDF sources
+  const pdfExtractIds = await findPdfExtractIds(plugin, pdfSourceIds);
+
+  // Find descendants of PDF sources (notes/flashcards inside PDFs)
+  const pdfDescendantIds = await getPdfDescendantIds(plugin, pdfSourceIds);
+
+  return new Set<RemId>([
+    scopeRem._id,
+    ...descendants.map(r => r._id),
+    ...allRemsInContext.map(r => r._id),
+    ...folderQueueRems.map(r => r._id),
+    ...sources.map(r => r._id),
+    ...referencingRems,
+    ...pdfExtractIds,
+    ...pdfDescendantIds
+  ]);
+}
