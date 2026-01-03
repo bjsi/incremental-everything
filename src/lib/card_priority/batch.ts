@@ -98,23 +98,23 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   }
 }
 
-export async function precomputeAllCardPriorities(plugin: RNPlugin) {
+export async function updateAllCardPriorities(plugin: RNPlugin) {
   const confirmed = confirm(
-    '📊 Pre-compute All Card Priorities\n\n' +
-      'This will analyze all flashcards in your knowledge base and pre-compute their priorities based on inheritance from their ancestors priorities.\n\n' +
+    '📊 Update All Inherited Card Priorities\n\n' +
+      'This will analyze all flashcards in your knowledge base and update all priorities that are inherited from their ancestors.\n\n' +
       'Your manually set card priorities will not be affected.\n\n' +
-      'This is a one-time optimization that will significantly speed up future plugin startups.\n\n' +
+      'This ensures that manual prioritization inputs made to ancestors are properly spread to their descendants .\n\n' +
       'This may take several minutes for large collections. Continue?'
   );
 
   if (!confirmed) {
-    console.log('Pre-computation cancelled by user');
-    await plugin.app.toast('Pre-computation cancelled');
+    console.log('Card Priorities Update cancelled by user');
+    await plugin.app.toast('Card Priorities Update cancelled');
     return;
   }
 
-  console.log('Starting card priority pre-computation...');
-  await plugin.app.toast('Starting card priority pre-computation. This may take a few minutes...');
+  console.log('Starting Card Priorities Update...');
+  await plugin.app.toast('Starting Card Priorities Update. This may take a few minutes...');
 
   try {
     const startTime = Date.now();
@@ -265,7 +265,7 @@ export async function precomputeAllCardPriorities(plugin: RNPlugin) {
     }
 
     const message =
-      `✅ Pre-computation complete!\n\n` +
+      `✅ Card Priorities Update complete!\n\n` +
       `• Total rems processed: ${processed}\n` +
       `• Newly tagged: ${tagged}${priorityChanged > 0 ? ` (${priorityChanged} with changed priority)` : ''}\n` +
       `• Preserved manual priorities: ${skippedManual}\n` +
@@ -276,13 +276,13 @@ export async function precomputeAllCardPriorities(plugin: RNPlugin) {
       `Future startups will be much faster!`;
 
     console.log(message);
-    await plugin.app.toast('✅ Pre-computation complete! See console for details.');
+    await plugin.app.toast('✅ Card Priorities Update complete! See console for details.');
     alert(message);
   } catch (error) {
-    console.error('Error during pre-computation:', error);
-    await plugin.app.toast('❌ Error during pre-computation. Check console for details.');
+    console.error('Error during Card Priorities Update:', error);
+    await plugin.app.toast('❌ Error during Card Priorities Update. Check console for details.');
     alert(
-      'An error occurred during pre-computation.\n\n' + 'Please check the console for details:\n' + String(error)
+      'An error occurred during Card Priorities Update.\n\n' + 'Please check the console for details:\n' + String(error)
     );
   }
 }

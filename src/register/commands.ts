@@ -28,7 +28,7 @@ import {
 } from '../lib/mobileUtils';
 import {
   removeAllCardPriorityTags,
-  precomputeAllCardPriorities,
+  updateAllCardPriorities,
 } from '../lib/card_priority';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { getPerformanceMode } from '../lib/utils';
@@ -450,11 +450,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
   // Pre-computation command
   await plugin.app.registerCommand({
-    id: 'precompute-card-priorities',
-    name: 'Pre-compute Card Priorities',
-    description: 'Pre-compute and tag all card priorities for faster plugin startups (run once)',
+    id: 'update-card-priorities',
+    name: 'Update all inherited Card Priorities',
+    description: 'Update all inherited Card Priorities (and pre-compute and tag all card not yet prioritized)',
     action: async () => {
-      await precomputeAllCardPriorities(plugin);
+      await updateAllCardPriorities(plugin);
     },
   });
 
