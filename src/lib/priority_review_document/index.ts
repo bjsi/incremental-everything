@@ -303,34 +303,7 @@ export async function createPriorityReviewDocument(
     }
   }
   
-  // 6. Create portals in the document
-  const reviewQueueTag = await findOrCreateTag(plugin, 'Priority Review Queue');
-  if (reviewQueueTag) { await reviewDoc.addTag(reviewQueueTag); }
-
-  for (const item of mixedItems) {
-    // Create a regular rem that will contain the portal reference
-    const childRem = await plugin.rem.createRem();
-    if (!childRem) continue;
-    
-    // Set it as a child of the review document first
-    await childRem.setParent(reviewDoc);
-    
-    // Set its text to be a portal reference to the target rem
-    const portalContent: RichTextInterface = [
-      {
-        i: 'q',
-        _id: item.rem._id,
-      }
-    ];
-    await childRem.setText(portalContent);
-
-    // Add type tag
-    const typeTagText = item.type === 'incremental' ? 'INC' : 'FC';
-    const typeTag = await findOrCreateTag(plugin, typeTagText);
-    if (typeTag) { await childRem.addTag(typeTag); }
-  }
-  
-  // 7. Add metadata to document
+  // 6. Add metadata to document
     const scopeName = scopeRemId 
     ? (await plugin.rem.findOne(scopeRemId))?.text?.join('') || 'Document'
     : 'Full Knowledge Base';
@@ -361,7 +334,7 @@ Created: ${timestamp}`;
     await metadataRem.setParent(reviewDoc);
   }
 
-  // 8. Generate Graph Data and Insert Graph Widget
+  // 7. Generate Graph Data and Insert Graph Widget
   
   // Initialize bins (0-5, 5-10, ... 95-100)
   const createBins = () => Array(20).fill(0).map((_, i) => ({
@@ -413,6 +386,34 @@ Created: ${timestamp}`;
     };
     
     await plugin.storage.setSynced(GRAPH_DATA_KEY_PREFIX + graphRem._id, graphData);
+  }
+
+    
+  // 8. Create portals in the document
+  const reviewQueueTag = await findOrCreateTag(plugin, 'Priority Review Queue');
+  if (reviewQueueTag) { await reviewDoc.addTag(reviewQueueTag); }
+
+  for (const item of mixedItems) {
+    // Create a regular rem that will contain the portal reference
+    const childRem = await plugin.rem.createRem();
+    if (!childRem) continue;
+    
+    // Set it as a child of the review document first
+    await childRem.setParent(reviewDoc);
+    
+    // Set its text to be a portal reference to the target rem
+    const portalContent: RichTextInterface = [
+      {
+        i: 'q',
+        _id: item.rem._id,
+      }
+    ];
+    await childRem.setText(portalContent);
+
+    // Add type tag
+    const typeTagText = item.type === 'incremental' ? 'INC' : 'FC';
+    const typeTag = await findOrCreateTag(plugin, typeTagText);
+    if (typeTag) { await childRem.addTag(typeTag); }
   }
   
   return reviewDoc;

@@ -165,7 +165,7 @@ export async function buildOptimizedCardPriorityCache(plugin: RNPlugin) {
 /**
  * Intelligently caches all card priorities with deferred loading.
  *
- * Phase 1: Load pre-tagged cards instantly
+ * Phase 1: Load pre-tagged cards
  * Phase 2: Process untagged cards in background
  *
  * @param plugin Plugin instance
@@ -240,15 +240,14 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   console.log(`CACHE: Found ${untaggedRemIds.length} untagged cards for deferred processing`);
 
   if (enrichedTaggedPriorities.length > 0) {
-    await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} card priorities instantly`);
+    await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} pre-tagged card priorities`);
   }
 
   if (untaggedRemIds.length > 0) {
     const untaggedPercentage = Math.round((untaggedRemIds.length / uniqueRemIds.length) * 100);
     if (untaggedPercentage > 20) {
       await plugin.app.toast(
-        `⏳ Processing ${untaggedRemIds.length} untagged cards in background... ` +
-          `Consider running 'Pre-compute Card Priorities' for instant startups!`
+        `⏳ Processing ${untaggedRemIds.length} untagged cards in background... `
       );
     }
 
@@ -257,7 +256,7 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
     }, 3000);
   } else {
     console.log('CACHE: All cards are pre-tagged! No deferred processing needed.');
-    await plugin.app.toast('✅ All card priorities loaded instantly!');
+    await plugin.app.toast('✅ All card priorities loaded!');
   }
 }
 
@@ -344,7 +343,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
     if (untaggedRemIds.length > 1000) {
       setTimeout(() => {
         plugin.app.toast(
-          `💡 Tip: Run 'Pre-compute Card Priorities' to avoid background processing in future sessions`
+          `💡 Tip: Run 'Update all inherited Card Priorities' to avoid background processing in future sessions`
         );
       }, 2000);
     }
