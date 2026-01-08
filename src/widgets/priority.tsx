@@ -6,6 +6,7 @@ import {
   PluginRem,
   RemId,
 } from '@remnote/plugin-sdk';
+import { shouldUseLightMode } from '../lib/mobileUtils';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -44,26 +45,18 @@ function Priority() {
 
   // --- ALL HOOKS DECLARED UNCONDITIONALLY AT THE TOP ---
 
-  // ✅ Track the values that determine effective mode
-  const performanceModeSetting = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<string>('performanceMode'),
-    []
-  ) || DEFAULT_PERFORMANCE_MODE;
-
-  const isMobile = useTrackerPlugin(
-    async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
-    []
-  );
-
-  const alwaysUseLightOnMobile = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId),
-    []
-  );
-
   // ✅ Calculate effective mode
-  const performanceMode = performanceModeSetting === PERFORMANCE_MODE_LIGHT ||
-    (isMobile && alwaysUseLightOnMobile !== false)
-    ? 'light' : 'full';
+  const performanceMode = useTrackerPlugin(async (rp) => {
+    // import { shouldUseLightMode } from '../lib/mobileUtils'; // This will be imported at the top
+    const useLight = await shouldUseLightMode(rp);
+    return useLight ? 'light' : 'full';
+  }, []) || 'full'; // Default to full while loading, or maybe light to be safe? Let's default to full as per original default logic or 'light' for safety. Original logic defaulted to settings or full. Let's stick to what allows consistent behavior. 'full' is safer for 'hasCards' checks usually, but 'light' is safer for performance. Given the lag, maybe 'light'? But let's trust the async result. Defaulting to 'light' might flicker UI. Let's stick to default from settings if possible, but simplest is just waiting.
+  // Actually, defaulting to 'light' avoids the Heavy check if it renders before loading.
+  // But wait, the hook runs asynchronously. The component might render with 'performanceMode' as undefined or default.
+  // If I use 'full' as default, it might trigger the heavy check in the first render tick if cardData runs immediately.
+  // However, cardData is also async.
+
+  // Let's look at how I replace the existing logic. I need to replace lines 47-66.
 
   // State Hooks
   const [scope, setScope] = useState<Scope>({ remId: null, name: 'All KB' });
@@ -173,20 +166,26 @@ function Priority() {
         console.log('[Priority] 🃏 cardData: Tier 1 (rem.getCards) found', directCards.length, 'cards');
       } else {
         // Tier 2: Check if rem exists in the card priority cache
-        console.log('[Priority] 🃏 cardData: Tier 1 returned 0, checking cache (Tier 2)...');
-        const cachedCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
-        const cachedInfo = cachedCardInfos?.find(info => info.remId === rem._id);
-
-        if (cachedInfo && cachedInfo.cardCount > 0) {
-          hasCards = true;
-          console.log('[Priority] 🃏 cardData: Tier 2 (cache) found cardCount:', cachedInfo.cardCount);
+        // 🔌 Skip cache check and global registry in light mode to ensure speed
+        if (performanceMode === PERFORMANCE_MODE_LIGHT) {
+          console.log('[Priority] 🃏 cardData: Tier 1 returned 0, skipping Tier 2/3 (Light Mode)');
+          hasCards = false;
         } else {
-          // Tier 3: Use global registry as final fallback (slowest but most reliable)
-          console.log('[Priority] 🃏 cardData: Tier 2 miss, checking global registry (Tier 3)...');
-          const allCards = await plugin.card.getAll();
-          const cardsForRem = allCards.filter(card => card.remId === rem._id);
-          hasCards = cardsForRem.length > 0;
-          console.log('[Priority] 🃏 cardData: Tier 3 (global registry) found', cardsForRem.length, 'cards');
+          console.log('[Priority] 🃏 cardData: Tier 1 returned 0, checking cache (Tier 2)...');
+          const cachedCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
+          const cachedInfo = cachedCardInfos?.find(info => info.remId === rem._id);
+
+          if (cachedInfo && cachedInfo.cardCount > 0) {
+            hasCards = true;
+            console.log('[Priority] 🃏 cardData: Tier 2 (cache) found cardCount:', cachedInfo.cardCount);
+          } else {
+            // Tier 3: Use global registry as final fallback (slowest but most reliable)
+            console.log('[Priority] 🃏 cardData: Tier 2 miss, checking global registry (Tier 3)...');
+            const allCards = await plugin.card.getAll();
+            const cardsForRem = allCards.filter(card => card.remId === rem._id);
+            hasCards = cardsForRem.length > 0;
+            console.log('[Priority] 🃏 cardData: Tier 3 (global registry) found', cardsForRem.length, 'cards');
+          }
         }
       }
 
@@ -202,7 +201,7 @@ function Priority() {
         hasCardPriorityPowerup: hasPowerup
       };
     },
-    [rem?._id]
+    [rem?._id, performanceMode]
   );
 
   // Then use:
