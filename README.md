@@ -27,7 +27,7 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
   * [Incremental Reading in RemNote](https://youtu.be/SL7wjgntrbg)
   
 
-- **What is Incremental Reading?**: [Incremental Journey - Incremental Reading in Simple Terms](hhttps://youtu.be/V4xEziM8mco)
+- **What is Incremental Reading?**: [Incremental Journey - Incremental Reading in Simple Terms](https://youtu.be/V4xEziM8mco)
 
 
 
