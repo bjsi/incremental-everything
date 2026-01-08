@@ -9,6 +9,8 @@ interface PrioritySliderProps {
   showValue?: boolean;
   disabled?: boolean;
   relativePriority?: number;
+  useAbsoluteColoring?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
 }
 
 export interface PrioritySliderRef {
@@ -24,6 +26,8 @@ export const PrioritySlider = forwardRef<PrioritySliderRef, PrioritySliderProps>
   showValue = true,
   disabled = false,
   relativePriority,
+  useAbsoluteColoring = false,
+  onKeyDown,
 }, ref) {
   const trackRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +66,10 @@ export const PrioritySlider = forwardRef<PrioritySliderRef, PrioritySliderProps>
 
   const percentage = ((value - min) / (max - min)) * 100;
   // Use relative priority for color if provided, otherwise fall back to absolute position
-  const colorValue = relativePriority !== undefined ? relativePriority : percentage;
+  // If useAbsoluteColoring is true, we force using the percentage (absolute value based)
+  const colorValue = useAbsoluteColoring
+    ? percentage
+    : (relativePriority !== undefined ? relativePriority : percentage);
   const thumbColor = percentileToHslColor(colorValue);
 
   const handleTrackClick = useCallback(
@@ -112,6 +119,7 @@ export const PrioritySlider = forwardRef<PrioritySliderRef, PrioritySliderProps>
           value={inputValue}
           onChange={handleInputChange}
           onBlur={handleInputBlur}
+          onKeyDown={onKeyDown}
           disabled={disabled}
           className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded shrink-0 border-0 outline-none"
           style={{

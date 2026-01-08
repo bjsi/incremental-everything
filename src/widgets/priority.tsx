@@ -27,7 +27,9 @@ import {
   cardPriorityCacheRefreshKey,
   queueSessionCacheKey,
   isMobileDeviceKey,
-  alwaysUseLightModeOnMobileId
+  alwaysUseLightModeOnMobileId,
+  defaultPriorityId,
+  defaultCardPriorityId
 } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
@@ -39,6 +41,90 @@ import * as _ from 'remeda';
 type Scope = { remId: string | null; name: string; };
 type ScopeMode = 'all' | 'document';
 type CardScopeType = 'prioritized' | 'all';
+
+// --- ACCELERATED KEYBOARD HANDLER HOOK ---
+// This hook implements the logic for rapid taps and hold-to-accelerate
+function useAcceleratedKeyboardHandler(value: number | null, defaultValue: number, onChange: (val: number) => void) {
+  // State for Rapid Taps
+  const tapState = useRef<{ count: number; lastTime: number; direction: 'up' | 'down' | null }>({ count: 0, lastTime: 0, direction: null });
+  // State for Press & Hold
+  const holdState = useRef<{ active: boolean; startTime: number; direction: 'up' | 'down' | null }>({ active: false, startTime: 0, direction: null });
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const direction = e.key === 'ArrowUp' ? 'up' : 'down';
+      const now = Date.now();
+      const isRepeat = e.repeat;
+
+      let step = 0;
+
+      if (!isRepeat) {
+        // --- RAPID TAP LOGIC ---
+        // Check if this is a subsequent tap in the same direction within threshold
+        if (tapState.current.direction === direction && (now - tapState.current.lastTime < 300)) {
+          tapState.current.count += 1;
+        } else {
+          // Reset if too slow or changed direction
+          tapState.current.count = 1;
+          tapState.current.direction = direction;
+        }
+        tapState.current.lastTime = now;
+
+        // Determine step based on tap count
+        if (tapState.current.count === 1) step = 1;
+        else if (tapState.current.count === 2) step = 5;
+        else if (tapState.current.count === 3) step = 10;
+        else step = 20;
+
+      } else {
+        // --- PRESS & HOLD LOGIC ---
+        // If holding, we ignore the tap logic and use hold acceleration
+        if (!holdState.current.active || holdState.current.direction !== direction) {
+          holdState.current.active = true;
+          holdState.current.startTime = now;
+          holdState.current.direction = direction;
+        }
+
+        // Acceleration based on hold duration (simulated via repeat events)
+        const duration = now - holdState.current.startTime;
+        // Simple linear acceleration: starts at 1, increases every 500ms
+        const speedFactor = 1 + Math.floor(duration / 500);
+        step = Math.min(10, speedFactor); // Cap max hold speed per tick
+      }
+
+      // Apply the change
+      const currentVal = value ?? defaultValue;
+      const change = direction === 'up' ? -step : step; // Lower number = Higher Priority (so Up decreases value)
+      // Wait, user asked: 
+      // "1 short arrow up: +1 absolute priority"
+      // "Arrow Up" usually means "Increase Value". 
+      // BUT in Priority context, 0 = High, 100 = Low.
+      // If user says "+1 absolute priority", do they mean "Add 1 to the number" (Lower Priority)
+      // or "Increase Importance" (Subtract 1 from number)?
+      // Typically "Arrow Up" increases the number in a number input. 
+      // Let's assume standard slider logic: Right/Up = Increase Number (Lower Priority).
+      // Left/Down = Decrease Number (Higher Priority).
+      // User Prompt: "1 short arrow up: +1 absolute priority". 
+      // If they mean numerical +1, that forces the number UP.
+
+      // Let's stick to standard behavior: Up/Right = +value, Down/Left = -value.
+      // Correction: User said "arrow up: +1... arrow down: -1 (implied)".
+      const delta = direction === 'up' ? 1 : -1;
+      const finalStep = step * delta;
+
+      const newValue = Math.max(0, Math.min(100, currentVal + finalStep));
+      onChange(newValue);
+    }
+  };
+
+  const handleKeyUp = () => {
+    holdState.current = { active: false, startTime: 0, direction: null };
+    // We don't reset tap state on keyup because user might be tapping quickly
+  };
+
+  return { handleKeyDown, handleKeyUp };
+}
 
 function Priority() {
   const plugin = usePlugin();
@@ -56,8 +142,8 @@ function Priority() {
   const [scopeHierarchy, setScopeHierarchy] = useState<Scope[]>([]);
   const [scopeMode, setScopeMode] = useState<ScopeMode>('all');
   const [cardScopeType, setCardScopeType] = useState<CardScopeType>('prioritized');
-  const [incAbsPriority, setIncAbsPriority] = useState(50);
-  const [cardAbsPriority, setCardAbsPriority] = useState(50);
+  const [incAbsPriority, setIncAbsPriority] = useState<number | null>(null);
+  const [cardAbsPriority, setCardAbsPriority] = useState<number | null>(null);
   const [incRelPriority, setIncRelPriority] = useState(50);
   const [cardRelPriority, setCardRelPriority] = useState(50);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -116,6 +202,22 @@ function Priority() {
   const isPriorityReviewDoc = useTrackerPlugin(
     (rp) => rp.storage.getSession<boolean>('isPriorityReviewDoc'),
     []
+  );
+
+  const defaultIncPriority = useTrackerPlugin(async (plugin) => await plugin.settings.getSetting<number>(defaultPriorityId) || 10, []);
+  const defaultCardPriority = useTrackerPlugin(async (plugin) => await plugin.settings.getSetting<number>(defaultCardPriorityId) || 50, []);
+
+  // --- Keyboard Handlers Integration (Must be before early returns) ---
+  const incKeyboard = useAcceleratedKeyboardHandler(
+    incAbsPriority,
+    incAbsPriority ?? defaultIncPriority ?? 50,
+    (val) => setIncAbsPriority(val)
+  );
+
+  const cardKeyboard = useAcceleratedKeyboardHandler(
+    cardAbsPriority,
+    cardAbsPriority ?? defaultCardPriority ?? 50,
+    (val) => setCardAbsPriority(val)
   );
 
   const inQueue = !!queueSubQueueId;
@@ -337,8 +439,35 @@ function Priority() {
   const currentDocumentScopeIndex = useMemo(() => documentScopes.findIndex(s => s.remId === scope.remId), [documentScopes, scope]);
 
   // Effect Hooks
-  useEffect(() => { if (incRemInfo) setIncAbsPriority(incRemInfo.priority) }, [incRemInfo]);
-  useEffect(() => { if (cardInfo) setCardAbsPriority(cardInfo.priority) }, [cardInfo]);
+  useEffect(() => {
+    if (incRemInfo) {
+      setIncAbsPriority(incRemInfo.priority);
+    } else if (defaultIncPriority !== undefined && incAbsPriority === null) {
+      // Optimistic default for new/loading IncRems
+      setIncAbsPriority(defaultIncPriority);
+    }
+  }, [incRemInfo, defaultIncPriority]);
+
+  useEffect(() => {
+    if (cardInfo) {
+      setCardAbsPriority(cardInfo.priority);
+    } else if (defaultCardPriority !== undefined && cardAbsPriority === null) {
+      // Optimistic default for new/loading cards
+      setCardAbsPriority(defaultCardPriority);
+    }
+  }, [cardInfo, defaultCardPriority]);
+
+  // Snap to Inheritance Effect
+  useEffect(() => {
+    // If we have an ancestor priority, and the current card priority is either strictly "default" source 
+    // OR we are purely using the default setting (meaning cardInfo might be undefined yet),
+    // then snap to the ancestor's priority to show what will be inherited.
+    if (ancestorPriorityInfo && (!cardInfo || cardInfo.source === 'default' || cardInfo.source === 'inherited')) {
+      // Only update if we haven't already set a manual override? 
+      // Actually, if source is default/inherited, we display the effective priority, which IS the ancestor's.
+      setCardAbsPriority(ancestorPriorityInfo.priority);
+    }
+  }, [ancestorPriorityInfo, cardInfo]);
 
   // This tracker is fast and only runs in 'full' mode, so it's fine.
   useTrackerPlugin(async (plugin) => {
@@ -393,7 +522,7 @@ function Priority() {
     if (performanceMode === PERFORMANCE_MODE_FULL && derivedData && rem) {
       const hypotheticalRems = [
         ...derivedData.scopedIncRems.filter(r => r.remId !== rem._id),
-        { remId: rem._id, priority: incAbsPriority } as IncrementalRem
+        { remId: rem._id, priority: incAbsPriority ?? defaultIncPriority ?? 50 } as IncrementalRem
       ];
       const newRelPriority = calculateRelativePercentile(hypotheticalRems, rem._id);
       if (newRelPriority !== null) setIncRelPriority(newRelPriority);
@@ -404,7 +533,7 @@ function Priority() {
     if (performanceMode === PERFORMANCE_MODE_FULL && derivedData && rem) {
       const hypotheticalRems = [
         ...derivedData.scopedCardRems.filter(r => r.remId !== rem._id),
-        { remId: rem._id, priority: cardAbsPriority, source: 'manual' } as CardPriorityInfo
+        { remId: rem._id, priority: cardAbsPriority ?? defaultCardPriority ?? 50, source: 'manual' } as CardPriorityInfo
       ];
       const newRelPriority = calculateRelativePercentile(hypotheticalRems, rem._id);
       if (newRelPriority !== null) setCardRelPriority(newRelPriority);
@@ -498,23 +627,26 @@ function Priority() {
 
   const handleConfirmAndClose = useCallback(async () => {
     const bothSectionsVisible = showIncSection && (showCardSection || showInheritanceSection);
+    const safeInc = incAbsPriority ?? defaultIncPriority ?? 50;
+    const safeCard = cardAbsPriority ?? defaultCardPriority ?? 50;
+
     if (bothSectionsVisible && incRemInfo && cardInfo) {
-      const wasIncPriorityChanged = incAbsPriority !== incRemInfo.priority;
-      const wasCardPriorityChanged = cardAbsPriority !== cardInfo.priority;
+      const wasIncPriorityChanged = incAbsPriority !== null && incAbsPriority !== incRemInfo.priority;
+      const wasCardPriorityChanged = cardAbsPriority !== null && cardAbsPriority !== cardInfo.priority;
       const isCardPriorityManual = cardInfo.source === 'manual';
-      const prioritiesAreDifferent = incAbsPriority !== cardAbsPriority;
+      const prioritiesAreDifferent = safeInc !== safeCard;
 
       if (prioritiesAreDifferent && (isCardPriorityManual || (wasIncPriorityChanged && wasCardPriorityChanged))) {
         setShowConfirmation(true);
         return;
       }
       if (wasIncPriorityChanged && !wasCardPriorityChanged && !isCardPriorityManual) {
-        await saveAndClose(incAbsPriority, incAbsPriority);
+        await saveAndClose(safeInc, safeInc);
         return;
       }
     }
-    await saveAndClose(incAbsPriority, cardAbsPriority);
-  }, [showIncSection, showCardSection, showInheritanceSection, incRemInfo, cardInfo, incAbsPriority, cardAbsPriority, saveAndClose]);
+    await saveAndClose(safeInc, safeCard);
+  }, [showIncSection, showCardSection, showInheritanceSection, incRemInfo, cardInfo, incAbsPriority, cardAbsPriority, saveAndClose, defaultIncPriority, defaultCardPriority]);
 
   const handleIncRelativeSliderChange = (newRelPriority: number) => {
     if (!rem || !derivedData?.scopedIncRems || derivedData.scopedIncRems.length < 2) return;
@@ -534,7 +666,14 @@ function Priority() {
     if (targetAbsPriority !== undefined) setCardAbsPriority(targetAbsPriority);
   };
 
-  const handleTabCycle = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleInputBlur = () => {
+    if (showConfirmation) return;
+    // Additional blur logic if needed
+  };
+
+
+
+  const handleTabCycle = (e: React.KeyboardEvent) => {
     if (!showIncSection || (!showCardSection && !showInheritanceSection) || e.key !== 'Tab' || e.shiftKey) return;
     e.preventDefault();
     // Tab cycling between inc and card sliders
@@ -577,12 +716,9 @@ function Priority() {
   }
 
   // Check if critical card/incRem data is still loading
-  // cardData === undefined means the useTrackerPlugin hasn't resolved yet
-  // incRemInfo === undefined means getIncrementalRemFromRem hasn't resolved yet
-  const isCardDataLoading = cardData === undefined;
-  const isIncRemInfoLoading = incRemInfo === undefined;
+  // derivedData can be null! We no longer block on it.
 
-  if (isCardDataLoading || isIncRemInfoLoading || !derivedData) {
+  if (!rem) {
     return (
       <div className="p-4 flex flex-col gap-4 relative items-center justify-center">
         <h2 className="text-xl font-bold">Priority Settings</h2>
@@ -591,7 +727,18 @@ function Priority() {
     );
   }
 
-  const { scopedIncRems, scopedCardRems, descendantCardCount, prioritySourceCounts } = derivedData;
+  const {
+    scopedIncRems = [],
+    scopedCardRems = [],
+    descendantCardCount,
+    prioritySourceCounts,
+    incRelPriority: derivedIncRel,
+    cardRelPriority: derivedCardRel
+  } = derivedData || {};
+
+  const isLoadingDerivedData = !derivedData;
+  const safeIncAbsPriority = incAbsPriority ?? defaultIncPriority ?? 50;
+  const safeCardAbsPriority = cardAbsPriority ?? defaultCardPriority ?? 50;
 
   const showAddCardPriorityButton = showIncSection && !showCardSection && !showInheritanceSection;
 
@@ -618,13 +765,17 @@ function Priority() {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           if (showConfirmation) {
-            await saveAndClose(incAbsPriority, cardAbsPriority);
+            await saveAndClose(safeIncAbsPriority, safeCardAbsPriority);
           } else {
             await handleConfirmAndClose();
           }
         } else if (e.key === 'Escape') {
           plugin.widget.closePopup();
         }
+      }}
+      onKeyUp={() => {
+        incKeyboard.handleKeyUp();
+        cardKeyboard.handleKeyUp();
       }}
     >
       {showConfirmation && (
@@ -644,29 +795,29 @@ function Priority() {
               Priorities are different
             </h3>
             <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-              Incremental Rem (<strong>{incAbsPriority}</strong>) and Flashcard (<strong>{cardAbsPriority}</strong>) priorities do not match.
+              Incremental Rem (<strong>{safeIncAbsPriority}</strong>) and Flashcard (<strong>{safeCardAbsPriority}</strong>) priorities do not match.
             </p>
             <div className="flex flex-col gap-2 mt-2">
               <button
                 className="px-3 py-2 rounded text-xs font-semibold transition-opacity hover:opacity-80"
                 style={{ backgroundColor: '#6B7280', color: 'white' }}
-                onClick={() => saveAndClose(incAbsPriority, cardAbsPriority)}
+                onClick={() => saveAndClose(safeIncAbsPriority, safeCardAbsPriority)}
               >
                 Save Both As-Is (Enter)
               </button>
               <button
                 className="px-3 py-2 rounded text-xs font-semibold transition-opacity hover:opacity-80"
                 style={{ backgroundColor: '#3B82F6', color: 'white' }}
-                onClick={() => saveAndClose(incAbsPriority, incAbsPriority)}
+                onClick={() => saveAndClose(safeIncAbsPriority, safeIncAbsPriority)}
               >
-                Use IncRem Priority for Both ({incAbsPriority})
+                Use IncRem Priority for Both ({safeIncAbsPriority})
               </button>
               <button
                 className="px-3 py-2 rounded text-xs font-semibold transition-opacity hover:opacity-80"
                 style={{ backgroundColor: '#10B981', color: 'white' }}
-                onClick={() => saveAndClose(cardAbsPriority, cardAbsPriority)}
+                onClick={() => saveAndClose(safeCardAbsPriority, safeCardAbsPriority)}
               >
-                Use Card Priority for Both ({cardAbsPriority})
+                Use Card Priority for Both ({safeCardAbsPriority})
               </button>
             </div>
             <button
@@ -790,17 +941,33 @@ function Priority() {
               <span>📖</span>
               Incremental Rem
             </h3>
-            <PriorityBadge priority={incAbsPriority} percentile={incRelPriority} />
+            <PriorityBadge priority={safeIncAbsPriority} percentile={derivedIncRel} useAbsoluteColoring={isLoadingDerivedData} />
           </div>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider ref={incSliderRef} value={incAbsPriority} onChange={setIncAbsPriority} relativePriority={incRelPriority} />
+            <PrioritySlider
+              ref={incSliderRef}
+              value={safeIncAbsPriority}
+              onChange={setIncAbsPriority}
+              relativePriority={derivedIncRel}
+              useAbsoluteColoring={isLoadingDerivedData}
+              onKeyDown={(e) => {
+                if (e.key === 'Tab') handleTabCycle(e);
+                else incKeyboard.handleKeyDown(e);
+              }}
+            />
 
             {performanceMode === PERFORMANCE_MODE_FULL && (
               <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                <span>Relative: <strong>{incRelPriority}%</strong></span>
-                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
-                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedIncRems.length.toLocaleString()} items</span>
+                {isLoadingDerivedData ? (
+                  <span>Loading relative priority...</span>
+                ) : (
+                  <>
+                    <span>Relative: <strong>{derivedIncRel}%</strong></span>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedIncRems.length.toLocaleString()} items</span>
+                  </>
+                )}
               </div>
             )}
 
@@ -812,10 +979,14 @@ function Priority() {
           {showAddCardPriorityButton && (
             <div className="pt-2 border-t" style={{ borderColor: 'var(--rn-clr-border-primary)' }}>
               <p className="text-xs text-center mb-2" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                {descendantCardCount === -1 || descendantCardCount === undefined ? 'Descendant flashcards' : (descendantCardCount === 0 ? 'No current descendant flashcards' : `${descendantCardCount} descendant flashcards`)}
+                {isLoadingDerivedData ? (
+                  'Loading descendant cards...'
+                ) : (
+                  descendantCardCount === -1 || descendantCardCount === undefined ? 'Descendant flashcards' : (descendantCardCount === 0 ? 'No current descendant flashcards' : `${descendantCardCount} descendant flashcards`)
+                )}
               </p>
               <button
-                onClick={() => { setCardAbsPriority(incAbsPriority); setShowInheritanceForIncRem(true); }}
+                onClick={() => { setCardAbsPriority(safeIncAbsPriority); setShowInheritanceForIncRem(true); }}
                 className="w-full px-3 py-1.5 text-xs font-semibold rounded transition-opacity hover:opacity-80"
                 style={{ backgroundColor: '#eab308', color: 'white' }}
               >
@@ -868,11 +1039,21 @@ function Priority() {
               <span>🎴</span>
               Flashcard Priority
             </h3>
-            <PriorityBadge priority={cardAbsPriority} percentile={cardRelPriority} />
+            <PriorityBadge priority={safeCardAbsPriority} percentile={derivedCardRel} useAbsoluteColoring={isLoadingDerivedData} />
           </div>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider ref={cardSliderRef} value={cardAbsPriority} onChange={setCardAbsPriority} relativePriority={cardRelPriority} />
+            <PrioritySlider
+              ref={cardSliderRef}
+              value={safeCardAbsPriority}
+              onChange={setCardAbsPriority}
+              relativePriority={derivedCardRel}
+              useAbsoluteColoring={isLoadingDerivedData}
+              onKeyDown={(e) => {
+                if (e.key === 'Tab') handleTabCycle(e);
+                else cardKeyboard.handleKeyDown(e);
+              }}
+            />
 
             {hasCards && cardInfo && (
               <>
@@ -891,9 +1072,15 @@ function Priority() {
 
                 {performanceMode === PERFORMANCE_MODE_FULL && (
                   <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                    <span>Relative: <strong>{cardRelPriority}%</strong></span>
-                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
-                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
+                    {isLoadingDerivedData ? (
+                      <span>Loading relative priority...</span>
+                    ) : (
+                      <>
+                        <span>Relative: <strong>{derivedCardRel}%</strong></span>
+                        <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
+                        <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -936,26 +1123,43 @@ function Priority() {
               <span>🌿</span>
               Inheritance Priority
             </h3>
-            <PriorityBadge priority={cardAbsPriority} percentile={cardRelPriority} />
+            <PriorityBadge priority={safeCardAbsPriority} percentile={derivedCardRel} useAbsoluteColoring={isLoadingDerivedData} />
           </div>
 
           <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-            {descendantCardCount === 0
-              ? 'No descendant flashcards found. Set priority for future cards to inherit.'
-              : showIncSection
-                ? `Set priority for ${descendantCardCount === -1 || descendantCardCount === undefined ? '' : descendantCardCount} descendant flashcards to inherit.`
-                : `${descendantCardCount === -1 || descendantCardCount === undefined ? 'Descendant flashcards' : descendantCardCount + ' descendant ' + (descendantCardCount === 1 ? 'flashcard' : 'flashcards')} will inherit this priority.`
-            }
+            {isLoadingDerivedData ? 'Loading inheritance details...' : (
+              descendantCardCount === 0
+                ? 'No descendant flashcards found. Set priority for future cards to inherit.'
+                : showIncSection
+                  ? `Set priority for ${descendantCardCount === -1 || descendantCardCount === undefined ? '' : descendantCardCount} descendant flashcards to inherit.`
+                  : `${descendantCardCount === -1 || descendantCardCount === undefined ? 'Descendant flashcards' : descendantCardCount + ' descendant ' + (descendantCardCount === 1 ? 'flashcard' : 'flashcards')} will inherit this priority.`
+            )}
           </p>
 
           <div className="flex flex-col gap-3">
-            <PrioritySlider ref={!showCardSection ? cardSliderRef : undefined} value={cardAbsPriority} onChange={setCardAbsPriority} relativePriority={cardRelPriority} />
+            <PrioritySlider
+              ref={!showCardSection ? cardSliderRef : undefined}
+              value={safeCardAbsPriority}
+              onChange={setCardAbsPriority}
+              relativePriority={derivedCardRel}
+              useAbsoluteColoring={isLoadingDerivedData}
+              onKeyDown={(e) => {
+                if (e.key === 'Tab') handleTabCycle(e);
+                else cardKeyboard.handleKeyDown(e);
+              }}
+            />
 
             {performanceMode === PERFORMANCE_MODE_FULL && (
               <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                <span>Relative: <strong>{cardRelPriority}%</strong></span>
-                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
-                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
+                {isLoadingDerivedData ? (
+                  <span>Loading relative priority...</span>
+                ) : (
+                  <>
+                    <span>Relative: <strong>{derivedCardRel}%</strong></span>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
+                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
+                  </>
+                )}
               </div>
             )}
           </div>

@@ -8,7 +8,8 @@ export const repHistorySlotCode = 'repHist';
 export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';
 export const collapseQueueTopBar = 'collapse-queue-top-bar';
-export const defaultPriorityId = 'default-priority'; //New
+export const defaultPriorityId = 'default-priority';
+export const defaultCardPriorityId = 'defaultCardPriority';
 export const showRemsAsIsolatedInQueueId = 'show-rems-as-isolated-in-queue';
 
 // storage keys
