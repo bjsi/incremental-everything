@@ -72,7 +72,17 @@ function Priority() {
   }, []);
 
   const rem = useTrackerPlugin(async (plugin) => {
-    const remId = widgetContext?.contextData?.remId;
+    let remId = widgetContext?.contextData?.remId;
+
+    // Fallback: Check if we just came from Highlight Actions (Create Incremental Rem)
+    if (!remId) {
+      remId = await plugin.storage.getSession<string>('priorityPopupTargetRemId');
+      if (remId) {
+        // Clear it immediately so it doesn't persist for other uses
+        // await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+      }
+    }
+
     if (!remId) {
       return null;
     }

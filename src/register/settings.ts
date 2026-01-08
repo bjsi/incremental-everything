@@ -8,7 +8,6 @@ import {
   alwaysUseLightModeOnMobileId,
   alwaysUseLightModeOnWebId,
   remnoteEnvironmentId,
-  pdfHighlightColorId,
   showRemsAsIsolatedInQueueId,
 } from '../lib/consts';
 
@@ -214,18 +213,5 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     ],
   });
 
-  plugin.settings.registerDropdownSetting({
-    id: pdfHighlightColorId,
-    title: 'Incremental PDF Highlight Color',
-    description:
-      'Choose the highlight color for PDF highlights tagged as Incremental Rem. When toggling OFF (removing Incremental tag), the highlight will be reset to Yellow.',
-    defaultValue: 'Blue',
-    options: [
-      { key: 'Red', label: 'Red', value: 'Red' },
-      { key: 'Orange', label: 'Orange', value: 'Orange' },
-      { key: 'Green', label: 'Green', value: 'Green' },
-      { key: 'Blue', label: 'Blue', value: 'Blue' },
-      { key: 'Purple', label: 'Purple', value: 'Purple' },
-    ],
-  });
+
 }

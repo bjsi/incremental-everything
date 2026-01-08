@@ -62,18 +62,18 @@ export async function loadIncrementalRemCache(
   batchSize: number = 500,
   batchDelayMs: number = 100
 ): Promise<IncrementalRem[]> {
-  console.log('TRACKER: Incremental Rem tracker starting...');
+
 
   const powerup = await plugin.powerup.getPowerupByCode(powerupCode);
   const taggedRem = (await powerup?.taggedRem()) || [];
-  console.log(`TRACKER: Found ${taggedRem.length} Incremental Rems. Starting batch processing...`);
+
 
   const updatedAllRem: IncrementalRem[] = [];
   const numBatches = Math.ceil(taggedRem.length / batchSize);
 
   for (let i = 0; i < taggedRem.length; i += batchSize) {
     const batch = taggedRem.slice(i, i + batchSize);
-    console.log(`TRACKER: Processing IncRem batch ${Math.floor(i / batchSize) + 1} of ${numBatches}...`);
+
 
     const batchInfos = (
       await Promise.all(batch.map((rem) => getIncrementalRemFromRem(plugin, rem)))
@@ -84,9 +84,9 @@ export async function loadIncrementalRemCache(
     await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
   }
 
-  console.log(`TRACKER: Processing complete. Final IncRem cache size is ${updatedAllRem.length}.`);
+
   await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
-  console.log('TRACKER: Incremental Rem cache has been saved.');
+
 
   return updatedAllRem;
 }
