@@ -103,7 +103,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
     '📊 Update All Inherited Card Priorities\n\n' +
       'This will analyze all flashcards in your knowledge base and update all priorities that are inherited from their ancestors.\n\n' +
       'Your manually set card priorities will not be affected.\n\n' +
-      'This ensures that manual prioritization inputs made to ancestors are properly spread to their descendants .\n\n' +
+      'This ensures that manual prioritization inputs made to ancestors are properly spread to their descendants.\n\n' +
       'This may take several minutes for large collections. Continue?'
   );
 

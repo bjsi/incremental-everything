@@ -6,6 +6,7 @@ import {
   PluginRem,
   RemId,
 } from '@remnote/plugin-sdk';
+import { shouldUseLightMode } from '../lib/mobileUtils';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -44,26 +45,11 @@ function Priority() {
 
   // --- ALL HOOKS DECLARED UNCONDITIONALLY AT THE TOP ---
 
-  // ✅ Track the values that determine effective mode
-  const performanceModeSetting = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<string>('performanceMode'),
-    []
-  ) || DEFAULT_PERFORMANCE_MODE;
-
-  const isMobile = useTrackerPlugin(
-    async (rp) => await rp.storage.getSynced<boolean>(isMobileDeviceKey),
-    []
-  );
-
-  const alwaysUseLightOnMobile = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId),
-    []
-  );
-
   // ✅ Calculate effective mode
-  const performanceMode = performanceModeSetting === PERFORMANCE_MODE_LIGHT || 
-                          (isMobile && alwaysUseLightOnMobile !== false) 
-                          ? 'light' : 'full';
+  const performanceMode = useTrackerPlugin(async (rp) => {
+    const useLight = await shouldUseLightMode(rp);
+    return useLight ? 'light' : 'full';
+  }, []) || 'light';
 
   // State Hooks
   const [scope, setScope] = useState<Scope>({ remId: null, name: 'All KB' });
@@ -84,7 +70,7 @@ function Priority() {
     const ctx = await plugin.widget.getWidgetContext<{ remId: string }>();
     return ctx;
   }, []);
-  
+
   const rem = useTrackerPlugin(async (plugin) => {
     const remId = widgetContext?.contextData?.remId;
     if (!remId) {
@@ -96,32 +82,32 @@ function Priority() {
 
   // 🔌 Conditionally fetch cache based on performance mode
   const sessionCache = useTrackerPlugin(
-    (rp) => (performanceMode === PERFORMANCE_MODE_FULL) 
-      ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey) 
-      : Promise.resolve(null), 
-  [performanceMode]);
-  
+    (rp) => (performanceMode === PERFORMANCE_MODE_FULL)
+      ? rp.storage.getSession<QueueSessionCache>(queueSessionCacheKey)
+      : Promise.resolve(null),
+    [performanceMode]);
+
   const allIncRems = useTrackerPlugin(async (plugin) => await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [], []);
-  
-  const allCardInfos = useTrackerPlugin(async (plugin) => 
+
+  const allCardInfos = useTrackerPlugin(async (plugin) =>
     (performanceMode === PERFORMANCE_MODE_FULL)
-      ? await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [] 
-      : Promise.resolve([]), 
-  [performanceMode]);
+      ? await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || []
+      : Promise.resolve([]),
+    [performanceMode]);
 
   const queueSubQueueId = useTrackerPlugin((rp) => rp.storage.getSession<string | null>(currentSubQueueIdKey), []);
-  
+
   // --- NEW: Priority Review Document awareness ---
   const originalScopeId = useTrackerPlugin(
     (rp) => rp.storage.getSession<string | null>('originalScopeId'),
     []
   );
-  
+
   const isPriorityReviewDoc = useTrackerPlugin(
     (rp) => rp.storage.getSession<boolean>('isPriorityReviewDoc'),
     []
   );
-  
+
   const inQueue = !!queueSubQueueId;
 
   const incRemInfo = useTrackerPlugin(async (plugin) => {
@@ -144,14 +130,14 @@ function Priority() {
         console.log('[Priority] 🃏 cardData: rem is null/undefined, returning undefined');
         return undefined;
       }
-      
+
       // Step 1: Check powerup first (fast) - this determines if we show the card section
       const hasPowerup = await rem.hasPowerup('cardPriority');
       console.log('[Priority] 🃏 cardData: hasPowerup =', hasPowerup);
-      
+
       // Step 2: Get card priority info (needed for displaying priority value)
       const cardPriorityInfo = await getCardPriority(plugin, rem);
-      
+
       // Step 3: If powerup exists, we can skip expensive hasCards check
       // The powerup is sufficient to show the card section
       if (hasPowerup) {
@@ -162,10 +148,10 @@ function Priority() {
           hasCardPriorityPowerup: true
         };
       }
-      
+
       // Step 4: No powerup - need to check for cards using three-tier fallback
       let hasCards = false;
-      
+
       // Tier 1: Try rem.getCards() first (fastest, works most of the time)
       const directCards = await rem.getCards();
       if (directCards.length > 0) {
@@ -173,36 +159,42 @@ function Priority() {
         console.log('[Priority] 🃏 cardData: Tier 1 (rem.getCards) found', directCards.length, 'cards');
       } else {
         // Tier 2: Check if rem exists in the card priority cache
-        console.log('[Priority] 🃏 cardData: Tier 1 returned 0, checking cache (Tier 2)...');
-        const cachedCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
-        const cachedInfo = cachedCardInfos?.find(info => info.remId === rem._id);
-        
-        if (cachedInfo && cachedInfo.cardCount > 0) {
-          hasCards = true;
-          console.log('[Priority] 🃏 cardData: Tier 2 (cache) found cardCount:', cachedInfo.cardCount);
+        // 🔌 Skip cache check and global registry in light mode to ensure speed
+        if (performanceMode === PERFORMANCE_MODE_LIGHT) {
+          console.log('[Priority] 🃏 cardData: Tier 1 returned 0, skipping Tier 2/3 (Light Mode)');
+          hasCards = false;
         } else {
-          // Tier 3: Use global registry as final fallback (slowest but most reliable)
-          console.log('[Priority] 🃏 cardData: Tier 2 miss, checking global registry (Tier 3)...');
-          const allCards = await plugin.card.getAll();
-          const cardsForRem = allCards.filter(card => card.remId === rem._id);
-          hasCards = cardsForRem.length > 0;
-          console.log('[Priority] 🃏 cardData: Tier 3 (global registry) found', cardsForRem.length, 'cards');
+          console.log('[Priority] 🃏 cardData: Tier 1 returned 0, checking cache (Tier 2)...');
+          const cachedCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
+          const cachedInfo = cachedCardInfos?.find(info => info.remId === rem._id);
+
+          if (cachedInfo && cachedInfo.cardCount > 0) {
+            hasCards = true;
+            console.log('[Priority] 🃏 cardData: Tier 2 (cache) found cardCount:', cachedInfo.cardCount);
+          } else {
+            // Tier 3: Use global registry as final fallback (slowest but most reliable)
+            console.log('[Priority] 🃏 cardData: Tier 2 miss, checking global registry (Tier 3)...');
+            const allCards = await plugin.card.getAll();
+            const cardsForRem = allCards.filter(card => card.remId === rem._id);
+            hasCards = cardsForRem.length > 0;
+            console.log('[Priority] 🃏 cardData: Tier 3 (global registry) found', cardsForRem.length, 'cards');
+          }
         }
       }
-      
+
       console.log('[Priority] 🃏 cardData results:', {
         hasCards,
         hasCardPriorityPowerup: hasPowerup,
         cardPriorityInfo: cardPriorityInfo ? `Found (priority: ${cardPriorityInfo.priority}, source: ${cardPriorityInfo.source}, cardCount: ${cardPriorityInfo.cardCount})` : 'null'
       });
-      
+
       return {
         hasCards,
         cardInfo: cardPriorityInfo,
         hasCardPriorityPowerup: hasPowerup
       };
     },
-    [rem?._id]
+    [rem?._id, performanceMode]
   );
 
   // Then use:
@@ -221,6 +213,21 @@ function Priority() {
   const derivedData = useRunAsync(async () => {
     if (!rem) return undefined;
 
+    // 🔌 Check performance mode
+    if (performanceMode === PERFORMANCE_MODE_LIGHT) {
+      // In light mode, we skip the expensive descendant card check and assume there might be descendants (always show inheritance option)
+      return {
+        scopedIncRems: [],
+        scopedCardRems: [],
+        incRelPriority: 50,
+        cardRelPriority: 50,
+        descendantCardCount: -1, // -1 indicates "unknown" / skipped check
+        prioritySourceCounts: { manual: 0, inherited: 0, default: 0 },
+      };
+    }
+
+    // --- FULL MODE LOGIC ---
+
     // Calculate descendant card count (needed for "Set Card Priority for Inheritance" button)
     // We use plugin.card.getAll() instead of rem.getCards() due to SDK inconsistency
     // where rem.getCards() sometimes returns [] even when cards exist.
@@ -228,29 +235,18 @@ function Priority() {
     // but for inheritance we need to count ALL cards including untagged descendants.
     const descendants = await rem.getDescendants();
     const descendantIds = new Set(descendants.map(d => d._id));
-    
+
+    // OPTIMIZATION: Use the set of IDs to filter efficiently, as suggested by RemNote support.
+    // This is already using the optimized approach of fetching all cards once and validiting IDs,
+    // avoiding individual rem fetches for each card.
     const allCards = await plugin.card.getAll();
     const cardsInDescendants = allCards.filter(card => descendantIds.has(card.remId));
     const finalDescendantCardCount = cardsInDescendants.length;
 
-    // 🔌 Check performance mode
-    if (performanceMode === PERFORMANCE_MODE_LIGHT) {
-      // In light mode, we only return the descendant count and empty arrays
-      return { 
-        scopedIncRems: [], 
-        scopedCardRems: [],
-        incRelPriority: 50,
-        cardRelPriority: 50,
-        descendantCardCount: finalDescendantCardCount, 
-        prioritySourceCounts: { manual: 0, inherited: 0, default: 0 },
-      };
-    }
-
-    // --- FULL MODE LOGIC ---
     // ... (rest of the existing derivedData logic) ...
     const effectiveScopeForCache = originalScopeId || queueSubQueueId;
     const useFastCache = inQueue && scope.remId === effectiveScopeForCache;
-    
+
     let finalScopedIncRems: IncrementalRem[];
     let finalScopedCardRems: CardPriorityInfo[];
     let finalIncRel: number | null = null;
@@ -263,29 +259,29 @@ function Priority() {
       const cardRemsInScope = allCardInfos.filter(ci => sessionCache.docPercentiles.hasOwnProperty(ci.remId));
       finalScopedIncRems = (scopeMode === 'all') ? allIncRems : incRemsInScope;
       const allCardsInScope = (scopeMode === 'all') ? allCardInfos : cardRemsInScope;
-      finalPrioritySourceCounts = allCardsInScope.reduce((counts, rem) => ({...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0 });
+      finalPrioritySourceCounts = allCardsInScope.reduce((counts, rem) => ({ ...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0 });
       finalScopedCardRems = (cardScopeType === 'prioritized' ? allCardsInScope.filter(c => c.source !== 'default') : allCardsInScope);
       finalIncRel = (scopeMode === 'document') ? sessionCache.incRemDocPercentiles[rem._id] : calculateRelativePercentile(allIncRems, rem._id);
       finalCardRel = (scopeMode === 'document') ? sessionCache.docPercentiles[rem._id] : calculateRelativePercentile(allCardInfos, rem._id);
-      
+
     } else {
       // --- OPTIMIZED ASYNC FALLBACK PATH WITH COMPREHENSIVE SCOPE ---
       const scopeRem = scopeMode === 'document' && scope.remId ? await plugin.rem.findOne(scope.remId) : null;
-      
+
       let scopeIds: Set<RemId> | null = null;
-      
+
       if (scopeRem) {
         // --- COMPREHENSIVE SCOPE CALCULATION ---
         const descendants = await scopeRem.getDescendants();
         const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
         const folderQueueRems = await scopeRem.allRemInFolderQueue();
         const sources = await scopeRem.getSources();
-        
+
         const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
           powerupCode,
           nextRepDateSlotCode
         );
-        
+
         const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
           if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
             return rem.parent;
@@ -293,7 +289,7 @@ function Priority() {
             return rem._id;
           }
         }).filter(id => id !== null && id !== undefined) as RemId[];
-        
+
         scopeIds = new Set<RemId>([
           scopeRem._id,
           ...descendants.map(d => d._id),
@@ -303,11 +299,11 @@ function Priority() {
           ...referencingRems
         ]);
       }
-      
+
       finalScopedIncRems = scopeIds ? allIncRems.filter(r => scopeIds.has(r.remId)) : allIncRems;
       let tempScopedCardRems = scopeIds ? allCardInfos.filter(ci => scopeIds.has(ci.remId)) : allCardInfos;
-      
-      finalPrioritySourceCounts = tempScopedCardRems.reduce((counts, rem) => ({...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0 });
+
+      finalPrioritySourceCounts = tempScopedCardRems.reduce((counts, rem) => ({ ...counts, [rem.source]: (counts[rem.source] || 0) + 1 }), { manual: 0, inherited: 0, default: 0 });
 
       if (cardScopeType === 'prioritized') {
         tempScopedCardRems = tempScopedCardRems.filter(c => c.source !== 'default');
@@ -315,13 +311,13 @@ function Priority() {
       finalScopedCardRems = tempScopedCardRems;
       finalIncRel = calculateRelativePercentile(finalScopedIncRems, rem._id);
       finalCardRel = calculateRelativePercentile(finalScopedCardRems, rem._id);
-    }    
-    return { 
-      scopedIncRems: finalScopedIncRems, 
+    }
+    return {
+      scopedIncRems: finalScopedIncRems,
       scopedCardRems: finalScopedCardRems,
       incRelPriority: finalIncRel || 50,
       cardRelPriority: finalCardRel || 50,
-      descendantCardCount: finalDescendantCardCount, 
+      descendantCardCount: finalDescendantCardCount,
       prioritySourceCounts: finalPrioritySourceCounts,
     };
   }, [rem, inQueue, scope, allIncRems, allCardInfos, cardScopeType, sessionCache, queueSubQueueId, scopeMode, originalScopeId, isPriorityReviewDoc, performanceMode]); // 🔌 Add performanceMode
@@ -333,7 +329,7 @@ function Priority() {
   // Effect Hooks
   useEffect(() => { if (incRemInfo) setIncAbsPriority(incRemInfo.priority) }, [incRemInfo]);
   useEffect(() => { if (cardInfo) setCardAbsPriority(cardInfo.priority) }, [cardInfo]);
-  
+
   // This tracker is fast and only runs in 'full' mode, so it's fine.
   useTrackerPlugin(async (plugin) => {
     if (!rem || performanceMode === PERFORMANCE_MODE_LIGHT) return; // 🔌 Skip in light mode
@@ -344,12 +340,12 @@ function Priority() {
       if (parent) { ancestors.push(parent); current = parent; } else { break; }
     }
     const hierarchy: Scope[] = [{ remId: null, name: 'All KB' }];
-    for (const ancestor of ancestors.reverse()) { 
+    for (const ancestor of ancestors.reverse()) {
       hierarchy.push({ remId: ancestor._id, name: await safeRemTextToString(plugin, ancestor.text) });
     }
     setScopeHierarchy(hierarchy);
   }, [rem?._id, performanceMode]); // 🔌 Add performanceMode
-  
+
   // --- MODIFIED: Initialize scope with original scope for Priority Review Documents ---
   useEffect(() => {
     const initializeScope = async () => {
@@ -357,11 +353,11 @@ function Priority() {
         // Use originalScopeId if available (Priority Review Document case)
         const effectiveScopeId = originalScopeId || queueSubQueueId;
         const scopeRem = await plugin.rem.findOne(effectiveScopeId);
-        
+
         if (scopeRem) {
-          setScope({ 
-            remId: scopeRem._id, 
-            name: await safeRemTextToString(plugin, scopeRem.text) 
+          setScope({
+            remId: scopeRem._id,
+            name: await safeRemTextToString(plugin, scopeRem.text)
           });
           setScopeMode('document');
         }
@@ -408,7 +404,7 @@ function Priority() {
   // Event Handlers
   const showIncSection = !!incRemInfo; // Converts to boolean - undefined/null become false
   const showCardSection = hasCards === true || hasCardPriorityPowerup || (cardInfo && cardInfo.cardCount > 0);
-  
+
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
 
@@ -445,39 +441,39 @@ function Priority() {
 
     // 🔌 Only do cache updates in 'full' mode
     if (performanceMode === PERFORMANCE_MODE_FULL) {
-        const numCardsRemaining = await plugin.queue.getNumRemainingCards();
-        const isInQueueNow = numCardsRemaining !== undefined;
-        await updateCardPriorityCache(plugin, rem._id, isInQueueNow);
-        
-        await flushLightCacheUpdates(plugin);
-        
-        const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
-        const sortedInfos = [...allCardInfos].sort((a, b) => a.priority - b.priority);
-        const totalItems = sortedInfos.length;
-        const recalculatedInfos = sortedInfos.map((info, index) => {
-          const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-          return { ...info, kbPercentile: percentile };
-        });
-        await plugin.storage.setSession(allCardPriorityInfoKey, recalculatedInfos);
-        
-        await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
-        
-        if (sessionCache && originalScopeId) {
-          const newDocPercentiles = { ...sessionCache.docPercentiles };
-          delete newDocPercentiles[rem._id];
-          
-          const updatedCache = {
-            ...sessionCache,
-            docPercentiles: newDocPercentiles
-          };
-          
-          await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
-        }
+      const numCardsRemaining = await plugin.queue.getNumRemainingCards();
+      const isInQueueNow = numCardsRemaining !== undefined;
+      await updateCardPriorityCache(plugin, rem._id, isInQueueNow);
+
+      await flushLightCacheUpdates(plugin);
+
+      const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
+      const sortedInfos = [...allCardInfos].sort((a, b) => a.priority - b.priority);
+      const totalItems = sortedInfos.length;
+      const recalculatedInfos = sortedInfos.map((info, index) => {
+        const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+        return { ...info, kbPercentile: percentile };
+      });
+      await plugin.storage.setSession(allCardPriorityInfoKey, recalculatedInfos);
+
+      await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+
+      if (sessionCache && originalScopeId) {
+        const newDocPercentiles = { ...sessionCache.docPercentiles };
+        delete newDocPercentiles[rem._id];
+
+        const updatedCache = {
+          ...sessionCache,
+          docPercentiles: newDocPercentiles
+        };
+
+        await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+      }
     }
   }, [rem, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
-  const showInheritanceSection = 
-    (!showIncSection && !showCardSection && derivedData?.descendantCardCount > 0) ||
+  const showInheritanceSection =
+    (!showIncSection && !showCardSection) ||
     (showIncSection && !hasCards && cardInfo?.source === 'manual') ||
     showInheritanceForIncRem;
 
@@ -510,7 +506,7 @@ function Priority() {
     await saveAndClose(incAbsPriority, cardAbsPriority);
   }, [showIncSection, showCardSection, showInheritanceSection, incRemInfo, cardInfo, incAbsPriority, cardAbsPriority, saveAndClose]);
 
-  const handleIncRelativeSliderChange = (newRelPriority: number) => { 
+  const handleIncRelativeSliderChange = (newRelPriority: number) => {
     if (!rem || !derivedData?.scopedIncRems || derivedData.scopedIncRems.length < 2) return;
     const otherRems = _.sortBy(derivedData.scopedIncRems.filter((r) => r.remId !== rem._id), (x) => x.priority);
     const targetIndex = Math.floor(((newRelPriority - 1) / 100) * otherRems.length);
@@ -519,7 +515,7 @@ function Priority() {
     if (targetAbsPriority !== undefined) setIncAbsPriority(targetAbsPriority);
   };
 
-    const handleCardRelativeSliderChange = (newRelPriority: number) => {
+  const handleCardRelativeSliderChange = (newRelPriority: number) => {
     if (!rem || !derivedData?.scopedCardRems || derivedData.scopedCardRems.length < 2) return;
     const otherRems = _.sortBy(derivedData.scopedCardRems.filter((r) => r.remId !== rem._id), (x) => x.priority);
     const targetIndex = Math.floor(((newRelPriority - 1) / 100) * otherRems.length);
@@ -553,21 +549,21 @@ function Priority() {
     await plugin.app.toast('Removed from Incremental Queue');
     plugin.widget.closePopup();
   }, [plugin, rem]);
-    
+
   const removeCardPriority = useCallback(async () => {
     if (!rem) return;
     await rem.removePowerup('cardPriority');
     // 🔌 Conditionally update cache
     if (performanceMode === PERFORMANCE_MODE_FULL) {
-        await updateCardPriorityCache(plugin, rem._id);
+      await updateCardPriorityCache(plugin, rem._id);
     }
     await plugin.app.toast('Card Priority for inheritance removed.');
     plugin.widget.closePopup();
   }, [plugin, rem, performanceMode]); // 🔌 Add performanceMode
-  
+
   // --- EARLY RETURNS & FINAL DATA DE-STRUCTURING ---
-  if (!widgetContext || !rem) { 
-    return <div className="p-4">Loading Rem Data...</div>; 
+  if (!widgetContext || !rem) {
+    return <div className="p-4">Loading Rem Data...</div>;
   }
 
   // Check if critical card/incRem data is still loading
@@ -587,19 +583,18 @@ function Priority() {
 
   const { scopedIncRems, scopedCardRems, descendantCardCount, prioritySourceCounts } = derivedData;
 
-  const showAddCardPriorityButton = showIncSection && !showCardSection && descendantCardCount > 0 && !showInheritanceSection;
+  const showAddCardPriorityButton = showIncSection && !showCardSection && !showInheritanceSection;
 
+  /* Deprecated: We now always show the inheritance section even if no cards exist, to allow setting future priority.
   if (!showIncSection && !showCardSection && !showInheritanceSection) {
     return (
-      <div
-        className="p-4 text-center text-sm"
-        style={{ color: 'var(--rn-clr-content-secondary)' }}
-      >
+      <div className="p-4 text-center text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
         This rem is neither an Incremental Rem nor has flashcards.
       </div>
     );
   }
-  
+  */
+
   // --- FINAL JSX RENDER ---
   return (
     <div
@@ -770,7 +765,7 @@ function Priority() {
           )}
         </div>
       )}
-      
+
       {showIncSection && (
         <div
           className="p-3 rounded-lg flex flex-col gap-3"
@@ -807,7 +802,7 @@ function Priority() {
           {showAddCardPriorityButton && (
             <div className="pt-2 border-t" style={{ borderColor: 'var(--rn-clr-border-primary)' }}>
               <p className="text-xs text-center mb-2" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                {descendantCardCount} descendant flashcards
+                {descendantCardCount === -1 || descendantCardCount === undefined ? 'Descendant flashcards' : (descendantCardCount === 0 ? 'No current descendant flashcards' : `${descendantCardCount} descendant flashcards`)}
               </p>
               <button
                 onClick={() => { setCardAbsPriority(incAbsPriority); setShowInheritanceForIncRem(true); }}
@@ -848,7 +843,7 @@ function Priority() {
           </button>
         </div>
       )}
-      
+
       {showCardSection && (
         <div
           className="p-3 rounded-lg flex flex-col gap-3"
@@ -935,9 +930,11 @@ function Priority() {
           </div>
 
           <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-            {showIncSection
-              ? `Set priority for ${descendantCardCount} descendant flashcards to inherit.`
-              : `${descendantCardCount} descendant ${descendantCardCount === 1 ? 'flashcard' : 'flashcards'} will inherit this priority.`
+            {descendantCardCount === 0
+              ? 'No descendant flashcards found. Set priority for future cards to inherit.'
+              : showIncSection
+                ? `Set priority for ${descendantCardCount === -1 || descendantCardCount === undefined ? '' : descendantCardCount} descendant flashcards to inherit.`
+                : `${descendantCardCount === -1 || descendantCardCount === undefined ? 'Descendant flashcards' : descendantCardCount + ' descendant ' + (descendantCardCount === 1 ? 'flashcard' : 'flashcards')} will inherit this priority.`
             }
           </p>
 
