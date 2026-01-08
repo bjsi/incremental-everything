@@ -47,16 +47,9 @@ function Priority() {
 
   // ✅ Calculate effective mode
   const performanceMode = useTrackerPlugin(async (rp) => {
-    // import { shouldUseLightMode } from '../lib/mobileUtils'; // This will be imported at the top
     const useLight = await shouldUseLightMode(rp);
     return useLight ? 'light' : 'full';
-  }, []) || 'full'; // Default to full while loading, or maybe light to be safe? Let's default to full as per original default logic or 'light' for safety. Original logic defaulted to settings or full. Let's stick to what allows consistent behavior. 'full' is safer for 'hasCards' checks usually, but 'light' is safer for performance. Given the lag, maybe 'light'? But let's trust the async result. Defaulting to 'light' might flicker UI. Let's stick to default from settings if possible, but simplest is just waiting.
-  // Actually, defaulting to 'light' avoids the Heavy check if it renders before loading.
-  // But wait, the hook runs asynchronously. The component might render with 'performanceMode' as undefined or default.
-  // If I use 'full' as default, it might trigger the heavy check in the first render tick if cardData runs immediately.
-  // However, cardData is also async.
-
-  // Let's look at how I replace the existing logic. I need to replace lines 47-66.
+  }, []) || 'light';
 
   // State Hooks
   const [scope, setScope] = useState<Scope>({ remId: null, name: 'All KB' });
@@ -480,7 +473,7 @@ function Priority() {
   }, [rem, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
   const showInheritanceSection =
-    (!showIncSection && !showCardSection && (derivedData?.descendantCardCount > 0 || performanceMode === PERFORMANCE_MODE_LIGHT)) ||
+    (!showIncSection && !showCardSection) ||
     (showIncSection && !hasCards && cardInfo?.source === 'manual') ||
     showInheritanceForIncRem;
 
@@ -590,18 +583,17 @@ function Priority() {
 
   const { scopedIncRems, scopedCardRems, descendantCardCount, prioritySourceCounts } = derivedData;
 
-  const showAddCardPriorityButton = showIncSection && !showCardSection && (descendantCardCount > 0 || performanceMode === PERFORMANCE_MODE_LIGHT) && !showInheritanceSection;
+  const showAddCardPriorityButton = showIncSection && !showCardSection && !showInheritanceSection;
 
+  /* Deprecated: We now always show the inheritance section even if no cards exist, to allow setting future priority.
   if (!showIncSection && !showCardSection && !showInheritanceSection) {
     return (
-      <div
-        className="p-4 text-center text-sm"
-        style={{ color: 'var(--rn-clr-content-secondary)' }}
-      >
+      <div className="p-4 text-center text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
         This rem is neither an Incremental Rem nor has flashcards.
       </div>
     );
   }
+  */
 
   // --- FINAL JSX RENDER ---
   return (
@@ -810,7 +802,7 @@ function Priority() {
           {showAddCardPriorityButton && (
             <div className="pt-2 border-t" style={{ borderColor: 'var(--rn-clr-border-primary)' }}>
               <p className="text-xs text-center mb-2" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                {descendantCardCount === -1 ? 'Descendant flashcards' : `${descendantCardCount} descendant flashcards`}
+                {descendantCardCount === -1 || descendantCardCount === undefined ? 'Descendant flashcards' : (descendantCardCount === 0 ? 'No current descendant flashcards' : `${descendantCardCount} descendant flashcards`)}
               </p>
               <button
                 onClick={() => { setCardAbsPriority(incAbsPriority); setShowInheritanceForIncRem(true); }}
@@ -938,9 +930,11 @@ function Priority() {
           </div>
 
           <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-            {showIncSection
-              ? `Set priority for ${descendantCardCount === -1 ? '' : descendantCardCount} descendant flashcards to inherit.`
-              : `${descendantCardCount === -1 ? 'Descendant flashcards' : descendantCardCount + ' descendant ' + (descendantCardCount === 1 ? 'flashcard' : 'flashcards')} will inherit this priority.`
+            {descendantCardCount === 0
+              ? 'No descendant flashcards found. Set priority for future cards to inherit.'
+              : showIncSection
+                ? `Set priority for ${descendantCardCount === -1 || descendantCardCount === undefined ? '' : descendantCardCount} descendant flashcards to inherit.`
+                : `${descendantCardCount === -1 || descendantCardCount === undefined ? 'Descendant flashcards' : descendantCardCount + ' descendant ' + (descendantCardCount === 1 ? 'flashcard' : 'flashcards')} will inherit this priority.`
             }
           </p>
 
