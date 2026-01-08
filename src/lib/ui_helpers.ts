@@ -32,7 +32,7 @@ export function registerQueueCounter(plugin: ReactRNPlugin, count: number): void
 }
 
 export async function registerQueueHidingCSS(plugin: ReactRNPlugin) {
-  
+
   const css = `
       /* Hide Priority and Priority Source Slots  */
       [data-rem-property~="priority"],
@@ -45,6 +45,23 @@ export async function registerQueueHidingCSS(plugin: ReactRNPlugin) {
 
   await plugin.app.registerCSS('hide-priority-in-queue', css);
 
+}
+
+// Register CSS for PDF Highlight coloring based on tags
+// This replaces the old manual color setting logic
+export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
+  const css = `
+    [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"] { 
+      background-color: #75ccf8 !important;
+      padding-bottom: 2.7px;
+    } 
+    [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"] { 
+      background-color: #75f8b2 !important;
+      padding-bottom: 2.7px;
+    }
+  `;
+
+  await plugin.app.registerCSS('pdf-inc-highlight-styling', css);
 }
 
 /**

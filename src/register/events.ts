@@ -106,8 +106,7 @@ async function resolveQueueScopes(
   console.log('QUEUE ENTER: Priority Review Document setup:');
   console.log(`  - Item selection from: Priority Review Doc (${subQueueId})`);
   console.log(
-    `  - Priority calculations for: ${
-      extractedScopeId ? `Original scope (${extractedScopeId})` : 'Full KB'
+    `  - Priority calculations for: ${extractedScopeId ? `Original scope (${extractedScopeId})` : 'Full KB'
     }`
   );
 
@@ -238,7 +237,7 @@ export function registerQueueEnterListener(
       originalScopeId,
       isPriorityReviewDoc,
     } = await resolveQueueScopes(plugin, subQueueId);
-    
+
     await plugin.storage.setSession(currentSubQueueIdKey, subQueueId || null);
     await plugin.storage.setSession('originalScopeId', originalScopeId);
     await plugin.storage.setSession('isPriorityReviewDoc', isPriorityReviewDoc);
@@ -255,11 +254,11 @@ export function registerQueueEnterListener(
     let dueCardsInScope: CardPriorityInfo[] = [];
 
     const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-    
+
     if (allIncRems.length === 0) {
       console.warn('QUEUE ENTER: Incremental Rem cache is empty! IncRem calculations will be skipped.');
     }
-    
+
     const dueIncRemsInKB = allIncRems?.filter(rem => Date.now() >= rem.nextRepDate) || [];
     let dueIncRemsInScope: IncrementalRem[] = [];
     let incRemDocPercentiles: Record<RemId, number> = {};
@@ -275,9 +274,9 @@ export function registerQueueEnterListener(
       console.log(`QUEUE ENTER: ${scopeType} scope: ${itemSelectionScope.size} items (${elapsed}ms)`);
 
       await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
-      
+
       let priorityCalcScope: Set<RemId> = new Set<RemId>();
-      
+
       if (isPriorityReviewDoc && scopeForPriorityCalc !== undefined) {
         if (scopeForPriorityCalc === null) {
           const fullKbIds = [
@@ -294,9 +293,9 @@ export function registerQueueEnterListener(
       }
 
       if (priorityCalcScope.size > 0) {
-        
+
         await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
-        
+
         if (await isFullPerformanceMode(plugin)) {
           console.log('QUEUE ENTER: Full mode. Calculating session cache...');
 
@@ -318,7 +317,7 @@ export function registerQueueEnterListener(
           console.log('QUEUE ENTER: Light mode. Skipping session cache calculation.');
         }
       }
-      
+
     }
 
     const sessionCache: QueueSessionCache = {
@@ -437,7 +436,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           return;
         }
 
-        console.log(`LISTENER: (Debounced) GlobalRemChanged fired for RemId: ${data.remId} (Full Mode)`);
+
 
         if (recentlyProcessedCards.has(data.remId)) {
           console.log('LISTENER: Skipping - recently processed by QueueCompleteCard');
@@ -458,7 +457,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         }
 
         await updateCardPriorityCache(plugin, data.remId);
-        console.log('LISTENER: (Debounced) Finished processing event.');
+
       }, REM_CHANGE_DEBOUNCE_MS);
     }
   );

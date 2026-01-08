@@ -26,6 +26,7 @@ import {
   flattenTreeForDisplay,
   createTreeNode,
 } from '../lib/hierarchical_parent_selector/treeHelpers';
+import { createRemUnderParent } from '../lib/highlightActions';
 
 // ============================================================================
 // STYLES
@@ -262,12 +263,12 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
         {node.name.length > 50 ? `${node.name.slice(0, 50)}...` : node.name}
       </span>
 
-      <AddChildButton 
+      <AddChildButton
         onClick={(e) => {
           e.stopPropagation();
           onAddChild();
-        }} 
-        isVisible={isSelected} 
+        }}
+        isVisible={isSelected}
       />
 
       <PriorityBadge
@@ -335,9 +336,9 @@ const NewChildInputRow: React.FC<NewChildInputRowProps> = ({
       onClick={(e) => e.stopPropagation()}
     >
       <span style={{ width: '20px', display: 'inline-block' }} /> {/* Placeholder for expand button */}
-      
+
       <span style={{ fontSize: '12px', color: '#22c55e' }}>+</span>
-      
+
       <input
         ref={inputRef}
         type="text"
@@ -363,7 +364,7 @@ const NewChildInputRow: React.FC<NewChildInputRowProps> = ({
           e.currentTarget.style.borderColor = 'var(--rn-clr-border-primary)';
         }}
       />
-      
+
       <button
         onClick={() => inputValue.trim() && onConfirm(inputValue.trim())}
         disabled={!inputValue.trim() || isCreating}
@@ -379,7 +380,7 @@ const NewChildInputRow: React.FC<NewChildInputRowProps> = ({
       >
         {isCreating ? '...' : 'Create'}
       </button>
-      
+
       <button
         onClick={onCancel}
         disabled={isCreating}
@@ -464,7 +465,7 @@ function ParentSelectorWidget() {
       console.log('[ParentSelector:Widget] contextData?.rootCandidates:', contextData?.rootCandidates?.length);
       console.log('[ParentSelector:Widget] allIncrementalRems:', allIncrementalRems?.length ?? 'null/undefined');
       console.log('[ParentSelector:Widget] isInitialized:', isInitialized);
-      
+
       if (!contextData?.rootCandidates || isInitialized) {
         console.log('[ParentSelector:Widget] Skipping init - no data or already initialized');
         return;
@@ -478,13 +479,13 @@ function ParentSelectorWidget() {
       // If there's a last selected destination, try to expand to it
       // FIX: Use empty array as fallback if allIncrementalRems is null/undefined
       const incrementalRemsToUse = allIncrementalRems || [];
-      
+
       console.log('[ParentSelector:Widget] lastSelectedDestination:', contextData.lastSelectedDestination);
       console.log('[ParentSelector:Widget] incrementalRemsToUse length:', incrementalRemsToUse.length);
-      
+
       if (contextData.lastSelectedDestination) {
         console.log('[ParentSelector:Widget] Attempting to expand to last destination...');
-        
+
         try {
           const { tree: expandedTree, foundIndex } = await expandToLastDestination(
             plugin,
@@ -492,7 +493,7 @@ function ParentSelectorWidget() {
             contextData.lastSelectedDestination,
             incrementalRemsToUse
           );
-          
+
           initialTree = expandedTree;
           console.log('[ParentSelector:Widget] Expand result - foundIndex:', foundIndex);
 
@@ -574,14 +575,14 @@ function ParentSelectorWidget() {
   // NEW: Handler to start creating a child for the selected node
   const handleStartAddChild = useCallback(() => {
     if (!selectedNode || isCreating || isCreatingChild) return;
-    
+
     console.log('[ParentSelector:Widget] Starting add child for:', selectedNode.name);
-    
+
     // If the node is not expanded and has children, expand it first
     if (selectedNode.hasChildren && !selectedNode.isExpanded) {
       handleToggleExpand(selectedNode.remId);
     }
-    
+
     setCreatingChildForNodeId(selectedNode.remId);
   }, [selectedNode, isCreating, isCreatingChild, handleToggleExpand]);
 
@@ -648,9 +649,9 @@ function ParentSelectorWidget() {
           // Calculate the new display list and find the index of the new child
           const newDisplayList = flattenTreeForDisplay(updatedTree);
           const newChildIndex = newDisplayList.findIndex((n) => n.remId === newRemId);
-          
+
           console.log('[ParentSelector:Widget] New child index in updated tree:', newChildIndex);
-          
+
           // Schedule the selection update
           setTimeout(() => {
             if (newChildIndex >= 0) {
@@ -664,7 +665,7 @@ function ParentSelectorWidget() {
         });
 
         await plugin.app.toast(`Created "${childName}"`);
-        
+
       } catch (error) {
         console.error('[ParentSelector:Widget] Error creating child rem:', error);
         await plugin.app.toast('Error creating rem');
@@ -700,78 +701,37 @@ function ParentSelectorWidget() {
       try {
         const { extractRemId, extractContent, makeIncremental, pdfRemId, contextRemId } =
           contextData;
-        
+
         // Check if we need to show priority popup after creating
         const showPriorityPopup = (contextData as any).showPriorityPopupAfterCreate === true;
 
-        // Create the new rem
-        const newRem = await plugin.rem.createRem();
-        if (!newRem) {
-          await plugin.app.toast('Failed to create rem');
+        // Create the new rem using the centralized function
+        // This ensures creating proper tags, priority handling, etc.
+        const highlightRem = await plugin.rem.findOne(extractRemId);
+        if (!highlightRem) {
+          await plugin.app.toast('Could not find original highlight');
           setIsCreating(false);
           return;
         }
 
-        const sourceLink = {
-          i: 'q' as const,
-          _id: extractRemId,
-          pin: true,
-        };
-        const contentWithReference = [...extractContent, ' ', sourceLink];
-        await newRem.setText(contentWithReference);
-        await newRem.setParent(node.remId);
+        await createRemUnderParent(
+          plugin as ReactRNPlugin,
+          highlightRem,
+          node.remId,
+          makeIncremental,
+          pdfRemId,
+          contextRemId,
+          node.name,
+          showPriorityPopup // Pass this flag to handle priority popup logic inside the function
+        );
 
-        if (makeIncremental) {
-          await initIncrementalRem(plugin as ReactRNPlugin, newRem);
-        }
-
-        // Save destination
-        console.log('[ParentSelector:Widget] About to save last destination:');
-        console.log('[ParentSelector:Widget]   pdfRemId:', pdfRemId);
-        console.log('[ParentSelector:Widget]   contextRemId:', contextRemId);
-        console.log('[ParentSelector:Widget]   destinationRemId (node.remId):', node.remId);
-        
-        await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, node.remId);
-        
-        console.log('[ParentSelector:Widget] Destination saved!');
-
-        // Remove incremental status from original extract
-        const extractRem = await plugin.rem.findOne(extractRemId);
-        if (extractRem) {
-          await removeIncrementalRemCache(plugin, extractRemId);
-          await extractRem.removePowerup(powerupCode);
-          await extractRem.setHighlightColor('Yellow');
-        }
-
-        // ====================================================================
-        // CRITICAL FIX: Handle priority popup BEFORE any closePopup call
-        // Opening a popup replaces the current one, so we don't need closePopup
-        // ====================================================================
-        
-        const actionText = makeIncremental ? 'incremental rem' : 'rem';
-        
-        if (showPriorityPopup && makeIncremental) {
-          // Show toast first
-          await plugin.app.toast(
-            `Created ${actionText} under "${node.name.slice(0, 30)}..."`
-          );
-          
-          // Open the priority popup - this replaces the current popup
-          // DO NOT call closePopup() here as it terminates the script
-          console.log('[ParentSelector:Widget] Opening priority popup for:', newRem._id);
-          await plugin.widget.openPopup('priority', {
-            remId: newRem._id,
-          });
-          // Note: The script may continue or not after openPopup, 
-          // but the popup will definitely open
-        } else {
-          // No priority popup needed - close this popup and show toast
+        // If NOT showing popup, we need to manually close the current parent_selector popup
+        // createRemUnderParent handles OPENING the priority popup if needed (which replaces this one)
+        // but if no priority popup is needed, we should close this one.
+        if (!showPriorityPopup || !makeIncremental) {
           plugin.widget.closePopup();
-          await plugin.app.toast(
-            `Created ${actionText} under "${node.name.slice(0, 30)}..."`
-          );
         }
-        
+
       } catch (error) {
         console.error('[ParentSelector:Widget] Error creating rem:', error);
         await plugin.app.toast('Error creating rem');
@@ -871,10 +831,10 @@ function ParentSelectorWidget() {
 
   if (isLoading) {
     return (
-      <div 
+      <div
         ref={containerRef}
         tabIndex={-1}
-        style={{...containerStyle, outline: 'none'}}
+        style={{ ...containerStyle, outline: 'none' }}
       >
         <div style={{ padding: '24px', textAlign: 'center' }}>
           <span style={{ color: 'var(--rn-clr-content-secondary)' }}>Loading...</span>
@@ -885,10 +845,10 @@ function ParentSelectorWidget() {
 
   if (!contextData || displayList.length === 0) {
     return (
-      <div 
+      <div
         ref={containerRef}
         tabIndex={-1}
-        style={{...containerStyle, outline: 'none'}}
+        style={{ ...containerStyle, outline: 'none' }}
       >
         <div style={{ padding: '16px' }}>
           <div style={{ color: 'var(--rn-clr-content-secondary)', marginBottom: '12px' }}>
@@ -924,7 +884,7 @@ function ParentSelectorWidget() {
 
     for (let index = 0; index < displayList.length; index++) {
       const node = displayList[index];
-      
+
       // Render the node row
       elements.push(
         <TreeNodeRow
@@ -980,12 +940,12 @@ function ParentSelectorWidget() {
         if (parentNode) {
           // Check if the next node (if exists) is not a descendant
           const nextNode = displayList[index + 1];
-          const currentIsDescendant = node.parentId === creatingChildForNodeId || 
+          const currentIsDescendant = node.parentId === creatingChildForNodeId ||
             (displayList.slice(displayList.findIndex(n => n.remId === creatingChildForNodeId) + 1, index + 1)
               .some(n => n.remId === node.parentId));
-          
+
           const nextIsNotDescendant = !nextNode || nextNode.depth <= parentNode.depth;
-          
+
           if (currentIsDescendant && nextIsNotDescendant) {
             elements.push(
               <NewChildInputRow
@@ -1024,10 +984,10 @@ function ParentSelectorWidget() {
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
       tabIndex={-1}
-      style={{...containerStyle, outline: 'none'}}
+      style={{ ...containerStyle, outline: 'none' }}
     >
       {/* Header */}
       <div style={headerStyle}>

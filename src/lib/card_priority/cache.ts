@@ -13,7 +13,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   const needsHeavyRecalc =
     forceHeavyRecalc || Array.from(pendingUpdates.values()).some((update) => !update.isLight);
 
-  console.log(`CACHE-FLUSH: Writing ${pendingUpdates.size} batched updates. Heavy Recalc: ${needsHeavyRecalc}`);
+
 
   const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
 
@@ -32,7 +32,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   }
 
   if (needsHeavyRecalc) {
-    console.log(`CACHE-FLUSH: Re-calculating percentiles for ${cache.length} items...`);
+
     const sortedCache = _.sortBy(cache, (info) => info.priority);
     const totalItems = sortedCache.length;
     const enrichedCache = sortedCache.map((info, index) => {
@@ -40,10 +40,10 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
       return { ...info, kbPercentile: percentile };
     });
     await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
-    console.log(`CACHE-FLUSH: Complete. Enriched cache size: ${enrichedCache.length}`);
+
   } else {
     await plugin.storage.setSession(allCardPriorityInfoKey, cache);
-    console.log(`CACHE-FLUSH: Light update complete. Cache size: ${cache.length}`);
+
   }
 
   pendingUpdates.clear();
@@ -51,7 +51,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
 
 export async function updateCardPriorityCache(plugin: RNPlugin, remId: RemId, isLightUpdate = false) {
   try {
-    console.log(`CACHE-UPDATE: Queuing ${isLightUpdate ? 'light' : 'heavy'} update for RemId: ${remId}`);
+
 
     const rem = await plugin.rem.findOne(remId);
     const updatedInfo = rem ? await getCardPriority(plugin, rem) : null;
@@ -112,8 +112,7 @@ export async function buildOptimizedCardPriorityCache(plugin: RNPlugin) {
 
   const uniqueRemIds = _.uniq([...cardRemIds, ...inheritanceRemIds]);
   console.log(
-    `CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${
-      inheritanceRemIds.length - cardRemIds.length
+    `CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${inheritanceRemIds.length - cardRemIds.length
     } inheritance-only)`
   );
 
@@ -186,8 +185,7 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
 
   const uniqueRemIds = _.uniq([...cardRemIds, ...inheritanceRemIds]);
   console.log(
-    `CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${
-      inheritanceRemIds.length - cardRemIds.length
+    `CACHE: Total ${uniqueRemIds.length} rems to process (${cardRemIds.length} with cards + ${inheritanceRemIds.length - cardRemIds.length
     } inheritance-only)`
   );
 
@@ -334,8 +332,8 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
     const totalTime = Math.round((Date.now() - startTime) / 1000);
     console.log(
       `DEFERRED: Background processing complete! ` +
-        `Processed ${processed} cards in ${totalTime}s ` +
-        `(${errorCount} errors)`
+      `Processed ${processed} cards in ${totalTime}s ` +
+      `(${errorCount} errors)`
     );
 
     await plugin.app.toast(`✅ Background processing complete! All ${processed} card priorities are now cached.`);

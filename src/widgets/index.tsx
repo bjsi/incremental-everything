@@ -15,8 +15,7 @@ import { registerCommands } from '../register/commands';
 import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerJumpToRemHelper } from '../register/window';
-import { registerQueueHidingCSS } from '../lib/ui_helpers';
-dayjs.extend(relativeTime);
+import { registerQueueHidingCSS, registerPdfHighlightCSS } from '../lib/ui_helpers';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -29,6 +28,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   (window as any).__plugin = plugin;
   registerJumpToRemHelper(plugin);
 
+
   await registerPluginPowerups(plugin);
   await registerPluginSettings(plugin);
 
@@ -38,7 +38,9 @@ async function onActivate(plugin: ReactRNPlugin) {
 
   registerCallbacks(plugin);
   registerWidgets(plugin);
-  
+
+  // Register CSS rules
+  await registerPdfHighlightCSS(plugin);
   await registerQueueHidingCSS(plugin);
 
   await registerCommands(plugin);
@@ -59,6 +61,6 @@ async function onActivate(plugin: ReactRNPlugin) {
   }
 }
 
-async function onDeactivate(_: ReactRNPlugin) {}
+async function onDeactivate(_: ReactRNPlugin) { }
 
 declareIndexPlugin(onActivate, onDeactivate);
