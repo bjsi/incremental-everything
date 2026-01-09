@@ -5,11 +5,15 @@ interface PriorityBadgeProps {
   priority: number;
   percentile?: number;
   compact?: boolean;
+  useAbsoluteColoring?: boolean;
 }
 
-export function PriorityBadge({ priority, percentile, compact = false }: PriorityBadgeProps) {
+export function PriorityBadge({ priority, percentile, compact = false, useAbsoluteColoring = false }: PriorityBadgeProps) {
   // Use percentile for color if available (including 0), otherwise fallback to gray
-  const bgColor = percentile !== undefined ? percentileToHslColor(percentile) : '#6b7280';
+  // If useAbsoluteColoring is true, we use the priority itself (0-100) for color mapping
+  const bgColor = useAbsoluteColoring
+    ? percentileToHslColor(priority)
+    : (percentile !== undefined ? percentileToHslColor(percentile) : '#6b7280');
 
   if (compact) {
     return (

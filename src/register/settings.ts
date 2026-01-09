@@ -4,6 +4,7 @@ import {
   multiplierId,
   collapseQueueTopBar,
   defaultPriorityId,
+  defaultCardPriorityId,
   displayPriorityShieldId,
   alwaysUseLightModeOnMobileId,
   alwaysUseLightModeOnWebId,
@@ -115,7 +116,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   });
 
   plugin.settings.registerNumberSetting({
-    id: 'defaultCardPriority',
+    id: defaultCardPriorityId,
     title: 'Default Card Priority',
     description: 'Default priority for flashcards without inherited priority (0-100, Lower = more important).  Default: 50',
     defaultValue: 50,
