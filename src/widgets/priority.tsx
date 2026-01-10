@@ -71,6 +71,7 @@ function Priority() {
   const [showInheritanceForIncRem, setShowInheritanceForIncRem] = useState(false);
   const incSliderRef = useRef<PrioritySliderRef>(null);
   const cardSliderRef = useRef<PrioritySliderRef>(null);
+  const isSaving = useRef(false);
 
   // Data Fetching Hooks
   const widgetContext = useRunAsync(async () => {
@@ -361,6 +362,7 @@ function Priority() {
 
   // Effect Hooks
   useEffect(() => {
+    if (isSaving.current) return;
     if (incRemInfo) {
       setIncAbsPriority(incRemInfo.priority);
     } else if (defaultIncPriority !== undefined && incAbsPriority === null) {
@@ -370,6 +372,7 @@ function Priority() {
   }, [incRemInfo, defaultIncPriority]);
 
   useEffect(() => {
+    if (isSaving.current) return;
     if (cardInfo) {
       setCardAbsPriority(cardInfo.priority);
     } else if (defaultCardPriority !== undefined && cardAbsPriority === null) {
@@ -380,6 +383,7 @@ function Priority() {
 
   // Snap to Inheritance Effect
   useEffect(() => {
+    if (isSaving.current) return;
     // If we have an ancestor priority, and the current card priority is either strictly "default" source 
     // OR we are purely using the default setting (meaning cardInfo might be undefined yet),
     // then snap to the ancestor's priority to show what will be inherited.
@@ -503,31 +507,29 @@ function Priority() {
     if (performanceMode === PERFORMANCE_MODE_FULL) {
       const numCardsRemaining = await plugin.queue.getNumRemainingCards();
       const isInQueueNow = numCardsRemaining !== undefined;
-      await updateCardPriorityCache(plugin, rem._id, isInQueueNow);
 
+      // Step 1: Fast "Light" Update
+      // Determine if we are In-Queue or not. If In-Queue, we generally want the fast update.
+      // But actually, for the popup save lag, we always want the fast update first.
+      await updateCardPriorityCache(plugin, rem._id, true); // true = force light update (no heavy recalc)
+
+      // Ensure the light update is committed to session storage so UI can see it immediately
       await flushLightCacheUpdates(plugin);
 
-      const allCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
-      const sortedInfos = [...allCardInfos].sort((a, b) => a.priority - b.priority);
-      const totalItems = sortedInfos.length;
-      const recalculatedInfos = sortedInfos.map((info, index) => {
-        const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-        return { ...info, kbPercentile: percentile };
-      });
-      await plugin.storage.setSession(allCardPriorityInfoKey, recalculatedInfos);
+      // Step 2: Fire-and-Forget Heavy Recalculation (Background)
+      // We do NOT await this. It will schedule a heavy recalc (sorting/percentiles) in 200ms.
+      updateCardPriorityCache(plugin, rem._id, false).catch(console.error);
 
+      // Signal refresh for UI components (like the display widget)
       await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
 
       if (sessionCache && originalScopeId) {
-        const newDocPercentiles = { ...sessionCache.docPercentiles };
-        delete newDocPercentiles[rem._id];
-
-        const updatedCache = {
-          ...sessionCache,
-          docPercentiles: newDocPercentiles
-        };
-
-        await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+        // We can optionally update the sessionCache docPercentiles here manually for instant document-scope feedback,
+        // but the background recalc will handle it shortly.
+        // Let's keep the existing logic for now but make sure it doesn't block.
+        // Actually, the previous logic deleted the key from cache. Let's persist that for correctness if needed,
+        // but it might be better to just let the global refresh handle it.
+        // For minimal lag, let's skip complex sessionCache manipulation here and rely on the global refresh mechanism.
       }
     }
   }, [rem, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
@@ -538,6 +540,7 @@ function Priority() {
     showInheritanceForIncRem;
 
   const saveAndClose = useCallback(async (incP: number, cardP: number) => {
+    isSaving.current = true;
     if (showIncSection) await saveIncPriority(incP);
     if (showCardSection || showInheritanceSection) {
       await saveCardPriority(cardP);
@@ -614,6 +617,7 @@ function Priority() {
 
   const removeFromIncremental = useCallback(async () => {
     if (!rem) return;
+    isSaving.current = true;
     await rem.removePowerup(powerupCode);
     await removeIncrementalRemCache(plugin, rem._id);
     await plugin.app.toast('Removed from Incremental Queue');
@@ -622,6 +626,7 @@ function Priority() {
 
   const removeCardPriority = useCallback(async () => {
     if (!rem) return;
+    isSaving.current = true;
     await rem.removePowerup('cardPriority');
     // 🔌 Conditionally update cache
     if (performanceMode === PERFORMANCE_MODE_FULL) {
