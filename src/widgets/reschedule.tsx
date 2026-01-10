@@ -13,6 +13,7 @@ import { powerupCode, prioritySlotCode, incremReviewStartTimeKey } from '../lib/
 import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
+import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 
 async function handleRescheduleAndPriorityUpdate(
   plugin: RNPlugin,
@@ -29,18 +30,18 @@ async function handleRescheduleAndPriorityUpdate(
   await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
 
   const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
-  
+
   // Calculate early/late status
   const scheduledDate = incRem.nextRepDate;
   const actualDate = Date.now();
   const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
   const wasEarly = daysDifference < 0;
   const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-  
+
   // Calculate review time (same as Next button does)
   const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
   const reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
-  
+
   const newHistory: IncrementalRep[] = [
     ...(incRem.history || []),
     {
@@ -52,7 +53,7 @@ async function handleRescheduleAndPriorityUpdate(
       reviewTimeSeconds: reviewTimeSeconds, // Track review time
     },
   ];
-  
+
   await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
 
   const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
@@ -71,7 +72,9 @@ const PrioritySlider: React.FC<{
   onChange: (value: number) => void;
   value: number;
   onSubmit: (e: React.KeyboardEvent) => void;
-}> = ({ onChange, value, onSubmit }) => {
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  inputRef?: React.RefObject<HTMLInputElement>;
+}> = ({ onChange, value, onSubmit, onKeyDown, inputRef }) => {
   return (
     <div className="flex flex-col gap-2">
       <div className="rn-clr-content-secondary priority-label">Lower = more important</div>
@@ -83,10 +86,12 @@ const PrioritySlider: React.FC<{
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value))}
         tabIndex={-1}
+        onKeyDown={onKeyDown}
       />
       <div className="rn-clr-content-secondary">
         Priority Value:{' '}
         <input
+          ref={inputRef}
           type="number"
           min={0}
           max={100}
@@ -100,6 +105,8 @@ const PrioritySlider: React.FC<{
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               onSubmit(e);
+            } else if (onKeyDown) {
+              onKeyDown(e);
             }
           }}
           className="priority-input"
@@ -115,6 +122,41 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
   const [futureDate, setFutureDate] = useState('');
   const [ancestorInfo, setAncestorInfo] = useState<any>(null);
   const intervalInputRef = useRef<HTMLInputElement>(null);
+  const priorityInputRef = useRef<HTMLInputElement>(null);
+
+  // --- KEYBOARD HANDLERS ---
+  const daysKeyboard = useAcceleratedKeyboardHandler(
+    days ? parseInt(days) : 1,
+    1,
+    (val) => {
+      // Min 0, no practical max but let's keep it sane
+      const newVal = Math.max(0, val);
+      setDays(newVal.toString());
+    }
+  );
+
+  const priorityKeyboard = useAcceleratedKeyboardHandler(
+    priority,
+    priority ?? 10, // Default priority if null
+    (val) => {
+      // Priority 0-100
+      setPriority(Math.max(0, Math.min(100, val)));
+    }
+  );
+
+  const handleTabCycle = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab' || e.shiftKey) return;
+    e.preventDefault();
+
+    // Cycle between interval input and priority input
+    if (document.activeElement === intervalInputRef.current) {
+      priorityInputRef.current?.focus();
+      priorityInputRef.current?.select();
+    } else {
+      intervalInputRef.current?.focus();
+      intervalInputRef.current?.select();
+    }
+  };
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -124,7 +166,7 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
 
       setDays(String(scheduleData?.newInterval || 1));
       setPriority(incRemData?.priority ?? 10);
-      
+
       // Fetch ancestor info
       const rem = await plugin.rem.findOne(remId);
       const ancestor = await findClosestIncrementalAncestor(plugin, rem);
@@ -169,7 +211,15 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4"
+      onKeyUp={() => {
+        // Global keyup handler for the form to ensure hold state releases
+        daysKeyboard.handleKeyUp();
+        priorityKeyboard.handleKeyUp();
+      }}
+    >
       <div className="flex flex-col gap-2">
         <label htmlFor="interval-days" className="font-semibold">
           Next repetition in (days):
@@ -184,8 +234,13 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               handleSubmit(e);
+            } else if (e.key === 'Tab') {
+              handleTabCycle(e);
+            } else {
+              daysKeyboard.handleKeyDown(e);
             }
           }}
+          onKeyUp={daysKeyboard.handleKeyUp}
           className="priority-input"
         />
         <div className="rn-clr-content-secondary h-4">{futureDate}</div>
@@ -193,7 +248,24 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
       <hr />
       <div>
         <label className="font-semibold">Priority</label>
-        <PrioritySlider value={priority} onChange={setPriority} onSubmit={handleSubmit} />
+        <PrioritySlider
+          value={priority}
+          onChange={setPriority}
+          onSubmit={handleSubmit}
+          inputRef={priorityInputRef}
+          onKeyDown={(e) => {
+            if (e.key === 'Tab') {
+              handleTabCycle(e);
+            } else {
+              priorityKeyboard.handleKeyDown(e);
+            }
+          }}
+        />
+        {/* We need global keyup listener or bind it to container/inputs? 
+            Since focus is on inputs, we can bind onKeyUp to inputs alongside onKeyDown 
+            Wait, `PrioritySlider` passes `onKeyDown` to both inputs but we need `onKeyUp` too 
+            for the hold state to clear. 
+        */}
       </div>
       {/* Show ancestor info if available */}
       {ancestorInfo && (
@@ -238,7 +310,16 @@ export function Reschedule() {
   }
 
   return (
-    <div className="flex flex-col p-4 gap-4 reschedule-popup">
+    <div
+      className="flex flex-col p-4 gap-4 reschedule-popup"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          plugin.widget.closePopup();
+        }
+      }}
+    >
       <div className="text-2xl font-bold">Reschedule & Set Priority</div>
       <RescheduleInput plugin={plugin} remId={remId} />
     </div>
