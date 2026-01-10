@@ -36,95 +36,16 @@ import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_pri
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { PriorityBadge, PrioritySlider, PrioritySliderRef } from '../components';
+import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import * as _ from 'remeda';
 
 type Scope = { remId: string | null; name: string; };
 type ScopeMode = 'all' | 'document';
 type CardScopeType = 'prioritized' | 'all';
 
-// --- ACCELERATED KEYBOARD HANDLER HOOK ---
-// This hook implements the logic for rapid taps and hold-to-accelerate
-function useAcceleratedKeyboardHandler(value: number | null, defaultValue: number, onChange: (val: number) => void) {
-  // State for Rapid Taps
-  const tapState = useRef<{ count: number; lastTime: number; direction: 'up' | 'down' | null }>({ count: 0, lastTime: 0, direction: null });
-  // State for Press & Hold
-  const holdState = useRef<{ active: boolean; startTime: number; direction: 'up' | 'down' | null }>({ active: false, startTime: 0, direction: null });
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      const direction = e.key === 'ArrowUp' ? 'up' : 'down';
-      const now = Date.now();
-      const isRepeat = e.repeat;
 
-      let step = 0;
 
-      if (!isRepeat) {
-        // --- RAPID TAP LOGIC ---
-        // Check if this is a subsequent tap in the same direction within threshold
-        if (tapState.current.direction === direction && (now - tapState.current.lastTime < 300)) {
-          tapState.current.count += 1;
-        } else {
-          // Reset if too slow or changed direction
-          tapState.current.count = 1;
-          tapState.current.direction = direction;
-        }
-        tapState.current.lastTime = now;
-
-        // Determine step based on tap count
-        if (tapState.current.count === 1) step = 1;
-        else if (tapState.current.count === 2) step = 5;
-        else if (tapState.current.count === 3) step = 10;
-        else step = 20;
-
-      } else {
-        // --- PRESS & HOLD LOGIC ---
-        // If holding, we ignore the tap logic and use hold acceleration
-        if (!holdState.current.active || holdState.current.direction !== direction) {
-          holdState.current.active = true;
-          holdState.current.startTime = now;
-          holdState.current.direction = direction;
-        }
-
-        // Acceleration based on hold duration (simulated via repeat events)
-        const duration = now - holdState.current.startTime;
-        // Simple linear acceleration: starts at 1, increases every 500ms
-        const speedFactor = 1 + Math.floor(duration / 500);
-        step = Math.min(10, speedFactor); // Cap max hold speed per tick
-      }
-
-      // Apply the change
-      const currentVal = value ?? defaultValue;
-      const change = direction === 'up' ? -step : step; // Lower number = Higher Priority (so Up decreases value)
-      // Wait, user asked: 
-      // "1 short arrow up: +1 absolute priority"
-      // "Arrow Up" usually means "Increase Value". 
-      // BUT in Priority context, 0 = High, 100 = Low.
-      // If user says "+1 absolute priority", do they mean "Add 1 to the number" (Lower Priority)
-      // or "Increase Importance" (Subtract 1 from number)?
-      // Typically "Arrow Up" increases the number in a number input. 
-      // Let's assume standard slider logic: Right/Up = Increase Number (Lower Priority).
-      // Left/Down = Decrease Number (Higher Priority).
-      // User Prompt: "1 short arrow up: +1 absolute priority". 
-      // If they mean numerical +1, that forces the number UP.
-
-      // Let's stick to standard behavior: Up/Right = +value, Down/Left = -value.
-      // Correction: User said "arrow up: +1... arrow down: -1 (implied)".
-      const delta = direction === 'up' ? 1 : -1;
-      const finalStep = step * delta;
-
-      const newValue = Math.max(0, Math.min(100, currentVal + finalStep));
-      onChange(newValue);
-    }
-  };
-
-  const handleKeyUp = () => {
-    holdState.current = { active: false, startTime: 0, direction: null };
-    // We don't reset tap state on keyup because user might be tapping quickly
-  };
-
-  return { handleKeyDown, handleKeyUp };
-}
 
 function Priority() {
   const plugin = usePlugin();
@@ -211,13 +132,13 @@ function Priority() {
   const incKeyboard = useAcceleratedKeyboardHandler(
     incAbsPriority,
     incAbsPriority ?? defaultIncPriority ?? 50,
-    (val) => setIncAbsPriority(val)
+    (val) => setIncAbsPriority(Math.max(0, Math.min(100, val)))
   );
 
   const cardKeyboard = useAcceleratedKeyboardHandler(
     cardAbsPriority,
     cardAbsPriority ?? defaultCardPriority ?? 50,
-    (val) => setCardAbsPriority(val)
+    (val) => setCardAbsPriority(Math.max(0, Math.min(100, val)))
   );
 
   const inQueue = !!queueSubQueueId;
