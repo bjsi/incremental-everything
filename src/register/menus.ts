@@ -42,20 +42,25 @@ export async function registerMenus(plugin: ReactRNPlugin) {
   plugin.app.registerMenuItem({
     id: 'tag_rem_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
-    name: 'Toggle tag as Incremental Rem',
+    name: 'Toggle Incremental Rem',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
-      if (!rem) {
-        return;
-      }
+      if (!rem) return;
+
       const isIncremental = await rem.hasPowerup(powerupCode);
+
       if (isIncremental) {
         await rem.removePowerup(powerupCode);
+        // Removed setHighlightColor -> CSS handles cleanup when tag is removed
+        await plugin.app.toast('❌ Removed Incremental tag');
       } else {
         await initIncrementalRem(plugin, rem);
+        // Removed setHighlightColor -> CSS handles styling via "incremental" tag
+        await plugin.app.toast('✅ Tagged as Incremental Rem');
+        await plugin.widget.openPopup('priority', {
+          remId: rem._id,
+        });
       }
-      const msg = isIncremental ? 'Untagged as Incremental Rem' : 'Tagged as Incremental Rem';
-      await plugin.app.toast(msg);
     },
   });
 
