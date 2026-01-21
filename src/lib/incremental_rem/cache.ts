@@ -86,7 +86,7 @@ export async function loadIncrementalRemCache(
 
 
   await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
-
+  await plugin.storage.setSession('inc_rem_cache_fully_loaded', true);
 
   return updatedAllRem;
 }
