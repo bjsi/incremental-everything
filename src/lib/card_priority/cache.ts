@@ -294,6 +294,7 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   } else {
     console.log('CACHE: All cards are pre-tagged! No deferred processing needed.');
     await plugin.app.toast('✅ All card priorities loaded!');
+    await plugin.storage.setSession('card_priority_cache_fully_loaded', true);
   }
 }
 
@@ -376,6 +377,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
     );
 
     await plugin.app.toast(`✅ Background processing complete! All ${processed} card priorities are now cached.`);
+    await plugin.storage.setSession('card_priority_cache_fully_loaded', true);
 
     if (untaggedRemIds.length > 1000) {
       setTimeout(() => {

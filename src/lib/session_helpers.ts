@@ -24,6 +24,8 @@ export async function resetQueueSession(plugin: ReactRNPlugin): Promise<void> {
   await plugin.storage.setSession('originalScopeId', null);
   await plugin.storage.setSession('isPriorityReviewDoc', null);
   await plugin.storage.setSession(queueSessionCacheKey, null);
+  await plugin.storage.setSession('skipCardHistorySave', null);
+  await plugin.storage.setSession('skipIncRemHistorySave', null);
 }
 
 /**
@@ -79,8 +81,8 @@ export async function calculateDueIncRemCount(
   const scopeRemIds = (await plugin.storage.getSession<RemId[]>(currentScopeRemIdsKey)) || [];
   const count = scopeRemIds.length
     ? allIncRems.filter(
-        (rem) => Date.now() >= rem.nextRepDate && scopeRemIds.includes(rem.remId)
-      ).length
+      (rem) => Date.now() >= rem.nextRepDate && scopeRemIds.includes(rem.remId)
+    ).length
     : 0;
   console.log(`QUEUE ENTER: Light mode - found ${count} due IncRems`);
   return count;

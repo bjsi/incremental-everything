@@ -140,40 +140,62 @@ export function registerQueueExitListener(
     if (await isFullPerformanceMode(plugin)) {
       console.log('[QueueExit] Full mode. Saving Priority Shield history...');
 
+      const skipCardHistorySave = await plugin.storage.getSession<boolean>('skipCardHistorySave');
+      const skipIncRemHistorySave = await plugin.storage.getSession<boolean>('skipIncRemHistorySave');
+
+      const isCardCacheLoaded = await plugin.storage.getSession<boolean>('card_priority_cache_fully_loaded');
+      const isIncRemCacheLoaded = await plugin.storage.getSession<boolean>('inc_rem_cache_fully_loaded');
+
+      const shouldSaveCard = isCardCacheLoaded || !skipCardHistorySave;
+      const shouldSaveIncRem = isIncRemCacheLoaded || !skipIncRemHistorySave;
+
       const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
       const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
       const seenRemIds = (await plugin.storage.getSession<string[]>(seenRemInSessionKey)) || [];
       const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
 
       // Save KB-level shields
-      await saveKBShield(plugin, allIncRems, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem');
-      await saveKBShield(plugin, allCardInfos, isCardDue, seenCardIds, cardPriorityShieldHistoryKey, 'Card');
+      if (shouldSaveIncRem) {
+        await saveKBShield(plugin, allIncRems, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem');
+      } else {
+        console.warn('[QueueExit] Skipping KB IncRem shield save because cache was incomplete');
+      }
+
+      if (shouldSaveCard) {
+        await saveKBShield(plugin, allCardInfos, isCardDue, seenCardIds, cardPriorityShieldHistoryKey, 'Card');
+      } else {
+        console.warn('[QueueExit] Skipping KB Card shield save because cache was incomplete');
+      }
 
       // Save document-level shields if scope exists
       const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
 
       if (historyKey && priorityCalcScopeRemIds && priorityCalcScopeRemIds.length > 0) {
-        await saveDocumentShield(
-          plugin,
-          allIncRems,
-          priorityCalcScopeRemIds,
-          isIncRemDue,
-          seenRemIds,
-          documentPriorityShieldHistoryKey,
-          historyKey,
-          'IncRem'
-        );
+        if (shouldSaveIncRem) {
+          await saveDocumentShield(
+            plugin,
+            allIncRems,
+            priorityCalcScopeRemIds,
+            isIncRemDue,
+            seenRemIds,
+            documentPriorityShieldHistoryKey,
+            historyKey,
+            'IncRem'
+          );
+        }
 
-        await saveDocumentShield(
-          plugin,
-          allCardInfos,
-          priorityCalcScopeRemIds,
-          isCardDue,
-          seenCardIds,
-          documentCardPriorityShieldHistoryKey,
-          historyKey,
-          'Card'
-        );
+        if (shouldSaveCard) {
+          await saveDocumentShield(
+            plugin,
+            allCardInfos,
+            priorityCalcScopeRemIds,
+            isCardDue,
+            seenCardIds,
+            documentCardPriorityShieldHistoryKey,
+            historyKey,
+            'Card'
+          );
+        }
       } else {
         console.log('[QueueExit] No scope ID or priority calc scope - skipping document shield saves');
       }
@@ -246,6 +268,9 @@ export function registerQueueEnterListener(
 
     if (allCardInfos.length === 0) {
       console.warn('QUEUE ENTER: Card priority cache is empty! Flashcard calculations will be skipped.');
+      await plugin.storage.setSession('skipCardHistorySave', true);
+    } else {
+      await plugin.storage.setSession('skipCardHistorySave', false);
     }
 
     const dueCardsInKB = (await isFullPerformanceMode(plugin)) ? allCardInfos.filter(info => info.dueCards > 0) : [];
@@ -257,6 +282,9 @@ export function registerQueueEnterListener(
 
     if (allIncRems.length === 0) {
       console.warn('QUEUE ENTER: Incremental Rem cache is empty! IncRem calculations will be skipped.');
+      await plugin.storage.setSession('skipIncRemHistorySave', true);
+    } else {
+      await plugin.storage.setSession('skipIncRemHistorySave', false);
     }
 
     const dueIncRemsInKB = allIncRems?.filter(rem => Date.now() >= rem.nextRepDate) || [];
