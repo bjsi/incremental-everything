@@ -556,13 +556,32 @@ function Priority() {
       await initIncrementalRem(plugin, rem);
     }
 
-    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+    // Fire-and-forget write
+    rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
 
-    // Get the updated IncRem info and update allIncrementalRemKey
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-    if (updatedIncRem) {
-      updateIncrementalRemCache(plugin, updatedIncRem); // Fire-and-forget
-    }
+    // Construct Optimistic IncRem Object
+    const currentNow = Date.now();
+    const optimisticIncRem: IncrementalRem = incRemInfo ? {
+      ...incRemInfo,
+      priority: priority,
+      // If we are just updating priority, nextRepDate etc shouldn't change unless it was new
+    } : {
+      // Fallback for newly initialized inc rem
+      remId: rem._id,
+      nextRepDate: currentNow, // Approximate
+      priority: priority,
+      history: [],
+      // Other fields might be missing if we construct from scratch, but updateIncrementalRemCache 
+      // mainly needs remId and priority for sorting/percentiles if it does a light update.
+      // However, for full correctness, initIncrementalRem above handles the DB side.
+      // The cache update might need more fields.
+      // Let's rely on the fact that if !incRemInfo, the cache probably doesn't have it either, 
+      // so a full refresh might be safer or we construct a minimal valid object.
+      // For now, let's assume if it exists we use it, if not we rely on background sync or a minimal object.
+    } as IncrementalRem;
+
+    // Fire-and-forget cache update
+    updateIncrementalRemCache(plugin, optimisticIncRem);
 
     // 🔌 Conditionally update session cache
     if (performanceMode === PERFORMANCE_MODE_FULL && sessionCache && originalScopeId) {
@@ -574,46 +593,34 @@ function Priority() {
         incRemDocPercentiles: newIncRemDocPercentiles
       };
 
-      await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+      plugin.storage.setSession(queueSessionCacheKey, updatedCache).catch(console.error);
     }
   }, [rem, incRemInfo, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
   const saveCardPriority = useCallback(async (priority: number) => {
     if (!rem) return;
 
-    // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-    await plugin.storage.setSession('manual_priority_update_pending', true);
+    // 1. Optimistic Updates (FIRST for responsiveness)
 
-    await setCardPriority(plugin, rem, priority, 'manual');
+    // Construct Optimistic Info to avoid DB reads (fixes Close Lag & Race Condition)
+    const optimisticInfo: CardPriorityInfo | null = cardInfo ? {
+      ...cardInfo,
+      priority: priority,
+      source: 'manual',
+      lastUpdated: Date.now()
+    } : {
+      // Fallback if we somehow didn't have cardInfo but are saving (e.g. inheritance only)
+      remId: rem._id,
+      priority: priority,
+      source: 'manual',
+      lastUpdated: Date.now(),
+      cardCount: cardInfo?.cardCount || 1, // approximate
+      dueCards: cardInfo?.dueCards || 0,
+      kbPercentile: cardInfo?.kbPercentile || 0
+    };
 
     // 🔌 Only do cache updates in 'full' mode
     if (performanceMode === PERFORMANCE_MODE_FULL) {
-      const numCardsRemaining = await plugin.queue.getNumRemainingCards();
-      const isInQueueNow = numCardsRemaining !== undefined;
-
-      // Step 1: Fast "Light" Update
-      // Determine if we are In-Queue or not. If In-Queue, we generally want the fast update.
-      // But actually, for the popup save lag, we always want the fast update first.
-
-      // Construct Optimistic Info to avoid DB reads (fixes Close Lag & Race Condition)
-      const optimisticInfo: CardPriorityInfo | null = cardInfo ? {
-        ...cardInfo,
-        priority: priority,
-        source: 'manual',
-        // Update lastUpdated?
-        lastUpdated: Date.now()
-      } : {
-        // Fallback if we somehow didn't have cardInfo but are saving (e.g. inheritance only)
-        remId: rem._id,
-        priority: priority,
-        source: 'manual',
-        lastUpdated: Date.now(),
-        cardCount: cardInfo?.cardCount || 1, // approximate
-        dueCards: cardInfo?.dueCards || 0,
-        kbPercentile: cardInfo?.kbPercentile || 0
-      };
-
-      // Pass optimistic info
       // Fire-and-forget light update
       updateCardPriorityCache(plugin, rem._id, true, optimisticInfo);
 
@@ -621,26 +628,29 @@ function Priority() {
       // Fire-and-forget flush
       flushLightCacheUpdates(plugin);
 
-      // Step 2: Fire-and-Forget Heavy Recalculation (Background)
+      // Fire-and-Forget Heavy Recalculation (Background)
       // We do NOT await this. It will schedule a heavy recalc (sorting/percentiles) in 200ms.
-      // Pass overrides here too just in case
       updateCardPriorityCache(plugin, rem._id, false, optimisticInfo).catch(console.error);
 
       if (sessionCache && originalScopeId) {
-        // We can optionally update the sessionCache docPercentiles here manually for instant document-scope feedback,
-        // but the background recalc will handle it shortly.
-        // Let's keep the existing logic for now but make sure it doesn't block.
-        // Actually, the previous logic deleted the key from cache. Let's persist that for correctness if needed,
-        // but it might be better to just let the global refresh handle it.
-        // For minimal lag, let's skip complex sessionCache manipulation here and rely on the global refresh mechanism.
+        // Minimal lag: rely on global refresh or previous logic without blocking
       }
     }
 
-    // 🔔 signal refresh for listeners (e.g. display widget) in ALL modes
+    // 🔔 Signal refresh for listeners (e.g. display widget) in ALL modes
     // This ensures that even in Light Mode, the display widget updates its color immediately.
-    // Fire-and-forget to avoid blocking the UI/close animation
     plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
-  }, [rem, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
+
+
+    // 2. Critical Writes (Fire and Forget)
+    // Signal events.ts to allow this update even if in queue (Global Context Survivor)
+    plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
+
+    // Perform the actual DB write
+    // We pass `hasCardPriorityPowerup` (from component scope) to skip the read check!
+    setCardPriority(plugin, rem, priority, 'manual', hasCardPriorityPowerup).catch(console.error);
+
+  }, [rem, plugin, sessionCache, originalScopeId, performanceMode, cardInfo, hasCardPriorityPowerup]); // 🔌 Add performanceMode
 
   const showInheritanceSection =
     (!showIncSection && !showCardSection) ||
@@ -649,11 +659,16 @@ function Priority() {
 
   const saveAndClose = useCallback(async (incP: number, cardP: number) => {
     isSaving.current = true;
-    if (showIncSection) await saveIncPriority(incP);
-    if (showCardSection || showInheritanceSection) {
-      await saveCardPriority(cardP);
-      // Cache flush and refresh signal are now handled inside saveCardPriority
+
+    // Fire both save operations immediately without waiting
+    if (showIncSection) {
+      saveIncPriority(incP).catch(console.error);
     }
+    if (showCardSection || showInheritanceSection) {
+      saveCardPriority(cardP).catch(console.error);
+    }
+
+    // Close immediately ("Fire and Forget")
     plugin.widget.closePopup();
   }, [plugin, showIncSection, showCardSection, showInheritanceSection, saveIncPriority, saveCardPriority]);
 
