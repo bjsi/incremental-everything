@@ -658,11 +658,16 @@ function Priority() {
     scopedCardRems = [],
     descendantCardCount,
     prioritySourceCounts,
-    incRelPriority: derivedIncRel,
-    cardRelPriority: derivedCardRel
+    // We do NOT use the derived priorities directly for rendering,
+    // because they don't update optimistically while dragging.
+    // Instead, we use the state variables `incRelPriority` and `cardRelPriority`
+    // which are kept in sync via the useEffects above.
   } = derivedData || {};
 
   const isLoadingDerivedData = !derivedData;
+  // In Light Mode, we don't calculate relative percentiles, so we should always use absolute coloring
+  // to give meaningful visual feedback (red->green->blue) instead of a static "50%" color.
+  const useAbsoluteColoring = isLoadingDerivedData || performanceMode === PERFORMANCE_MODE_LIGHT;
   const safeIncAbsPriority = incAbsPriority ?? defaultIncPriority ?? 50;
   const safeCardAbsPriority = cardAbsPriority ?? defaultCardPriority ?? 50;
 
@@ -867,7 +872,7 @@ function Priority() {
               <span>📖</span>
               Incremental Rem
             </h3>
-            <PriorityBadge priority={safeIncAbsPriority} percentile={derivedIncRel} useAbsoluteColoring={isLoadingDerivedData} />
+            <PriorityBadge priority={safeIncAbsPriority} percentile={incRelPriority} useAbsoluteColoring={useAbsoluteColoring} />
           </div>
 
           <div className="flex flex-col gap-3">
@@ -875,8 +880,8 @@ function Priority() {
               ref={incSliderRef}
               value={safeIncAbsPriority}
               onChange={setIncAbsPriority}
-              relativePriority={derivedIncRel}
-              useAbsoluteColoring={isLoadingDerivedData}
+              relativePriority={incRelPriority}
+              useAbsoluteColoring={useAbsoluteColoring}
               onKeyDown={(e) => {
                 if (e.key === 'Tab') handleTabCycle(e);
                 else incKeyboard.handleKeyDown(e);
@@ -889,7 +894,7 @@ function Priority() {
                   <span>Loading relative priority...</span>
                 ) : (
                   <>
-                    <span>Relative: <strong>{derivedIncRel}%</strong></span>
+                    <span>Relative: <strong>{incRelPriority}%</strong></span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedIncRems.length.toLocaleString()} items</span>
                   </>
@@ -965,7 +970,7 @@ function Priority() {
               <span>🎴</span>
               Flashcard Priority
             </h3>
-            <PriorityBadge priority={safeCardAbsPriority} percentile={derivedCardRel} useAbsoluteColoring={isLoadingDerivedData} />
+            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={useAbsoluteColoring} />
           </div>
 
           <div className="flex flex-col gap-3">
@@ -973,8 +978,8 @@ function Priority() {
               ref={cardSliderRef}
               value={safeCardAbsPriority}
               onChange={setCardAbsPriority}
-              relativePriority={derivedCardRel}
-              useAbsoluteColoring={isLoadingDerivedData}
+              relativePriority={cardRelPriority}
+              useAbsoluteColoring={useAbsoluteColoring}
               onKeyDown={(e) => {
                 if (e.key === 'Tab') handleTabCycle(e);
                 else cardKeyboard.handleKeyDown(e);
@@ -1002,7 +1007,7 @@ function Priority() {
                       <span>Loading relative priority...</span>
                     ) : (
                       <>
-                        <span>Relative: <strong>{derivedCardRel}%</strong></span>
+                        <span>Relative: <strong>{cardRelPriority}%</strong></span>
                         <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
                         <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
                       </>
@@ -1049,7 +1054,7 @@ function Priority() {
               <span>🌿</span>
               Inheritance Priority
             </h3>
-            <PriorityBadge priority={safeCardAbsPriority} percentile={derivedCardRel} useAbsoluteColoring={isLoadingDerivedData} />
+            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={useAbsoluteColoring} />
           </div>
 
           <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
@@ -1067,8 +1072,8 @@ function Priority() {
               ref={!showCardSection ? cardSliderRef : undefined}
               value={safeCardAbsPriority}
               onChange={setCardAbsPriority}
-              relativePriority={derivedCardRel}
-              useAbsoluteColoring={isLoadingDerivedData}
+              relativePriority={cardRelPriority}
+              useAbsoluteColoring={useAbsoluteColoring}
               onKeyDown={(e) => {
                 if (e.key === 'Tab') handleTabCycle(e);
                 else cardKeyboard.handleKeyDown(e);
@@ -1081,7 +1086,7 @@ function Priority() {
                   <span>Loading relative priority...</span>
                 ) : (
                   <>
-                    <span>Relative: <strong>{derivedCardRel}%</strong></span>
+                    <span>Relative: <strong>{cardRelPriority}%</strong></span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>•</span>
                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>{scopedCardRems.length.toLocaleString()} cards</span>
                   </>
