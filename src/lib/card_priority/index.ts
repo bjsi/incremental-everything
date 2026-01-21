@@ -99,16 +99,20 @@ export async function setCardPriority(
   plugin: RNPlugin,
   rem: PluginRem,
   priority: number,
-  source: PrioritySource
+  source: PrioritySource,
+  knownHasPowerup: boolean = false
 ): Promise<void> {
-  const hasPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
+  const hasPowerup = knownHasPowerup || (await rem.hasPowerup(CARD_PRIORITY_CODE));
   if (!hasPowerup) {
     await rem.addPowerup(CARD_PRIORITY_CODE);
   }
 
-  await rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT, [priority.toString()]);
-  await rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]);
-  await rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()]);
+  // Parallelize the property updates for maximum speed (Fire and Forget style)
+  await Promise.all([
+    rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT, [priority.toString()]),
+    rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]),
+    rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()])
+  ]);
 }
 
 /**
@@ -363,7 +367,7 @@ async function getDueCardsWithPrioritiesSlow(
   }>
 > {
   console.log(`[getDueCardsWithPrioritiesSlow] Starting fallback gathering...`);
-  
+
   const results: Array<{
     rem: PluginRem;
     cards: any[];
@@ -374,7 +378,7 @@ async function getDueCardsWithPrioritiesSlow(
   // Get all cards once using the reliable plugin.card.getAll()
   const allCards = await plugin.card.getAll();
   const now = Date.now();
-  
+
   // Build a map of remId -> due card count
   const remDueCardCount = new Map<RemId, number>();
   for (const card of allCards) {
@@ -382,7 +386,7 @@ async function getDueCardsWithPrioritiesSlow(
       remDueCardCount.set(card.remId, (remDueCardCount.get(card.remId) || 0) + 1);
     }
   }
-  
+
   console.log(`[getDueCardsWithPrioritiesSlow] Found ${remDueCardCount.size} rems with due cards`);
 
   let remsToCheckIds: Set<RemId>;

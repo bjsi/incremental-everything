@@ -426,9 +426,17 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
 
       remChangeDebounceTimer = setTimeout(async () => {
         const inQueue = !!(await plugin.storage.getSession(currentSubQueueIdKey));
-        if (inQueue) {
+        const isManualUpdate = await plugin.storage.getSession<boolean>('manual_priority_update_pending');
+
+        if (inQueue && !isManualUpdate) {
           console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping processing because user is in the queue.');
           return;
+        }
+
+        if (isManualUpdate) {
+          console.log('LISTENER: Processing manual priority update (Queue Override).');
+          // Reset flag
+          await plugin.storage.setSession('manual_priority_update_pending', false);
         }
 
         if (await isLightPerformanceMode(plugin)) {
