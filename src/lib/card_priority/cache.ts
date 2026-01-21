@@ -1,6 +1,6 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { allCardPriorityInfoKey } from '../consts';
-import { CardPriorityInfo } from './types';
+import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../consts';
+import { CardPriorityInfo, PrioritySource } from './types';
 import { getCardPriority, autoAssignCardPriority } from './index';
 import * as _ from 'remeda';
 
@@ -43,18 +43,56 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
 
   } else {
     await plugin.storage.setSession(allCardPriorityInfoKey, cache);
-
   }
+
+  // Signal all listeners that the cache has been updated
+  // This is crucial for UI components to refresh their priority displays
+  await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
 
   pendingUpdates.clear();
 }
 
-export async function updateCardPriorityCache(plugin: RNPlugin, remId: RemId, isLightUpdate = false) {
+export async function updateCardPriorityCache(
+  plugin: RNPlugin,
+  remId: RemId,
+  isLightUpdate = false,
+  optimisticInfo?: Partial<CardPriorityInfo> | null
+) {
   try {
+    let updatedInfo: CardPriorityInfo | null = null;
 
+    if (optimisticInfo && optimisticInfo.remId) {
+      // Optimistic Path: Use provided info directly (fastest, no DB read)
+      // We assume the caller provided enough info to be useful (at least remId, priority, source)
+      // Check if we need to fetch other fields if they are missing? 
+      // For now, assume if optimisticInfo is provided, it's intended to replace/merge.
+      // But we need a base.
+      // Strategy: If optimisticInfo is "complete enough", use it. Else fetch and merge.
+      // For priority/source updates, we usually have previous info in cache.
 
-    const rem = await plugin.rem.findOne(remId);
-    const updatedInfo = rem ? await getCardPriority(plugin, rem) : null;
+      // Let's rely on the caller passing a mostly complete object if they avoid the DB read.
+      // OR, we can read from the existing cache to fill gaps?
+      // Reading from pendingUpdates or session cache takes time? No, session cache read is effectively sync if cached? 2 calls?
+
+      // Simplest robust approach: If optimisticInfo has priority/source, use it.
+      // If full object is passed, use it.
+      if (optimisticInfo.cardCount !== undefined) {
+        updatedInfo = optimisticInfo as CardPriorityInfo;
+      } else {
+        // Should fetch to be safe if incomplete, OR merging logic.
+        // Let's implement fetch-then-merge for partial, OR skip-fetch for full.
+        // For now, let's stick to the previous override logic BUT prefer optimistic if valid.
+        const rem = await plugin.rem.findOne(remId);
+        const fetched = rem ? await getCardPriority(plugin, rem) : null;
+        if (fetched) {
+          updatedInfo = { ...fetched, ...optimisticInfo };
+        }
+      }
+    } else {
+      // Standard Path: Fetch from DB
+      const rem = await plugin.rem.findOne(remId);
+      updatedInfo = rem ? await getCardPriority(plugin, rem) : null;
+    }
 
     pendingUpdates.set(remId, { info: updatedInfo, isLight: isLightUpdate });
 

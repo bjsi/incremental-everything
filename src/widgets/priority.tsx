@@ -14,7 +14,9 @@ import {
   getCardPriority,
   setCardPriority,
   CardPriorityInfo,
-  QueueSessionCache
+  QueueSessionCache,
+  CARD_PRIORITY_CODE,
+  PRIORITY_SLOT
 } from '../lib/card_priority';
 import { calculateRelativePercentile, DEFAULT_PERFORMANCE_MODE, PERFORMANCE_MODE_FULL, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import {
@@ -65,13 +67,15 @@ function Priority() {
   const [cardScopeType, setCardScopeType] = useState<CardScopeType>('prioritized');
   const [incAbsPriority, setIncAbsPriority] = useState<number | null>(null);
   const [cardAbsPriority, setCardAbsPriority] = useState<number | null>(null);
-  const [incRelPriority, setIncRelPriority] = useState(50);
-  const [cardRelPriority, setCardRelPriority] = useState(50);
+  // RelPriority moved to useMemo below derivedData to ensure synchronous updates (fixing flicker)
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showInheritanceForIncRem, setShowInheritanceForIncRem] = useState(false);
   const incSliderRef = useRef<PrioritySliderRef>(null);
   const cardSliderRef = useRef<PrioritySliderRef>(null);
   const isSaving = useRef(false);
+  // Dirty flags to track if user has interacted with the inputs
+  const incIsDirty = useRef(false);
+  const cardIsDirty = useRef(false);
 
   // Data Fetching Hooks
   const widgetContext = useRunAsync(async () => {
@@ -133,13 +137,21 @@ function Priority() {
   const incKeyboard = useAcceleratedKeyboardHandler(
     incAbsPriority,
     incAbsPriority ?? defaultIncPriority ?? 50,
-    (val) => setIncAbsPriority(Math.max(0, Math.min(100, val)))
+    (val) => {
+      console.log('[Priority] ⌨️ Inc Keyboard Input:', val);
+      incIsDirty.current = true;
+      setIncAbsPriority(Math.max(0, Math.min(100, val)));
+    }
   );
 
   const cardKeyboard = useAcceleratedKeyboardHandler(
     cardAbsPriority,
     cardAbsPriority ?? defaultCardPriority ?? 50,
-    (val) => setCardAbsPriority(Math.max(0, Math.min(100, val)))
+    (val) => {
+      console.log('[Priority] ⌨️ Card Keyboard Input:', val);
+      cardIsDirty.current = true;
+      setCardAbsPriority(Math.max(0, Math.min(100, val)));
+    }
   );
 
   const inQueue = !!queueSubQueueId;
@@ -149,7 +161,31 @@ function Priority() {
       return null;
     }
     const result = await getIncrementalRemFromRem(plugin, rem);
+
+
     return result;
+  }, [rem?._id]);
+
+  // --- FAST PRIORITY FETCHER (O(1)) ---
+  // To avoid the 50->30 flicker, we fetch *only* the raw priority values directly from the powerup slots.
+  // This bypasses the heavy CardInfo (checking cached/global cards) and IncRemInfo (checking dates/history) builders.
+  const fastPriorityValues = useTrackerPlugin(async (plugin) => {
+    if (!rem) return null;
+
+    // Fast path: Card Priority
+    // getPowerupProperty is much faster than constructing full objects
+    const cardPStr = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+    const card = cardPStr ? parseInt(cardPStr) : undefined;
+
+    // Fast path: Inc Rem Priority
+    // Note: getPowerupProperty returns the raw string value of the slot
+    const incPStr = await rem.getPowerupProperty(powerupCode, prioritySlotCode);
+    const inc = incPStr ? parseInt(incPStr) : undefined;
+
+    return {
+      card: !isNaN(card as number) ? card : undefined,
+      inc: !isNaN(inc as number) ? inc : undefined
+    };
   }, [rem?._id]);
 
   // Replace the separate hasCards, cardInfo hooks with a combined one:
@@ -354,32 +390,90 @@ function Priority() {
       descendantCardCount: finalDescendantCardCount,
       prioritySourceCounts: finalPrioritySourceCounts,
     };
-  }, [rem, inQueue, scope, allIncRems, allCardInfos, cardScopeType, sessionCache, queueSubQueueId, scopeMode, originalScopeId, isPriorityReviewDoc, performanceMode]); // 🔌 Add performanceMode
+  }, [rem, inQueue, scope, allIncRems, allCardInfos, cardScopeType, sessionCache, queueSubQueueId, scopeMode, originalScopeId, isPriorityReviewDoc, performanceMode]);
+
+  // --- OPTIMIZED RELATIVE PRIORITY CALCULATION (Synchronous - fixes flicker) ---
+  // Using O(N) counting sort logic instead of sorting (O(N log N)) for performance
+  const incRelPriority = useMemo(() => {
+    if (performanceMode === PERFORMANCE_MODE_LIGHT || !derivedData || !rem) return 50;
+    const p = incAbsPriority ?? defaultIncPriority ?? 50;
+    // Count items with priority <= p. In a stable sort, our item (if added) would be last among equals.
+    // So distinct items < p count + distinct items === p count = items <= p
+    const others = derivedData.scopedIncRems.filter(r => r.remId !== rem._id);
+    const countLowerOrEqual = others.reduce((acc, curr) => (curr.priority <= p ? acc + 1 : acc), 0);
+    const rank = countLowerOrEqual + 1;
+    const total = others.length + 1;
+    return Math.round((rank / total) * 1000) / 10; // Round to 1 decimal place
+  }, [performanceMode, derivedData, rem, incAbsPriority, defaultIncPriority]);
+
+  const cardRelPriority = useMemo(() => {
+    if (performanceMode === PERFORMANCE_MODE_LIGHT || !derivedData || !rem) return 50;
+    const p = cardAbsPriority ?? defaultCardPriority ?? 50;
+    const others = derivedData.scopedCardRems.filter(r => r.remId !== rem._id);
+    const countLowerOrEqual = others.reduce((acc, curr) => (curr.priority <= p ? acc + 1 : acc), 0);
+    const rank = countLowerOrEqual + 1;
+    const total = others.length + 1;
+    return Math.round((rank / total) * 1000) / 10;
+  }, [performanceMode, derivedData, rem, cardAbsPriority, defaultCardPriority]);
 
   // Synchronous Derived Data Hooks (Memoization)
   const documentScopes = useMemo(() => scopeHierarchy.filter(s => s.remId !== null), [scopeHierarchy]);
   const currentDocumentScopeIndex = useMemo(() => documentScopes.findIndex(s => s.remId === scope.remId), [documentScopes, scope]);
 
   // Effect Hooks
+  // Reset dirty flags and values when Rem changes
+  useEffect(() => {
+    console.log('[Priority] 🔄 Rem changed, resetting dirty flags. remId:', rem?._id);
+    incIsDirty.current = false;
+    cardIsDirty.current = false;
+    // We don't necessarily want to set priorities to null here because other hooks
+    // might be about to set them, and setting null might cause a flash.
+    // However, for cleanliness on ID swap, we should relying on the data hooks to fire again.
+  }, [rem?._id]);
+
   useEffect(() => {
     if (isSaving.current) return;
     if (incRemInfo) {
-      setIncAbsPriority(incRemInfo.priority);
+      console.log('[Priority] ⚡ IncRem Effect [incRemInfo]', { dirty: incIsDirty.current, val: incRemInfo.priority });
+      if (!incIsDirty.current) {
+        setIncAbsPriority(incRemInfo.priority);
+      }
     } else if (defaultIncPriority !== undefined && incAbsPriority === null) {
+      console.log('[Priority] ⚡ IncRem Effect [default]', { dirty: incIsDirty.current, val: defaultIncPriority });
       // Optimistic default for new/loading IncRems
-      setIncAbsPriority(defaultIncPriority);
+      // Only set if not dirty (though usually fresh load implies not dirty)
+      // GUARD: Ensure we have loaded the incRemInfo status (it shouldn't be undefined if we decided it's null/missing)
+      // Actually incRemInfo comes from useTrackerPlugin, so it starts undefined.
+      // If it is undefined, we should NOT set default yet.
+      if (incRemInfo === undefined) return;
+
+      if (!incIsDirty.current) {
+        setIncAbsPriority(defaultIncPriority);
+      }
     }
   }, [incRemInfo, defaultIncPriority]);
 
   useEffect(() => {
     if (isSaving.current) return;
     if (cardInfo) {
-      setCardAbsPriority(cardInfo.priority);
+      console.log('[Priority] ⚡ CardInfo Effect [cardInfo]', { dirty: cardIsDirty.current, val: cardInfo.priority });
+      if (!cardIsDirty.current) {
+        setCardAbsPriority(cardInfo.priority);
+      }
     } else if (defaultCardPriority !== undefined && cardAbsPriority === null) {
+      console.log('[Priority] ⚡ CardInfo Effect [default]', { dirty: cardIsDirty.current, val: defaultCardPriority });
       // Optimistic default for new/loading cards
-      setCardAbsPriority(defaultCardPriority);
+
+      // GUARD: Ensure cardData has actually loaded.
+      // If cardData is undefined, it means we are still loading info.
+      // We shouldn't fallback to default yet, otherwise we get a 50 -> 30 flicker.
+      if (cardData === undefined) return;
+
+      if (!cardIsDirty.current) {
+        setCardAbsPriority(defaultCardPriority);
+      }
     }
-  }, [cardInfo, defaultCardPriority]);
+  }, [cardInfo, defaultCardPriority, cardData]);
 
   // Snap to Inheritance Effect
   useEffect(() => {
@@ -390,7 +484,12 @@ function Priority() {
     if (ancestorPriorityInfo && (!cardInfo || cardInfo.source === 'default' || cardInfo.source === 'inherited')) {
       // Only update if we haven't already set a manual override? 
       // Actually, if source is default/inherited, we display the effective priority, which IS the ancestor's.
-      setCardAbsPriority(ancestorPriorityInfo.priority);
+      console.log('[Priority] ⚡ Snap Effect', { dirty: cardIsDirty.current, val: ancestorPriorityInfo.priority });
+      if (!cardIsDirty.current) {
+        setCardAbsPriority(ancestorPriorityInfo.priority);
+      } else {
+        console.log('[Priority] 🛑 Snap Effect IGNORED (dirty)');
+      }
     }
   }, [ancestorPriorityInfo, cardInfo]);
 
@@ -442,28 +541,8 @@ function Priority() {
     }, 50);
   }, [incRemInfo, cardInfo]);
 
-  // This effect calculates hypothetical relative priority, skip in 'light' mode
-  useEffect(() => {
-    if (performanceMode === PERFORMANCE_MODE_FULL && derivedData && rem) {
-      const hypotheticalRems = [
-        ...derivedData.scopedIncRems.filter(r => r.remId !== rem._id),
-        { remId: rem._id, priority: incAbsPriority ?? defaultIncPriority ?? 50 } as IncrementalRem
-      ];
-      const newRelPriority = calculateRelativePercentile(hypotheticalRems, rem._id);
-      if (newRelPriority !== null) setIncRelPriority(newRelPriority);
-    }
-  }, [incAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode
-
-  useEffect(() => {
-    if (performanceMode === PERFORMANCE_MODE_FULL && derivedData && rem) {
-      const hypotheticalRems = [
-        ...derivedData.scopedCardRems.filter(r => r.remId !== rem._id),
-        { remId: rem._id, priority: cardAbsPriority ?? defaultCardPriority ?? 50, source: 'manual' } as CardPriorityInfo
-      ];
-      const newRelPriority = calculateRelativePercentile(hypotheticalRems, rem._id);
-      if (newRelPriority !== null) setCardRelPriority(newRelPriority);
-    }
-  }, [cardAbsPriority, derivedData, rem, performanceMode]); // 🔌 Add performanceMode
+  // Effects for calculating hypothetical relative priority REMOVED
+  // Replaced by synchronous useMemo above to prevent "Blue Flash" flicker.
 
   // Event Handlers
   const showIncSection = !!incRemInfo; // Converts to boolean - undefined/null become false
@@ -511,17 +590,35 @@ function Priority() {
       // Step 1: Fast "Light" Update
       // Determine if we are In-Queue or not. If In-Queue, we generally want the fast update.
       // But actually, for the popup save lag, we always want the fast update first.
-      await updateCardPriorityCache(plugin, rem._id, true); // true = force light update (no heavy recalc)
+
+      // Construct Optimistic Info to avoid DB reads (fixes Close Lag & Race Condition)
+      const optimisticInfo: CardPriorityInfo | null = cardInfo ? {
+        ...cardInfo,
+        priority: priority,
+        source: 'manual',
+        // Update lastUpdated?
+        lastUpdated: Date.now()
+      } : {
+        // Fallback if we somehow didn't have cardInfo but are saving (e.g. inheritance only)
+        remId: rem._id,
+        priority: priority,
+        source: 'manual',
+        lastUpdated: Date.now(),
+        cardCount: cardInfo?.cardCount || 1, // approximate
+        dueCards: cardInfo?.dueCards || 0,
+        kbPercentile: cardInfo?.kbPercentile || 0
+      };
+
+      // Pass optimistic info
+      await updateCardPriorityCache(plugin, rem._id, true, optimisticInfo); // true = force light update (async but fast)
 
       // Ensure the light update is committed to session storage so UI can see it immediately
       await flushLightCacheUpdates(plugin);
 
       // Step 2: Fire-and-Forget Heavy Recalculation (Background)
       // We do NOT await this. It will schedule a heavy recalc (sorting/percentiles) in 200ms.
-      updateCardPriorityCache(plugin, rem._id, false).catch(console.error);
-
-      // Signal refresh for UI components (like the display widget)
-      await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+      // Pass overrides here too just in case
+      updateCardPriorityCache(plugin, rem._id, false, optimisticInfo).catch(console.error);
 
       if (sessionCache && originalScopeId) {
         // We can optionally update the sessionCache docPercentiles here manually for instant document-scope feedback,
@@ -532,6 +629,11 @@ function Priority() {
         // For minimal lag, let's skip complex sessionCache manipulation here and rely on the global refresh mechanism.
       }
     }
+
+    // 🔔 signal refresh for listeners (e.g. display widget) in ALL modes
+    // This ensures that even in Light Mode, the display widget updates its color immediately.
+    // Fire-and-forget to avoid blocking the UI/close animation
+    plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
   }, [rem, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
   const showInheritanceSection =
@@ -630,6 +732,9 @@ function Priority() {
     await rem.removePowerup('cardPriority');
     // 🔌 Conditionally update cache
     if (performanceMode === PERFORMANCE_MODE_FULL) {
+      // For removal, we don't have overrides, we assume the next read will see the powerup gone.
+      // Or we can force it? Ideally removal propagates fast enough or we accept a small delay on reset.
+      // But let's rely on standard read for removal for now.
       await updateCardPriorityCache(plugin, rem._id);
     }
     await plugin.app.toast('Card Priority for inheritance removed.');
@@ -667,9 +772,16 @@ function Priority() {
   const isLoadingDerivedData = !derivedData;
   // In Light Mode, we don't calculate relative percentiles, so we should always use absolute coloring
   // to give meaningful visual feedback (red->green->blue) instead of a static "50%" color.
-  const useAbsoluteColoring = isLoadingDerivedData || performanceMode === PERFORMANCE_MODE_LIGHT;
-  const safeIncAbsPriority = incAbsPriority ?? defaultIncPriority ?? 50;
-  const safeCardAbsPriority = cardAbsPriority ?? defaultCardPriority ?? 50;
+  // Also, if we have fewer than 2 items in scope (e.g. initial load or single item), relative priority
+  // will be 100% (Blue), which is misleading for high priority items. Force absolute coloring in that case.
+  const baseUseAbsolute = isLoadingDerivedData || performanceMode === PERFORMANCE_MODE_LIGHT;
+  const incUseAbsoluteColoring = baseUseAbsolute || scopedIncRems.length < 2;
+  const cardUseAbsoluteColoring = baseUseAbsolute || scopedCardRems.length < 2;
+
+  // FIX: Should prefer fastPriorityValues over default to avoid 50->30 flicker
+  // This uses the O(1) fetch result which is available almost instantly
+  const safeIncAbsPriority = incAbsPriority ?? fastPriorityValues?.inc ?? incRemInfo?.priority ?? defaultIncPriority ?? 50;
+  const safeCardAbsPriority = cardAbsPriority ?? fastPriorityValues?.card ?? cardInfo?.priority ?? defaultCardPriority ?? 50;
 
   const showAddCardPriorityButton = showIncSection && !showCardSection && !showInheritanceSection;
 
@@ -872,16 +984,20 @@ function Priority() {
               <span>📖</span>
               Incremental Rem
             </h3>
-            <PriorityBadge priority={safeIncAbsPriority} percentile={incRelPriority} useAbsoluteColoring={useAbsoluteColoring} />
+            <PriorityBadge priority={safeIncAbsPriority} percentile={incRelPriority} useAbsoluteColoring={incUseAbsoluteColoring} />
           </div>
 
           <div className="flex flex-col gap-3">
             <PrioritySlider
               ref={incSliderRef}
               value={safeIncAbsPriority}
-              onChange={setIncAbsPriority}
+              onChange={(val) => {
+                console.log('[Priority] 🎚️ Inc Slider Change:', val);
+                incIsDirty.current = true;
+                setIncAbsPriority(val);
+              }}
               relativePriority={incRelPriority}
-              useAbsoluteColoring={useAbsoluteColoring}
+              useAbsoluteColoring={incUseAbsoluteColoring}
               onKeyDown={(e) => {
                 if (e.key === 'Tab') handleTabCycle(e);
                 else incKeyboard.handleKeyDown(e);
@@ -970,16 +1086,20 @@ function Priority() {
               <span>🎴</span>
               Flashcard Priority
             </h3>
-            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={useAbsoluteColoring} />
+            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={cardUseAbsoluteColoring} />
           </div>
 
           <div className="flex flex-col gap-3">
             <PrioritySlider
               ref={cardSliderRef}
               value={safeCardAbsPriority}
-              onChange={setCardAbsPriority}
+              onChange={(val) => {
+                console.log('[Priority] 🎚️ Card Slider Change:', val);
+                cardIsDirty.current = true;
+                setCardAbsPriority(val);
+              }}
               relativePriority={cardRelPriority}
-              useAbsoluteColoring={useAbsoluteColoring}
+              useAbsoluteColoring={cardUseAbsoluteColoring}
               onKeyDown={(e) => {
                 if (e.key === 'Tab') handleTabCycle(e);
                 else cardKeyboard.handleKeyDown(e);
@@ -1054,7 +1174,7 @@ function Priority() {
               <span>🌿</span>
               Inheritance Priority
             </h3>
-            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={useAbsoluteColoring} />
+            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={cardUseAbsoluteColoring} />
           </div>
 
           <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
@@ -1071,9 +1191,13 @@ function Priority() {
             <PrioritySlider
               ref={!showCardSection ? cardSliderRef : undefined}
               value={safeCardAbsPriority}
-              onChange={setCardAbsPriority}
+              onChange={(val) => {
+                console.log('[Priority] 🎚️ Ancestor Slider Change:', val);
+                cardIsDirty.current = true;
+                setCardAbsPriority(val);
+              }}
               relativePriority={cardRelPriority}
-              useAbsoluteColoring={useAbsoluteColoring}
+              useAbsoluteColoring={cardUseAbsoluteColoring}
               onKeyDown={(e) => {
                 if (e.key === 'Tab') handleTabCycle(e);
                 else cardKeyboard.handleKeyDown(e);

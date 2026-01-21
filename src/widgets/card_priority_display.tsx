@@ -60,16 +60,16 @@ function computeShieldStatus(
   return {
     kb: topMissedInKb
       ? {
-          absolute: topMissedInKb.priority,
-          percentile: kbPercentile,
-        }
+        absolute: topMissedInKb.priority,
+        percentile: kbPercentile,
+      }
       : null,
     doc:
       topMissedInDoc && docPercentile !== undefined
         ? {
-            absolute: topMissedInDoc.priority,
-            percentile: docPercentile,
-          }
+          absolute: topMissedInDoc.priority,
+          percentile: docPercentile,
+        }
         : null,
   };
 }
@@ -147,7 +147,7 @@ export function CardPriorityDisplay() {
     }
     return allPrioritizedCardInfo.find(info => info.remId === rem._id);
   }, [rem, isIncRem, allPrioritizedCardInfo, useLightMode]);
-  
+
   const docPercentile = useMemo(() => {
     if (useLightMode || !rem || !sessionCache?.docPercentiles) return null;
     return sessionCache.docPercentiles[rem._id];
@@ -168,7 +168,7 @@ export function CardPriorityDisplay() {
     if (!useLightMode || !rem || isIncRem) return null;
     // Fetch priority directly, on-demand. This is fast for a single rem.
     return await getCardPriority(rp, rem);
-  }, [useLightMode, rem, isIncRem]);
+  }, [useLightMode, rem, isIncRem, refreshSignal]);
 
 
   // --- 🔌 COMBINE RESULTS ---
