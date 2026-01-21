@@ -561,7 +561,7 @@ function Priority() {
     // Get the updated IncRem info and update allIncrementalRemKey
     const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (updatedIncRem) {
-      await updateIncrementalRemCache(plugin, updatedIncRem);
+      updateIncrementalRemCache(plugin, updatedIncRem); // Fire-and-forget
     }
 
     // 🔌 Conditionally update session cache
@@ -580,6 +580,10 @@ function Priority() {
 
   const saveCardPriority = useCallback(async (priority: number) => {
     if (!rem) return;
+
+    // Signal events.ts to allow this update even if in queue (Global Context Survivor)
+    await plugin.storage.setSession('manual_priority_update_pending', true);
+
     await setCardPriority(plugin, rem, priority, 'manual');
 
     // 🔌 Only do cache updates in 'full' mode
@@ -610,10 +614,12 @@ function Priority() {
       };
 
       // Pass optimistic info
-      await updateCardPriorityCache(plugin, rem._id, true, optimisticInfo); // true = force light update (async but fast)
+      // Fire-and-forget light update
+      updateCardPriorityCache(plugin, rem._id, true, optimisticInfo);
 
       // Ensure the light update is committed to session storage so UI can see it immediately
-      await flushLightCacheUpdates(plugin);
+      // Fire-and-forget flush
+      flushLightCacheUpdates(plugin);
 
       // Step 2: Fire-and-Forget Heavy Recalculation (Background)
       // We do NOT await this. It will schedule a heavy recalc (sorting/percentiles) in 200ms.

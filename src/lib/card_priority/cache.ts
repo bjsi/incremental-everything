@@ -32,6 +32,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   }
 
   if (needsHeavyRecalc) {
+    console.log('[Cache] 🏋️ Heavy Recalc Triggered');
 
     const sortedCache = _.sortBy(cache, (info) => info.priority);
     const totalItems = sortedCache.length;
