@@ -14,6 +14,7 @@ import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
+import { PrioritySlider, PrioritySliderRef } from '../components';
 
 async function handleRescheduleAndPriorityUpdate(
   plugin: RNPlugin,
@@ -68,53 +69,7 @@ async function handleRescheduleAndPriorityUpdate(
   await plugin.widget.closePopup();
 }
 
-const PrioritySlider: React.FC<{
-  onChange: (value: number) => void;
-  value: number;
-  onSubmit: (e: React.KeyboardEvent) => void;
-  onKeyDown?: (e: React.KeyboardEvent) => void;
-  inputRef?: React.RefObject<HTMLInputElement>;
-}> = ({ onChange, value, onSubmit, onKeyDown, inputRef }) => {
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="rn-clr-content-secondary priority-label">Lower = more important</div>
-      <input
-        type="range"
-        className="priority-slider"
-        min={0}
-        max={100}
-        value={value}
-        onChange={(e) => onChange(parseInt(e.target.value))}
-        tabIndex={-1}
-        onKeyDown={onKeyDown}
-      />
-      <div className="rn-clr-content-secondary">
-        Priority Value:{' '}
-        <input
-          ref={inputRef}
-          type="number"
-          min={0}
-          max={100}
-          value={value}
-          onChange={(e) => {
-            const num = parseInt(e.target.value);
-            if (!isNaN(num)) {
-              onChange(Math.min(100, Math.max(0, num)));
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              onSubmit(e);
-            } else if (onKeyDown) {
-              onKeyDown(e);
-            }
-          }}
-          className="priority-input"
-        />
-      </div>
-    </div>
-  );
-};
+
 
 const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin, remId }) => {
   const [days, setDays] = useState<string | null>(null);
@@ -122,7 +77,7 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
   const [futureDate, setFutureDate] = useState('');
   const [ancestorInfo, setAncestorInfo] = useState<any>(null);
   const intervalInputRef = useRef<HTMLInputElement>(null);
-  const priorityInputRef = useRef<HTMLInputElement>(null);
+  const prioritySliderRef = useRef<PrioritySliderRef>(null);
 
   // --- KEYBOARD HANDLERS ---
   const daysKeyboard = useAcceleratedKeyboardHandler(
@@ -148,10 +103,10 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
     if (e.key !== 'Tab' || e.shiftKey) return;
     e.preventDefault();
 
-    // Cycle between interval input and priority input
+    // Cycle between interval input and priority slider
     if (document.activeElement === intervalInputRef.current) {
-      priorityInputRef.current?.focus();
-      priorityInputRef.current?.select();
+      prioritySliderRef.current?.focus();
+      prioritySliderRef.current?.select();
     } else {
       intervalInputRef.current?.focus();
       intervalInputRef.current?.select();
@@ -220,52 +175,73 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
         priorityKeyboard.handleKeyUp();
       }}
     >
-      <div className="flex flex-col gap-2">
-        <label htmlFor="interval-days" className="font-semibold">
-          Next repetition in (days):
-        </label>
-        <input
-          ref={intervalInputRef}
-          id="interval-days"
-          type="number"
-          min="0"
-          value={days}
-          onChange={(e) => setDays(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleSubmit(e);
-            } else if (e.key === 'Tab') {
-              handleTabCycle(e);
-            } else {
-              daysKeyboard.handleKeyDown(e);
-            }
-          }}
-          onKeyUp={daysKeyboard.handleKeyUp}
-          className="priority-input"
-        />
-        <div className="rn-clr-content-secondary h-4">{futureDate}</div>
+      <div className="flex flex-col gap-1" data-section="days">
+        <div className="flex justify-between text-xs font-semibold mb-1">
+          <span className="flex items-center gap-1">
+            <span>📅</span> Next repetition in (days)
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            ref={intervalInputRef}
+            id="interval-days"
+            type="number"
+            min="0"
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSubmit(e);
+              } else if (e.key === 'Tab') {
+                handleTabCycle(e);
+              } else {
+                daysKeyboard.handleKeyDown(e);
+              }
+            }}
+            onKeyUp={daysKeyboard.handleKeyUp}
+            className="text-sm font-bold tabular-nums px-2 py-1 rounded shrink-0 border-0 outline-none transition-shadow"
+            style={{
+              backgroundColor: '#F97316',
+              color: 'white',
+              width: '60px',
+              textAlign: 'center',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.15)',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.5), inset 0 1px 2px rgba(0,0,0,0.15)';
+              e.currentTarget.style.border = '2px solid white';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.15)';
+              e.currentTarget.style.border = 'none';
+            }}
+          />
+          <span className="text-xs opacity-60 italic">{futureDate}</span>
+        </div>
       </div>
-      <hr />
-      <div>
-        <label className="font-semibold">Priority</label>
+      {/* Priority Section - styled like priority_light.tsx */}
+      <div className="flex flex-col gap-1" data-section="priority">
+        <div className="flex justify-between text-xs font-semibold mb-1">
+          <span className="flex items-center gap-1">
+            <span>📖</span> Priority
+            <span className="text-[10px] font-normal opacity-70 italic">(Lower = more important)</span>
+          </span>
+        </div>
         <PrioritySlider
+          ref={prioritySliderRef}
           value={priority}
           onChange={setPriority}
-          onSubmit={handleSubmit}
-          inputRef={priorityInputRef}
+          useAbsoluteColoring={true}
           onKeyDown={(e) => {
             if (e.key === 'Tab') {
               handleTabCycle(e);
+            } else if (e.key === 'Enter') {
+              handleSubmit(e);
             } else {
               priorityKeyboard.handleKeyDown(e);
             }
           }}
         />
-        {/* We need global keyup listener or bind it to container/inputs? 
-            Since focus is on inputs, we can bind onKeyUp to inputs alongside onKeyDown 
-            Wait, `PrioritySlider` passes `onKeyDown` to both inputs but we need `onKeyUp` too 
-            for the hold state to clear. 
-        */}
       </div>
       {/* Show ancestor info if available */}
       {ancestorInfo && (
@@ -279,18 +255,21 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
         </div>
       )}
       {/* --- ACCEPT BUTTON --- */}
-      <div className="flex justify-end mt-2">
+      <div className="flex flex-col items-end gap-1 mt-3">
         <button
           type="submit"
-          className="px-4 py-2 font-semibold rounded" // Using basic layout classes
+          className="px-3 py-1 text-sm font-bold rounded-lg transition-all hover:scale-105 active:scale-95"
           style={{
-            backgroundColor: '#3B82F6', // Equivalent to Tailwind's 'bg-blue-500'
+            background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
             color: 'white',
             border: 'none',
+            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.4)',
           }}
+          title="Press Enter to accept"
         >
-          Accept
+          ✓ Accept
         </button>
+        <span className="text-[10px] opacity-50 italic">Press Enter to accept</span>
       </div>
     </form>
   );
@@ -311,7 +290,11 @@ export function Reschedule() {
 
   return (
     <div
-      className="flex flex-col p-4 gap-4 reschedule-popup"
+      className="flex flex-col gap-3 p-4 relative"
+      style={{
+        backgroundColor: 'var(--rn-clr-background-primary)',
+        color: 'var(--rn-clr-content-primary)',
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -320,7 +303,21 @@ export function Reschedule() {
         }
       }}
     >
-      <div className="text-2xl font-bold">Reschedule & Set Priority</div>
+      {/* Header with icon and close button */}
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <img
+            src={plugin.rootURL + 'reschedule-icon.png'}
+            alt="Reschedule"
+            style={{ width: '24px', height: '24px' }}
+          />
+          <h3 className="text-lg font-bold">Reschedule</h3>
+        </div>
+        <button
+          className="text-xs opacity-50 hover:opacity-100 px-2 transition-opacity"
+          onClick={() => plugin.widget.closePopup()}
+        >✕</button>
+      </div>
       <RescheduleInput plugin={plugin} remId={remId} />
     </div>
   );
