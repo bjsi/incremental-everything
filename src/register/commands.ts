@@ -88,7 +88,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem) {
         return;
       }
-      await plugin.widget.openPopup('priority', {
+      await plugin.widget.openPopup('priority_light', {
         remId: rem._id,
       });
     },
@@ -630,7 +630,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       if (args && args.remId) {
-        await plugin.widget.openPopup('priority', {
+        await plugin.widget.openPopup('priority_light', {
           remId: args.remId,
         });
       }

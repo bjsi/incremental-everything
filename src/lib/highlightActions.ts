@@ -134,7 +134,7 @@ export const showPriorityPopupForRem = async (
 
   // Store the rem ID for the priority popup to use
   await plugin.storage.setSession('priorityPopupTargetRemId', remId);
-  await plugin.widget.openPopup('priority');
+  await plugin.widget.openPopup('priority_light');
 };
 
 /**
