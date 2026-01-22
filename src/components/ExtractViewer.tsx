@@ -2,7 +2,7 @@
 // UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PluginRem, RNPlugin, DocumentViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
+import { PluginRem, RNPlugin, DocumentViewer, RichText, BuiltInPowerupCodes, RemId, RichTextElementRemInterface } from '@remnote/plugin-sdk';
 import { powerupCode, allCardPriorityInfoKey } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import {
@@ -43,6 +43,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   // --- STATE 2: DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status) ---
   const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
   const [hoveredAncestorId, setHoveredAncestorId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
 
   // -----------------------------------------------------------
   // 1. EFFECT FOR DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status)
@@ -69,9 +70,9 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
           }
 
           const parentRem = await plugin.rem.findOne(currentParent);
-          if (!parentRem || !parentRem.text) break;
+          if (!parentRem) break;
 
-          const parentText = await safeRemTextToString(plugin, parentRem.text);
+          const parentText = await safeRemTextToString(plugin, parentRem.text || []);
 
           ancestorList.unshift({
             text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),
@@ -103,12 +104,12 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
 
   /**
    * OPTIMIZED METADATA CALCULATION FOR ExtractViewer.tsx
-   * 
+   *
    * Replace the existing useEffect for metadata calculation with this optimized version.
-   * 
+   *
    * Key optimization: Uses allCardPriorityInfoKey cache instead of per-rem getCards() calls.
    * This avoids the SDK inconsistency where rem.getCards() sometimes returns [] for valid flashcards.
-   * 
+   *
    * Performance improvement:
    * - Before: N API calls (one per rem in remsToProcess)
    * - After: 1 session storage read + in-memory filtering
@@ -250,42 +251,35 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   return (
     <div className="extract-viewer" style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}>
       {/* Breadcrumb Section (Hidden/Placeholder while loading context) */}
-      <div className={`breadcrumb-section px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 ${isContextLoading ? 'opacity-0 h-8' : 'h-auto'}`}>
+      <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center overflow-x-auto ${isContextLoading ? 'opacity-0' : ''}`}>
         {!isContextLoading && ancestors.length > 0 && (
-          <div className="text-sm text-gray-600 dark:text-gray-400 flex flex-wrap items-center">
-            {ancestors.map((ancestor, index) => (
-              <div
-                key={ancestor.id}
-                className="relative inline-flex items-center"
-                onMouseEnter={() => setHoveredAncestorId(ancestor.id)}
-                onMouseLeave={() => setHoveredAncestorId(null)}
-              >
-                <span
-                  onClick={() => handleAncestorClick(ancestor.id)}
-                  className="hover:underline"
-                  style={{ cursor: 'pointer' }}
+          <div className="text-sm text-gray-600 dark:text-gray-400 flex flex-nowrap items-center w-full">
+            {ancestors.map((ancestor, index) => {
+              const isLast = index === ancestors.length - 1;
+              return (
+                <div
+                  key={ancestor.id}
+                  className="flex items-center flex-shrink-0"
                 >
-                  {ancestor.text}
-                </span>
-                {index < ancestors.length - 1 && <span className="mx-1">›</span>}
-
-                {/* Tooltip Popup */}
-                {hoveredAncestorId === ancestor.id && ancestor.text !== ancestor.fullText && (
-                  <div
-                    className="absolute z-50 p-2 rounded-md shadow-lg text-xs top-full left-0 mt-1 w-max max-w-xs break-words pointer-events-none"
-                    style={{
-                      backgroundColor: 'var(--rn-clr-background-elevation-15, #ffffff)',
-                      color: 'var(--rn-clr-content-primary, #37352f)',
-                      border: '1px solid var(--rn-clr-border-subtle, #e5e7eb)',
-                      boxShadow: 'var(--rn-shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1))',
-                      borderRadius: 'var(--rn-radius-md, 0.375rem)',
-                    }}
-                  >
-                    {ancestor.fullText}
-                  </div>
-                )}
-              </div>
-            ))}
+                  {isLast ? (
+                    <div className="max-w-[150px] truncate whitespace-nowrap">
+                      <RichText
+                        text={[{ i: 'q', _id: ancestor.id } as RichTextElementRemInterface]}
+                      />
+                    </div>
+                  ) : (
+                    <span
+                      onClick={() => handleAncestorClick(ancestor.id)}
+                      className="hover:underline cursor-pointer max-w-[150px] truncate inline-block"
+                      title={ancestor.fullText}
+                    >
+                      {ancestor.text}
+                    </span>
+                  )}
+                  {index < ancestors.length - 1 && <span className="mx-1">›</span>}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
