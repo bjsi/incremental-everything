@@ -52,6 +52,7 @@ function PriorityLight() {
             cardPStr,
             hasIncPowerup,
             hasCardPowerup,
+            cards,
             defaultInc,
             defaultCard
         ] = await Promise.all([
@@ -59,9 +60,12 @@ function PriorityLight() {
             rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT),
             rem.hasPowerup(powerupCode),
             rem.hasPowerup('cardPriority'), // check using string or const if available
+            rem.getCards(),
             rp.settings.getSetting<number>(defaultPriorityId),
             rp.settings.getSetting<number>(defaultCardPriorityId)
         ]);
+
+        const hasCards = cards.length > 0;
 
         return {
             rem,
@@ -69,6 +73,7 @@ function PriorityLight() {
             cardPriority: cardPStr ? parseInt(cardPStr) : null,
             hasIncPowerup,
             hasCardPowerup,
+            hasCards,
             defaults: {
                 inc: defaultInc || 50,
                 card: defaultCard || 50
@@ -191,6 +196,9 @@ function PriorityLight() {
     const currentInc = incVal ?? data.defaults.inc;
     const currentCard = cardVal ?? data.defaults.card;
 
+    // Match priority.tsx logic: only show Card section if has cards OR has cardPriority powerup
+    const showCardSection = data.hasCards || data.hasCardPowerup;
+
     return (
         <div
             className="flex flex-col gap-3 p-4 relative"
@@ -243,29 +251,31 @@ function PriorityLight() {
                 </div>
             )}
 
-            {/* Card Priority Section */}
-            <div
-                className="flex flex-col gap-1 mt-1"
-                data-section="card"
-                style={{ opacity: data.hasCardPowerup ? 1 : 0.8 }}
-            >
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className="flex items-center gap-1">
-                        <span>🎴</span> Flashcard
-                        {!data.hasCardPowerup && <span className="text-[10px] font-normal opacity-70 italic">(Create)</span>}
-                    </span>
+            {/* Card Priority Section - Only shown if rem has cards OR cardPriority powerup */}
+            {showCardSection && (
+                <div
+                    className="flex flex-col gap-1 mt-1"
+                    data-section="card"
+                    style={{ opacity: data.hasCardPowerup ? 1 : 0.8 }}
+                >
+                    <div className="flex justify-between text-xs font-semibold mb-1">
+                        <span className="flex items-center gap-1">
+                            <span>🎴</span> Flashcard
+                            {!data.hasCardPowerup && <span className="text-[10px] font-normal opacity-70 italic">(Create)</span>}
+                        </span>
+                    </div>
+                    <PrioritySlider
+                        ref={cardSliderRef}
+                        value={currentCard}
+                        onChange={(v) => { setCardVal(v); }}
+                        useAbsoluteColoring={true}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Tab') handleTab(e);
+                            else cardKeyboard.handleKeyDown(e);
+                        }}
+                    />
                 </div>
-                <PrioritySlider
-                    ref={cardSliderRef}
-                    value={currentCard}
-                    onChange={(v) => { setCardVal(v); }}
-                    useAbsoluteColoring={true}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Tab') handleTab(e);
-                        else cardKeyboard.handleKeyDown(e);
-                    }}
-                />
-            </div>
+            )}
 
             <button
                 onClick={handleSave}
