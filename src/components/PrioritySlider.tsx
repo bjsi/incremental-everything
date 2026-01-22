@@ -118,10 +118,18 @@ export const PrioritySlider = forwardRef<PrioritySliderRef, PrioritySliderProps>
           inputMode="numeric"
           value={inputValue}
           onChange={handleInputChange}
-          onBlur={handleInputBlur}
+          onBlur={(e) => {
+            handleInputBlur();
+            e.currentTarget.style.border = 'none';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.border = '2px solid white';
+            e.currentTarget.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.2)';
+          }}
           onKeyDown={onKeyDown}
           disabled={disabled}
-          className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded shrink-0 border-0 outline-none"
+          className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded shrink-0 border-0 outline-none transition-shadow"
           style={{
             backgroundColor: thumbColor,
             color: 'white',
