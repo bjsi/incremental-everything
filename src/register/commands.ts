@@ -254,7 +254,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   plugin.app.registerCommand({
     id: 'batch-priority-change',
     name: 'Batch Priority Change',
-    keyboardShortcut: 'opt+shift+p',
+    // keyboardShortcut: 'opt+shift+p', // Removed to avoid conflict/declutter
     action: async () => {
       const focusedRem = await plugin.focus.getFocusedRem();
       if (!focusedRem) {
