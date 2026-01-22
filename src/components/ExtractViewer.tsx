@@ -254,32 +254,21 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
       <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center overflow-x-auto ${isContextLoading ? 'opacity-0' : ''}`}>
         {!isContextLoading && ancestors.length > 0 && (
           <div className="text-sm text-gray-600 dark:text-gray-400 flex flex-nowrap items-center w-full">
-            {ancestors.map((ancestor, index) => {
-              const isLast = index === ancestors.length - 1;
-              return (
-                <div
-                  key={ancestor.id}
-                  className="flex items-center flex-shrink-0"
+            {ancestors.map((ancestor, index) => (
+              <div
+                key={ancestor.id}
+                className="flex items-center flex-shrink-0"
+              >
+                <span
+                  onClick={() => handleAncestorClick(ancestor.id)}
+                  className="hover:underline cursor-pointer max-w-[150px] truncate inline-block"
+                  title={ancestor.fullText}
                 >
-                  {isLast ? (
-                    <div className="max-w-[150px] truncate whitespace-nowrap">
-                      <RichText
-                        text={[{ i: 'q', _id: ancestor.id } as RichTextElementRemInterface]}
-                      />
-                    </div>
-                  ) : (
-                    <span
-                      onClick={() => handleAncestorClick(ancestor.id)}
-                      className="hover:underline cursor-pointer max-w-[150px] truncate inline-block"
-                      title={ancestor.fullText}
-                    >
-                      {ancestor.text}
-                    </span>
-                  )}
-                  {index < ancestors.length - 1 && <span className="mx-1">›</span>}
-                </div>
-              );
-            })}
+                  {ancestor.text}
+                </span>
+                {index < ancestors.length - 1 && <span className="mx-1">›</span>}
+              </div>
+            ))}
           </div>
         )}
       </div>
