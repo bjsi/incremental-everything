@@ -36,13 +36,17 @@ function PriorityLight() {
         return await plugin.widget.getWidgetContext<any>();
     }, []);
 
-    const remId = context?.contextData?.remId;
-
     // 2. Ultra-Fast Data Fetching (O(1))
     // We only fetch the primitive values needed to render the sliders.
     // We avoid heavy object construction (like getIncrementalRemFromRem or card stats).
     const data = useTrackerPlugin(async (rp) => {
+        // Resolve remId: from context OR from session storage (fallback for Create Incremental Rem flow)
+        let remId = context?.contextData?.remId;
+        if (!remId) {
+            remId = await rp.storage.getSession<string>('priorityPopupTargetRemId');
+        }
         if (!remId) return null;
+
         const rem = await rp.rem.findOne(remId);
         if (!rem) return null;
 
@@ -79,7 +83,7 @@ function PriorityLight() {
                 card: defaultCard || 50
             }
         };
-    }, [remId]);
+    }, [context?.contextData?.remId]);
 
     // State
     const [incVal, setIncVal] = useState<number | null>(null);
@@ -143,21 +147,24 @@ function PriorityLight() {
             }
         }
 
-        // Save Card Priority
-        const effectiveCard = cardVal ?? data.defaults.card;
-        if (effectiveCard !== data.cardPriority || !data.hasCardPowerup) {
-            // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-            plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
+        // Save Card Priority - ONLY if the Card section was shown to the user
+        const showCardSection = data.hasCards || data.hasCardPowerup;
+        if (showCardSection) {
+            const effectiveCard = cardVal ?? data.defaults.card;
+            if (effectiveCard !== data.cardPriority || !data.hasCardPowerup) {
+                // Signal events.ts to allow this update even if in queue (Global Context Survivor)
+                plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
 
-            // Fire and forget DB write
-            promises.push(setCardPriority(plugin, data.rem, effectiveCard, 'manual', data.hasCardPowerup));
+                // Fire and forget DB write
+                promises.push(setCardPriority(plugin, data.rem, effectiveCard, 'manual', data.hasCardPowerup));
 
-            // Optimistic Cache Update
-            updateCardPriorityCache(plugin, data.rem._id, true, { remId: data.rem._id, priority: effectiveCard, source: 'manual' } as any);
+                // Optimistic Cache Update
+                updateCardPriorityCache(plugin, data.rem._id, true, { remId: data.rem._id, priority: effectiveCard, source: 'manual' } as any);
 
-            // FLUSH IMMEDIATELY to resolve race condition and signal listeners
-            // This replaces the manual 'cardPriorityCacheRefreshKey' set
-            flushLightCacheUpdates(plugin).catch(console.error);
+                // FLUSH IMMEDIATELY to resolve race condition and signal listeners
+                // This replaces the manual 'cardPriorityCacheRefreshKey' set
+                flushLightCacheUpdates(plugin).catch(console.error);
+            }
         }
 
         // Ensure all DB writes are at least triggered (caught to avoid unhandled rejections)
@@ -198,6 +205,16 @@ function PriorityLight() {
 
     // Match priority.tsx logic: only show Card section if has cards OR has cardPriority powerup
     const showCardSection = data.hasCards || data.hasCardPowerup;
+    const showIncSection = data.hasIncPowerup;
+
+    // If neither section can be shown, redirect to the main priority widget
+    // which handles inheritance and complex priority cases
+    if (!showIncSection && !showCardSection) {
+        // Close this popup and open the full priority widget
+        plugin.widget.closePopup();
+        plugin.widget.openPopup('priority', { remId: data.rem._id });
+        return <div className="h-20 flex items-center justify-center text-sm">Redirecting...</div>;
+    }
 
     return (
         <div
