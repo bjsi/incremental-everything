@@ -11,6 +11,7 @@ export const collapseQueueTopBar = 'collapse-queue-top-bar';
 export const defaultPriorityId = 'default-priority';
 export const defaultCardPriorityId = 'defaultCardPriority';
 export const showRemsAsIsolatedInQueueId = 'show-rems-as-isolated-in-queue';
+export const priorityStepSizeId = 'priority-step-size';
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';

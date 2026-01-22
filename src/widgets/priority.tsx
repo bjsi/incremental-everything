@@ -138,7 +138,7 @@ function Priority() {
     incAbsPriority,
     incAbsPriority ?? defaultIncPriority ?? 50,
     (val) => {
-      console.log('[Priority] ⌨️ Inc Keyboard Input:', val);
+
       incIsDirty.current = true;
       setIncAbsPriority(Math.max(0, Math.min(100, val)));
     }
@@ -148,7 +148,7 @@ function Priority() {
     cardAbsPriority,
     cardAbsPriority ?? defaultCardPriority ?? 50,
     (val) => {
-      console.log('[Priority] ⌨️ Card Keyboard Input:', val);
+
       cardIsDirty.current = true;
       setCardAbsPriority(Math.max(0, Math.min(100, val)));
     }
@@ -195,15 +195,12 @@ function Priority() {
   // sometimes returns [] even when cards exist.
   const cardData = useTrackerPlugin(
     async (plugin) => {
-      console.log('[Priority] 🃏 cardData hook called, rem?._id:', rem?._id);
       if (!rem) {
-        console.log('[Priority] 🃏 cardData: rem is null/undefined, returning undefined');
         return undefined;
       }
 
       // Step 1: Check powerup first (fast) - this determines if we show the card section
       const hasPowerup = await rem.hasPowerup('cardPriority');
-      console.log('[Priority] 🃏 cardData: hasPowerup =', hasPowerup);
 
       // Step 2: Get card priority info (needed for displaying priority value)
       const cardPriorityInfo = await getCardPriority(plugin, rem);
@@ -211,7 +208,6 @@ function Priority() {
       // Step 3: If powerup exists, we can skip expensive hasCards check
       // The powerup is sufficient to show the card section
       if (hasPowerup) {
-        console.log('[Priority] 🃏 cardData: Powerup found, skipping expensive card checks');
         return {
           hasCards: true, // Treat as true since powerup exists
           cardInfo: cardPriorityInfo,
@@ -226,37 +222,27 @@ function Priority() {
       const directCards = await rem.getCards();
       if (directCards.length > 0) {
         hasCards = true;
-        console.log('[Priority] 🃏 cardData: Tier 1 (rem.getCards) found', directCards.length, 'cards');
       } else {
         // Tier 2: Check if rem exists in the card priority cache
         // 🔌 Skip cache check and global registry in light mode to ensure speed
         if (performanceMode === PERFORMANCE_MODE_LIGHT) {
-          console.log('[Priority] 🃏 cardData: Tier 1 returned 0, skipping Tier 2/3 (Light Mode)');
           hasCards = false;
         } else {
-          console.log('[Priority] 🃏 cardData: Tier 1 returned 0, checking cache (Tier 2)...');
           const cachedCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
           const cachedInfo = cachedCardInfos?.find(info => info.remId === rem._id);
 
           if (cachedInfo && cachedInfo.cardCount > 0) {
             hasCards = true;
-            console.log('[Priority] 🃏 cardData: Tier 2 (cache) found cardCount:', cachedInfo.cardCount);
           } else {
             // Tier 3: Use global registry as final fallback (slowest but most reliable)
-            console.log('[Priority] 🃏 cardData: Tier 2 miss, checking global registry (Tier 3)...');
             const allCards = await plugin.card.getAll();
             const cardsForRem = allCards.filter(card => card.remId === rem._id);
             hasCards = cardsForRem.length > 0;
-            console.log('[Priority] 🃏 cardData: Tier 3 (global registry) found', cardsForRem.length, 'cards');
           }
         }
       }
 
-      console.log('[Priority] 🃏 cardData results:', {
-        hasCards,
-        hasCardPriorityPowerup: hasPowerup,
-        cardPriorityInfo: cardPriorityInfo ? `Found (priority: ${cardPriorityInfo.priority}, source: ${cardPriorityInfo.source}, cardCount: ${cardPriorityInfo.cardCount})` : 'null'
-      });
+
 
       return {
         hasCards,
@@ -423,7 +409,6 @@ function Priority() {
   // Effect Hooks
   // Reset dirty flags and values when Rem changes
   useEffect(() => {
-    console.log('[Priority] 🔄 Rem changed, resetting dirty flags. remId:', rem?._id);
     incIsDirty.current = false;
     cardIsDirty.current = false;
     // We don't necessarily want to set priorities to null here because other hooks
@@ -434,12 +419,10 @@ function Priority() {
   useEffect(() => {
     if (isSaving.current) return;
     if (incRemInfo) {
-      console.log('[Priority] ⚡ IncRem Effect [incRemInfo]', { dirty: incIsDirty.current, val: incRemInfo.priority });
       if (!incIsDirty.current) {
         setIncAbsPriority(incRemInfo.priority);
       }
     } else if (defaultIncPriority !== undefined && incAbsPriority === null) {
-      console.log('[Priority] ⚡ IncRem Effect [default]', { dirty: incIsDirty.current, val: defaultIncPriority });
       // Optimistic default for new/loading IncRems
       // Only set if not dirty (though usually fresh load implies not dirty)
       // GUARD: Ensure we have loaded the incRemInfo status (it shouldn't be undefined if we decided it's null/missing)
@@ -456,12 +439,10 @@ function Priority() {
   useEffect(() => {
     if (isSaving.current) return;
     if (cardInfo) {
-      console.log('[Priority] ⚡ CardInfo Effect [cardInfo]', { dirty: cardIsDirty.current, val: cardInfo.priority });
       if (!cardIsDirty.current) {
         setCardAbsPriority(cardInfo.priority);
       }
     } else if (defaultCardPriority !== undefined && cardAbsPriority === null) {
-      console.log('[Priority] ⚡ CardInfo Effect [default]', { dirty: cardIsDirty.current, val: defaultCardPriority });
       // Optimistic default for new/loading cards
 
       // GUARD: Ensure cardData has actually loaded.
@@ -484,11 +465,9 @@ function Priority() {
     if (ancestorPriorityInfo && (!cardInfo || cardInfo.source === 'default' || cardInfo.source === 'inherited')) {
       // Only update if we haven't already set a manual override? 
       // Actually, if source is default/inherited, we display the effective priority, which IS the ancestor's.
-      console.log('[Priority] ⚡ Snap Effect', { dirty: cardIsDirty.current, val: ancestorPriorityInfo.priority });
       if (!cardIsDirty.current) {
         setCardAbsPriority(ancestorPriorityInfo.priority);
       } else {
-        console.log('[Priority] 🛑 Snap Effect IGNORED (dirty)');
       }
     }
   }, [ancestorPriorityInfo, cardInfo]);
@@ -1013,7 +992,6 @@ function Priority() {
               ref={incSliderRef}
               value={safeIncAbsPriority}
               onChange={(val) => {
-                console.log('[Priority] 🎚️ Inc Slider Change:', val);
                 incIsDirty.current = true;
                 setIncAbsPriority(val);
               }}
@@ -1115,7 +1093,7 @@ function Priority() {
               ref={cardSliderRef}
               value={safeCardAbsPriority}
               onChange={(val) => {
-                console.log('[Priority] 🎚️ Card Slider Change:', val);
+
                 cardIsDirty.current = true;
                 setCardAbsPriority(val);
               }}
@@ -1213,7 +1191,7 @@ function Priority() {
               ref={!showCardSection ? cardSliderRef : undefined}
               value={safeCardAbsPriority}
               onChange={(val) => {
-                console.log('[Priority] 🎚️ Ancestor Slider Change:', val);
+
                 cardIsDirty.current = true;
                 setCardAbsPriority(val);
               }}

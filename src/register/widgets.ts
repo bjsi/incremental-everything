@@ -2,6 +2,15 @@ import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sd
 import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode } from '../lib/consts';
 
 export function registerWidgets(plugin: ReactRNPlugin) {
+
+  // NEW: Light Priority Widget
+  plugin.app.registerWidget('priority_light', WidgetLocation.Popup, {
+    dimensions: {
+      width: '350px', // Compact width
+      height: 'auto',
+    },
+  });
+
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {
     dimensions: {
       width: '500px',
