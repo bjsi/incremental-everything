@@ -212,7 +212,7 @@ function PriorityLight() {
             }}
         >
             <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold opacity-80">Quick Priority</h3>
+                <h3 className="text-sm font-bold opacity-80">Light Priority</h3>
                 <button
                     className="text-xs opacity-50 hover:opacity-100 px-2"
                     onClick={() => plugin.widget.closePopup()}
