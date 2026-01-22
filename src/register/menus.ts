@@ -57,7 +57,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         await initIncrementalRem(plugin, rem);
         // Removed setHighlightColor -> CSS handles styling via "incremental" tag
         await plugin.app.toast('✅ Tagged as Incremental Rem');
-        await plugin.widget.openPopup('priority', {
+        await plugin.widget.openPopup('priority_light', {
           remId: rem._id,
         });
       }
@@ -82,7 +82,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         await initIncrementalRem(plugin, rem);
         // Removed setHighlightColor -> CSS handles styling via "incremental" tag
         await plugin.app.toast('✅ Tagged as Incremental Rem');
-        await plugin.widget.openPopup('priority', {
+        await plugin.widget.openPopup('priority_light', {
           remId: rem._id,
         });
       }

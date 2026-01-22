@@ -36,13 +36,17 @@ function PriorityLight() {
         return await plugin.widget.getWidgetContext<any>();
     }, []);
 
-    const remId = context?.contextData?.remId;
-
     // 2. Ultra-Fast Data Fetching (O(1))
     // We only fetch the primitive values needed to render the sliders.
     // We avoid heavy object construction (like getIncrementalRemFromRem or card stats).
     const data = useTrackerPlugin(async (rp) => {
+        // Resolve remId: from context OR from session storage (fallback for Create Incremental Rem flow)
+        let remId = context?.contextData?.remId;
+        if (!remId) {
+            remId = await rp.storage.getSession<string>('priorityPopupTargetRemId');
+        }
         if (!remId) return null;
+
         const rem = await rp.rem.findOne(remId);
         if (!rem) return null;
 
@@ -52,6 +56,7 @@ function PriorityLight() {
             cardPStr,
             hasIncPowerup,
             hasCardPowerup,
+            cards,
             defaultInc,
             defaultCard
         ] = await Promise.all([
@@ -59,9 +64,12 @@ function PriorityLight() {
             rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT),
             rem.hasPowerup(powerupCode),
             rem.hasPowerup('cardPriority'), // check using string or const if available
+            rem.getCards(),
             rp.settings.getSetting<number>(defaultPriorityId),
             rp.settings.getSetting<number>(defaultCardPriorityId)
         ]);
+
+        const hasCards = cards.length > 0;
 
         return {
             rem,
@@ -69,12 +77,13 @@ function PriorityLight() {
             cardPriority: cardPStr ? parseInt(cardPStr) : null,
             hasIncPowerup,
             hasCardPowerup,
+            hasCards,
             defaults: {
                 inc: defaultInc || 50,
                 card: defaultCard || 50
             }
         };
-    }, [remId]);
+    }, [context?.contextData?.remId]);
 
     // State
     const [incVal, setIncVal] = useState<number | null>(null);
@@ -138,21 +147,24 @@ function PriorityLight() {
             }
         }
 
-        // Save Card Priority
-        const effectiveCard = cardVal ?? data.defaults.card;
-        if (effectiveCard !== data.cardPriority || !data.hasCardPowerup) {
-            // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-            plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
+        // Save Card Priority - ONLY if the Card section was shown to the user
+        const showCardSection = data.hasCards || data.hasCardPowerup;
+        if (showCardSection) {
+            const effectiveCard = cardVal ?? data.defaults.card;
+            if (effectiveCard !== data.cardPriority || !data.hasCardPowerup) {
+                // Signal events.ts to allow this update even if in queue (Global Context Survivor)
+                plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
 
-            // Fire and forget DB write
-            promises.push(setCardPriority(plugin, data.rem, effectiveCard, 'manual', data.hasCardPowerup));
+                // Fire and forget DB write
+                promises.push(setCardPriority(plugin, data.rem, effectiveCard, 'manual', data.hasCardPowerup));
 
-            // Optimistic Cache Update
-            updateCardPriorityCache(plugin, data.rem._id, true, { remId: data.rem._id, priority: effectiveCard, source: 'manual' } as any);
+                // Optimistic Cache Update
+                updateCardPriorityCache(plugin, data.rem._id, true, { remId: data.rem._id, priority: effectiveCard, source: 'manual' } as any);
 
-            // FLUSH IMMEDIATELY to resolve race condition and signal listeners
-            // This replaces the manual 'cardPriorityCacheRefreshKey' set
-            flushLightCacheUpdates(plugin).catch(console.error);
+                // FLUSH IMMEDIATELY to resolve race condition and signal listeners
+                // This replaces the manual 'cardPriorityCacheRefreshKey' set
+                flushLightCacheUpdates(plugin).catch(console.error);
+            }
         }
 
         // Ensure all DB writes are at least triggered (caught to avoid unhandled rejections)
@@ -190,6 +202,19 @@ function PriorityLight() {
 
     const currentInc = incVal ?? data.defaults.inc;
     const currentCard = cardVal ?? data.defaults.card;
+
+    // Match priority.tsx logic: only show Card section if has cards OR has cardPriority powerup
+    const showCardSection = data.hasCards || data.hasCardPowerup;
+    const showIncSection = data.hasIncPowerup;
+
+    // If neither section can be shown, redirect to the main priority widget
+    // which handles inheritance and complex priority cases
+    if (!showIncSection && !showCardSection) {
+        // Close this popup and open the full priority widget
+        plugin.widget.closePopup();
+        plugin.widget.openPopup('priority', { remId: data.rem._id });
+        return <div className="h-20 flex items-center justify-center text-sm">Redirecting...</div>;
+    }
 
     return (
         <div
@@ -243,29 +268,31 @@ function PriorityLight() {
                 </div>
             )}
 
-            {/* Card Priority Section */}
-            <div
-                className="flex flex-col gap-1 mt-1"
-                data-section="card"
-                style={{ opacity: data.hasCardPowerup ? 1 : 0.8 }}
-            >
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                    <span className="flex items-center gap-1">
-                        <span>🎴</span> Flashcard
-                        {!data.hasCardPowerup && <span className="text-[10px] font-normal opacity-70 italic">(Create)</span>}
-                    </span>
+            {/* Card Priority Section - Only shown if rem has cards OR cardPriority powerup */}
+            {showCardSection && (
+                <div
+                    className="flex flex-col gap-1 mt-1"
+                    data-section="card"
+                    style={{ opacity: data.hasCardPowerup ? 1 : 0.8 }}
+                >
+                    <div className="flex justify-between text-xs font-semibold mb-1">
+                        <span className="flex items-center gap-1">
+                            <span>🎴</span> Flashcard
+                            {!data.hasCardPowerup && <span className="text-[10px] font-normal opacity-70 italic">(Create)</span>}
+                        </span>
+                    </div>
+                    <PrioritySlider
+                        ref={cardSliderRef}
+                        value={currentCard}
+                        onChange={(v) => { setCardVal(v); }}
+                        useAbsoluteColoring={true}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Tab') handleTab(e);
+                            else cardKeyboard.handleKeyDown(e);
+                        }}
+                    />
                 </div>
-                <PrioritySlider
-                    ref={cardSliderRef}
-                    value={currentCard}
-                    onChange={(v) => { setCardVal(v); }}
-                    useAbsoluteColoring={true}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Tab') handleTab(e);
-                        else cardKeyboard.handleKeyDown(e);
-                    }}
-                />
-            </div>
+            )}
 
             <button
                 onClick={handleSave}
