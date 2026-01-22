@@ -116,6 +116,18 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   });
 
   plugin.settings.registerNumberSetting({
+    id: 'priority-step-size',
+    title: 'Priority Step Size',
+    description: 'Sets the step size for quick priority increase/decrease shortcuts (Ctrl+Shift+Up/Down). Default: 10',
+    defaultValue: 10,
+    validators: [
+      { type: 'int' as const },
+      { type: 'gte' as const, arg: 1 },
+      { type: 'lte' as const, arg: 50 },
+    ],
+  });
+
+  plugin.settings.registerNumberSetting({
     id: defaultCardPriorityId,
     title: 'Default Card Priority',
     description: 'Default priority for flashcards without inherited priority (0-100, Lower = more important).  Default: 50',

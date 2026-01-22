@@ -26,6 +26,7 @@ import {
   getFriendlyPlatformName,
   handleMobileDetectionOnStartup,
 } from '../lib/mobileUtils';
+import { handleQuickPriorityChange } from '../lib/quick_priority';
 import {
   removeAllCardPriorityTags,
   updateAllCardPriorities,
@@ -138,6 +139,40 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       console.log(`Opening 'priority' popup for remId: ${remId}`);
       await plugin.widget.openPopup('priority', {
+        remId: remId,
+      });
+    },
+  });
+
+  // NEW: Light Priority Command
+  plugin.app.registerCommand({
+    id: 'set-priority-light',
+    name: 'Quick Set Priority',
+    description: 'Instant popup to set Incremental and Card priorities',
+    keyboardShortcut: 'ctrl+opt+p', // Shortcuts: Ctrl + Option + P
+    action: async () => {
+      let remId: string | undefined;
+      const url = await plugin.window.getURL();
+
+      // Context detection logic (Same as main command)
+      if (url.includes('/flashcards')) {
+        const card = await plugin.queue.getCurrentCard();
+        if (card) {
+          remId = card.remId;
+        } else {
+          remId = await plugin.storage.getSession(currentIncRemKey);
+        }
+      } else {
+        const focusedRem = await plugin.focus.getFocusedRem();
+        remId = focusedRem?._id;
+      }
+
+      if (!remId) {
+        await plugin.app.toast('No Rem found to set priority.');
+        return;
+      }
+
+      await plugin.widget.openPopup('priority_light', {
         remId: remId,
       });
     },
@@ -593,12 +628,33 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async (args: { remId: string }) => {
       // Small safety delay to ensure previous UI operations (like closing parent selector) have settled
       await new Promise(resolve => setTimeout(resolve, 50));
-      
+
       if (args && args.remId) {
         await plugin.widget.openPopup('priority', {
           remId: args.remId,
         });
       }
+    },
+  });
+
+  // NEW: Quick Priority Shortcuts
+  plugin.app.registerCommand({
+    id: 'quick-increase-priority',
+    name: 'Quick Increase Priority Number (Less Important)',
+    description: 'Increases the priority number by the step size (default 10), making it LESS important.',
+    keyboardShortcut: 'ctrl+shift+up',
+    action: async () => {
+      await handleQuickPriorityChange(plugin, 'increase');
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'quick-decrease-priority',
+    name: 'Quick Decrease Priority Number (More Important)',
+    description: 'Decreases the priority number by the step size (default 10), making it MORE important.',
+    keyboardShortcut: 'ctrl+shift+down',
+    action: async () => {
+      await handleQuickPriorityChange(plugin, 'decrease');
     },
   });
 }

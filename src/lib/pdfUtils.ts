@@ -446,26 +446,26 @@ export const findPDFinRem = async (
   // Check if rem itself is a PDF
   if (await isUploadedPdf(rem)) {
     if (!targetPdfId || rem._id === targetPdfId) {
-      //console.log(`    [findPDFinRem] Rem itself is a PDF (${rem._id})`);
+      // console.log(`    [findPDFinRem] Rem itself is a PDF (${rem._id})`);
       return rem;
     }
   }
 
   // Check sources
   const sources = await rem.getSources();
-  //console.log(`    [findPDFinRem] Checking ${sources.length} sources`);
+  // console.log(`    [findPDFinRem] Checking ${sources.length} sources`);
 
   const foundPdfs: PluginRem[] = [];
 
   for (const source of sources) {
     if (await isUploadedPdf(source)) {
       const sourceText = await safeRemTextToString(plugin, source.text);
-      //console.log(`    [findPDFinRem] Found PDF in source: "${sourceText}" (${source._id})`);
+      // console.log(`    [findPDFinRem] Found PDF in source: "${sourceText}" (${source._id})`);
       foundPdfs.push(source);
 
       // If we're looking for a specific PDF and found it, return immediately
       if (targetPdfId && source._id === targetPdfId) {
-        //console.log(`    [findPDFinRem] ✓ MATCH! This is the target PDF`);
+        // console.log(`    [findPDFinRem] ✓ MATCH! This is the target PDF`);
         return source;
       }
     }
@@ -473,7 +473,7 @@ export const findPDFinRem = async (
 
   // If we have a target PDF but didn't find it, return null
   if (targetPdfId) {
-    //console.log(`    [findPDFinRem] Found ${foundPdfs.length} PDF(s) but none matched target ${targetPdfId}`);
+    // console.log(`    [findPDFinRem] Found ${foundPdfs.length} PDF(s) but none matched target ${targetPdfId}`);
     return null;
   }
 
