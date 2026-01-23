@@ -164,4 +164,13 @@ export function registerWidgets(plugin: ReactRNPlugin) {
       height: 'auto',
     },
   });
+
+  plugin.app.registerWidget('incremental_history', WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/3626/3626838.png",
+    widgetTabTitle: "Incremental History",
+  });
 }
