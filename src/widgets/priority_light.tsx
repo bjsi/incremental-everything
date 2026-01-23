@@ -4,6 +4,7 @@ import {
     useRunAsync,
     useTrackerPlugin,
 } from '@remnote/plugin-sdk';
+import { getRemCardContent } from '../lib/pdfUtils';
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
     powerupCode,
@@ -52,6 +53,7 @@ function PriorityLight() {
         if (!rem) return null;
 
         // Parallel fetch for speed
+        // Parallel fetch for speed - Step 1: Fetch raw data
         const [
             incPStr,
             hasIncPowerup,
@@ -68,6 +70,9 @@ function PriorityLight() {
             rp.settings.getSetting<number>(defaultPriorityId),
         ]);
 
+        // Step 2: Fetch content
+        const remContent = await getRemCardContent(rp, rem);
+
         const hasCards = cards.length > 0;
 
         return {
@@ -80,7 +85,10 @@ function PriorityLight() {
             defaults: {
                 inc: defaultInc || 50,
                 card: 50 // inherited/default handled by cardPriorityVal
-            }
+            },
+            remName: remContent.front, // Legacy fallback
+            front: remContent.front,
+            back: remContent.back,
         };
     }, [context?.contextData?.remId]);
 
@@ -155,7 +163,12 @@ function PriorityLight() {
                 plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
 
                 // Fire and forget DB write
-                promises.push(setCardPriority(plugin, data.rem, effectiveCard, 'manual', data.hasCardPowerup));
+                if (!data.hasCardPowerup) {
+                    // CRITICAL: We MUST await the powerup addition here.
+                    await data.rem.addPowerup(CARD_PRIORITY_CODE);
+                }
+
+                promises.push(setCardPriority(plugin, data.rem, effectiveCard, 'manual', true));
 
                 // Optimistic Cache Update
                 updateCardPriorityCache(plugin, data.rem._id, true, { remId: data.rem._id, priority: effectiveCard, source: 'manual' } as any);
@@ -249,12 +262,24 @@ function PriorityLight() {
                 cardKeyboard.handleKeyUp();
             }}
         >
-            <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold opacity-80">Light Priority</h3>
-                <button
-                    className="text-xs opacity-50 hover:opacity-100 px-2"
-                    onClick={() => plugin.widget.closePopup()}
-                >✕</button>
+            <div className="flex flex-col mb-2">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold opacity-60 uppercase tracking-wide">Light Priority</h3>
+                    <button
+                        className="text-xs opacity-50 hover:opacity-100 px-2"
+                        onClick={() => plugin.widget.closePopup()}
+                    >✕</button>
+                </div>
+                <div
+                    className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
+                    title={`${data.front}${data.back ? ` → ${data.back}` : ''}`}
+                    style={{ width: '100%' }}
+                >
+                    <span className="text-sm font-medium">
+                        {data.front}
+                        {data.back && <span className="opacity-80"> → {data.back}</span>}
+                    </span>
+                </div>
             </div>
 
             {/* Incremental Rem Section - HIDDEN if not an Incremental Rem */}

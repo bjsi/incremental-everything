@@ -103,10 +103,10 @@ export async function handleNextRepetitionClick(
   incRem: IncrementalRem | undefined
 ) {
   await updateReviewRemData(plugin, incRem);
-    
+
   // Keep the sleep to be safe, but it's less critical now
-  await sleep(150); 
-  
+  await sleep(150);
+
   await plugin.queue.removeCurrentCardFromQueue();
 }
 
@@ -206,8 +206,8 @@ export const getIncrementalRemFromRem = async (
   } else {
     console.error(
       'Failed to parse incremental rem info for Rem with id: ' +
-        r._id +
-        'with error: ',
+      r._id +
+      'with error: ',
       parsed.error
     );
     return null;
@@ -265,6 +265,8 @@ export const getCurrentIncrementalRem = async (plugin: RNPlugin) => {
   return rem;
 };
 
+import { addToIncrementalHistory } from '../history_utils';
+
 /**
  * Sets the current Incremental Rem in session storage.
  *
@@ -272,6 +274,10 @@ export const getCurrentIncrementalRem = async (plugin: RNPlugin) => {
  * @param remId - The rem ID to set as current, or undefined to clear
  */
 export const setCurrentIncrementalRem = async (plugin: RNPlugin, remId: string | undefined) => {
+  if (remId) {
+    // Fire and forget history update
+    addToIncrementalHistory(plugin, remId).catch(console.error);
+  }
   return await plugin.storage.setSession(currentIncRemKey, remId);
 };
 

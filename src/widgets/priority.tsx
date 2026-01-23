@@ -37,7 +37,7 @@ import {
 import { IncrementalRem } from '../lib/incremental_rem';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import { getRemCardContent, safeRemTextToString } from '../lib/pdfUtils';
 import { PriorityBadge, PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import * as _ from 'remeda';
@@ -134,6 +134,11 @@ function Priority() {
   const defaultIncPriority = useTrackerPlugin(async (plugin) => await plugin.settings.getSetting<number>(defaultPriorityId) || 10, []);
   const defaultCardPriority = useTrackerPlugin(async (plugin) => await plugin.settings.getSetting<number>(defaultCardPriorityId) || 50, []);
 
+  const remContent = useTrackerPlugin(async (plugin) => {
+    if (!rem) return null;
+    return await getRemCardContent(plugin, rem);
+  }, [rem?._id]);
+
   // --- Keyboard Handlers Integration (Must be before early returns) ---
   const incKeyboard = useAcceleratedKeyboardHandler(
     incAbsPriority,
@@ -206,11 +211,12 @@ function Priority() {
       // Step 2: Get card priority info (needed for displaying priority value)
       const cardPriorityInfo = await getCardPriority(plugin, rem);
 
-      // Step 3: If powerup exists, we can skip expensive hasCards check
-      // The powerup is sufficient to show the card section
+      // Step 3: If powerup exists, we can still use cardInfo (already fetched) to determine meaningful card count.
+      // We should NOT force hasCards: true just because powerup exists, because that hides the Inheritance Section
+      // for cardless rems that have the powerup (which users use to set inheritance).
       if (hasPowerup) {
         return {
-          hasCards: true, // Treat as true since powerup exists
+          hasCards: (cardPriorityInfo?.cardCount || 0) > 0,
           cardInfo: cardPriorityInfo,
           hasCardPriorityPowerup: true
         };
@@ -526,7 +532,8 @@ function Priority() {
 
   // Event Handlers
   const showIncSection = !!incRemInfo; // Converts to boolean - undefined/null become false
-  const showCardSection = hasCards === true || hasCardPriorityPowerup || (cardInfo && cardInfo.cardCount > 0);
+  // UPDATED: Only show card section if strictly has cards. If powerup exists but no cards, show Inheritance section.
+  const showCardSection = hasCards === true || (cardInfo && cardInfo.cardCount > 0);
 
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
@@ -771,6 +778,7 @@ function Priority() {
     return (
       <div className="p-4 flex flex-col gap-4 relative items-center justify-center">
         <h2 className="text-xl font-bold">Priority Settings</h2>
+
         <div className="text-lg">Loading...</div>
       </div>
     );
@@ -893,13 +901,23 @@ function Priority() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold" style={{ color: 'var(--rn-clr-content-primary)' }}>
-          Priority Settings
-        </h2>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex flex-col overflow-hidden mr-2">
+          <h2 className="text-base font-bold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+            Priority Settings
+          </h2>
+          <div className="mt-1 overflow-hidden text-ellipsis whitespace-nowrap" style={{ width: '100%' }} title={remContent ? `${remContent.front}${remContent.back ? ` → ${remContent.back}` : ''}` : ''}>
+            {remContent && (
+              <span className="text-sm font-medium">
+                {remContent.front}
+                {remContent.back && <span className="opacity-80"> → {remContent.back}</span>}
+              </span>
+            )}
+          </div>
+        </div>
         <button
           onClick={() => plugin.widget.closePopup()}
-          className="p-1 rounded transition-colors text-sm"
+          className="p-1 rounded transition-colors text-sm self-start"
           style={{ color: 'var(--rn-clr-content-tertiary)' }}
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
