@@ -15,6 +15,7 @@ import {
     CARD_PRIORITY_CODE,
     PRIORITY_SLOT,
     setCardPriority,
+    getCardPriority,
 } from '../lib/card_priority';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
@@ -53,34 +54,30 @@ function PriorityLight() {
         // Parallel fetch for speed
         const [
             incPStr,
-            cardPStr,
             hasIncPowerup,
             hasCardPowerup,
-            cards,
+            cardInfo,
             defaultInc,
-            defaultCard
         ] = await Promise.all([
             rem.getPowerupProperty(powerupCode, prioritySlotCode),
-            rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT),
             rem.hasPowerup(powerupCode),
             rem.hasPowerup('cardPriority'), // check using string or const if available
-            rem.getCards(),
+            getCardPriority(rp, rem),
             rp.settings.getSetting<number>(defaultPriorityId),
-            rp.settings.getSetting<number>(defaultCardPriorityId)
         ]);
 
-        const hasCards = cards.length > 0;
+        const hasCards = cardInfo ? cardInfo.cardCount > 0 : false;
 
         return {
             rem,
             incPriority: incPStr ? parseInt(incPStr) : null,
-            cardPriority: cardPStr ? parseInt(cardPStr) : null,
+            cardPriority: cardInfo ? cardInfo.priority : 50,
             hasIncPowerup,
             hasCardPowerup,
             hasCards,
             defaults: {
                 inc: defaultInc || 50,
-                card: defaultCard || 50
+                card: 50 // inherited/default handled by cardInfo
             }
         };
     }, [context?.contextData?.remId]);
@@ -196,6 +193,22 @@ function PriorityLight() {
         }
     };
 
+    // React Error #310 fix: Move redirect side-effect to a top-level unconditional useEffect
+    // This ensures hook order is consistent across renders
+    useEffect(() => {
+        if (data && !data.hasIncPowerup && !(data.hasCards || data.hasCardPowerup)) {
+            const redirect = async () => {
+                // Set session storage fallback so priority.tsx can find the remId
+                await plugin.storage.setSession('priorityPopupTargetRemId', data.rem._id);
+                // Close this popup first
+                await plugin.widget.closePopup();
+                // Then open the full priority widget
+                await plugin.widget.openPopup('priority', { remId: data.rem._id });
+            };
+            redirect();
+        }
+    }, [data, plugin]);
+
     if (!data) {
         return <div className="h-20 flex items-center justify-center text-sm">Loading...</div>;
     }
@@ -210,9 +223,7 @@ function PriorityLight() {
     // If neither section can be shown, redirect to the main priority widget
     // which handles inheritance and complex priority cases
     if (!showIncSection && !showCardSection) {
-        // Close this popup and open the full priority widget
-        plugin.widget.closePopup();
-        plugin.widget.openPopup('priority', { remId: data.rem._id });
+        // UI feedback only - side effect handled in useEffect above
         return <div className="h-20 flex items-center justify-center text-sm">Redirecting...</div>;
     }
 

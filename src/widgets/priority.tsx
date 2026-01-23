@@ -174,8 +174,9 @@ function Priority() {
 
     // Fast path: Card Priority
     // getPowerupProperty is much faster than constructing full objects
-    const cardPStr = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
-    const card = cardPStr ? parseInt(cardPStr) : undefined;
+    // UPDATED: Use getCardPriority to handle inheritance correctly (raw slot read misses it)
+    const cardInfo = await getCardPriority(plugin, rem);
+    const card = cardInfo?.priority;
 
     // Fast path: Inc Rem Priority
     // Note: getPowerupProperty returns the raw string value of the slot
@@ -183,7 +184,7 @@ function Priority() {
     const inc = incPStr ? parseInt(incPStr) : undefined;
 
     return {
-      card: !isNaN(card as number) ? card : undefined,
+      card: card, // already a number or undefined/default from getCardPriority
       inc: !isNaN(inc as number) ? inc : undefined
     };
   }, [rem?._id]);
