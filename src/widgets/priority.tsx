@@ -626,8 +626,16 @@ function Priority() {
     plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
 
     // Perform the actual DB write
-    // We pass `hasCardPriorityPowerup` (from component scope) to skip the read check!
-    setCardPriority(plugin, rem, priority, 'manual', hasCardPriorityPowerup).catch(console.error);
+    if (!hasCardPriorityPowerup) {
+      // CRITICAL: We MUST await the powerup addition here.
+      // If we don't, the 'await rem.hasPowerup' check inside setCardPriority will yield control,
+      // and saveAndClose will immediately close the popup, destroying the widget context
+      // before the powerup is added.
+      await rem.addPowerup(CARD_PRIORITY_CODE);
+    }
+
+    // Now we can fire-and-forget the property updates safely, passing true for knownHasPowerup
+    setCardPriority(plugin, rem, priority, 'manual', true).catch(console.error);
 
   }, [rem, plugin, sessionCache, originalScopeId, performanceMode, cardInfo, hasCardPriorityPowerup]); // 🔌 Add performanceMode
 
@@ -639,15 +647,24 @@ function Priority() {
   const saveAndClose = useCallback(async (incP: number, cardP: number) => {
     isSaving.current = true;
 
-    // Fire both save operations immediately without waiting
+    // Fire both save operations
+    const promises: Promise<any>[] = [];
+
     if (showIncSection) {
+      // Fire-and-forget inc priority (assuming it already exists if showIncSection is true)
       saveIncPriority(incP).catch(console.error);
     }
     if (showCardSection || showInheritanceSection) {
-      saveCardPriority(cardP).catch(console.error);
+      // CRITICAL: We must await saveCardPriority because it might need to add a powerup (async).
+      // If hasCardPriorityPowerup is true (normal case), the await returns immediately (fast).
+      // If false (inheritance case), it waits for addPowerup (necessary delay).
+      promises.push(saveCardPriority(cardP));
     }
 
-    // Close immediately ("Fire and Forget")
+    // Wait for critical operations (like adding powerup) before closing
+    await Promise.all(promises);
+
+    // Close immediately
     plugin.widget.closePopup();
   }, [plugin, showIncSection, showCardSection, showInheritanceSection, saveIncPriority, saveCardPriority]);
 
