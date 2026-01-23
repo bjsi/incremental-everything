@@ -93,6 +93,32 @@ export async function getCardPriority(
 }
 
 /**
+ * Lightweight version of getCardPriority that only resolves the priority value (including inheritance).
+ * Does NOT fetch cards or calculate counts, making it suitable for fast-path rendering.
+ */
+export async function getCardPriorityValue(
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<number> {
+  // Check direct slot first
+  const priorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+
+  if (priorityValue) {
+    const parsed = parseInt(priorityValue);
+    return !isNaN(parsed) ? parsed : 50;
+  }
+
+  // Check inheritance
+  const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
+  if (ancestorPriority) {
+    return ancestorPriority.priority;
+  }
+
+  // Default
+  return (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+}
+
+/**
  * Set card priority
  */
 export async function setCardPriority(

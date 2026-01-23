@@ -13,6 +13,7 @@ import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/inc
 import {
   getCardPriority,
   setCardPriority,
+  getCardPriorityValue,
   CardPriorityInfo,
   QueueSessionCache,
   CARD_PRIORITY_CODE,
@@ -174,9 +175,8 @@ function Priority() {
 
     // Fast path: Card Priority
     // getPowerupProperty is much faster than constructing full objects
-    // UPDATED: Use getCardPriority to handle inheritance correctly (raw slot read misses it)
-    const cardInfo = await getCardPriority(plugin, rem);
-    const card = cardInfo?.priority;
+    // UPDATED: Use getCardPriorityValue (LIGHTWEIGHT) to handle inheritance correctly without fetching cards
+    const card = await getCardPriorityValue(plugin, rem);
 
     // Fast path: Inc Rem Priority
     // Note: getPowerupProperty returns the raw string value of the slot

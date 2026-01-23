@@ -15,7 +15,7 @@ import {
     CARD_PRIORITY_CODE,
     PRIORITY_SLOT,
     setCardPriority,
-    getCardPriority,
+    getCardPriorityValue,
 } from '../lib/card_priority';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
@@ -56,28 +56,30 @@ function PriorityLight() {
             incPStr,
             hasIncPowerup,
             hasCardPowerup,
-            cardInfo,
+            cards,
+            cardPriorityVal,
             defaultInc,
         ] = await Promise.all([
             rem.getPowerupProperty(powerupCode, prioritySlotCode),
             rem.hasPowerup(powerupCode),
             rem.hasPowerup('cardPriority'), // check using string or const if available
-            getCardPriority(rp, rem),
+            rem.getCards(),
+            getCardPriorityValue(rp, rem),
             rp.settings.getSetting<number>(defaultPriorityId),
         ]);
 
-        const hasCards = cardInfo ? cardInfo.cardCount > 0 : false;
+        const hasCards = cards.length > 0;
 
         return {
             rem,
             incPriority: incPStr ? parseInt(incPStr) : null,
-            cardPriority: cardInfo ? cardInfo.priority : 50,
+            cardPriority: cardPriorityVal, // correctly resolved number
             hasIncPowerup,
             hasCardPowerup,
             hasCards,
             defaults: {
                 inc: defaultInc || 50,
-                card: 50 // inherited/default handled by cardInfo
+                card: 50 // inherited/default handled by cardPriorityVal
             }
         };
     }, [context?.contextData?.remId]);
