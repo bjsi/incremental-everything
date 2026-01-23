@@ -926,3 +926,18 @@ export const isHtmlSource = async (rem: PluginRem): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Safely extracts the Front and Back content of a Rem.
+ * Returns robust text representations for display headers.
+ */
+export async function getRemCardContent(
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<{ front: string; back: string }> {
+  const front = await safeRemTextToString(plugin, rem.text);
+  // rem.backText is available for Concept/Descriptor/Question rems with a back side
+  const back = rem.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+
+  return { front, back };
+}
