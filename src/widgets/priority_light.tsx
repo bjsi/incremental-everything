@@ -60,13 +60,15 @@ function PriorityLight() {
             hasCardPowerup,
             cards,
             cardPriorityVal,
+            cardPStr, // Fetch raw slot value to verify existence
             defaultInc,
         ] = await Promise.all([
             rem.getPowerupProperty(powerupCode, prioritySlotCode),
             rem.hasPowerup(powerupCode),
-            rem.hasPowerup('cardPriority'), // check using string or const if available
+            rem.hasPowerup(CARD_PRIORITY_CODE), // check using constant
             rem.getCards(),
             getCardPriorityValue(rp, rem),
+            rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT), // Get raw string check
             rp.settings.getSetting<number>(defaultPriorityId),
         ]);
 
@@ -80,7 +82,8 @@ function PriorityLight() {
             incPriority: incPStr ? parseInt(incPStr) : null,
             cardPriority: cardPriorityVal, // correctly resolved number
             hasIncPowerup,
-            hasCardPowerup,
+            // Robust check: Valid if has powerup OR if we found a value in the slot
+            hasCardPowerup: hasCardPowerup || !!cardPStr,
             hasCards,
             defaults: {
                 inc: defaultInc || 50,
