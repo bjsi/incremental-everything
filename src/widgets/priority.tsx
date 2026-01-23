@@ -768,17 +768,16 @@ function Priority() {
 
   // --- EARLY RETURNS & FINAL DATA DE-STRUCTURING ---
   if (!widgetContext || !rem) {
-    return <div className="p-4">Loading Rem Data...</div>;
+    return <div className="p-4" style={{ minWidth: '360px', minHeight: '350px' }}>Loading Rem Data...</div>;
   }
 
   // Check if critical card/incRem data is still loading
   // derivedData can be null! We no longer block on it.
 
-  if (!rem) {
+  if (cardData === undefined) {
     return (
-      <div className="p-4 flex flex-col gap-4 relative items-center justify-center">
+      <div className="p-4 flex flex-col gap-4 relative items-center justify-center" style={{ minWidth: '360px', minHeight: '350px' }}>
         <h2 className="text-xl font-bold">Priority Settings</h2>
-
         <div className="text-lg">Loading...</div>
       </div>
     );
