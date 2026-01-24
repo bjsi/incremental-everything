@@ -57,6 +57,8 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         await initIncrementalRem(plugin, rem);
         // Removed setHighlightColor -> CSS handles styling via "incremental" tag
         await plugin.app.toast('✅ Tagged as Incremental Rem');
+        // Clear stale session storage to prevent race condition with widget context
+        await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
         await plugin.widget.openPopup('priority_light', {
           remId: rem._id,
         });
@@ -82,6 +84,8 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         await initIncrementalRem(plugin, rem);
         // Removed setHighlightColor -> CSS handles styling via "incremental" tag
         await plugin.app.toast('✅ Tagged as Incremental Rem');
+        // Clear stale session storage to prevent race condition with widget context
+        await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
         await plugin.widget.openPopup('priority_light', {
           remId: rem._id,
         });
