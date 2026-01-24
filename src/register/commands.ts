@@ -642,7 +642,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'quick-increase-priority',
     name: 'Quick Increase Priority Number (Less Important)',
     description: 'Increases the priority number by the step size (default 10), making it LESS important.',
-    keyboardShortcut: 'ctrl+shift+up',
+    keyboardShortcut: 'ctrl+opt+up',
     action: async () => {
       await handleQuickPriorityChange(plugin, 'increase');
     },
@@ -652,7 +652,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'quick-decrease-priority',
     name: 'Quick Decrease Priority Number (More Important)',
     description: 'Decreases the priority number by the step size (default 10), making it MORE important.',
-    keyboardShortcut: 'ctrl+shift+down',
+    keyboardShortcut: 'ctrl+opt+down',
     action: async () => {
       await handleQuickPriorityChange(plugin, 'decrease');
     },
