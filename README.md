@@ -1,24 +1,39 @@
-# Incremental Everything Plus
+# Incremental Everything
 
-A RemNote plugin which allows you to interleave your flashcard reviews with notes, paragraphs from books, websites, video snippets and more! Heavily inspired by SuperMemo's [Incremental Reading](https://supermemo.guru/wiki/Incremental_reading) mode.
+![Incremental Everything Logo](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-logo.png)
 
-## Features
+**A Complete Learning System for RemNote.**
 
-- **Incremental Reading**: Read and review 1000s of notes, books and websites in parallel. [Learn more](https://www.youtube.com/watch?v=oNCLLNZEtz0).
+Incremental Everything allows you to interleave your flashcard reviews with notes, books, websites, and videos. Heavily inspired by SuperMemo's [Incremental Reading](https://supermemo.guru/wiki/Incremental_reading), it transforms RemNote into a powerful lifelong learning tool that handles the entire lifecycle of knowledge: **Acquisition → Processing → Mastery**.
+
+## 🚀 Features
+
+### The Core Loop
+- **Incremental Reading**: Read and review 1000s of notes, books, and websites in parallel. [Learn more](https://www.youtube.com/watch?v=oNCLLNZEtz0).
 - **Incremental Writing**: Write your essays and blog posts incrementally to maximize creativity. [Learn more](https://www.youtube.com/watch?v=LLS_8Y744lk).
 - **Incremental Video**: Watch and take notes on your YouTube video backlog.
 - **Incremental Tasks**: Clear out your tasklist between flashcard reviews.
-- **Incremental Exercises**: Spread out textbook exercises over time.
-- Plugin support: Any RemNote plugin widget can easily integrate with Incremental Everything!
+
+### 🧠 Advanced Prioritization
+Manage information overload with a robust dual-priority system:
+- **Absolute & Relative Priorities**: Prioritize items from 0-100 and see exactly where they rank in your knowledge base.
+- **Priority Inheritance**: New extracts and flashcards automatically inherit the priority of their source material.
+- **Priority Shield**: A real-time diagnostic tool that shows your capacity to process high-priority material.
+- **Priority Review Documents**: Generate focused study sessions for your top N most important items (passive reading and flashcards) when you're overwhelmed.
+
+### 📱 Performance Modes
+- **Light Mode (Default for Mobile/Web)**: Fast, stable, and essential features only. Prevents crashes on phones and tablets.
+- **Full Mode (Desktop Power User)**: Complete feature set with heavy statistical calculations for detailed analytics.
 
 ## Installation
 
 - Open the [RemNote plugin store](https://www.remnote.com/plugins), search for "Incremental Everything" and install the plugin.
 
-## More Information (Full Documentation)
+## 📚 Documentation & Support
 
-- Stay tunned and see the latest changes in the [Changelog](https://github.com/bjsi/incremental-everything/wiki/Changelog).
-- For more information, please see the [User's Manual in the project wiki](https://github.com/bjsi/incremental-everything/wiki).
+This README covers the basics. For the comprehensive guides, please visit the **User's Manual**:
+
+👉 **[Incremental Everything Wiki](https://github.com/bjsi/incremental-everything/wiki)**
 
 ### 🎥 Videos about the basics
 
@@ -29,47 +44,56 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 
 - **What is Incremental Reading?**: [Incremental Journey - Incremental Reading in Simple Terms](https://youtu.be/V4xEziM8mco)
 
+### Useful Links
+- **[Changelog](https://github.com/bjsi/incremental-everything/wiki/Changelog)**: See the latest features and updates.
+- **[Discord](http://bit.ly/RemNoteDiscord)**: Join the community and chat with us (look for the plugin channels).
 
 
 ## Usage
 
-### Create Incremental Rem
+### Getting Started
+1. **Make Incremental**: Make any Rem, PDF, or Website `Incremental` using the `/Incremental Everything` command (Shortcut: `Alt+X`).
 
-- Tag a Rem with the `Incremental` tag using the `/Incremental Everything` command.
-  ![Tagging](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/tag-inc-rem.gif)
-- Turn a PDF/website highlight into an incremental Rem by clicking on the highlight and clicking the puzzle piece icon.
-  ![Highlight](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
-- You can also create a new row in a table created from the `Incremental` tag.
-- You can use the shortcut `alt/opt+x` to create an incremental Rem.
-- You can use the shortcut `alt/opt+shift+x` to create an incremental Rem and open the priority menu.
+![Make Incremental using the command](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/tag-inc-rem.gif)
 
-#### Disable Incremental Rem
+2. **Prioritize it**: Use `Alt+P` to set its importance.
+3. **Review it**: The plugin interleaves these items into your regular flashcard queue.
+4. **Disable it**: Remove the `Incremental` tag or press the **Done** button in the queue if you are done reviewing it.
 
-- If you are done reviewing an incremental Rem and do not wish to see it anymore, you can disable it by removing the `Incremental` tag.
+### ⚡ Prioritization & Sorting
+- 0 is for your most important material and 100 is for the least important.
+- **Change Priority**: Click the button in the queue or press `Alt+P` to open the full priority popup.
+- **Quick Shortcuts**: Use `Ctrl+Opt+Up` / `Ctrl+Opt+Down` to adjust priority instantly without breaking flow.
+- **Sorting Criteria**: Use the queue menu to adjust the balance between **Structure** (strict priority) and **Exploration** (randomness), and control the ratio of Flashcards to Reading material.
 
-### Review
+### Scheduling
 
-- The plugin automatically interleaves incremental Rem between your regular flashcard reviews.
-- All of RemNote's practice modes ("Practice with SRS", "Practice All" and "Practice in Order") should work as expected.
-  - Note that "Practice in Order" won't order the incremental Rem with flashcards. The flashcards and incremental Rem will get interleaved together.
-- In "Practice with SRS" and "Practice All" modes Rem are sorted by priority. In "Practice in Order" mode they are sorted by their order in the document.
-- Inside the queue, you can control how many incremental Rem you want to see and how they are sorted using the Sorting Criteria button in the queue menu.
+- The plugin uses an extremely simple scheduling algorithm: `const newInterval = Math.ceil(multiplier ** Math.max(repHistory.length, 1));` where the multiplier is 1.5 by default.
+- Note that you can manually set the next repetition date using the **Reschedule** command (**Ctrl+J**), or RemNote's tables and properties features.
 
-#### Incremental Reading
+### 📱 Mobile Support
+The plugin now features **Automatic Light Mode**.
+- When you open RemNote on iOS or Android, the plugin automatically switches to "Light Mode".
+- This disables heavy background calculations to ensure a crash-free experience on mobile devices.
+- Your desktop experience remains fully featured.
+
+### Incremental Reading
 
 - You can tag PDFs, websites and highlights with the `Incremental` tag to do classic SuperMemo-style incremental reading.
 - It will work if you tag the PDF or website itself, or a Rem with a single PDF or website as a source.
 - The plugin will render the PDF or website reader view inside the queue.
-- If you want to turn a highlight into an incremental Rem, click on the highlight and click the puzzle piece icon (I need to add proper shortcuts still!)
+- If you want to turn a highlight into an incremental Rem, click on the highlight and click the puzzle piece icon.
+- ** 📄 PDFs & Web**
+  - **Visual Status**: Highlights turn **Green** when toggled as Incremental, and **Blue** when extracted.
+  - **Create Incremental Rem**: Select text in a PDF -> Highlight it -> Click the Puzzle Icon -> **"Create Incremental Rem"**. This extracts the text to a new Rem under a parent of your choice (using the smart parent selector).
+![Highlight](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
 
-![Incremental Reading](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-read.gif)
-
-#### Incremental Writing
+### Incremental Writing
 
 - You can tag any normal Rem with the `Incremental` tag to turn it into an incremental Rem.
 - The plugin will render it as a normal Rem in the document view in the queue.
 
-#### Incremental Video
+### Incremental Video
 
 - You can tag YouTube videos with the `Incremental` tag to watch them incrementally.
 - It will work if you tag the link Rem itself, or a Rem with the YouTube link as a source.
@@ -78,7 +102,7 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 
 ![Incremental Video](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-vid.png)
 
-#### Incremental Mathematics
+### Incremental Mathematics
 
 - A quick example of plugin interoperability.
 - Integrates with my [Lean theorem prover plugin](https://github.com/bjsi/remnote-lean) to schedule math proof problem sets over time.
@@ -87,7 +111,7 @@ A RemNote plugin which allows you to interleave your flashcard reviews with note
 
 ![Incremental Mathematics](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/lean.png)
 
-#### Subset Review
+### Subset Review
 
 - You can do basic subset reviews by studying a particular document. Only Rem from that document will be shown to you.
 - You can also create a table from the `Incremental` tag and filter it down to a sorted subset using the table filter and sort features.
@@ -102,84 +126,6 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
 - Only YouTube videos
 
 ![Only YouTube videos Filter](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-vid-filter.png)
-
-### Prioritization
-
-- You can use the `/Prioritize` command to set the priority of an incremental Rem or change it using RemNote's tables and properties features.
-- The plugin will prioritize Rem with a lower priority over Rem with a higher priority. So 0 is for your most important material and 100 is for the least important.
-- You can set the balance between priority sorting and randomness using the Sorting Criteria menu button in the queue.
-
-### Scheduling
-
-- The plugin uses an extremely simple scheduling algorithm: `const newInterval = Math.ceil(multiplier ** Math.max(repHistory.length, 1));` where the multiplier is 1.5 by default.
-- Note that you can manually set the next repetition date using RemNote's tables and properties features.
-
-## Improvements of this Plus version in relation to the original Incremental Everything plugin
-
-
-###  Priotitization & Sorting System improvements
-
-- **"Change Priority" Button:** Added a button to the answer bar to quickly change a Rem's priority directly from the queue, using the original priority popup.
-
-- **At-a-Glance Priority Assessment:** The "Change Priority" button now displays not only its set (absolute) priority, but also the Rem's relative rank within the Knowledge Base (`% of KB`) and current document (`% of Doc`). The label's background is also color-coded — from red (high priority) to blue (low priority) — for instant visual feedback.
-
-- **Interactive Priority Popup:** The "Set Priority" popup has been redesigned for a more intuitive workflow. It now features a new "Relative Priority" slider with a full-color gradient, allowing you to set a Rem's priority by either typing an absolute value or visually selecting its desired percentile rank.
-
-- **Customizable Default Priority:** Added a new option in the plugin settings for users to set their own default priority for new incremental Rem.
-
-- **Priority Inheritance:** New incremental rems now automatically inherit the priority from their closest parent or ancestor that is also an incremental rem. This streamlines workflow by making priority management more intuitive and hierarchical, falling back to the default priority only if no ancestor is found.
-
-- **Sorting Criteria - New Flashcard Ratio selector and logic:** The Flashcard Ratio slider has been completely overhauled to be linear and intuitive, directly controlling the number of cards. This fixes persistent bugs in the queuing logic, ensuring the selected card sequence is now reliable and accurate.
-
-- **Priority Shield (= Priority Protection):** To give you a clear, actionable metric for managing your learning load, a new "Priority Shield" has been added.
-    -   This real-time status indicator shows your processing capacity for high-priority material by displaying the priority of the most important due item you have yet to review.
-    -   It appears automatically below the answer buttons in the queue, providing separate metrics for your entire Knowledge Base (KB) and the current document.
-    -   You can track your performance over time by accessing the "Priority Shield History" graph from the queue menu (the three-dot icon).
-    -   The real-time display can be toggled on or off in the plugin's settings.
-
-
-### Easier switch between Queue and Editor with new buttons
-
-- **Review & Open in Editor:** For moments when the queue's embedded view is too limited, a **"Review & Open"** button is available on the answer bar. This button first registers your review of the item (rescheduling it for the future, just like the "Next" button) and then instantly navigates you to the full RemNote editor for that item. This is ideal for detailed note-taking, using other plugins like AI tools, or performing complex edits without losing your review progress.
-
-- **"Open Editor in New Tab" (for PDFs):** As a workaround for recent RemNote changes that prevent opening an editor pane within the PDF viewer in the queue, a new button has been added for PDF rems. This allows users to quickly open the source document in a new browser tab to see the full context without exiting their review session.
-
-
-### Other improvements
-
-- **"Scroll to Highlight" Button:** Added a button to the answer bar that appears only for highlight cards, allowing you to instantly jump back to the highlight's position in the PDF.
-
-- **Reschedule button:** Added a button to the answer bar that opens a popup for manually setting the next review interval in days. This popup intelligently defaults to the same interval the 'Next' button would have calculated, provides a live preview of the resulting date, and performs a full repetition when submitted.
-
-- **"Press 'P' to Edit" Hint:** Added an idle button that appears for regular Rem and PDF cards, informing users of the native shortcut to open the editor (as trying to edit directly in the Document Viewer triggers keyboard shortcut conflicts and is not recommended).
-
-- **"Enter" Key in Popup:** The priority popup can now be closed by pressing the "Enter" key after typing a value, improving workflow speed.
-
-- **PDF Highlight menu item toggle** now also triggers the *priority popup*, so that, when making PDF extracts, the user can instantly set the extract priority or press enter to use the default priority.
-
-
-### Enhanced Queue Layout & Plugin Compatibility
-
-The previous plugin version applied a single, permanent CSS rule that modified the entire flashcard queue, which could unintentionally affect the layout of regular flashcards.
-
-```// Original implementation
-async function onActivate(plugin: ReactRNPlugin) {
-  plugin.app.registerCSS(
-    'queue-container',
-    `
-    .rn-queue__content {
-      height: 100vh !important;
-      ...
-    }
-    `
-  );
-```
-
-We now implemented a more intelligent and compatible approach:
-
-- **Conditional Styling:** The layout-fixing styles are now dynamically applied only when an incremental rem is being reviewed. The styles are immediately removed for standard flashcards, preserving the native RemNote queue experience.
-
-- **Plugin Compatibility:** A fix has been added to automatically hide the Flashcard Repetition History plugin widget during incremental reviews. This resolves layout conflicts and allows both plugins to be used together seamlessly.
 
 
 ## Known Issues
@@ -201,8 +147,7 @@ When viewing a regular Rem card in the queue, the editor correctly appears. Howe
 
 ## Development Details
 
-- The plugin stores repetition data as powerup properties on the Rem. So these aren't "normal" RemNote flashcards. All of the scheduling is managed internally by the plugin.
-- Let me know if you want to help develop the plugin! Join the [RemNote Discord](http://bit.ly/RemNoteDiscord) and message me (Jamesb)!
+- The plugin stores repetition data as powerup properties on the Rem. These aren't "normal" RemNote flashcards. All of the scheduling is managed internally by the plugin.
 
 ### How to Develop
 
@@ -216,9 +161,3 @@ npm run dev
 ```
 
 Then follow [this part of the quick start guide](https://plugins.remnote.com/getting-started/quick_start_guide#run-the-plugin-template-inside-remnote) to get the plugin running in RemNote.
-
-
-
-
-
-
