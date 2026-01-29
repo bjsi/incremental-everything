@@ -40,37 +40,37 @@ const MAX_DEPTH_CHECK = 3;
  * **PERFORMANCE MODE: In Light Mode, skips flashcard checking and adds cardPriority directly.**
  */
 const handleCardPriorityInheritance = async (
-  plugin: RNPlugin, 
-  rem: PluginRem, 
+  plugin: RNPlugin,
+  rem: PluginRem,
   incRemInfo: IncrementalRem | null
 ) => {
   if (!rem || !incRemInfo) return;
-  
+
   // Start the timer
   const startTime = Date.now();
   console.log(`[Done Button] 🏁 Starting depth-limited (max ${MAX_DEPTH_CHECK} levels) check for Rem: ${rem._id}`);
-  
+
   try {
     // 1. Check if the Rem already has a *set* cardPriority tag with a non-default source.
     const existingSource = await rem.getPowerupProperty('cardPriority', 'prioritySource');
-    
+
     // If the Rem is tagged AND the source is 'manual' or 'inherited', we stop.
     // We proceed if the Rem is untagged (existingSource is null) or if the tag source is 'default'.
     if (existingSource && typeof existingSource === 'string' && existingSource.toLowerCase() !== 'default') {
       console.log(`[Done Button] Rem already has manual/inherited priority tag. Skipping check. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
-    
+
     // 2. Check if we should use Light Mode for performance
     const useLightMode = await shouldUseLightMode(plugin);
-    
+
     if (useLightMode) {
       // In Light Mode, skip expensive flashcard checking and add cardPriority directly
       await setCardPriority(plugin, rem, incRemInfo.priority, 'manual');
       console.log(`[Done Button] ⚡ Light Mode: Set card priority ${incRemInfo.priority} without flashcard check. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
-    
+
     // 3. Full Mode: Check the Rem itself for flashcards (Depth 1)
     const remCards = await rem.getCards();
     if (remCards && remCards.length > 0) {
@@ -79,24 +79,24 @@ const handleCardPriorityInheritance = async (
       console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} for Rem with direct flashcards. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
-    
+
     // 4. Full Mode: Check descendants up to MAX_DEPTH_CHECK (Children and Grandchildren)
     // Uses getDescendantsToDepth to avoid fetching the entire hierarchy upfront.
     const descendantsToCheck = await getDescendantsToDepth(rem, MAX_DEPTH_CHECK);
-    
+
     if (descendantsToCheck.length === 0) {
       console.log(`[Done Button] No descendants found within ${MAX_DEPTH_CHECK} levels. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
-    
+
     console.log(`[Done Button] Checking ${descendantsToCheck.length} descendants up to level ${MAX_DEPTH_CHECK}...`);
 
     // 5. Full Mode: Batch-check the limited descendants with early termination
     const BATCH_SIZE = 50;
-    
+
     for (let i = 0; i < descendantsToCheck.length; i += BATCH_SIZE) {
       const batch = descendantsToCheck.slice(i, i + BATCH_SIZE);
-      
+
       // Check batch in parallel
       const batchResults = await Promise.all(
         batch.map(async (descendant) => {
@@ -104,7 +104,7 @@ const handleCardPriorityInheritance = async (
           return cards && cards.length > 0;
         })
       );
-      
+
       // Check if any descendant in this batch has flashcards
       if (batchResults.some(hasCards => hasCards)) {
         // Found at least one descendant with flashcards
@@ -114,10 +114,10 @@ const handleCardPriorityInheritance = async (
       }
       console.log(`[Done Button] Batch ${Math.floor(i / BATCH_SIZE) + 1} clear. Moving to next batch...`);
     }
-    
+
     // No flashcards found in the Rem or its checked descendants
     console.log(`[Done Button] No flashcards found in Rem or all checked descendants. Total time: ${Date.now() - startTime}ms.`);
-    
+
   } catch (error) {
     console.error(`[Done Button] ❌ Error in handleCardPriorityInheritance. Total time: ${Date.now() - startTime}ms.`, error);
   }
@@ -135,7 +135,7 @@ const handleReviewAndOpenRem = async (
     if (pdfRem) {
       const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
       const currentPage = await plugin.storage.getSynced<number>(pageKey);
-      
+
       if (currentPage) {
         await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
       }
@@ -167,15 +167,15 @@ export function AnswerButtons() {
   ) ?? true;
 
   const activeHighlightId = useTrackerPlugin(
-    (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey), 
+    (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey),
     []
   );
-  
+
   const remType = useTrackerPlugin(
     (rp) => rp.storage.getSession<string | null>(currentIncrementalRemTypeKey),
     []
   );
-  
+
   const baseData = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
     if (!ctx?.remId) return null;
@@ -206,14 +206,14 @@ export function AnswerButtons() {
     if (useLightMode || !shouldDisplayShield || !coreData?.sessionCache) return null;
 
     const seenRemIds = (await rp.storage.getSession<string[]>(seenRemInSessionKey)) || [];
-    
+
     const { sessionCache, rem } = coreData;
     const dueKb = sessionCache.dueIncRemsInKB || [];
     const unreviewedDueKb = dueKb.filter(
       (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
     );
     const topMissedInKb = _.minBy(unreviewedDueKb, (r) => r.priority);
-    
+
     const dueDoc = sessionCache.dueIncRemsInScope || [];
     const unreviewedDueDoc = dueDoc.filter(
       (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
@@ -246,20 +246,31 @@ export function AnswerButtons() {
   // ✅ MEMOIZE CALCULATIONS (but they must run every render, not conditionally)
   const percentiles = useMemo(() => {
     if (!coreData) return { kb: null, doc: null };
-    
+
     const { incRemInfo, sessionCache } = coreData;
     const kbPercentile = calculateRelativePercentile(allIncRems, incRemInfo.remId);
     const docPercentile = sessionCache?.incRemDocPercentiles?.[incRemInfo.remId] ?? null;
-    
+
     return { kb: kbPercentile, doc: docPercentile };
   }, [coreData, allIncRems]);
+
+  // Calculate history stats for display (must be before early returns)
+  const historyStats = useMemo(() => {
+    if (!coreData?.incRemInfo?.history || coreData.incRemInfo.history.length === 0) {
+      return { reps: 0, totalMinutes: 0 };
+    }
+    const reps = coreData.incRemInfo.history.length;
+    const totalSeconds = coreData.incRemInfo.history.reduce((total, rep) => total + (rep.reviewTimeSeconds || 0), 0);
+    const totalMinutes = Math.round(totalSeconds / 6) / 10; // Round to 1 decimal
+    return { reps, totalMinutes };
+  }, [coreData?.incRemInfo?.history]);
 
   // ✅ NOW we can do early returns AFTER all hooks are called
   if (!coreData) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
         alignItems: 'center',
         padding: '20px',
         color: '#6b7280',
@@ -278,7 +289,7 @@ export function AnswerButtons() {
       if (pdfRem) {
         const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
         const currentPage = await plugin.storage.getSynced<number>(pageKey);
-        
+
         if (currentPage) {
           await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
         }
@@ -377,14 +388,14 @@ export function AnswerButtons() {
         <Button
           variant="danger"
           onClick={async () => {
-                  // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
-                  await handleCardPriorityInheritance(plugin, rem, incRemInfo);
+            // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
+            await handleCardPriorityInheritance(plugin, rem, incRemInfo);
 
-                  // 2. Proceed with the final, destructive Done button logic
-                  await removeIncrementalRemCache(plugin, rem._id);
-                  await plugin.queue.removeCurrentCardFromQueue(true);
-                  await rem.removePowerup(powerupCode);
-              }}
+            // 2. Proceed with the final, destructive Done button logic
+            await removeIncrementalRemCache(plugin, rem._id);
+            await plugin.queue.removeCurrentCardFromQueue(true);
+            await rem.removePowerup(powerupCode);
+          }}
         >
           <div style={buttonStyles.label}>Done</div>
           <div style={buttonStyles.sublabel}>Untag</div>
@@ -480,7 +491,7 @@ export function AnswerButtons() {
                 try {
                   // Open the URL in a new tab
                   const newWindow = window.open(htmlSourceUrl, '_blank');
-                  
+
                   // Fallback if popup was blocked
                   if (!newWindow || newWindow.closed) {
                     const link = document.createElement('a');
@@ -491,7 +502,7 @@ export function AnswerButtons() {
                     link.click();
                     setTimeout(() => document.body.removeChild(link), 100);
                   }
-                  
+
                   // Show a helpful toast
                   await plugin.app.toast('📎 URL opened! Use RemNote Clipper in the browser to take notes.');
                 } catch (error) {
@@ -581,61 +592,96 @@ export function AnswerButtons() {
       {/* Priority and Shield Info Bar */}
       {(incRemInfo || (shouldDisplayShield && shieldStatusAsync)) && (
         <div style={infoBarStyle}>
-          {/* Priority Display */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontWeight: 600 }}>Priority:</span>
-            <div style={priorityBadgeStyle}>
-              <span>{incRemInfo.priority}</span>
-              {/* Show KB percentile (always current). Doc percentile removed from cache after priority change. */}
-              {percentiles.kb !== null && (
-                <span style={{ opacity: 0.9, fontSize: '11px' }}>
-                  ({percentiles.kb}% KB
-                  {/* 🔌 Conditionally show Doc percentile */}
-                  {!useLightMode && percentiles.doc !== null && `, ${percentiles.doc}% Doc`})
+          {/* Left side: Priority and Shield */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Priority Display */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontWeight: 600 }}>Priority:</span>
+              <div style={priorityBadgeStyle}>
+                <span>{incRemInfo.priority}</span>
+                {/* Show KB percentile (always current). Doc percentile removed from cache after priority change. */}
+                {percentiles.kb !== null && (
+                  <span style={{ opacity: 0.9, fontSize: '11px' }}>
+                    ({percentiles.kb}% KB
+                    {/* 🔌 Conditionally show Doc percentile */}
+                    {!useLightMode && percentiles.doc !== null && `, ${percentiles.doc}% Doc`})
+                  </span>
+                )}
+              </div>
+              {/* Show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
+              {percentiles.kb !== null && percentiles.doc === null && (
+                <span
+                  style={{
+                    fontSize: '16px',
+                    opacity: 0.6,
+                    cursor: 'help'
+                  }}
+                  title="Doc percentile will be recalculated when you start a new queue session"
+                >
+                  ⟳
                 </span>
               )}
             </div>
-            {/* Show refresh icon only when Doc percentile is missing (will be recalculated on next queue) */}
-            {percentiles.kb !== null && percentiles.doc === null && (
-              <span 
-                style={{ 
-                  fontSize: '16px', 
-                  opacity: 0.6,
-                  cursor: 'help'
-                }}
-                title="Doc percentile will be recalculated when you start a new queue session"
-              >
-                ⟳
-              </span>
-            )}
-          </div>
 
-          {/* Shield Display */}
-          {/* 🔌 Conditionally show Shield */}
-          {!useLightMode && shouldDisplayShield && shieldStatusAsync && (
-            <>
-              <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontWeight: 600 }}>🛡️ IncRem Shield:</span>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  {shieldStatusAsync.kb ? (
-                    <span>
-                      KB: <strong>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile}%)
-                    </span>
-                  ) : (
-                    <span>KB: 100%</span>
-                  )}
-                  {shieldStatusAsync.doc ? (
-                    <span>
-                      Doc: <strong>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile}%)
-                    </span>
-                  ) : (
-                    sessionCache?.dueIncRemsInScope && <span>Doc: 100%</span>
-                  )}
+            {/* Shield Display */}
+            {/* 🔌 Conditionally show Shield */}
+            {!useLightMode && shouldDisplayShield && shieldStatusAsync && (
+              <>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 600 }}>🛡️ IncRem Shield:</span>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    {shieldStatusAsync.kb ? (
+                      <span>
+                        KB: <strong>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile}%)
+                      </span>
+                    ) : (
+                      <span>KB: 100%</span>
+                    )}
+                    {shieldStatusAsync.doc ? (
+                      <span>
+                        Doc: <strong>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile}%)
+                      </span>
+                    ) : (
+                      sessionCache?.dueIncRemsInScope && <span>Doc: 100%</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
+            {/* Separator before History */}
+            <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+
+            {/* Repetition History Stats and Icon */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>
+                <strong>{historyStats.reps}</strong> Reps, <strong>{historyStats.totalMinutes}</strong> min
+              </span>
+              <span
+                role="button"
+                style={{
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  opacity: 0.7,
+                  padding: '4px',
+                  borderRadius: '6px',
+                  transition: 'opacity 0.2s, background-color 0.2s',
+                }}
+                onClick={() => plugin.widget.openPopup('repetition_history', { remId: ctx.remId })}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                  e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '0.7';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                title="Repetition History"
+              >
+                📊
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>

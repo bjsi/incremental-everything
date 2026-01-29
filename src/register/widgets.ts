@@ -173,4 +173,12 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/3626/3626838.png",
     widgetTabTitle: "Incremental History",
   });
+
+  // Repetition history popup for Answer Buttons
+  plugin.app.registerWidget('repetition_history', WidgetLocation.Popup, {
+    dimensions: {
+      width: '380px',
+      height: 'auto',
+    },
+  });
 }
