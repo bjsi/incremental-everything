@@ -663,4 +663,61 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await handleQuickPriorityChange(plugin, 'decrease');
     },
   });
+
+  // Open Repetition History command
+  plugin.app.registerCommand({
+    id: 'open-repetition-history',
+    name: 'Open IncRem Repetition History',
+    keyboardShortcut: 'ctrl+shift+h',
+    action: async () => {
+      let remId: string | undefined;
+      const url = await plugin.window.getURL();
+
+      // Check if we are in the queue
+      if (url.includes('/flashcards')) {
+        // First, try to get the current native flashcard
+        const card = await plugin.queue.getCurrentCard();
+        if (card) {
+          remId = card.remId;
+        } else {
+          // If it's not a native card, it might be our plugin's queue view
+          remId = await plugin.storage.getSession(currentIncRemKey);
+        }
+      } else {
+        // If not in the queue, get the focused Rem from the editor
+        const focusedRem = await plugin.focus.getFocusedRem();
+        remId = focusedRem?._id;
+      }
+
+      if (!remId) {
+        await plugin.app.toast('Could not find a Rem.');
+        return;
+      }
+
+      // Check if the Rem is an Incremental Rem
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) {
+        await plugin.app.toast('Could not find the Rem.');
+        return;
+      }
+
+      // Check if it has the Incremental powerup
+      const hasIncrementalPowerup = await rem.hasPowerup(powerupCode);
+      if (!hasIncrementalPowerup) {
+        await plugin.app.toast('This Rem is not an Incremental Rem.');
+        return;
+      }
+
+      // Verify it's actually an Incremental Rem with valid data
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+      if (!incRemInfo) {
+        await plugin.app.toast('Could not retrieve Incremental Rem information.');
+        return;
+      }
+
+      await plugin.widget.openPopup('repetition_history', {
+        remId: remId,
+      });
+    },
+  });
 }
