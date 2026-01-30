@@ -79,12 +79,12 @@ export async function getNextSpacingDateForRem(
 
   // NOTE: if you change to use nextRepDate, you'll need to handle lookback mode
   // it's a simple exponential, but shouldn't explode if you do a bunch of practice-all
-  const newInterval = Math.ceil(multiplier ** Math.max(cleansedHistory.length, 1));
+  const newInterval = Math.ceil(multiplier ** Math.max(cleansedHistory.length + 1, 1));
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
-  
+
   // Calculate if review was early/late and by how many days
-  const scheduledDate = inLookbackMode 
-    ? dayjs().startOf('day').valueOf() 
+  const scheduledDate = inLookbackMode
+    ? dayjs().startOf('day').valueOf()
     : incrementalRemInfo.nextRepDate;
   const actualDate = Date.now();
   const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);

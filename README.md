@@ -40,7 +40,8 @@ This README covers the basics. For the comprehensive guides, please visit the **
 - **Introductory Videos**: 
   * [Incremental Reading Web Pages in RemNote](https://youtu.be/eXRlfCTOQNw)
   * [Incremental Reading in RemNote](https://youtu.be/SL7wjgntrbg)
-  
+
+- **Priorities Playlist**: [Prioritization in Incremental Everything](https://www.youtube.com/playlist?list=PLpmcfTqNVuo9DWjeIrMZZfG140kOZD8Tl) – Covers setting priorities, inheritance, the Priority Shield, creating Priority Review Documents, and how to use prioritization to manage information overload.
 
 - **What is Incremental Reading?**: [Incremental Journey - Incremental Reading in Simple Terms](https://youtu.be/V4xEziM8mco)
 
