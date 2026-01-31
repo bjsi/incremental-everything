@@ -51,7 +51,8 @@ async function handleRescheduleAndPriorityUpdate(
       interval: intervalDays,
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
-      reviewTimeSeconds: reviewTimeSeconds, // Track review time
+      reviewTimeSeconds: reviewTimeSeconds,
+      priority: incRem.priority, // Record priority at time of rep
     },
   ];
 

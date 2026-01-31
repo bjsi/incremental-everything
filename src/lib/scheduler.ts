@@ -25,6 +25,35 @@ function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
   return cleansedHistory;
 }
 
+/**
+ * Get only the repetitions since the last 'madeIncremental' event.
+ * This is used for interval calculation so that after re-activating a dismissed Rem,
+ * the interval calculation starts fresh rather than using the full historical count.
+ * 
+ * @param history Full cleansed history array
+ * @returns Only the reps (eventType undefined or 'rep') after the last 'madeIncremental' marker
+ */
+function getRepsSinceLastMadeIncremental(history: IncrementalRep[]): IncrementalRep[] {
+  // Find the index of the last 'madeIncremental' marker
+  let lastSessionStartIndex = -1;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].eventType === 'madeIncremental') {
+      lastSessionStartIndex = i;
+      break;
+    }
+  }
+
+  // Get entries after the last session start (or all if no marker found)
+  const entriesAfterSessionStart = lastSessionStartIndex >= 0
+    ? history.slice(lastSessionStartIndex + 1)
+    : history;
+
+  // Filter to only actual repetitions (eventType undefined or 'rep')
+  return entriesAfterSessionStart.filter(
+    entry => entry.eventType === undefined || entry.eventType === 'rep'
+  );
+}
+
 export function timeWhenCardAppearsInQueueFromScheduled(
   history: IncrementalRep[],
   index: number
@@ -77,9 +106,13 @@ export async function getNextSpacingDateForRem(
     inLookbackMode ? removeLastInteraction : _.identity
   );
 
+  // Get only the reps since the last 'madeIncremental' marker for interval calculation
+  // This ensures interval calculation restarts after re-activating a dismissed Rem
+  const sessionHistory = getRepsSinceLastMadeIncremental(cleansedHistory);
+
   // NOTE: if you change to use nextRepDate, you'll need to handle lookback mode
   // it's a simple exponential, but shouldn't explode if you do a bunch of practice-all
-  const newInterval = Math.ceil(multiplier ** Math.max(cleansedHistory.length + 1, 1));
+  const newInterval = Math.ceil(multiplier ** Math.max(sessionHistory.length + 1, 1));
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
 
   // Calculate if review was early/late and by how many days
@@ -102,6 +135,7 @@ export async function getNextSpacingDateForRem(
       interval: newInterval,
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
+      priority: incrementalRemInfo.priority, // Record priority at time of rep
       // reviewTimeSeconds will be added by reviewRem()
     },
   ];

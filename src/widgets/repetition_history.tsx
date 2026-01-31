@@ -5,6 +5,7 @@ import { formatDuration } from '../lib/utils';
 import dayjs from 'dayjs';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { getDismissedHistoryFromRem } from '../lib/dismissed';
 
 /**
  * Formats the early/late status into a human-readable string.
@@ -60,27 +61,59 @@ function RepetitionHistoryPopup() {
             const remId = ctx?.contextData?.remId;
 
             if (!remId) {
-                return { history: [], remName: '', error: 'No remId' };
+                return { history: [], remName: '', error: 'No remId', isDismissed: false, dismissedDate: null };
             }
 
             const rem = await plugin.rem.findOne(remId);
             if (!rem) {
-                return { history: [], remName: '', error: 'Rem not found' };
+                return { history: [], remName: '', error: 'Rem not found', isDismissed: false, dismissedDate: null };
             }
 
             // Get rem name
             const remName = await safeRemTextToString(plugin, rem.text);
+
+            // First try to get incremental rem info
             const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
 
+            if (incRemInfo) {
+                // Active incremental rem
+                return {
+                    history: incRemInfo.history || [],
+                    remName: remName || 'Unknown Rem',
+                    nextRepDate: incRemInfo.nextRepDate || null,
+                    isDismissed: false,
+                    dismissedDate: null,
+                    error: null
+                };
+            }
+
+            // Check for dismissed history if not an active incremental rem
+            const dismissedInfo = await getDismissedHistoryFromRem(plugin, rem);
+
+            if (dismissedInfo) {
+                // Dismissed rem with history
+                return {
+                    history: dismissedInfo.history || [],
+                    remName: remName || 'Unknown Rem',
+                    nextRepDate: null,
+                    isDismissed: true,
+                    dismissedDate: dismissedInfo.dismissedDate,
+                    error: null
+                };
+            }
+
+            // Neither incremental nor dismissed
             return {
-                history: incRemInfo?.history || [],
+                history: [],
                 remName: remName || 'Unknown Rem',
-                nextRepDate: incRemInfo?.nextRepDate || null,
+                nextRepDate: null,
+                isDismissed: false,
+                dismissedDate: null,
                 error: null
             };
         } catch (error) {
             console.error('[RepetitionHistoryPopup] Error loading history:', error);
-            return { history: [], remName: '', nextRepDate: null, error: String(error) };
+            return { history: [], remName: '', nextRepDate: null, isDismissed: false, dismissedDate: null, error: String(error) };
         }
     }, []);
 
@@ -175,7 +208,7 @@ function RepetitionHistoryPopup() {
 
     const gridHeaderStyle: React.CSSProperties = {
         display: 'grid',
-        gridTemplateColumns: '95px 60px 50px 75px',
+        gridTemplateColumns: '95px 60px 50px 40px 75px',
         padding: '8px 16px',
         fontSize: '10px',
         fontWeight: 600,
@@ -190,7 +223,7 @@ function RepetitionHistoryPopup() {
 
     const gridRowStyle: React.CSSProperties = {
         display: 'grid',
-        gridTemplateColumns: '95px 60px 50px 75px',
+        gridTemplateColumns: '95px 60px 50px 40px 75px',
         padding: '10px 16px',
         fontSize: '12px',
         borderBottom: '1px solid var(--rn-clr-border-secondary)',
@@ -218,10 +251,11 @@ function RepetitionHistoryPopup() {
         );
     }
 
-    const { history, remName, nextRepDate } = data;
+    const { history, remName, nextRepDate, isDismissed, dismissedDate } = data;
     const totalTime = getTotalTime(history);
     const age = calculateAge(history);
-    const repCount = history?.length || 0;
+    // Count only actual repetitions, not event markers (madeIncremental, dismissed)
+    const repCount = history?.filter(h => h.eventType === undefined || h.eventType === 'rep').length || 0;
 
     // Calculate days late/early for next scheduled rep
     const now = Date.now();
@@ -279,13 +313,31 @@ function RepetitionHistoryPopup() {
             </div>
 
             <div style={secondaryStatsStyle}>
-                <span>Next: <strong>{nextRepDate ? dayjs(nextRepDate).format('MMM D, YYYY') : '—'}</strong></span>
-                <span style={{ color: daysLate !== null && daysLate > 0 ? 'var(--rn-clr-red, #ef4444)' : daysLate !== null && daysLate < 0 ? 'var(--rn-clr-green, #22c55e)' : 'inherit' }}>
-                    {daysLateText}
-                </span>
+                {isDismissed ? (
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                        color: '#f59e0b',
+                        fontWeight: 600,
+                        fontSize: '11px',
+                    }}>
+                        ⚪ Dismissed {dismissedDate ? `on ${dayjs(dismissedDate).format('MMM D, YYYY')}` : ''}
+                    </span>
+                ) : (
+                    <>
+                        <span>Next: <strong>{nextRepDate ? dayjs(nextRepDate).format('MMM D, YYYY') : '—'}</strong></span>
+                        <span style={{ color: daysLate !== null && daysLate > 0 ? 'var(--rn-clr-red, #ef4444)' : daysLate !== null && daysLate < 0 ? 'var(--rn-clr-green, #22c55e)' : 'inherit' }}>
+                            {daysLateText}
+                        </span>
+                    </>
+                )}
             </div>
 
-            {repCount === 0 ? (
+            {sortedHistory.length === 0 ? (
                 <div style={emptyStyle}>
                     No repetitions yet. Complete your first review!
                 </div>
@@ -295,24 +347,71 @@ function RepetitionHistoryPopup() {
                         <span>Date</span>
                         <span>Time</span>
                         <span>Int.</span>
+                        <span>Pri.</span>
                         <span>Status</span>
                     </div>
-                    {sortedHistory.map((rep, index) => (
-                        <div key={index} style={gridRowStyle}>
-                            <span>{dayjs(rep.date).format('MMM D, YYYY')}</span>
-                            <span>{formatDuration(rep.reviewTimeSeconds || 0) || '—'}</span>
-                            <span>{rep.interval !== undefined ? `${rep.interval}d` : '—'}</span>
-                            <span style={{
-                                color: rep.daysEarlyOrLate !== undefined && rep.daysEarlyOrLate > 0
-                                    ? 'var(--rn-clr-red, #ef4444)'
-                                    : rep.daysEarlyOrLate !== undefined && rep.daysEarlyOrLate < 0
-                                        ? 'var(--rn-clr-green, #22c55e)'
-                                        : 'inherit'
-                            }}>
-                                {formatEarlyLate(rep)}
-                            </span>
-                        </div>
-                    ))}
+                    {sortedHistory.map((rep, index) => {
+                        // Render event markers differently
+                        if (rep.eventType === 'madeIncremental') {
+                            return (
+                                <div key={index} style={{
+                                    display: 'flex',
+                                    gridColumn: '1 / -1',
+                                    justifyContent: 'center',
+                                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                    color: '#22c55e',
+                                    fontWeight: 600,
+                                    fontSize: '11px',
+                                    borderRadius: '4px',
+                                    padding: '6px 8px',
+                                    margin: '4px 0',
+                                    whiteSpace: 'nowrap',
+                                }}>
+                                    ▶ Made Incremental — {dayjs(rep.date).format('MMM D, YYYY')}
+                                    {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
+                                </div>
+                            );
+                        }
+
+                        if (rep.eventType === 'dismissed') {
+                            return (
+                                <div key={index} style={{
+                                    display: 'flex',
+                                    gridColumn: '1 / -1',
+                                    justifyContent: 'center',
+                                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                    color: '#f59e0b',
+                                    fontWeight: 600,
+                                    fontSize: '11px',
+                                    borderRadius: '4px',
+                                    padding: '6px 8px',
+                                    margin: '4px 0',
+                                    whiteSpace: 'nowrap',
+                                }}>
+                                    ⏸ Dismissed — {dayjs(rep.date).format('MMM D, YYYY')}
+                                </div>
+                            );
+                        }
+
+                        // Regular rep entry
+                        return (
+                            <div key={index} style={gridRowStyle}>
+                                <span>{dayjs(rep.date).format('MMM D, YYYY')}</span>
+                                <span>{formatDuration(rep.reviewTimeSeconds || 0) || '—'}</span>
+                                <span>{rep.interval !== undefined ? `${rep.interval}d` : '—'}</span>
+                                <span>{rep.priority !== undefined ? rep.priority : '—'}</span>
+                                <span style={{
+                                    color: rep.daysEarlyOrLate !== undefined && rep.daysEarlyOrLate > 0
+                                        ? 'var(--rn-clr-red, #ef4444)'
+                                        : rep.daysEarlyOrLate !== undefined && rep.daysEarlyOrLate < 0
+                                            ? 'var(--rn-clr-green, #22c55e)'
+                                            : 'inherit'
+                                }}>
+                                    {formatEarlyLate(rep)}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

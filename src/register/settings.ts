@@ -26,6 +26,21 @@ const SHOW_LEFT_BORDER_CSS = `
   }
 `;
 
+const showDismissedIndicatorId = 'show-dismissed-indicator';
+const SHOW_DISMISSED_INDICATOR_CSS = `
+  .rem[data-rem-tags~="dismissed"]:not([data-rem-tags~="incremental"]) {
+    border-left: 3px solid #f59e0b;
+    padding-left: 5px;
+  }
+`;
+
+const hideDismissedTagId = 'hide-dismissed-tag';
+const HIDE_DISMISSED_TAG_CSS = `
+  [data-rem-tags~="dismissed"] .hierarchy-editor__tag-bar__tag {
+    display: none;
+  }
+`;
+
 /**
  * Registers every plugin setting (numbers, dropdowns, toggles) and applies startup defaults (e.g. hiding CardPriority tags).
  * Settings covered:
@@ -93,6 +108,34 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   const shouldShowLeftBorderForIncRems = await plugin.settings.getSetting('showLeftBorderForIncRems');
   if (shouldShowLeftBorderForIncRems) {
     await plugin.app.registerCSS(showLeftBorderForIncRemsId, SHOW_LEFT_BORDER_CSS);
+  }
+
+  // Dismissed Rems settings
+  plugin.settings.registerBooleanSetting({
+    id: 'showDismissedIndicator',
+    title: 'Show Yellow Left Border for Dismissed Rems',
+    description:
+      'If enabled, Rems that have been dismissed from Incremental learning (via Done button) will show a yellow left border to indicate they have preserved history.',
+    defaultValue: true,
+  });
+
+  const shouldShowDismissedIndicator = await plugin.settings.getSetting('showDismissedIndicator');
+  if (shouldShowDismissedIndicator) {
+    await plugin.app.registerCSS(showDismissedIndicatorId, SHOW_DISMISSED_INDICATOR_CSS);
+  }
+
+  // Hide dismissed powerup tag setting
+  plugin.settings.registerBooleanSetting({
+    id: 'hideDismissedTag',
+    title: 'Hide Dismissed Tag in Editor',
+    description:
+      'If enabled, this will hide the "Dismissed" powerup tag in the editor to reduce clutter. After changing this setting, reload RemNote.',
+    defaultValue: true,
+  });
+
+  const shouldHideDismissedTag = await plugin.settings.getSetting('hideDismissedTag');
+  if (shouldHideDismissedTag) {
+    await plugin.app.registerCSS(hideDismissedTagId, HIDE_DISMISSED_TAG_CSS);
   }
 
   plugin.settings.registerNumberSetting({

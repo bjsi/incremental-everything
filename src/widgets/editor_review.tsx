@@ -31,17 +31,17 @@ async function handleEditorReview(
   await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
 
   const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
-  
+
   // Calculate early/late status
   const scheduledDate = incRem.nextRepDate;
   const actualDate = Date.now();
   const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
   const wasEarly = daysDifference < 0;
   const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-  
+
   // Convert minutes to seconds
   const reviewTimeSeconds = Math.round(reviewTimeMinutes * 60);
-  
+
   const newHistory: IncrementalRep[] = [
     ...(incRem.history || []),
     {
@@ -51,9 +51,10 @@ async function handleEditorReview(
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
       reviewTimeSeconds: reviewTimeSeconds,
+      priority: incRem.priority, // Record priority at time of rep
     },
   ];
-  
+
   await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
 
   const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
@@ -120,8 +121,8 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
       const inLookbackMode = !!(await plugin.queue.inLookbackMode());
       const scheduleData = await getNextSpacingDateForRem(plugin, remId, inLookbackMode);
       const incRemData = await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(remId));
-      
-      const rem = await plugin.rem.findOne(remId);      
+
+      const rem = await plugin.rem.findOne(remId);
       if (rem) {
         const name = await safeRemTextToString(plugin, rem.text);
         setRemName(name);
@@ -130,7 +131,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
       // Set the calculated interval from the scheduling algorithm
       setDays(String(scheduleData?.newInterval || 1));
       setPriority(incRemData?.priority ?? 10);
-      
+
       // Fetch ancestor info
       const ancestor = await findClosestIncrementalAncestor(plugin, rem);
       setAncestorInfo(ancestor);
@@ -159,7 +160,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
     e.preventDefault();
     const numDays = parseInt(days);
     const numMinutes = parseFloat(reviewTimeMinutes) || 0;
-    
+
     if (!isNaN(numDays)) {
       const result = await handleEditorReview(plugin, remId, numDays, priority, numMinutes);
       if (result) {
@@ -177,7 +178,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
     await plugin.storage.setSession('editor-review-timer-interval', parseInt(days));
     await plugin.storage.setSession('editor-review-timer-priority', priority);
     await plugin.storage.setSession('editor-review-timer-rem-name', remName);
-    
+
     await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
     await plugin.widget.closePopup();
   };
@@ -281,7 +282,7 @@ export function EditorReview() {
   );
 
   const remId = ctx?.contextData?.remId;
-  
+
   const remName = useRunAsync(async () => {
     if (!remId) return '';
     const rem = await plugin.rem.findOne(remId);

@@ -56,6 +56,19 @@ export const IncrementalRep = z.object({
    * Negative = early, Positive = late, 0 = on time
    */
   daysEarlyOrLate: z.number().optional(),
+  /**
+   * Event type for this history entry:
+   * - 'rep' (default): A regular repetition/review
+   * - 'madeIncremental': Marker for when the Rem was made Incremental
+   * - 'dismissed': Marker for when the Rem was dismissed
+   * 
+   * The scheduler uses this to count only reps since the last 'madeIncremental' event.
+   */
+  eventType: z.enum(['rep', 'madeIncremental', 'dismissed']).optional(),
+  /**
+   * The absolute priority (0-100) at the time of this repetition
+   */
+  priority: z.number().min(0).max(100).optional(),
 });
 
 export type IncrementalRep = z.infer<typeof IncrementalRep>;

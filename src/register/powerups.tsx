@@ -8,7 +8,11 @@ import {
   prioritySlotCode,
   nextRepDateSlotCode,
   repHistorySlotCode,
+  originalIncrementalDateSlotCode,
   priorityGraphPowerupCode,
+  dismissedPowerupCode,
+  dismissedHistorySlotCode,
+  dismissedDateSlotCode,
 } from '../lib/consts';
 import { initIncrementalRem } from '../lib/incremental_rem';
 
@@ -45,6 +49,12 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
         {
           code: repHistorySlotCode,
           name: 'History',
+          hidden: true,
+        },
+        {
+          code: originalIncrementalDateSlotCode,
+          name: 'Created',
+          propertyType: PropertyType.DATE,
           hidden: true,
         },
       ],
@@ -87,5 +97,27 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
     options: {
       slots: [] // No special slots needed, we just use the tag as a trigger
     }
+  });
+
+  // Dismissed Powerup - stores history of previously Incremental Rems
+  await plugin.app.registerPowerup({
+    name: 'Dismissed',
+    code: dismissedPowerupCode,
+    description: 'Stores history of previously Incremental Rems',
+    options: {
+      slots: [
+        {
+          code: dismissedHistorySlotCode,
+          name: 'History',
+          hidden: true,
+        },
+        {
+          code: dismissedDateSlotCode,
+          name: 'Dismissed Date',
+          propertyType: PropertyType.DATE,
+          hidden: true,
+        },
+      ],
+    },
   });
 }

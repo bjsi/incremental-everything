@@ -3,6 +3,12 @@ export const powerupCode = 'incremental';
 export const prioritySlotCode = 'priority';
 export const nextRepDateSlotCode = 'nextRepDate';
 export const repHistorySlotCode = 'repHist';
+export const originalIncrementalDateSlotCode = 'originalIncDate';
+
+// Dismissed Powerup
+export const dismissedPowerupCode = 'dismissed';
+export const dismissedHistorySlotCode = 'dismissedHistory';
+export const dismissedDateSlotCode = 'dismissedDate';
 
 // settings
 export const initialIntervalId = 'initial-interval';
