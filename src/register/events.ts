@@ -14,6 +14,8 @@ import {
   queueSessionCacheKey,
   currentScopeRemIdsKey,
   powerupCode,
+  dismissedPowerupCode,
+  repHistorySlotCode,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -21,9 +23,11 @@ import {
   autoAssignCardPriority,
   getCardPriority,
 } from '../lib/card_priority';
-import { IncrementalRem } from '../lib/incremental_rem';
+import { IncrementalRem, getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { flushCacheUpdatesNow, updateCardPriorityCache } from '../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
+import { transferToDismissed } from '../lib/dismissed';
+import { IncrementalRep } from '../lib/incremental_rem/types';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../lib/priority_review_document';
 import {
   calculateAllPercentiles,
@@ -440,19 +444,112 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
  * Registers a debounced handler for the global Rem change stream: ignores updates fired while
  * the user is in the queue or running in Light mode, then auto-assigns priorities (if missing)
  * and refreshes the priority cache for the changed Rem.
+ * 
+ * Also detects when an Incremental powerup is manually removed and transfers history to dismissed.
  *
  * @param plugin Plugin instance for storage, settings, and Rem lookups.
  */
 export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
   let remChangeDebounceTimer: NodeJS.Timeout;
 
+  // Store captured history per remId (captured before debounce to avoid race condition)
+  // Key: remId, Value: cloned history array
+  const pendingHistoryMap = new Map<string, IncrementalRep[]>();
+
+  // Store captured nextRepDate per remId (for manual date reset detection)
+  const pendingNextRepDateMap = new Map<string, number>();
+
   plugin.event.addListener(
     AppEvents.GlobalRemChanged,
     undefined,
-    (data) => {
+    async (data) => {
       clearTimeout(remChangeDebounceTimer);
 
+      // IMPORTANT: Capture history and nextRepDate from cache NOW, before debounce
+      // This avoids race condition where plugin.track() refreshes cache before our debounced callback
+      const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+      const cachedIncRem = allIncRems.find(r => r.remId === data.remId);
+
+      if (cachedIncRem && cachedIncRem.history && cachedIncRem.history.length > 0) {
+        pendingHistoryMap.set(data.remId, [...cachedIncRem.history]); // Clone and store per remId
+      }
+
+      // Also capture nextRepDate for manual date reset detection
+      if (cachedIncRem && cachedIncRem.nextRepDate) {
+        pendingNextRepDateMap.set(data.remId, cachedIncRem.nextRepDate);
+      }
+
       remChangeDebounceTimer = setTimeout(async () => {
+        const rem = await plugin.rem.findOne(data.remId);
+        if (!rem) {
+          pendingHistoryMap.delete(data.remId);
+          pendingNextRepDateMap.delete(data.remId);
+          return;
+        }
+
+        // Check for powerup removal detection
+        const hasIncremental = await rem.hasPowerup(powerupCode);
+        const hasDismissed = await rem.hasPowerup(dismissedPowerupCode);
+
+        // Use the pre-captured history for THIS remId
+        const pendingHistory = pendingHistoryMap.get(data.remId);
+        const hadHistoryPreCaptured = pendingHistory && pendingHistory.length > 0;
+
+        if (!hasIncremental && !hasDismissed && hadHistoryPreCaptured) {
+          // Powerup was manually removed! Transfer to dismissed
+          await transferToDismissed(plugin, rem, pendingHistory!);
+        }
+
+        // === MANUAL DATE RESET DETECTION ===
+        // Only check if still an incremental rem (powerup not removed)
+        if (hasIncremental && !hasDismissed) {
+          const oldNextRepDate = pendingNextRepDateMap.get(data.remId);
+
+          if (oldNextRepDate !== undefined) {
+            // Get the CURRENT nextRepDate from the rem itself
+            const currentIncRem = await getIncrementalRemFromRem(plugin, rem);
+
+            if (currentIncRem && currentIncRem.nextRepDate !== oldNextRepDate) {
+              // Check if this change was made by the plugin using a session flag
+              const pluginIsUpdating = await plugin.storage.getSession<boolean>('plugin_updating_srs_data');
+
+              if (!pluginIsUpdating) {
+                // Date was changed manually! Add manualDateReset event
+                console.log('[GlobalRemChanged] Manual date reset detected:', {
+                  remId: data.remId,
+                  oldDate: new Date(oldNextRepDate).toLocaleDateString(),
+                  newDate: new Date(currentIncRem.nextRepDate).toLocaleDateString()
+                });
+
+                // Calculate the new interval in days
+                const intervalDays = Math.round((currentIncRem.nextRepDate - Date.now()) / (1000 * 60 * 60 * 24));
+
+                // Add manualDateReset event to history
+                const newHistoryEntry: IncrementalRep = {
+                  date: Date.now(),
+                  scheduled: oldNextRepDate,
+                  interval: Math.max(0, intervalDays),
+                  eventType: 'manualDateReset' as const,
+                };
+
+                const updatedHistory: IncrementalRep[] = [
+                  ...(currentIncRem.history || []),
+                  newHistoryEntry,
+                ];
+
+                // Update just the history slot (date already changed by user)
+                await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(updatedHistory)]);
+                console.log('[GlobalRemChanged] Added manualDateReset event to history');
+              }
+            }
+          }
+        }
+
+        // Clear pending state for this rem
+        pendingHistoryMap.delete(data.remId);
+        pendingNextRepDateMap.delete(data.remId);
+
+        // Original logic continues below
         const inQueue = !!(await plugin.storage.getSession(currentSubQueueIdKey));
         const isManualUpdate = await plugin.storage.getSession<boolean>('manual_priority_update_pending');
 
@@ -472,15 +569,8 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           return;
         }
 
-
-
         if (recentlyProcessedCards.has(data.remId)) {
           console.log('LISTENER: Skipping - recently processed by QueueCompleteCard');
-          return;
-        }
-
-        const rem = await plugin.rem.findOne(data.remId);
-        if (!rem) {
           return;
         }
 

@@ -11,6 +11,7 @@ import {
   nextRepDateSlotCode,
   prioritySlotCode,
   repHistorySlotCode,
+  originalIncrementalDateSlotCode,
   initialIntervalId,
   defaultPriorityId,
   currentIncRemKey,
@@ -21,6 +22,7 @@ import { IncrementalRem } from './types';
 import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
+import { mergeHistoryFromDismissed } from '../dismissed';
 
 type ReviewOverrideOptions = {
   /**
@@ -225,6 +227,10 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
   const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
 
   if (!isAlreadyIncremental) {
+    // Check for dismissed history to import (merge from previous learning sessions)
+    const dismissedHistory = await mergeHistoryFromDismissed(plugin, rem);
+    const hasExistingHistory = dismissedHistory && dismissedHistory.length > 0;
+
     const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
 
     const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
@@ -242,7 +248,31 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
 
     await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]);
-    await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify([])]);
+
+    // Create 'madeIncremental' marker to indicate the start of a new learning session
+    // This is used by the scheduler to count only reps since this marker
+    const madeIncrementalMarker = {
+      date: Date.now(),
+      scheduled: Date.now(),
+      eventType: 'madeIncremental' as const,
+      priority: Number(initialPriority), // Record priority at time of creation
+    };
+
+    // Build history: dismissed history (if any) + madeIncremental marker
+    const historyWithMarker = [
+      ...(dismissedHistory || []),
+      madeIncrementalMarker,
+    ];
+
+    await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(historyWithMarker)]);
+
+    // Set originalIncrementalDate only if no dismissed history (truly new Incremental Rem)
+    if (!hasExistingHistory) {
+      const todayRef = await getDailyDocReferenceForDate(plugin, new Date());
+      if (todayRef) {
+        await rem.setPowerupProperty(powerupCode, originalIncrementalDateSlotCode, todayRef);
+      }
+    }
 
     const newIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (!newIncRem) {

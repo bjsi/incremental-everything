@@ -11,6 +11,7 @@ import {
   noIncRemTimerKey,
   alwaysUseLightModeOnMobileId,
   alwaysUseLightModeOnWebId,
+  dismissedPowerupCode,
 } from '../lib/consts';
 import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
@@ -248,9 +249,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      console.log(`Opening 'reschedule' popup for remId: ${remId}`);
+      // Determine context (queue vs editor) for event type
+      const isQueue = url.includes('/flashcards');
+      const context = isQueue ? 'queue' : 'editor';
+
+      console.log(`Opening 'reschedule' popup for remId: ${remId}, context: ${context}`);
       await plugin.widget.openPopup('reschedule', {
         remId: remId,
+        context: context,
       });
     },
   });
@@ -694,24 +700,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      // Check if the Rem is an Incremental Rem
       const rem = await plugin.rem.findOne(remId);
       if (!rem) {
         await plugin.app.toast('Could not find the Rem.');
         return;
       }
 
-      // Check if it has the Incremental powerup
+      // Check if it has either the Incremental powerup OR the dismissed powerup
       const hasIncrementalPowerup = await rem.hasPowerup(powerupCode);
-      if (!hasIncrementalPowerup) {
-        await plugin.app.toast('This Rem is not an Incremental Rem.');
-        return;
-      }
+      const hasDismissedPowerup = await rem.hasPowerup(dismissedPowerupCode);
 
-      // Verify it's actually an Incremental Rem with valid data
-      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-      if (!incRemInfo) {
-        await plugin.app.toast('Could not retrieve Incremental Rem information.');
+      if (!hasIncrementalPowerup && !hasDismissedPowerup) {
+        await plugin.app.toast('This Rem has no repetition history (not Incremental or Dismissed).');
         return;
       }
 

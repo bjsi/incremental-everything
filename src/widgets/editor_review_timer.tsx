@@ -17,17 +17,17 @@ dayjs.extend(duration);
 function EditorReviewTimer() {
   const plugin = usePlugin();
   const [currentTime, setCurrentTime] = useState(Date.now());
-  
+
   const timerData = useTrackerPlugin(
     async (rp) => {
       const remId = await rp.storage.getSession<string>('editor-review-timer-rem-id');
       if (!remId) return null;
-      
+
       const startTime = await rp.storage.getSession<number>('editor-review-timer-start');
       const interval = await rp.storage.getSession<number>('editor-review-timer-interval');
       const priority = await rp.storage.getSession<number>('editor-review-timer-priority');
       const remName = await rp.storage.getSession<string>('editor-review-timer-rem-name');
-      
+
       return {
         remId,
         startTime,
@@ -44,7 +44,7 @@ function EditorReviewTimer() {
     const intervalId = setInterval(() => {
       setCurrentTime(Date.now());
     }, 1000);
-    
+
     return () => clearInterval(intervalId);
   }, []);
 
@@ -58,7 +58,7 @@ function EditorReviewTimer() {
   const minutes = elapsedDuration.minutes();
   const seconds = elapsedDuration.seconds();
 
-  const timeDisplay = hours > 0 
+  const timeDisplay = hours > 0
     ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
     : `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
@@ -79,17 +79,17 @@ function EditorReviewTimer() {
     await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
 
     const newNextRepDate = Date.now() + timerData.interval * 1000 * 60 * 60 * 24;
-    
+
     // Calculate early/late status
     const scheduledDate = incRem.nextRepDate;
     const actualDate = Date.now();
     const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
     const wasEarly = daysDifference < 0;
     const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-    
+
     // Calculate review time in seconds
     const reviewTimeSeconds = Math.round(elapsedMs / 1000);
-    
+
     const newHistory: IncrementalRep[] = [
       ...(incRem.history || []),
       {
@@ -99,9 +99,11 @@ function EditorReviewTimer() {
         wasEarly: wasEarly,
         daysEarlyOrLate: daysEarlyOrLate,
         reviewTimeSeconds: reviewTimeSeconds,
+        priority: incRem.priority, // Record priority at time of rep
+        eventType: 'executeRepetition' as const,
       },
     ];
-    
+
     await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
 
     const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
@@ -127,17 +129,17 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-interval', null);
     await plugin.storage.setSession('editor-review-timer-priority', null);
     await plugin.storage.setSession('editor-review-timer-rem-name', null);
-    
+
     await plugin.app.toast('Timer cancelled');
   };
 
   // Truncate rem name if too long
-  const displayName = timerData.remName.length > 40 
+  const displayName = timerData.remName.length > 40
     ? timerData.remName.substring(0, 37) + '...'
     : timerData.remName;
 
   return (
-    <div 
+    <div
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -152,9 +154,9 @@ function EditorReviewTimer() {
     >
       <span style={{ fontSize: '18px' }}>⏱️</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
-        <div style={{ 
-          fontSize: '13px', 
-          fontWeight: 600, 
+        <div style={{
+          fontSize: '13px',
+          fontWeight: 600,
           color: '#1e40af',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -162,8 +164,8 @@ function EditorReviewTimer() {
         }}>
           Reviewing: {displayName}
         </div>
-        <div style={{ 
-          fontSize: '16px', 
+        <div style={{
+          fontSize: '16px',
           color: '#1e3a8a',
           fontVariantNumeric: 'tabular-nums',
           fontWeight: 700,

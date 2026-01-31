@@ -31,6 +31,7 @@ import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDept
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
+import { transferToDismissed } from '../lib/dismissed';
 
 const MAX_DEPTH_CHECK = 3;
 
@@ -259,8 +260,17 @@ export function AnswerButtons() {
     if (!coreData?.incRemInfo?.history || coreData.incRemInfo.history.length === 0) {
       return { reps: 0, totalMinutes: 0 };
     }
-    const reps = coreData.incRemInfo.history.length;
-    const totalSeconds = coreData.incRemInfo.history.reduce((total, rep) => total + (rep.reviewTimeSeconds || 0), 0);
+    // Only count real repetitions (events that count for interval calculation)
+    // Includes: undefined, 'rep', 'rescheduledInQueue', 'executeRepetition'
+    // Excludes: 'madeIncremental', 'dismissed', 'rescheduledInEditor', 'manualDateReset'
+    const realReps = coreData.incRemInfo.history.filter(
+      h => h.eventType === undefined ||
+        h.eventType === 'rep' ||
+        h.eventType === 'rescheduledInQueue' ||
+        h.eventType === 'executeRepetition'
+    );
+    const reps = realReps.length;
+    const totalSeconds = realReps.reduce((total, rep) => total + (rep.reviewTimeSeconds || 0), 0);
     const totalMinutes = Math.round(totalSeconds / 6) / 10; // Round to 1 decimal
     return { reps, totalMinutes };
   }, [coreData?.incRemInfo?.history]);
@@ -391,7 +401,10 @@ export function AnswerButtons() {
             // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
             await handleCardPriorityInheritance(plugin, rem, incRemInfo);
 
-            // 2. Proceed with the final, destructive Done button logic
+            // 2. Save history to dismissed powerup BEFORE removing incremental
+            await transferToDismissed(plugin, rem, incRemInfo.history || []);
+
+            // 3. Proceed with the final, destructive Done button logic
             await removeIncrementalRemCache(plugin, rem._id);
             await plugin.queue.removeCurrentCardFromQueue(true);
             await rem.removePowerup(powerupCode);
