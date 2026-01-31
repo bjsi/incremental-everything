@@ -11,8 +11,12 @@ dayjs.extend(relativeTime);
 function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
   const cleansedHistory = [];
   for (let i = 0; i < history.length; i++) {
-    // Always preserve event markers (madeIncremental, dismissed) - they should never be filtered
-    if (history[i].eventType === 'madeIncremental' || history[i].eventType === 'dismissed') {
+    // Always preserve event markers - they should never be filtered by early response logic
+    const eventType = history[i].eventType;
+    if (eventType === 'madeIncremental' ||
+      eventType === 'dismissed' ||
+      eventType === 'rescheduledInEditor' ||
+      eventType === 'manualDateReset') {
       cleansedHistory.push(history[i]);
       continue;
     }
@@ -46,7 +50,7 @@ function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
  * - 'manualDateReset': Manual date change (no review)
  * - 'madeIncremental', 'dismissed': Session markers
  * 
- * @param history Full cleansed history array
+ * @param history Full cleansed history array (after early-response filtering)
  * @returns Only the events that count for interval after the last 'madeIncremental' marker
  */
 function getRepsSinceLastMadeIncremental(history: IncrementalRep[]): IncrementalRep[] {
