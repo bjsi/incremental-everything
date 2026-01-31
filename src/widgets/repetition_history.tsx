@@ -416,6 +416,7 @@ function RepetitionHistoryPopup() {
                                 }}>
                                     📅 Rescheduled in Editor — {dayjs(rep.date).format('MMM D, YYYY')}
                                     {rep.interval !== undefined && ` → ${rep.interval}d`}
+                                    {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </div>
                             );
                         }
@@ -438,6 +439,7 @@ function RepetitionHistoryPopup() {
                                 }}>
                                     ✏️ Manual Date Reset — {dayjs(rep.date).format('MMM D, YYYY')}
                                     {rep.interval !== undefined && ` → ${rep.interval}d`}
+                                    {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </div>
                             );
                         }

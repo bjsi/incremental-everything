@@ -59,7 +59,7 @@ async function handleRescheduleAndPriorityUpdate(
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
       reviewTimeSeconds: reviewTimeSeconds,
-      priority: incRem.priority, // Record priority at time of rep
+      priority: newPriority, // Record the NEW priority set during reschedule
       eventType: eventType as 'rescheduledInQueue' | 'rescheduledInEditor',
     },
   ];
