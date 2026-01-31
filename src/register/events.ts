@@ -15,6 +15,7 @@ import {
   currentScopeRemIdsKey,
   powerupCode,
   dismissedPowerupCode,
+  repHistorySlotCode,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -455,13 +456,16 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
   // Key: remId, Value: cloned history array
   const pendingHistoryMap = new Map<string, IncrementalRep[]>();
 
+  // Store captured nextRepDate per remId (for manual date reset detection)
+  const pendingNextRepDateMap = new Map<string, number>();
+
   plugin.event.addListener(
     AppEvents.GlobalRemChanged,
     undefined,
     async (data) => {
       clearTimeout(remChangeDebounceTimer);
 
-      // IMPORTANT: Capture history from cache NOW, before debounce
+      // IMPORTANT: Capture history and nextRepDate from cache NOW, before debounce
       // This avoids race condition where plugin.track() refreshes cache before our debounced callback
       const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
       const cachedIncRem = allIncRems.find(r => r.remId === data.remId);
@@ -470,10 +474,16 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         pendingHistoryMap.set(data.remId, [...cachedIncRem.history]); // Clone and store per remId
       }
 
+      // Also capture nextRepDate for manual date reset detection
+      if (cachedIncRem && cachedIncRem.nextRepDate) {
+        pendingNextRepDateMap.set(data.remId, cachedIncRem.nextRepDate);
+      }
+
       remChangeDebounceTimer = setTimeout(async () => {
         const rem = await plugin.rem.findOne(data.remId);
         if (!rem) {
           pendingHistoryMap.delete(data.remId);
+          pendingNextRepDateMap.delete(data.remId);
           return;
         }
 
@@ -490,8 +500,54 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           await transferToDismissed(plugin, rem, pendingHistory!);
         }
 
+        // === MANUAL DATE RESET DETECTION ===
+        // Only check if still an incremental rem (powerup not removed)
+        if (hasIncremental && !hasDismissed) {
+          const oldNextRepDate = pendingNextRepDateMap.get(data.remId);
+
+          if (oldNextRepDate !== undefined) {
+            // Get the CURRENT nextRepDate from the rem itself
+            const currentIncRem = await getIncrementalRemFromRem(plugin, rem);
+
+            if (currentIncRem && currentIncRem.nextRepDate !== oldNextRepDate) {
+              // Check if this change was made by the plugin using a session flag
+              const pluginIsUpdating = await plugin.storage.getSession<boolean>('plugin_updating_srs_data');
+
+              if (!pluginIsUpdating) {
+                // Date was changed manually! Add manualDateReset event
+                console.log('[GlobalRemChanged] Manual date reset detected:', {
+                  remId: data.remId,
+                  oldDate: new Date(oldNextRepDate).toLocaleDateString(),
+                  newDate: new Date(currentIncRem.nextRepDate).toLocaleDateString()
+                });
+
+                // Calculate the new interval in days
+                const intervalDays = Math.round((currentIncRem.nextRepDate - Date.now()) / (1000 * 60 * 60 * 24));
+
+                // Add manualDateReset event to history
+                const newHistoryEntry: IncrementalRep = {
+                  date: Date.now(),
+                  scheduled: oldNextRepDate,
+                  interval: Math.max(0, intervalDays),
+                  eventType: 'manualDateReset' as const,
+                };
+
+                const updatedHistory: IncrementalRep[] = [
+                  ...(currentIncRem.history || []),
+                  newHistoryEntry,
+                ];
+
+                // Update just the history slot (date already changed by user)
+                await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(updatedHistory)]);
+                console.log('[GlobalRemChanged] Added manualDateReset event to history');
+              }
+            }
+          }
+        }
+
         // Clear pending state for this rem
         pendingHistoryMap.delete(data.remId);
+        pendingNextRepDateMap.delete(data.remId);
 
         // Original logic continues below
         const inQueue = !!(await plugin.storage.getSession(currentSubQueueIdKey));

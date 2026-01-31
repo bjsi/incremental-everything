@@ -100,6 +100,7 @@ function EditorReviewTimer() {
         daysEarlyOrLate: daysEarlyOrLate,
         reviewTimeSeconds: reviewTimeSeconds,
         priority: incRem.priority, // Record priority at time of rep
+        eventType: 'executeRepetition' as const,
       },
     ];
 

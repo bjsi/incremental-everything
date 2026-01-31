@@ -249,9 +249,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      console.log(`Opening 'reschedule' popup for remId: ${remId}`);
+      // Determine context (queue vs editor) for event type
+      const isQueue = url.includes('/flashcards');
+      const context = isQueue ? 'queue' : 'editor';
+
+      console.log(`Opening 'reschedule' popup for remId: ${remId}, context: ${context}`);
       await plugin.widget.openPopup('reschedule', {
         remId: remId,
+        context: context,
       });
     },
   });

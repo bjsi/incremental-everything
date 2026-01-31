@@ -58,13 +58,25 @@ export const IncrementalRep = z.object({
   daysEarlyOrLate: z.number().optional(),
   /**
    * Event type for this history entry:
-   * - 'rep' (default): A regular repetition/review
+   * - undefined or 'rep': A regular repetition/review (Next button)
+   * - 'rescheduledInQueue': Rescheduled during queue review (Ctrl+J in queue) - counts for interval
+   * - 'rescheduledInEditor': Rescheduled from editor (Ctrl+J in editor) - doesn't count for interval
+   * - 'manualDateReset': User manually changed the date slot - doesn't count for interval
+   * - 'executeRepetition': Execute Repetition command in editor - counts for interval
    * - 'madeIncremental': Marker for when the Rem was made Incremental
    * - 'dismissed': Marker for when the Rem was dismissed
    * 
-   * The scheduler uses this to count only reps since the last 'madeIncremental' event.
+   * The scheduler uses this to count only review events since the last 'madeIncremental' event.
    */
-  eventType: z.enum(['rep', 'madeIncremental', 'dismissed']).optional(),
+  eventType: z.enum([
+    'rep',
+    'rescheduledInQueue',
+    'rescheduledInEditor',
+    'manualDateReset',
+    'executeRepetition',
+    'madeIncremental',
+    'dismissed'
+  ]).optional(),
   /**
    * The absolute priority (0-100) at the time of this repetition
    */

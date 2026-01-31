@@ -11,13 +11,19 @@ dayjs.extend(relativeTime);
 function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
   const cleansedHistory = [];
   for (let i = 0; i < history.length; i++) {
+    // Always preserve event markers (madeIncremental, dismissed) - they should never be filtered
+    if (history[i].eventType === 'madeIncremental' || history[i].eventType === 'dismissed') {
+      cleansedHistory.push(history[i]);
+      continue;
+    }
+
     const scheduledTime = timeWhenCardAppearsInQueueFromScheduled(history, i + 1)?.getTime();
     if (
       history[i + 1]?.date != undefined &&
       scheduledTime != undefined &&
       new Date(history[i + 1]?.date).getTime() < scheduledTime
     ) {
-      // Skip
+      // Skip - this rep was followed by an early response
     } else {
       cleansedHistory.push(history[i]);
     }
@@ -30,8 +36,18 @@ function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
  * This is used for interval calculation so that after re-activating a dismissed Rem,
  * the interval calculation starts fresh rather than using the full historical count.
  * 
+ * Only events that represent actual reviews are counted:
+ * - undefined or 'rep': Normal queue review
+ * - 'rescheduledInQueue': Reschedule during queue review
+ * - 'executeRepetition': Execute repetition command in editor
+ * 
+ * Events that do NOT count:
+ * - 'rescheduledInEditor': Reschedule from editor (no review confirmed)
+ * - 'manualDateReset': Manual date change (no review)
+ * - 'madeIncremental', 'dismissed': Session markers
+ * 
  * @param history Full cleansed history array
- * @returns Only the reps (eventType undefined or 'rep') after the last 'madeIncremental' marker
+ * @returns Only the events that count for interval after the last 'madeIncremental' marker
  */
 function getRepsSinceLastMadeIncremental(history: IncrementalRep[]): IncrementalRep[] {
   // Find the index of the last 'madeIncremental' marker
@@ -48,9 +64,15 @@ function getRepsSinceLastMadeIncremental(history: IncrementalRep[]): Incremental
     ? history.slice(lastSessionStartIndex + 1)
     : history;
 
-  // Filter to only actual repetitions (eventType undefined or 'rep')
-  return entriesAfterSessionStart.filter(
-    entry => entry.eventType === undefined || entry.eventType === 'rep'
+  // Filter to only events that count for interval calculation
+  // - undefined or 'rep': Normal review
+  // - 'rescheduledInQueue': Reschedule during queue review (review happened)
+  // - 'executeRepetition': Execute repetition command (review happened)
+  return entriesAfterSessionStart.filter(entry =>
+    entry.eventType === undefined ||
+    entry.eventType === 'rep' ||
+    entry.eventType === 'rescheduledInQueue' ||
+    entry.eventType === 'executeRepetition'
   );
 }
 
@@ -162,6 +184,15 @@ export async function updateSRSDataForRem(
     console.log('failed to create date reference for date', date);
     return;
   }
+
+  // Set flag to indicate plugin is making the update (prevents manual date reset detection)
+  await plugin.storage.setSession('plugin_updating_srs_data', true);
+
   await rem?.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateReference);
   await rem?.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(newHistory)]);
+
+  // Clear flag after a short delay to account for async event processing
+  setTimeout(async () => {
+    await plugin.storage.setSession('plugin_updating_srs_data', false);
+  }, 500);
 }

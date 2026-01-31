@@ -254,8 +254,13 @@ function RepetitionHistoryPopup() {
     const { history, remName, nextRepDate, isDismissed, dismissedDate } = data;
     const totalTime = getTotalTime(history);
     const age = calculateAge(history);
-    // Count only actual repetitions, not event markers (madeIncremental, dismissed)
-    const repCount = history?.filter(h => h.eventType === undefined || h.eventType === 'rep').length || 0;
+    // Count only events that represent actual reviews (same as scheduler logic)
+    const repCount = history?.filter(h =>
+        h.eventType === undefined ||
+        h.eventType === 'rep' ||
+        h.eventType === 'rescheduledInQueue' ||
+        h.eventType === 'executeRepetition'
+    ).length || 0;
 
     // Calculate days late/early for next scheduled rep
     const now = Date.now();
@@ -393,10 +398,61 @@ function RepetitionHistoryPopup() {
                             );
                         }
 
-                        // Regular rep entry
+                        // Rescheduled in Editor - event marker (purple, no review counted)
+                        if (rep.eventType === 'rescheduledInEditor') {
+                            return (
+                                <div key={index} style={{
+                                    display: 'flex',
+                                    gridColumn: '1 / -1',
+                                    justifyContent: 'center',
+                                    backgroundColor: 'rgba(147, 51, 234, 0.1)',
+                                    color: '#9333ea',
+                                    fontWeight: 600,
+                                    fontSize: '11px',
+                                    borderRadius: '4px',
+                                    padding: '6px 8px',
+                                    margin: '4px 0',
+                                    whiteSpace: 'nowrap',
+                                }}>
+                                    📅 Rescheduled in Editor — {dayjs(rep.date).format('MMM D, YYYY')}
+                                    {rep.interval !== undefined && ` → ${rep.interval}d`}
+                                </div>
+                            );
+                        }
+
+                        // Manual Date Reset - event marker (gray, no review counted)
+                        if (rep.eventType === 'manualDateReset') {
+                            return (
+                                <div key={index} style={{
+                                    display: 'flex',
+                                    gridColumn: '1 / -1',
+                                    justifyContent: 'center',
+                                    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+                                    color: '#6b7280',
+                                    fontWeight: 600,
+                                    fontSize: '11px',
+                                    borderRadius: '4px',
+                                    padding: '6px 8px',
+                                    margin: '4px 0',
+                                    whiteSpace: 'nowrap',
+                                }}>
+                                    ✏️ Manual Date Reset — {dayjs(rep.date).format('MMM D, YYYY')}
+                                    {rep.interval !== undefined && ` → ${rep.interval}d`}
+                                </div>
+                            );
+                        }
+
+                        // Get event indicator for row display
+                        const getEventIndicator = () => {
+                            if (rep.eventType === 'rescheduledInQueue') return '📅 ';
+                            if (rep.eventType === 'executeRepetition') return '⌨️ ';
+                            return '';
+                        };
+
+                        // Regular rep entry (includes rescheduledInQueue and executeRepetition with indicators)
                         return (
                             <div key={index} style={gridRowStyle}>
-                                <span>{dayjs(rep.date).format('MMM D, YYYY')}</span>
+                                <span>{getEventIndicator()}{dayjs(rep.date).format('MMM D, YYYY')}</span>
                                 <span>{formatDuration(rep.reviewTimeSeconds || 0) || '—'}</span>
                                 <span>{rep.interval !== undefined ? `${rep.interval}d` : '—'}</span>
                                 <span>{rep.priority !== undefined ? rep.priority : '—'}</span>

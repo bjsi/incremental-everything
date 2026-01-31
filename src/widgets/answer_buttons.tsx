@@ -260,9 +260,14 @@ export function AnswerButtons() {
     if (!coreData?.incRemInfo?.history || coreData.incRemInfo.history.length === 0) {
       return { reps: 0, totalMinutes: 0 };
     }
-    // Only count real repetitions (exclude 'madeIncremental' and 'dismissed' markers)
+    // Only count real repetitions (events that count for interval calculation)
+    // Includes: undefined, 'rep', 'rescheduledInQueue', 'executeRepetition'
+    // Excludes: 'madeIncremental', 'dismissed', 'rescheduledInEditor', 'manualDateReset'
     const realReps = coreData.incRemInfo.history.filter(
-      h => h.eventType === undefined || h.eventType === 'rep'
+      h => h.eventType === undefined ||
+        h.eventType === 'rep' ||
+        h.eventType === 'rescheduledInQueue' ||
+        h.eventType === 'executeRepetition'
     );
     const reps = realReps.length;
     const totalSeconds = realReps.reduce((total, rep) => total + (rep.reviewTimeSeconds || 0), 0);

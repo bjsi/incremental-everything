@@ -20,7 +20,8 @@ async function handleRescheduleAndPriorityUpdate(
   plugin: RNPlugin,
   remId: string,
   intervalDays: number,
-  newPriority: number
+  newPriority: number,
+  context: 'queue' | 'editor' = 'queue'
 ) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) return;
@@ -39,9 +40,15 @@ async function handleRescheduleAndPriorityUpdate(
   const wasEarly = daysDifference < 0;
   const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
 
-  // Calculate review time (same as Next button does)
-  const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-  const reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
+  // Calculate review time only for queue context (editor reschedule doesn't imply actual review)
+  let reviewTimeSeconds: number | undefined;
+  if (context === 'queue') {
+    const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+    reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
+  }
+
+  // Determine event type based on context
+  const eventType = context === 'queue' ? 'rescheduledInQueue' : 'rescheduledInEditor';
 
   const newHistory: IncrementalRep[] = [
     ...(incRem.history || []),
@@ -53,6 +60,7 @@ async function handleRescheduleAndPriorityUpdate(
       daysEarlyOrLate: daysEarlyOrLate,
       reviewTimeSeconds: reviewTimeSeconds,
       priority: incRem.priority, // Record priority at time of rep
+      eventType: eventType as 'rescheduledInQueue' | 'rescheduledInEditor',
     },
   ];
 
@@ -63,16 +71,18 @@ async function handleRescheduleAndPriorityUpdate(
     await updateIncrementalRemCache(plugin, updatedIncRem);
   }
 
-  // Clear the start time (same as Next button does)
-  await plugin.storage.setSession(incremReviewStartTimeKey, null);
+  // Clear the start time (only relevant for queue context)
+  if (context === 'queue') {
+    await plugin.storage.setSession(incremReviewStartTimeKey, null);
+    await plugin.queue.removeCurrentCardFromQueue();
+  }
 
-  await plugin.queue.removeCurrentCardFromQueue();
   await plugin.widget.closePopup();
 }
 
 
 
-const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin, remId }) => {
+const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'queue' | 'editor' }> = ({ plugin, remId, context }) => {
   const [days, setDays] = useState<string | null>(null);
   const [priority, setPriority] = useState<number | null>(null);
   const [futureDate, setFutureDate] = useState('');
@@ -158,7 +168,7 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin
     e.preventDefault();
     const numDays = parseInt(days || '');
     if (!isNaN(numDays) && priority !== null) {
-      await handleRescheduleAndPriorityUpdate(plugin, remId, numDays, priority);
+      await handleRescheduleAndPriorityUpdate(plugin, remId, numDays, priority, context);
     }
   };
 
@@ -284,6 +294,7 @@ export function Reschedule() {
   );
 
   const remId = ctx?.contextData?.remId;
+  const context = (ctx?.contextData?.context as 'queue' | 'editor') || 'queue';
 
   if (!remId) {
     return null;
@@ -319,7 +330,7 @@ export function Reschedule() {
           onClick={() => plugin.widget.closePopup()}
         >✕</button>
       </div>
-      <RescheduleInput plugin={plugin} remId={remId} />
+      <RescheduleInput plugin={plugin} remId={remId} context={context} />
     </div>
   );
 }
