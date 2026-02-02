@@ -8,7 +8,7 @@ import {
   nextRepDateSlotCode,
 } from './consts';
 import { IncrementalRem } from './incremental_rem';
-import { calculateRelativePercentile } from './utils';
+import { calculateRelativePercentile, calculateVolumeBasedPercentile } from './utils';
 import * as _ from 'remeda';
 import { CardPriorityInfo } from './card_priority';
 
@@ -54,13 +54,18 @@ export async function calculateCardPriorityShield(
   if (unreviewedDueKb.length > 0) {
     const topMissedInKb = _.minBy(unreviewedDueKb, (info) => info.priority);
     if (topMissedInKb) {
-      const percentile = calculateRelativePercentile(allPrioritizedCardInfo, topMissedInKb.remId);
-      
+      const percentile = calculateVolumeBasedPercentile(
+        allPrioritizedCardInfo,
+        topMissedInKb.priority,
+        (info) => info.dueCards > 0 && (!seenRemIds.includes(info.remId) || info.remId === currentRemId)
+      );
+
       status.kb = {
         absolute: topMissedInKb.priority,
-        percentile: percentile === null ? 100 : percentile,
+        percentile: percentile,
         universeSize: allPrioritizedCardInfo.length, // NEW: Track KB universe size
       };
+      console.log(`[CardPriorityShield] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${percentile}%, Universe ${allPrioritizedCardInfo.length}`);
     }
   } else if (allPrioritizedCardInfo.length > 0) {
     // Even if no unreviewed due cards, still track universe size
@@ -75,30 +80,30 @@ export async function calculateCardPriorityShield(
   // --- NEW: Use originalScopeId if available (for Priority Review Documents) ---
   const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
   const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
-  
+
   // Use originalScopeId if it exists (Priority Review Document case), otherwise use subQueueId
   const effectiveScopeId = originalScopeId || subQueueId;
-  
+
   if (effectiveScopeId) {
     const scopeRem = await plugin.rem.findOne(effectiveScopeId);
     if (scopeRem) {
       console.log('[CardPriorityShield] Building comprehensive document scope...');
-      
+
       if (originalScopeId) {
         console.log('[CardPriorityShield] Using original scope from Priority Review Document:', originalScopeId);
       }
-      
+
       // --- COMPREHENSIVE SCOPE CALCULATION (same as before) ---
       const descendants = await scopeRem.getDescendants();
       const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
       const folderQueueRems = await scopeRem.allRemInFolderQueue();
       const sources = await scopeRem.getSources();
-      
+
       const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
         powerupCode,
         nextRepDateSlotCode
       );
-      
+
       const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
         if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
           return rem.parent;
@@ -106,7 +111,7 @@ export async function calculateCardPriorityShield(
           return rem._id;
         }
       }).filter(id => id !== null && id !== undefined) as RemId[];
-      
+
       const scopeRemIds = new Set<RemId>([
         scopeRem._id,
         ...descendants.map(r => r._id),
@@ -115,17 +120,17 @@ export async function calculateCardPriorityShield(
         ...sources.map(r => r._id),
         ...referencingRems
       ]);
-      
+
       console.log(`[CardPriorityShield] Comprehensive scope: ${scopeRemIds.size} rems`);
       console.log(`[CardPriorityShield]  - Descendants: ${descendants.length}`);
       console.log(`[CardPriorityShield]  - Document/portal: ${allRemsInContext.length}`);
       console.log(`[CardPriorityShield]  - Folder queue: ${folderQueueRems.length}`);
       console.log(`[CardPriorityShield]  - Sources: ${sources.length}`);
       console.log(`[CardPriorityShield]  - References: ${referencingRems.length}`);
-      
+
       // Filter the main cache to get only the cards in the current document scope.
       const docPrioritizedCardInfo = allPrioritizedCardInfo.filter(info => scopeRemIds.has(info.remId));
-      
+
       // Now find unreviewed due cards within this smaller, document-scoped list.
       const unreviewedDueDoc = docPrioritizedCardInfo.filter(
         (info) => info.dueCards > 0 && (!seenRemIds.includes(info.remId) || info.remId === currentRemId)
@@ -134,13 +139,18 @@ export async function calculateCardPriorityShield(
       if (unreviewedDueDoc.length > 0) {
         const topMissedInDoc = _.minBy(unreviewedDueDoc, (info) => info.priority);
         if (topMissedInDoc) {
-          const percentile = calculateRelativePercentile(docPrioritizedCardInfo, topMissedInDoc.remId);
+          const percentile = calculateVolumeBasedPercentile(
+            docPrioritizedCardInfo,
+            topMissedInDoc.priority,
+            (info) => info.dueCards > 0 && (!seenRemIds.includes(info.remId) || info.remId === currentRemId)
+          );
 
           status.doc = {
             absolute: topMissedInDoc.priority,
-            percentile: percentile === null ? 100 : percentile,
+            percentile: percentile,
             universeSize: docPrioritizedCardInfo.length, // NEW: Track doc universe size
           };
+          console.log(`[CardPriorityShield] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${percentile}%, Universe ${docPrioritizedCardInfo.length}`);
         }
       } else if (docPrioritizedCardInfo.length > 0) {
         // Even if no unreviewed due cards, still track universe size
@@ -169,17 +179,17 @@ export async function calculatePriorityShield(
 
   const allRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
   const seenRemIds = (await plugin.storage.getSession<RemId[]>(seenRemInSessionKey)) || [];
-  
+
   // --- NEW: Use originalScopeId if available (for Priority Review Documents) ---
   const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
   const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
   const effectiveScopeId = originalScopeId || subQueueId;
-  
+
   // --- MODIFIED: Get docScopeRemIds based on effective scope ---
   // Note: The currentScopeRemIdsKey might contain the item selection scope for Priority Review Documents
   // For priority shield calculations, we need to use the original document scope
   let docScopeRemIds: RemId[] | null = null;
-  
+
   if (effectiveScopeId) {
     // If we have an effectiveScopeId, we should recalculate the comprehensive scope
     // to ensure it matches the original document, not the Priority Review Document
@@ -189,12 +199,12 @@ export async function calculatePriorityShield(
       const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
       const folderQueueRems = await scopeRem.allRemInFolderQueue();
       const sources = await scopeRem.getSources();
-      
+
       const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
         powerupCode,
         nextRepDateSlotCode
       );
-      
+
       const referencingRems = ((await scopeRem.remsReferencingThis()) || []).map((rem) => {
         if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
           return rem.parent;
@@ -202,7 +212,7 @@ export async function calculatePriorityShield(
           return rem._id;
         }
       }).filter(id => id !== null && id !== undefined) as RemId[];
-      
+
       const scopeRemIds = new Set<RemId>([
         scopeRem._id,
         ...descendants.map(r => r._id),
@@ -211,9 +221,9 @@ export async function calculatePriorityShield(
         ...sources.map(r => r._id),
         ...referencingRems
       ]);
-      
+
       docScopeRemIds = Array.from(scopeRemIds);
-      
+
       if (originalScopeId) {
         console.log('[PriorityShield] Using original scope from Priority Review Document:', originalScopeId);
       }
@@ -241,13 +251,18 @@ export async function calculatePriorityShield(
   const topMissedInKb = _.minBy(unreviewedDueRems, (rem) => rem.priority);
   if (topMissedInKb) {
     status.kb.absolute = topMissedInKb.priority;
-    status.kb.percentile = calculateRelativePercentile(allRems, topMissedInKb.remId);
+    status.kb.percentile = calculateVolumeBasedPercentile(
+      allRems,
+      topMissedInKb.priority,
+      (rem) => (Date.now() >= rem.nextRepDate && !seenRemIds.includes(rem.remId)) || rem.remId === currentRemId
+    );
+    console.log(`[PriorityShield] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${status.kb.percentile}%, Universe ${allRems.length}`);
   }
 
   const scopeIds = docScopeRemIds;
   if (scopeIds && scopeIds.length > 0) {
     const scopedRems = allRems.filter((rem) => scopeIds.includes(rem.remId));
-    
+
     // Track doc universe size
     status.doc.universeSize = scopedRems.length;
 
@@ -261,7 +276,12 @@ export async function calculatePriorityShield(
       const topMissedInDoc = _.minBy(unreviewedDueInScope, (rem) => rem.priority);
       if (topMissedInDoc) {
         status.doc.absolute = topMissedInDoc.priority;
-        status.doc.percentile = calculateRelativePercentile(scopedRems, topMissedInDoc.remId);
+        status.doc.percentile = calculateVolumeBasedPercentile(
+          scopedRems,
+          topMissedInDoc.priority,
+          (rem) => (Date.now() >= rem.nextRepDate && !seenRemIds.includes(rem.remId)) || rem.remId === currentRemId
+        );
+        console.log(`[PriorityShield] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${status.doc.percentile}%, Universe ${scopedRems.length}`);
       }
     }
   }

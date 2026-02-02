@@ -12,9 +12,10 @@ import {
   cardPriorityCacheRefreshKey,
   displayPriorityShieldId,
   seenCardInSessionKey,
+  priorityCalcScopeRemIdsKey,
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
-import { PERFORMANCE_MODE_LIGHT } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge } from '../components';
 import * as _ from 'remeda';
@@ -37,7 +38,8 @@ function computeShieldStatus(
   remId: string | undefined,
   sessionCache: QueueSessionCache | null,
   allPrioritizedCardInfo: CardPriorityInfo[] | null,
-  seenRemIds: string[]
+  seenRemIds: string[],
+  scopeRemIds: string[] | null
 ): ShieldStatus {
   if (!remId || !sessionCache) return null;
 
@@ -47,15 +49,35 @@ function computeShieldStatus(
   const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.dueCardsInKB), (info) => info.priority);
   const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.dueCardsInScope), (info) => info.priority);
 
-  const kbPercentile =
-    topMissedInKb?.kbPercentile ??
-    (topMissedInKb
-      ? allPrioritizedCardInfo?.find((c) => c.remId === topMissedInKb.remId)?.kbPercentile
-      : undefined);
+  const predicate = (info: CardPriorityInfo) => info.dueCards > 0 && (!seenRemIds.includes(info.remId) || info.remId === remId);
 
-  const docPercentile = topMissedInDoc
-    ? sessionCache.docPercentiles[topMissedInDoc.remId]
-    : undefined;
+  let kbPercentile: number | undefined;
+  if (topMissedInKb && allPrioritizedCardInfo) {
+    kbPercentile = calculateVolumeBasedPercentile(
+      allPrioritizedCardInfo,
+      topMissedInKb.priority,
+      predicate
+    );
+    // console.log(`[Display] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allPrioritizedCardInfo.length}`);
+  }
+
+  let docPercentile: number | undefined;
+  if (topMissedInDoc && allPrioritizedCardInfo && scopeRemIds) {
+    const scopeSet = new Set(scopeRemIds);
+    const allCardsInScope = allPrioritizedCardInfo.filter(c => scopeSet.has(c.remId));
+    if (allCardsInScope.length > 0) {
+      docPercentile = calculateVolumeBasedPercentile(
+        allCardsInScope,
+        topMissedInDoc.priority,
+        predicate
+      );
+      console.log(`[Display] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allCardsInScope.length}`);
+    }
+  }
+
+  if (topMissedInKb && kbPercentile !== undefined) {
+    console.log(`[CardPriorityShield] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allPrioritizedCardInfo?.length}`);
+  }
 
   return {
     kb: topMissedInKb
@@ -110,6 +132,11 @@ export function CardPriorityDisplay() {
     return (await rp.rem.findOne(ctx.remId)) ?? null;
   }, []);
 
+  const scopeRemIds = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string[] | null>(priorityCalcScopeRemIdsKey),
+    []
+  );
+
   const isIncRem = useTrackerPlugin(async (_rp) => {
     if (!rem) {
       return false;
@@ -159,8 +186,8 @@ export function CardPriorityDisplay() {
   // Percentiles are looked up from the main cache to stay fresh.
   const shieldStatus = useMemo(() => {
     if (useLightMode || !rem || !sessionCache) return null;
-    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds);
-  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds]);
+    return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds, scopeRemIds);
+  }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds]);
 
 
   // --- 🔌 ON-DEMAND PATH (Light Mode) ---
@@ -227,13 +254,13 @@ export function CardPriorityDisplay() {
               {shieldStatus.kb && (
                 <span>
                   KB: <PriorityBadge priority={shieldStatus.kb.absolute} percentile={shieldStatus.kb.percentile} compact />
-                  {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile}%)`}
+                  {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile.toFixed(1)}%)`}
                 </span>
               )}
               {shieldStatus.doc && (
                 <span>
                   Doc: <PriorityBadge priority={shieldStatus.doc.absolute} percentile={shieldStatus.doc.percentile} compact />
-                  {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile}%)`}
+                  {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile.toFixed(1)}%)`}
                 </span>
               )}
             </div>

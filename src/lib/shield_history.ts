@@ -1,7 +1,7 @@
 import { ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
 import dayjs from 'dayjs';
 import * as _ from 'remeda';
-import { calculateRelativePercentile } from './utils';
+import { calculateVolumeBasedPercentile } from './utils';
 import { IncrementalRem } from './incremental_rem';
 import { CardPriorityInfo } from './card_priority';
 
@@ -48,7 +48,9 @@ function filterUnreviewedDue<T extends PriorityItem>(
  */
 function calculateShieldStatus<T extends PriorityItem>(
   allItems: T[],
-  unreviewedDue: T[]
+  unreviewedDue: T[],
+  isDue: (item: T) => boolean,
+  seenIds: string[]
 ): ShieldHistoryEntry {
   const status: ShieldHistoryEntry = {
     absolute: null,
@@ -60,7 +62,11 @@ function calculateShieldStatus<T extends PriorityItem>(
     const topMissed = _.minBy(unreviewedDue, item => item.priority);
     if (topMissed) {
       status.absolute = topMissed.priority;
-      status.percentile = calculateRelativePercentile(allItems, topMissed.remId);
+      status.percentile = calculateVolumeBasedPercentile(
+        allItems,
+        topMissed.priority,
+        (item) => isDue(item) && !seenIds.includes(item.remId)
+      );
     }
   }
 
@@ -135,7 +141,7 @@ export async function saveKBShield<T extends PriorityItem>(
 
   const today = dayjs().format('YYYY-MM-DD');
   const unreviewedDue = filterUnreviewedDue(allItems, isDue, seenIds);
-  const status = calculateShieldStatus(allItems, unreviewedDue);
+  const status = calculateShieldStatus(allItems, unreviewedDue, isDue, seenIds);
 
   await saveKBShieldHistory(plugin, storageKey, status, today);
   console.log(`[QueueExit] Saved KB ${label} shield:`, status);
@@ -170,14 +176,15 @@ export async function saveDocumentShield<T extends PriorityItem>(
 
   console.log(`[QueueExit] Processing ${label} document shield with PRIORITY CALC scope:`, scopeRemIds.length, 'rems');
 
-  const scopedItems = allItems.filter(item => scopeRemIds.includes(item.remId));
+  const scopeSet = new Set(scopeRemIds);
+  const scopedItems = allItems.filter(item => scopeSet.has(item.remId));
   console.log(`[QueueExit] Found ${scopedItems.length} ${label} items in priority calculation scope`);
 
   const unreviewedDueInScope = filterUnreviewedDue(scopedItems, isDue, seenIds);
   console.log(`[QueueExit] Found ${unreviewedDueInScope.length} due ${label} items in priority calculation scope`);
 
   const today = dayjs().format('YYYY-MM-DD');
-  const status = calculateShieldStatus(scopedItems, unreviewedDueInScope);
+  const status = calculateShieldStatus(scopedItems, unreviewedDueInScope, isDue, seenIds);
 
   await saveScopedShieldHistory(plugin, storageKey, historyKey, status, today);
   console.log(
