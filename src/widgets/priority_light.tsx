@@ -11,6 +11,7 @@ import {
     prioritySlotCode,
     defaultPriorityId,
     defaultCardPriorityId,
+    cardPriorityCacheRefreshKey,
 } from '../lib/consts';
 import {
     CARD_PRIORITY_CODE,
@@ -82,9 +83,10 @@ function PriorityLight() {
             incPriority: incPStr ? parseInt(incPStr) : null,
             cardPriority: cardPriorityVal, // correctly resolved number
             hasIncPowerup,
-            // Robust check: Valid if has powerup OR if we found a value in the slot
             hasCardPowerup: hasCardPowerup || !!cardPStr,
             hasCards,
+            cardCount: cards.length,
+            dueCards: cards.filter(c => (c.nextRepetitionTime ?? Infinity) <= Date.now()).length,
             defaults: {
                 inc: defaultInc || 50,
                 card: 50 // inherited/default handled by cardPriorityVal
@@ -174,18 +176,30 @@ function PriorityLight() {
                 promises.push(setCardPriority(plugin, data.rem, effectiveCard, 'manual', true));
 
                 // Optimistic Cache Update
-                updateCardPriorityCache(plugin, data.rem._id, true, { remId: data.rem._id, priority: effectiveCard, source: 'manual' } as any);
+                // We provide cardCount and dueCards from our initial fetch to avoid a DB read in the cache updater.
+                // This allows the update to be synchronous, ensuring flushLightCacheUpdates picks it up immediately.
+                updateCardPriorityCache(plugin, data.rem._id, true, {
+                    remId: data.rem._id,
+                    priority: effectiveCard,
+                    source: 'manual',
+                    cardCount: data.cardCount,
+                    dueCards: data.dueCards,
+                } as any);
 
                 // FLUSH IMMEDIATELY to resolve race condition and signal listeners
                 // This replaces the manual 'cardPriorityCacheRefreshKey' set
                 flushLightCacheUpdates(plugin).catch(console.error);
+
+                // Explicitly signal refresh as a fail-safe (mirrors priority.tsx behavior)
+                plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
             }
         }
 
-        // Ensure all DB writes are at least triggered (caught to avoid unhandled rejections)
-        Promise.all(promises).catch(e => console.error("Error saving priority:", e));
+        // Ensure all DB writes are completed before closing to prevent race conditions
+        // where the background listener consumes stale data.
+        await Promise.all(promises).catch(e => console.error("Error saving priority:", e));
 
-        // Close immediately
+        // Close immediately after save
         plugin.widget.closePopup();
     }, [data, incVal, cardVal, plugin]);
 
