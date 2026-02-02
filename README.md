@@ -2,6 +2,9 @@
 
 ![Incremental Everything Logo](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-logo.png)
 
+🇪🇸 [Español](https://github.com/bjsi/incremental-everything/blob/main/README_ES.md) | 🇧🇷 [Português Brasileiro](https://github.com/bjsi/incremental-everything/blob/main/README_PT-BR.md)
+
+
 **A Complete Learning System for RemNote.**
 
 Incremental Everything allows you to interleave your flashcard reviews with notes, books, websites, and videos. Heavily inspired by SuperMemo's [Incremental Reading](https://supermemo.guru/wiki/Incremental_reading), it transforms RemNote into a powerful lifelong learning tool that handles the entire lifecycle of knowledge: **Acquisition → Processing → Mastery**.
