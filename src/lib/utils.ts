@@ -70,6 +70,7 @@ export function percentileToHslColor(percentile: number): string {
   return `hsl(${hue}, ${saturation}, ${lightness})`;
 }
 
+
 /**
  * Calculates the percentile rank of an item's priority within a list.
  * Generic function that works with any type that has priority and remId properties.
@@ -93,6 +94,59 @@ export function calculateRelativePercentile<T extends { priority: number; remId:
   }
 
   const percentile = ((index + 1) / sortedItems.length) * 100;
+  return Math.round(percentile * 10) / 10;
+}
+
+/**
+ * Calculates a "volume-aware" percentile rank for a priority shield.
+ * Unlike standard percentile which depends on the exact position of a specific item,
+ * this calculation treats all items with the same priority as a block.
+ *
+ * The rank is calculated as:
+ * Rank = (Count of Higher Priority Items) + (Count of Non-Due Items with Same Priority)
+ *
+ * This ensures that as you complete items with the *same* priority, the shield naturally moves up.
+ *
+ * @param allItems The full list of items in the universe (KB or Doc scope).
+ * @param topMissedPriority The priority value of the "top missed" item (the shield's current level).
+ * @param isDuePredicate A function to determine if an item is currently "due" (unreviewed).
+ * @returns A number from 1-100 representing the completion progress.
+ */
+export function calculateVolumeBasedPercentile<T extends { priority: number }>(
+  allItems: T[],
+  topMissedPriority: number,
+  isDuePredicate: (item: T) => boolean
+): number {
+  if (!allItems || allItems.length === 0) {
+    return 100; // Empty universe is considered complete/100%
+  }
+
+  // 1. Count items with strictly higher priority (lower priority value number)
+  const higherPriorityCount = allItems.filter((x) => x.priority < topMissedPriority).length;
+
+  // 2. Count items with the SAME priority that are ALREADY PROCESSED (not due)
+  // We want to give credit for the work done *within* this priority block.
+  // Note: We assume "topMissedPriority" is the level where the first due item exists.
+  // So any item with this priority that is NOT due is considered "behind us" (processed).
+  const samePriorityProcessedCount = allItems.filter(
+    (x) => x.priority === topMissedPriority && !isDuePredicate(x)
+  ).length;
+
+  // 3. Current Rank in the processed queue
+  // If we have 100 items total:
+  // - 10 are Priority 1 (all done) -> higherPriorityCount = 10
+  // - 50 are Priority 2.
+  //   - Current Shield is at Priority 2.
+  //   - 20 of them are NOT due (processed).
+  //   - 30 of them ARE due.
+  // Rank = 10 (higher) + 20 (same processed) = 30.
+  const currentRank = higherPriorityCount + samePriorityProcessedCount;
+
+  // 4. Calculate Percentile
+  // 30 / 100 = 30%.
+  const percentile = (currentRank / allItems.length) * 100;
+
+  // Round to 1 decimal place
   return Math.round(percentile * 10) / 10;
 }
 

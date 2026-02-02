@@ -21,12 +21,13 @@ import {
   displayPriorityShieldId,
   seenRemInSessionKey,
   remnoteEnvironmentId,
-  queueSessionCacheKey
+  queueSessionCacheKey,
+  priorityCalcScopeRemIdsKey
 } from '../lib/consts';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetitionManualOffset, updateReviewRemData } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
+import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
@@ -177,6 +178,11 @@ export function AnswerButtons() {
     []
   );
 
+  const scopeRemIds = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string[] | null>(priorityCalcScopeRemIdsKey),
+    []
+  );
+
   const baseData = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
     if (!ctx?.remId) return null;
@@ -221,14 +227,40 @@ export function AnswerButtons() {
     );
     const topMissedInDoc = _.minBy(unreviewedDueDoc, (r) => r.priority);
 
+    const kbPercentile = topMissedInKb ? calculateVolumeBasedPercentile(
+      allIncRems,
+      topMissedInKb.priority,
+      (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
+    ) : null;
+
+    if (topMissedInKb) {
+      console.log(`[AnswerButtons] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allIncRems.length}`);
+    }
+
+
+    // DOC Shield Calculation
+    let docPercentile: number | null = null;
+    if (topMissedInDoc && scopeRemIds) {
+      const scopeSet = new Set(scopeRemIds);
+      const allIncRemsInScope = allIncRems.filter(r => scopeSet.has(r.remId));
+      if (allIncRemsInScope.length > 0) {
+        docPercentile = calculateVolumeBasedPercentile(
+          allIncRemsInScope,
+          topMissedInDoc.priority,
+          (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
+        );
+        console.log(`[AnswerButtons] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allIncRemsInScope.length}`);
+      }
+    }
+
     return {
       kb: topMissedInKb ? {
         absolute: topMissedInKb.priority,
-        percentile: calculateRelativePercentile(allIncRems, topMissedInKb.remId),
+        percentile: kbPercentile ?? null,
       } : null,
       doc: topMissedInDoc ? {
         absolute: topMissedInDoc.priority,
-        percentile: sessionCache.incRemDocPercentiles?.[topMissedInDoc.remId] ?? null,
+        percentile: docPercentile,
       } : null,
     };
   }, [shouldDisplayShield, coreData?.sessionCache, allIncRems, coreData?.rem?._id, useLightMode]);
@@ -646,14 +678,14 @@ export function AnswerButtons() {
                   <div style={{ display: 'flex', gap: '12px' }}>
                     {shieldStatusAsync.kb ? (
                       <span>
-                        KB: <strong>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile}%)
+                        KB: <strong>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile?.toFixed(1)}%)
                       </span>
                     ) : (
                       <span>KB: 100%</span>
                     )}
                     {shieldStatusAsync.doc ? (
                       <span>
-                        Doc: <strong>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile}%)
+                        Doc: <strong>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile?.toFixed(1)}%)
                       </span>
                     ) : (
                       sessionCache?.dueIncRemsInScope && <span>Doc: 100%</span>
