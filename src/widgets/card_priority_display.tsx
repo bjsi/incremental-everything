@@ -97,6 +97,7 @@ function computeShieldStatus(
 }
 
 export function CardPriorityDisplay() {
+  // console.log('[CardPriorityDisplay] Mounting/Rendering');
   const plugin = usePlugin();
 
   // ✅ Use the centralized function that handles mobile AND web detection
@@ -137,12 +138,7 @@ export function CardPriorityDisplay() {
     []
   );
 
-  const isIncRem = useTrackerPlugin(async (_rp) => {
-    if (!rem) {
-      return false;
-    }
-    return rem.hasPowerup(powerupCode);
-  }, [rem]);
+
 
 
   // --- 🔌 CACHE-BASED PATH (Full Mode) ---
@@ -169,11 +165,11 @@ export function CardPriorityDisplay() {
   );
 
   const cardInfo = useMemo(() => {
-    if (useLightMode || !rem || isIncRem || !allPrioritizedCardInfo) {
+    if (useLightMode || !rem || !allPrioritizedCardInfo) {
       return null;
     }
     return allPrioritizedCardInfo.find(info => info.remId === rem._id);
-  }, [rem, isIncRem, allPrioritizedCardInfo, useLightMode]);
+  }, [rem, allPrioritizedCardInfo, useLightMode]);
 
   const docPercentile = useMemo(() => {
     if (useLightMode || !rem || !sessionCache?.docPercentiles) return null;
@@ -192,16 +188,31 @@ export function CardPriorityDisplay() {
 
   // --- 🔌 ON-DEMAND PATH (Light Mode) ---
   const lightCardInfo = useTrackerPlugin(async (rp) => {
-    if (!useLightMode || !rem || isIncRem) return null;
+    if (!useLightMode || !rem) return null;
     // Fetch priority directly, on-demand. This is fast for a single rem.
     return await getCardPriority(rp, rem);
-  }, [useLightMode, rem, isIncRem, refreshSignal]);
+  }, [useLightMode, rem, refreshSignal]);
 
 
   // --- 🔌 COMBINE RESULTS ---
   const finalCardInfo = useLightMode ? lightCardInfo : cardInfo;
 
-  if (!rem || isIncRem || !finalCardInfo) {
+  // console.log('[CardPriorityDisplay] Critical State Check:', {
+  //   remId: rem?._id,
+  //   useLightMode,
+  //   hasFinalCardInfo: !!finalCardInfo,
+  //   allPrioritizedCardInfoLength: allPrioritizedCardInfo?.length,
+  //   sessionCachePresent: !!sessionCache,
+  //   effectiveMode
+  // });
+
+  // Widget behaves according to QueueItemType.Flashcard filter (see registerWidget)
+  // This means it naturally hides during Incremental Rem queue turns
+  if (!rem || !finalCardInfo) {
+    // console.warn('[CardPriorityDisplay] Widget not shown. Reason:', {
+    //   missingRem: !rem,
+    //   missingCardInfo: !finalCardInfo
+    // });
     return null;
   }
 

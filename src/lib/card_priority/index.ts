@@ -147,13 +147,13 @@ export async function setCardPriority(
 export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): Promise<number> {
   const existingPriority = await getCardPriority(plugin, rem);
 
-  if (existingPriority && existingPriority.source === 'manual') {
+  if (existingPriority && (existingPriority.source === 'manual' || existingPriority.source === 'incremental')) {
     return existingPriority.priority;
   }
 
   const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
   if (incRemInfo) {
-    await setCardPriority(plugin, rem, incRemInfo.priority, 'inherited');
+    await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
     return incRemInfo.priority;
   }
 
@@ -182,13 +182,13 @@ export async function calculateNewPriority(
   rem: PluginRem,
   existingPriority: CardPriorityInfo | null = null
 ): Promise<{ priority: number; source: PrioritySource }> {
-  if (existingPriority && existingPriority.source === 'manual') {
-    return { priority: existingPriority.priority, source: 'manual' };
+  if (existingPriority && (existingPriority.source === 'manual' || existingPriority.source === 'incremental')) {
+    return { priority: existingPriority.priority, source: existingPriority.source };
   }
 
   const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
   if (incRemInfo) {
-    return { priority: incRemInfo.priority, source: 'inherited' };
+    return { priority: incRemInfo.priority, source: 'incremental' };
   }
 
   const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
@@ -224,7 +224,7 @@ export async function updateInheritedPriorities(
 
     const cardInfo = await getCardPriority(plugin, descendant);
 
-    if (!cardInfo || cardInfo.source !== 'manual') {
+    if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
       const closerAncestor = await findClosestAncestorWithPriority(plugin, descendant);
 
       if (!closerAncestor || closerAncestor.priority === newPriority) {
@@ -515,7 +515,7 @@ export async function batchUpdateInheritedPriorities(
         if (incInfo) return;
 
         const cardInfo = await getCardPriority(plugin, descendant);
-        if (!cardInfo || cardInfo.source !== 'manual') {
+        if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
           const closerAncestor = await findClosestAncestorWithPriority(plugin, descendant);
           if (!closerAncestor || closerAncestor.priority === newPriority) {
             await setCardPriority(plugin, descendant, newPriority, 'inherited');
