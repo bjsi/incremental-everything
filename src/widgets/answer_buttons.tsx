@@ -68,8 +68,8 @@ const handleCardPriorityInheritance = async (
 
     if (useLightMode) {
       // In Light Mode, skip expensive flashcard checking and add cardPriority directly
-      await setCardPriority(plugin, rem, incRemInfo.priority, 'manual');
-      console.log(`[Done Button] ⚡ Light Mode: Set card priority ${incRemInfo.priority} without flashcard check. Total time: ${Date.now() - startTime}ms.`);
+      await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
+      console.log(`[Done Button] ⚡ Light Mode: Set card priority ${incRemInfo.priority} (source: incremental) without flashcard check. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
 
@@ -77,8 +77,8 @@ const handleCardPriorityInheritance = async (
     const remCards = await rem.getCards();
     if (remCards && remCards.length > 0) {
       // Rem has its own flashcards, set card priority
-      await setCardPriority(plugin, rem, incRemInfo.priority, 'manual');
-      console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} for Rem with direct flashcards. Total time: ${Date.now() - startTime}ms.`);
+      await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
+      console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} (source: incremental) for Rem with direct flashcards. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
 
@@ -110,8 +110,8 @@ const handleCardPriorityInheritance = async (
       // Check if any descendant in this batch has flashcards
       if (batchResults.some(hasCards => hasCards)) {
         // Found at least one descendant with flashcards
-        await setCardPriority(plugin, rem, incRemInfo.priority, 'manual');
-        console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} for Rem with descendant flashcards. Found in batch starting at index ${i}. Total time: ${Date.now() - startTime}ms.`);
+        await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
+        console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} (source: incremental) for Rem with descendant flashcards. Found in batch starting at index ${i}. Total time: ${Date.now() - startTime}ms.`);
         return; // Early termination
       }
       console.log(`[Done Button] Batch ${Math.floor(i / BATCH_SIZE) + 1} clear. Moving to next batch...`);

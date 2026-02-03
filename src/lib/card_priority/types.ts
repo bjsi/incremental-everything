@@ -6,7 +6,7 @@ export const PRIORITY_SLOT = 'priority';
 export const SOURCE_SLOT = 'prioritySource';
 export const LAST_UPDATED_SLOT = 'lastUpdated';
 
-export type PrioritySource = 'manual' | 'inherited' | 'default';
+export type PrioritySource = 'manual' | 'inherited' | 'default' | 'incremental';
 
 export interface CardPriorityInfo {
   remId: string;

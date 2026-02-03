@@ -53,20 +53,20 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
 
       const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
       const now = Date.now();
-      console.log('⏰ TIMER CHECK:', {
-        noIncRemTimerEnd,
-        now,
-        isTimerActive: noIncRemTimerEnd && noIncRemTimerEnd > now,
-        timerWillExpireIn: noIncRemTimerEnd
-          ? Math.ceil((noIncRemTimerEnd - now) / 1000) + ' seconds'
-          : 'no timer set',
-      });
+      // console.log('⏰ TIMER CHECK:', {
+      //   noIncRemTimerEnd,
+      //   now,
+      //   isTimerActive: noIncRemTimerEnd && noIncRemTimerEnd > now,
+      //   timerWillExpireIn: noIncRemTimerEnd
+      //     ? Math.ceil((noIncRemTimerEnd - now) / 1000) + ' seconds'
+      //     : 'no timer set',
+      // });
 
       const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > now;
 
       if (isTimerActive) {
         const remainingSeconds = Math.ceil((noIncRemTimerEnd - now) / 1000);
-        console.log('⚠️ TIMER IS ACTIVE - BLOCKING INCREM! Time remaining:', remainingSeconds, 'seconds');
+        // console.log('⚠️ TIMER IS ACTIVE - BLOCKING INCREM! Time remaining:', remainingSeconds, 'seconds');
 
         await plugin.app.registerCSS(queueLayoutFixId, '');
         await plugin.app.registerCSS(queueCounterId, '');
@@ -86,17 +86,17 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
 
       if (queueInfo.subQueueId && docScopeRemIds === null) {
-        console.log('⚠️ GetNextCard: Session cache not ready yet. Calculating scope on-the-fly...');
+        // console.log('⚠️ GetNextCard: Session cache not ready yet. Calculating scope on-the-fly...');
 
         const itemSelectionScope = await buildDocumentScope(plugin, queueInfo.subQueueId);
 
         if (itemSelectionScope.size === 0) {
-          console.log('❌ GetNextCard: Could not build scope. Returning null.');
+          // console.log('❌ GetNextCard: Could not build scope. Returning null.');
           return null;
         }
 
         docScopeRemIds = Array.from(itemSelectionScope);
-        console.log(`✅ GetNextCard: Calculated on-the-fly scope with ${docScopeRemIds.length} items (including PDF extracts)`);
+        // console.log(`✅ GetNextCard: Calculated on-the-fly scope with ${docScopeRemIds.length} items (including PDF extracts)`);
       }
 
       const cardsPerRem = await getCardsPerRem(plugin);
@@ -130,17 +130,17 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         }
       });
 
-      console.log('📊 GetNextCard Summary:', {
-        allIncrementalRem: allIncrementalRem.length,
-        sorted: sorted.length,
-        filtered: filtered.length,
-        seenRemIds: seenRemIds.length,
-        queueMode: queueInfo.mode,
-        subQueueId: queueInfo.subQueueId,
-        usingCachedScope: queueInfo.subQueueId
-          ? (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null
-          : 'N/A',
-      });
+      // console.log('📊 GetNextCard Summary:', {
+      //   allIncrementalRem: allIncrementalRem.length,
+      //   sorted: sorted.length,
+      //   filtered: filtered.length,
+      //   seenRemIds: seenRemIds.length,
+      //   queueMode: queueInfo.mode,
+      //   subQueueId: queueInfo.subQueueId,
+      //   usingCachedScope: queueInfo.subQueueId
+      //     ? (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null
+      //     : 'N/A',
+      // });
 
       if (
         !queueInfo.subQueueId ||
@@ -170,19 +170,19 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         intervalBetweenIncRem === 'no-cards';
 
       if (shouldShowIncRem) {
-        console.log('🎯 INCREM CONDITION TRUE:', {
-          sessionItemCounter,
-          intervalBetweenIncRem,
-          calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${
-            (sessionItemCounter + 1) % intervalBetweenIncRem
-          }`,
-          numCardsRemaining: queueInfo.numCardsRemaining,
-          filteredLength: filtered.length,
-          allIncrementalRemLength: allIncrementalRem.length,
-        });
+        // console.log('🎯 INCREM CONDITION TRUE:', {
+        //   sessionItemCounter,
+        //   intervalBetweenIncRem,
+        //   calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${
+        //     (sessionItemCounter + 1) % intervalBetweenIncRem
+        //   }`,
+        //   numCardsRemaining: queueInfo.numCardsRemaining,
+        //   filteredLength: filtered.length,
+        //   allIncrementalRemLength: allIncrementalRem.length,
+        // });
 
         if (filtered.length === 0) {
-          console.log('⚠️ FILTERED LENGTH IS 0 - Returning null, will show a flashcard.');
+          // console.log('⚠️ FILTERED LENGTH IS 0 - Returning null, will show a flashcard.');
           await plugin.app.registerCSS(queueLayoutFixId, '');
           sessionItemCounter++;
           return null;
@@ -196,7 +196,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           [filtered[idx1], filtered[idx2]] = [filtered[idx2], filtered[idx1]];
         }
 
-        console.log('✅ Filtered has items, selecting first IncRem');
+        // console.log('✅ Filtered has items, selecting first IncRem');
         let first = filtered[0];
 
         while (!(await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(first.remId)))) {
@@ -212,7 +212,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
 
         await plugin.storage.setSession(incremReviewStartTimeKey, Date.now());
 
-        console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
+        // console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
         sessionItemCounter++;
         return {
           type: QueueItemType.Plugin,
@@ -224,17 +224,17 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           typeof intervalBetweenIncRem === 'number'
             ? intervalBetweenIncRem
             : Number(intervalBetweenIncRem);
-        console.log('🎴 FLASHCARD TURN:', {
-          sessionItemCounter,
-          intervalBetweenIncRem,
-          calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${
-            (sessionItemCounter + 1) % moduloDenominator
-          }`,
-          nextIncRemAt:
-            typeof intervalBetweenIncRem === 'number'
-              ? intervalBetweenIncRem - ((sessionItemCounter + 1) % intervalBetweenIncRem)
-              : 'N/A',
-        });
+        // console.log('🎴 FLASHCARD TURN:', {
+        //   sessionItemCounter,
+        //   intervalBetweenIncRem,
+        //   calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${
+        //     (sessionItemCounter + 1) % moduloDenominator
+        //   }`,
+        //   nextIncRemAt:
+        //     typeof intervalBetweenIncRem === 'number'
+        //       ? intervalBetweenIncRem - ((sessionItemCounter + 1) % intervalBetweenIncRem)
+        //       : 'N/A',
+        // });
         sessionItemCounter++;
         await plugin.app.registerCSS(queueLayoutFixId, '');
         return null;
