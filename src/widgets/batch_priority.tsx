@@ -7,10 +7,10 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  powerupCode, 
+import {
+  powerupCode,
   prioritySlotCode,
-  allIncrementalRemKey 
+  allIncrementalRemKey
 } from '../lib/consts';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
@@ -38,13 +38,16 @@ interface IncrementalRemData {
   path: string[];
   pathIds: string[];
   isChecked: boolean;
+  pathIds: string[];
+  isChecked: boolean;
   percentile: number | null;
+  originalIndex: number;
 }
 
 function BatchPriority() {
   console.log('🚀 BatchPriority: Component rendering');
   const plugin = usePlugin();
-  
+
   // Get the focused rem from session storage
   const focusedRemId = useTrackerPlugin(
     async (rp) => {
@@ -88,170 +91,167 @@ function BatchPriority() {
     []
   );
 
-// Load incremental rems in the focused rem's hierarchy
-useEffect(() => {
-  const loadIncrementalRems = async () => {
-    console.log('🔄 BatchPriority: Starting to load incremental rems');
-    console.log('   - focusedRemId:', focusedRemId);
-    
-    if (!focusedRemId) {
-      console.log('❌ BatchPriority: No focused rem ID, stopping load');
-      setIsLoading(false);
-      setErrorMessage('No focused rem ID found in session');
-      return;
-    }
+  // Load incremental rems in the focused rem's hierarchy
+  useEffect(() => {
+    const loadIncrementalRems = async () => {
+      console.log('🔄 BatchPriority: Starting to load incremental rems');
+      console.log('   - focusedRemId:', focusedRemId);
 
-    try {
-      setIsLoading(true);
-      setErrorMessage('');
-      
-      console.log('🔍 BatchPriority: Finding rem with ID:', focusedRemId);
-      const focusedRem = await plugin.rem.findOne(focusedRemId);
-      
-      if (!focusedRem) {
-        console.log('❌ BatchPriority: Could not find rem with ID:', focusedRemId);
+      if (!focusedRemId) {
+        console.log('❌ BatchPriority: No focused rem ID, stopping load');
         setIsLoading(false);
-        setErrorMessage(`Could not find rem with ID: ${focusedRemId}`);
+        setErrorMessage('No focused rem ID found in session');
         return;
       }
-      
-      console.log('✅ BatchPriority: Found focused rem:', focusedRem._id);
-      const focusedRemText = focusedRem.text ? await safeRemTextToString(plugin, focusedRem.text) : 'Untitled';
-      console.log('   - Rem text:', focusedRemText);
 
-      // Get all descendants of the focused rem first
-      console.log('🌳 BatchPriority: Getting all descendants...');
-      const allDescendants = await focusedRem.getDescendants();
-      console.log('   - Found', allDescendants.length, 'descendants');
-      
-      // Include the focused rem itself
-      const allRemsToCheck = [focusedRem, ...allDescendants];
-      console.log('   - Total rems to check:', allRemsToCheck.length);
-      
-      const incrementalData: IncrementalRemData[] = [];
-      
-      // Check each rem for incremental powerup - process ALL rems in the hierarchy
-      console.log('🔎 BatchPriority: Checking each rem for incremental powerup...');
-      
-      for (const rem of allRemsToCheck) {
-        try {
-          const hasIncremental = await rem.hasPowerup(powerupCode);
-          
-          if (hasIncremental) {
-            console.log(`   ✓ Found incremental rem:`, rem._id);
-            
-            const incInfo = await getIncrementalRemFromRem(plugin, rem);
-            if (incInfo) {
-              const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled';
-              console.log(`     - Name: ${remText}, Priority: ${incInfo.priority}`);
-              
-              // Calculate depth and path for hierarchy display
-              const { path, pathIds } = await getRemPathWithIds(plugin, rem, focusedRemId);
-              const depth = rem._id === focusedRemId ? 0 : path.length - 1;
-              
-              // Determine type using the existing remToActionItemType function
-              const actionItem = await remToActionItemType(plugin, rem);
-              const remType = actionItem?.type || 'rem';
-              
-              incrementalData.push({
-                remId: rem._id,
-                rem: rem,
-                name: remText,
-                currentPriority: incInfo.priority,
-                newPriority: null,
-                type: remType,
-                nextRepDate: incInfo.nextRepDate,
-                repetitions: incInfo.history?.length || 0,
-                depth: depth,
-                path: path,
-                pathIds: pathIds,
-                isChecked: true,
-                percentile: allIncrementalRems ?
-                  calculateRelativePercentile(allIncrementalRems, rem._id) : null
-              });
-            } else {
-              console.log(`     ⚠️ Could not get incremental info for rem:`, rem._id);
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+
+        console.log('🔍 BatchPriority: Finding rem with ID:', focusedRemId);
+        const focusedRem = await plugin.rem.findOne(focusedRemId);
+
+        if (!focusedRem) {
+          console.log('❌ BatchPriority: Could not find rem with ID:', focusedRemId);
+          setIsLoading(false);
+          setErrorMessage(`Could not find rem with ID: ${focusedRemId}`);
+          return;
+        }
+
+        console.log('✅ BatchPriority: Found focused rem:', focusedRem._id);
+        const focusedRemText = focusedRem.text ? await safeRemTextToString(plugin, focusedRem.text) : 'Untitled';
+        console.log('   - Rem text:', focusedRemText);
+
+        // Get all descendants of the focused rem first
+        console.log('🌳 BatchPriority: Getting all descendants...');
+        const allDescendants = await focusedRem.getDescendants();
+        console.log('   - Found', allDescendants.length, 'descendants');
+
+        // Include the focused rem itself
+        const allRemsToCheck = [focusedRem, ...allDescendants];
+        console.log('   - Total rems to check:', allRemsToCheck.length);
+
+        const incrementalData: IncrementalRemData[] = [];
+
+        // Create a map for fast index lookup
+        const remIndexMap = new Map<string, number>();
+        allRemsToCheck.forEach((r, i) => remIndexMap.set(r._id, i));
+
+        // Check each rem for incremental powerup - process ALL rems in the hierarchy
+        console.log('🔎 BatchPriority: Checking each rem for incremental powerup...');
+
+        for (const rem of allRemsToCheck) {
+          try {
+            const hasIncremental = await rem.hasPowerup(powerupCode);
+
+            if (hasIncremental) {
+              console.log(`   ✓ Found incremental rem:`, rem._id);
+
+              const incInfo = await getIncrementalRemFromRem(plugin, rem);
+              if (incInfo) {
+                const remText = rem.text ? await safeRemTextToString(plugin, rem.text) : 'Untitled';
+                console.log(`     - Name: ${remText}, Priority: ${incInfo.priority}`);
+
+                // Calculate depth and path for hierarchy display
+                const { path, pathIds } = await getRemPathWithIds(plugin, rem, focusedRemId);
+                const depth = rem._id === focusedRemId ? 0 : path.length - 1;
+
+                // Determine type using the existing remToActionItemType function
+                const actionItem = await remToActionItemType(plugin, rem);
+                const remType = actionItem?.type || 'rem';
+
+                incrementalData.push({
+                  remId: rem._id,
+                  rem: rem,
+                  name: remText,
+                  currentPriority: incInfo.priority,
+                  newPriority: null,
+                  type: remType,
+                  nextRepDate: incInfo.nextRepDate,
+                  repetitions: incInfo.history?.length || 0,
+                  depth: depth,
+                  path: path,
+                  pathIds: pathIds,
+                  isChecked: true,
+                  isChecked: true,
+                  percentile: allIncrementalRems ?
+                    calculateRelativePercentile(allIncrementalRems, rem._id) : null,
+                  originalIndex: remIndexMap.get(rem._id) ?? 0
+                });
+              } else {
+                console.log(`     ⚠️ Could not get incremental info for rem:`, rem._id);
+              }
             }
+          } catch (remError) {
+            console.error(`   ❌ Error checking rem:`, remError);
           }
-        } catch (remError) {
-          console.error(`   ❌ Error checking rem:`, remError);
         }
-      }
-      
-      console.log('📈 BatchPriority: Found', incrementalData.length, 'incremental rems total');
-      
-      // Sort by hierarchy (path)
-      incrementalData.sort((a, b) => {
-        const minLength = Math.min(a.path.length, b.path.length);
-        for (let i = 0; i < minLength; i++) {
-          const comp = a.path[i].localeCompare(b.path[i]);
-          if (comp !== 0) return comp;
-        }
-        return a.path.length - b.path.length;
-      });
-      
-      console.log('✅ BatchPriority: Setting incremental rems data');
-      setIncrementalRems(incrementalData);
-      setFilteredRems(incrementalData);
-      
-      // Initially expand all nodes
-      const allIds = new Set(incrementalData.map(item => item.remId));
-      setExpandedNodes(allIds);
-      console.log('   - Expanded all nodes');
-      
-    } catch (error) {
-      console.error('❌ BatchPriority: Error loading incremental rems:', error);
-      const message = error instanceof Error ? error.message : 'Unknown error occurred';
-      setErrorMessage(`Error: ${message}`);
-      await plugin.app.toast('Error loading incremental rems');
-    } finally {
-      setIsLoading(false);
-      console.log('🏁 BatchPriority: Finished loading');
-    }
-  };
 
-  loadIncrementalRems();
-}, [focusedRemId, plugin, allIncrementalRems]);
+        console.log('📈 BatchPriority: Found', incrementalData.length, 'incremental rems total');
+
+        // Sort by hierarchy (document order)
+        incrementalData.sort((a, b) => {
+          return a.originalIndex - b.originalIndex;
+        });
+
+        console.log('✅ BatchPriority: Setting incremental rems data');
+        setIncrementalRems(incrementalData);
+        setFilteredRems(incrementalData);
+
+        // Initially expand all nodes
+        const allIds = new Set(incrementalData.map(item => item.remId));
+        setExpandedNodes(allIds);
+        console.log('   - Expanded all nodes');
+
+      } catch (error) {
+        console.error('❌ BatchPriority: Error loading incremental rems:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error occurred';
+        setErrorMessage(`Error: ${message}`);
+        await plugin.app.toast('Error loading incremental rems');
+      } finally {
+        setIsLoading(false);
+        console.log('🏁 BatchPriority: Finished loading');
+      }
+    };
+
+    loadIncrementalRems();
+  }, [focusedRemId, plugin, allIncrementalRems]);
 
   // Apply filters and sorting
   useEffect(() => {
     let filtered = [...incrementalRems];
-    
+
     // Apply search filter
     if (searchTerm) {
-      filtered = filtered.filter(rem => 
+      filtered = filtered.filter(rem =>
         rem.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     // Apply type filter
     if (typeFilter !== 'all') {
       filtered = filtered.filter(rem => rem.type === typeFilter);
     }
-    
+
     // Apply priority range filter
-    filtered = filtered.filter(rem => 
-      rem.currentPriority >= priorityRangeMin && 
+    filtered = filtered.filter(rem =>
+      rem.currentPriority >= priorityRangeMin &&
       rem.currentPriority <= priorityRangeMax
     );
-    
+
     // Apply sorting
     if (sortField === 'hierarchy') {
-      // Hierarchical sorting - maintain tree structure
+      // Hierarchical sorting - maintain tree structure via document order
       filtered.sort((a, b) => {
-        const minLength = Math.min(a.path.length, b.path.length);
-        for (let i = 0; i < minLength; i++) {
-          const comp = a.path[i].localeCompare(b.path[i]);
-          if (comp !== 0) return sortDirection === 'asc' ? comp : -comp;
-        }
-        const lengthComp = a.path.length - b.path.length;
-        return sortDirection === 'asc' ? lengthComp : -lengthComp;
+        const diff = a.originalIndex - b.originalIndex;
+        // If sorting descending, reverse the order
+        return sortDirection === 'asc' ? diff : -diff;
       });
     } else {
       // Other sorting fields
       filtered.sort((a, b) => {
         let compareValue = 0;
-        
+
         switch (sortField) {
           case 'name':
             compareValue = a.name.localeCompare(b.name);
@@ -277,11 +277,11 @@ useEffect(() => {
             compareValue = (a.percentile ?? 100) - (b.percentile ?? 100);
             break;
         }
-        
+
         return sortDirection === 'asc' ? compareValue : -compareValue;
       });
     }
-    
+
     setFilteredRems(filtered);
   }, [incrementalRems, searchTerm, typeFilter, priorityRangeMin, priorityRangeMax, sortField, sortDirection]);
 
@@ -290,13 +290,13 @@ useEffect(() => {
     console.log('🧮 BatchPriority: Calculating new priorities');
     console.log('   - Operation:', operation);
     console.log('   - Parameters:', { changePercent, decreasePercent, spreadStart, spreadEnd });
-    
+
     // Save current state for undo
     setPreviousStates(prev => [...prev, incrementalRems]);
-    
+
     const checkedRems = incrementalRems.filter(r => r.isChecked);
     console.log('   - Checked rems:', checkedRems.length);
-    
+
     if (checkedRems.length === 0) {
       console.log('   ⚠️ No items selected');
       plugin.app.toast('No items selected for priority change');
@@ -311,38 +311,38 @@ useEffect(() => {
         console.log('   - Increase multiplier:', multiplier);
         updatedRems = updatedRems.map(rem => ({
           ...rem,
-          newPriority: rem.isChecked ? 
+          newPriority: rem.isChecked ?
             Math.max(0, Math.round(rem.currentPriority * multiplier)) : null
         }));
         break;
       }
-      
+
       case 'decrease': {
         const multiplier = decreasePercent / 100;
         console.log('   - Decrease multiplier:', multiplier);
         updatedRems = updatedRems.map(rem => ({
           ...rem,
-          newPriority: rem.isChecked ? 
+          newPriority: rem.isChecked ?
             Math.min(100, Math.round(rem.currentPriority * multiplier)) : null
         }));
         break;
       }
-      
+
       case 'spread': {
         const spreadRange = spreadEnd - spreadStart;
         const numChecked = checkedRems.length;
         console.log('   - Spread range:', spreadRange, 'Num checked:', numChecked);
-        
+
         if (numChecked <= 1) {
           console.log('   ⚠️ Need at least 2 items for spread');
           plugin.app.toast('Need at least 2 items for spread operation');
           return;
         }
-        
+
         const step = spreadRange / (numChecked - 1);
         console.log('   - Step size:', step);
         let currentIndex = 0;
-        
+
         updatedRems = updatedRems.map(rem => {
           if (rem.isChecked) {
             const newPriority = Math.round(spreadStart + (currentIndex * step));
@@ -353,17 +353,17 @@ useEffect(() => {
         });
         break;
       }
-      
+
       case 'adjust': {
         // Adjust maintains relative priorities within new range
         const checkedPriorities = checkedRems.map(r => r.currentPriority);
         const minCurrent = Math.min(...checkedPriorities);
         const maxCurrent = Math.max(...checkedPriorities);
         const currentRange = maxCurrent - minCurrent || 1;
-        
+
         const newRange = spreadEnd - spreadStart;
         console.log('   - Adjust: current range', currentRange, 'new range:', newRange);
-        
+
         updatedRems = updatedRems.map(rem => {
           if (rem.isChecked) {
             const relativePosition = (rem.currentPriority - minCurrent) / currentRange;
@@ -375,7 +375,7 @@ useEffect(() => {
         break;
       }
     }
-    
+
     console.log('✅ BatchPriority: Calculated new priorities');
     setIncrementalRems(updatedRems);
     setIsPreviewMode(true);
@@ -387,30 +387,30 @@ useEffect(() => {
     console.log('💾 BatchPriority: Applying changes');
     const toUpdate = incrementalRems.filter(r => r.isChecked && r.newPriority !== null);
     console.log('   - Rems to update:', toUpdate.length);
-    
+
     if (toUpdate.length === 0) {
       console.log('   ⚠️ No changes to apply');
       await plugin.app.toast('No changes to apply');
       return;
     }
-    
+
     setIsApplying(true);
     setTotalToApply(toUpdate.length);
     setAppliedCount(0);
-    
+
     try {
       // Update each rem's priority
       for (let i = 0; i < toUpdate.length; i++) {
         const remData = toUpdate[i];
         console.log(`   - Updating rem ${i + 1}/${toUpdate.length}: ${remData.name} to priority ${remData.newPriority}`);
         await remData.rem.setPowerupProperty(
-          powerupCode, 
-          prioritySlotCode, 
+          powerupCode,
+          prioritySlotCode,
           [remData.newPriority!.toString()]
         );
         setAppliedCount(i + 1);
       }
-      
+
       // Update the session storage with new incremental rem data
       console.log('📊 BatchPriority: Updating session storage');
       for (const remData of toUpdate) {
@@ -420,11 +420,11 @@ useEffect(() => {
         }
       }
       console.log('   - Updated session storage for', toUpdate.length, 'rems');
-      
+
       console.log('✅ BatchPriority: Successfully applied all changes');
       await plugin.app.toast(`Successfully updated priority for ${toUpdate.length} rem(s)`);
       plugin.widget.closePopup();
-      
+
     } catch (error) {
       console.error('❌ BatchPriority: Error applying changes:', error);
       await plugin.app.toast('Error applying changes');
@@ -456,12 +456,12 @@ useEffect(() => {
       dayjs(rem.nextRepDate).format('YYYY-MM-DD'),
       rem.repetitions
     ]);
-    
+
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -510,11 +510,11 @@ useEffect(() => {
     });
   };
 
-// Check if a node should be visible based on parent expansion
+  // Check if a node should be visible based on parent expansion
   const isNodeVisible = (remData: IncrementalRemData) => {
     // Always show root level items
     if (remData.depth === 0) return true;
-    
+
     // For hierarchical sorting, check if all parent nodes are expanded
     if (sortField === 'hierarchy') {
       // Check each ancestor in the path
@@ -524,14 +524,14 @@ useEffect(() => {
         // An ancestor's expansion state only matters if it's also an incremental rem
         // that is being displayed in the table. We ignore intermediate non-incremental rems.
         const isParentInTable = incrementalRems.some(rem => rem.remId === parentId);
-        
+
         if (isParentInTable && !expandedNodes.has(parentId)) {
           return false;
         }
       }
       return true;
     }
-    
+
     // For non-hierarchical sorting, show all items
     return true;
   };
@@ -667,7 +667,7 @@ useEffect(() => {
       <div style={{ padding: '16px' }}>
         <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px', color: '#dc2626' }}>Error</div>
         <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>{errorMessage}</div>
-        <button 
+        <button
           onClick={() => plugin.widget.closePopup()}
           style={{ ...styles.button, ...styles.secondaryButton }}
         >
@@ -684,7 +684,7 @@ useEffect(() => {
         <div style={{ fontSize: '14px', color: '#6b7280' }}>
           The selected rem and its descendants contain no incremental rems.
         </div>
-        <button 
+        <button
           onClick={() => plugin.widget.closePopup()}
           style={{ ...styles.button, ...styles.secondaryButton, marginTop: '16px' }}
         >
@@ -698,7 +698,7 @@ useEffect(() => {
     <div style={styles.container}>
       <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>Batch Priority Change</div>
-        
+
         {/* Search and Filters Bar */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
@@ -708,7 +708,7 @@ useEffect(() => {
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{ ...styles.input, flex: '1', minWidth: '200px' }}
           />
-          
+
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -719,7 +719,7 @@ useEffect(() => {
               <option key={type} value={type}>{getDisplayType(type)}</option>
             ))}
           </select>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <label style={{ fontSize: '12px' }}>Priority:</label>
             <input
@@ -740,7 +740,7 @@ useEffect(() => {
               style={{ ...styles.input, width: '60px' }}
             />
           </div>
-          
+
           <button
             onClick={exportToCSV}
             style={{ ...styles.button, backgroundColor: '#8b5cf6', color: 'white' }}
@@ -748,7 +748,7 @@ useEffect(() => {
             Export CSV
           </button>
         </div>
-        
+
         {/* Operation Selection */}
         <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px', backgroundColor: '#f9fafb' }}>
           <div style={{ fontWeight: 600, marginBottom: '8px' }}>Priority Operation</div>
@@ -781,14 +781,14 @@ useEffect(() => {
                     style={{ ...styles.input, width: '80px' }}
                   />
                   <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
-                    Multiply by {changePercent/100} (lower value = higher priority)
-                    <br/>
+                    Multiply by {changePercent / 100} (lower value = higher priority)
+                    <br />
                     <span style={{ color: '#3b82f6' }}>Valid range: 1-99%</span>
                   </div>
                 </div>
               )}
             </div>
-            
+
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
@@ -826,14 +826,14 @@ useEffect(() => {
                     style={{ ...styles.input, width: '80px' }}
                   />
                   <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
-                    Multiply by {decreasePercent/100} (higher value = lower priority)
-                    <br/>
+                    Multiply by {decreasePercent / 100} (higher value = lower priority)
+                    <br />
                     <span style={{ color: '#3b82f6' }}>Valid range: 101-1000%</span>
                   </div>
                 </div>
               )}
             </div>
-            
+
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
@@ -873,7 +873,7 @@ useEffect(() => {
                 </div>
               )}
             </div>
-            
+
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
@@ -930,7 +930,7 @@ useEffect(() => {
           >
             Uncheck All
           </button>
-          
+
           {previousStates.length > 0 && (
             <button
               onClick={undoLastOperation}
@@ -939,7 +939,7 @@ useEffect(() => {
               Undo ({previousStates.length})
             </button>
           )}
-          
+
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
             {!isPreviewMode && (
               <button
@@ -977,14 +977,14 @@ useEffect(() => {
         {/* Progress Bar */}
         {isApplying && (
           <div style={{ width: '100%', backgroundColor: '#e5e7eb', borderRadius: '4px', height: '20px' }}>
-            <div 
-              style={{ 
-                width: `${(appliedCount / totalToApply) * 100}%`, 
+            <div
+              style={{
+                width: `${(appliedCount / totalToApply) * 100}%`,
                 backgroundColor: '#3b82f6',
                 height: '100%',
                 borderRadius: '4px',
                 transition: 'width 0.3s ease'
-              }} 
+              }}
             />
           </div>
         )}
@@ -1016,22 +1016,22 @@ useEffect(() => {
               Reps {sortField === 'repetitions' && (sortDirection === 'asc' ? '↑' : '↓')}
             </div>
           </div>
-          
+
           {/* Table Body */}
           <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
             {filteredRems.map((remData) => {
               if (!isNodeVisible(remData)) return null;
-              
+
               const hasChildNodes = hasChildren(remData.remId);
               const isExpanded = expandedNodes.has(remData.remId);
-              const priorityColor = remData.percentile ? 
+              const priorityColor = remData.percentile ?
                 percentileToHslColor(remData.percentile) : 'transparent';
-              
+
               return (
                 <div
                   key={remData.remId}
-                  style={{ 
-                    display: 'grid', 
+                  style={{
+                    display: 'grid',
                     gridTemplateColumns: '40px 1fr 80px 80px 80px 120px 120px 60px',
                     ...styles.tableRow,
                     paddingLeft: sortField === 'hierarchy' ? `${remData.depth * 20 + 8}px` : '8px'
@@ -1059,9 +1059,9 @@ useEffect(() => {
                         {isExpanded ? '▼' : '▶'}
                       </button>
                     )}
-                    <span style={{ 
-                      overflow: 'hidden', 
-                      textOverflow: 'ellipsis', 
+                    <span style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       maxWidth: '300px',
                       display: 'inline-block'
@@ -1074,11 +1074,11 @@ useEffect(() => {
                   </div>
                   <div style={{ padding: '8px' }}>
                     {remData.newPriority !== null && (
-                      <span 
-                        style={{ 
+                      <span
+                        style={{
                           fontWeight: 600,
                           // Inverted colors: red for increase (better), green for decrease (worse)
-                          color: remData.newPriority < remData.currentPriority ? '#ef4444' : '#10b981' 
+                          color: remData.newPriority < remData.currentPriority ? '#ef4444' : '#10b981'
                         }}
                       >
                         {remData.newPriority}
@@ -1086,11 +1086,11 @@ useEffect(() => {
                     )}
                   </div>
                   <div style={{ padding: '8px' }}>
-                    <span 
-                      style={{ 
-                        padding: '2px 6px', 
-                        borderRadius: '4px', 
-                        fontSize: '11px', 
+                    <span
+                      style={{
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
                         color: 'white',
                         backgroundColor: priorityColor,
                         display: 'inline-block'
@@ -1117,8 +1117,8 @@ useEffect(() => {
         {/* Summary */}
         <div style={{ fontSize: '14px', color: '#6b7280', display: 'flex', justifyContent: 'space-between' }}>
           <span>
-            Total: {incrementalRems.length} incremental rem(s) | 
-            Filtered: {filteredRems.length} | 
+            Total: {incrementalRems.length} incremental rem(s) |
+            Filtered: {filteredRems.length} |
             Selected: {incrementalRems.filter(r => r.isChecked).length}
           </span>
           <span>
@@ -1133,39 +1133,39 @@ useEffect(() => {
 }
 
 // Helper function with IDs for proper hierarchy tracking - including focused rem as root
-async function getRemPathWithIds(plugin: RNPlugin, rem: PluginRem, stopAtId: string): Promise<{path: string[], pathIds: string[]}> {
+async function getRemPathWithIds(plugin: RNPlugin, rem: PluginRem, stopAtId: string): Promise<{ path: string[], pathIds: string[] }> {
   console.log('🛤️ Getting path for rem:', rem._id, 'stopping at:', stopAtId);
   const path: string[] = [];
   const pathIds: string[] = [];
   let current: PluginRem | undefined = rem;
-  
+
   // If this IS the focused rem, just return its own info
   if (current._id === stopAtId) {
     const text = current.text ? await safeRemTextToString(plugin, current.text) : 'Untitled';
     return { path: [text], pathIds: [current._id] };
   }
-  
+
   // Build path from current up to (but not including) the focused rem
   while (current) {
     const text = current.text ? await safeRemTextToString(plugin, current.text) : 'Untitled';
     path.unshift(text);
     pathIds.unshift(current._id);
-    
+
     // Stop if we've reached the focused rem
     if (current._id === stopAtId) {
       break;
     }
-    
+
     // If no parent or parent would go beyond focused rem, stop
     if (!current.parent) {
       break;
     }
-    
+
     // Check if the parent is an ancestor of the focused rem
     // This ensures we include intermediate non-incremental rems in the path
     current = await plugin.rem.findOne(current.parent);
   }
-  
+
   console.log('   - Path:', path);
   console.log('   - Path IDs:', pathIds);
   return { path, pathIds };

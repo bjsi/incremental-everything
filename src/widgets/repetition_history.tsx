@@ -290,6 +290,28 @@ function RepetitionHistoryPopup() {
                     <div style={headerTitleStyle}>
                         <span>📊</span>
                         <span>Repetition History</span>
+                        <button
+                            onClick={async () => {
+                                const ctx = await plugin.widget.getWidgetContext<WidgetLocation.Popup>();
+                                const remId = ctx?.contextData?.remId;
+                                if (remId) {
+                                    await plugin.widget.openPopup('aggregated_repetition_history', { remId });
+                                }
+                            }}
+                            style={{
+                                marginLeft: '12px',
+                                fontSize: '11px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--rn-clr-border-primary)',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                color: 'var(--rn-clr-content-secondary)'
+                            }}
+                            title="Switch to Aggregated View"
+                        >
+                            Show Aggregated
+                        </button>
                     </div>
                     <button
                         style={closeButtonStyle}
