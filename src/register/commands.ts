@@ -710,14 +710,38 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const hasIncrementalPowerup = await rem.hasPowerup(powerupCode);
       const hasDismissedPowerup = await rem.hasPowerup(dismissedPowerupCode);
 
-      if (!hasIncrementalPowerup && !hasDismissedPowerup) {
-        await plugin.app.toast('This Rem has no repetition history (not Incremental or Dismissed).');
+      if (hasIncrementalPowerup || hasDismissedPowerup) {
+        // If it is directly an incremental/dismissed rem, open the single history widget
+        await plugin.widget.openPopup('repetition_history', {
+          remId: remId,
+        });
         return;
       }
 
-      await plugin.widget.openPopup('repetition_history', {
-        remId: remId,
-      });
+      // If not directly incremental, check if it has any incremental descendants
+      // We'll use a quick check on getDescendants. This might be heavy for huge trees, 
+      // but necessary to know if we should show the aggregated view.
+      // Optimization: We could check just one? `getDescendants` returns all.
+      const descendants = await rem.getDescendants();
+      const hasRelevantDescendant = await Promise.race([
+        (async () => {
+          for (const d of descendants) {
+            if (await d.hasPowerup(powerupCode)) return true;
+            if (await d.hasPowerup(dismissedPowerupCode)) return true;
+          }
+          return false;
+        })()
+      ]);
+
+      if (hasRelevantDescendant) {
+        // If it has relevant descendants, default to aggregated view
+        await plugin.widget.openPopup('aggregated_repetition_history', {
+          remId: remId,
+        });
+        return;
+      }
+
+      await plugin.app.toast('This Rem has no repetition history (not Incremental/Dismissed and no such descendants).');
     },
   });
 }

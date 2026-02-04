@@ -74,7 +74,48 @@ function calculateShieldStatus<T extends PriorityItem>(
 }
 
 /**
- * Saves shield history to storage.
+ * Helper to get the current KB ID.
+ */
+async function getCurrentKbId(plugin: ReactRNPlugin): Promise<string> {
+  const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+  return kbData?._id || 'global';
+}
+
+/**
+ * Migrates legacy history (date -> entry) to KB-aware history (kbId -> date -> entry).
+ * Only migrates if the current KB is the Primary Knowledge Base.
+ */
+async function migrateToKbAware<T>(
+  plugin: ReactRNPlugin,
+  history: any,
+  currentKbId: string
+): Promise<Record<string, Record<string, T>>> {
+  if (!history) return {};
+
+  // Check if it's already KB-aware (keys are NOT dates/likely KB IDs, or empty)
+  const keys = Object.keys(history);
+  if (keys.length === 0) return {};
+
+  const isLegacy = keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+
+  if (isLegacy) {
+    const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+    if (isPrimary) {
+      console.log('[ShieldHistory] Primary KB detected. Migrating legacy history to:', currentKbId);
+      return {
+        [currentKbId]: history
+      };
+    } else {
+      console.log('[ShieldHistory] Non-primary KB. Skipping legacy migration to preserve for Main KB.');
+      return history;
+    }
+  }
+
+  return history;
+}
+
+/**
+ * Saves shield history to storage (KB-aware).
  *
  * @param plugin Plugin instance
  * @param storageKey Key to store the history under
@@ -87,13 +128,45 @@ async function saveKBShieldHistory(
   historyEntry: ShieldHistoryEntry,
   date: string
 ): Promise<void> {
-  const history = (await plugin.storage.getSynced<ShieldHistory>(storageKey)) || {};
-  history[date] = historyEntry;
+  let rawHistory = (await plugin.storage.getSynced<any>(storageKey)) || {};
+  const kbId = await getCurrentKbId(plugin);
+
+  const keys = Object.keys(rawHistory);
+  const isLegacy = keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+  let history = rawHistory;
+
+  if (isLegacy) {
+    const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+    if (isPrimary) {
+      console.log('[ShieldHistory] Primary KB detected. Migrating legacy keys to:', kbId);
+      const newHistory: Record<string, any> = {};
+      const legacyEntries: Record<string, any> = {};
+
+      for (const key of keys) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+          legacyEntries[key] = rawHistory[key];
+        } else {
+          newHistory[key] = rawHistory[key];
+        }
+      }
+
+      newHistory[kbId] = { ...(newHistory[kbId] || {}), ...legacyEntries };
+      history = newHistory;
+    } else {
+      console.log('[ShieldHistory] Non-primary KB. Keeping legacy keys at root.');
+    }
+  }
+
+  if (!history[kbId]) {
+    history[kbId] = {};
+  }
+  history[kbId][date] = historyEntry;
+
   await plugin.storage.setSynced(storageKey, history);
 }
 
 /**
- * Saves scoped shield history to storage.
+ * Saves scoped shield history to storage (KB-aware).
  *
  * @param plugin Plugin instance
  * @param storageKey Key to store the history under
@@ -108,12 +181,55 @@ async function saveScopedShieldHistory(
   historyEntry: ShieldHistoryEntry,
   date: string
 ): Promise<void> {
-  const history = (await plugin.storage.getSynced<ShieldHistoryByScope>(storageKey)) || {};
-  if (!history[scopeKey]) {
-    history[scopeKey] = {};
+  let rawHistory = (await plugin.storage.getSynced<any>(storageKey)) || {};
+  const kbId = await getCurrentKbId(plugin);
+
+  const keys = Object.keys(rawHistory);
+  let isLegacy = false;
+
+  if (keys.length > 0) {
+    const firstValue = rawHistory[keys[0]];
+    const dateKeys = Object.keys(firstValue || {});
+    if (dateKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
+      isLegacy = true;
+    }
   }
-  history[scopeKey][date] = historyEntry;
-  await plugin.storage.setSynced(storageKey, history);
+
+  if (isLegacy) {
+    const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+    if (isPrimary) {
+      console.log('[ShieldHistory] Primary KB detected. Migrating legacy scoped history to:', kbId);
+
+      const newHistory: Record<string, any> = {};
+      const legacyEntries: Record<string, any> = {};
+
+      for (const key of keys) {
+        const val = rawHistory[key];
+        const subKeys = Object.keys(val || {});
+        if (subKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
+          legacyEntries[key] = val;
+        } else {
+          newHistory[key] = val;
+        }
+      }
+
+      newHistory[kbId] = { ...(newHistory[kbId] || {}), ...legacyEntries };
+      rawHistory = newHistory;
+
+    } else {
+      console.log('[ShieldHistory] Non-primary KB. Keeping legacy scoped history at root.');
+    }
+  }
+
+  if (!rawHistory[kbId]) {
+    rawHistory[kbId] = {};
+  }
+  if (!rawHistory[kbId][scopeKey]) {
+    rawHistory[kbId][scopeKey] = {};
+  }
+
+  rawHistory[kbId][scopeKey][date] = historyEntry;
+  await plugin.storage.setSynced(storageKey, rawHistory);
 }
 
 /**
