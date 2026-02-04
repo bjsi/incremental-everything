@@ -9,6 +9,8 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import * as _ from 'remeda';
+import dayjs from 'dayjs';
+import { IncrementalRep } from '../lib/incremental_rem/types';
 import { NextRepTime } from '../components/NextRepTime';
 import { DraggableButton } from '../components/buttons/DraggableButton';
 import { Button } from '../components/buttons/Button';
@@ -22,7 +24,8 @@ import {
   seenRemInSessionKey,
   remnoteEnvironmentId,
   queueSessionCacheKey,
-  priorityCalcScopeRemIdsKey
+  priorityCalcScopeRemIdsKey,
+  incremReviewStartTimeKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetitionManualOffset, updateReviewRemData } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -433,10 +436,26 @@ export function AnswerButtons() {
             // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
             await handleCardPriorityInheritance(plugin, rem, incRemInfo);
 
-            // 2. Save history to dismissed powerup BEFORE removing incremental
-            await transferToDismissed(plugin, rem, incRemInfo.history || []);
+            // 2. Calculate review time and add current history entry
+            // This ensures we capture the final review data AND prevents passing empty history to transferToDismissed
+            const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+            const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
 
-            // 3. Proceed with the final, destructive Done button logic
+            const currentRep: IncrementalRep = {
+              date: Date.now(),
+              scheduled: incRemInfo.nextRepDate, // Should technically be now since we are done, but using scheduled as reference
+              reviewTimeSeconds: reviewTimeSeconds,
+              eventType: 'rep', // Standard repetition event before dismissal
+              priority: incRemInfo.priority,
+            };
+
+            const updatedHistory = [...(incRemInfo.history || []), currentRep];
+
+            // 3. Save updated history to dismissed powerup BEFORE removing incremental
+            // Passing updatedHistory ensures it's never empty, so transferToDismissed will always execute
+            await transferToDismissed(plugin, rem, updatedHistory);
+
+            // 4. Proceed with the final, destructive Done button logic
             await removeIncrementalRemCache(plugin, rem._id);
             await plugin.queue.removeCurrentCardFromQueue(true);
             await rem.removePowerup(powerupCode);
