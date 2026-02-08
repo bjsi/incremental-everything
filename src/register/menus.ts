@@ -97,9 +97,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
     id: 'create_inc_rem_highlight',
     location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
     name: 'Create Incremental Rem',
-    iconUrl: plugin.rootURL.endsWith('/')
-      ? `${plugin.rootURL}highlight-sparkles.png`
-      : `${plugin.rootURL}/highlight-sparkles.png`,
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/3626/3626838.png",
     action: async (args: { remId: string }) => {
       console.log('[ParentSelector:Menu] CREATE INCREMENTAL REM triggered for:', args.remId);
 

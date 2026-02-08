@@ -38,7 +38,18 @@ export async function registerQueueHidingCSS(plugin: ReactRNPlugin) {
       [data-rem-property~="priority"],
       [data-rem-container-property~="priority"],
       [data-rem-property~="priority-source"],
-      [data-rem-container-property~="priority-source"] {
+      [data-rem-container-property~="priority-source"],
+      /* Hide Last Updated Slot */
+      [data-rem-property~="last-updated"],
+      [data-rem-container-property~="last-updated"],
+      /* Hide Original Incremental Date Slot */
+      [data-rem-property~="original-inc-date"],
+      [data-rem-container-property~="original-inc-date"],
+      /* Hide Dismissed Slots */
+      [data-rem-property~="dismissed-history"],
+      [data-rem-container-property~="dismissed-history"],
+      [data-rem-property~="dismissed-date"],
+      [data-rem-container-property~="dismissed-date"] {
         display: none !important; 
       }
   `;
