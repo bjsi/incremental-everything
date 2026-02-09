@@ -40,6 +40,18 @@ export async function registerMenus(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerMenuItem({
+    id: 'priority_shield_document_menuitem',
+    name: 'Priority Shield History',
+    location: PluginCommandMenuLocation.DocumentMenu,
+    action: async (args: { remId: string }) => {
+      // For document menu, the remId IS the scope/subQueueId
+      await plugin.widget.openPopup('priority_shield_graph', {
+        subQueueId: args.remId,
+      });
+    },
+  });
+
+  plugin.app.registerMenuItem({
     id: 'tag_rem_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
     name: 'Toggle Incremental Rem',
