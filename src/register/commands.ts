@@ -12,6 +12,7 @@ import {
   alwaysUseLightModeOnMobileId,
   alwaysUseLightModeOnWebId,
   dismissedPowerupCode,
+  currentSubQueueIdKey,
 } from '../lib/consts';
 import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
@@ -742,6 +743,40 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       await plugin.app.toast('This Rem has no repetition history (not Incremental/Dismissed and no such descendants).');
+    },
+  });
+
+  // Open Sorting Criteria Widget Command
+  plugin.app.registerCommand({
+    id: 'open-sorting-criteria',
+    name: 'Open Sorting Criteria',
+    description: 'Open the Sorting Criteria widget to adjust randomness and cards per rem.',
+    action: async () => {
+      await plugin.widget.openPopup('sorting_criteria');
+    },
+  });
+
+  // Open Priority Shield Graph Command
+  plugin.app.registerCommand({
+    id: 'open-priority-shield',
+    name: 'Open Priority Shield Graph',
+    description: 'Open the Priority Shield Graph history.',
+    action: async () => {
+      let subQueueId: string | null = null;
+      const url = await plugin.window.getURL();
+
+      // Check if we are in the queue to get context
+      if (url.includes('/flashcards')) {
+        subQueueId = (await plugin.storage.getSession<string | null>(currentSubQueueIdKey)) ?? null;
+      } else {
+        // In editor, use focused rem
+        const focusedRem = await plugin.focus.getFocusedRem();
+        subQueueId = focusedRem?._id || null;
+      }
+
+      await plugin.widget.openPopup('priority_shield_graph', {
+        subQueueId,
+      });
     },
   });
 }
