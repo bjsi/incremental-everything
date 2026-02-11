@@ -97,3 +97,8 @@ export const popupDocumentIdKey = 'popup-document-id';
 // Priority Review Graph
 export const priorityGraphPowerupCode = 'priority_review_graph';
 export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';
+
+// Priority Graph (document-scope, triggered via inc_rem_counter)
+export const priorityGraphDocPowerupCode = 'priority_graph';
+export const PRIORITY_GRAPH_DATA_KEY_PREFIX = 'priority_graph_data_';
+export const GRAPH_LAST_UPDATED_KEY_PREFIX = 'priority_graph_last_updated_';

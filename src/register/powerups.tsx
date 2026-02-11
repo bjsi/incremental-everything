@@ -10,6 +10,7 @@ import {
   repHistorySlotCode,
   originalIncrementalDateSlotCode,
   priorityGraphPowerupCode,
+  priorityGraphDocPowerupCode,
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
@@ -96,6 +97,15 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
     description: 'Displays a distribution graph of priorities for items in this document.',
     options: {
       slots: [] // No special slots needed, we just use the tag as a trigger
+    }
+  });
+
+  await plugin.app.registerPowerup({
+    name: 'Priority Graph',
+    code: priorityGraphDocPowerupCode,
+    description: 'Displays a priority distribution graph for a document scope.',
+    options: {
+      slots: []
     }
   });
 
