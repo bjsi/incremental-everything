@@ -1,10 +1,55 @@
-import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useMemo } from 'react';
-import { allIncrementalRemKey } from '../lib/consts';
+import { allIncrementalRemKey, allCardPriorityInfoKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
+import { CardPriorityInfo } from '../lib/card_priority';
 import { extractText, determineIncRemType, getTotalTimeSpent, getTopLevelDocument } from '../lib/incRemHelpers';
 import { IncRemTable, IncRemWithDetails, DocumentInfo } from '../components';
 import { buildDocumentScope } from '../lib/scope_helpers';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+
+interface GraphDataPoint {
+  range: string;
+  incRem: number;
+  card: number;
+}
+
+/**
+ * Computes absolute priority bins from all KB IncRems and card infos.
+ */
+function computeKbGraphBins(
+  allIncRems: IncrementalRem[],
+  allCardInfos: CardPriorityInfo[],
+): GraphDataPoint[] {
+  const bins: GraphDataPoint[] = Array(20).fill(0).map((_, i) => ({
+    range: `${i * 5}-${(i + 1) * 5}`,
+    incRem: 0,
+    card: 0,
+  }));
+
+  for (const item of allIncRems) {
+    const p = Math.max(0, Math.min(100, item.priority));
+    const idx = Math.min(Math.floor(p / 5), 19);
+    bins[idx].incRem++;
+  }
+
+  for (const item of allCardInfos) {
+    const p = Math.max(0, Math.min(100, item.priority));
+    const idx = Math.min(Math.floor(p / 5), 19);
+    bins[idx].card++;
+  }
+
+  return bins;
+}
 
 export function IncRemMainView() {
   const plugin = usePlugin();
@@ -12,8 +57,9 @@ export function IncRemMainView() {
   const [incRemsWithDetails, setIncRemsWithDetails] = useState<IncRemWithDetails[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [filteredByDocument, setFilteredByDocument] = useState<Set<string> | null>(null);
+  const [showGraph, setShowGraph] = useState(false);
 
-  useTrackerPlugin(
+  const allIncRems = useTrackerPlugin(
     async (rp) => {
       try {
         const incRems = (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
@@ -26,6 +72,11 @@ export function IncRemMainView() {
     },
     []
   );
+
+  // Fetch card priority infos for the graph
+  const allCardInfos = useRunAsync(async () => {
+    return (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+  }, []);
 
   const loadIncRemDetails = async (incRems: IncrementalRem[]) => {
     if (loadingRems) return;
@@ -124,23 +175,115 @@ export function IncRemMainView() {
     return incRemsWithDetails.filter((rem) => filteredByDocument.has(rem.remId));
   }, [incRemsWithDetails, filteredByDocument]);
 
+  // Compute KB-wide graph bins
+  const graphBins = useMemo(() => {
+    if (!showGraph || !allIncRems || !allCardInfos) return null;
+    return computeKbGraphBins(allIncRems, allCardInfos);
+  }, [showGraph, allIncRems, allCardInfos]);
+
   const now = Date.now();
   const dueCount = displayedRems.filter((r) => r.nextRepDate <= now).length;
   const totalCount = displayedRems.length;
 
   return (
-    <IncRemTable
-      title="All Inc Rems"
-      icon="📊"
-      incRems={displayedRems}
-      loading={loadingRems}
-      dueCount={dueCount}
-      totalCount={totalCount}
-      onRemClick={handleRemClick}
-      documents={documents}
-      selectedDocumentId={selectedDocumentId}
-      onDocumentFilterChange={handleDocumentFilterChange}
-    />
+    <div className="flex flex-col h-full" style={{ backgroundColor: 'var(--rn-clr-background-primary)' }}>
+      {/* Graph toggle button in a small bar above the table */}
+      <div
+        className="flex items-center justify-end px-4 py-1 shrink-0"
+        style={{ borderBottom: '1px solid var(--rn-clr-border-primary)' }}
+      >
+        <button
+          onClick={() => setShowGraph(!showGraph)}
+          className="px-2 py-1 text-xs rounded transition-colors"
+          style={{
+            backgroundColor: showGraph ? 'var(--rn-clr-background-tertiary)' : 'var(--rn-clr-background-primary)',
+            color: 'var(--rn-clr-content-tertiary)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = showGraph ? 'var(--rn-clr-background-tertiary)' : 'var(--rn-clr-background-primary)';
+          }}
+          title={showGraph ? 'Hide KB Priority Graph' : 'Show KB Priority Graph'}
+        >
+          📊 {showGraph ? 'Hide Graph' : 'KB Priority Graph'}
+        </button>
+      </div>
+
+      {/* KB Priority Distribution Graph */}
+      {showGraph && graphBins && (
+        <div className="shrink-0 px-2 py-3" style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', overflow: 'hidden' }}>
+          <div className="w-full flex flex-col items-center p-3 bg-white rounded-lg border border-gray-200 shadow-sm" style={{ maxWidth: '100%' }}>
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">
+              KB Priority Distribution
+              <span className="text-xs font-normal text-gray-400 ml-2">
+                ({allIncRems?.length || 0} IncRems, {allCardInfos?.length || 0} Rems with Cards)
+              </span>
+            </h4>
+
+            <div style={{ width: '100%', height: 250 }}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={250} minWidth={100}>
+                <BarChart
+                  data={graphBins}
+                  margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="range"
+                    tick={{ fontSize: 10 }}
+                    interval={0}
+                    angle={-45}
+                    textAnchor="end"
+                    height={50}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    orientation="left"
+                    stroke="#3b82f6"
+                    allowDecimals={false}
+                    tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v)}
+                    label={{ value: 'IncRems', angle: -90, position: 'insideLeft', fill: '#3b82f6', fontSize: 10 }}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#ef4444"
+                    allowDecimals={false}
+                    tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v)}
+                    label={{ value: 'Rems with Cards', angle: 90, position: 'insideRight', fill: '#ef4444', fontSize: 10 }}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                  />
+                  <Legend verticalAlign="top" height={36} />
+                  <Bar yAxisId="left" dataKey="incRem" name="Incremental Rems" fill="#3b82f6" />
+                  <Bar yAxisId="right" dataKey="card" name="Rems with Cards" fill="#ef4444" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="text-xs text-gray-500 mt-1">
+              X-Axis: Absolute Priority (0-100)
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Original IncRemTable */}
+      <div className="flex-1" style={{ minHeight: 0 }}>
+        <IncRemTable
+          title="All Inc Rems"
+          icon="📊"
+          incRems={displayedRems}
+          loading={loadingRems}
+          dueCount={dueCount}
+          totalCount={totalCount}
+          onRemClick={handleRemClick}
+          documents={documents}
+          selectedDocumentId={selectedDocumentId}
+          onDocumentFilterChange={handleDocumentFilterChange}
+        />
+      </div>
+    </div>
   );
 }
 
