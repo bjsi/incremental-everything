@@ -1,15 +1,17 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
-import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey, priorityGraphDocPowerupCode, GRAPH_LAST_UPDATED_KEY_PREFIX } from '../lib/consts';
+import { allIncrementalRemKey, currentDocumentIdKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { generateAndStoreGraphData } from '../lib/priority_graph_data';
+import { PriorityDistributionGraphComponent } from './priority_distribution_graph';
 import '../style.css';
 import '../App.css';
 
 function IncRemCounter() {
   const plugin = usePlugin();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
 
   const counterData = useTrackerPlugin(
     async (rp) => {
@@ -51,12 +53,7 @@ function IncRemCounter() {
     []
   );
 
-  // Fetch the last updated timestamp for this document's graph
-  const lastUpdated = useRunAsync(async () => {
-    if (!counterData?.documentId) return null;
-    const ts = await plugin.storage.getSynced(GRAPH_LAST_UPDATED_KEY_PREFIX + counterData.documentId) as string | null;
-    return ts;
-  }, [counterData?.documentId, isGenerating]);
+
 
   if (!counterData || counterData.total === 0) {
     return null;
@@ -79,44 +76,17 @@ function IncRemCounter() {
     e.stopPropagation();
     if (!counterData.documentId || isGenerating) return;
 
+    // Toggle visibility
+    if (showGraph) {
+      setShowGraph(false);
+      return;
+    }
+
+    // If opening, generate data
     setIsGenerating(true);
+    setShowGraph(true);
     try {
-      const documentId = counterData.documentId;
-      const documentRem = await plugin.rem.findOne(documentId);
-      if (!documentRem) {
-        setIsGenerating(false);
-        return;
-      }
-
-      // Check if a graph Rem already exists as a child of this document
-      const children = await documentRem.getChildrenRem();
-      let graphRem = null;
-      for (const child of children) {
-        const hasPowerup = await child.hasPowerup(priorityGraphDocPowerupCode);
-        if (hasPowerup) {
-          graphRem = child;
-          break;
-        }
-      }
-
-      // If no graph Rem exists, create one as the first child
-      if (!graphRem) {
-        graphRem = await plugin.rem.createRem();
-        if (!graphRem) {
-          setIsGenerating(false);
-          return;
-        }
-        await graphRem.setText(["Priority Distribution Graph"]);
-        await graphRem.addPowerup(priorityGraphDocPowerupCode);
-
-        // Insert as first child (position 0)
-        await graphRem.setParent(documentRem, 0);
-      }
-
-      // Generate and store the graph data
-      await generateAndStoreGraphData(plugin, documentId, graphRem._id);
-
-      await plugin.app.toast('📊 Priority Graph updated!');
+      await generateAndStoreGraphData(plugin, counterData.documentId);
     } catch (err) {
       console.error('[PriorityGraph] Error generating graph:', err);
       await plugin.app.toast('Error generating graph');
@@ -125,21 +95,9 @@ function IncRemCounter() {
     }
   };
 
-  const handleRefreshClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Reuse the same logic as generating — it finds existing graph or creates one
-    await handleGraphClick(e);
-  };
 
-  // Format the last updated timestamp
-  const lastUpdatedText = lastUpdated
-    ? new Date(lastUpdated).toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    : null;
+
+
 
   return (
     <div style={{ padding: '8px 12px' }}>
@@ -168,29 +126,23 @@ function IncRemCounter() {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Last updated timestamp */}
-          {lastUpdatedText && (
-            <span className="text-xs mr-1" style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.7 }}>
-              📊 {lastUpdatedText}
-            </span>
-          )}
-
-          {/* Priority Graph button */}
+          {/* Priority Graph toggle button */}
           <button
             onClick={handleGraphClick}
             className="px-2 py-1 text-xs rounded transition-colors"
             style={{
-              backgroundColor: 'var(--rn-clr-background-primary)',
+              backgroundColor: showGraph ? 'var(--rn-clr-background-tertiary)' : 'var(--rn-clr-background-primary)',
               color: 'var(--rn-clr-content-tertiary)',
               opacity: isGenerating ? 0.5 : 1,
             }}
             onMouseEnter={(e) => { if (!isGenerating) e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)'; }}
-            title={lastUpdated ? 'Refresh Priority Graph' : 'Generate Priority Graph'}
+            onMouseLeave={(e) => { if (!showGraph) e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)'; }}
+            title={showGraph ? 'Hide Priority Distribution Graph' : 'Show Priority Distribution Graph'}
             disabled={isGenerating}
           >
-            {isGenerating ? '⏳' : (lastUpdated ? '🔄' : '📊')}
+            {isGenerating ? '⏳' : '📊'}
           </button>
+
 
           {/* View All button */}
           <button
@@ -208,6 +160,13 @@ function IncRemCounter() {
           </button>
         </div>
       </div>
+
+      {/* Inline Graph Container */}
+      {showGraph && counterData.documentId && (
+        <div className="mt-2 w-full border-t border-gray-200 pt-2">
+          <PriorityDistributionGraphComponent documentId={counterData.documentId} />
+        </div>
+      )}
     </div>
   );
 }

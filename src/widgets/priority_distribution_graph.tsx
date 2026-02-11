@@ -10,7 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { PRIORITY_GRAPH_DATA_KEY_PREFIX, priorityGraphDocPowerupCode, priorityGraphLastUpdatedSlotCode } from '../lib/consts';
+import { PRIORITY_GRAPH_DATA_KEY_PREFIX } from '../lib/consts';
 
 interface GraphDataPoint {
   range: string;
@@ -24,29 +24,15 @@ interface PriorityGraphData {
   lastUpdated?: string;
 }
 
-function PriorityDistributionGraph() {
+// Export as a reusable component, not just a widget
+export function PriorityDistributionGraphComponent({ documentId }: { documentId: string }) {
   const plugin = usePlugin();
   const [viewMode, setViewMode] = useState<'absolute' | 'kbRelative'>('absolute');
 
-  // Get the Rem ID this widget is attached to
-  const context = useTrackerPlugin(async (rp) => {
-    return await rp.widget.getWidgetContext<{ widgetInstanceId: string; remId: string }>();
-  }, []);
-
-  const remId = context?.remId;
-  const widgetInstanceId = context?.widgetInstanceId;
-
-  // Watch for updates to the graph data via the lastUpdated slot
-  const lastUpdatedSlot = useTrackerPlugin(async (reactivePlugin) => {
-    if (!remId) return null;
-    const rem = await reactivePlugin.rem.findOne(remId);
-    return await rem?.getPowerupProperty(priorityGraphDocPowerupCode, priorityGraphLastUpdatedSlotCode);
-  }, [remId]);
-
-  // Fetch the data and parse it
-  const graphData = useRunAsync(async () => {
-    if (!remId) return null;
-    const stored = await plugin.storage.getSynced(PRIORITY_GRAPH_DATA_KEY_PREFIX + remId) as any;
+  // Reactive fetch: automatically re-runs when the storage key updates
+  const graphData = useTrackerPlugin(async (reactivePlugin) => {
+    if (!documentId) return null;
+    const stored = await reactivePlugin.storage.getSynced(PRIORITY_GRAPH_DATA_KEY_PREFIX + documentId) as any;
 
     if (!stored) return null;
 
@@ -55,7 +41,7 @@ function PriorityDistributionGraph() {
       binsKbRelative: stored.binsKbRelative,
       lastUpdated: stored.lastUpdated || null,
     } as PriorityGraphData;
-  }, [remId, lastUpdatedSlot]);
+  }, [documentId]);
 
   if (!graphData || !graphData.bins || graphData.bins.length === 0) {
     return null;
@@ -154,7 +140,7 @@ function PriorityDistributionGraph() {
         <div className="text-xs text-gray-500 mb-1">
           {viewMode === 'absolute'
             ? 'X-Axis: Absolute Priority (0-100)'
-            : 'X-Axis: KB-wide Percentile (0-100%)'}
+            : 'X-Axis: KB-wide Relative Percentile (0-100%)'}
         </div>
         {graphData.lastUpdated && (
           <div className="text-xs text-gray-400 mt-1">
@@ -166,4 +152,7 @@ function PriorityDistributionGraph() {
   );
 }
 
-renderWidget(PriorityDistributionGraph);
+// Retain default export for widget registration if needed, but we essentially deprecate it.
+// We'll just export an empty or placeholder widget to avoid build errors if registry still points to it,
+// or we can remove the widgets.ts entry entirely later.
+export default PriorityDistributionGraphComponent;

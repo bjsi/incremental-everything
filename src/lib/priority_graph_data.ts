@@ -5,9 +5,6 @@ import {
     allIncrementalRemKey,
     allCardPriorityInfoKey,
     PRIORITY_GRAPH_DATA_KEY_PREFIX,
-    GRAPH_LAST_UPDATED_KEY_PREFIX,
-    priorityGraphDocPowerupCode,
-    priorityGraphLastUpdatedSlotCode,
 } from './consts';
 import { calculateAllPercentiles } from './utils';
 import { buildDocumentScope } from './scope_helpers';
@@ -101,7 +98,6 @@ export function computePriorityGraphData(
 export async function generateAndStoreGraphData(
     plugin: RNPlugin,
     documentId: string,
-    graphRemId: string,
 ): Promise<PriorityGraphData> {
     // 1. Build the document scope
     const documentScope = await buildDocumentScope(plugin as any, documentId);
@@ -117,59 +113,11 @@ export async function generateAndStoreGraphData(
     // 4. Compute the graph data (doc-scoped items, KB-wide percentiles)
     const graphData = computePriorityGraphData(docIncRems, docCardInfos, allIncRems, allCardInfos);
 
-    // 5. Store in synced storage
-    await plugin.storage.setSynced(PRIORITY_GRAPH_DATA_KEY_PREFIX + graphRemId, graphData);
-
-    // 6. Store last updated timestamp for the document (for UI display in inc_rem_counter)
-    await plugin.storage.setSynced(GRAPH_LAST_UPDATED_KEY_PREFIX + documentId, graphData.lastUpdated);
-
-    // 7. Update the lastUpdated slot on the graph Rem itself to trigger widget reactivity
-    const graphRem = await plugin.rem.findOne(graphRemId);
-    if (graphRem) {
-        await graphRem.setPowerupProperty(priorityGraphDocPowerupCode, priorityGraphLastUpdatedSlotCode, [String(Date.now())]);
-    }
+    // 5. Store in synced storage keyed by DOCUMENT ID
+    // We reuse the same prefix but append documentId, ensuring unique storage per document
+    await plugin.storage.setSynced(PRIORITY_GRAPH_DATA_KEY_PREFIX + documentId, graphData);
 
     return graphData;
 }
 
-/**
- * Refreshes graph data for all Rems tagged with the priority_graph powerup.
- * Intended to run in background on startup after card priority cache is loaded.
- */
-export async function refreshAllPriorityGraphs(plugin: RNPlugin): Promise<void> {
-    try {
-        const powerupRem = await plugin.powerup.getPowerupByCode(priorityGraphDocPowerupCode);
-        if (!powerupRem) {
-            console.log('[PriorityGraph] No priority graph powerup found. Skipping refresh.');
-            return;
-        }
 
-        const taggedRems = await powerupRem.taggedRem();
-        if (!taggedRems || taggedRems.length === 0) {
-            console.log('[PriorityGraph] No graph Rems found. Skipping refresh.');
-            return;
-        }
-
-        console.log(`[PriorityGraph] Refreshing ${taggedRems.length} priority graph(s) on startup...`);
-
-        for (const graphRem of taggedRems) {
-            try {
-                // Find the parent document of this graph Rem
-                const parentId = graphRem.parent;
-                if (!parentId) {
-                    console.warn(`[PriorityGraph] Graph Rem ${graphRem._id} has no parent. Skipping.`);
-                    continue;
-                }
-
-                await generateAndStoreGraphData(plugin, parentId, graphRem._id);
-                console.log(`[PriorityGraph] Refreshed graph for document ${parentId}`);
-            } catch (err) {
-                console.warn(`[PriorityGraph] Failed to refresh graph Rem ${graphRem._id}:`, err);
-            }
-        }
-
-        console.log('[PriorityGraph] Startup refresh complete.');
-    } catch (err) {
-        console.error('[PriorityGraph] Error during startup refresh:', err);
-    }
-}

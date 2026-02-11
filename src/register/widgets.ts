@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, priorityGraphDocPowerupCode } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode } from '../lib/consts';
 
 export function registerWidgets(plugin: ReactRNPlugin) {
 
@@ -165,13 +165,7 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerWidget('priority_distribution_graph', WidgetLocation.UnderRemEditor, {
-    powerupFilter: priorityGraphDocPowerupCode,
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
+
 
   plugin.app.registerWidget('incremental_history', WidgetLocation.RightSidebar, {
     dimensions: {
