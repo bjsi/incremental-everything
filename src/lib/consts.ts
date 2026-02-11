@@ -102,3 +102,4 @@ export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';
 export const priorityGraphDocPowerupCode = 'priority_graph';
 export const PRIORITY_GRAPH_DATA_KEY_PREFIX = 'priority_graph_data_';
 export const GRAPH_LAST_UPDATED_KEY_PREFIX = 'priority_graph_last_updated_';
+export const priorityGraphLastUpdatedSlotCode = 'priority_graph_last_updated';

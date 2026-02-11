@@ -10,7 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { PRIORITY_GRAPH_DATA_KEY_PREFIX } from '../lib/consts';
+import { PRIORITY_GRAPH_DATA_KEY_PREFIX, priorityGraphDocPowerupCode, priorityGraphLastUpdatedSlotCode } from '../lib/consts';
 
 interface GraphDataPoint {
   range: string;
@@ -34,6 +34,14 @@ function PriorityDistributionGraph() {
   }, []);
 
   const remId = context?.remId;
+  const widgetInstanceId = context?.widgetInstanceId;
+
+  // Watch for updates to the graph data via the lastUpdated slot
+  const lastUpdatedSlot = useTrackerPlugin(async (reactivePlugin) => {
+    if (!remId) return null;
+    const rem = await reactivePlugin.rem.findOne(remId);
+    return await rem?.getPowerupProperty(priorityGraphDocPowerupCode, priorityGraphLastUpdatedSlotCode);
+  }, [remId]);
 
   // Fetch the data and parse it
   const graphData = useRunAsync(async () => {
@@ -47,7 +55,7 @@ function PriorityDistributionGraph() {
       binsKbRelative: stored.binsKbRelative,
       lastUpdated: stored.lastUpdated || null,
     } as PriorityGraphData;
-  }, [remId]);
+  }, [remId, lastUpdatedSlot]);
 
   if (!graphData || !graphData.bins || graphData.bins.length === 0) {
     return null;

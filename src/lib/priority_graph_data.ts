@@ -7,6 +7,7 @@ import {
     PRIORITY_GRAPH_DATA_KEY_PREFIX,
     GRAPH_LAST_UPDATED_KEY_PREFIX,
     priorityGraphDocPowerupCode,
+    priorityGraphLastUpdatedSlotCode,
 } from './consts';
 import { calculateAllPercentiles } from './utils';
 import { buildDocumentScope } from './scope_helpers';
@@ -121,6 +122,12 @@ export async function generateAndStoreGraphData(
 
     // 6. Store last updated timestamp for the document (for UI display in inc_rem_counter)
     await plugin.storage.setSynced(GRAPH_LAST_UPDATED_KEY_PREFIX + documentId, graphData.lastUpdated);
+
+    // 7. Update the lastUpdated slot on the graph Rem itself to trigger widget reactivity
+    const graphRem = await plugin.rem.findOne(graphRemId);
+    if (graphRem) {
+        await graphRem.setPowerupProperty(priorityGraphDocPowerupCode, priorityGraphLastUpdatedSlotCode, [String(Date.now())]);
+    }
 
     return graphData;
 }

@@ -14,6 +14,7 @@ import {
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
+  priorityGraphLastUpdatedSlotCode,
 } from '../lib/consts';
 import { initIncrementalRem } from '../lib/incremental_rem';
 
@@ -105,7 +106,14 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
     code: priorityGraphDocPowerupCode,
     description: 'Displays a priority distribution graph for a document scope.',
     options: {
-      slots: []
+      slots: [
+        {
+          code: priorityGraphLastUpdatedSlotCode,
+          name: 'Last Updated',
+          propertyType: PropertyType.NUMBER,
+          hidden: true,
+        },
+      ]
     }
   });
 
