@@ -125,8 +125,16 @@ export function IncRemMainView() {
   const handleRemClick = async (remId: string) => {
     try {
       const rem = await plugin.rem.findOne(remId);
+      const incRem = incRemsWithDetails.find(r => r.remId === remId);
+
       if (rem) {
-        await plugin.window.openRem(rem);
+        if (incRem?.incRemType === 'pdf-note') {
+          // For PDF notes, attempt to force open in main editor context using openRemAsPage
+          // User confirmed this is the safe way to avoid opening the PDF
+          await rem.openRemAsPage();
+        } else {
+          await plugin.window.openRem(rem);
+        }
         await plugin.widget.closePopup();
       }
     } catch (error) {

@@ -67,12 +67,18 @@ export function IncRemList() {
 
         const incRemType = await determineIncRemType(plugin, rem);
 
+
+        const lastReviewDate = incRem.history && incRem.history.length > 0
+          ? Math.max(...incRem.history.map(h => h.date))
+          : undefined;
+
         remsWithDetails.push({
           ...incRem,
           remText: textStr || '[Empty rem]',
           incRemType,
           percentile: percentiles[incRem.remId],
           totalTimeSpent: getTotalTimeSpent(incRem),
+          lastReviewDate,
         });
       } catch (error) {
         console.error('Error loading rem details:', error);
@@ -87,8 +93,16 @@ export function IncRemList() {
 
   const handleRemClick = async (remId: string) => {
     const rem = await plugin.rem.findOne(remId);
+    const incRem = incRemsWithDetails.find(r => r.remId === remId);
+
     if (rem) {
-      await plugin.window.openRem(rem);
+      if (incRem?.incRemType === 'pdf-note') {
+        // For PDF notes, attempt to force open in main editor context using openRemAsPage
+        // User confirmed this is the safe way to avoid opening the PDF
+        await rem.openRemAsPage();
+      } else {
+        await plugin.window.openRem(rem);
+      }
       await plugin.widget.closePopup();
     }
   };

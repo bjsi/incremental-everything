@@ -10,10 +10,11 @@ export interface IncRemWithDetails extends IncrementalRem {
   totalTimeSpent?: number;
   documentId?: string;
   documentName?: string;
+  lastReviewDate?: number;
 }
 
 type FilterStatus = 'all' | 'due' | 'scheduled';
-type SortBy = 'priority' | 'date' | 'reviews' | 'time';
+type SortBy = 'priority' | 'date' | 'reviews' | 'time' | 'lastReview';
 type SortOrder = 'asc' | 'desc';
 
 export interface DocumentInfo {
@@ -51,6 +52,7 @@ export function IncRemTable({
   onDocumentFilterChange,
 }: IncRemTableProps) {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [filterType, setFilterType] = useState<ActionItemType | 'all'>('all');
   const [priorityMin, setPriorityMin] = useState<number>(0);
   const [priorityMax, setPriorityMax] = useState<number>(100);
   const [searchText, setSearchText] = useState<string>('');
@@ -64,6 +66,7 @@ export function IncRemTable({
       if (filterStatus === 'due' && rem.nextRepDate > now) return false;
       if (filterStatus === 'scheduled' && rem.nextRepDate <= now) return false;
       if (rem.priority < priorityMin || rem.priority > priorityMax) return false;
+      if (filterType !== 'all' && rem.incRemType !== filterType) return false;
       if (searchText && rem.remText && !rem.remText.toLowerCase().includes(searchText.toLowerCase())) {
         return false;
       }
@@ -84,14 +87,18 @@ export function IncRemTable({
         const aTime = a.totalTimeSpent || 0;
         const bTime = b.totalTimeSpent || 0;
         comparison = aTime - bTime;
+      } else if (sortBy === 'lastReview') {
+        const aDate = a.lastReviewDate || 0;
+        const bDate = b.lastReviewDate || 0;
+        comparison = aDate - bDate;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
     return filtered;
-  }, [incRems, filterStatus, priorityMin, priorityMax, searchText, sortBy, sortOrder]);
+  }, [incRems, filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder]);
 
-  const hasActiveFilters = filterStatus !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '' || selectedDocumentId;
+  const hasActiveFilters = filterStatus !== 'all' || filterType !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '' || selectedDocumentId;
 
   return (
     <div className="flex flex-col h-full" style={{
@@ -147,9 +154,10 @@ export function IncRemTable({
             }}
           >
             <option value="priority">Priority</option>
-            <option value="date">Date</option>
+            <option value="date">Due Date</option>
             <option value="reviews">Reviews</option>
             <option value="time">Time Spent</option>
+            <option value="lastReview">Last Review Date</option>
           </select>
           <button
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -221,6 +229,30 @@ export function IncRemTable({
           </select>
         )}
 
+        {/* Rem Type filter */}
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value as ActionItemType | 'all')}
+          className="px-2 py-1 text-xs rounded"
+          style={{
+            backgroundColor: 'var(--rn-clr-background-primary)',
+            color: 'var(--rn-clr-content-primary)',
+            border: 'none',
+            maxWidth: '120px',
+          }}
+          title="Filter by Rem Type"
+        >
+          <option value="all">All Types</option>
+          <option value="pdf">PDF</option>
+          <option value="pdf-highlight">PDF Highlight</option>
+          <option value="pdf-note">PDF Note</option>
+          <option value="html">HTML</option>
+          <option value="html-highlight">HTML Highlight</option>
+          <option value="youtube">YouTube</option>
+          <option value="video">Video</option>
+          <option value="rem">Rem</option>
+        </select>
+
         {/* Priority range */}
         <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
           <span>★</span>
@@ -258,6 +290,7 @@ export function IncRemTable({
           <button
             onClick={() => {
               setFilterStatus('all');
+              setFilterType('all');
               setPriorityMin(0);
               setPriorityMax(100);
               setSearchText('');
@@ -291,6 +324,7 @@ export function IncRemTable({
                   ...incRem,
                   historyCount: incRem.history?.length,
                   totalTimeSpent: incRem.totalTimeSpent,
+                  lastReviewDate: incRem.lastReviewDate,
                 } as IncRemRowData}
                 onClick={() => onRemClick(incRem.remId)}
               />
