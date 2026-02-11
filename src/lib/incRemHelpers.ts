@@ -107,7 +107,7 @@ export const getHtmlSourceUrl = async (
   remType: string | null | undefined
 ): Promise<string | null> => {
   if (!rem) return null;
-  
+
   try {
     // Helper function to extract URL from a rem that has the Link powerup
     const getUrlFromRem = async (r: PluginRem): Promise<string | null> => {
@@ -132,11 +132,11 @@ export const getHtmlSourceUrl = async (
         console.log('[getHtmlSourceUrl] Found URL directly on rem');
         return directUrl;
       }
-      
+
       // 2. Check Sources - RemNote Clipper stores the URL on a source rem
       const sources = await rem.getSources();
       console.log('[getHtmlSourceUrl] Checking sources, count:', sources.length);
-      
+
       for (const source of sources) {
         const sourceUrl = await getUrlFromRem(source);
         if (sourceUrl) {
@@ -144,7 +144,7 @@ export const getHtmlSourceUrl = async (
           return sourceUrl;
         }
       }
-      
+
       // 3. Check parent rem (sometimes the structure nests differently)
       const parent = await rem.getParentRem();
       if (parent) {
@@ -153,7 +153,7 @@ export const getHtmlSourceUrl = async (
           console.log('[getHtmlSourceUrl] Found URL on parent rem');
           return parentUrl;
         }
-        
+
         // Also check parent's sources
         const parentSources = await parent.getSources();
         for (const source of parentSources) {
@@ -165,7 +165,7 @@ export const getHtmlSourceUrl = async (
         }
       }
     }
-    
+
     // For HTML highlights, we need to get the URL from the source HTML document
     if (remType === 'html-highlight') {
       // The source HTML rem is stored via the HTMLId property
@@ -173,10 +173,10 @@ export const getHtmlSourceUrl = async (
         BuiltInPowerupCodes.HTMLHighlight,
         'HTMLId'
       );
-      
+
       // Extract the rem ID from the rich text (it's a reference)
       const htmlRemId = (htmlIdRichText?.[0] as any)?._id;
-      
+
       if (htmlRemId) {
         const htmlRem = await plugin.rem.findOne(htmlRemId);
         if (htmlRem) {
@@ -185,7 +185,7 @@ export const getHtmlSourceUrl = async (
           if (directUrl) {
             return directUrl;
           }
-          
+
           // Check sources of the HTML rem
           const sources = await htmlRem.getSources();
           for (const source of sources) {
@@ -197,7 +197,7 @@ export const getHtmlSourceUrl = async (
         }
       }
     }
-    
+
     console.log('[getHtmlSourceUrl] No URL found after checking all locations');
     return null;
   } catch (error) {
@@ -205,3 +205,31 @@ export const getHtmlSourceUrl = async (
     return null;
   }
 };
+
+/**
+ * Get a breadcrumb string for a rem (e.g. "Grandparent > Parent").
+ * Traverses up to 5 levels deep.
+ */
+export async function getBreadcrumbText(plugin: RNPlugin, rem: any): Promise<string> {
+  try {
+    const parts: string[] = [];
+    let current = rem;
+    // We want ancestors, so start with parent
+    let parent = await current.getParentRem();
+
+    for (let i = 0; i < 5; i++) {
+      if (!parent) break;
+      const text = await parent.text;
+      const name = extractText(text);
+      if (name) {
+        parts.unshift(name.length > 40 ? name.substring(0, 40) + '...' : name);
+      }
+      parent = await parent.getParentRem();
+    }
+
+    if (parts.length === 0) return '';
+    return parts.join(' > ');
+  } catch (error) {
+    return '';
+  }
+}

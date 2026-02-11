@@ -11,6 +11,7 @@ export interface IncRemWithDetails extends IncrementalRem {
   documentId?: string;
   documentName?: string;
   lastReviewDate?: number;
+  breadcrumb?: string;
 }
 
 type FilterStatus = 'all' | 'due' | 'scheduled';
@@ -325,6 +326,7 @@ export function IncRemTable({
                   historyCount: incRem.history?.length,
                   totalTimeSpent: incRem.totalTimeSpent,
                   lastReviewDate: incRem.lastReviewDate,
+                  breadcrumb: incRem.breadcrumb,
                 } as IncRemRowData}
                 onClick={() => onRemClick(incRem.remId)}
               />

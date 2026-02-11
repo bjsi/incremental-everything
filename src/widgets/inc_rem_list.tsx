@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { buildDocumentScope } from '../lib/scope_helpers';
-import { extractText, determineIncRemType, getTotalTimeSpent } from '../lib/incRemHelpers';
+import { extractText, determineIncRemType, getTotalTimeSpent, getBreadcrumbText } from '../lib/incRemHelpers';
 import { IncRemTable, IncRemWithDetails } from '../components';
 import '../style.css';
 import '../App.css';
@@ -67,10 +67,12 @@ export function IncRemList() {
 
         const incRemType = await determineIncRemType(plugin, rem);
 
-
         const lastReviewDate = incRem.history && incRem.history.length > 0
           ? Math.max(...incRem.history.map(h => h.date))
           : undefined;
+
+        // Get breadcrumb for tooltip
+        const breadcrumb = await getBreadcrumbText(plugin, rem);
 
         remsWithDetails.push({
           ...incRem,
@@ -79,6 +81,7 @@ export function IncRemList() {
           percentile: percentiles[incRem.remId],
           totalTimeSpent: getTotalTimeSpent(incRem),
           lastReviewDate,
+          breadcrumb,
         });
       } catch (error) {
         console.error('Error loading rem details:', error);
@@ -97,8 +100,7 @@ export function IncRemList() {
 
     if (rem) {
       if (incRem?.incRemType === 'pdf-note') {
-        // For PDF notes, attempt to force open in main editor context using openRemAsPage
-        // User confirmed this is the safe way to avoid opening the PDF
+        // For PDF notes, use openRemAsPage to avoid opening the PDF viewer
         await rem.openRemAsPage();
       } else {
         await plugin.window.openRem(rem);

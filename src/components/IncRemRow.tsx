@@ -15,6 +15,7 @@ export interface IncRemRowData {
   historyCount?: number;
   totalTimeSpent?: number;
   lastReviewDate?: number;
+  breadcrumb?: string;
 }
 
 interface IncRemRowProps {
@@ -38,7 +39,7 @@ export function IncRemRow({ incRem, onClick, showType = true }: IncRemRowProps) 
         className="flex-1 min-w-0 text-sm"
         style={{ color: 'var(--rn-clr-content-primary)' }}
       >
-        <div className="truncate" title={incRem.remText}>
+        <div className="truncate" title={incRem.breadcrumb ? `${incRem.breadcrumb} > ${incRem.remText}` : incRem.remText}>
           {incRem.remText || 'Loading...'}
         </div>
         {(incRem.historyCount !== undefined && incRem.historyCount > 0) || (incRem.totalTimeSpent !== undefined && incRem.totalTimeSpent > 0) ? (

@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { allIncrementalRemKey, allCardPriorityInfoKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { CardPriorityInfo } from '../lib/card_priority';
-import { extractText, determineIncRemType, getTotalTimeSpent, getTopLevelDocument } from '../lib/incRemHelpers';
+import { extractText, determineIncRemType, getTotalTimeSpent, getTopLevelDocument, getBreadcrumbText } from '../lib/incRemHelpers';
 import { IncRemTable, IncRemWithDetails, DocumentInfo } from '../components';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import {
@@ -102,6 +102,9 @@ export function IncRemMainView() {
 
           const topLevelDoc = await getTopLevelDocument(plugin, rem);
 
+          // Get breadcrumb for tooltip
+          const breadcrumb = await getBreadcrumbText(plugin, rem);
+
           return {
             ...incRem,
             remText: textStr || '[Empty rem]',
@@ -110,6 +113,7 @@ export function IncRemMainView() {
             totalTimeSpent: getTotalTimeSpent(incRem),
             documentId: topLevelDoc?.id,
             documentName: topLevelDoc?.name,
+            breadcrumb,
           };
         } catch (error) {
           console.error('Error loading rem details:', error);
