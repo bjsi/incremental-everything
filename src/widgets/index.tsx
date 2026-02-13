@@ -54,6 +54,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   if (!useLightMode) {
     // Run the full, expensive cache build
     loadCardPriorityCache(plugin);
+
   } else {
     // In 'light' mode, just set an empty cache.
     console.log('CACHE: Light mode enabled. Skipping card priority cache build.');

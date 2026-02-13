@@ -99,6 +99,8 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
     }
   });
 
+
+
   // Dismissed Powerup - stores history of previously Incremental Rems
   await plugin.app.registerPowerup({
     name: 'Dismissed',

@@ -165,6 +165,8 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+
+
   plugin.app.registerWidget('incremental_history', WidgetLocation.RightSidebar, {
     dimensions: {
       width: '100%',

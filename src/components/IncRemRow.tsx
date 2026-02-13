@@ -3,7 +3,7 @@ import { ActionItemType } from '../lib/incremental_rem/types';
 import { TypeBadge } from './TypeBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { TimeBadge } from './TimeBadge';
-import { formatDuration } from '../lib/utils';
+import { formatDuration, timeSince } from '../lib/utils';
 
 export interface IncRemRowData {
   remId: string;
@@ -14,6 +14,8 @@ export interface IncRemRowData {
   percentile?: number;
   historyCount?: number;
   totalTimeSpent?: number;
+  lastReviewDate?: number;
+  breadcrumb?: string;
 }
 
 interface IncRemRowProps {
@@ -37,7 +39,7 @@ export function IncRemRow({ incRem, onClick, showType = true }: IncRemRowProps) 
         className="flex-1 min-w-0 text-sm"
         style={{ color: 'var(--rn-clr-content-primary)' }}
       >
-        <div className="truncate" title={incRem.remText}>
+        <div className="truncate" title={incRem.breadcrumb ? `${incRem.breadcrumb} > ${incRem.remText}` : incRem.remText}>
           {incRem.remText || 'Loading...'}
         </div>
         {(incRem.historyCount !== undefined && incRem.historyCount > 0) || (incRem.totalTimeSpent !== undefined && incRem.totalTimeSpent > 0) ? (
@@ -48,6 +50,11 @@ export function IncRemRow({ incRem, onClick, showType = true }: IncRemRowProps) 
             {incRem.totalTimeSpent !== undefined && incRem.totalTimeSpent > 0 && (
               <span style={{ color: '#10b981' }} title="Total time spent">
                 ⏱️ {formatDuration(incRem.totalTimeSpent)}
+              </span>
+            )}
+            {incRem.lastReviewDate && (
+              <span style={{ color: 'var(--rn-clr-content-tertiary)' }} title="Last review date">
+                • Last reviewed: {timeSince(new Date(incRem.lastReviewDate))}
               </span>
             )}
           </div>

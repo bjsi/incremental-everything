@@ -577,7 +577,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         const cards = await rem.getCards();
         if (cards && cards.length > 0) {
           const existingPriority = await getCardPriority(plugin, rem);
-          if (!existingPriority) {
+          if (!existingPriority || existingPriority.source === 'default' || existingPriority.source === 'inherited') {
             await autoAssignCardPriority(plugin, rem);
           }
         }

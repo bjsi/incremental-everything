@@ -116,8 +116,8 @@ function BatchCardPriority() {
             // Extract just the priority number from the object - use ?? to handle 0 correctly
             const cardPriorityValue = cardPriorityInfo?.priority ?? null;
             const cardPrioritySource = cardPriorityInfo?.source ?? null;
-            // Check if it's manually set (not inherited or default)
-            const hasManualCardPriority = hasCardPriority && cardPrioritySource === 'manual';
+            // Check if it's manually or incrementally set (not inherited or default)
+            const hasManualCardPriority = hasCardPriority && (cardPrioritySource === 'manual' || cardPrioritySource === 'incremental');
 
             // Check for Incremental Rem powerup directly
             const hasIncremental = await rem.hasPowerup(powerupCode);
@@ -141,9 +141,8 @@ function BatchCardPriority() {
               cardPrioritySource: cardPrioritySource,
               hasIncRem: hasIncremental,
               incRemPriority: incRemPriority,
-              // Select by default only if it doesn't have manual cardPriority
-              // or if it's an IncRem (depending on the checkbox)
-              isChecked: !hasManualCardPriority || (hasIncremental && tagIncRemsWithCardPriority),
+              // Select by default only if it doesn't have manual/incremental cardPriority
+              isChecked: !hasManualCardPriority,
             });
           } catch (error) {
             console.error(`Error processing rem ${rem._id}:`, error);
@@ -207,8 +206,8 @@ function BatchCardPriority() {
         category === 'withManualCardPriority'
           ? remsWithManualCardPriority
           : category === 'withIncRem'
-          ? remsWithIncRem
-          : remsWithoutPriority;
+            ? remsWithIncRem
+            : remsWithoutPriority;
       const allChecked = categoryRems.every((r) => r.isChecked);
 
       return prev.map((r) => {
@@ -242,13 +241,13 @@ function BatchCardPriority() {
       return;
     }
 
-    // Check if any selected rems already have manual cardPriority and overwrite is off
+    // Check if any selected rems already have manual/incremental cardPriority and overwrite is off
     const selectedWithManualCardPriority = selectedRems.filter((r) => r.hasManualCardPriority);
     if (selectedWithManualCardPriority.length > 0 && !overwriteExisting) {
       const confirmed = confirm(
-        `${selectedWithManualCardPriority.length} selected rem(s) already have manual cardPriority.\n\n` +
-          `Enable "Overwrite existing manual cardPriority" to update them.\n\n` +
-          `Continue without updating these rems?`
+        `${selectedWithManualCardPriority.length} selected rem(s) already have manual/incremental cardPriority.\n\n` +
+        `Enable "Overwrite existing manual/incremental cardPriority" to update them.\n\n` +
+        `Continue without updating these rems?`
       );
       if (!confirmed) return;
     }
@@ -426,6 +425,10 @@ function BatchCardPriority() {
       backgroundColor: '#fbbf24',
       color: '#78350f',
     },
+    incrementalBadge: {
+      backgroundColor: '#86efac',
+      color: '#14532d',
+    },
     incRemBadge: {
       backgroundColor: '#60a5fa',
       color: '#1e3a8a',
@@ -482,7 +485,7 @@ function BatchCardPriority() {
         </div>
       </div>
 
-      {/* Rems with existing manual cardPriority */}
+      {/* Rems with existing manual/incremental cardPriority */}
       {remsWithManualCardPriority.length > 0 && (
         <div style={styles.section}>
           <div style={styles.sectionTitle}>
@@ -492,7 +495,7 @@ function BatchCardPriority() {
               onChange={(e) => setOverwriteExisting(e.target.checked)}
               disabled={isApplying}
             />
-            <span>Overwrite existing manual cardPriority ({remsWithManualCardPriority.length})</span>
+            <span>Overwrite existing manual/incremental cardPriority ({remsWithManualCardPriority.length})</span>
             <button
               onClick={() => toggleAll('withManualCardPriority')}
               style={{ marginLeft: 'auto', fontSize: '12px', padding: '2px 8px' }}
@@ -511,8 +514,8 @@ function BatchCardPriority() {
                   disabled={isApplying || !overwriteExisting}
                 />
                 <span>{rem.name}</span>
-                <span style={{ ...styles.badge, ...styles.cardPriorityBadge }}>
-                  CP: {rem.cardPriority}
+                <span style={{ ...styles.badge, ...(rem.cardPrioritySource === 'manual' ? styles.cardPriorityBadge : styles.incrementalBadge) }}>
+                  {rem.cardPrioritySource === 'manual' ? 'Manual' : 'Incremental'} CP: {rem.cardPriority}
                 </span>
               </div>
             ))}
