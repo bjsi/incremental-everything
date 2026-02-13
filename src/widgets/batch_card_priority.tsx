@@ -141,9 +141,8 @@ function BatchCardPriority() {
               cardPrioritySource: cardPrioritySource,
               hasIncRem: hasIncremental,
               incRemPriority: incRemPriority,
-              // Select by default only if it doesn't have manual cardPriority
-              // or if it's an IncRem (depending on the checkbox)
-              isChecked: !hasManualCardPriority || (hasIncremental && tagIncRemsWithCardPriority),
+              // Select by default only if it doesn't have manual/incremental cardPriority
+              isChecked: !hasManualCardPriority,
             });
           } catch (error) {
             console.error(`Error processing rem ${rem._id}:`, error);
