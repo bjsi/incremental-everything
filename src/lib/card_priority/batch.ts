@@ -12,9 +12,9 @@ import * as _ from 'remeda';
 export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   const confirmed = confirm(
     '⚠️ Remove All CardPriority Data\n\n' +
-      'This will permanently remove ALL cardPriority tags and their data from your entire knowledge base.\n\n' +
-      'This action cannot be undone.\n\n' +
-      'Are you sure you want to proceed?'
+    'This will permanently remove ALL cardPriority tags and their data from your entire knowledge base.\n\n' +
+    'This action cannot be undone.\n\n' +
+    'Are you sure you want to proceed?'
   );
 
   if (!confirmed) {
@@ -92,8 +92,8 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
     await plugin.app.toast('❌ Error during cleanup. Check console for details.');
     alert(
       'An error occurred during cleanup.\n\n' +
-        'Some tags may not have been removed.\n' +
-        'Please check the console for details.'
+      'Some tags may not have been removed.\n' +
+      'Please check the console for details.'
     );
   }
 }
@@ -101,10 +101,10 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
 export async function updateAllCardPriorities(plugin: RNPlugin) {
   const confirmed = confirm(
     '📊 Update All Inherited Card Priorities\n\n' +
-      'This will analyze all flashcards in your knowledge base and update all priorities that are inherited from their ancestors.\n\n' +
-      'Your manually set card priorities will not be affected.\n\n' +
-      'This ensures that manual prioritization inputs made to ancestors are properly spread to their descendants.\n\n' +
-      'This may take several minutes for large collections. Continue?'
+    'This will analyze all flashcards in your knowledge base and update all priorities that are inherited from their ancestors.\n\n' +
+    'Your manually set card priorities will not be affected.\n\n' +
+    'This ensures that manual prioritization inputs made to ancestors are properly spread to their descendants.\n\n' +
+    'This may take several minutes for large collections. Continue?'
   );
 
   if (!confirmed) {
@@ -120,15 +120,25 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
     const startTime = Date.now();
 
     const allCards = await plugin.card.getAll();
-    const uniqueRemIds = _.uniq(allCards.map((c) => c.remId));
+    const cardRemIds = new Set(allCards.map((c) => c.remId));
+
+    // Also include rems that have the cardPriority powerup but no cards
+    // (e.g. IncRems with cardPriority set for inheritance purposes)
+    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+    const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+    for (const rem of taggedRems) {
+      cardRemIds.add(rem._id);
+    }
+
+    const uniqueRemIds = Array.from(cardRemIds);
 
     if (uniqueRemIds.length === 0) {
-      await plugin.app.toast('No flashcards found in knowledge base');
+      await plugin.app.toast('No flashcards or cardPriority rems found in knowledge base');
       return;
     }
 
-    console.log(`Found ${uniqueRemIds.length} rems with flashcards to process`);
-    await plugin.app.toast(`Found ${uniqueRemIds.length} rems with flashcards. Processing...`);
+    console.log(`Found ${uniqueRemIds.length} rems to process (${allCards.length} from cards, ${taggedRems.length} from cardPriority powerup)`);
+    await plugin.app.toast(`Found ${uniqueRemIds.length} rems to process...`);
 
     let processed = 0;
     let tagged = 0;
@@ -162,7 +172,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
               const priorityValue = await rem.getPowerupProperty('cardPriority', 'priority');
               const source = await rem.getPowerupProperty('cardPriority', 'prioritySource');
 
-              if (priorityValue && source === 'manual') {
+              if (priorityValue && (source === 'manual' || source === 'incremental')) {
                 skippedManual++;
                 processed++;
                 return;
@@ -190,6 +200,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
               calculatedPriority.priority !== oldPriorityValue ||
               calculatedPriority.source !== oldPrioritySource
             ) {
+
               await setCardPriority(plugin, rem, calculatedPriority.priority, calculatedPriority.source);
               tagged++;
 
@@ -218,7 +229,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
         await plugin.app.toast(`Progress: ${progress}% (${processed}/${uniqueRemIds.length}) - ${elapsed}s elapsed`);
         console.log(
           `Progress: ${processed}/${uniqueRemIds.length} (${progress}%) - ` +
-            `Tagged: ${tagged}, Changed: ${priorityChanged}, Skipped manual: ${skippedManual}, Errors: ${errors}`
+          `Tagged: ${tagged}, Changed: ${priorityChanged}, Skipped manual: ${skippedManual}, Errors: ${errors}`
         );
       }
 
