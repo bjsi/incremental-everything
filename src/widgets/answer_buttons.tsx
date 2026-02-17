@@ -53,7 +53,7 @@ const handleCardPriorityInheritance = async (
 
   // Start the timer
   const startTime = Date.now();
-  console.log(`[Done Button] 🏁 Starting depth-limited (max ${MAX_DEPTH_CHECK} levels) check for Rem: ${rem._id}`);
+  // console.log(`[Done Button] 🏁 Starting depth-limited (max ${MAX_DEPTH_CHECK} levels) check for Rem: ${rem._id}`);
 
   try {
     // 1. Check if the Rem already has a *set* cardPriority tag with a non-default source.
@@ -62,7 +62,7 @@ const handleCardPriorityInheritance = async (
     // If the Rem is tagged AND the source is 'manual' or 'inherited', we stop.
     // We proceed if the Rem is untagged (existingSource is null) or if the tag source is 'default'.
     if (existingSource && typeof existingSource === 'string' && existingSource.toLowerCase() !== 'default') {
-      console.log(`[Done Button] Rem already has manual/inherited priority tag. Skipping check. Total time: ${Date.now() - startTime}ms.`);
+      // console.log(`[Done Button] Rem already has manual/inherited priority tag. Skipping check. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
 
@@ -72,7 +72,7 @@ const handleCardPriorityInheritance = async (
     if (useLightMode) {
       // In Light Mode, skip expensive flashcard checking and add cardPriority directly
       await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
-      console.log(`[Done Button] ⚡ Light Mode: Set card priority ${incRemInfo.priority} (source: incremental) without flashcard check. Total time: ${Date.now() - startTime}ms.`);
+      // console.log(`[Done Button] ⚡ Light Mode: Set card priority ${incRemInfo.priority} (source: incremental) without flashcard check. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
 
@@ -81,7 +81,7 @@ const handleCardPriorityInheritance = async (
     if (remCards && remCards.length > 0) {
       // Rem has its own flashcards, set card priority
       await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
-      console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} (source: incremental) for Rem with direct flashcards. Total time: ${Date.now() - startTime}ms.`);
+      // console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} (source: incremental) for Rem with direct flashcards. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
 
@@ -90,11 +90,11 @@ const handleCardPriorityInheritance = async (
     const descendantsToCheck = await getDescendantsToDepth(rem, MAX_DEPTH_CHECK);
 
     if (descendantsToCheck.length === 0) {
-      console.log(`[Done Button] No descendants found within ${MAX_DEPTH_CHECK} levels. Total time: ${Date.now() - startTime}ms.`);
+      // console.log(`[Done Button] No descendants found within ${MAX_DEPTH_CHECK} levels. Total time: ${Date.now() - startTime}ms.`);
       return;
     }
 
-    console.log(`[Done Button] Checking ${descendantsToCheck.length} descendants up to level ${MAX_DEPTH_CHECK}...`);
+    // console.log(`[Done Button] Checking ${descendantsToCheck.length} descendants up to level ${MAX_DEPTH_CHECK}...`);
 
     // 5. Full Mode: Batch-check the limited descendants with early termination
     const BATCH_SIZE = 50;
@@ -114,17 +114,17 @@ const handleCardPriorityInheritance = async (
       if (batchResults.some(hasCards => hasCards)) {
         // Found at least one descendant with flashcards
         await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
-        console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} (source: incremental) for Rem with descendant flashcards. Found in batch starting at index ${i}. Total time: ${Date.now() - startTime}ms.`);
+        // console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} (source: incremental) for Rem with descendant flashcards. Found in batch starting at index ${i}. Total time: ${Date.now() - startTime}ms.`);
         return; // Early termination
       }
-      console.log(`[Done Button] Batch ${Math.floor(i / BATCH_SIZE) + 1} clear. Moving to next batch...`);
+      // console.log(`[Done Button] Batch ${Math.floor(i / BATCH_SIZE) + 1} clear. Moving to next batch...`);
     }
 
     // No flashcards found in the Rem or its checked descendants
-    console.log(`[Done Button] No flashcards found in Rem or all checked descendants. Total time: ${Date.now() - startTime}ms.`);
+    // console.log(`[Done Button] No flashcards found in Rem or all checked descendants. Total time: ${Date.now() - startTime}ms.`);
 
   } catch (error) {
-    console.error(`[Done Button] ❌ Error in handleCardPriorityInheritance. Total time: ${Date.now() - startTime}ms.`, error);
+    // console.error(`[Done Button] ❌ Error in handleCardPriorityInheritance. Total time: ${Date.now() - startTime}ms.`, error);
   }
 };
 
@@ -237,7 +237,7 @@ export function AnswerButtons() {
     ) : null;
 
     if (topMissedInKb) {
-      console.log(`[AnswerButtons] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allIncRems.length}`);
+      // console.log(`[AnswerButtons] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allIncRems.length}`);
     }
 
 
@@ -252,7 +252,7 @@ export function AnswerButtons() {
           topMissedInDoc.priority,
           (r) => !seenRemIds.includes(r.remId) || r.remId === rem._id
         );
-        console.log(`[AnswerButtons] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allIncRemsInScope.length}`);
+        // console.log(`[AnswerButtons] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allIncRemsInScope.length}`);
       }
     }
 
@@ -269,13 +269,13 @@ export function AnswerButtons() {
   }, [shouldDisplayShield, coreData?.sessionCache, allIncRems, coreData?.rem?._id, useLightMode]);
 
   const htmlSourceUrl = useTrackerPlugin(async (rp) => {
-    console.log('[htmlSourceUrl] rem:', baseData?.rem?._id, 'remType:', remType);
+    // console.log('[htmlSourceUrl] rem:', baseData?.rem?._id, 'remType:', remType);
     if (!baseData?.rem) return null;
     const type = await rp.storage.getSession<string | null>(currentIncrementalRemTypeKey);
-    console.log('[htmlSourceUrl] type from session:', type);
+    // console.log('[htmlSourceUrl] type from session:', type);
     if (type !== 'html' && type !== 'html-highlight') return null;
     const url = await getHtmlSourceUrl(rp, baseData.rem, type);
-    console.log('[htmlSourceUrl] found URL:', url);
+    // console.log('[htmlSourceUrl] found URL:', url);
     return url;
   }, [baseData?.rem?._id, remType]);
 
@@ -433,32 +433,34 @@ export function AnswerButtons() {
         <Button
           variant="danger"
           onClick={async () => {
-            // 1. AWAIT the *critical, fast* inheritance check (up to 3 levels deep)
             await handleCardPriorityInheritance(plugin, rem, incRemInfo);
 
-            // 2. Calculate review time and add current history entry
-            // This ensures we capture the final review data AND prevents passing empty history to transferToDismissed
+            //Calculate review time and add current history entry
             const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
             const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
 
             const currentRep: IncrementalRep = {
               date: Date.now(),
-              scheduled: incRemInfo.nextRepDate, // Should technically be now since we are done, but using scheduled as reference
+              scheduled: incRemInfo.nextRepDate,
               reviewTimeSeconds: reviewTimeSeconds,
-              eventType: 'rep', // Standard repetition event before dismissal
+              eventType: 'rep',
               priority: incRemInfo.priority,
             };
 
             const updatedHistory = [...(incRemInfo.history || []), currentRep];
 
-            // 3. Save updated history to dismissed powerup BEFORE removing incremental
-            // Passing updatedHistory ensures it's never empty, so transferToDismissed will always execute
+            // Save updated history to dismissed powerup BEFORE removing incremental
             await transferToDismissed(plugin, rem, updatedHistory);
 
-            // 4. Proceed with the final, destructive Done button logic
+            // Remove from session cache
             await removeIncrementalRemCache(plugin, rem._id);
-            await plugin.queue.removeCurrentCardFromQueue(true);
+
+            // removePowerup causes the widget to unmount, killing the async chain.
+            // It must execute BEFORE removeCurrentCardFromQueue.
             await rem.removePowerup(powerupCode);
+
+            // Best-effort queue advance (widget likely already unmounted).
+            plugin.queue.removeCurrentCardFromQueue(true);
           }}
         >
           <div style={buttonStyles.label}>Done</div>

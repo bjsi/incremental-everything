@@ -210,7 +210,7 @@ export function registerQueueExitListener(
     await resetQueueSession(plugin);
     resetSessionItemCounter();
 
-    console.log('Session state reset complete');
+    // console.log('Session state reset complete');
   });
 }
 
@@ -235,7 +235,7 @@ export function registerURLChangeListener(plugin: ReactRNPlugin) {
       const documentId = focusedRem?._id || null;
       await plugin.storage.setSession(currentDocumentIdKey, documentId);
     } catch (error) {
-      console.error('Failed to update document ID for counter:', error);
+      // console.error('Failed to update document ID for counter:', error);
     }
   });
 }
@@ -396,10 +396,10 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
         return;
       }
 
-      console.log('🎴 CARD COMPLETED (Full Mode):', data);
+      // console.log('🎴 CARD COMPLETED (Full Mode):', data);
 
       if (!data || !data.cardId) {
-        console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
+        // console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
         return;
       }
 
@@ -408,13 +408,13 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
       const rem = remId ? await plugin.rem.findOne(remId) : null;
       const isIncRem = rem ? await rem.hasPowerup(powerupCode) : false;
 
-      console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
+      // console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
 
       if (remId) {
         recentlyProcessedCards.add(remId);
         setTimeout(() => recentlyProcessedCards.delete(remId), CARD_PROCESSING_DEBOUNCE_MS);
 
-        console.log('LISTENER: Calling LIGHT updateCardPriorityCache...');
+        // console.log('LISTENER: Calling LIGHT updateCardPriorityCache...');
         await updateCardPriorityCache(plugin, remId, true);
 
         // Mark card as seen for this session (used by Shield)
@@ -434,7 +434,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
           await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
         }
       } else {
-        console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
+        // console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
       }
     }
   );
@@ -554,23 +554,23 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         const isManualUpdate = await plugin.storage.getSession<boolean>('manual_priority_update_pending');
 
         if (inQueue && !isManualUpdate) {
-          console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping processing because user is in the queue.');
+          // console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping processing because user is in the queue.');
           return;
         }
 
         if (isManualUpdate) {
-          console.log('LISTENER: Processing manual priority update (Queue Override).');
+          // console.log('LISTENER: Processing manual priority update (Queue Override).');
           // Reset flag
           await plugin.storage.setSession('manual_priority_update_pending', false);
         }
 
         if (await isLightPerformanceMode(plugin)) {
-          console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping (Light Mode).');
+          // console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping (Light Mode).');
           return;
         }
 
         if (recentlyProcessedCards.has(data.remId)) {
-          console.log('LISTENER: Skipping - recently processed by QueueCompleteCard');
+          // console.log('LISTENER: Skipping - recently processed by QueueCompleteCard');
           return;
         }
 
