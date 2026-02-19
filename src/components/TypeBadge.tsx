@@ -8,6 +8,7 @@ const TYPE_BADGES: Record<ActionItemType, { emoji: string; label: string; bgColo
   'html': { emoji: '🌐', label: 'Web', bgColor: '#dbeafe', textColor: '#1e40af', description: 'A web page added as incremental rem' },
   'html-highlight': { emoji: '🔖', label: 'Web Extract', bgColor: '#d1fae5', textColor: '#065f46', description: 'Text highlighted from a web page' },
   'youtube': { emoji: '▶️', label: 'YouTube', bgColor: '#fee2e2', textColor: '#991b1b', description: 'A YouTube video added as incremental rem' },
+  'youtube-highlight': { emoji: '✂️', label: 'Video Extract', bgColor: '#fecaca', textColor: '#7f1d1d', description: 'A segment extracted from a YouTube video' },
   'video': { emoji: '🎬', label: 'Video', bgColor: '#fae8ff', textColor: '#86198f', description: 'A video file added as incremental rem' },
   'rem': { emoji: '📝', label: 'Rem', bgColor: '#f3f4f6', textColor: '#374151', description: 'A regular rem added as incremental rem' },
   'unknown': { emoji: '❓', label: 'Unknown', bgColor: '#f3f4f6', textColor: '#6b7280', description: 'Unknown type' },

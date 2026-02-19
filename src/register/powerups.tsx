@@ -13,6 +13,10 @@ import {
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
+  videoExtractPowerupCode,
+  videoExtractUrlSlotCode,
+  videoExtractStartSlotCode,
+  videoExtractEndSlotCode,
 } from '../lib/consts';
 import { initIncrementalRem } from '../lib/incremental_rem';
 
@@ -117,6 +121,35 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
           code: dismissedDateSlotCode,
           name: 'Dismissed Date',
           propertyType: PropertyType.DATE,
+          hidden: true,
+        },
+      ],
+    },
+  });
+
+  // Video Extract Powerup - stores start/end times for YouTube video segments
+  await plugin.app.registerPowerup({
+    name: 'VideoExtract',
+    code: videoExtractPowerupCode,
+    description: 'A segment extracted from a YouTube video with start/end times',
+    options: {
+      slots: [
+        {
+          code: videoExtractUrlSlotCode,
+          name: 'Video URL',
+          propertyType: PropertyType.TEXT,
+          hidden: true,
+        },
+        {
+          code: videoExtractStartSlotCode,
+          name: 'Start Time',
+          propertyType: PropertyType.NUMBER,
+          hidden: true,
+        },
+        {
+          code: videoExtractEndSlotCode,
+          name: 'End Time',
+          propertyType: PropertyType.NUMBER,
           hidden: true,
         },
       ],

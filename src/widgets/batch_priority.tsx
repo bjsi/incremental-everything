@@ -580,6 +580,7 @@ function BatchPriority() {
       'pdf': 'PDF',
       'html': 'HTML',
       'youtube': 'YouTube',
+      'youtube-highlight': 'Video Extract',
       'rem': 'Extract',
       'pdf-highlight': 'PDF Highlight',
       'html-highlight': 'HTML Highlight'

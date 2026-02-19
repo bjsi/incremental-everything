@@ -5,6 +5,7 @@ export type ActionItemType =
   | 'pdf'
   | 'html'
   | 'youtube'
+  | 'youtube-highlight'
   | 'video'
   | 'rem'
   | 'pdf-highlight'
@@ -19,11 +20,20 @@ export type VideoActionItem = { type: 'video'; rem: PluginRem };
 export type RemActionItem = { type: 'rem'; rem: PluginRem };
 export type PDFHighlightActionItem = { type: 'pdf-highlight'; rem: PluginRem; extract: PluginRem };
 export type HTMLHighlightActionItem = { type: 'html-highlight'; rem: PluginRem; extract: PluginRem };
+export type YoutubeHighlightActionItem = {
+  type: 'youtube-highlight';
+  rem: PluginRem;       // parent YouTube video Rem
+  extract: PluginRem;   // child extract Rem
+  url: string;
+  startTime: number;    // seconds
+  endTime: number;      // seconds
+};
 
 export type RemAndType =
   | PDFActionItem
   | HTMLActionItem
   | YoutubeActionItem
+  | YoutubeHighlightActionItem
   | VideoActionItem
   | RemActionItem
   | PDFHighlightActionItem
