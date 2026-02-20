@@ -12,6 +12,7 @@ import {
   videoExtractStartSlotCode,
   videoExtractEndSlotCode,
 } from '../lib/consts';
+import { getTranscriptForRange, extractVideoId } from '../lib/youtube_transcript';
 
 interface VideoViewerProps {
   actionItem: YoutubeActionItem;
@@ -111,6 +112,30 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
       await initIncrementalRem(plugin as any, newRem);
 
       await plugin.app.toast(`✅ Created video extract [${formatTime(startTime)} – ${formatTime(endTime)}]`);
+
+      // Fetch transcript and add segments as children Rems
+      try {
+        const videoId = extractVideoId(props.actionItem.url);
+        console.log('[VideoViewer] Attempting transcript fetch for videoId:', videoId, 'range:', startTime, '-', endTime);
+        if (videoId) {
+          const segments = await getTranscriptForRange(videoId, startTime, endTime);
+          if (segments.length > 0) {
+            for (const seg of segments) {
+              const childRem = await plugin.rem.createRem();
+              if (childRem) {
+                await childRem.setText([seg.text]);
+                await childRem.setParent(newRem._id);
+              }
+            }
+            await plugin.app.toast(`📝 Added ${segments.length} transcript segment(s)`);
+          } else {
+            await plugin.app.toast('ℹ️ No transcript segments found for this range');
+          }
+        }
+      } catch (transcriptErr) {
+        console.warn('[VideoViewer] Could not fetch transcript:', transcriptErr);
+        await plugin.app.toast('⚠️ Transcript unavailable (see console for details)');
+      }
 
       // Show priority popup
       setTimeout(async () => {
