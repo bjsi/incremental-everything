@@ -78,6 +78,7 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
 
   const handleSetEnd = async () => {
     if (extractState.phase !== 'capturing') return;
+    setPlaying(false); // Pause video so user can set priority freely
     const { startTime } = extractState;
     const endTime = position || 0;
 
@@ -120,14 +121,30 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
         if (videoId) {
           const segments = await getTranscriptForRange(videoId, startTime, endTime);
           if (segments.length > 0) {
+            // Consolidate segments into larger chunks (~300 chars each)
+            const MAX_CHUNK_CHARS = 300;
+            const chunks: string[] = [];
+            let current = '';
+
             for (const seg of segments) {
+              const candidate = current ? `${current} ${seg.text}` : seg.text;
+              if (current && candidate.length > MAX_CHUNK_CHARS) {
+                chunks.push(current);
+                current = seg.text;
+              } else {
+                current = candidate;
+              }
+            }
+            if (current) chunks.push(current);
+
+            for (const chunk of chunks) {
               const childRem = await plugin.rem.createRem();
               if (childRem) {
-                await childRem.setText([seg.text]);
+                await childRem.setText([chunk]);
                 await childRem.setParent(newRem._id);
               }
             }
-            await plugin.app.toast(`📝 Added ${segments.length} transcript segment(s)`);
+            await plugin.app.toast(`📝 Added transcript (${chunks.length} block${chunks.length > 1 ? 's' : ''})`);
           } else {
             await plugin.app.toast('ℹ️ No transcript segments found for this range');
           }
