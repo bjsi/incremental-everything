@@ -8,6 +8,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
+import { VideoExtractViewer } from '../components/VideoExtractViewer';
 import { NativeVideoViewer } from '../components/NativeVideoViewer';
 import { ExtractViewer } from '../components/ExtractViewer';
 import { IsolatedCardViewer } from '../components/IsolatedCardViewer';
@@ -56,14 +57,14 @@ export function QueueComponent() {
         console.log('⛔ useTrackerPlugin: No ctx.remId yet');
         return undefined;
       }
-      
+
       console.log('🔄 useTrackerPlugin RUNNING for remId:', ctx.remId);
       const rem = await rp.rem.findOne(ctx.remId);
       if (!rem) {
         console.log('⛔ useTrackerPlugin: Rem not found');
         return null;
       }
-      
+
       console.log('🔄 useTrackerPlugin: Calling remToActionItemType');
       const result = await remToActionItemType(rp, rem);
       console.log('✅ useTrackerPlugin result:', result?.type);
@@ -73,7 +74,7 @@ export function QueueComponent() {
   );
 
   const lastProcessedRemId = useRef<string | null>(null);
-  
+
   useEffect(() => {
     if (ctx?.remId && ctx.remId !== lastProcessedRemId.current) {
       lastProcessedRemId.current = ctx.remId;
@@ -106,12 +107,12 @@ export function QueueComponent() {
     // remAndType tells us WHAT to display, but ctx.remId tells us WHO we are.
     const incrementalRemId = ctx?.remId;
     setCurrentIncrementalRem(plugin, incrementalRemId);
-    
+
     plugin.storage.setSession(currentIncrementalRemTypeKey, remAndType?.type);
-    
+
     // For highlights, we still need to identify the specific extract.
-    const activeHighlight = (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight') 
-      ? (remAndType as any).extract?._id 
+    const activeHighlight = (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight')
+      ? (remAndType as any).extract?._id
       : null;
     plugin.storage.setSession(activeHighlightIdKey, activeHighlight);
 
@@ -278,6 +279,8 @@ export function QueueComponent() {
           <Reader actionItem={remAndType} />
         ) : remAndType.type === 'youtube' ? (
           <VideoViewer actionItem={remAndType} />
+        ) : remAndType.type === 'youtube-highlight' ? (
+          <VideoExtractViewer actionItem={remAndType} />
         ) : remAndType.type === 'video' ? (
           <NativeVideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'rem' ? (

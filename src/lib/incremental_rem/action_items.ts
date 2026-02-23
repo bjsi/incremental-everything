@@ -6,6 +6,12 @@ import {
 } from '@remnote/plugin-sdk';
 import { RemAndType } from './types';
 import { safeRemTextToString } from '../pdfUtils';
+import {
+  videoExtractPowerupCode,
+  videoExtractUrlSlotCode,
+  videoExtractStartSlotCode,
+  videoExtractEndSlotCode,
+} from '../consts';
 
 export const remToActionItemType = async (
   plugin: RNPlugin,
@@ -20,12 +26,38 @@ export const remToActionItemType = async (
       const tagText = await safeRemTextToString(plugin, tagRem.text);
 
       if (tagText.toLowerCase() === 'extractviewer' ||
-          tagText.toLowerCase() === 'extract viewer') {
+        tagText.toLowerCase() === 'extract viewer') {
         return { rem, type: 'rem' };
       }
     }
   } catch (error) {
     // Ignore errors
+  }
+
+  // Check for VideoExtract powerup (YouTube video segment)
+  if (await rem.hasPowerup(videoExtractPowerupCode)) {
+    try {
+      const videoUrl = await rem.getPowerupProperty(videoExtractPowerupCode, videoExtractUrlSlotCode);
+      const startTime = await rem.getPowerupProperty(videoExtractPowerupCode, videoExtractStartSlotCode);
+      const endTime = await rem.getPowerupProperty(videoExtractPowerupCode, videoExtractEndSlotCode);
+
+      if (videoUrl && startTime != null && endTime != null) {
+        // Find the parent video Rem
+        const parentId = rem.parent;
+        const parentRem = parentId ? await plugin.rem.findOne(parentId) : null;
+
+        return {
+          type: 'youtube-highlight',
+          rem: parentRem || rem, // parent video Rem (fallback to self)
+          extract: rem,
+          url: String(videoUrl),
+          startTime: Number(startTime),
+          endTime: Number(endTime),
+        };
+      }
+    } catch (error) {
+      console.error('[action_items] Error reading VideoExtract powerup:', error);
+    }
   }
 
   if (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) {

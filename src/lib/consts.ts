@@ -100,3 +100,9 @@ export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';
 
 // Priority Graph (document-scope, inline in inc_rem_counter)
 export const PRIORITY_GRAPH_DATA_KEY_PREFIX = 'priority_graph_data_';
+
+// Video Extract Powerup
+export const videoExtractPowerupCode = 'videoExtract';
+export const videoExtractUrlSlotCode = 'videoUrl';
+export const videoExtractStartSlotCode = 'startTime';
+export const videoExtractEndSlotCode = 'endTime';

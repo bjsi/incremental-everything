@@ -142,7 +142,12 @@ export async function setCardPriority(
 }
 
 /**
- * Automatically assign priority to cards based on context
+ * Automatically assign priority to cards based on context.
+ *
+ * IMPORTANT: Each branch must check whether the existing priority already
+ * matches (value + source) before calling setCardPriority. Writing without
+ * this guard updates LAST_UPDATED_SLOT with Date.now(), which modifies the
+ * Rem and re-fires GlobalRemChanged — creating an infinite ~1 s loop.
  */
 export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): Promise<number> {
   const existingPriority = await getCardPriority(plugin, rem);
@@ -153,6 +158,10 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
 
   const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
   if (incRemInfo) {
+    // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop)
+    if (existingPriority && existingPriority.source === 'incremental' && existingPriority.priority === incRemInfo.priority) {
+      return incRemInfo.priority;
+    }
     await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
     return incRemInfo.priority;
   }
@@ -160,6 +169,10 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
   const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
 
   if (ancestorPriority) {
+    // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop)
+    if (existingPriority && existingPriority.source === 'inherited' && existingPriority.priority === ancestorPriority.priority) {
+      return ancestorPriority.priority;
+    }
     await setCardPriority(plugin, rem, ancestorPriority.priority, 'inherited');
     return ancestorPriority.priority;
   }
@@ -169,6 +182,10 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
   }
 
   const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+  // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop)
+  if (existingPriority && existingPriority.source === 'default' && existingPriority.priority === defaultPriority) {
+    return defaultPriority;
+  }
   await setCardPriority(plugin, rem, defaultPriority, 'default');
   return defaultPriority;
 }

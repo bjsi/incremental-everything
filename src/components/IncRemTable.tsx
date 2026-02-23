@@ -250,6 +250,7 @@ export function IncRemTable({
           <option value="html">HTML</option>
           <option value="html-highlight">HTML Highlight</option>
           <option value="youtube">YouTube</option>
+          <option value="youtube-highlight">Video Extract</option>
           <option value="video">Video</option>
           <option value="rem">Rem</option>
         </select>
