@@ -2,6 +2,7 @@ import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { findPDFinRem, getCurrentPageKey, addPageToHistory, safeRemTextToString } from './pdfUtils';
 import { getIncrementalRemFromRem, updateReviewRemData } from './incremental_rem';
 import { incremReviewStartTimeKey } from './consts';
+import { determineIncRemType } from './incRemHelpers';
 
 export const handleReviewAndOpenRem = async (
     plugin: RNPlugin,
@@ -38,5 +39,12 @@ export const handleReviewAndOpenRem = async (
 
     await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
 
-    await plugin.window.openRem(rem);
+    const incRemType = await determineIncRemType(plugin, rem);
+
+    if (incRemType === 'pdf-note') {
+        await rem.openRemAsPage();
+    } else {
+        await plugin.window.openRem(rem);
+    }
 };
+
