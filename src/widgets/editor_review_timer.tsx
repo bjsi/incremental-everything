@@ -10,7 +10,7 @@ import { updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, currentSubQueueIdKey, remnoteEnvironmentId, pageRangeWidgetId } from '../lib/consts';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
-import { findPDFinRem, getIncrementalPageRange, getIncrementalReadingPosition, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
+import { findPDFinRem, getIncrementalPageRange, getIncrementalReadingPosition, clearIncrementalPDFData, PageRangeContext, addPageToHistory } from '../lib/pdfUtils';
 import { PageControls } from '../components/reader/ui';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
@@ -144,6 +144,8 @@ function EditorReviewTimer() {
     : `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
   const handleEndReview = async () => {
+    if (!timerData) return;
+
     const rem = await plugin.rem.findOne(timerData.remId);
     if (!rem) {
       await plugin.app.toast('Error: Rem not found');
@@ -163,6 +165,11 @@ function EditorReviewTimer() {
 
     // Calculate review time in seconds
     const reviewTimeSeconds = Math.round(elapsedMs / 1000);
+
+    // Synchronize time spent reading directly to the PDF reading history tracker
+    if (isPdfNote && pdfRemId) {
+      await addPageToHistory(plugin, timerData.remId, pdfRemId, currentPage, reviewTimeSeconds);
+    }
 
     if (timerData.fromQueue) {
       // Mode 1: Started from queue "Review & Open". Repetition was already created.
@@ -236,6 +243,8 @@ function EditorReviewTimer() {
   };
 
   const handleGoToRem = async () => {
+    if (!timerData) return;
+
     const rem = await plugin.rem.findOne(timerData.remId);
     if (!rem) {
       await plugin.app.toast('Error: Rem not found');
