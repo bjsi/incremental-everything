@@ -456,11 +456,10 @@ export function AnswerButtons() {
             await removeIncrementalRemCache(plugin, rem._id);
 
             // removePowerup causes the widget to unmount, killing the async chain.
-            // It must execute BEFORE removeCurrentCardFromQueue.
+            // The tracker polling loop (every 500ms) will detect the powerup is gone
+            // and call removeCurrentCardFromQueue — so we must NOT call it here too,
+            // otherwise the double-call races and skips the next card.
             await rem.removePowerup(powerupCode);
-
-            // Best-effort queue advance (widget likely already unmounted).
-            plugin.queue.removeCurrentCardFromQueue(true);
           }}
         >
           <div style={buttonStyles.label}>Done</div>
