@@ -113,7 +113,8 @@ export function PageControls({
         flex: '0 0 auto'
       }}
     >
-      <button 
+      <button
+        type="button"
         onClick={onDecrement}
         style={{
           ...metadataBarStyles.pageButton,
@@ -124,7 +125,7 @@ export function PageControls({
       >
         ←
       </button>
-      
+
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <span style={metadataBarStyles.pageLabel}>Page</span>
         <input
@@ -144,8 +145,9 @@ export function PageControls({
           </span>
         )}
       </div>
-      
-      <button 
+
+      <button
+        type="button"
         onClick={onIncrement}
         style={{
           ...metadataBarStyles.pageButton,
@@ -156,7 +158,7 @@ export function PageControls({
       >
         →
       </button>
-      
+
       <div
         style={{
           width: '1px',
@@ -165,8 +167,9 @@ export function PageControls({
           margin: '0 4px',
         }}
       />
-      
+
       <button
+        type="button"
         onClick={onSetRange}
         style={activeRangeButtonStyle}
         title={pageRangeStart > 1 || pageRangeEnd > 0 ? `Current range: ${pageRangeStart}-${pageRangeEnd || '∞'}` : "Set page range"}
@@ -174,9 +177,10 @@ export function PageControls({
         <span>📄</span>
         <span>{pageRangeStart > 1 || pageRangeEnd > 0 ? `${pageRangeStart}-${pageRangeEnd || '∞'}` : 'Range'}</span>
       </button>
-      
+
       {(pageRangeStart > 1 || pageRangeEnd > 0) && (
         <button
+          type="button"
           onClick={onClearRange}
           style={metadataBarStyles.clearButton}
           title="Clear page range"
