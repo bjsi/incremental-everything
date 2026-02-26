@@ -1,4 +1,4 @@
-import { ReactRNPlugin, RemId, Rem, BuiltInPowerupCodes, RichTextElementRemInterface } from '@remnote/plugin-sdk';
+import { RNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface } from '@remnote/plugin-sdk';
 import { allIncrementalRemKey, powerupCode, nextRepDateSlotCode } from './consts';
 
 /**
@@ -6,7 +6,7 @@ import { allIncrementalRemKey, powerupCode, nextRepDateSlotCode } from './consts
  * Returns both all source IDs and a filtered set of PDF-only source IDs.
  */
 export async function collectPdfSourcesFromRems(
-  rems: Rem[]
+  rems: PluginRem[]
 ): Promise<{ allSourceIds: string[]; pdfSourceIds: Set<string> }> {
   const pdfSourceIds = new Set<string>();
   const allSourceIds: string[] = [];
@@ -33,7 +33,7 @@ export async function collectPdfSourcesFromRems(
  * Returns an array of RemIds for PDF extracts that are incremental rems.
  */
 export async function findPdfExtractIds(
-  plugin: ReactRNPlugin,
+  plugin: RNPlugin,
   pdfSourceIds: Set<string>
 ): Promise<RemId[]> {
   if (pdfSourceIds.size === 0) {
@@ -73,7 +73,7 @@ export async function findPdfExtractIds(
  * This includes notes/flashcards created inside PDFs.
  */
 export async function getPdfDescendantIds(
-  plugin: ReactRNPlugin,
+  plugin: RNPlugin,
   pdfSourceIds: Set<string>
 ): Promise<RemId[]> {
   if (pdfSourceIds.size === 0) {
@@ -120,7 +120,7 @@ export async function getPdfDescendantIds(
  * @returns Set of RemIds that belong to this document's scope
  */
 export async function buildDocumentScope(
-  plugin: ReactRNPlugin,
+  plugin: RNPlugin,
   documentId: RemId
 ): Promise<Set<RemId>> {
   const document = await plugin.rem.findOne(documentId);
@@ -160,17 +160,17 @@ export async function buildDocumentScope(
  * @param scopeRemId RemId to build scope for
  */
 export async function buildComprehensiveScope(
-  plugin: ReactRNPlugin,
+  plugin: RNPlugin,
   scopeRemId: RemId
 ): Promise<Set<RemId>> {
   const scopeRem = await plugin.rem.findOne(scopeRemId);
   if (!scopeRem) return new Set();
 
   const descendants = await scopeRem.getDescendants();
-  
+
   // This captures items inside Portals and Tables
   const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-  
+
   const folderQueueRems = await scopeRem.allRemInFolderQueue();
   const sources = await scopeRem.getSources();
 

@@ -465,18 +465,25 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
     async (data) => {
       clearTimeout(remChangeDebounceTimer);
 
-      // IMPORTANT: Capture history and nextRepDate from cache NOW, before debounce
-      // This avoids race condition where plugin.track() refreshes cache before our debounced callback
-      const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-      const cachedIncRem = allIncRems.find(r => r.remId === data.remId);
+      const rem = await plugin.rem.findOne(data.remId);
+      if (!rem) return;
 
-      if (cachedIncRem && cachedIncRem.history && cachedIncRem.history.length > 0) {
-        pendingHistoryMap.set(data.remId, [...cachedIncRem.history]); // Clone and store per remId
+      // IMPORTANT: Capture history and nextRepDate directly from the Rem NOW, before debounce
+      // This avoids race condition where plugin.track() refreshes cache before our debounced callback
+      const currentIncRem = await getIncrementalRemFromRem(plugin, rem);
+
+      if (currentIncRem && currentIncRem.history && currentIncRem.history.length > 0) {
+        pendingHistoryMap.set(data.remId, [...currentIncRem.history]); // Clone and store per remId
       }
 
       // Also capture nextRepDate for manual date reset detection
-      if (cachedIncRem && cachedIncRem.nextRepDate) {
-        pendingNextRepDateMap.set(data.remId, cachedIncRem.nextRepDate);
+      if (currentIncRem && currentIncRem.nextRepDate) {
+        if (!pendingNextRepDateMap.has(data.remId)) {
+          // Only set it the *first* time we see a change for this rem in this debounce window
+          // If we overwrite it on subsequent rapid changes (like during a review save),
+          // we lose the original starting date before the save began.
+          pendingNextRepDateMap.set(data.remId, currentIncRem.nextRepDate);
+        }
       }
 
       remChangeDebounceTimer = setTimeout(async () => {
