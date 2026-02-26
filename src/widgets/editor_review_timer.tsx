@@ -9,6 +9,7 @@ import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, currentSubQueueIdKey, remnoteEnvironmentId } from '../lib/consts';
 import { IncrementalRep } from '../lib/incremental_rem';
+import { determineIncRemType } from '../lib/incRemHelpers';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
@@ -156,6 +157,22 @@ function EditorReviewTimer() {
     }
   };
 
+  const handleGoToRem = async () => {
+    const rem = await plugin.rem.findOne(timerData.remId);
+    if (!rem) {
+      await plugin.app.toast('Error: Rem not found');
+      return;
+    }
+
+    // Check if it's a PDF note to open it properly without invoking the PDF viewer
+    const incRemType = await determineIncRemType(plugin, rem);
+    if (incRemType === 'pdf-note') {
+      await rem.openRemAsPage();
+    } else {
+      await plugin.window.openRem(rem);
+    }
+  };
+
   const handleCancel = async () => {
     // Clear timer data without saving
     await plugin.storage.setSession('editor-review-timer-rem-id', undefined);
@@ -229,6 +246,27 @@ function EditorReviewTimer() {
           }}
         >
           ✓ {timerData.fromQueue ? 'End Review and Back to Queue' : 'End Review'}
+        </button>
+        <button
+          onClick={handleGoToRem}
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#2563eb';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#3b82f6';
+          }}
+        >
+          ↗ Go to Rem
         </button>
         <button
           onClick={handleCancel}

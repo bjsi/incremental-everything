@@ -38,9 +38,9 @@ type ShieldStatus = {
 function computeShieldStatus(
   remId: string | undefined,
   sessionCache: QueueSessionCache | null,
-  allPrioritizedCardInfo: CardPriorityInfo[] | null,
+  allPrioritizedCardInfo: CardPriorityInfo[] | null | undefined,
   seenRemIds: string[],
-  scopeRemIds: string[] | null
+  scopeRemIds: string[] | null | undefined
 ): ShieldStatus {
   if (!remId || !sessionCache) return null;
 
