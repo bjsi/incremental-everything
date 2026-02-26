@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { updateSRSDataForRem } from '../lib/scheduler';
-import { powerupCode, prioritySlotCode } from '../lib/consts';
+import { powerupCode, prioritySlotCode, currentSubQueueIdKey, remnoteEnvironmentId } from '../lib/consts';
 import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
@@ -27,6 +27,7 @@ function EditorReviewTimer() {
       const interval = await rp.storage.getSession<number>('editor-review-timer-interval');
       const priority = await rp.storage.getSession<number>('editor-review-timer-priority');
       const remName = await rp.storage.getSession<string>('editor-review-timer-rem-name');
+      const fromQueue = await rp.storage.getSession<boolean>('editor-review-timer-from-queue');
 
       return {
         remId,
@@ -34,6 +35,7 @@ function EditorReviewTimer() {
         interval,
         priority,
         remName: remName || 'Unnamed Rem',
+        fromQueue,
       };
     },
     []
@@ -76,35 +78,66 @@ function EditorReviewTimer() {
     }
 
     // Update priority if changed
-    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
-
-    const newNextRepDate = Date.now() + timerData.interval * 1000 * 60 * 60 * 24;
-
-    // Calculate early/late status
-    const scheduledDate = incRem.nextRepDate;
-    const actualDate = Date.now();
-    const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-    const wasEarly = daysDifference < 0;
-    const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+    if (timerData.priority !== undefined && timerData.priority !== null) {
+      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+    }
 
     // Calculate review time in seconds
     const reviewTimeSeconds = Math.round(elapsedMs / 1000);
 
-    const newHistory: IncrementalRep[] = [
-      ...(incRem.history || []),
-      {
-        date: actualDate,
-        scheduled: scheduledDate,
-        interval: timerData.interval,
-        wasEarly: wasEarly,
-        daysEarlyOrLate: daysEarlyOrLate,
-        reviewTimeSeconds: reviewTimeSeconds,
-        priority: incRem.priority, // Record priority at time of rep
-        eventType: 'executeRepetition' as const,
-      },
-    ];
+    if (timerData.fromQueue) {
+      // Mode 1: Started from queue "Review & Open". Repetition was already created.
+      // We just update the reviewTimeSeconds of the last history entry.
+      const updatedHistory = [...(incRem.history || [])];
+      if (updatedHistory.length > 0) {
+        updatedHistory[updatedHistory.length - 1].reviewTimeSeconds = reviewTimeSeconds;
+      }
 
-    await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
+      await updateSRSDataForRem(plugin, timerData.remId, incRem.nextRepDate, updatedHistory);
+      await plugin.app.toast(`✓ ${timerData.remName}: Repetition updated (${timeDisplay})`);
+
+      // Return to the queue
+      const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
+      if (subQueueId) {
+        const subQueueRem = await plugin.rem.findOne(subQueueId);
+        if (subQueueRem) {
+          await subQueueRem.openRemAsPage();
+          await plugin.app.toast('Hit Cmd+Shift+P to resume your Queue!');
+        } else {
+          await plugin.app.toast('Could not find the queue document.');
+        }
+      } else {
+        await plugin.app.toast("Please click 'Flashcards' on the sidebar to resume the Global Queue!");
+      }
+    } else {
+      // Mode 2: Started from Editor command. We need to create the repetition right now.
+      const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
+
+      // Calculate early/late status
+      const scheduledDate = incRem.nextRepDate;
+      const actualDate = Date.now();
+      const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+      const wasEarly = daysDifference < 0;
+      const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+
+      const newHistory: IncrementalRep[] = [
+        ...(incRem.history || []),
+        {
+          date: actualDate,
+          scheduled: scheduledDate,
+          interval: timerData.interval || 0,
+          wasEarly: wasEarly,
+          daysEarlyOrLate: daysEarlyOrLate,
+          reviewTimeSeconds: reviewTimeSeconds,
+          priority: incRem.priority, // Record priority at time of rep
+          eventType: 'executeRepetition' as const,
+        },
+      ];
+
+      await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
+      const dateStr = dayjs(newNextRepDate).format('MMMM D, YYYY');
+      await plugin.app.toast(`✓ ${timerData.remName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
+    }
 
     const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
     if (updatedIncRem) {
@@ -117,9 +150,7 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-interval', null);
     await plugin.storage.setSession('editor-review-timer-priority', null);
     await plugin.storage.setSession('editor-review-timer-rem-name', null);
-
-    const dateStr = dayjs(newNextRepDate).format('MMMM D, YYYY');
-    await plugin.app.toast(`✓ ${timerData.remName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
+    await plugin.storage.setSession('editor-review-timer-from-queue', null);
   };
 
   const handleCancel = async () => {
@@ -129,6 +160,7 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-interval', null);
     await plugin.storage.setSession('editor-review-timer-priority', null);
     await plugin.storage.setSession('editor-review-timer-rem-name', null);
+    await plugin.storage.setSession('editor-review-timer-from-queue', null);
 
     await plugin.app.toast('Timer cancelled');
   };
@@ -193,7 +225,7 @@ function EditorReviewTimer() {
             e.currentTarget.style.backgroundColor = '#10b981';
           }}
         >
-          ✓ End Review
+          ✓ {timerData.fromQueue ? 'End Review and Back to Queue' : 'End Review'}
         </button>
         <button
           onClick={handleCancel}

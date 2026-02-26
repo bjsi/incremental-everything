@@ -31,7 +31,7 @@ import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetiti
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
-import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
+import { safeRemTextToString, findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
@@ -149,6 +149,20 @@ const handleReviewAndOpenRem = async (
 
   const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
   await updateReviewRemData(plugin, incRemInfo ?? undefined);
+
+  // Start the timer
+  const remName = await safeRemTextToString(plugin, rem.text);
+  const existingStartTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+  await plugin.storage.setSession('editor-review-timer-rem-id', rem._id);
+  await plugin.storage.setSession('editor-review-timer-start', existingStartTime || Date.now());
+  // We do not set an interval since the repetition was already recorded above
+  await plugin.storage.setSession('editor-review-timer-interval', null);
+  await plugin.storage.setSession('editor-review-timer-priority', incRemInfo?.priority ?? 10);
+  await plugin.storage.setSession('editor-review-timer-rem-name', remName || 'Unnamed Rem');
+  await plugin.storage.setSession('editor-review-timer-from-queue', true);
+
+  await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
+
   await plugin.window.openRem(rem);
 };
 
