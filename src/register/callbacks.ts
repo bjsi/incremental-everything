@@ -20,22 +20,25 @@ import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
 import { buildDocumentScope } from '../lib/scope_helpers';
 
 const QUEUE_LAYOUT_FIX_CSS = `
-  .rn-queue {
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) {
     height: 100% !important;
   }
-  .rn-queue__content,
-  .rn-queue__content .rn-flashcard,
-  .rn-queue__content .rn-flashcard__content,
-  .rn-queue__content > .box-border,
-  .rn-queue__content > .box-border > .fade-in-first-load {
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content,
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content .rn-flashcard,
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content .rn-flashcard__content,
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content > .box-border,
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content div.fade-in-first-load:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]),
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content div.fade-in-first-load:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) > div,
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"] {
     flex-grow: 1 !important;
   }
-  /* Hide unwanted UI elements during incremental rem review */
-  .rn-flashcard-insights,
-  div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
-  div:has(> iframe[data-plugin-id="flashcard-repetition-history"]) {
-    display: none !important;
 
+  /* Hide unwanted UI elements during incremental rem review */
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-flashcard-insights,
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) [data-cy="bottom-of-card-ai-suggestions"],
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) div.fade-in-first-load:has(iframe[data-plugin-id="flashcard-repetition-history"]) {
+    display: none !important;
   }
 `;
 
