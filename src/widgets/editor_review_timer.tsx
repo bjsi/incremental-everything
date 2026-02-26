@@ -95,20 +95,6 @@ function EditorReviewTimer() {
 
       await updateSRSDataForRem(plugin, timerData.remId, incRem.nextRepDate, updatedHistory);
       await plugin.app.toast(`✓ ${timerData.remName}: Repetition updated (${timeDisplay})`);
-
-      // Return to the queue
-      const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
-      if (subQueueId) {
-        const subQueueRem = await plugin.rem.findOne(subQueueId);
-        if (subQueueRem) {
-          await subQueueRem.openRemAsPage();
-          await plugin.app.toast('Hit Cmd+Shift+P to resume your Queue!');
-        } else {
-          await plugin.app.toast('Could not find the queue document.');
-        }
-      } else {
-        await plugin.app.toast("Please click 'Flashcards' on the sidebar to resume the Global Queue!");
-      }
     } else {
       // Mode 2: Started from Editor command. We need to create the repetition right now.
       const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
@@ -144,13 +130,30 @@ function EditorReviewTimer() {
       await updateIncrementalRemCache(plugin, updatedIncRem);
     }
 
-    // Clear timer data
+    // Clear timer data FIRST (to prevent navigation from interrupting cleanup)
     await plugin.storage.setSession('editor-review-timer-rem-id', undefined);
     await plugin.storage.setSession('editor-review-timer-start', undefined);
     await plugin.storage.setSession('editor-review-timer-interval', undefined);
     await plugin.storage.setSession('editor-review-timer-priority', undefined);
     await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
     await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
+
+    // Perform navigation at the very end
+    if (timerData.fromQueue) {
+      // Return to the queue
+      const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
+      if (subQueueId) {
+        const subQueueRem = await plugin.rem.findOne(subQueueId);
+        if (subQueueRem) {
+          await subQueueRem.openRemAsPage();
+          await plugin.app.toast('Hit Cmd+Shift+P to resume your Queue!');
+        } else {
+          await plugin.app.toast('Could not find the queue document.');
+        }
+      } else {
+        await plugin.app.toast("Please click 'Flashcards' on the sidebar to resume the Global Queue!");
+      }
+    }
   };
 
   const handleCancel = async () => {
