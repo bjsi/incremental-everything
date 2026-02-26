@@ -13,6 +13,7 @@ import {
   displayPriorityShieldId,
   seenCardInSessionKey,
   priorityCalcScopeRemIdsKey,
+  incrementalQueueActiveKey,
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile } from '../lib/utils';
@@ -138,6 +139,10 @@ export function CardPriorityDisplay() {
     []
   );
 
+  const isIncrementalQueueActive = useTrackerPlugin(
+    (rp) => rp.storage.getSession<boolean>(incrementalQueueActiveKey),
+    []
+  );
 
 
 
@@ -206,9 +211,8 @@ export function CardPriorityDisplay() {
   //   effectiveMode
   // });
 
-  // Widget behaves according to QueueItemType.Flashcard filter (see registerWidget)
-  // This means it naturally hides during Incremental Rem queue turns
-  if (!rem || !finalCardInfo) {
+  // Check isIncrementalQueueActive
+  if (!rem || !finalCardInfo || isIncrementalQueueActive) {
     // console.warn('[CardPriorityDisplay] Widget not shown. Reason:', {
     //   missingRem: !rem,
     //   missingCardInfo: !finalCardInfo
