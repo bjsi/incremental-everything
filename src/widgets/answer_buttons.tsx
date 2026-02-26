@@ -36,6 +36,7 @@ import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
+import { handleReviewAndOpenRem } from '../lib/review_actions';
 
 const MAX_DEPTH_CHECK = 3;
 
@@ -128,43 +129,6 @@ const handleCardPriorityInheritance = async (
   }
 };
 
-const handleReviewAndOpenRem = async (
-  plugin: RNPlugin,
-  rem: PluginRem | undefined,
-  remType: string | null | undefined
-) => {
-  if (!rem) return;
-
-  if (remType === 'pdf') {
-    const pdfRem = await findPDFinRem(plugin, rem);
-    if (pdfRem) {
-      const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
-      const currentPage = await plugin.storage.getSynced<number>(pageKey);
-
-      if (currentPage) {
-        await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
-      }
-    }
-  }
-
-  const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-  await updateReviewRemData(plugin, incRemInfo ?? undefined);
-
-  // Start the timer
-  const remName = await safeRemTextToString(plugin, rem.text);
-  const existingStartTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-  await plugin.storage.setSession('editor-review-timer-rem-id', rem._id);
-  await plugin.storage.setSession('editor-review-timer-start', existingStartTime || Date.now());
-  // We do not set an interval since the repetition was already recorded above
-  await plugin.storage.setSession('editor-review-timer-interval', null);
-  await plugin.storage.setSession('editor-review-timer-priority', incRemInfo?.priority ?? 10);
-  await plugin.storage.setSession('editor-review-timer-rem-name', remName || 'Unnamed Rem');
-  await plugin.storage.setSession('editor-review-timer-from-queue', true);
-
-  await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
-
-  await plugin.window.openRem(rem);
-};
 
 export function AnswerButtons() {
   const plugin = usePlugin();

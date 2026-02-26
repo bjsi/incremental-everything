@@ -145,22 +145,22 @@ function EditorReviewTimer() {
     }
 
     // Clear timer data
-    await plugin.storage.setSession('editor-review-timer-rem-id', null);
-    await plugin.storage.setSession('editor-review-timer-start', null);
-    await plugin.storage.setSession('editor-review-timer-interval', null);
-    await plugin.storage.setSession('editor-review-timer-priority', null);
-    await plugin.storage.setSession('editor-review-timer-rem-name', null);
-    await plugin.storage.setSession('editor-review-timer-from-queue', null);
+    await plugin.storage.setSession('editor-review-timer-rem-id', undefined);
+    await plugin.storage.setSession('editor-review-timer-start', undefined);
+    await plugin.storage.setSession('editor-review-timer-interval', undefined);
+    await plugin.storage.setSession('editor-review-timer-priority', undefined);
+    await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
+    await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
   };
 
   const handleCancel = async () => {
     // Clear timer data without saving
-    await plugin.storage.setSession('editor-review-timer-rem-id', null);
-    await plugin.storage.setSession('editor-review-timer-start', null);
-    await plugin.storage.setSession('editor-review-timer-interval', null);
-    await plugin.storage.setSession('editor-review-timer-priority', null);
-    await plugin.storage.setSession('editor-review-timer-rem-name', null);
-    await plugin.storage.setSession('editor-review-timer-from-queue', null);
+    await plugin.storage.setSession('editor-review-timer-rem-id', undefined);
+    await plugin.storage.setSession('editor-review-timer-start', undefined);
+    await plugin.storage.setSession('editor-review-timer-interval', undefined);
+    await plugin.storage.setSession('editor-review-timer-priority', undefined);
+    await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
+    await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
 
     await plugin.app.toast('Timer cancelled');
   };
