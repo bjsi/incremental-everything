@@ -5,15 +5,17 @@ import {
   WidgetLocation,
   RNPlugin,
 } from '@remnote/plugin-sdk';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
-import { powerupCode, prioritySlotCode } from '../lib/consts';
+import { powerupCode, prioritySlotCode, pageRangeWidgetId } from '../lib/consts';
 import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import { safeRemTextToString, findPDFinRem, getIncrementalReadingPosition, addPageToHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
+import { PageControls } from '../components/reader/ui';
+import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 
 async function handleEditorReview(
   plugin: RNPlugin,
@@ -41,6 +43,13 @@ async function handleEditorReview(
 
   // Convert minutes to seconds
   const reviewTimeSeconds = Math.round(reviewTimeMinutes * 60);
+
+  // Synchronize time spent reading directly to the PDF reading history tracker
+  const pdfRem = await findPDFinRem(plugin, rem);
+  if (pdfRem && reviewTimeSeconds > 0) {
+    const activePage = await getIncrementalReadingPosition(plugin, remId, pdfRem._id);
+    await addPageToHistory(plugin, remId, pdfRem._id, activePage || 1, reviewTimeSeconds);
+  }
 
   const newHistory: IncrementalRep[] = [
     ...(incRem.history || []),
@@ -115,6 +124,13 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
   const [futureDate, setFutureDate] = useState('');
   const [ancestorInfo, setAncestorInfo] = useState<any>(null);
   const [remName, setRemName] = useState<string>('');
+
+  // PDF States
+  const [pdfRemId, setPdfRemId] = useState<string | null>(null);
+  const [isPdfNote, setIsPdfNote] = useState(false);
+
+  const pdfControls = usePdfPageControls(plugin, remId, pdfRemId, 0);
+
   const intervalInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -127,6 +143,14 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
       if (rem) {
         const name = await safeRemTextToString(plugin, rem.text);
         setRemName(name);
+
+        const pdfRem = await findPDFinRem(plugin, rem);
+        if (pdfRem) {
+          setIsPdfNote(true);
+          setPdfRemId(pdfRem._id);
+        } else {
+          setIsPdfNote(false);
+        }
       }
 
       // Set the calculated interval from the scheduling algorithm
@@ -242,6 +266,16 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
           <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
             {ancestorInfo.ancestorName}
           </div>
+        </div>
+      )}
+
+      {isPdfNote && pdfRemId && (
+        <div className="flex justify-center my-2 p-2 border rounded shadow-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+          <PageControls
+            incrementalRemId={remId as any}
+            {...pdfControls}
+            totalPages={0}
+          />
         </div>
       )}
 

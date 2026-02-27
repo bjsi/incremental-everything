@@ -122,7 +122,7 @@ export function IncRemMainView() {
       })
     );
 
-    setIncRemsWithDetails(remsWithDetails.filter((rem): rem is IncRemWithDetails => rem !== null));
+    setIncRemsWithDetails(remsWithDetails.filter(Boolean) as IncRemWithDetails[]);
     setLoadingRems(false);
   };
 

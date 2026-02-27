@@ -11,6 +11,7 @@ interface DraggableButtonProps {
   onDragUp?: () => Promise<void> | void;
   onDragDown?: () => Promise<void> | void;
   style?: React.CSSProperties;
+  title?: string;
 }
 
 /**
@@ -29,6 +30,7 @@ export function DraggableButton({
   onDragUp,
   onDragDown,
   style,
+  title,
 }: DraggableButtonProps) {
   const [dragMode, setDragMode] = React.useState<'up' | 'down' | null>(null);
   const dragStartY = React.useRef<number | null>(null);
@@ -111,38 +113,38 @@ export function DraggableButton({
     variant === 'primary'
       ? styles.primary
       : variant === 'danger'
-      ? styles.danger
-      : styles.secondary;
+        ? styles.danger
+        : styles.secondary;
 
   // Visual feedback + inline text change while dragging
   const dragFeedbackStyle: React.CSSProperties =
     dragMode === 'up'
       ? {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 8px 18px rgba(59,130,246,0.25)',
-          borderColor: 'var(--rn-clr-blue, #3b82f6)',
-          backgroundColor: 'var(--rn-clr-blue-light, #e0ecff)',
-          color: 'var(--rn-clr-blue-dark, #1e3a8a)',
-        }
+        transform: 'translateY(-4px)',
+        boxShadow: '0 8px 18px rgba(59,130,246,0.25)',
+        borderColor: 'var(--rn-clr-blue, #3b82f6)',
+        backgroundColor: 'var(--rn-clr-blue-light, #e0ecff)',
+        color: 'var(--rn-clr-blue-dark, #1e3a8a)',
+      }
       : dragMode === 'down'
-      ? {
+        ? {
           transform: 'translateY(4px)',
           boxShadow: '0 8px 18px rgba(16,185,129,0.18)',
           borderColor: 'var(--rn-clr-green, #10b981)',
           backgroundColor: 'var(--rn-clr-green-light, #dcfce7)',
           color: 'var(--rn-clr-green-dark, #064e3b)',
         }
-      : {};
+        : {};
 
   const activeContent =
     dragMode === 'up'
       ? overlayUpText
       : dragMode === 'down'
-      ? overlayDownText
-      : null;
+        ? overlayDownText
+        : null;
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', overflow: 'visible', zIndex: 1 }}>
+    <div style={{ position: 'relative', display: 'inline-flex', overflow: 'visible', zIndex: 1 }} title={title}>
       <button
         onClick={async () => {
           if (skipNextClick.current) {

@@ -1,7 +1,7 @@
 // lib/pdfUtils.ts
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, allIncrementalRemKey, incremReviewStartTimeKey } from './consts';
-import { IncrementalRem } from './types';
+import { IncrementalRem } from './incremental_rem/types';
 
 export interface PageRangeContext {
   incrementalRemId: RemId;
@@ -221,7 +221,8 @@ export const addPageToHistory = async (
   plugin: RNPlugin,
   incrementalRemId: string,
   pdfRemId: string,
-  pageToRecord?: number
+  pageToRecord?: number,
+  sessionDurationOverride?: number
 ): Promise<void> => {
   console.log(`[addPageToHistory] Triggered for Rem: ${incrementalRemId}`);
 
@@ -240,25 +241,36 @@ export const addPageToHistory = async (
   let sessionDuration: number | undefined;
 
   // --- DIRECT CALCULATION LOGIC ---
-  try {
-    const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-
-    if (startTime) {
-      const calculatedDuration = Math.round((Date.now() - startTime) / 1000);
-
-      // ✅ FILTER: Only record meaningful sessions (> 2 seconds)
-      // This ignores the "0s" noise from React re-renders
-      if (calculatedDuration > 2) {
-        if (calculatedDuration > 14400) {
-          console.log(`[addPageToHistory] ⚠️ Duration too long (${calculatedDuration}s). Ignoring.`);
-        } else {
-          sessionDuration = calculatedDuration;
-          console.log(`[addPageToHistory] ✅ SAVED Duration: ${sessionDuration}s`);
-        }
+  if (sessionDurationOverride !== undefined) {
+    if (sessionDurationOverride > 2) {
+      if (sessionDurationOverride > 14400) {
+        console.log(`[addPageToHistory] ⚠️ Override duration too long (${sessionDurationOverride}s). Ignoring.`);
+      } else {
+        sessionDuration = sessionDurationOverride;
+        console.log(`[addPageToHistory] ✅ SAVED Override Duration: ${sessionDuration}s`);
       }
     }
-  } catch (e) {
-    console.error("[addPageToHistory] Error calculating duration:", e);
+  } else {
+    try {
+      const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+
+      if (startTime) {
+        const calculatedDuration = Math.round((Date.now() - startTime) / 1000);
+
+        // ✅ FILTER: Only record meaningful sessions (> 2 seconds)
+        // This ignores the "0s" noise from React re-renders
+        if (calculatedDuration > 2) {
+          if (calculatedDuration > 14400) {
+            console.log(`[addPageToHistory] ⚠️ Duration too long (${calculatedDuration}s). Ignoring.`);
+          } else {
+            sessionDuration = calculatedDuration;
+            console.log(`[addPageToHistory] ✅ SAVED Duration: ${sessionDuration}s`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[addPageToHistory] Error calculating duration:", e);
+    }
   }
   // --------------------------------
 

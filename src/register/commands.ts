@@ -35,6 +35,7 @@ import {
 } from '../lib/card_priority';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { getPerformanceMode } from '../lib/utils';
+import { handleReviewAndOpenRem } from '../lib/review_actions';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async () => {
@@ -112,11 +113,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (url.includes('/flashcards')) {
         console.log('In flashcards view.');
         // First, try to get the current native flashcard. This works for regular cards.
-        const card = await plugin.queue.getCurrentCard();
-        console.log('Result of getCurrentCard():', card);
+        const currentQueueItem = await plugin.queue.getCurrentCard();
+        console.log('Result of getCurrentCard():', currentQueueItem);
 
-        if (card) {
-          remId = card.remId;
+        if (currentQueueItem) {
+          remId = currentQueueItem.remId;
           console.log('Found native card. remId:', remId);
         } else {
           console.log('Not a native card. Checking session storage for incremental rem...');
@@ -160,9 +161,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // Context detection logic (Same as main command)
       if (url.includes('/flashcards')) {
-        const card = await plugin.queue.getCurrentCard();
-        if (card) {
-          remId = card.remId;
+        const currentQueueItem = await plugin.queue.getCurrentCard();
+        if (currentQueueItem) {
+          remId = currentQueueItem.remId;
         } else {
           remId = await plugin.storage.getSession(currentIncRemKey);
         }
@@ -198,11 +199,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (url.includes('/flashcards')) {
         console.log('In flashcards view.');
         // First, try to get the current native flashcard
-        const card = await plugin.queue.getCurrentCard();
-        console.log('Result of getCurrentCard():', card);
+        const currentQueueItem = await plugin.queue.getCurrentCard();
+        console.log('Result of getCurrentCard():', currentQueueItem);
 
-        if (card) {
-          remId = card.remId;
+        if (currentQueueItem) {
+          remId = currentQueueItem.remId;
           console.log('Found native card. remId:', remId);
         } else {
           console.log('Not a native card. Checking session storage for incremental rem...');
@@ -458,24 +459,57 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async () => {
       console.log('--- Review Incremental Rem in Editor Command Triggered ---');
 
-      // Get focused Rem
-      const focusedRem = await plugin.focus.getFocusedRem();
-      if (!focusedRem) {
-        await plugin.app.toast('No Rem focused');
-        return;
-      }
+      const url = await plugin.window.getURL();
+      const isQueue = url && url.includes('/flashcards');
 
-      // Check if it's an Incremental Rem
-      const hasIncPowerup = await focusedRem.hasPowerup(powerupCode);
-      if (!hasIncPowerup) {
-        await plugin.app.toast('This Rem is not tagged as an Incremental Rem');
-        return;
-      }
+      if (isQueue) {
+        // Queue context behavior
+        const currentQueueItem = await plugin.queue.getCurrentCard();
+        let remId = currentQueueItem?.remId;
 
-      // Open the editor review popup
-      await plugin.widget.openPopup('editor_review', {
-        remId: focusedRem._id,
-      });
+        if (!remId) {
+          // If the SDK doesn't report an active card (because it's an IncRem or document), fall back to session storage
+          remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+          console.log('review-increm-in-editor: remId from session storage (currentIncRemKey):', remId);
+        }
+
+        if (!remId) {
+          await plugin.app.toast('No card or Incremental Rem currently active in the queue.');
+          return;
+        }
+
+        const rem = await plugin.rem.findOne(remId);
+        if (!rem) return;
+
+        const hasIncPowerup = await rem.hasPowerup(powerupCode);
+        if (!hasIncPowerup) {
+          await plugin.app.toast('Current card is not an Incremental Rem.');
+          return;
+        }
+
+        // Delegate to exact function used by "Review & Open"
+        await handleReviewAndOpenRem(plugin, rem, null);
+      } else {
+        // Editor context behavior
+        // Get focused Rem
+        const focusedRem = await plugin.focus.getFocusedRem();
+        if (!focusedRem) {
+          await plugin.app.toast('No Rem focused');
+          return;
+        }
+
+        // Check if it's an Incremental Rem
+        const hasIncPowerup = await focusedRem.hasPowerup(powerupCode);
+        if (!hasIncPowerup) {
+          await plugin.app.toast('This Rem is not tagged as an Incremental Rem');
+          return;
+        }
+
+        // Open the editor review popup
+        await plugin.widget.openPopup('editor_review', {
+          remId: focusedRem._id,
+        });
+      }
     },
   });
 
@@ -636,16 +670,38 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   plugin.app.registerCommand({
     id: 'force-open-priority',
     name: 'Force Open Priority Popup',
-    action: async (args: { remId: string }) => {
+    action: async () => {
       // Small safety delay to ensure previous UI operations (like closing parent selector) have settled
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      if (args && args.remId) {
+      // Try reading remId from a custom session key if invoked programmatically
+      let remId = await plugin.storage.getSession<string>('forceOpenPriorityTargetRemId');
+
+      // Fallback: look for focused rem or queue card if no session key provided
+      if (!remId) {
+        const url = await plugin.window.getURL();
+        if (url.includes('/flashcards')) {
+          const card = await plugin.queue.getCurrentCard();
+          if (card) {
+            remId = card.remId;
+          } else {
+            remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+          }
+        } else {
+          const focusedRem = await plugin.focus.getFocusedRem();
+          remId = focusedRem?._id;
+        }
+      }
+
+      if (remId) {
         // Clear stale session storage to prevent race condition with widget context
         await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+        await plugin.storage.setSession('forceOpenPriorityTargetRemId', undefined); // Clear the argument
         await plugin.widget.openPopup('priority_light', {
-          remId: args.remId,
+          remId: remId,
         });
+      } else {
+        await plugin.app.toast('No Rem found to open priority popup for.');
       }
     },
   });

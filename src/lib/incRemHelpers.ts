@@ -36,7 +36,7 @@ export async function determineIncRemType(plugin: RNPlugin, rem: any): Promise<A
 
     let type: ActionItemType = actionItem.type;
 
-    // Check if this is a note under a PDF
+    // Check if this is a note under a PDF (a rem that is merely nested under a PDF)
     if (type === 'rem') {
       let currentRem = rem;
       for (let i = 0; i < 20; i++) {

@@ -77,7 +77,7 @@ interface PageControlsProps {
   onInputKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onSetRange: () => void;
   onClearRange: () => void;
-  metadataBarStyles: ReturnType<typeof useMemo>;
+  metadataBarStyles: any;
 }
 
 export function PageControls({
@@ -113,8 +113,15 @@ export function PageControls({
         flex: '0 0 auto'
       }}
     >
-      <button 
+      <button
+        type="button"
         onClick={onDecrement}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.closest('form')?.requestSubmit();
+          }
+        }}
         style={{
           ...metadataBarStyles.pageButton,
           opacity: currentPage <= Math.max(1, pageRangeStart) ? 0.4 : 1,
@@ -124,7 +131,7 @@ export function PageControls({
       >
         ←
       </button>
-      
+
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <span style={metadataBarStyles.pageLabel}>Page</span>
         <input
@@ -144,9 +151,16 @@ export function PageControls({
           </span>
         )}
       </div>
-      
-      <button 
+
+      <button
+        type="button"
         onClick={onIncrement}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.closest('form')?.requestSubmit();
+          }
+        }}
         style={{
           ...metadataBarStyles.pageButton,
           opacity: (totalPages > 0 && currentPage >= Math.min(pageRangeEnd > 0 ? pageRangeEnd : Infinity, totalPages)) ? 0.4 : 1,
@@ -156,7 +170,7 @@ export function PageControls({
       >
         →
       </button>
-      
+
       <div
         style={{
           width: '1px',
@@ -165,21 +179,35 @@ export function PageControls({
           margin: '0 4px',
         }}
       />
-      
+
       <button
+        type="button"
         onClick={onSetRange}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.closest('form')?.requestSubmit();
+          }
+        }}
         style={activeRangeButtonStyle}
-        title={pageRangeStart > 1 || pageRangeEnd > 0 ? `Current range: ${pageRangeStart}-${pageRangeEnd || '∞'}` : "Set page range"}
+        title={pageRangeStart > 1 || pageRangeEnd > 0 ? "Update reading range" : "Set reading range"}
       >
         <span>📄</span>
         <span>{pageRangeStart > 1 || pageRangeEnd > 0 ? `${pageRangeStart}-${pageRangeEnd || '∞'}` : 'Range'}</span>
       </button>
-      
+
       {(pageRangeStart > 1 || pageRangeEnd > 0) && (
         <button
+          type="button"
           onClick={onClearRange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.currentTarget.closest('form')?.requestSubmit();
+            }
+          }}
           style={metadataBarStyles.clearButton}
-          title="Clear page range"
+          title="Clear range"
           onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
           onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}
         >

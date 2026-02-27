@@ -119,7 +119,6 @@ export function registerWidgets(plugin: ReactRNPlugin) {
       width: '100%',
       height: 'auto',
     },
-    queueItemTypeFilter: QueueItemType.Flashcard,
   });
 
   plugin.app.registerWidget('video_debug', WidgetLocation.Popup, {

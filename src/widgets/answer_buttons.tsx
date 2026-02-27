@@ -31,11 +31,12 @@ import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetiti
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
-import { findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
+import { safeRemTextToString, findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
+import { handleReviewAndOpenRem } from '../lib/review_actions';
 
 const MAX_DEPTH_CHECK = 3;
 
@@ -128,29 +129,6 @@ const handleCardPriorityInheritance = async (
   }
 };
 
-const handleReviewAndOpenRem = async (
-  plugin: RNPlugin,
-  rem: PluginRem | undefined,
-  remType: string | null | undefined
-) => {
-  if (!rem) return;
-
-  if (remType === 'pdf') {
-    const pdfRem = await findPDFinRem(plugin, rem);
-    if (pdfRem) {
-      const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
-      const currentPage = await plugin.storage.getSynced<number>(pageKey);
-
-      if (currentPage) {
-        await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
-      }
-    }
-  }
-
-  const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-  await updateReviewRemData(plugin, incRemInfo ?? undefined);
-  await plugin.window.openRem(rem);
-};
 
 export function AnswerButtons() {
   const plugin = usePlugin();
@@ -415,6 +393,7 @@ export function AnswerButtons() {
           overlayUpText="Repeat tomorrow"
           overlayDownText="Repeat today"
           dragThreshold={12}
+          title="Next: Mark as reviewed, calculate next interval, and advance to next card"
         >
           <div style={buttonStyles.label}>Next</div>
           <div style={buttonStyles.sublabel}><NextRepTime rem={incRemInfo} /></div>
@@ -425,6 +404,7 @@ export function AnswerButtons() {
           onClick={async () => {
             await plugin.widget.openPopup('reschedule', { remId: ctx.remId });
           }}
+          title="Reschedule (Ctrl+J): Manually set custom interval and adjust priority"
         >
           <div style={buttonStyles.label}>Reschedule</div>
           <div style={buttonStyles.sublabel}>Set interval</div>
@@ -461,6 +441,7 @@ export function AnswerButtons() {
             // otherwise the double-call races and skips the next card.
             await rem.removePowerup(powerupCode);
           }}
+          title="Done: Permanently finish item by removing its Incremental power-up"
         >
           <div style={buttonStyles.label}>Done</div>
           <div style={buttonStyles.sublabel}>Untag</div>
@@ -474,12 +455,14 @@ export function AnswerButtons() {
           onClick={async () => {
             await plugin.widget.openPopup('priority', { remId: ctx.remId });
           }}
+          title="Change Priority (Ctrl+P / Ctrl+Alt+P): Adjust item's priority on the fly"
         >
           <div style={buttonStyles.label}>Change Priority</div>
         </Button>
 
         <Button
           onClick={() => handleReviewAndOpenRem(plugin, rem, remType)}
+          title="Review & Open (Ctrl+Shift+J): Reschedule item, open in editor, and start Editor Review Timer"
         >
           <div style={buttonStyles.label}>Review & Open</div>
           <div style={buttonStyles.sublabel}>Go to Editor</div>
@@ -508,6 +491,7 @@ export function AnswerButtons() {
             }
           }}
           style={{ minWidth: '100px' }}
+          title="Open Editor in New Tab: Instantly open the full source document in a new browser tab"
         >
           <div style={buttonStyles.label}>Open Editor</div>
           <div style={buttonStyles.sublabel}>New Tab</div>
@@ -528,6 +512,7 @@ export function AnswerButtons() {
                 animation: 'highlightPulse 2s ease-in-out 3',
                 fontWeight: 600,
               }}
+              title="Scroll to Highlight: Instantly snap view back to highlight's position"
             >
               <div style={buttonStyles.label}>Scroll to</div>
               <div style={buttonStyles.sublabel}>Highlight</div>
@@ -584,6 +569,7 @@ export function AnswerButtons() {
                 fontWeight: 600,
                 minWidth: '110px',
               }}
+              title="Open URL for Web Clipper 📎: Open original URL in a new tab"
             >
               <div style={{ ...buttonStyles.label, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span>📎</span>
@@ -646,12 +632,41 @@ export function AnswerButtons() {
                 pointerEvents: 'none'
               }}
               className="desktop-only-hint"
+              title="Press 'P' to Edit: Open Rem in pop-up previewer for quick edits"
             >
               <div style={buttonStyles.label}>Press 'P' to</div>
               <div style={buttonStyles.sublabel}>Edit in Previewer</div>
             </Button>
           </>
         )}
+
+        <div style={dividerStyle} />
+        <span
+          role="button"
+          style={{
+            cursor: 'pointer',
+            fontSize: '18px',
+            opacity: 0.7,
+            padding: '4px',
+            borderRadius: '6px',
+            transition: 'opacity 0.2s, background-color 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => window.open('https://github.com/bjsi/incremental-everything/wiki/Reviewing-Items-in-the-Queue', '_blank')}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '1';
+            e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '0.7';
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+          title="Help: Guide to Answer Buttons"
+        >
+          ℹ️
+        </span>
       </div>
 
       {/* Priority and Shield Info Bar */}

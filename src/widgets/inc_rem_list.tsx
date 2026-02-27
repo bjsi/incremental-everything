@@ -1,4 +1,4 @@
-import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
+import { ReactRNPlugin, renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
@@ -16,7 +16,7 @@ export function IncRemList() {
   const counterData = useTrackerPlugin(
     async (rp) => {
       try {
-        const documentId = await rp.storage.getSession(popupDocumentIdKey);
+        const documentId = await rp.storage.getSession<string>(popupDocumentIdKey);
         const allIncRems = (await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
         const now = Date.now();
 
