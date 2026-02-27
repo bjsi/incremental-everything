@@ -8,9 +8,10 @@ interface ButtonProps {
   style?: React.CSSProperties;
   disabled?: boolean;
   className?: string;
+  title?: string;
 }
 
-export function Button({ children, onClick, variant = 'secondary', style, disabled, className }: ButtonProps) {
+export function Button({ children, onClick, variant = 'secondary', style, disabled, className, title }: ButtonProps) {
   const styles = getButtonStyles();
   const variantStyles = variant === 'primary' ? styles.primary : variant === 'danger' ? styles.danger : styles.secondary;
 
@@ -18,6 +19,7 @@ export function Button({ children, onClick, variant = 'secondary', style, disabl
     <button
       onClick={onClick}
       disabled={disabled}
+      title={title}
       style={{
         ...styles.base,
         ...variantStyles,
