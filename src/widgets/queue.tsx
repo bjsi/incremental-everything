@@ -21,6 +21,7 @@ import {
   currentIncrementalRemTypeKey,
   activeHighlightIdKey,
   showRemsAsIsolatedInQueueId,
+  powerupCode,
 } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -138,6 +139,23 @@ export function QueueComponent() {
       plugin.storage.setSession(shouldHideIncEverythingKey, false);
     };
   }, [remAndType?.type, shouldRenderEditorForRemType, plugin]);
+
+  // Track if this Rem still has the incremental powerup.
+  // When a user presses "Done", the powerup is removed and we should proactively advance.
+  const hasIncrementalPowerup = useTrackerPlugin(async (rp) => {
+    if (!ctx?.remId) return true; // Default true while loading to prevent premature skips
+    const rem = await rp.rem.findOne(ctx.remId);
+    if (!rem) return false;
+    return await rem.hasPowerup(powerupCode);
+  }, [ctx?.remId]);
+
+  // If the powerup goes missing while we're mounted, immediately advance the queue.
+  useEffect(() => {
+    if (hasIncrementalPowerup === false) {
+      console.log('🎬 QueueComponent: Rem lost powerup, advancing queue proactively');
+      plugin.queue.removeCurrentCardFromQueue(true);
+    }
+  }, [hasIncrementalPowerup, plugin]);
 
   // Reset view mode when switching to a new rem
   useEffect(() => {
