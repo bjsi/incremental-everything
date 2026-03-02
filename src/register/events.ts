@@ -161,7 +161,7 @@ export function registerQueueExitListener(
 
       // Save KB-level shields
       if (shouldSaveIncRem) {
-        await saveKBShield(plugin, allIncRems, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem');
+        await saveKBShield(plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem');
       } else {
         console.warn('[QueueExit] Skipping KB IncRem shield save because cache was incomplete');
       }
@@ -179,7 +179,7 @@ export function registerQueueExitListener(
         if (shouldSaveIncRem) {
           await saveDocumentShield(
             plugin,
-            allIncRems,
+            allIncRems as any,
             priorityCalcScopeRemIds,
             isIncRemDue,
             seenRemIds,
@@ -337,7 +337,7 @@ export function registerQueueEnterListener(
           dueCardsInScope = dueCardsInKB.filter(info => priorityCalcScope.has(info.remId));
 
           const scopedIncRems = allIncRems.filter(rem => priorityCalcScope.has(rem.remId));
-          incRemDocPercentiles = calculateAllPercentiles(scopedIncRems);
+          incRemDocPercentiles = calculateAllPercentiles(scopedIncRems as any);
           dueIncRemsInScope = dueIncRemsInKB.filter(rem => priorityCalcScope.has(rem.remId));
 
           console.log(`QUEUE ENTER: Priority calculations complete:`);
