@@ -164,7 +164,7 @@ export function CardPriorityDisplay() {
         return null;
       }
       const cache = await rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
-      return cache ?? [];
+      return cache ? [...cache] : [];
     },
     [useLightMode, refreshSignal]
   );

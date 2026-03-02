@@ -10,12 +10,10 @@ let pendingUpdates = new Map<RemId, { info: CardPriorityInfo | null; isLight: bo
 async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   if (pendingUpdates.size === 0) return;
 
+  const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+
   const needsHeavyRecalc =
     forceHeavyRecalc || Array.from(pendingUpdates.values()).some((update) => !update.isLight);
-
-
-
-  const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
 
   for (const [remId, update] of pendingUpdates.entries()) {
     const index = cache.findIndex((info) => info.remId === remId);
@@ -43,7 +41,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
     await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
 
   } else {
-    await plugin.storage.setSession(allCardPriorityInfoKey, cache);
+    await plugin.storage.setSession(allCardPriorityInfoKey, [...cache]);
   }
 
   // Signal all listeners that the cache has been updated
