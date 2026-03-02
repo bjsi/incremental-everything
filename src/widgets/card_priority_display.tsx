@@ -72,12 +72,12 @@ function computeShieldStatus(
         topMissedInDoc.priority,
         predicate
       );
-      console.log(`[Display] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allCardsInScope.length}`);
+      // console.log(`[Display] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allCardsInScope.length}`);
     }
   }
 
   if (topMissedInKb && kbPercentile !== undefined) {
-    console.log(`[CardPriorityShield] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allPrioritizedCardInfo?.length}`);
+    // console.log(`[CardPriorityShield] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allPrioritizedCardInfo?.length}`);
   }
 
   return {
@@ -201,6 +201,15 @@ export function CardPriorityDisplay() {
 
   // --- 🔌 COMBINE RESULTS ---
   const finalCardInfo = useLightMode ? lightCardInfo : cardInfo;
+
+  // console.log('[CardPriorityDisplay] Render trace:', {
+  //   remId: rem?._id,
+  //   refreshSignal,
+  //   useLightMode,
+  //   cardInfoPriority: cardInfo?.priority,
+  //   finalPriority: finalCardInfo?.priority,
+  //   cacheLength: allPrioritizedCardInfo?.length
+  // });
 
   // console.log('[CardPriorityDisplay] Critical State Check:', {
   //   remId: rem?._id,

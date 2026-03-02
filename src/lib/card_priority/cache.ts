@@ -10,6 +10,8 @@ let pendingUpdates = new Map<RemId, { info: CardPriorityInfo | null; isLight: bo
 async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   if (pendingUpdates.size === 0) return;
 
+  // console.log(`[Cache] Flush Started. pendingUpdates size: ${pendingUpdates.size}, forceHeavy: ${forceHeavyRecalc}`);
+
   const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
 
   const needsHeavyRecalc =
@@ -30,7 +32,22 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
   }
 
   if (needsHeavyRecalc) {
-    console.log('[Cache] 🏋️ Heavy Recalc Triggered');
+    // console.log('[Cache] 🏋️ Heavy Recalc Triggered');
+
+    // Make sure we apply the manual pending updates directly onto the array before sorting it
+    // because the pending updates we just injected into `cache` will dictate their new percentiles!
+    for (const [remId, update] of pendingUpdates.entries()) {
+      const index = cache.findIndex((info) => info.remId === remId);
+      if (index > -1) {
+        if (update.info) {
+          cache[index] = { ...update.info, kbPercentile: cache[index].kbPercentile };
+        } else {
+          cache.splice(index, 1);
+        }
+      } else if (update.info) {
+        cache.push(update.info);
+      }
+    }
 
     const sortedCache = _.sortBy(cache, (info) => info.priority);
     const totalItems = sortedCache.length;
@@ -41,6 +58,7 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
     await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
 
   } else {
+    console.log(`[Cache] ⚡ Light Update Triggered`);
     await plugin.storage.setSession(allCardPriorityInfoKey, [...cache]);
   }
 
@@ -57,6 +75,7 @@ export async function updateCardPriorityCache(
   isLightUpdate = false,
   optimisticInfo?: Partial<CardPriorityInfo> | null
 ) {
+  // console.log(`[Cache] Update Requested for remId: ${remId}. isLight: ${isLightUpdate}, optimPriority: ${optimisticInfo?.priority}`);
   try {
     let updatedInfo: CardPriorityInfo | null = null;
 
