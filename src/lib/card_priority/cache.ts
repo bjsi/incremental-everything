@@ -7,66 +7,103 @@ import * as _ from 'remeda';
 let cacheUpdateTimer: NodeJS.Timeout | null = null;
 let pendingUpdates = new Map<RemId, { info: CardPriorityInfo | null; isLight: boolean }>();
 
+export function getPendingCacheUpdate(remId: RemId): CardPriorityInfo | null | undefined {
+  const update = pendingUpdates.get(remId);
+  console.log(`[Cache] getPendingCacheUpdate(${remId}) = ${update?.info?.priority}`);
+  return update?.info;
+}
+
+let isFlushing = false;
+let needsHeavyRecalcNextRound = false;
+
 async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
-  if (pendingUpdates.size === 0) return;
+  if (pendingUpdates.size === 0 && !forceHeavyRecalc) return;
 
-  // console.log(`[Cache] Flush Started. pendingUpdates size: ${pendingUpdates.size}, forceHeavy: ${forceHeavyRecalc}`);
-
-  const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
-
-  const needsHeavyRecalc =
-    forceHeavyRecalc || Array.from(pendingUpdates.values()).some((update) => !update.isLight);
-
-  for (const [remId, update] of pendingUpdates.entries()) {
-    const index = cache.findIndex((info) => info.remId === remId);
-    if (index > -1) {
-      if (update.info) {
-        const oldPercentile = cache[index].kbPercentile;
-        cache[index] = { ...update.info, kbPercentile: oldPercentile };
-      } else {
-        cache.splice(index, 1);
-      }
-    } else if (update.info) {
-      cache.push(update.info);
-    }
+  if (isFlushing) {
+    if (forceHeavyRecalc) needsHeavyRecalcNextRound = true;
+    return; // Already flushing, the current loop will pick up any new updates added to pendingUpdates
   }
 
-  if (needsHeavyRecalc) {
-    // console.log('[Cache] 🏋️ Heavy Recalc Triggered');
+  isFlushing = true;
 
-    // Make sure we apply the manual pending updates directly onto the array before sorting it
-    // because the pending updates we just injected into `cache` will dictate their new percentiles!
-    for (const [remId, update] of pendingUpdates.entries()) {
-      const index = cache.findIndex((info) => info.remId === remId);
-      if (index > -1) {
-        if (update.info) {
-          cache[index] = { ...update.info, kbPercentile: cache[index].kbPercentile };
-        } else {
-          cache.splice(index, 1);
+  try {
+    while (pendingUpdates.size > 0 || needsHeavyRecalcNextRound || forceHeavyRecalc) {
+      const updatesToProcess = new Map(pendingUpdates);
+      pendingUpdates.clear();
+
+      const runHeavy = forceHeavyRecalc || needsHeavyRecalcNextRound;
+      forceHeavyRecalc = false;
+      needsHeavyRecalcNextRound = false;
+
+      if (updatesToProcess.size === 0 && !runHeavy) break;
+
+      const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+
+      let needsHeavyRecalc = runHeavy;
+
+      // Build a Map for O(1) lookups and updates
+      const cacheMap = new Map<RemId, CardPriorityInfo>();
+      for (const info of cache) {
+        cacheMap.set(info.remId, info);
+      }
+
+      for (const [remId, update] of updatesToProcess.entries()) {
+        const existing = cacheMap.get(remId);
+        let priorityChanged = false;
+
+        if (existing) {
+          if (update.info) {
+            // If this is an actively pushed update (manual or light UI action), 
+            // or if it's strictly newer than the cache DB timestamp, we trust it over the DB snapshot.
+            const isActivelyPushedUpdate = update.isLight || (update.info.lastUpdated && update.info.lastUpdated >= existing.lastUpdated);
+
+            if (existing.priority !== update.info.priority || existing.source !== update.info.source) {
+              priorityChanged = true;
+            }
+
+            cacheMap.set(remId, {
+              ...existing,
+              ...update.info,
+              priority: isActivelyPushedUpdate ? update.info.priority : existing.priority,
+              source: isActivelyPushedUpdate ? update.info.source : existing.source,
+              kbPercentile: existing.kbPercentile
+            });
+          } else {
+            cacheMap.delete(remId);
+            priorityChanged = true;
+          }
+        } else if (update.info) {
+          cacheMap.set(remId, update.info);
+          priorityChanged = true;
         }
-      } else if (update.info) {
-        cache.push(update.info);
+
+        if (priorityChanged) {
+          needsHeavyRecalc = true;
+        }
       }
+
+      // Convert map back to array.
+      const updatedCache = Array.from(cacheMap.values());
+
+      if (needsHeavyRecalc) {
+        const sortedCache = _.sortBy(updatedCache, (info) => info.priority);
+        const totalItems = sortedCache.length;
+        const enrichedCache = sortedCache.map((info, index) => {
+          const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
+          return { ...info, kbPercentile: percentile };
+        });
+        await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
+      } else {
+        await plugin.storage.setSession(allCardPriorityInfoKey, updatedCache);
+      }
+
+      // Signal all listeners that the cache has been updated
+      // This is crucial for UI components to refresh their priority displays
+      await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
     }
-
-    const sortedCache = _.sortBy(cache, (info) => info.priority);
-    const totalItems = sortedCache.length;
-    const enrichedCache = sortedCache.map((info, index) => {
-      const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-      return { ...info, kbPercentile: percentile };
-    });
-    await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
-
-  } else {
-    console.log(`[Cache] ⚡ Light Update Triggered`);
-    await plugin.storage.setSession(allCardPriorityInfoKey, [...cache]);
+  } finally {
+    isFlushing = false;
   }
-
-  // Signal all listeners that the cache has been updated
-  // This is crucial for UI components to refresh their priority displays
-  await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
-
-  pendingUpdates.clear();
 }
 
 export async function updateCardPriorityCache(
@@ -75,7 +112,7 @@ export async function updateCardPriorityCache(
   isLightUpdate = false,
   optimisticInfo?: Partial<CardPriorityInfo> | null
 ) {
-  // console.log(`[Cache] Update Requested for remId: ${remId}. isLight: ${isLightUpdate}, optimPriority: ${optimisticInfo?.priority}`);
+  console.log(`[Cache] updateCardPriorityCache Requested for remId: ${remId}. isLight: ${isLightUpdate}, optimPriority: ${optimisticInfo?.priority}`);
   try {
     let updatedInfo: CardPriorityInfo | null = null;
 
@@ -114,22 +151,18 @@ export async function updateCardPriorityCache(
 
     pendingUpdates.set(remId, { info: updatedInfo, isLight: isLightUpdate });
 
-    if (cacheUpdateTimer) clearTimeout(cacheUpdateTimer);
-
-    cacheUpdateTimer = setTimeout(async () => {
-      await flushCacheUpdates(plugin);
-      cacheUpdateTimer = null;
-    }, 200);
+    // The flushCacheUpdates function now has an intelligent internal `isFlushing` loop
+    // that prevents overlapping saves and safely batches rapid requests. 
+    // We no longer need arbitrary `setTimeout` delays. We ask it to flush immediately.
+    flushCacheUpdates(plugin).catch(e => {
+      console.error('[Cache] Automated flush failed:', e);
+    });
   } catch (e) {
     console.error('Error updating card priority cache for Rem:', remId, e);
   }
 }
 
 export async function flushCacheUpdatesNow(plugin: RNPlugin) {
-  if (cacheUpdateTimer) {
-    clearTimeout(cacheUpdateTimer);
-    cacheUpdateTimer = null;
-  }
   await flushCacheUpdates(plugin, true);
 }
 
@@ -139,10 +172,6 @@ export async function flushCacheUpdatesNow(plugin: RNPlugin) {
  * This is used for fast, in-queue UI updates.
  */
 export async function flushLightCacheUpdates(plugin: RNPlugin) {
-  if (cacheUpdateTimer) {
-    clearTimeout(cacheUpdateTimer);
-    cacheUpdateTimer = null;
-  }
   await flushCacheUpdates(plugin);
 }
 

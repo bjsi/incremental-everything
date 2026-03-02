@@ -583,33 +583,14 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         }
 
         const cards = await rem.getCards();
-        let targetPriority: number | null = null;
-        let targetSource: PrioritySource | null = null;
-
         if (cards && cards.length > 0) {
           const existingPriority = await getCardPriority(plugin, rem);
           if (!existingPriority || existingPriority.source === 'default' || existingPriority.source === 'inherited') {
             await autoAssignCardPriority(plugin, rem);
           }
-          const finalPriority = await getCardPriority(plugin, rem);
-          if (finalPriority) {
-            targetPriority = finalPriority.priority;
-            targetSource = finalPriority.source;
-          }
         }
 
-        // Compare against existing cache to prevent useless UI rebuilds and overwrites
-        const allInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
-        const cachedEntry = allInfos.find((info) => info.remId === data.remId);
-
-        if (
-          !cachedEntry ||
-          cachedEntry.priority !== targetPriority ||
-          cachedEntry.source !== targetSource
-        ) {
-          console.log(`[GlobalRemChanged] Detected true property drift for ${data.remId}. Triggering update.`);
-          await updateCardPriorityCache(plugin, data.remId);
-        }
+        await updateCardPriorityCache(plugin, data.remId);
 
       }, REM_CHANGE_DEBOUNCE_MS);
     }
