@@ -200,8 +200,12 @@ export function QueueComponent() {
     return null;
   }
 
-  console.log('🎬 QueueComponent: ctx.remId exists:', ctx.remId);
+  // If the powerup is gone, this widget should NOT be rendering anything that covers the flashcard.
+  if (hasIncrementalPowerup === false) {
+    return null;
+  }
 
+  console.log('🎬 QueueComponent: ctx.remId exists:', ctx.remId);
 
   if (remAndType?.type === 'rem' && !shouldRenderEditorForRemType) {
     return null;
