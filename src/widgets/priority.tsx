@@ -608,16 +608,22 @@ function Priority() {
 
     // 🔌 Only do cache updates in 'full' mode
     if (performanceMode === PERFORMANCE_MODE_FULL) {
-      // Fire-and-forget light update
-      updateCardPriorityCache(plugin, rem._id, true, optimisticInfo);
-
-      // Ensure the light update is committed to session storage so UI can see it immediately
-      // Fire-and-forget flush
-      flushLightCacheUpdates(plugin);
-
-      // Fire-and-Forget Heavy Recalculation (Background)
-      // We do NOT await this. It will schedule a heavy recalc (sorting/percentiles) in 200ms.
-      updateCardPriorityCache(plugin, rem._id, false, optimisticInfo).catch(console.error);
+      // DANGEROUS TO USE INTERNAL RAM CACHE LOCALLY BECAUSE WIDGET IFRAME WILL DIE!
+      // Must directly write to global Session Storage before closing!
+      try {
+        const currentCache = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
+        const existingIndex = currentCache.findIndex(i => i.remId === rem._id);
+        const newCache = [...currentCache];
+        if (existingIndex !== -1) {
+          newCache[existingIndex] = optimisticInfo;
+        } else {
+          newCache.push(optimisticInfo);
+        }
+        await plugin.storage.setSession(allCardPriorityInfoKey, newCache);
+        console.log(`[Priority] Fast optimistic push cross-iframe succeeded for ${rem._id}`);
+      } catch (err) {
+        console.error("Fast cache set failed", err);
+      }
 
       if (sessionCache && originalScopeId) {
         // Minimal lag: rely on global refresh or previous logic without blocking
@@ -631,7 +637,15 @@ function Priority() {
 
     // 2. Critical Writes (Fire and Forget)
     // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-    plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
+    try {
+      const manualRems = await plugin.storage.getSession<string[]>('manual_priority_pending_rems') || [];
+      if (!manualRems.includes(rem._id)) {
+        manualRems.push(rem._id);
+        await plugin.storage.setSession('manual_priority_pending_rems', manualRems);
+      }
+    } catch (err) {
+      console.error(err);
+    }
 
     // Perform the actual DB write
     if (!hasCardPriorityPowerup) {

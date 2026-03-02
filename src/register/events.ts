@@ -559,7 +559,9 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
 
         // Original logic continues below
         const inQueue = !!(await plugin.storage.getSession(currentSubQueueIdKey));
-        const isManualUpdate = await plugin.storage.getSession<boolean>('manual_priority_update_pending');
+
+        const manualPendingRems = await plugin.storage.getSession<string[]>('manual_priority_pending_rems') || [];
+        const isManualUpdate = manualPendingRems.includes(data.remId);
 
         if (inQueue && !isManualUpdate) {
           // console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping processing because user is in the queue.');
@@ -568,8 +570,11 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
 
         if (isManualUpdate) {
           // console.log('LISTENER: Processing manual priority update (Queue Override).');
-          // Reset flag
-          await plugin.storage.setSession('manual_priority_update_pending', false);
+          // Consume the flag for this specific RemId only!
+          await plugin.storage.setSession(
+            'manual_priority_pending_rems',
+            manualPendingRems.filter(id => id !== data.remId)
+          );
         }
 
         if (await isLightPerformanceMode(plugin)) {
@@ -583,14 +588,33 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         }
 
         const cards = await rem.getCards();
+        let targetPriority: number | null = null;
+        let targetSource: PrioritySource | null = null;
+
         if (cards && cards.length > 0) {
           const existingPriority = await getCardPriority(plugin, rem);
           if (!existingPriority || existingPriority.source === 'default' || existingPriority.source === 'inherited') {
             await autoAssignCardPriority(plugin, rem);
           }
+          const finalPriority = await getCardPriority(plugin, rem);
+          if (finalPriority) {
+            targetPriority = finalPriority.priority;
+            targetSource = finalPriority.source;
+          }
         }
 
-        await updateCardPriorityCache(plugin, data.remId);
+        // Compare against existing cache to prevent useless UI rebuilds and overwrites
+        const allInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+        const cachedEntry = allInfos.find((info) => info.remId === data.remId);
+
+        if (
+          !cachedEntry ||
+          cachedEntry.priority !== targetPriority ||
+          cachedEntry.source !== targetSource
+        ) {
+          console.log(`[GlobalRemChanged] Detected true property drift for ${data.remId}. Triggering update.`);
+          await updateCardPriorityCache(plugin, data.remId);
+        }
 
       }, REM_CHANGE_DEBOUNCE_MS);
     }

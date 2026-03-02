@@ -6,11 +6,20 @@ import * as _ from 'remeda';
 
 let cacheUpdateTimer: NodeJS.Timeout | null = null;
 let pendingUpdates = new Map<RemId, { info: CardPriorityInfo | null; isLight: boolean }>();
+const lightModeOptimisticOverrides = new Map<RemId, { info: CardPriorityInfo; expiresAt: number }>();
 
 export function getPendingCacheUpdate(remId: RemId): CardPriorityInfo | null | undefined {
   const update = pendingUpdates.get(remId);
-  console.log(`[Cache] getPendingCacheUpdate(${remId}) = ${update?.info?.priority}`);
-  return update?.info;
+  if (update?.info) {
+    return update.info;
+  }
+
+  const override = lightModeOptimisticOverrides.get(remId);
+  if (override && Date.now() < override.expiresAt) {
+    return override.info;
+  }
+
+  return undefined;
 }
 
 let isFlushing = false;
@@ -61,10 +70,12 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
               priorityChanged = true;
             }
 
+            const newPriorityForMap = isActivelyPushedUpdate ? update.info.priority : existing.priority;
+
             cacheMap.set(remId, {
               ...existing,
               ...update.info,
-              priority: isActivelyPushedUpdate ? update.info.priority : existing.priority,
+              priority: newPriorityForMap,
               source: isActivelyPushedUpdate ? update.info.source : existing.source,
               kbPercentile: existing.kbPercentile
             });
@@ -101,6 +112,8 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
       // This is crucial for UI components to refresh their priority displays
       await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
     }
+  } catch (err) {
+    console.error(`[Cache] Error inside while loop:`, err);
   } finally {
     isFlushing = false;
   }
@@ -112,7 +125,6 @@ export async function updateCardPriorityCache(
   isLightUpdate = false,
   optimisticInfo?: Partial<CardPriorityInfo> | null
 ) {
-  console.log(`[Cache] updateCardPriorityCache Requested for remId: ${remId}. isLight: ${isLightUpdate}, optimPriority: ${optimisticInfo?.priority}`);
   try {
     let updatedInfo: CardPriorityInfo | null = null;
 
@@ -150,6 +162,15 @@ export async function updateCardPriorityCache(
     }
 
     pendingUpdates.set(remId, { info: updatedInfo, isLight: isLightUpdate });
+
+    // Inject into the 5-second TTL map so the UI can safely read it 
+    // after React completes its async render cycles and before the DB commits
+    if (updatedInfo && isLightUpdate) {
+      lightModeOptimisticOverrides.set(remId, {
+        info: updatedInfo,
+        expiresAt: Date.now() + 5000
+      });
+    }
 
     // The flushCacheUpdates function now has an intelligent internal `isFlushing` loop
     // that prevents overlapping saves and safely batches rapid requests. 
