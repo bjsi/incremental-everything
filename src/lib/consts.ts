@@ -19,6 +19,10 @@ export const defaultCardPriorityId = 'defaultCardPriority';
 export const showRemsAsIsolatedInQueueId = 'show-rems-as-isolated-in-queue';
 export const priorityStepSizeId = 'priority-step-size';
 
+// FSRS DSR settings
+export const displayFsrsDsrId = 'display-fsrs-dsr';
+export const fsrsWeightsId = 'fsrs-weights';
+
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
 export const currentIncRemKey = 'current-inc-rem';
@@ -41,6 +45,8 @@ export const shouldHideIncEverythingKey = 'shouldHideIncEverything';
 
 // commands
 export const nextRepCommandId = 'next-rep-cmd';
+export const dismissIncRemCommandId = 'dismiss-inc-rem';
+export const nextInQueueCommandId = 'next-in-queue';
 
 // --- Keys for our successful fixes ---
 export const queueLayoutFixId = 'incremental-everything-queue-layout-fix';

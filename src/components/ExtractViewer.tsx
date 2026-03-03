@@ -249,7 +249,24 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   );
 
   return (
-    <div className="extract-viewer" style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}>
+    <div
+      className="extract-viewer"
+      style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}
+      onClick={(e) => {
+        // When clicking non-interactive areas (metadata bar, empty space),
+        // redirect focus into the DocumentViewer's editable area.
+        // This prevents a "no-man's-land" focus state where neither the
+        // RemNote editor nor the parent window handles keyboard events properly.
+        const target = e.target as HTMLElement;
+        if (!target.closest('.document-viewer-section, a, button, [role="button"], input, select, textarea, [contenteditable]')) {
+          const docViewerSection = (e.currentTarget as HTMLElement).querySelector('.document-viewer-section');
+          const editable = docViewerSection?.querySelector('[contenteditable="true"]') as HTMLElement | null;
+          if (editable) {
+            editable.focus();
+          }
+        }
+      }}
+    >
       {/* Breadcrumb Section (Hidden/Placeholder while loading context) */}
       <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center overflow-x-auto ${isContextLoading ? 'opacity-0' : ''}`}>
         {!isContextLoading && ancestors.length > 0 && (

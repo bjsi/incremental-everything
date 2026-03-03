@@ -38,97 +38,7 @@ import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleReviewAndOpenRem } from '../lib/review_actions';
 
-const MAX_DEPTH_CHECK = 3;
-
-/**
- * Smart function to check if a Rem or its descendants have flashcards.
- * **OPTIMIZED: Checks up to MAX_DEPTH_CHECK (3 levels: PluginRem, Children, Grandchildren).**
- * **PERFORMANCE MODE: In Light Mode, skips flashcard checking and adds cardPriority directly.**
- */
-const handleCardPriorityInheritance = async (
-  plugin: RNPlugin,
-  rem: PluginRem,
-  incRemInfo: IncrementalRem | null
-) => {
-  if (!rem || !incRemInfo) return;
-
-  // Start the timer
-  const startTime = Date.now();
-  // console.log(`[Done Button] 🏁 Starting depth-limited (max ${MAX_DEPTH_CHECK} levels) check for Rem: ${rem._id}`);
-
-  try {
-    // 1. Check if the Rem already has a *set* cardPriority tag with a non-default source.
-    const existingSource = await rem.getPowerupProperty('cardPriority', 'prioritySource');
-
-    // If the Rem is tagged AND the source is 'manual' or 'inherited', we stop.
-    // We proceed if the Rem is untagged (existingSource is null) or if the tag source is 'default'.
-    if (existingSource && typeof existingSource === 'string' && existingSource.toLowerCase() !== 'default') {
-      // console.log(`[Done Button] Rem already has manual/inherited priority tag. Skipping check. Total time: ${Date.now() - startTime}ms.`);
-      return;
-    }
-
-    // 2. Check if we should use Light Mode for performance
-    const useLightMode = await shouldUseLightMode(plugin);
-
-    if (useLightMode) {
-      // In Light Mode, skip expensive flashcard checking and add cardPriority directly
-      await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
-      // console.log(`[Done Button] ⚡ Light Mode: Set card priority ${incRemInfo.priority} (source: incremental) without flashcard check. Total time: ${Date.now() - startTime}ms.`);
-      return;
-    }
-
-    // 3. Full Mode: Check the Rem itself for flashcards (Depth 1)
-    const remCards = await rem.getCards();
-    if (remCards && remCards.length > 0) {
-      // Rem has its own flashcards, set card priority
-      await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
-      // console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} (source: incremental) for Rem with direct flashcards. Total time: ${Date.now() - startTime}ms.`);
-      return;
-    }
-
-    // 4. Full Mode: Check descendants up to MAX_DEPTH_CHECK (Children and Grandchildren)
-    // Uses getDescendantsToDepth to avoid fetching the entire hierarchy upfront.
-    const descendantsToCheck = await getDescendantsToDepth(rem, MAX_DEPTH_CHECK);
-
-    if (descendantsToCheck.length === 0) {
-      // console.log(`[Done Button] No descendants found within ${MAX_DEPTH_CHECK} levels. Total time: ${Date.now() - startTime}ms.`);
-      return;
-    }
-
-    // console.log(`[Done Button] Checking ${descendantsToCheck.length} descendants up to level ${MAX_DEPTH_CHECK}...`);
-
-    // 5. Full Mode: Batch-check the limited descendants with early termination
-    const BATCH_SIZE = 50;
-
-    for (let i = 0; i < descendantsToCheck.length; i += BATCH_SIZE) {
-      const batch = descendantsToCheck.slice(i, i + BATCH_SIZE);
-
-      // Check batch in parallel
-      const batchResults = await Promise.all(
-        batch.map(async (descendant) => {
-          const cards = await descendant.getCards();
-          return cards && cards.length > 0;
-        })
-      );
-
-      // Check if any descendant in this batch has flashcards
-      if (batchResults.some(hasCards => hasCards)) {
-        // Found at least one descendant with flashcards
-        await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
-        // console.log(`[Done Button] ✅ Set card priority ${incRemInfo.priority} (source: incremental) for Rem with descendant flashcards. Found in batch starting at index ${i}. Total time: ${Date.now() - startTime}ms.`);
-        return; // Early termination
-      }
-      // console.log(`[Done Button] Batch ${Math.floor(i / BATCH_SIZE) + 1} clear. Moving to next batch...`);
-    }
-
-    // No flashcards found in the Rem or its checked descendants
-    // console.log(`[Done Button] No flashcards found in Rem or all checked descendants. Total time: ${Date.now() - startTime}ms.`);
-
-  } catch (error) {
-    // console.error(`[Done Button] ❌ Error in handleCardPriorityInheritance. Total time: ${Date.now() - startTime}ms.`, error);
-  }
-};
-
+import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 
 export function AnswerButtons() {
   const plugin = usePlugin();
@@ -382,7 +292,28 @@ export function AnswerButtons() {
   };
 
   return (
-    <div style={containerStyle} className="incremental-everything-answer-buttons">
+    <div
+      style={containerStyle}
+      className="incremental-everything-answer-buttons"
+      onMouseDown={(e) => {
+        // Prevent the plugin iframe from capturing keyboard focus on non-interactive areas.
+        // Without this, clicking the answer buttons area steals focus from RemNote's
+        // parent window, blocking native queue shortcuts like "P" (previewer) and "G" (Go to Rem).
+        if (!(e.target as HTMLElement).closest('button, [role="button"], a, input, select, textarea')) {
+          e.preventDefault();
+        }
+      }}
+      onClick={() => {
+        // After any click, return focus to the parent window so native
+        // RemNote shortcuts work immediately.
+        try {
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+          window.parent?.focus();
+        } catch (_) { /* cross-origin safe */ }
+      }}
+    >
       {/* Single row of buttons */}
       <div style={buttonRowStyle}>
         <DraggableButton
@@ -393,7 +324,7 @@ export function AnswerButtons() {
           overlayUpText="Repeat tomorrow"
           overlayDownText="Repeat today"
           dragThreshold={12}
-          title="Next: Mark as reviewed, calculate next interval, and advance to next card"
+          title="Next (Cmd+Right on Mac; Ctrl+Right on Windows/Linux): Mark as reviewed, calculate next interval, and advance to next item"
         >
           <div style={buttonStyles.label}>Next</div>
           <div style={buttonStyles.sublabel}><NextRepTime rem={incRemInfo} /></div>
@@ -441,7 +372,7 @@ export function AnswerButtons() {
             // otherwise the double-call races and skips the next card.
             await rem.removePowerup(powerupCode);
           }}
-          title="Done: Permanently finish item by removing its Incremental power-up"
+          title="Done (Ctrl+D): Permanently finish item by removing its Incremental power-up"
         >
           <div style={buttonStyles.label}>Done</div>
           <div style={buttonStyles.sublabel}>Untag</div>
@@ -621,22 +552,56 @@ export function AnswerButtons() {
           </>
         )}
 
-        {/* Desktop-only hint */}
+        {/* Desktop-only hint — compact informational badge */}
         {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
           <>
             <div style={dividerStyle} />
-            <Button
-              style={{
-                backgroundColor: 'var(--rn-clr-background-tertiary)',
-                cursor: 'default',
-                pointerEvents: 'none'
-              }}
+            <div
               className="desktop-only-hint"
-              title="Press 'P' to Edit: Open Rem in pop-up previewer for quick edits"
+              title="Press 'P' to open the Rem in RemNote's pop-up previewer for quick edits"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '20px',
+                border: '1px dashed var(--rn-clr-border-primary)',
+                backgroundColor: 'transparent',
+                cursor: 'default',
+                pointerEvents: 'none',
+                userSelect: 'none',
+                whiteSpace: 'nowrap',
+              }}
             >
-              <div style={buttonStyles.label}>Press 'P' to</div>
-              <div style={buttonStyles.sublabel}>Edit in Previewer</div>
-            </Button>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '20px',
+                height: '20px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--rn-clr-background-tertiary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: 'var(--rn-clr-content-primary)',
+                fontFamily: 'monospace',
+                animation: 'keyHintPulse 2.5s ease-in-out infinite',
+              }}>P</span>
+              <span style={{
+                fontSize: '10.5px',
+                fontWeight: 500,
+                color: 'var(--rn-clr-content-tertiary)',
+                letterSpacing: '0.2px',
+              }}>Edit</span>
+            </div>
+            <style>{`
+              @keyframes keyHintPulse {
+                0%, 100% { opacity: 0.7; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.08); }
+              }
+            `}</style>
           </>
         )}
 

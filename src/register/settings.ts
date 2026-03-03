@@ -10,6 +10,8 @@ import {
   alwaysUseLightModeOnWebId,
   remnoteEnvironmentId,
   showRemsAsIsolatedInQueueId,
+  displayFsrsDsrId,
+  fsrsWeightsId,
 } from '../lib/consts';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
@@ -269,5 +271,22 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     ],
   });
 
+
+  // --- FSRS DSR Settings ---
+  plugin.settings.registerBooleanSetting({
+    id: displayFsrsDsrId,
+    title: 'Display FSRS DSR Stats (Flashcards)',
+    description:
+      'If enabled, shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card priority display widget. Requires FSRS v6 scheduler.',
+    defaultValue: true,
+  });
+
+  plugin.settings.registerStringSetting({
+    id: fsrsWeightsId,
+    title: 'FSRS Global Weights',
+    description:
+      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler settings. Leave blank to use the official FSRS v6.1.1 defaults.',
+    defaultValue: '',
+  });
 
 }

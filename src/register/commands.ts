@@ -13,10 +13,19 @@ import {
   alwaysUseLightModeOnWebId,
   dismissedPowerupCode,
   currentSubQueueIdKey,
+  dismissIncRemCommandId,
+  nextInQueueCommandId,
+  currentIncrementalRemTypeKey,
+  incremReviewStartTimeKey,
 } from '../lib/consts';
 import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
-import { findPDFinRem, safeRemTextToString } from '../lib/pdfUtils';
+import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { IncrementalRep } from '../lib/incremental_rem/types';
+import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory } from '../lib/pdfUtils';
+import { transferToDismissed } from '../lib/dismissed';
+import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
+import dayjs from 'dayjs';
 import {
   getOperatingSystem,
   getPlatform,
@@ -833,6 +842,180 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await plugin.widget.openPopup('priority_shield_graph', {
         subQueueId,
       });
+    },
+  });
+
+  // Dismiss Incremental Rem command (Ctrl+D)
+  // In Queue: replicates the Done button (card priority inheritance, review time, transfer to dismissed, remove powerup)
+  // In Editor: dismisses the focused Incremental Rem (transfer history to dismissed, remove powerup)
+  plugin.app.registerCommand({
+    id: dismissIncRemCommandId,
+    name: 'Dismiss Incremental Rem',
+    keyboardShortcut: 'ctrl+d',
+    action: async () => {
+      const url = await plugin.window.getURL();
+      const isQueue = url && url.includes('/flashcards');
+
+      let rem;
+      let incRemInfo;
+
+      if (isQueue) {
+        // Queue context: get current incremental rem from session storage
+        const currentQueueItem = await plugin.queue.getCurrentCard();
+        let remId = currentQueueItem?.remId;
+
+        if (!remId) {
+          remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+        }
+
+        if (!remId) {
+          await plugin.app.toast('No Incremental Rem currently active in the queue.');
+          return;
+        }
+
+        rem = await plugin.rem.findOne(remId);
+        if (!rem) {
+          await plugin.app.toast('Could not find the Rem.');
+          return;
+        }
+
+        const hasIncPowerup = await rem.hasPowerup(powerupCode);
+        if (!hasIncPowerup) {
+          await plugin.app.toast('This command only works with Incremental Rems, not regular flashcards.');
+          return;
+        }
+
+        incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+        if (!incRemInfo) {
+          await plugin.app.toast('Could not retrieve Incremental Rem information.');
+          return;
+        }
+
+        // Replicate the Done button logic from answer_buttons.tsx
+        // 1. Handle card priority inheritance
+        await handleCardPriorityInheritance(plugin, rem, incRemInfo);
+
+        // 2. Calculate review time
+        const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+        const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
+
+        // 3. Build the current rep history entry
+        const currentRep: IncrementalRep = {
+          date: Date.now(),
+          scheduled: incRemInfo.nextRepDate,
+          reviewTimeSeconds: reviewTimeSeconds,
+          eventType: 'rep',
+          priority: incRemInfo.priority,
+        };
+
+        const updatedHistory = [...(incRemInfo.history || []), currentRep];
+
+        // 4. Transfer history to dismissed powerup
+        await transferToDismissed(plugin, rem, updatedHistory);
+
+        // 5. Remove from session cache
+        await removeIncrementalRemCache(plugin, rem._id);
+
+        // 6. Remove incremental powerup
+        // The tracker polling loop will detect the powerup is gone
+        // and call removeCurrentCardFromQueue to advance the queue.
+        await rem.removePowerup(powerupCode);
+
+      } else {
+        // Editor context: dismiss the focused Incremental Rem
+        const focusedRem = await plugin.focus.getFocusedRem();
+        if (!focusedRem) {
+          await plugin.app.toast('No Rem focused.');
+          return;
+        }
+
+        const hasIncPowerup = await focusedRem.hasPowerup(powerupCode);
+        if (!hasIncPowerup) {
+          await plugin.app.toast('This Rem is not an Incremental Rem.');
+          return;
+        }
+
+        incRemInfo = await getIncrementalRemFromRem(plugin, focusedRem);
+        if (!incRemInfo) {
+          await plugin.app.toast('Could not retrieve Incremental Rem information.');
+          return;
+        }
+
+        // In editor: transfer existing history to dismissed (no new rep entry needed)
+        await transferToDismissed(plugin, focusedRem, incRemInfo.history || []);
+
+        // Remove from session cache
+        await removeIncrementalRemCache(plugin, focusedRem._id);
+
+        // Remove incremental powerup
+        await focusedRem.removePowerup(powerupCode);
+
+        await plugin.app.toast('Incremental Rem dismissed.');
+      }
+    },
+  });
+
+  // Next item in the queue command (Ctrl+Right Arrow)
+  // Only works in the queue with an Incremental Rem active.
+  // Replicates the Next button logic: PDF page history + handleNextRepetitionClick.
+  plugin.app.registerCommand({
+    id: nextInQueueCommandId,
+    name: 'Next Item in Queue',
+    keyboardShortcut: 'cmd+right',
+    action: async () => {
+      const url = await plugin.window.getURL();
+
+      if (!url || !url.includes('/flashcards')) {
+        await plugin.app.toast('This command only works in the queue.');
+        return;
+      }
+
+      // Get current incremental rem
+      const currentQueueItem = await plugin.queue.getCurrentCard();
+      let remId = currentQueueItem?.remId;
+
+      if (!remId) {
+        remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+      }
+
+      if (!remId) {
+        await plugin.app.toast('No Incremental Rem currently active in the queue.');
+        return;
+      }
+
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) {
+        await plugin.app.toast('Could not find the Rem.');
+        return;
+      }
+
+      const hasIncPowerup = await rem.hasPowerup(powerupCode);
+      if (!hasIncPowerup) {
+        await plugin.app.toast('This command only works with Incremental Rems, not regular flashcards.');
+        return;
+      }
+
+      const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+      if (!incRemInfo) {
+        await plugin.app.toast('Could not retrieve Incremental Rem information.');
+        return;
+      }
+
+      // Handle PDF page history (same as handleNextClick in answer_buttons.tsx)
+      const remType = await plugin.storage.getSession<string | null>(currentIncrementalRemTypeKey);
+      if (remType === 'pdf') {
+        const pdfRem = await findPDFinRem(plugin, rem);
+        if (pdfRem) {
+          const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
+          const currentPage = await plugin.storage.getSynced<number>(pageKey);
+          if (currentPage) {
+            await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
+          }
+        }
+      }
+
+      // Advance the queue (updates SRS data + removes current card)
+      await handleNextRepetitionClick(plugin, incRemInfo);
     },
   });
 }
