@@ -4,7 +4,9 @@ import { incrementalQueueActiveKey, currentIncRemKey, powerupCode } from '../lib
 
 export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
+    console.log('[Tracker] IncRem cache load triggered by plugin.track()');
     await loadIncrementalRemCache(rp as any);
+    console.log('[Tracker] IncRem cache load completed.');
   });
 
   // Track queue state and current rem to detect when powerup is removed

@@ -17,7 +17,7 @@ import {
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
-import { buildDocumentScope } from '../lib/scope_helpers';
+
 
 const QUEUE_LAYOUT_FIX_CSS = `
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) {
@@ -89,17 +89,13 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
 
       if (queueInfo.subQueueId && docScopeRemIds === null) {
-        // console.log('⚠️ GetNextCard: Session cache not ready yet. Calculating scope on-the-fly...');
-
-        const itemSelectionScope = await buildDocumentScope(plugin, queueInfo.subQueueId);
-
-        if (itemSelectionScope.size === 0) {
-          // console.log('❌ GetNextCard: Could not build scope. Returning null.');
-          return null;
-        }
-
-        docScopeRemIds = Array.from(itemSelectionScope);
-        // console.log(`✅ GetNextCard: Calculated on-the-fly scope with ${docScopeRemIds.length} items (including PDF extracts)`);
+        // QueueEnter is still computing the scope in the background.
+        // Do NOT call buildDocumentScope here — it hangs and causes RemNote's
+        // getNextCard timeout to expire, blocking all IncRem injection.
+        // Instead, temporarily skip scope filtering and inject from the full KB.
+        // The QueueEnter handler will set the proper scope for future calls.
+        console.log('⚠️ GetNextCard: Scope not ready yet. Using full KB for IncRem injection.');
+        docScopeRemIds = null; // explicit: no scope filtering
       }
 
       const cardsPerRem = await getCardsPerRem(plugin);
@@ -118,7 +114,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       const filtered = sorted.filter((x) => {
         const isDue = Date.now() >= x.nextRepDate;
         const hasBeenSeen = seenRemIds.includes(x.remId);
-        const isInScope = !queueInfo.subQueueId || docScopeRemIds?.includes(x.remId);
+        const isInScope = !queueInfo.subQueueId || !docScopeRemIds || docScopeRemIds.includes(x.remId);
 
         if (!isInScope) {
           return false;
@@ -133,44 +129,50 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         }
       });
 
-      // console.log('📊 GetNextCard Summary:', {
-      //   allIncrementalRem: allIncrementalRem.length,
-      //   sorted: sorted.length,
-      //   filtered: filtered.length,
-      //   seenRemIds: seenRemIds.length,
-      //   queueMode: queueInfo.mode,
-      //   subQueueId: queueInfo.subQueueId,
-      //   usingCachedScope: queueInfo.subQueueId
-      //     ? (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null
-      //     : 'N/A',
-      // });
+      console.log('📊 GetNextCard Summary:', {
+        allIncrementalRem: allIncrementalRem.length,
+        sorted: sorted.length,
+        filtered: filtered.length,
+        seenRemIds: seenRemIds.length,
+        queueMode: queueInfo.mode,
+        subQueueId: queueInfo.subQueueId,
+        sessionItemCounter,
+        intervalBetweenIncRem,
+        scopeSource: docScopeRemIds ? (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null ? 'cached' : 'on-the-fly' : 'none',
+      });
 
-      if (
-        !queueInfo.subQueueId ||
-        (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null
-      ) {
-        plugin.app.registerCSS(
-          queueCounterId,
-          `
-          .rn-queue__card-counter {
-            /*visibility: hidden;*/
-          }
+      // Always register the queue counter — don't gate it behind scope being cached.
+      // During the race window (QueueEnter still running), the counter would never appear
+      // because currentScopeRemIdsKey is null.
+      plugin.app.registerCSS(
+        queueCounterId,
+        `
+        .rn-queue__card-counter {
+          /*visibility: hidden;*/
+        }
 
-          .light .rn-queue__card-counter:after {
-            content: ' + ${filtered.length}';
-          }
+        .light .rn-queue__card-counter:after {
+          content: ' + ${filtered.length}';
+        }
 
-          .dark .rn-queue__card-counter:after {
-            content: ' + ${filtered.length}';
-          }`.trim()
-        );
-      }
+        .dark .rn-queue__card-counter:after {
+          content: ' + ${filtered.length}';
+        }`.trim()
+      );
 
       const shouldShowIncRem =
         (typeof intervalBetweenIncRem === 'number' &&
           (sessionItemCounter + 1) % intervalBetweenIncRem === 0) ||
         queueInfo.numCardsRemaining === 0 ||
         intervalBetweenIncRem === 'no-cards';
+
+      console.log('🎯 GetNextCard Decision:', {
+        shouldShowIncRem,
+        sessionItemCounter,
+        counterCheck: typeof intervalBetweenIncRem === 'number' ? `(${sessionItemCounter}+1) % ${intervalBetweenIncRem} = ${(sessionItemCounter + 1) % intervalBetweenIncRem}` : intervalBetweenIncRem,
+        numCardsRemaining: queueInfo.numCardsRemaining,
+        filteredLength: filtered.length,
+      });
 
       if (shouldShowIncRem) {
         // console.log('🎯 INCREM CONDITION TRUE:', {
