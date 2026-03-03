@@ -3,6 +3,7 @@ import {
   usePlugin,
   useTrackerPlugin,
   WidgetLocation,
+  QueueInteractionScore,
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import {
@@ -14,12 +15,15 @@ import {
   seenCardInSessionKey,
   priorityCalcScopeRemIdsKey,
   incrementalQueueActiveKey,
+  displayFsrsDsrId,
+  fsrsWeightsId,
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge } from '../components';
+import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
 import * as _ from 'remeda';
 
 type ShieldSlice = {
@@ -145,6 +149,71 @@ export function CardPriorityDisplay() {
     []
   );
 
+  // --- FSRS settings trackers ---
+  const showFsrsDsr = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(displayFsrsDsrId),
+    []
+  ) ?? true;
+
+  const fsrsWeightsRaw = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<string>(fsrsWeightsId),
+    []
+  );
+
+  // --- Fetch card repetition history ---
+  const cardRepData = useTrackerPlugin(async (rp) => {
+    const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardUnder>();
+    const cardId = ctx?.cardId;
+    const remId = ctx?.remId;
+    if (!cardId && !remId) return null;
+
+    let cards: any[] = [];
+    if (cardId) {
+      const card = await rp.card.findOne(cardId);
+      if (card) cards = [card];
+    }
+    if (cards.length === 0 && remId) {
+      const remObj = await rp.rem.findOne(remId);
+      if (remObj) cards = await remObj.getCards();
+    }
+
+    // Use the first card (forward card) as the primary
+    const card = cards[0];
+    if (!card) return null;
+
+    return {
+      cardId: card._id as string,
+      history: card.repetitionHistory || [],
+    };
+  }, []);
+
+  // --- Compute review stats from repetition history ---
+  const historyStats = useMemo(() => {
+    if (!cardRepData?.history || cardRepData.history.length === 0) {
+      return { reps: 0, totalMinutes: 0 };
+    }
+    // Count only gradeable repetitions (Again, Hard, Good, Easy)
+    const gradeable = cardRepData.history.filter(
+      (h: any) => {
+        const s = h.score;
+        return s === QueueInteractionScore.AGAIN ||
+          s === QueueInteractionScore.HARD ||
+          s === QueueInteractionScore.GOOD ||
+          s === QueueInteractionScore.EASY;
+      }
+    );
+    const reps = gradeable.length;
+    const totalMs = gradeable.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
+    const totalMinutes = Math.round(totalMs / 6000) / 10; // ms → min, 1 decimal
+    return { reps, totalMinutes };
+  }, [cardRepData?.history]);
+
+  // --- Compute FSRS state ---
+  const fsrsState: FSRSState | null = useMemo(() => {
+    if (!showFsrsDsr || !cardRepData?.history || cardRepData.history.length === 0) return null;
+    const weights = parseWeightsString(fsrsWeightsRaw);
+    return computeFSRSState(cardRepData.history, weights);
+  }, [showFsrsDsr, cardRepData?.history, fsrsWeightsRaw]);
 
 
   // --- 🔌 CACHE-BASED PATH (Full Mode) ---
@@ -184,8 +253,6 @@ export function CardPriorityDisplay() {
 
 
   // --- REWRITTEN: The Shield calculation is now ultra-fast ---
-  // It reads from the small, pre-filtered lists in our new session cache.
-  // Percentiles are looked up from the main cache to stay fresh.
   const shieldStatus = useMemo(() => {
     if (useLightMode || !rem || !sessionCache) return null;
     return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds, scopeRemIds);
@@ -196,13 +263,11 @@ export function CardPriorityDisplay() {
   const lightCardInfo = useTrackerPlugin(async (rp) => {
     if (!useLightMode || !rem) return null;
 
-    // Check if an optimistic update is currently pending write to the database!
     const pendingInfo = getPendingCacheUpdate(rem._id);
     if (pendingInfo) {
       return pendingInfo;
     }
 
-    // Fetch priority directly, on-demand. This is fast for a single rem.
     return await getCardPriority(rp, rem);
   }, [useLightMode, rem, refreshSignal]);
 
@@ -210,30 +275,8 @@ export function CardPriorityDisplay() {
   // --- 🔌 COMBINE RESULTS ---
   const finalCardInfo = useLightMode ? lightCardInfo : cardInfo;
 
-  // console.log('[CardPriorityDisplay] Render trace:', {
-  //   remId: rem?._id,
-  //   refreshSignal,
-  //   useLightMode,
-  //   cardInfoPriority: cardInfo?.priority,
-  //   finalPriority: finalCardInfo?.priority,
-  //   cacheLength: allPrioritizedCardInfo?.length
-  // });
-
-  // console.log('[CardPriorityDisplay] Critical State Check:', {
-  //   remId: rem?._id,
-  //   useLightMode,
-  //   hasFinalCardInfo: !!finalCardInfo,
-  //   allPrioritizedCardInfoLength: allPrioritizedCardInfo?.length,
-  //   sessionCachePresent: !!sessionCache,
-  //   effectiveMode
-  // });
-
   // Check isIncrementalQueueActive
   if (!rem || !finalCardInfo || isIncrementalQueueActive) {
-    // console.warn('[CardPriorityDisplay] Widget not shown. Reason:', {
-    //   missingRem: !rem,
-    //   missingCardInfo: !finalCardInfo
-    // });
     return null;
   }
 
@@ -245,19 +288,33 @@ export function CardPriorityDisplay() {
     await plugin.widget.openPopup('priority', { remId: rem._id });
   };
 
+  const handleDebugClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!rem) return;
+    await plugin.widget.openPopup('flashcard_repetition_history', {
+      remId: rem._id,
+      cardId: cardRepData?.cardId,
+    });
+  };
+
   return (
     <div
-      className="flex items-center justify-center gap-4 px-3 py-1.5 rounded-md cursor-pointer transition-all"
+      className="flex items-center justify-center gap-3 px-3 py-1.5"
       style={{
         backgroundColor: 'var(--rn-clr-background-secondary)',
         border: '1px solid var(--rn-clr-border-primary)',
+        borderRadius: '8px',
         margin: '4px 0',
+        cursor: 'pointer',
+        transition: 'background-color 0.15s',
+        flexWrap: 'wrap',
       }}
       onClick={handleClick}
       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'; }}
       title="Click to set priority (Opt+P)"
     >
+      {/* Priority */}
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
         <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode} />
@@ -277,6 +334,7 @@ export function CardPriorityDisplay() {
         )}
       </div>
 
+      {/* Shield */}
       {displayPriorityShield && !useLightMode && (shieldStatus?.kb || shieldStatus?.doc) && (
         <>
           <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
@@ -296,6 +354,51 @@ export function CardPriorityDisplay() {
                 </span>
               )}
             </div>
+          </div>
+        </>
+      )}
+
+      {/* Review Stats + FSRS DSR + Debug */}
+      {(historyStats.reps > 0 || fsrsState) && (
+        <>
+          <span style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.4 }}>|</span>
+          <div className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
+            <span>
+              <strong>{historyStats.reps}</strong> Reps, <strong>{historyStats.totalMinutes}</strong> min
+            </span>
+
+            {showFsrsDsr && fsrsState && (
+              <>
+                <span style={{ opacity: 0.4 }}>|</span>
+                <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nBased on ${fsrsState.reviewCount} reviews.`}>
+                  D: <strong>{fsrsState.d.toFixed(2)}</strong>
+                  {' · '}
+                  S: <strong>{fsrsState.s.toFixed(1)}d</strong>
+                  {' · '}
+                  R: <strong style={{ color: fsrsState.r >= 0.9 ? 'var(--rn-clr-green, #22c55e)' : fsrsState.r >= 0.7 ? 'var(--rn-clr-yellow, #eab308)' : 'var(--rn-clr-red, #ef4444)' }}>
+                    {(fsrsState.r * 100).toFixed(1)}%
+                  </strong>
+                </span>
+              </>
+            )}
+
+            <span
+              role="button"
+              style={{
+                cursor: 'pointer',
+                fontSize: '13px',
+                opacity: 0.5,
+                padding: '2px 4px',
+                borderRadius: '4px',
+                transition: 'opacity 0.15s, background-color 0.15s',
+              }}
+              onClick={handleDebugClick}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+              title="Inspect full repetition history"
+            >
+              🔬
+            </span>
           </div>
         </>
       )}
