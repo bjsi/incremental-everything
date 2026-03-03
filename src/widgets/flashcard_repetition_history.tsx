@@ -175,7 +175,7 @@ function FlashcardRepetitionHistory() {
                             }}>
                                 <strong>D:</strong> {fsrs.finalState.d.toFixed(4)}
                                 {' · '}
-                                <strong>S:</strong> {fsrs.finalState.s.toFixed(2)}d ({formatStabilityDays(fsrs.finalState.s)})
+                                <strong>S:</strong> {fsrs.finalState.s.toFixed(2)}d{formatStabilityDays(fsrs.finalState.s) !== `${fsrs.finalState.s.toFixed(2)}d` ? ` (${formatStabilityDays(fsrs.finalState.s)})` : ''}
                                 {' · '}
                                 <strong>R:</strong>{' '}
                                 <span style={{ color: fsrs.finalState.r >= 0.9 ? '#22c55e' : fsrs.finalState.r >= 0.7 ? '#eab308' : '#ef4444' }}>
@@ -211,6 +211,7 @@ function FlashcardRepetitionHistory() {
                                         <th style={{ ...cellStyle, textAlign: 'left' }}>Next Interval</th>
                                         {showFsrsDsr && <th style={{ ...cellStyle, textAlign: 'right' }}>D</th>}
                                         {showFsrsDsr && <th style={{ ...cellStyle, textAlign: 'right' }}>S</th>}
+                                        {showFsrsDsr && <th style={{ ...cellStyle, textAlign: 'right' }}>R</th>}
                                         {showFsrsDsr && <th style={{ ...cellStyle, textAlign: 'right' }}>SInc</th>}
                                         <th style={{ ...cellStyle, textAlign: 'left' }}>pluginData</th>
                                     </tr>
@@ -269,7 +270,20 @@ function FlashcardRepetitionHistory() {
                                                 )}
                                                 {showFsrsDsr && (
                                                     <td style={{ ...cellStyle, textAlign: 'right' }}>
-                                                        {stepState ? `${stepState.s.toFixed(1)}d (${formatStabilityDays(stepState.s)})` : '—'}
+                                                        {stepState ? (() => {
+                                                            const raw = `${stepState.s.toFixed(1)}d`;
+                                                            const friendly = formatStabilityDays(stepState.s);
+                                                            return friendly !== raw ? `${raw} (${friendly})` : raw;
+                                                        })() : '—'}
+                                                    </td>
+                                                )}
+                                                {showFsrsDsr && (
+                                                    <td style={{ ...cellStyle, textAlign: 'right' }}>
+                                                        {stepState?.r != null ? (
+                                                            <span style={{ color: stepState.r >= 0.9 ? '#22c55e' : stepState.r >= 0.7 ? '#eab308' : '#ef4444' }}>
+                                                                {(stepState.r * 100).toFixed(1)}%
+                                                            </span>
+                                                        ) : '—'}
                                                     </td>
                                                 )}
                                                 {showFsrsDsr && (
