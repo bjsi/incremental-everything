@@ -103,7 +103,7 @@ function computeShieldStatus(
 }
 
 export function CardPriorityDisplay() {
-  // console.log('[CardPriorityDisplay] Mounting/Rendering');
+  console.log('[CardPriorityDisplay] Mounting/Rendering');
   const plugin = usePlugin();
 
   // ✅ Use the centralized function that handles mobile AND web detection
@@ -111,6 +111,7 @@ export function CardPriorityDisplay() {
     async (rp) => await getEffectivePerformanceMode(rp),
     []
   );
+  console.log('[CardPriorityDisplay] effectiveMode:', effectiveMode);
 
   const useLightMode = effectiveMode === PERFORMANCE_MODE_LIGHT;
 
@@ -134,9 +135,14 @@ export function CardPriorityDisplay() {
   const rem = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
     if (!ctx?.remId) {
+      console.log('[CardPriorityDisplay] rem tracker: ctx or remId is null', ctx);
       return null;
     }
-    return (await rp.rem.findOne(ctx.remId)) ?? null;
+    const found = (await rp.rem.findOne(ctx.remId)) ?? null;
+    if (!found) {
+      console.log('[CardPriorityDisplay] rem tracker: rem not found for id', ctx.remId);
+    }
+    return found;
   }, []);
 
   const scopeRemIds = useTrackerPlugin(
@@ -259,9 +265,14 @@ export function CardPriorityDisplay() {
   }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds]);
 
 
-  // --- 🔌 ON-DEMAND PATH (Light Mode) ---
+  // --- 🔌 ON-DEMAND PATH (Light Mode OR Full Mode fallback when cache not ready) ---
   const lightCardInfo = useTrackerPlugin(async (rp) => {
-    if (!useLightMode || !rem) return null;
+    if (!rem) return null;
+    // Skip on-demand only when the cache-based path already found THIS rem
+    if (cardInfo) {
+      return null;
+    }
+    console.log('[CardPriorityDisplay] Using on-demand path (useLightMode:', useLightMode, ', cardInfo:', !!cardInfo, ')');
 
     const pendingInfo = getPendingCacheUpdate(rem._id);
     if (pendingInfo) {
@@ -269,19 +280,28 @@ export function CardPriorityDisplay() {
     }
 
     return await getCardPriority(rp, rem);
-  }, [useLightMode, rem, refreshSignal]);
+  }, [useLightMode, rem, refreshSignal, cardInfo]);
 
 
   // --- 🔌 COMBINE RESULTS ---
-  const finalCardInfo = useLightMode ? lightCardInfo : cardInfo;
+  // Prefer cache-based cardInfo; fall back to on-demand lightCardInfo (covers Light Mode + cache-not-ready)
+  const finalCardInfo = cardInfo || lightCardInfo;
 
   // Check isIncrementalQueueActive
   if (!rem || !finalCardInfo || isIncrementalQueueActive) {
+    console.log('[CardPriorityDisplay] Early return — rem:', !!rem, ', finalCardInfo:', !!finalCardInfo,
+      ', isIncrementalQueueActive:', isIncrementalQueueActive,
+      ', cardInfo:', !!cardInfo, ', lightCardInfo:', !!lightCardInfo,
+      ', useLightMode:', useLightMode,
+      ', allPrioritizedCardInfo length:', allPrioritizedCardInfo?.length,
+      ', sessionCache:', !!sessionCache);
     return null;
   }
 
   // KB percentile is read directly from the main cache, which is already fast.
-  const kbPercentile = (!useLightMode && cardInfo) ? cardInfo.kbPercentile : undefined;
+  // Only show relative data when the cache is actually populated
+  const cacheReady = !!(cardInfo && allPrioritizedCardInfo && allPrioritizedCardInfo.length > 0);
+  const kbPercentile = (!useLightMode && cacheReady && cardInfo) ? cardInfo.kbPercentile : undefined;
 
   const handleClick = async () => {
     if (!rem) return;
@@ -317,14 +337,14 @@ export function CardPriorityDisplay() {
       {/* Priority */}
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
-        <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode} />
-        {!useLightMode && kbPercentile !== undefined && (
+        <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode || !cacheReady} />
+        {!useLightMode && cacheReady && kbPercentile !== undefined && (
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
             ({kbPercentile}% KB
             {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
           </span>
         )}
-        {!useLightMode && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
+        {!useLightMode && cacheReady && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
           <span
             className="text-sm opacity-60 cursor-help"
             title="Doc percentile will be recalculated when you start a new queue session"
@@ -335,7 +355,7 @@ export function CardPriorityDisplay() {
       </div>
 
       {/* Shield */}
-      {displayPriorityShield && !useLightMode && (shieldStatus?.kb || shieldStatus?.doc) && (
+      {displayPriorityShield && !useLightMode && cacheReady && (shieldStatus?.kb || shieldStatus?.doc) && (
         <>
           <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
           <div className="flex items-center gap-2">
