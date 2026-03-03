@@ -2,9 +2,9 @@ import { RNPlugin, PluginRem, RichTextInterface } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem';
 import { getCardRandomness, getSortingRandomness, applySortingCriteria } from '../sorting';
 import { getDueCardsWithPriorities } from '../card_priority';
-import { 
-  allIncrementalRemKey, 
-  priorityGraphPowerupCode, 
+import {
+  allIncrementalRemKey,
+  priorityGraphPowerupCode,
   GRAPH_DATA_KEY_PREFIX,
   allCardPriorityInfoKey
 } from '../consts';
@@ -44,8 +44,8 @@ export async function isPriorityReviewDocument(rem: PluginRem): Promise<boolean>
       typeof text === 'string'
         ? text
         : Array.isArray(text)
-        ? text.join('')
-        : '';
+          ? text.join('')
+          : '';
     return tagTextString.includes('Priority Review Queue');
   });
 }
@@ -108,16 +108,16 @@ export async function createPriorityReviewDocument(
     hour: '2-digit',
     minute: '2-digit'
   });
-  
+
   // Create a blank Rem first
   const reviewDoc = await plugin.rem.createRem();
   if (!reviewDoc) {
     throw new Error("Failed to create the initial review document Rem.");
   }
-  
+
   // Build the document name with rem reference if there's a scope
   let docNameContent: RichTextInterface;
-  
+
   if (scopeRemId) {
     const scopeRem = await plugin.rem.findOne(scopeRemId);
     if (scopeRem) {
@@ -138,18 +138,18 @@ export async function createPriorityReviewDocument(
     // Full KB scope
     docNameContent = [`Priority Review - Full Knowledge Base - ${timestamp}`];
   }
-  
+
   // Set the rich text name and make it a document
   await reviewDoc.setText(docNameContent);
   await reviewDoc.setIsDocument(true);
-  
+
   // 2. Fetch Data
   const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
 
   // 3. Get DUE items (Fresh calculation)
   const scopeRem = scopeRemId ? (await plugin.rem.findOne(scopeRemId)) ?? null : null;
   const now = Date.now();
-  
+
   // IncRems
   let scopedIncRems = allIncRems;
   if (scopeRem) {
@@ -158,7 +158,7 @@ export async function createPriorityReviewDocument(
     scopedIncRems = allIncRems.filter(r => comprehensiveScopeIds.has(r.remId));
   }
   const dueIncRems = scopedIncRems.filter(rem => rem.nextRepDate <= now);
-  
+
   // Cards
   // This fetches the actual cards we will use. 
   // It might find cards NOT present in allCardInfos if the cache is stale.
@@ -169,7 +169,7 @@ export async function createPriorityReviewDocument(
   );
 
   // --- DEBUG & FIX START ---
-  
+
   // 3b. Establish "Universe" for Percentiles
   // We start with the cached data (allCardInfos) filtered by scope
   const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
@@ -188,9 +188,9 @@ export async function createPriorityReviewDocument(
   if (missingCards.length > 0) {
     // 2. Deduplicate missing items by RemId so we don't add the same Rem multiple times
     const uniqueMissingRems = _.uniqBy(missingCards, c => c.rem._id);
-    
+
     console.warn(`[PriorityGraph] Found ${missingCards.length} due cards missing from cache. Merged ${uniqueMissingRems.length} unique Rems into universe.`);
-    
+
     // Note: You might also need to map these to match the CardPriorityInfo shape 
     // depending on your type definitions, but fixing the filter prevents the false alarm.
     const missingCardInfos = uniqueMissingRems.map(item => ({
@@ -198,7 +198,7 @@ export async function createPriorityReviewDocument(
       priority: item.priority,
       source: item.source,
       // You may need to fill other CardPriorityInfo fields like cardCount/dueCards/lastUpdated with defaults
-      cardCount: 1, 
+      cardCount: 1,
       dueCards: 1,
       lastUpdated: Date.now()
     }));
@@ -210,20 +210,20 @@ export async function createPriorityReviewDocument(
 
   // Calculate "Relative Percentiles" maps: { [remId]: percentile (0-100) }
   // scopedIncRems is already filtered above
-  const incRemPercentiles = calculateAllPercentiles(scopedIncRems);
-  
+  const incRemPercentiles = calculateAllPercentiles(scopedIncRems as any);
+
   // Use the SAFE universe list that definitely includes our due cards
   const cardPercentiles = calculateAllPercentiles(universeCardInfos);
 
   // --- DEBUG & FIX END ---
-  
+
   // 4. Apply sorting criteria (Randomness)
   const incRemRandomness = await getSortingRandomness(plugin);
   const cardRandomness = await getCardRandomness(plugin);
-  
-  const sortedIncRems = applySortingCriteria(dueIncRems, incRemRandomness);
+
+  const sortedIncRems = applySortingCriteria((dueIncRems as any[]), incRemRandomness);
   const sortedCards = applySortingCriteria(cardsWithPriority, cardRandomness);
-  
+
   // 5. Mix Items & Attach Pre-calculated Percentiles
   interface MixedItem {
     rem: PluginRem;
@@ -243,13 +243,13 @@ export async function createPriorityReviewDocument(
     if (rem) {
       // Lookup the percentile relative to the entire scope universe
       // Fallback to 100 (lowest rank) if not found
-      const percentile = incRemPercentiles[item.remId] ?? 100;
-      
-      mixedItems.push({ 
-        rem, 
-        type: 'incremental', 
-        priority: item.priority,
-        percentile: percentile 
+      const percentile = incRemPercentiles[(item as any).remId] ?? 100;
+
+      mixedItems.push({
+        rem,
+        type: 'incremental',
+        priority: (item as any).priority,
+        percentile: percentile
       });
       return true;
     }
@@ -259,18 +259,18 @@ export async function createPriorityReviewDocument(
   const addCard = (idx: number) => {
     if (idx >= sortedCards.length) return false;
     const item = sortedCards[idx];
-    
+
     // Lookup percentile with debug log if missing
     let percentile = cardPercentiles[item.rem._id];
-    
+
     if (percentile === undefined) {
       console.warn(`[PriorityGraph] Percentile missing for Card Rem: ${item.rem._id}. Fallback to 100.`);
       percentile = 100;
     }
-    
-    mixedItems.push({ 
-      rem: item.rem, 
-      type: 'flashcard', 
+
+    mixedItems.push({
+      rem: item.rem,
+      type: 'flashcard',
       priority: item.priority,
       percentile: percentile
     });
@@ -289,7 +289,7 @@ export async function createPriorityReviewDocument(
           if (addCard(cardIndex)) { cardIndex++; addedThisCycle = true; }
         }
       }
-      
+
       if (!addedThisCycle) break;
     }
 
@@ -302,12 +302,12 @@ export async function createPriorityReviewDocument(
       addCard(i);
     }
   }
-  
+
   // 6. Add metadata to document
-    const scopeName = scopeRemId 
+  const scopeName = scopeRemId
     ? (await plugin.rem.findOne(scopeRemId))?.text?.join('') || 'Document'
     : 'Full Knowledge Base';
-    
+
   // Format randomness as percentage
   const incRemRandPct = Math.round(incRemRandomness * 100);
   const cardRandPct = Math.round(cardRandomness * 100);
@@ -335,7 +335,7 @@ Created: ${timestamp}`;
   }
 
   // 7. Generate Graph Data and Insert Graph Widget
-  
+
   // Initialize bins (0-5, 5-10, ... 95-100)
   const createBins = () => Array(20).fill(0).map((_, i) => ({
     range: `${i * 5}-${(i + 1) * 5}`,
@@ -350,7 +350,7 @@ Created: ${timestamp}`;
     // Fill Absolute Bins
     const pAbs = Math.max(0, Math.min(100, item.priority));
     const absIndex = Math.min(Math.floor(pAbs / 5), 19);
-    
+
     // Fill Relative Bins
     const pRel = Math.max(0, Math.min(100, item.percentile));
     const relIndex = Math.min(Math.floor(pRel / 5), 19);
@@ -369,10 +369,10 @@ Created: ${timestamp}`;
   if (graphRem) {
     await graphRem.setParent(reviewDoc);
     await graphRem.setText(["Priority Distribution Graph"]);
-    
+
     // CRITICAL FIX: Add the Powerup explicitly by Code
     await graphRem.addPowerup(priorityGraphPowerupCode);
-    
+
     // Save the graph data in storage associated with this Rem
     // We use synced storage so it persists across sessions
     // UPDATED: Save object with bins AND stats
@@ -384,11 +384,11 @@ Created: ${timestamp}`;
         card: cardRandPct
       }
     };
-    
+
     await plugin.storage.setSynced(GRAPH_DATA_KEY_PREFIX + graphRem._id, graphData);
   }
 
-    
+
   // 8. Create portals in the document
   const reviewQueueTag = await findOrCreateTag(plugin, 'Priority Review Queue');
   if (reviewQueueTag) { await reviewDoc.addTag(reviewQueueTag); }
@@ -397,10 +397,10 @@ Created: ${timestamp}`;
     // Create a regular rem that will contain the portal reference
     const childRem = await plugin.rem.createRem();
     if (!childRem) continue;
-    
+
     // Set it as a child of the review document first
     await childRem.setParent(reviewDoc);
-    
+
     // Set its text to be a portal reference to the target rem
     const portalContent: RichTextInterface = [
       {
@@ -415,6 +415,6 @@ Created: ${timestamp}`;
     const typeTag = await findOrCreateTag(plugin, typeTagText);
     if (typeTag) { await childRem.addTag(typeTag); }
   }
-  
+
   return reviewDoc;
 }

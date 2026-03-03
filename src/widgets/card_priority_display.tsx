@@ -9,13 +9,14 @@ import {
   powerupCode,
   allCardPriorityInfoKey,
   queueSessionCacheKey,
-  cardPriorityCacheRefreshKey,
   displayPriorityShieldId,
+  cardPriorityCacheRefreshKey,
   seenCardInSessionKey,
   priorityCalcScopeRemIdsKey,
   incrementalQueueActiveKey,
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
+import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge } from '../components';
@@ -72,12 +73,12 @@ function computeShieldStatus(
         topMissedInDoc.priority,
         predicate
       );
-      console.log(`[Display] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allCardsInScope.length}`);
+      // console.log(`[Display] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${docPercentile}%, Universe ${allCardsInScope.length}`);
     }
   }
 
   if (topMissedInKb && kbPercentile !== undefined) {
-    console.log(`[CardPriorityShield] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allPrioritizedCardInfo?.length}`);
+    // console.log(`[CardPriorityShield] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${kbPercentile}%, Universe ${allPrioritizedCardInfo?.length}`);
   }
 
   return {
@@ -164,7 +165,7 @@ export function CardPriorityDisplay() {
         return null;
       }
       const cache = await rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
-      return cache ?? [];
+      return cache ? [...cache] : [];
     },
     [useLightMode, refreshSignal]
   );
@@ -194,6 +195,13 @@ export function CardPriorityDisplay() {
   // --- 🔌 ON-DEMAND PATH (Light Mode) ---
   const lightCardInfo = useTrackerPlugin(async (rp) => {
     if (!useLightMode || !rem) return null;
+
+    // Check if an optimistic update is currently pending write to the database!
+    const pendingInfo = getPendingCacheUpdate(rem._id);
+    if (pendingInfo) {
+      return pendingInfo;
+    }
+
     // Fetch priority directly, on-demand. This is fast for a single rem.
     return await getCardPriority(rp, rem);
   }, [useLightMode, rem, refreshSignal]);
@@ -201,6 +209,15 @@ export function CardPriorityDisplay() {
 
   // --- 🔌 COMBINE RESULTS ---
   const finalCardInfo = useLightMode ? lightCardInfo : cardInfo;
+
+  // console.log('[CardPriorityDisplay] Render trace:', {
+  //   remId: rem?._id,
+  //   refreshSignal,
+  //   useLightMode,
+  //   cardInfoPriority: cardInfo?.priority,
+  //   finalPriority: finalCardInfo?.priority,
+  //   cacheLength: allPrioritizedCardInfo?.length
+  // });
 
   // console.log('[CardPriorityDisplay] Critical State Check:', {
   //   remId: rem?._id,
