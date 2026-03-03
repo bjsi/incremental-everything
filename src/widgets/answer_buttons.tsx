@@ -292,7 +292,28 @@ export function AnswerButtons() {
   };
 
   return (
-    <div style={containerStyle} className="incremental-everything-answer-buttons">
+    <div
+      style={containerStyle}
+      className="incremental-everything-answer-buttons"
+      onMouseDown={(e) => {
+        // Prevent the plugin iframe from capturing keyboard focus on non-interactive areas.
+        // Without this, clicking the answer buttons area steals focus from RemNote's
+        // parent window, blocking native queue shortcuts like "P" (previewer) and "G" (Go to Rem).
+        if (!(e.target as HTMLElement).closest('button, [role="button"], a, input, select, textarea')) {
+          e.preventDefault();
+        }
+      }}
+      onClick={() => {
+        // After any click, return focus to the parent window so native
+        // RemNote shortcuts work immediately.
+        try {
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+          window.parent?.focus();
+        } catch (_) { /* cross-origin safe */ }
+      }}
+    >
       {/* Single row of buttons */}
       <div style={buttonRowStyle}>
         <DraggableButton
@@ -531,22 +552,56 @@ export function AnswerButtons() {
           </>
         )}
 
-        {/* Desktop-only hint */}
+        {/* Desktop-only hint — compact informational badge */}
         {['rem', 'pdf', 'pdf-highlight'].includes(remType || '') && (
           <>
             <div style={dividerStyle} />
-            <Button
-              style={{
-                backgroundColor: 'var(--rn-clr-background-tertiary)',
-                cursor: 'default',
-                pointerEvents: 'none'
-              }}
+            <div
               className="desktop-only-hint"
-              title="Press 'P' to Edit: Open Rem in pop-up previewer for quick edits"
+              title="Press 'P' to open the Rem in RemNote's pop-up previewer for quick edits"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '20px',
+                border: '1px dashed var(--rn-clr-border-primary)',
+                backgroundColor: 'transparent',
+                cursor: 'default',
+                pointerEvents: 'none',
+                userSelect: 'none',
+                whiteSpace: 'nowrap',
+              }}
             >
-              <div style={buttonStyles.label}>Press 'P' to</div>
-              <div style={buttonStyles.sublabel}>Edit in Previewer</div>
-            </Button>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '20px',
+                height: '20px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--rn-clr-background-tertiary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: 'var(--rn-clr-content-primary)',
+                fontFamily: 'monospace',
+                animation: 'keyHintPulse 2.5s ease-in-out infinite',
+              }}>P</span>
+              <span style={{
+                fontSize: '10.5px',
+                fontWeight: 500,
+                color: 'var(--rn-clr-content-tertiary)',
+                letterSpacing: '0.2px',
+              }}>Edit</span>
+            </div>
+            <style>{`
+              @keyframes keyHintPulse {
+                0%, 100% { opacity: 0.7; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.08); }
+              }
+            `}</style>
           </>
         )}
 
