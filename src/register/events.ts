@@ -16,6 +16,7 @@ import {
   powerupCode,
   dismissedPowerupCode,
   repHistorySlotCode,
+  incrementalQueueActiveKey,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -134,6 +135,10 @@ export function registerQueueExitListener(
   resetSessionItemCounter: ResetSessionItemCounter
 ) {
   plugin.event.addListener(AppEvents.QueueExit, undefined, async ({ subQueueId }) => {
+    // Safety net: always clear the incremental queue flag on exit.
+    // The QueueComponent's useEffect cleanup may not fire if its iframe is destroyed abruptly.
+    await plugin.storage.setSession(incrementalQueueActiveKey, false);
+
     await flushCacheUpdatesNow(plugin);
     console.log('QueueExit triggered, subQueueId:', subQueueId);
 
@@ -254,6 +259,10 @@ export function registerQueueEnterListener(
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async ({ subQueueId }) => {
     console.log('QUEUE ENTER: Starting session pre-calculation for subQueueId:', subQueueId);
+
+    // Safety net: clear stale incremental queue flag from a previous session
+    // whose iframe cleanup may not have fired.
+    await plugin.storage.setSession(incrementalQueueActiveKey, false);
 
     resetSessionItemCounter();
     await clearSeenItems(plugin);

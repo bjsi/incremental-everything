@@ -14,6 +14,7 @@ import {
   seenRemInSessionKey,
   noIncRemTimerKey,
   incremReviewStartTimeKey,
+  incrementalQueueActiveKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
@@ -242,6 +243,10 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         // });
         sessionItemCounter++;
         await plugin.app.registerCSS(queueLayoutFixId, '');
+        // Bullet-proof mid-session reset: if the previous IncRem widget unmounted
+        // unceremoniously (skipping its useEffect cleanup), ensure the flag is cleared
+        // so regular flashcards can render their widgets (like CardPriorityDisplay).
+        await plugin.storage.setSession(incrementalQueueActiveKey, false);
         return null;
       }
     }
