@@ -12,6 +12,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import { computeFSRSStatesPerReview, computeFSRSState, parseWeightsString, FSRSStepState } from '../lib/fsrs';
+import { formatStabilityDays } from '../lib/utils';
 import { displayFsrsDsrId, fsrsWeightsId } from '../lib/consts';
 
 function scoreLabel(score: QueueInteractionScore): string {
@@ -174,11 +175,20 @@ function FlashcardRepetitionHistory() {
                             }}>
                                 <strong>D:</strong> {fsrs.finalState.d.toFixed(4)}
                                 {' · '}
-                                <strong>S:</strong> {fsrs.finalState.s.toFixed(2)}d
+                                <strong>S:</strong> {fsrs.finalState.s.toFixed(2)}d ({formatStabilityDays(fsrs.finalState.s)})
                                 {' · '}
                                 <strong>R:</strong>{' '}
                                 <span style={{ color: fsrs.finalState.r >= 0.9 ? '#22c55e' : fsrs.finalState.r >= 0.7 ? '#eab308' : '#ef4444' }}>
                                     {(fsrs.finalState.r * 100).toFixed(1)}%
+                                </span>
+                                {' · '}
+                                <span title={`SInc (Stability Increase) — how much stability grows after answering.\n\nHard: ×${fsrs.finalState.sInc.hard.toFixed(2)} → ${formatStabilityDays(fsrs.finalState.s * fsrs.finalState.sInc.hard)}\nGood: ×${fsrs.finalState.sInc.good.toFixed(2)} → ${formatStabilityDays(fsrs.finalState.s * fsrs.finalState.sInc.good)}\nEasy: ×${fsrs.finalState.sInc.easy.toFixed(2)} → ${formatStabilityDays(fsrs.finalState.s * fsrs.finalState.sInc.easy)}\n\nHigher = faster learning. 1.0 = no growth.`}
+                                    style={{ cursor: 'help' }}
+                                >
+                                    <strong>SInc:</strong>{' '}
+                                    <span style={{ color: '#f59e0b' }}>×{fsrs.finalState.sInc.hard.toFixed(2)}</span>{' / '}
+                                    <span style={{ color: '#22c55e' }}>×{fsrs.finalState.sInc.good.toFixed(2)}</span>{' / '}
+                                    <span style={{ color: '#3b82f6' }}>×{fsrs.finalState.sInc.easy.toFixed(2)}</span>
                                 </span>
                                 {' · '}
                                 Next: {card.nextRepetitionTime ? new Date(card.nextRepetitionTime).toLocaleDateString() : '—'}
@@ -201,6 +211,7 @@ function FlashcardRepetitionHistory() {
                                         <th style={{ ...cellStyle, textAlign: 'left' }}>Next Interval</th>
                                         {showFsrsDsr && <th style={{ ...cellStyle, textAlign: 'right' }}>D</th>}
                                         {showFsrsDsr && <th style={{ ...cellStyle, textAlign: 'right' }}>S</th>}
+                                        {showFsrsDsr && <th style={{ ...cellStyle, textAlign: 'right' }}>SInc</th>}
                                         <th style={{ ...cellStyle, textAlign: 'left' }}>pluginData</th>
                                     </tr>
                                 </thead>
@@ -258,13 +269,18 @@ function FlashcardRepetitionHistory() {
                                                 )}
                                                 {showFsrsDsr && (
                                                     <td style={{ ...cellStyle, textAlign: 'right' }}>
-                                                        {stepState ? `${stepState.s.toFixed(1)}d` : '—'}
+                                                        {stepState ? `${stepState.s.toFixed(1)}d (${formatStabilityDays(stepState.s)})` : '—'}
                                                     </td>
                                                 )}
-                                                <td style={{ ...cellStyle, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {showFsrsDsr && (
+                                                    <td style={{ ...cellStyle, textAlign: 'right' }}>
+                                                        {stepState?.sInc != null ? `×${stepState.sInc.toFixed(2)}` : '—'}
+                                                    </td>
+                                                )}
+                                                <td style={{ ...cellStyle, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                     {rep.pluginData ? (
                                                         <span title={JSON.stringify(rep.pluginData, null, 2)} style={{ cursor: 'help' }}>
-                                                            {JSON.stringify(rep.pluginData).slice(0, 30)}…
+                                                            {JSON.stringify(rep.pluginData).slice(0, 80)}…
                                                         </span>
                                                     ) : '—'}
                                                 </td>

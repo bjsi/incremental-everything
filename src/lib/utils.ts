@@ -235,3 +235,13 @@ export function timeSince(date: Date) {
   }
   return Math.floor(seconds) + "s ago";
 }
+
+/**
+ * Format FSRS stability (in days) as a friendly human-readable string.
+ * Examples: 0.3d, 5d, 3.5m, 2y, 1.2y
+ */
+export function formatStabilityDays(days: number): string {
+  if (days < 30) return `${days.toFixed(1)}d`;
+  if (days < 365) return `${(days / 30.44).toFixed(1)}m`;
+  return `${(days / 365.25).toFixed(1)}y`;
+}
