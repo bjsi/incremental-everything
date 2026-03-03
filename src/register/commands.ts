@@ -916,10 +916,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // 5. Remove from session cache
         await removeIncrementalRemCache(plugin, rem._id);
 
-        // 6. Remove incremental powerup
-        // The tracker polling loop will detect the powerup is gone
-        // and call removeCurrentCardFromQueue to advance the queue.
-        await rem.removePowerup(powerupCode);
+        // 6. Remove incremental powerup AND advance queue simultaneously.
+        // removePowerup destroys the widget sandbox on the next microtask,
+        // so both IPC messages must be sent in the same tick.
+        await Promise.allSettled([
+          rem.removePowerup(powerupCode),
+          plugin.queue.removeCurrentCardFromQueue(true),
+        ]);
 
       } else {
         // Editor context: dismiss the focused Incremental Rem
