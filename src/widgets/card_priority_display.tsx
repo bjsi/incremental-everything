@@ -103,7 +103,7 @@ function computeShieldStatus(
 }
 
 export function CardPriorityDisplay() {
-  console.log('[CardPriorityDisplay] Mounting/Rendering');
+  // console.log('[CardPriorityDisplay] Mounting/Rendering');
   const plugin = usePlugin();
 
   // ✅ Use the centralized function that handles mobile AND web detection
@@ -111,7 +111,7 @@ export function CardPriorityDisplay() {
     async (rp) => await getEffectivePerformanceMode(rp),
     []
   );
-  console.log('[CardPriorityDisplay] effectiveMode:', effectiveMode);
+  // console.log('[CardPriorityDisplay] effectiveMode:', effectiveMode);
 
   const useLightMode = effectiveMode === PERFORMANCE_MODE_LIGHT;
 
@@ -135,12 +135,12 @@ export function CardPriorityDisplay() {
   const rem = useTrackerPlugin(async (rp) => {
     const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
     if (!ctx?.remId) {
-      console.log('[CardPriorityDisplay] rem tracker: ctx or remId is null', ctx);
+      // console.log('[CardPriorityDisplay] rem tracker: ctx or remId is null', ctx);
       return null;
     }
     const found = (await rp.rem.findOne(ctx.remId)) ?? null;
     if (!found) {
-      console.log('[CardPriorityDisplay] rem tracker: rem not found for id', ctx.remId);
+      // console.log('[CardPriorityDisplay] rem tracker: rem not found for id', ctx.remId);
     }
     return found;
   }, []);
@@ -272,7 +272,7 @@ export function CardPriorityDisplay() {
     if (cardInfo) {
       return null;
     }
-    console.log('[CardPriorityDisplay] Using on-demand path (useLightMode:', useLightMode, ', cardInfo:', !!cardInfo, ')');
+    // console.log('[CardPriorityDisplay] Using on-demand path (useLightMode:', useLightMode, ', cardInfo:', !!cardInfo, ')');
 
     const pendingInfo = getPendingCacheUpdate(rem._id);
     if (pendingInfo) {
@@ -289,12 +289,12 @@ export function CardPriorityDisplay() {
 
   // Check isIncrementalQueueActive
   if (!rem || !finalCardInfo || isIncrementalQueueActive) {
-    console.log('[CardPriorityDisplay] Early return — rem:', !!rem, ', finalCardInfo:', !!finalCardInfo,
-      ', isIncrementalQueueActive:', isIncrementalQueueActive,
-      ', cardInfo:', !!cardInfo, ', lightCardInfo:', !!lightCardInfo,
-      ', useLightMode:', useLightMode,
-      ', allPrioritizedCardInfo length:', allPrioritizedCardInfo?.length,
-      ', sessionCache:', !!sessionCache);
+    // console.log('[CardPriorityDisplay] Early return — rem:', !!rem, ', finalCardInfo:', !!finalCardInfo,
+    //   ', isIncrementalQueueActive:', isIncrementalQueueActive,
+    //   ', cardInfo:', !!cardInfo, ', lightCardInfo:', !!lightCardInfo,
+    //   ', useLightMode:', useLightMode,
+    //   ', allPrioritizedCardInfo length:', allPrioritizedCardInfo?.length,
+    //   ', sessionCache:', !!sessionCache);
     return null;
   }
 
