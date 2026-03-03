@@ -41,6 +41,8 @@ export const shouldHideIncEverythingKey = 'shouldHideIncEverything';
 
 // commands
 export const nextRepCommandId = 'next-rep-cmd';
+export const dismissIncRemCommandId = 'dismiss-inc-rem';
+export const nextInQueueCommandId = 'next-in-queue';
 
 // --- Keys for our successful fixes ---
 export const queueLayoutFixId = 'incremental-everything-queue-layout-fix';
