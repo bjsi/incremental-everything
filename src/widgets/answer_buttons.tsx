@@ -366,11 +366,17 @@ export function AnswerButtons() {
             // Remove from session cache
             await removeIncrementalRemCache(plugin, rem._id);
 
-            // removePowerup causes the widget to unmount, killing the async chain.
-            // The tracker polling loop (every 500ms) will detect the powerup is gone
-            // and call removeCurrentCardFromQueue — so we must NOT call it here too,
-            // otherwise the double-call races and skips the next card.
-            await rem.removePowerup(powerupCode);
+            // CRITICAL: Both removePowerup and removeCurrentCardFromQueue must be
+            // fired simultaneously. removePowerup destroys the widget sandbox
+            // shortly after resolving, so any subsequent await never completes.
+            // By initiating both calls at once, both IPC messages reach RemNote
+            // before either can trigger sandbox destruction.
+            console.log('[Done] Firing removePowerup + removeCurrentCardFromQueue simultaneously for rem:', rem._id);
+            await Promise.allSettled([
+              rem.removePowerup(powerupCode),
+              plugin.queue.removeCurrentCardFromQueue(true),
+            ]);
+            console.log('[Done] Both operations settled');
           }}
           title="Done (Ctrl+D): Permanently finish item by removing its Incremental power-up"
         >
