@@ -13,6 +13,9 @@ export const dismissedDateSlotCode = 'dismissedDate';
 // settings
 export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';
+export const betaSchedulerEnabledId = 'beta-scheduler-enabled';
+export const betaFirstReviewIntervalId = 'beta-first-review-interval';
+export const betaMaxIntervalId = 'beta-max-interval';
 export const collapseQueueTopBar = 'collapse-queue-top-bar';
 export const defaultPriorityId = 'default-priority';
 export const defaultCardPriorityId = 'defaultCardPriority';

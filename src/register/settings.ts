@@ -2,6 +2,9 @@ import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import {
   initialIntervalId,
   multiplierId,
+  betaSchedulerEnabledId,
+  betaFirstReviewIntervalId,
+  betaMaxIntervalId,
   collapseQueueTopBar,
   defaultPriorityId,
   defaultCardPriorityId,
@@ -68,6 +71,31 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     description:
       'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
     defaultValue: 1.5,
+  });
+
+  // --- Beta Scheduler Settings ---
+  plugin.settings.registerBooleanSetting({
+    id: betaSchedulerEnabledId,
+    title: 'Use Beta Scheduler (Saturating Curve)',
+    description:
+      'Enable the beta saturating scheduler. Intervals start at the First Review Interval and gradually approach the Max Interval, instead of growing exponentially. When enabled, the Multiplier setting above is ignored. See the IncRem Scheduler wiki page for details.',
+    defaultValue: false,
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: betaFirstReviewIntervalId,
+    title: 'First Review Interval (Beta Scheduler)',
+    description:
+      'Interval in days assigned after completing the first review. Not to be confused with "Initial Interval", which controls when a new IncRem first appears in the queue (before any review). Only used when the Beta Scheduler is enabled.',
+    defaultValue: 5,
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: betaMaxIntervalId,
+    title: 'Max Interval (Beta Scheduler)',
+    description:
+      'Upper bound in days the interval gradually approaches. The interval will never exceed this value. Only used when the Beta Scheduler is enabled.',
+    defaultValue: 30,
   });
 
   plugin.settings.registerBooleanSetting({
