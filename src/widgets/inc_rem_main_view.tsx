@@ -57,6 +57,7 @@ function computeKbGraphBins(
 }
 
 const INC_REM_MAIN_VIEW_STATE_KEY = 'inc-rem-main-view-state';
+const INC_REM_MAIN_VIEW_DOC_FILTER_KEY = 'inc-rem-main-view-doc-filter';
 
 export function IncRemMainView() {
   const plugin = usePlugin();
@@ -85,6 +86,14 @@ export function IncRemMainView() {
       if (state) {
         setInitialState(state);
         await rp.storage.setSession(INC_REM_MAIN_VIEW_STATE_KEY, undefined);
+      }
+      // Restore the document filter if previously saved
+      const savedDocId = await rp.storage.getSession<string | null>(INC_REM_MAIN_VIEW_DOC_FILTER_KEY);
+      if (savedDocId) {
+        setSelectedDocumentId(savedDocId);
+        const scope = await buildDocumentScope(rp as any, savedDocId);
+        setFilteredByDocument(scope);
+        await rp.storage.setSession(INC_REM_MAIN_VIEW_DOC_FILTER_KEY, undefined);
       }
       setStateCheckDone(true);
       return null;
@@ -232,6 +241,10 @@ export function IncRemMainView() {
     // Store the current list state so the timer can reopen with the same filters/sorting
     if (currentListState.current) {
       await plugin.storage.setSession(INC_REM_MAIN_VIEW_STATE_KEY, currentListState.current);
+    }
+    // Also store the document filter (exclusive to main view)
+    if (selectedDocumentId) {
+      await plugin.storage.setSession(INC_REM_MAIN_VIEW_DOC_FILTER_KEY, selectedDocumentId);
     }
 
     // Compute the scheduler's suggested interval (like editor_review does)

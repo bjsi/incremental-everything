@@ -224,6 +224,7 @@ function EditorReviewTimer() {
     // Clear stored list state if cancelling
     await plugin.storage.setSession('inc-rem-list-state', undefined);
     await plugin.storage.setSession('inc-rem-main-view-state', undefined);
+    await plugin.storage.setSession('inc-rem-main-view-doc-filter', undefined);
 
     await plugin.app.toast('Timer cancelled');
   };
