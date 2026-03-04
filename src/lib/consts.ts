@@ -44,7 +44,6 @@ export const hideIncEverythingId = 'hide-inc-everything';
 export const shouldHideIncEverythingKey = 'shouldHideIncEverything';
 
 // commands
-export const nextRepCommandId = 'next-rep-cmd';
 export const dismissIncRemCommandId = 'dismiss-inc-rem';
 export const nextInQueueCommandId = 'next-in-queue';
 

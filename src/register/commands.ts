@@ -5,7 +5,6 @@ import {
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
-  nextRepCommandId,
   currentIncRemKey,
   pageRangeWidgetId,
   noIncRemTimerKey,
@@ -73,23 +72,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     }
   };
 
-  plugin.app.registerCommand({
-    id: nextRepCommandId,
-    name: 'Next Repetition',
-    action: async () => {
-      const rem = await getCurrentIncrementalRem(plugin);
-      const url = await plugin.window.getURL();
-      debugger;
-      if (!rem || !url.includes('/flashcards')) {
-        return;
-      }
-      const incRem = await getIncrementalRemFromRem(plugin, rem);
-      if (!incRem) {
-        return;
-      }
-      await handleNextRepetitionClick(plugin, incRem);
-    },
-  });
+
 
   await plugin.app.registerCommand({
     id: 'extract-with-priority',
