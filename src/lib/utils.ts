@@ -277,3 +277,16 @@ export function formatStabilityDays(days: number): string {
   if (days < 365) return `${(days / 30.44).toFixed(1)}m`;
   return `${(days / 365.25).toFixed(1)}y`;
 }
+
+/**
+ * Converts a retrievability score (0-1) into an HSL color string gradient.
+ * 100% maps to green (~120 deg).
+ * 65% maps to red (0 deg).
+ * Below 65% remains red.
+ */
+export function getRetrievabilityColor(r: number): string {
+  if (r <= 0.65) return 'var(--rn-clr-red, #ef4444)';
+  const clampedR = Math.min(1.0, r);
+  const hue = Math.round(((clampedR - 0.65) / 0.35) * 120);
+  return `hsl(${hue}, 80%, 45%)`;
+}

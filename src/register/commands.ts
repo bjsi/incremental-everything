@@ -743,14 +743,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'ctrl+shift+h',
     action: async () => {
       let remId: string | undefined;
+      let cardId: string | undefined;
       const url = await plugin.window.getURL();
+      const isQueue = url.includes('/flashcards');
 
       // Check if we are in the queue
-      if (url.includes('/flashcards')) {
+      if (isQueue) {
         // First, try to get the current native flashcard
         const card = await plugin.queue.getCurrentCard();
         if (card) {
           remId = card.remId;
+          cardId = card._id;
         } else {
           // If it's not a native card, it might be our plugin's queue view
           remId = await plugin.storage.getSession(currentIncRemKey);
@@ -772,9 +775,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      // Check if it has either the Incremental powerup OR the dismissed powerup
       const hasIncrementalPowerup = await rem.hasPowerup(powerupCode);
       const hasDismissedPowerup = await rem.hasPowerup(dismissedPowerupCode);
+
+      // If we are in the queue reviewing a regular flashcard (not an Incremental Rem)
+      if (isQueue && !hasIncrementalPowerup) {
+        await plugin.widget.openPopup('flashcard_repetition_history', {
+          remId: remId,
+          cardId: cardId,
+        });
+        return;
+      }
 
       if (hasIncrementalPowerup || hasDismissedPowerup) {
         // If it is directly an incremental/dismissed rem, open the single history widget

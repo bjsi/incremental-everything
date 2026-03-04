@@ -12,7 +12,8 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import { computeFSRSStatesPerReview, computeFSRSState, parseWeightsString, FSRSStepState } from '../lib/fsrs';
-import { formatStabilityDays, formatTimeAgo } from '../lib/utils';
+import { formatStabilityDays, formatTimeAgo, getRetrievabilityColor } from '../lib/utils';
+import { safeRemTextToString } from '../lib/pdfUtils';
 import { displayFsrsDsrId, fsrsWeightsId } from '../lib/consts';
 
 function scoreLabel(score: QueueInteractionScore): string {
@@ -93,16 +94,25 @@ function FlashcardRepetitionHistory() {
             const card = await rp.card.findOne(cardId);
             if (card) cards = [card];
         }
+        let remName = '';
         if (cards.length === 0 && remId) {
             const rem = await rp.rem.findOne(remId);
             if (rem) {
                 cards = await rem.getCards();
+                remName = await safeRemTextToString(rp, rem.text);
+            }
+        } else if (cards.length > 0 && cards[0].remId) {
+            // If we found cards via cardId, fetch the parent rem to get its name
+            const rem = await rp.rem.findOne(cards[0].remId);
+            if (rem) {
+                remName = await safeRemTextToString(rp, rem.text);
             }
         }
 
         return {
             cardId,
             remId,
+            remName,
             cards: cards.map((c: any) => ({
                 _id: c._id,
                 type: c.type,
@@ -138,6 +148,11 @@ function FlashcardRepetitionHistory() {
                 📊 Flashcard Repetition History
             </h3>
             <div style={{ marginBottom: 8, color: 'var(--rn-clr-content-tertiary)', fontSize: 10 }}>
+                {data.remName && (
+                    <span title={data.remName}>
+                        <strong>{data.remName.length > 100 ? `${data.remName.substring(0, 100)}…` : data.remName}</strong> ·{' '}
+                    </span>
+                )}
                 Card ID: <code>{data.cardId || '—'}</code> · Rem ID: <code>{data.remId || '—'}</code>
             </div>
 
@@ -221,6 +236,15 @@ function FlashcardRepetitionHistory() {
                                     <span style={{ color: 'var(--rn-clr-content-tertiary)' }}> ({formatTimeAgo(nextRepDate.getTime(), Date.now())})</span>
                                 </div>
                             )}
+                            {lastPracticeDate && fsrs?.finalState?.s && (
+                                <div>
+                                    <strong
+                                        title="Based on the current FSRS memory models, this is the optimal date you should review things to achive 90% chance of recall. If it's different from the scheduled date, it's either because the original scheduler was not FSRS or had different weights set, or because of fuzz (randomness), load balancing, or RemNote's internal constraints."
+                                        style={{ cursor: 'help', textDecoration: 'underline dotted', textUnderlineOffset: '2px' }}
+                                    >Optimum Next repetition date:</strong> {new Date(lastPracticeDate.getTime() + fsrs.finalState.s * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}> ({formatTimeAgo(lastPracticeDate.getTime() + fsrs.finalState.s * 24 * 60 * 60 * 1000, Date.now())})</span>
+                                </div>
+                            )}
                             {staleDate && (
                                 <div>
                                     <strong>Date at which becomes stale:</strong> {staleDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
@@ -258,7 +282,7 @@ function FlashcardRepetitionHistory() {
                                 <strong>S:</strong> {fsrs.finalState.s.toFixed(1)}d{formatStabilityDays(fsrs.finalState.s) !== `${fsrs.finalState.s.toFixed(2)}d` ? ` (${formatStabilityDays(fsrs.finalState.s)})` : ''}
                                 {' · '}
                                 <strong>R:</strong>{' '}
-                                <span style={{ color: fsrs.finalState.r >= 0.9 ? '#22c55e' : fsrs.finalState.r >= 0.7 ? '#eab308' : '#ef4444' }}>
+                                <span style={{ color: getRetrievabilityColor(fsrs.finalState.r) }}>
                                     {(fsrs.finalState.r * 100).toFixed(1)}%
                                 </span>
                                 {' · '}
@@ -360,7 +384,7 @@ function FlashcardRepetitionHistory() {
                                                 {showFsrsDsr && (
                                                     <td style={{ ...cellStyle, textAlign: 'right' }}>
                                                         {stepState?.r != null ? (
-                                                            <span style={{ color: stepState.r >= 0.9 ? '#22c55e' : stepState.r >= 0.7 ? '#eab308' : '#ef4444' }}>
+                                                            <span style={{ color: getRetrievabilityColor(stepState.r) }}>
                                                                 {(stepState.r * 100).toFixed(1)}%
                                                             </span>
                                                         ) : '—'}
