@@ -36,6 +36,7 @@ export const handleReviewAndOpenRem = async (
     await plugin.storage.setSession('editor-review-timer-priority', incRemInfo?.priority ?? 10);
     await plugin.storage.setSession('editor-review-timer-rem-name', remName || 'Unnamed Rem');
     await plugin.storage.setSession('editor-review-timer-from-queue', true);
+    await plugin.storage.setSession('editor-review-timer-origin', 'queue');
 
     await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
 

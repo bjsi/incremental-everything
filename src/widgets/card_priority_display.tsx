@@ -20,7 +20,7 @@ import {
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
-import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, formatStabilityDays } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge } from '../components';
 import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
@@ -393,11 +393,17 @@ export function CardPriorityDisplay() {
                 <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nBased on ${fsrsState.reviewCount} reviews.`}>
                   D: <strong>{fsrsState.d.toFixed(2)}</strong>
                   {' · '}
-                  S: <strong>{fsrsState.s.toFixed(1)}d</strong>
+                  S: <strong>{formatStabilityDays(fsrsState.s)}</strong>
                   {' · '}
                   R: <strong style={{ color: fsrsState.r >= 0.9 ? 'var(--rn-clr-green, #22c55e)' : fsrsState.r >= 0.7 ? 'var(--rn-clr-yellow, #eab308)' : 'var(--rn-clr-red, #ef4444)' }}>
                     {(fsrsState.r * 100).toFixed(1)}%
                   </strong>
+                </span>
+                {' · '}
+                <span title={`SInc (Stability Increase) — how much your memory stability grows after answering.\n\nHard: ×${fsrsState.sInc.hard.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.hard)}\nGood: ×${fsrsState.sInc.good.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.good)}\nEasy: ×${fsrsState.sInc.easy.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.easy)}\n\nHigher = faster learning. A value of 1.0 means no growth.`}
+                  style={{ cursor: 'help' }}
+                >
+                  SInc: <strong>{fsrsState.sInc.good.toFixed(2)}×</strong>
                 </span>
               </>
             )}

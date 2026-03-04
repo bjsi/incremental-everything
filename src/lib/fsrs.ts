@@ -58,6 +58,8 @@ export interface FSRSState {
     s: number;         // Stability (days)
     r: number;         // Retrievability [0, 1]
     reviewCount: number;
+    /** Stability Increase ratio (nextS / currentS) for each recall grade */
+    sInc: { hard: number; good: number; easy: number };
 }
 
 export interface FSRSStepState {
@@ -65,6 +67,7 @@ export interface FSRSStepState {
     s: number;
     r: number | null;  // R at the moment of THIS review (null for first review)
     state: CardState;   // State the card was in WHEN this review happened
+    sInc: number | null; // Stability increase ratio (newS / oldS), null for first review
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +244,22 @@ export function computeFSRSState(
     const FACTOR_VAL = Math.pow(0.9, 1 / DECAY_VAL) - 1;
     const r = forgettingCurve(daysSinceLastReview, s, DECAY_VAL, FACTOR_VAL);
 
-    return { d, s, r, reviewCount };
+    // Compute SInc (Stability Increase) for each recall grade
+    const computeSInc = (rating: number): number => {
+        if (state === 'learning' || state === 'relearning') {
+            return nextShortTermStability(w, s, rating, is21w) / s;
+        }
+        // review state: use recall stability
+        return nextRecallStability(w, d, s, r, rating) / s;
+    };
+
+    const sInc = {
+        hard: computeSInc(RATINGS.hard),
+        good: computeSInc(RATINGS.good),
+        easy: computeSInc(RATINGS.easy),
+    };
+
+    return { d, s, r, reviewCount, sInc };
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +285,7 @@ export function computeFSRSStatesPerReview(
         const rating = fsrsRatingFromScore(rep.score);
         if (rating === null) {
             // Non-gradeable — pass through with null state
-            result.push({ d: d ?? 0, s: s ?? 0, r: null, state });
+            result.push({ d: d ?? 0, s: s ?? 0, r: null, state, sInc: null });
             continue;
         }
 
@@ -276,7 +294,7 @@ export function computeFSRSStatesPerReview(
             s = initStability(w, rating);
             state = nextState(state, rating);
             lastReviewDate = rep.date;
-            result.push({ d, s, r: null, state });
+            result.push({ d, s, r: null, state, sInc: null });
             continue;
         }
 
@@ -300,7 +318,7 @@ export function computeFSRSStatesPerReview(
 
         state = nextState(state, rating);
         lastReviewDate = rep.date;
-        result.push({ d, s, r, state });
+        result.push({ d, s, r, state, sInc: oldS > 0 ? s / oldS : null });
     }
 
     return result;

@@ -1,10 +1,15 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
-import React, { useState, useMemo } from 'react';
-import { allIncrementalRemKey, allCardPriorityInfoKey } from '../lib/consts';
+import React, { useState, useMemo, useRef } from 'react';
+import { allIncrementalRemKey, allCardPriorityInfoKey, powerupCode, prioritySlotCode } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { CardPriorityInfo } from '../lib/card_priority';
 import { extractText, determineIncRemType, getTotalTimeSpent, getTopLevelDocument, getBreadcrumbText } from '../lib/incRemHelpers';
+import { safeRemTextToString } from '../lib/pdfUtils';
+import { getNextSpacingDateForRem } from '../lib/scheduler';
 import { IncRemTable, IncRemWithDetails, DocumentInfo } from '../components';
+import type { IncRemListState } from '../components';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import {
   BarChart,
@@ -51,6 +56,9 @@ function computeKbGraphBins(
   return bins;
 }
 
+const INC_REM_MAIN_VIEW_STATE_KEY = 'inc-rem-main-view-state';
+const INC_REM_MAIN_VIEW_DOC_FILTER_KEY = 'inc-rem-main-view-doc-filter';
+
 export function IncRemMainView() {
   const plugin = usePlugin();
   const [loadingRems, setLoadingRems] = useState<boolean>(false);
@@ -58,6 +66,40 @@ export function IncRemMainView() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [filteredByDocument, setFilteredByDocument] = useState<Set<string> | null>(null);
   const [showGraph, setShowGraph] = useState(false);
+
+  // Track in-flight priority changes so cache reloads don't overwrite them with stale data.
+  const pendingPriorityChanges = useRef<Record<string, number>>({});
+
+  // Track current filter/sort state for "Back to IncRem List" flow
+  const currentListState = useRef<IncRemListState | null>(null);
+
+  // Load saved state from session (for "Back to IncRem List" flow)
+  const [initialState, setInitialState] = useState<IncRemListState | undefined>(undefined);
+  const [stateCheckDone, setStateCheckDone] = useState(false);
+  const initialStateLoaded = useRef(false);
+
+  useTrackerPlugin(
+    async (rp) => {
+      if (initialStateLoaded.current) return null;
+      initialStateLoaded.current = true;
+      const state = await rp.storage.getSession<IncRemListState>(INC_REM_MAIN_VIEW_STATE_KEY);
+      if (state) {
+        setInitialState(state);
+        await rp.storage.setSession(INC_REM_MAIN_VIEW_STATE_KEY, undefined);
+      }
+      // Restore the document filter if previously saved
+      const savedDocId = await rp.storage.getSession<string | null>(INC_REM_MAIN_VIEW_DOC_FILTER_KEY);
+      if (savedDocId) {
+        setSelectedDocumentId(savedDocId);
+        const scope = await buildDocumentScope(rp as any, savedDocId);
+        setFilteredByDocument(scope);
+        await rp.storage.setSession(INC_REM_MAIN_VIEW_DOC_FILTER_KEY, undefined);
+      }
+      setStateCheckDone(true);
+      return null;
+    },
+    []
+  );
 
   const allIncRems = useTrackerPlugin(
     async (rp) => {
@@ -122,7 +164,28 @@ export function IncRemMainView() {
       })
     );
 
-    setIncRemsWithDetails(remsWithDetails.filter(Boolean) as IncRemWithDetails[]);
+    let finalDetails = remsWithDetails.filter(Boolean) as IncRemWithDetails[];
+
+    // Apply any pending priority changes so stale cache data doesn't overwrite them
+    const pending = pendingPriorityChanges.current;
+    const hasPending = Object.keys(pending).length > 0;
+    if (hasPending) {
+      finalDetails = finalDetails.map((item) =>
+        pending[item.remId] !== undefined
+          ? { ...item, priority: pending[item.remId] }
+          : item
+      );
+    }
+
+    // Clear pending entries only when the cache data already has the correct value
+    for (const remId of Object.keys(pending)) {
+      const cacheItem = incRems.find(r => r.remId === remId);
+      if (cacheItem && cacheItem.priority === pending[remId]) {
+        delete pendingPriorityChanges.current[remId];
+      }
+    }
+
+    setIncRemsWithDetails(finalDetails);
     setLoadingRems(false);
   };
 
@@ -133,8 +196,7 @@ export function IncRemMainView() {
 
       if (rem) {
         if (incRem?.incRemType === 'pdf-note') {
-          // For PDF notes, attempt to force open in main editor context using openRemAsPage
-          // User confirmed this is the safe way to avoid opening the PDF
+          // For PDF notes, use openRemAsPage to avoid opening the PDF viewer
           await rem.openRemAsPage();
         } else {
           await plugin.window.openRem(rem);
@@ -144,6 +206,79 @@ export function IncRemMainView() {
     } catch (error) {
       console.error('Error opening rem:', error);
     }
+  };
+
+  const handlePriorityChange = async (remId: string, newPriority: number) => {
+    const rem = await plugin.rem.findOne(remId);
+    if (!rem) return;
+
+    // Track the pending change BEFORE any async ops that trigger cache reloads
+    pendingPriorityChanges.current[remId] = newPriority;
+
+    // Persist to powerup property
+    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+
+    // Update the cache
+    const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+    if (incRemInfo) {
+      await updateIncrementalRemCache(plugin, incRemInfo);
+    }
+
+    // Update local state so the UI re-renders immediately
+    setIncRemsWithDetails((prev) =>
+      prev.map((item) =>
+        item.remId === remId ? { ...item, priority: newPriority } : item
+      )
+    );
+
+    await plugin.app.toast(`Priority updated to ${newPriority}`);
+  };
+
+  const handleReviewAndOpen = async (remId: string) => {
+    const rem = await plugin.rem.findOne(remId);
+    if (!rem) return;
+
+    // Store the current list state so the timer can reopen with the same filters/sorting
+    if (currentListState.current) {
+      await plugin.storage.setSession(INC_REM_MAIN_VIEW_STATE_KEY, currentListState.current);
+    }
+    // Also store the document filter (exclusive to main view)
+    if (selectedDocumentId) {
+      await plugin.storage.setSession(INC_REM_MAIN_VIEW_DOC_FILTER_KEY, selectedDocumentId);
+    }
+
+    // Compute the scheduler's suggested interval (like editor_review does)
+    const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+    const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+    const scheduleData = await getNextSpacingDateForRem(plugin, remId, inLookbackMode);
+    const interval = scheduleData?.newInterval || 1;
+    const remName = await safeRemTextToString(plugin, rem.text);
+
+    // Set up timer session keys (DON'T call updateReviewRemData — the timer will
+    // handle rescheduling on end-review via Mode 2)
+    await plugin.storage.setSession('editor-review-timer-rem-id', remId);
+    await plugin.storage.setSession('editor-review-timer-start', Date.now());
+    await plugin.storage.setSession('editor-review-timer-interval', interval);
+    await plugin.storage.setSession('editor-review-timer-priority', incRemInfo?.priority ?? 10);
+    await plugin.storage.setSession('editor-review-timer-rem-name', remName || 'Unnamed Rem');
+    await plugin.storage.setSession('editor-review-timer-from-queue', false);
+    await plugin.storage.setSession('editor-review-timer-origin', 'inc-rem-main-view');
+
+    await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
+
+    // Open the rem in the editor
+    const incRemType = await determineIncRemType(plugin, rem);
+    if (incRemType === 'pdf-note') {
+      await rem.openRemAsPage();
+    } else {
+      await plugin.window.openRem(rem);
+    }
+
+    await plugin.widget.closePopup();
+  };
+
+  const handleStateChange = (state: IncRemListState) => {
+    currentListState.current = state;
   };
 
   const handleDocumentFilterChange = async (documentId: string | null) => {
@@ -282,18 +417,24 @@ export function IncRemMainView() {
 
       {/* Original IncRemTable */}
       <div className="flex-1" style={{ minHeight: 0 }}>
-        <IncRemTable
-          title="All Inc Rems"
-          icon="📊"
-          incRems={displayedRems}
-          loading={loadingRems}
-          dueCount={dueCount}
-          totalCount={totalCount}
-          onRemClick={handleRemClick}
-          documents={documents}
-          selectedDocumentId={selectedDocumentId}
-          onDocumentFilterChange={handleDocumentFilterChange}
-        />
+        {stateCheckDone && (
+          <IncRemTable
+            title="All Inc Rems"
+            icon="📊"
+            incRems={displayedRems}
+            loading={loadingRems}
+            dueCount={dueCount}
+            totalCount={totalCount}
+            onRemClick={handleRemClick}
+            documents={documents}
+            selectedDocumentId={selectedDocumentId}
+            onDocumentFilterChange={handleDocumentFilterChange}
+            onPriorityChange={handlePriorityChange}
+            onReviewAndOpen={handleReviewAndOpen}
+            initialState={initialState}
+            onStateChange={handleStateChange}
+          />
+        )}
       </div>
     </div>
   );

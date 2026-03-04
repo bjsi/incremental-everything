@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { ActionItemType } from '../lib/incremental_rem/types';
 import { IncRemRow, IncRemRowData } from './IncRemRow';
@@ -17,6 +17,16 @@ export interface IncRemWithDetails extends IncrementalRem {
 type FilterStatus = 'all' | 'due' | 'scheduled';
 type SortBy = 'priority' | 'date' | 'reviews' | 'time' | 'lastReview';
 type SortOrder = 'asc' | 'desc';
+
+export interface IncRemListState {
+  filterStatus: FilterStatus;
+  filterType: ActionItemType | 'all';
+  priorityMin: number;
+  priorityMax: number;
+  searchText: string;
+  sortBy: SortBy;
+  sortOrder: SortOrder;
+}
 
 export interface DocumentInfo {
   id: string;
@@ -37,6 +47,11 @@ interface IncRemTableProps {
   documents?: DocumentInfo[];
   selectedDocumentId?: string | null;
   onDocumentFilterChange?: (documentId: string | null) => void;
+  onPriorityChange?: (remId: string, newPriority: number) => Promise<void>;
+  onReviewAndOpen?: (remId: string) => void;
+  initialState?: IncRemListState;
+  onStateChange?: (state: IncRemListState) => void;
+  subtitle?: string;
 }
 
 export function IncRemTable({
@@ -51,14 +66,31 @@ export function IncRemTable({
   documents,
   selectedDocumentId,
   onDocumentFilterChange,
+  onPriorityChange,
+  onReviewAndOpen,
+  initialState,
+  onStateChange,
+  subtitle,
 }: IncRemTableProps) {
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
-  const [filterType, setFilterType] = useState<ActionItemType | 'all'>('all');
-  const [priorityMin, setPriorityMin] = useState<number>(0);
-  const [priorityMax, setPriorityMax] = useState<number>(100);
-  const [searchText, setSearchText] = useState<string>('');
-  const [sortBy, setSortBy] = useState<SortBy>('priority');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>(initialState?.filterStatus ?? 'all');
+  const [filterType, setFilterType] = useState<ActionItemType | 'all'>(initialState?.filterType ?? 'all');
+  const [priorityMin, setPriorityMin] = useState<number>(initialState?.priorityMin ?? 0);
+  const [priorityMax, setPriorityMax] = useState<number>(initialState?.priorityMax ?? 100);
+  const [searchText, setSearchText] = useState<string>(initialState?.searchText ?? '');
+  const [sortBy, setSortBy] = useState<SortBy>(initialState?.sortBy ?? 'priority');
+  const [sortOrder, setSortOrder] = useState<SortOrder>(initialState?.sortOrder ?? 'asc');
+
+  // Inline priority editing state
+  const [editingPriorityRemId, setEditingPriorityRemId] = useState<string | null>(null);
+  const [editingPriorityValue, setEditingPriorityValue] = useState<number>(0);
+  const editingPriorityValueRef = useRef<number>(0);
+
+  // Report state changes to parent so it can store them for the "Back to IncRem List" flow
+  useEffect(() => {
+    if (onStateChange) {
+      onStateChange({ filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder });
+    }
+  }, [filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder, onStateChange]);
 
   const filteredAndSortedRems = useMemo(() => {
     const now = Date.now();
@@ -113,7 +145,7 @@ export function IncRemTable({
       >
         <div className="flex items-center gap-2">
           <span className="text-lg">{icon}</span>
-          <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>{title}</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }} title={subtitle}>{title}</span>
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
             <span style={{ color: '#f97316' }}>{dueCount}</span>
             <span> due</span>
@@ -330,6 +362,30 @@ export function IncRemTable({
                   breadcrumb: incRem.breadcrumb,
                 } as IncRemRowData}
                 onClick={() => onRemClick(incRem.remId)}
+                // Priority editing
+                onPriorityClick={onPriorityChange ? (remId) => {
+                  if (editingPriorityRemId === remId) {
+                    setEditingPriorityRemId(null);
+                  } else {
+                    setEditingPriorityRemId(remId);
+                    setEditingPriorityValue(incRem.priority);
+                    editingPriorityValueRef.current = incRem.priority;
+                  }
+                } : undefined}
+                editingPriority={editingPriorityRemId === incRem.remId ? { value: editingPriorityValue } : undefined}
+                onPriorityChange={(value) => {
+                  setEditingPriorityValue(value);
+                  editingPriorityValueRef.current = value;
+                }}
+                onPrioritySave={async (remId) => {
+                  if (onPriorityChange) {
+                    await onPriorityChange(remId, editingPriorityValueRef.current);
+                  }
+                  setEditingPriorityRemId(null);
+                }}
+                onPriorityCancel={() => setEditingPriorityRemId(null)}
+                // Review & Open
+                onReviewAndOpen={onReviewAndOpen}
               />
             ))}
           </div>

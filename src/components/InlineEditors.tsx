@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 
 interface InlinePriorityEditorProps {
   value: number;
@@ -8,8 +9,20 @@ interface InlinePriorityEditorProps {
 }
 
 export function InlinePriorityEditor({ value, onChange, onSave, onCancel }: InlinePriorityEditorProps) {
+  // Reuse the same accelerated keyboard handler from priority.tsx / priority_light.tsx
+  // Rapid taps: 1→5→10→20 step sizes; hold-to-accelerate over time
+  const keyboard = useAcceleratedKeyboardHandler(
+    value,
+    value,
+    (val) => onChange(Math.max(0, Math.min(100, val)))
+  );
+
   return (
-    <div className="flex items-center gap-2 mb-2 p-2 rounded" style={{ backgroundColor: 'var(--rn-clr-background-primary)', border: '1px solid var(--rn-clr-border-primary)' }}>
+    <div
+      className="flex items-center gap-2 mb-2 p-2 rounded"
+      style={{ backgroundColor: 'var(--rn-clr-background-primary)', border: '1px solid var(--rn-clr-border-primary)' }}
+      onKeyUp={keyboard.handleKeyUp}
+    >
       <span className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
       <input
         type="number"
@@ -19,7 +32,8 @@ export function InlinePriorityEditor({ value, onChange, onSave, onCancel }: Inli
         onChange={(e) => onChange(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); onSave(); }
-          if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+          else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+          else keyboard.handleKeyDown(e);
         }}
         className="w-14 text-xs p-1 rounded text-center"
         style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)' }}

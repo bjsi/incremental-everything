@@ -63,7 +63,8 @@ export async function loadIncrementalRemCache(
   batchDelayMs: number = 100
 ): Promise<IncrementalRem[]> {
 
-
+  console.log('[IncRem Cache] Loading started...');
+  const startTime = Date.now();
   const powerup = await plugin.powerup.getPowerupByCode(powerupCode);
   const taggedRem = (await powerup?.taggedRem()) || [];
 
@@ -87,6 +88,8 @@ export async function loadIncrementalRemCache(
 
   await plugin.storage.setSession(allIncrementalRemKey, updatedAllRem);
   await plugin.storage.setSession('inc_rem_cache_fully_loaded', true);
+  const elapsed = Date.now() - startTime;
+  console.log(`[IncRem Cache] Loading complete: ${updatedAllRem.length} IncRems loaded in ${elapsed}ms`);
 
   return updatedAllRem;
 }

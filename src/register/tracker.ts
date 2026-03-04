@@ -4,7 +4,9 @@ import { incrementalQueueActiveKey, currentIncRemKey, powerupCode } from '../lib
 
 export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
-    await loadIncrementalRemCache(rp);
+    console.log('[Tracker] IncRem cache load triggered by plugin.track()');
+    await loadIncrementalRemCache(rp as any);
+    console.log('[Tracker] IncRem cache load completed.');
   });
 
   // Track queue state and current rem to detect when powerup is removed
@@ -59,7 +61,11 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
           const hasPowerup = await rem.hasPowerup(powerupCode);
 
           if (!hasPowerup) {
-            await plugin.queue.removeCurrentCardFromQueue(true);
+            // NOTE: Do NOT call removeCurrentCardFromQueue here.
+            // QueueComponent's hasIncrementalPowerup hook in queue.tsx now
+            // handles queue advancement reactively. Calling it here too
+            // causes a double popCard that skips the next flashcard.
+            console.log('[Tracker] Powerup gone for', currentRemId, '— letting QueueComponent handle advancement');
             if (intervalId) {
               clearInterval(intervalId);
               intervalId = null;
