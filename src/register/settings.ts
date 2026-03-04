@@ -57,6 +57,9 @@ const HIDE_DISMISSED_TAG_CSS = `
  *
  * @param plugin RemNote plugin entry point used to register settings/CSS and read persisted values.
  */
+
+// Scheduling settings
+
 export async function registerPluginSettings(plugin: ReactRNPlugin) {
   plugin.settings.registerNumberSetting({
     id: initialIntervalId,
@@ -107,6 +110,79 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   //   defaultValue: true,
   // });
 
+  // Priority settings
+
+  plugin.settings.registerNumberSetting({
+    id: defaultPriorityId,
+    title: 'Default Priority',
+    description: 'Sets the default priority for new incremental rem (0-100, Lower = more important). Default: 10',
+    defaultValue: 10,
+    validators: [
+      {
+        type: 'int' as const,
+      },
+      {
+        type: 'gte' as const,
+        arg: 0,
+      },
+      {
+        type: 'lte' as const,
+        arg: 100,
+      },
+    ],
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: defaultCardPriorityId,
+    title: 'Default Card Priority',
+    description: 'Default priority for flashcards without inherited priority (0-100, Lower = more important).  Default: 50',
+    defaultValue: 50,
+    validators: [
+      { type: 'int' as const },
+      { type: 'gte' as const, arg: 0 },
+      { type: 'lte' as const, arg: 100 },
+    ],
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: 'priority-step-size',
+    title: 'Priority Step Size',
+    description: 'Sets the step size for quick priority increase/decrease shortcuts (Ctrl+Shift+Up/Down). Default: 10',
+    defaultValue: 10,
+    validators: [
+      { type: 'int' as const },
+      { type: 'gte' as const, arg: 1 },
+      { type: 'lte' as const, arg: 50 },
+    ],
+  });
+
+
+  plugin.settings.registerDropdownSetting({
+    id: 'priorityEditorDisplayMode',
+    title: 'Priority Editor in Editor',
+    description: 'Controls when to show the priority widget in the right-hand margin of the editor.',
+    defaultValue: 'all',
+    options: [
+      {
+        key: 'all',
+        label: 'Show for IncRem and Cards',
+        value: 'all',
+      },
+      {
+        key: 'incRemOnly',
+        label: 'Show only for IncRem',
+        value: 'incRemOnly',
+      },
+      {
+        key: 'disable',
+        label: 'Disable',
+        value: 'disable',
+      },
+    ],
+  });
+
+  // Queue Display Settings
+
   plugin.settings.registerBooleanSetting({
     id: showRemsAsIsolatedInQueueId,
     title: 'Show regular Rems in isolated view (Queue)',
@@ -114,6 +190,18 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
       'When enabled, incremental Rems that are plain Rems will use the isolated card view in the queue instead of the full document context. Switch back to context with the button in the queue.',
     defaultValue: false,
   });
+
+
+  plugin.settings.registerBooleanSetting({
+    id: displayPriorityShieldId,
+    title: 'Display Priority Shield in Queue',
+    description:
+      'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
+    defaultValue: true,
+  });
+
+
+  // Visual Indicators in Editor
 
   plugin.settings.registerBooleanSetting({
     id: 'hideCardPriorityTag',
@@ -169,49 +257,9 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     await plugin.app.registerCSS(hideDismissedTagId, HIDE_DISMISSED_TAG_CSS);
   }
 
-  plugin.settings.registerNumberSetting({
-    id: defaultPriorityId,
-    title: 'Default Priority',
-    description: 'Sets the default priority for new incremental rem (0-100, Lower = more important). Default: 10',
-    defaultValue: 10,
-    validators: [
-      {
-        type: 'int' as const,
-      },
-      {
-        type: 'gte' as const,
-        arg: 0,
-      },
-      {
-        type: 'lte' as const,
-        arg: 100,
-      },
-    ],
-  });
 
-  plugin.settings.registerNumberSetting({
-    id: 'priority-step-size',
-    title: 'Priority Step Size',
-    description: 'Sets the step size for quick priority increase/decrease shortcuts (Ctrl+Shift+Up/Down). Default: 10',
-    defaultValue: 10,
-    validators: [
-      { type: 'int' as const },
-      { type: 'gte' as const, arg: 1 },
-      { type: 'lte' as const, arg: 50 },
-    ],
-  });
 
-  plugin.settings.registerNumberSetting({
-    id: defaultCardPriorityId,
-    title: 'Default Card Priority',
-    description: 'Default priority for flashcards without inherited priority (0-100, Lower = more important).  Default: 50',
-    defaultValue: 50,
-    validators: [
-      { type: 'int' as const },
-      { type: 'gte' as const, arg: 0 },
-      { type: 'lte' as const, arg: 100 },
-    ],
-  });
+  // Performance Mode
 
   plugin.settings.registerDropdownSetting({
     id: 'performanceMode',
@@ -249,37 +297,27 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     defaultValue: true,
   });
 
+
+
+  // --- FSRS DSR Settings ---
   plugin.settings.registerBooleanSetting({
-    id: displayPriorityShieldId,
-    title: 'Display Priority Shield in Queue',
+    id: displayFsrsDsrId,
+    title: 'Display FSRS DSR Stats (Flashcards)',
     description:
-      'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
+      'If enabled, shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card priority display widget. Requires FSRS v6 scheduler.',
     defaultValue: true,
   });
 
-  plugin.settings.registerDropdownSetting({
-    id: 'priorityEditorDisplayMode',
-    title: 'Priority Editor in Editor',
-    description: 'Controls when to show the priority widget in the right-hand margin of the editor.',
-    defaultValue: 'all',
-    options: [
-      {
-        key: 'all',
-        label: 'Show for IncRem and Cards',
-        value: 'all',
-      },
-      {
-        key: 'incRemOnly',
-        label: 'Show only for IncRem',
-        value: 'incRemOnly',
-      },
-      {
-        key: 'disable',
-        label: 'Disable',
-        value: 'disable',
-      },
-    ],
+  plugin.settings.registerStringSetting({
+    id: fsrsWeightsId,
+    title: 'FSRS Global Weights',
+    description:
+      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler settings. Leave blank to use the official FSRS v6.1.1 defaults.',
+    defaultValue: '',
   });
+
+
+  // Environment
 
   plugin.settings.registerDropdownSetting({
     id: remnoteEnvironmentId,
@@ -298,24 +336,6 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
         value: 'www',
       },
     ],
-  });
-
-
-  // --- FSRS DSR Settings ---
-  plugin.settings.registerBooleanSetting({
-    id: displayFsrsDsrId,
-    title: 'Display FSRS DSR Stats (Flashcards)',
-    description:
-      'If enabled, shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card priority display widget. Requires FSRS v6 scheduler.',
-    defaultValue: true,
-  });
-
-  plugin.settings.registerStringSetting({
-    id: fsrsWeightsId,
-    title: 'FSRS Global Weights',
-    description:
-      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler settings. Leave blank to use the official FSRS v6.1.1 defaults.',
-    defaultValue: '',
   });
 
 }
