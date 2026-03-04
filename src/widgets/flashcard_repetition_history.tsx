@@ -145,6 +145,15 @@ function FlashcardRepetitionHistory() {
                 const fsrs = fsrsData?.[ci];
                 const sortedHistory = [...card.history].sort((a: any, b: any) => a.date - b.date);
 
+                const gradeableReps = sortedHistory.filter((h: any) =>
+                    h.score === QueueInteractionScore.AGAIN ||
+                    h.score === QueueInteractionScore.HARD ||
+                    h.score === QueueInteractionScore.GOOD ||
+                    h.score === QueueInteractionScore.EASY
+                );
+                const totalMs = gradeableReps.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
+                const totalMinutes = Math.round(totalMs / 6000) / 10;
+
                 return (
                     <div key={card._id} style={{ marginBottom: 16 }}>
                         {/* Card header */}
@@ -161,7 +170,7 @@ function FlashcardRepetitionHistory() {
                                 ? card.type.charAt(0).toUpperCase() + card.type.slice(1) + ' Card'
                                 : `Cloze Card (${card.type?.clozeId})`}
                             <span style={{ fontWeight: 400, marginLeft: 8, color: 'var(--rn-clr-content-tertiary)' }}>
-                                ({sortedHistory.length} reviews)
+                                ({sortedHistory.length} reviews, {totalMinutes} min)
                             </span>
                         </div>
 
