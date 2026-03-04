@@ -373,26 +373,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerCommand({
-    id: 'untag-incremental-everything',
-    name: 'Untag Incremental Everything',
-    action: async () => {
-      const selection = await plugin.editor.getSelection();
-      if (!selection) {
-        return;
-      }
-      if (selection.type === SelectionType.Text) {
-        const focused = await plugin.focus.getFocusedRem();
-        if (!focused) {
-          return;
-        }
-        await focused.removePowerup(powerupCode);
-      } else if (selection.type === SelectionType.Rem) {
-        const rems = (await plugin.rem.findMany(selection.remIds)) || [];
-        await Promise.all(rems.map((r) => r.removePowerup(powerupCode)));
-      }
-    },
-  });
-  plugin.app.registerCommand({
     id: 'debug-incremental-everything',
     name: 'Debug Incremental Everything',
     action: async () => {
@@ -861,7 +841,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // In Editor: dismisses the focused Incremental Rem (transfer history to dismissed, remove powerup)
   plugin.app.registerCommand({
     id: dismissIncRemCommandId,
-    name: 'Dismiss Incremental Rem',
+    name: 'Dismiss Incremental Rem (Untag)',
     keyboardShortcut: 'ctrl+d',
     action: async () => {
       const url = await plugin.window.getURL();
@@ -936,35 +916,57 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         ]);
 
       } else {
-        // Editor context: dismiss the focused Incremental Rem
-        const focusedRem = await plugin.focus.getFocusedRem();
-        if (!focusedRem) {
-          await plugin.app.toast('No Rem focused.');
+        // Editor context: dismiss focused Incremental Rem(s)
+        // Supports both single-focus and multi-select
+        const selection = await plugin.editor.getSelection();
+        const remsToDissmiss: Rem[] = [];
+
+        if (selection?.type === SelectionType.Rem) {
+          // Multi-select: gather all selected rems
+          const selectedRems = (await plugin.rem.findMany(selection.remIds)) || [];
+          for (const r of selectedRems) {
+            if (await r.hasPowerup(powerupCode)) {
+              remsToDissmiss.push(r);
+            }
+          }
+        } else {
+          // Single focus fallback
+          const focusedRem = await plugin.focus.getFocusedRem();
+          if (!focusedRem) {
+            await plugin.app.toast('No Rem focused.');
+            return;
+          }
+          const hasIncPowerup = await focusedRem.hasPowerup(powerupCode);
+          if (!hasIncPowerup) {
+            await plugin.app.toast('This Rem is not an Incremental Rem.');
+            return;
+          }
+          remsToDissmiss.push(focusedRem);
+        }
+
+        if (remsToDissmiss.length === 0) {
+          await plugin.app.toast('No Incremental Rems found in the selection.');
           return;
         }
 
-        const hasIncPowerup = await focusedRem.hasPowerup(powerupCode);
-        if (!hasIncPowerup) {
-          await plugin.app.toast('This Rem is not an Incremental Rem.');
-          return;
+        for (const r of remsToDissmiss) {
+          incRemInfo = await getIncrementalRemFromRem(plugin, r);
+          if (incRemInfo) {
+            // Transfer existing history to dismissed (no new rep entry needed)
+            await transferToDismissed(plugin, r, incRemInfo.history || []);
+          }
+          // Remove from session cache
+          await removeIncrementalRemCache(plugin, r._id);
+          // Remove incremental powerup
+          await r.removePowerup(powerupCode);
         }
 
-        incRemInfo = await getIncrementalRemFromRem(plugin, focusedRem);
-        if (!incRemInfo) {
-          await plugin.app.toast('Could not retrieve Incremental Rem information.');
-          return;
-        }
-
-        // In editor: transfer existing history to dismissed (no new rep entry needed)
-        await transferToDismissed(plugin, focusedRem, incRemInfo.history || []);
-
-        // Remove from session cache
-        await removeIncrementalRemCache(plugin, focusedRem._id);
-
-        // Remove incremental powerup
-        await focusedRem.removePowerup(powerupCode);
-
-        await plugin.app.toast('Incremental Rem dismissed.');
+        const count = remsToDissmiss.length;
+        await plugin.app.toast(
+          count === 1
+            ? 'Incremental Rem dismissed.'
+            : `${count} Incremental Rems dismissed.`
+        );
       }
     },
   });
