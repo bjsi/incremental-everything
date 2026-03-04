@@ -10,7 +10,7 @@ import {
     WidgetLocation,
     QueueInteractionScore,
 } from '@remnote/plugin-sdk';
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { computeFSRSStatesPerReview, computeFSRSState, parseWeightsString, FSRSStepState } from '../lib/fsrs';
 import { formatStabilityDays, formatTimeAgo, getRetrievabilityColor } from '../lib/utils';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -133,6 +133,16 @@ function FlashcardRepetitionHistory() {
             finalState: computeFSRSState(card.history, weights),
         }));
     }, [data, fsrsWeightsRaw]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                plugin.widget.closePopup();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [plugin]);
 
     if (!data) {
         return (
