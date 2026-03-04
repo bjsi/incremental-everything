@@ -14,8 +14,8 @@ import { ExtractViewer } from '../components/ExtractViewer';
 import { IsolatedCardViewer } from '../components/IsolatedCardViewer';
 import { remToActionItemType } from '../lib/incremental_rem';
 import {
-  collapseQueueTopBar,
-  collapseTopBarKey,
+  // collapseQueueTopBar, // Disabled: feature not working
+  // collapseTopBarKey, // Disabled: feature not working
   incrementalQueueActiveKey,
   shouldHideIncEverythingKey,
   currentIncrementalRemTypeKey,
@@ -83,25 +83,27 @@ export function QueueComponent() {
     }
   }, [ctx?.remId]);
 
-  const shouldCollapseTopBar = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(collapseQueueTopBar),
-    []
-  );
+  // Disabled: collapseQueueTopBar feature not working
+  // const shouldCollapseTopBar = useTrackerPlugin(
+  //   (rp) => rp.settings.getSetting<boolean>(collapseQueueTopBar),
+  //   []
+  // );
 
   const showRemsAsIsolated = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(showRemsAsIsolatedInQueueId),
     []
   );
 
-  // This hook signals the component's state and manages the top bar.
+  // This hook signals the component's state.
   useEffect(() => {
     plugin.storage.setSession(incrementalQueueActiveKey, true);
-    plugin.storage.setSession(collapseTopBarKey, shouldCollapseTopBar);
+    // Disabled: collapseTopBarKey feature not working
+    // plugin.storage.setSession(collapseTopBarKey, shouldCollapseTopBar);
     return () => {
       plugin.storage.setSession(incrementalQueueActiveKey, false);
-      plugin.storage.setSession(collapseTopBarKey, false);
+      // plugin.storage.setSession(collapseTopBarKey, false);
     };
-  }, [plugin, shouldCollapseTopBar]);
+  }, [plugin]);
 
   useEffect(() => {
     // The true identity of the incremental item in the queue is ALWAYS ctx.remId.

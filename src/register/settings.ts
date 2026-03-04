@@ -5,7 +5,7 @@ import {
   betaSchedulerEnabledId,
   betaFirstReviewIntervalId,
   betaMaxIntervalId,
-  collapseQueueTopBar,
+  // collapseQueueTopBar, // Disabled: feature not working
   defaultPriorityId,
   defaultCardPriorityId,
   displayPriorityShieldId,
@@ -98,13 +98,14 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     defaultValue: 30,
   });
 
-  plugin.settings.registerBooleanSetting({
-    id: collapseQueueTopBar,
-    title: 'Collapse Queue Top Bar',
-    description:
-      'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
-    defaultValue: true,
-  });
+  // Disabled: collapseQueueTopBar feature not working
+  // plugin.settings.registerBooleanSetting({
+  //   id: collapseQueueTopBar,
+  //   title: 'Collapse Queue Top Bar',
+  //   description:
+  //     'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
+  //   defaultValue: true,
+  // });
 
   plugin.settings.registerBooleanSetting({
     id: showRemsAsIsolatedInQueueId,
