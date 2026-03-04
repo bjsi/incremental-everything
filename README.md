@@ -72,8 +72,9 @@ This README covers the basics. For the comprehensive guides, please visit the **
 
 ### Scheduling
 
-- The plugin uses an extremely simple scheduling algorithm: `const newInterval = Math.ceil(multiplier ** Math.max(repHistory.length, 1));` where the multiplier is 1.5 by default.
-- Note that you can manually set the next repetition date using the **Reschedule** command (**Ctrl+J**), or RemNote's tables and properties features.
+- **Default Scheduler**: Uses an exponential formula — `interval = ⌈Multiplier ^ N⌉` days (multiplier defaults to 1.5). Simple and effective for items needing few reviews.
+- **Beta Scheduler (Saturating Curve)**: An opt-in alternative where intervals start at a configurable *First Review Interval* (default 5 days) and gradually approach a *Max Interval* (default 30 days). Ideal for items needing many reviews (books, chapters). See the [IncRem Scheduler](https://github.com/bjsi/incremental-everything/wiki/IncRem-Scheduler) wiki page for details.
+- You can manually set the next repetition date using the **Reschedule** command (**Ctrl+J**), or RemNote's tables and properties features.
 
 ### 📱 Mobile Support
 The plugin now features **Automatic Light Mode**.
