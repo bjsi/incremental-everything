@@ -702,7 +702,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // Open Repetition History command
   plugin.app.registerCommand({
     id: 'open-repetition-history',
-    name: 'Open IncRem Repetition History',
+    name: 'Open Repetition History',
     keyboardShortcut: 'ctrl+shift+h',
     action: async () => {
       let remId: string | undefined;
