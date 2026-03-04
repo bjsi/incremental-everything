@@ -34,6 +34,7 @@ function EditorReviewTimer() {
       const priority = await rp.storage.getSession<number>('editor-review-timer-priority');
       const remName = await rp.storage.getSession<string>('editor-review-timer-rem-name');
       const fromQueue = await rp.storage.getSession<boolean>('editor-review-timer-from-queue');
+      const origin = await rp.storage.getSession<string>('editor-review-timer-origin');
 
       return {
         remId,
@@ -42,6 +43,7 @@ function EditorReviewTimer() {
         priority,
         remName: remName || 'Unnamed Rem',
         fromQueue,
+        origin: origin || (fromQueue ? 'queue' : 'editor'),
       };
     },
     []
@@ -115,7 +117,7 @@ function EditorReviewTimer() {
       await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
     }
 
-    if (timerData.fromQueue) {
+    if (timerData.origin === 'queue') {
       // Mode 1: Started from queue "Review & Open". Repetition was already created.
       // We just update the reviewTimeSeconds of the last history entry.
       const updatedHistory = [...(incRem.history || [])];
@@ -167,9 +169,10 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-priority', undefined);
     await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
     await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
+    await plugin.storage.setSession('editor-review-timer-origin', undefined);
 
     // Perform navigation at the very end
-    if (timerData.fromQueue) {
+    if (timerData.origin === 'queue') {
       // Return to the queue
       const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
       if (subQueueId) {
@@ -183,6 +186,12 @@ function EditorReviewTimer() {
       } else {
         await plugin.app.toast("Please click 'Flashcards' on the sidebar to resume the Global Queue!");
       }
+    } else if (timerData.origin === 'inc-rem-list') {
+      // Return to the IncRem List popup (state was already stored in session by inc_rem_list.tsx)
+      await plugin.widget.openPopup('inc_rem_list');
+    } else if (timerData.origin === 'inc-rem-main-view') {
+      // Return to the Main View popup (state was already stored in session by inc_rem_main_view.tsx)
+      await plugin.widget.openPopup('inc_rem_main_view');
     }
   };
 
@@ -205,13 +214,16 @@ function EditorReviewTimer() {
   };
 
   const handleCancel = async () => {
-    // Clear timer data without saving
     await plugin.storage.setSession('editor-review-timer-rem-id', undefined);
     await plugin.storage.setSession('editor-review-timer-start', undefined);
     await plugin.storage.setSession('editor-review-timer-interval', undefined);
     await plugin.storage.setSession('editor-review-timer-priority', undefined);
     await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
     await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
+    await plugin.storage.setSession('editor-review-timer-origin', undefined);
+    // Clear stored list state if cancelling
+    await plugin.storage.setSession('inc-rem-list-state', undefined);
+    await plugin.storage.setSession('inc-rem-main-view-state', undefined);
 
     await plugin.app.toast('Timer cancelled');
   };
@@ -291,7 +303,11 @@ function EditorReviewTimer() {
             e.currentTarget.style.backgroundColor = '#10b981';
           }}
         >
-          ✓ {timerData.fromQueue ? 'End Review and Back to Queue' : 'End Review'}
+          ✓ {timerData.origin === 'queue'
+            ? 'End Review and Back to Queue'
+            : (timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view')
+              ? 'End Review and Back to IncRem List'
+              : 'End Review'}
         </button>
         <button
           onClick={handleGoToRem}

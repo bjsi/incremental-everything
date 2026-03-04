@@ -192,7 +192,7 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('flashcard_repetition_history', WidgetLocation.Popup, {
     dimensions: {
-      width: '1100px',
+      width: '1150px',
       height: 'auto',
     },
   });

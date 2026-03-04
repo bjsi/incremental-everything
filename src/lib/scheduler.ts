@@ -195,8 +195,9 @@ export async function updateSRSDataForRem(
   await rem?.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateReference);
   await rem?.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(newHistory)]);
 
-  // Clear flag after a short delay to account for async event processing
+  // Clear flag after a delay longer than the GlobalRemChanged debounce (1000ms)
+  // to prevent false-positive manual date reset detection
   setTimeout(async () => {
     await plugin.storage.setSession('plugin_updating_srs_data', false);
-  }, 500);
+  }, 3000);
 }
