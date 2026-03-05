@@ -1,6 +1,7 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -23,6 +24,7 @@ interface ShieldHistoryEntry {
   absolute: number | null;
   percentile: number | null;
   universeSize?: number; // NEW: Track the total count of items in scope
+  dismissedCount?: number;
 }
 
 interface ChartData {
@@ -30,6 +32,9 @@ interface ChartData {
   absolute: number | null;
   relative: number | null;
   universeSize: number; // NEW: Universe size for the chart
+  dismissedCount?: number;
+  totalUniverse?: number;
+  processingPercentage?: number;
 }
 
 function PriorityShieldGraph() {
@@ -83,12 +88,27 @@ function PriorityShieldGraph() {
 
   const processHistoryData = (history: Record<string, ShieldHistoryEntry> | undefined) => {
     if (!history) return [];
-    const unsortedData = Object.entries(history).map(([date, values]) => ({
-      date: date,
-      absolute: values.absolute,
-      relative: values.percentile,
-      universeSize: values.universeSize || 0, // NEW: Include universe size with default
-    }));
+    const unsortedData = Object.entries(history).map(([date, values]) => {
+      const universeSize = values.universeSize || 0;
+      const isIncRem = 'dismissedCount' in values;
+
+      const item: any = {
+        date: date,
+        absolute: values.absolute,
+        relative: values.percentile,
+        universeSize: universeSize,
+      };
+
+      if (isIncRem) {
+        const dismissedCount = values.dismissedCount || 0;
+        const totalUniverse = universeSize + dismissedCount;
+        item.dismissedCount = dismissedCount;
+        item.totalUniverse = totalUniverse;
+        item.processingPercentage = totalUniverse > 0 ? (dismissedCount / totalUniverse) * 100 : 0;
+      }
+      return item;
+    });
+
     const sortedData = unsortedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return sortedData.map(item => ({
       ...item,
@@ -227,25 +247,40 @@ function PriorityShieldGraph() {
   // Custom tooltip to show all three values clearly
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0]?.payload;
+      const isIncRem = data && 'dismissedCount' in data;
+
       return (
-        <div className="bg-white p-2 border border-gray-300 rounded shadow">
-          <p className="font-semibold">{`Date: ${label}`}</p>
+        <div className="bg-white p-2 border border-gray-300 rounded shadow text-sm tooltip-container">
+          <p className="font-semibold mb-1">{`Date: ${label}`}</p>
           {payload.map((entry: any, index: number) => {
-            if (entry.dataKey === 'universeSize') {
+            if (entry.dataKey === 'absolute' || entry.dataKey === 'relative') {
+              return (
+                <p key={index} style={{ color: entry.color }}>
+                  {`${entry.name}: ${entry.value !== null ?
+                    (entry.dataKey === 'relative' ? `${entry.value}%` : entry.value)
+                    : 'N/A'}`}
+                </p>
+              );
+            }
+            if (!isIncRem && entry.dataKey === 'universeSize') {
               return (
                 <p key={index} style={{ color: entry.color }}>
                   {`${entry.name}: ${entry.value.toLocaleString()}`}
                 </p>
               );
             }
-            return (
-              <p key={index} style={{ color: entry.color }}>
-                {`${entry.name}: ${entry.value !== null ?
-                  (entry.dataKey === 'relative' ? `${entry.value}%` : entry.value)
-                  : 'N/A'}`}
-              </p>
-            );
+            return null;
           })}
+
+          {isIncRem && data && (
+            <div className="mt-1 pt-1 border-t border-gray-100">
+              <p style={{ color: '#10b981' }}>{`Universe of Incremental Rems: ${(data.universeSize || 0).toLocaleString()}`}</p>
+              <p style={{ color: '#d97706' }}>{`Universe of Dismissed Rems: ${(data.dismissedCount || 0).toLocaleString()}`}</p>
+              <p style={{ color: '#333' }} className="font-medium">{`Total Universe: ${(data.totalUniverse || 0).toLocaleString()}`}</p>
+              <p className="text-[11px] text-gray-500 mt-1 uppercase tracking-wider">{`Processing: ${data.processingPercentage ? data.processingPercentage.toFixed(1) : 0}%`}</p>
+            </div>
+          )}
         </div>
       );
     }
@@ -253,6 +288,7 @@ function PriorityShieldGraph() {
   };
 
   const renderChart = (data: ChartData[], title: string, color1: string, color2: string, color3: string) => {
+    const isIncRemChart = title.includes('IncRem');
     const zState = getZState(title);
 
     const zoomOut = () => {
@@ -314,7 +350,7 @@ function PriorityShieldGraph() {
     }
 
     // Find the maximum universe size for better y-axis scaling based on visible data
-    const maxUniverse = Math.max(...displayData.map(d => d.universeSize || 0));
+    const maxUniverse = Math.max(...displayData.map(d => isIncRemChart && d.totalUniverse !== undefined ? d.totalUniverse : (d.universeSize || 0)));
     const universeAxisMax = Math.ceil(maxUniverse * 1.1) || 10; // Add 10% padding
 
     let absoluteMin = 0;
@@ -379,7 +415,7 @@ function PriorityShieldGraph() {
         </div>
 
         <ResponsiveContainer width="100%" height={300} debounce={50}>
-          <LineChart
+          <ComposedChart
             data={displayData}
             margin={{ top: 5, right: 50, left: 10, bottom: 5 }}
             onMouseDown={(e: any) => {
@@ -467,17 +503,45 @@ function PriorityShieldGraph() {
               dot={{ r: 3 }}
             />
 
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="universeSize"
-              name="Universe Size"
-              stroke={color3}
-              strokeWidth={2}
-              strokeDasharray="5 5" // Dashed line to differentiate
-              dot={{ r: 3 }}
-              animationDuration={300}
-            />
+            {isIncRemChart ? (
+              <>
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="universeSize"
+                  name="Universe Size (IncRems)"
+                  stackId="1"
+                  stroke="#10b981"
+                  fill="transparent"
+                  strokeWidth={2}
+                  animationDuration={300}
+                />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="dismissedCount"
+                  name="Dismissed Rems"
+                  stackId="1"
+                  stroke="#333"
+                  fill="rgba(250, 204, 21, 0.4)"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  animationDuration={300}
+                />
+              </>
+            ) : (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="universeSize"
+                name="Universe Size"
+                stroke={color3}
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={{ r: 3 }}
+                animationDuration={300}
+              />
+            )}
 
             {zState.refAreaLeft && zState.refAreaRight ? (
               <ReferenceArea
@@ -488,7 +552,7 @@ function PriorityShieldGraph() {
                 fill="#8884d8"
               />
             ) : null}
-          </LineChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
     );
