@@ -89,7 +89,7 @@ function EditorReviewTimer() {
     ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
     : `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-  const handleEndReview = async () => {
+  const handleEndReview = async (navigateBack: boolean = true) => {
     if (!timerData) return;
 
     const rem = await plugin.rem.findOne(timerData.remId);
@@ -118,7 +118,7 @@ function EditorReviewTimer() {
     }
 
     if (timerData.origin === 'queue') {
-      // Mode 1: Started from queue "Review & Open". Repetition was already created.
+      // Mode 1: Started from queue "Review in Editor". Repetition was already created.
       // We just update the reviewTimeSeconds of the last history entry.
       const updatedHistory = [...(incRem.history || [])];
       if (updatedHistory.length > 0) {
@@ -171,27 +171,29 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
     await plugin.storage.setSession('editor-review-timer-origin', undefined);
 
-    // Perform navigation at the very end
-    if (timerData.origin === 'queue') {
-      // Return to the queue
-      const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
-      if (subQueueId) {
-        const subQueueRem = await plugin.rem.findOne(subQueueId);
-        if (subQueueRem) {
-          await subQueueRem.openRemAsPage();
-          await plugin.app.toast('Hit Cmd+Shift+P to resume your Queue!');
+    // Perform navigation at the very end — only if requested
+    if (navigateBack) {
+      if (timerData.origin === 'queue') {
+        // Return to the queue
+        const subQueueId = await plugin.storage.getSession<string>(currentSubQueueIdKey);
+        if (subQueueId) {
+          const subQueueRem = await plugin.rem.findOne(subQueueId);
+          if (subQueueRem) {
+            await subQueueRem.openRemAsPage();
+            await plugin.app.toast('Hit Cmd+Shift+P to resume your Queue!');
+          } else {
+            await plugin.app.toast('Could not find the queue document.');
+          }
         } else {
-          await plugin.app.toast('Could not find the queue document.');
+          await plugin.app.toast("Please click 'Flashcards' on the sidebar to resume the Global Queue!");
         }
-      } else {
-        await plugin.app.toast("Please click 'Flashcards' on the sidebar to resume the Global Queue!");
+      } else if (timerData.origin === 'inc-rem-list') {
+        // Return to the IncRem List popup (state was already stored in session by inc_rem_list.tsx)
+        await plugin.widget.openPopup('inc_rem_list');
+      } else if (timerData.origin === 'inc-rem-main-view') {
+        // Return to the Main View popup (state was already stored in session by inc_rem_main_view.tsx)
+        await plugin.widget.openPopup('inc_rem_main_view');
       }
-    } else if (timerData.origin === 'inc-rem-list') {
-      // Return to the IncRem List popup (state was already stored in session by inc_rem_list.tsx)
-      await plugin.widget.openPopup('inc_rem_list');
-    } else if (timerData.origin === 'inc-rem-main-view') {
-      // Return to the Main View popup (state was already stored in session by inc_rem_main_view.tsx)
-      await plugin.widget.openPopup('inc_rem_main_view');
     }
   };
 
@@ -285,12 +287,41 @@ function EditorReviewTimer() {
       )}
 
       <div style={{ display: 'flex', gap: '8px' }}>
+        {/* "Back to..." button — shown when origin is queue or inc-rem-list/main-view */}
+        {(timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
+          <button
+            onClick={() => handleEndReview(true)}
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              backgroundColor: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#059669';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#10b981';
+            }}
+          >
+            ✓ {timerData.origin === 'queue'
+              ? 'End Review and Back to Queue'
+              : 'End Review and Back to IncRem List'}
+          </button>
+        )}
+
+        {/* Plain "End Review" button — always shown */}
         <button
-          onClick={handleEndReview}
+          onClick={() => handleEndReview(false)}
           style={{
             padding: '6px 14px',
             fontSize: '13px',
-            backgroundColor: '#10b981',
+            backgroundColor: (timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view')
+              ? '#6b7280' : '#10b981',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
@@ -298,17 +329,15 @@ function EditorReviewTimer() {
             fontWeight: 600,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#059669';
+            e.currentTarget.style.backgroundColor = (timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view')
+              ? '#4b5563' : '#059669';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#10b981';
+            e.currentTarget.style.backgroundColor = (timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view')
+              ? '#6b7280' : '#10b981';
           }}
         >
-          ✓ {timerData.origin === 'queue'
-            ? 'End Review and Back to Queue'
-            : (timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view')
-              ? 'End Review and Back to IncRem List'
-              : 'End Review'}
+          ✓ End Review
         </button>
         <button
           onClick={handleGoToRem}

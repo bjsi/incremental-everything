@@ -97,7 +97,7 @@ export interface ReviewDocumentConfig {
 export async function createPriorityReviewDocument(
   plugin: RNPlugin,
   config: ReviewDocumentConfig
-): Promise<PluginRem> {
+): Promise<{ doc: PluginRem; actualItemCount: number }> {
   const { scopeRemId, itemCount, cardRatio } = config;
 
   // 1. Create the review document with rem reference in title
@@ -416,5 +416,5 @@ Created: ${timestamp}`;
     if (typeTag) { await childRem.addTag(typeTag); }
   }
 
-  return reviewDoc;
+  return { doc: reviewDoc, actualItemCount: mixedItems.length };
 }
