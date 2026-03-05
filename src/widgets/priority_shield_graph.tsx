@@ -40,6 +40,7 @@ function PriorityShieldGraph() {
     endIndex: number | null;
     refAreaLeft: string | null;
     refAreaRight: string | null;
+    autoFit?: boolean;
   }>>({});
 
   const getZState = (title: string) => {
@@ -48,6 +49,7 @@ function PriorityShieldGraph() {
       endIndex: null,
       refAreaLeft: null,
       refAreaRight: null,
+      autoFit: false,
     };
   };
 
@@ -75,7 +77,8 @@ function PriorityShieldGraph() {
   const documentName = useRunAsync(async () => {
     if (!effectiveDocScopeId) return null;
     const rem = await plugin.rem.findOne(effectiveDocScopeId);
-    return rem?.text?.join('') || 'Document';
+    if (!rem?.text) return 'Document';
+    return await plugin.richText.toString(rem.text) || 'Document';
   }, [effectiveDocScopeId]);
 
   const processHistoryData = (history: Record<string, ShieldHistoryEntry> | undefined) => {
@@ -314,6 +317,34 @@ function PriorityShieldGraph() {
     const maxUniverse = Math.max(...displayData.map(d => d.universeSize || 0));
     const universeAxisMax = Math.ceil(maxUniverse * 1.1) || 10; // Add 10% padding
 
+    let absoluteMin = 0;
+    let absoluteMax = 100;
+    let relativeMin = 0;
+    let relativeMax = 100;
+
+    if (zState.autoFit && displayData.length > 0) {
+      const absValues = displayData.map(d => d.absolute).filter((v): v is number => v !== null);
+      const relValues = displayData.map(d => d.relative).filter((v): v is number => v !== null);
+
+      if (absValues.length > 0) {
+        absoluteMin = Math.max(0, Math.floor(Math.min(...absValues) - 5));
+        absoluteMax = Math.min(100, Math.ceil(Math.max(...absValues) + 5));
+        if (absoluteMax === absoluteMin) { absoluteMin = Math.max(0, absoluteMin - 5); absoluteMax = Math.min(100, absoluteMax + 5); }
+      }
+      if (relValues.length > 0) {
+        relativeMin = Math.max(0, Math.floor(Math.min(...relValues) - 5));
+        relativeMax = Math.min(100, Math.ceil(Math.max(...relValues) + 5));
+        if (relativeMax === relativeMin) { relativeMin = Math.max(0, relativeMin - 5); relativeMax = Math.min(100, relativeMax + 5); }
+      }
+    }
+
+    const toggleAutoFit = () => {
+      setZoomState(prev => ({
+        ...prev,
+        [title]: { ...getZState(title), autoFit: !getZState(title).autoFit }
+      }));
+    };
+
     return (
       <div
         className="mb-6 relative"
@@ -322,14 +353,23 @@ function PriorityShieldGraph() {
       >
         <h4 className="text-md font-semibold text-center mb-2">{title}</h4>
 
-        {zState.startIndex !== null && (
+        <div className="absolute top-0 right-4 flex gap-2 z-10 w-full justify-end" style={{ top: '-10px' }}>
           <button
-            className="absolute top-0 right-4 p-1 text-xs border rounded bg-white hover:bg-gray-100 shadow-sm z-10 rn-clr-content-primary"
-            onClick={zoomOut}
+            className="p-1 px-2 text-xs border rounded bg-white hover:bg-gray-100 shadow-sm rn-clr-content-primary"
+            onClick={toggleAutoFit}
           >
-            Reset Zoom
+            {zState.autoFit ? 'Reset Y-Axis' : 'Optimize Priorities Zoom'}
           </button>
-        )}
+
+          {zState.startIndex !== null && (
+            <button
+              className="p-1 px-2 text-xs border rounded bg-white hover:bg-gray-100 shadow-sm rn-clr-content-primary"
+              onClick={zoomOut}
+            >
+              Reset Data Range
+            </button>
+          )}
+        </div>
 
         <ResponsiveContainer width="100%" height={300} debounce={50}>
           <LineChart
@@ -367,7 +407,7 @@ function PriorityShieldGraph() {
               yAxisId="left"
               orientation="left"
               stroke={color1}
-              domain={[0, 100]}
+              domain={[absoluteMin, absoluteMax]}
               allowDataOverflow
               width={30}
             />
@@ -377,7 +417,7 @@ function PriorityShieldGraph() {
               yAxisId="middle"
               orientation="right"
               stroke={color2}
-              domain={[0, 100]}
+              domain={[relativeMin, relativeMax]}
               allowDataOverflow
               tickFormatter={(tick) => `${tick}%`}
               width={60}
@@ -490,7 +530,7 @@ function PriorityShieldGraph() {
 
       <div className="mt-4 text-sm rn-clr-content-secondary text-justify">
         <p className="mb-3">
-          <b>Graph Controls:</b> Click and drag on any graph to zoom into a specific period. A "Reset Zoom" button will appear in the top-right corner to return to the full view.
+          <b>Graph Controls:</b> Click and drag on any graph to zoom into a specific period. Use the "Optimize Priorities Zoom" button to perfectly frame the vertical priority lines within your zoomed date range. A "Reset" button will appear in the top-right corner to return to the full view.
         </p>
 
         <p className="mb-3">
