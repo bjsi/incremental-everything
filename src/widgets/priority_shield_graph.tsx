@@ -326,15 +326,20 @@ function PriorityShieldGraph() {
       const absValues = displayData.map(d => d.absolute).filter((v): v is number => v !== null);
       const relValues = displayData.map(d => d.relative).filter((v): v is number => v !== null);
 
-      if (absValues.length > 0) {
-        absoluteMin = Math.max(0, Math.floor(Math.min(...absValues) - 5));
-        absoluteMax = Math.min(100, Math.ceil(Math.max(...absValues) + 5));
-        if (absoluteMax === absoluteMin) { absoluteMin = Math.max(0, absoluteMin - 5); absoluteMax = Math.min(100, absoluteMax + 5); }
-      }
-      if (relValues.length > 0) {
-        relativeMin = Math.max(0, Math.floor(Math.min(...relValues) - 5));
-        relativeMax = Math.min(100, Math.ceil(Math.max(...relValues) + 5));
-        if (relativeMax === relativeMin) { relativeMin = Math.max(0, relativeMin - 5); relativeMax = Math.min(100, relativeMax + 5); }
+      const allValues = [...absValues, ...relValues];
+
+      if (allValues.length > 0) {
+        const globalMin = Math.max(0, Math.floor(Math.min(...allValues) - 5));
+        let globalMax = Math.min(100, Math.ceil(Math.max(...allValues) + 5));
+
+        if (globalMax === globalMin) {
+          globalMax = Math.min(100, globalMax + 5);
+        }
+
+        absoluteMin = globalMin;
+        absoluteMax = globalMax;
+        relativeMin = globalMin;
+        relativeMax = globalMax;
       }
     }
 
@@ -351,11 +356,12 @@ function PriorityShieldGraph() {
         style={{ userSelect: 'none' }}
         onDragStart={(e) => e.preventDefault()}
       >
-        <h4 className="text-md font-semibold text-center mb-2">{title}</h4>
+        <h4 className="text-md font-semibold text-center mb-2 mt-2">{title}</h4>
 
-        <div className="absolute top-0 right-4 flex gap-2 z-10 w-full justify-end" style={{ top: '-10px' }}>
+        <div className="absolute top-0 right-4 flex gap-2 z-10 justify-end items-center pointer-events-auto w-max" style={{ top: '6px' }}>
           <button
-            className="p-1 px-2 text-xs border rounded bg-white hover:bg-gray-100 shadow-sm rn-clr-content-primary"
+            className="rn-button rn-button--secondary shadow-sm relative"
+            style={{ margin: 0, fontSize: '11px', minHeight: '22px', padding: '0 8px' }}
             onClick={toggleAutoFit}
           >
             {zState.autoFit ? 'Reset Y-Axis' : 'Optimize Priorities Zoom'}
@@ -363,7 +369,8 @@ function PriorityShieldGraph() {
 
           {zState.startIndex !== null && (
             <button
-              className="p-1 px-2 text-xs border rounded bg-white hover:bg-gray-100 shadow-sm rn-clr-content-primary"
+              className="rn-button rn-button--secondary shadow-sm relative"
+              style={{ margin: 0, fontSize: '11px', minHeight: '22px', padding: '0 8px' }}
               onClick={zoomOut}
             >
               Reset Data Range
