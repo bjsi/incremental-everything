@@ -8,7 +8,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceArea,
 } from 'recharts';
+import { useState } from 'react';
 import {
   priorityShieldHistoryKey,
   documentPriorityShieldHistoryKey,
@@ -32,6 +34,22 @@ interface ChartData {
 
 function PriorityShieldGraph() {
   const plugin = usePlugin();
+
+  const [zoomState, setZoomState] = useState<Record<string, {
+    startIndex: number | null;
+    endIndex: number | null;
+    refAreaLeft: string | null;
+    refAreaRight: string | null;
+  }>>({});
+
+  const getZState = (title: string) => {
+    return zoomState[title] || {
+      startIndex: null,
+      endIndex: null,
+      refAreaLeft: null,
+      refAreaRight: null,
+    };
+  };
 
   // Get the context to check if we're in a document queue
   const ctx = useTrackerPlugin(
@@ -232,15 +250,115 @@ function PriorityShieldGraph() {
   };
 
   const renderChart = (data: ChartData[], title: string, color1: string, color2: string, color3: string) => {
-    // Find the maximum universe size for better y-axis scaling
-    const maxUniverse = Math.max(...data.map(d => d.universeSize || 0));
-    const universeAxisMax = Math.ceil(maxUniverse * 1.1); // Add 10% padding
+    const zState = getZState(title);
+
+    const zoomOut = () => {
+      setZoomState(prev => ({
+        ...prev,
+        [title]: {
+          startIndex: null,
+          endIndex: null,
+          refAreaLeft: null,
+          refAreaRight: null,
+        }
+      }));
+    };
+
+    const zoom = () => {
+      let { refAreaLeft, refAreaRight } = zState;
+
+      if (refAreaLeft === refAreaRight || !refAreaLeft || !refAreaRight) {
+        setZoomState(prev => ({
+          ...prev,
+          [title]: { ...prev[title], refAreaLeft: null, refAreaRight: null }
+        }));
+        return;
+      }
+
+      let indexLeft = data.findIndex(d => d.date === refAreaLeft);
+      let indexRight = data.findIndex(d => d.date === refAreaRight);
+
+      if (indexLeft === -1 || indexRight === -1) {
+        setZoomState(prev => ({
+          ...prev,
+          [title]: { ...prev[title], refAreaLeft: null, refAreaRight: null }
+        }));
+        return;
+      }
+
+      if (indexLeft > indexRight) {
+        let temp = indexLeft;
+        indexLeft = indexRight;
+        indexRight = temp;
+      }
+
+      setZoomState(prev => ({
+        ...prev,
+        [title]: {
+          ...prev[title],
+          refAreaLeft: null,
+          refAreaRight: null,
+          startIndex: indexLeft,
+          endIndex: indexRight,
+        }
+      }));
+    };
+
+    // Slice data based on zoom state
+    let displayData = data;
+    if (typeof zState.startIndex === 'number' && typeof zState.endIndex === 'number') {
+      displayData = data.slice(zState.startIndex, zState.endIndex + 1);
+    }
+
+    // Find the maximum universe size for better y-axis scaling based on visible data
+    const maxUniverse = Math.max(...displayData.map(d => d.universeSize || 0));
+    const universeAxisMax = Math.ceil(maxUniverse * 1.1) || 10; // Add 10% padding
 
     return (
-      <div className="mb-6">
+      <div
+        className="mb-6 relative"
+        style={{ userSelect: 'none' }}
+        onDragStart={(e) => e.preventDefault()}
+      >
         <h4 className="text-md font-semibold text-center mb-2">{title}</h4>
+
+        {zState.startIndex !== null && (
+          <button
+            className="absolute top-0 right-4 p-1 text-xs border rounded bg-white hover:bg-gray-100 shadow-sm z-10 rn-clr-content-primary"
+            onClick={zoomOut}
+          >
+            Reset Zoom
+          </button>
+        )}
+
         <ResponsiveContainer width="100%" height={300} debounce={50}>
-          <LineChart data={data} margin={{ top: 5, right: 50, left: 10, bottom: 5 }}>
+          <LineChart
+            data={displayData}
+            margin={{ top: 5, right: 50, left: 10, bottom: 5 }}
+            onMouseDown={(e: any) => {
+              if (e && e.activeLabel) {
+                const current = getZState(title);
+                setZoomState(prev => ({
+                  ...prev,
+                  [title]: {
+                    ...current,
+                    refAreaLeft: e.activeLabel,
+                    refAreaRight: e.activeLabel
+                  }
+                }));
+              }
+            }}
+            onMouseMove={(e: any) => {
+              const current = getZState(title);
+              if (current.refAreaLeft && e && e.activeLabel && e.activeLabel !== current.refAreaRight) {
+                setZoomState(prev => ({ ...prev, [title]: { ...current, refAreaRight: e.activeLabel } }));
+              }
+            }}
+            onMouseUp={zoom}
+            onMouseLeave={() => {
+              if (zState.refAreaLeft) zoom();
+            }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />
 
@@ -250,6 +368,7 @@ function PriorityShieldGraph() {
               orientation="left"
               stroke={color1}
               domain={[0, 100]}
+              allowDataOverflow
               width={30}
             />
 
@@ -259,6 +378,7 @@ function PriorityShieldGraph() {
               orientation="right"
               stroke={color2}
               domain={[0, 100]}
+              allowDataOverflow
               tickFormatter={(tick) => `${tick}%`}
               width={60}
             />
@@ -269,6 +389,7 @@ function PriorityShieldGraph() {
               orientation="right"
               stroke={color3}
               domain={[0, universeAxisMax]}
+              allowDataOverflow
               tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toString()}
               width={45}
               tick={{ fontSize: 11 }}
@@ -308,7 +429,18 @@ function PriorityShieldGraph() {
               strokeWidth={2}
               strokeDasharray="5 5" // Dashed line to differentiate
               dot={{ r: 3 }}
+              animationDuration={300}
             />
+
+            {zState.refAreaLeft && zState.refAreaRight ? (
+              <ReferenceArea
+                yAxisId="left"
+                x1={zState.refAreaLeft}
+                x2={zState.refAreaRight}
+                strokeOpacity={0.3}
+                fill="#8884d8"
+              />
+            ) : null}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -335,18 +467,20 @@ function PriorityShieldGraph() {
         `📄 ${documentName || 'Document'} IncRem Shield`,
         '#e74c3c', '#f39c12', '#9b59b6'
       )}
+      {effectiveDocScopeId && hasCardDocData && renderChart(
+        cardDocChartData!,
+        `📄 ${documentName || 'Document'} Card Shield`,
+        '#d35400', '#f1c40f', '#16a085'
+      )}
+
+      {(hasDocData || hasCardDocData) && (hasKbData || hasCardKbData) && (
+        <div style={{ height: '2px', backgroundColor: 'var(--rn-clr-border-opaque)', margin: '32px 0' }} />
+      )}
+
       {hasKbData && renderChart(
         kbChartData,
         '🌐 Knowledge Base IncRem Shield',
         '#8884d8', '#82ca9d', '#e91e63'
-      )}
-
-      {(hasDocData || hasKbData) && (hasCardDocData || hasCardKbData) && <hr className="my-8 border-gray-400" />}
-
-      {effectiveDocScopeId && hasCardDocData && renderChart(
-        cardDocChartData!,
-        `🎴 ${documentName || 'Document'} Card Shield`,
-        '#d35400', '#f1c40f', '#16a085'
       )}
       {hasCardKbData && renderChart(
         cardKbChartData,
@@ -355,6 +489,10 @@ function PriorityShieldGraph() {
       )}
 
       <div className="mt-4 text-sm rn-clr-content-secondary text-justify">
+        <p className="mb-3">
+          <b>Graph Controls:</b> Click and drag on any graph to zoom into a specific period. A "Reset Zoom" button will appear in the top-right corner to return to the full view.
+        </p>
+
         <p className="mb-3">
           <b>Priority Shield:</b> This metric represents your processing capacity for high-priority items. A higher shield value (closer to 100) means you are successfully reviewing your most important material on time.
         </p>

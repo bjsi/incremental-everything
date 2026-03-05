@@ -15,7 +15,7 @@ export interface IncRemWithDetails extends IncrementalRem {
 }
 
 type FilterStatus = 'all' | 'due' | 'scheduled';
-type SortBy = 'priority' | 'date' | 'reviews' | 'time' | 'lastReview';
+type SortBy = 'priority' | 'date' | 'reviews' | 'time' | 'lastReview' | 'queueOrder';
 type SortOrder = 'asc' | 'desc';
 
 export interface IncRemListState {
@@ -48,10 +48,11 @@ interface IncRemTableProps {
   selectedDocumentId?: string | null;
   onDocumentFilterChange?: (documentId: string | null) => void;
   onPriorityChange?: (remId: string, newPriority: number) => Promise<void>;
-  onReviewAndOpen?: (remId: string) => void;
+  onReviewAndOpen?: (remId: string, subsequentRemIds?: string[]) => void;
   initialState?: IncRemListState;
   onStateChange?: (state: IncRemListState) => void;
   subtitle?: string;
+  sortingRandomness?: number;
 }
 
 export function IncRemTable({
@@ -71,6 +72,7 @@ export function IncRemTable({
   initialState,
   onStateChange,
   subtitle,
+  sortingRandomness = 0,
 }: IncRemTableProps) {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>(initialState?.filterStatus ?? 'all');
   const [filterType, setFilterType] = useState<ActionItemType | 'all'>(initialState?.filterType ?? 'all');
@@ -85,19 +87,34 @@ export function IncRemTable({
   const [editingPriorityValue, setEditingPriorityValue] = useState<number>(0);
   const editingPriorityValueRef = useRef<number>(0);
 
+  // Force filters when 'queueOrder' is selected
+  const effectiveFilterStatus = sortBy === 'queueOrder' ? 'due' : filterStatus;
+  const effectiveSortOrder = sortBy === 'queueOrder' ? 'asc' : sortOrder;
+
   // Report state changes to parent so it can store them for the "Back to IncRem List" flow
+  // Use the actual state values, not the effective ones, so if they change sort they get their old filters back
   useEffect(() => {
     if (onStateChange) {
       onStateChange({ filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder });
     }
   }, [filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder, onStateChange]);
 
+  // Apply sorting criteria, preserving a stable random order for 'queueOrder'
+  const randomOrderCache = useRef<Record<string, number>>({});
+
+  // Clear random cache if we change sort type away from queueOrder
+  useEffect(() => {
+    if (sortBy !== 'queueOrder') {
+      randomOrderCache.current = {};
+    }
+  }, [sortBy]);
+
   const filteredAndSortedRems = useMemo(() => {
     const now = Date.now();
 
     let filtered = incRems.filter((rem) => {
-      if (filterStatus === 'due' && rem.nextRepDate > now) return false;
-      if (filterStatus === 'scheduled' && rem.nextRepDate <= now) return false;
+      if (effectiveFilterStatus === 'due' && rem.nextRepDate > now) return false;
+      if (effectiveFilterStatus === 'scheduled' && rem.nextRepDate <= now) return false;
       if (rem.priority < priorityMin || rem.priority > priorityMax) return false;
       if (filterType !== 'all' && rem.incRemType !== filterType) return false;
       if (searchText && rem.remText && !rem.remText.toLowerCase().includes(searchText.toLowerCase())) {
@@ -106,30 +123,60 @@ export function IncRemTable({
       return true;
     });
 
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      if (sortBy === 'priority') {
-        comparison = a.priority - b.priority;
-      } else if (sortBy === 'date') {
-        comparison = a.nextRepDate - b.nextRepDate;
-      } else if (sortBy === 'reviews') {
-        const aReviews = a.history?.length || 0;
-        const bReviews = b.history?.length || 0;
-        comparison = aReviews - bReviews;
-      } else if (sortBy === 'time') {
-        const aTime = a.totalTimeSpent || 0;
-        const bTime = b.totalTimeSpent || 0;
-        comparison = aTime - bTime;
-      } else if (sortBy === 'lastReview') {
-        const aDate = a.lastReviewDate || 0;
-        const bDate = b.lastReviewDate || 0;
-        comparison = aDate - bDate;
+    if (sortBy === 'queueOrder') {
+      // 1. Sort by priority first
+      filtered.sort((a, b) => a.priority - b.priority);
+
+      // 2. Apply randomness swaps once, caching the resulting order via a mapped index
+      const cacheNeedsInit = Object.keys(randomOrderCache.current).length === 0 ||
+        filtered.some(r => randomOrderCache.current[r.remId] === undefined);
+
+      if (cacheNeedsInit) {
+        // Build new random order
+        const orderArr = [...filtered];
+        const numSwaps = Math.floor(sortingRandomness * orderArr.length);
+
+        for (let i = 0; i < numSwaps; i++) {
+          const idx1 = Math.floor(Math.random() * orderArr.length);
+          const idx2 = Math.floor(Math.random() * orderArr.length);
+          [orderArr[idx1], orderArr[idx2]] = [orderArr[idx2], orderArr[idx1]];
+        }
+
+        // Save the resulting indices to the cache
+        randomOrderCache.current = {};
+        orderArr.forEach((rem, idx) => {
+          randomOrderCache.current[rem.remId] = idx;
+        });
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
+
+      // Sort using the cached random order
+      filtered.sort((a, b) => randomOrderCache.current[a.remId] - randomOrderCache.current[b.remId]);
+    } else {
+      filtered.sort((a, b) => {
+        let comparison = 0;
+        if (sortBy === 'priority') {
+          comparison = a.priority - b.priority;
+        } else if (sortBy === 'date') {
+          comparison = a.nextRepDate - b.nextRepDate;
+        } else if (sortBy === 'reviews') {
+          const aReviews = a.history?.length || 0;
+          const bReviews = b.history?.length || 0;
+          comparison = aReviews - bReviews;
+        } else if (sortBy === 'time') {
+          const aTime = a.totalTimeSpent || 0;
+          const bTime = b.totalTimeSpent || 0;
+          comparison = aTime - bTime;
+        } else if (sortBy === 'lastReview') {
+          const aDate = a.lastReviewDate || 0;
+          const bDate = b.lastReviewDate || 0;
+          comparison = aDate - bDate;
+        }
+        return effectiveSortOrder === 'asc' ? comparison : -comparison;
+      });
+    }
 
     return filtered;
-  }, [incRems, filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder]);
+  }, [incRems, effectiveFilterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, effectiveSortOrder, sortingRandomness]);
 
   const hasActiveFilters = filterStatus !== 'all' || filterType !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '' || selectedDocumentId;
 
@@ -159,16 +206,18 @@ export function IncRemTable({
         </div>
         <div className="flex items-center gap-2">
           {/* Status toggle */}
-          <div className="flex text-xs" style={{ backgroundColor: 'var(--rn-clr-background-primary)', borderRadius: '4px' }}>
+          <div className="flex text-xs" style={{ backgroundColor: 'var(--rn-clr-background-primary)', borderRadius: '4px', opacity: sortBy === 'queueOrder' ? 0.5 : 1 }}>
             {(['all', 'due', 'scheduled'] as FilterStatus[]).map((status) => (
               <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
-                className={`px-2 py-1 transition-colors ${status === 'all' ? 'rounded-l' : status === 'scheduled' ? 'rounded-r' : ''}`}
+                disabled={sortBy === 'queueOrder'}
+                className={`px-2 py-1 transition-colors ${status === 'all' ? 'rounded-l' : status === 'scheduled' ? 'rounded-r' : ''} ${sortBy === 'queueOrder' && status !== 'due' ? 'cursor-not-allowed' : ''}`}
                 style={{
-                  backgroundColor: filterStatus === status ? 'var(--rn-clr-background-tertiary)' : 'transparent',
-                  color: filterStatus === status ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-tertiary)',
+                  backgroundColor: effectiveFilterStatus === status ? 'var(--rn-clr-background-tertiary)' : 'transparent',
+                  color: effectiveFilterStatus === status ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-tertiary)',
                 }}
+                title={sortBy === 'queueOrder' ? "Locked when sorting by Queue Order" : undefined}
               >
                 {status.charAt(0).toUpperCase() + status.slice(1)}
               </button>
@@ -191,18 +240,42 @@ export function IncRemTable({
             <option value="reviews">Reviews</option>
             <option value="time">Time Spent</option>
             <option value="lastReview">Last Review Date</option>
+            <option value="queueOrder">Sort for Review</option>
           </select>
           <button
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="px-2 py-1 text-xs rounded transition-colors"
+            disabled={sortBy === 'queueOrder'}
+            className={`px-2 py-1 text-xs rounded transition-colors ${sortBy === 'queueOrder' ? 'cursor-not-allowed' : ''}`}
             style={{
               backgroundColor: 'var(--rn-clr-background-primary)',
               color: 'var(--rn-clr-content-primary)',
+              opacity: sortBy === 'queueOrder' ? 0.5 : 1
             }}
-            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+            title={sortBy === 'queueOrder' ? 'Locked to Ascending when sorting by Queue Order' : sortOrder === 'asc' ? 'Ascending' : 'Descending'}
           >
-            {sortOrder === 'asc' ? '↑' : '↓'}
+            {effectiveSortOrder === 'asc' ? '↑' : '↓'}
           </button>
+
+          {/* Top-Level Review Button */}
+          {onReviewAndOpen && filteredAndSortedRems.length > 0 && (
+            <button
+              onClick={() => {
+                // Determine the next rems sequence and invoke the callback with the first one
+                onReviewAndOpen(filteredAndSortedRems[0].remId, filteredAndSortedRems.slice(1).map(r => r.remId));
+              }}
+              className="px-3 py-1 text-xs rounded transition-colors font-semibold ml-1"
+              style={{
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#3b82f6'; }}
+              title="Start reviewing this list sequentially in the Editor"
+            >
+              Review in Editor
+            </button>
+          )}
 
           {/* Close button */}
           {onClose && (
@@ -385,7 +458,13 @@ export function IncRemTable({
                 }}
                 onPriorityCancel={() => setEditingPriorityRemId(null)}
                 // Review & Open
-                onReviewAndOpen={onReviewAndOpen}
+                onReviewAndOpen={(remId) => {
+                  if (onReviewAndOpen) {
+                    const idx = filteredAndSortedRems.findIndex(r => r.remId === remId);
+                    const subsequentIds = idx >= 0 ? filteredAndSortedRems.slice(idx + 1).map(r => r.remId) : [];
+                    onReviewAndOpen(remId, subsequentIds);
+                  }
+                }}
               />
             ))}
           </div>
