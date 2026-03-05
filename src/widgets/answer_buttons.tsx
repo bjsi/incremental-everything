@@ -394,15 +394,16 @@ export function AnswerButtons() {
           }}
           title="Change Priority (Ctrl+P / Ctrl+Alt+P): Adjust item's priority on the fly"
         >
-          <div style={buttonStyles.label}>Change Priority</div>
+          <div style={buttonStyles.label}>Change</div>
+          <div style={buttonStyles.label}>Priority</div>
         </Button>
 
         <Button
           onClick={() => handleReviewAndOpenRem(plugin, rem, remType)}
-          title="Review & Open (Ctrl+Shift+J): Reschedule item, open in editor, and start Editor Review Timer"
+          title="Review in Editor (Ctrl+Shift+J): Reschedule item, open in editor, and start Editor Review Timer"
         >
-          <div style={buttonStyles.label}>Review & Open</div>
-          <div style={buttonStyles.sublabel}>Go to Editor</div>
+          <div style={buttonStyles.label}>Review</div>
+          <div style={buttonStyles.label}>in Editor</div>
         </Button>
 
         <Button
