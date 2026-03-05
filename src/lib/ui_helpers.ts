@@ -2,7 +2,7 @@ import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import {
   queueCounterId,
   scrollToHighlightId,
-  collapseTopBarId,
+  // collapseTopBarId, // Disabled: feature not working
   hideIncEverythingId,
 } from './consts';
 
@@ -83,7 +83,7 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
  */
 export function clearQueueUI(plugin: ReactRNPlugin): void {
   plugin.app.unregisterMenuItem(scrollToHighlightId);
-  plugin.app.registerCSS(collapseTopBarId, '');
+  // plugin.app.registerCSS(collapseTopBarId, ''); // Disabled: feature not working
   plugin.app.registerCSS(queueCounterId, '');
   plugin.app.registerCSS(hideIncEverythingId, '');
 }

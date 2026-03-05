@@ -478,21 +478,46 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       const rem = await plugin.rem.findOne(data.remId);
       if (!rem) return;
 
-      // IMPORTANT: Capture history and nextRepDate directly from the Rem NOW, before debounce
-      // This avoids race condition where plugin.track() refreshes cache before our debounced callback
-      const currentIncRem = await getIncrementalRemFromRem(plugin, rem);
+      // IMPORTANT: Capture history NOW, before debounce
+      //
+      // History capture strategy: We prioritize the session cache (allIncrementalRemKey)
+      // because when removePowerup() is called, the GlobalRemChanged event fires AFTER
+      // the powerup and all its slots are already deleted. Reading from the rem's powerup
+      // slots would fail in that case. The session cache still holds the old data.
+      //
+      // We fall back to direct rem read for cases where the session cache hasn't been
+      // populated yet (e.g., Light Mode or before first queue entry).
+      let capturedHistory: IncrementalRep[] | null = null;
 
-      if (currentIncRem && currentIncRem.history && currentIncRem.history.length > 0) {
-        pendingHistoryMap.set(data.remId, [...currentIncRem.history]); // Clone and store per remId
+      // Primary: read from session cache (immune to powerup removal timing)
+      const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+      const cachedIncRem = allIncRems.find(r => r.remId === data.remId);
+
+      if (cachedIncRem && cachedIncRem.history && cachedIncRem.history.length > 0) {
+        capturedHistory = [...cachedIncRem.history];
+      }
+
+      // Fallback: read directly from rem (works when powerup is still present)
+      const currentIncRem = !capturedHistory ? await getIncrementalRemFromRem(plugin, rem) : null;
+
+      if (!capturedHistory && currentIncRem && currentIncRem.history && currentIncRem.history.length > 0) {
+        capturedHistory = [...currentIncRem.history];
+      }
+
+      if (capturedHistory && capturedHistory.length > 0) {
+        pendingHistoryMap.set(data.remId, capturedHistory);
       }
 
       // Also capture nextRepDate for manual date reset detection
-      if (currentIncRem && currentIncRem.nextRepDate) {
-        if (!pendingNextRepDateMap.has(data.remId)) {
-          // Only set it the *first* time we see a change for this rem in this debounce window
-          // If we overwrite it on subsequent rapid changes (like during a review save),
-          // we lose the original starting date before the save began.
-          pendingNextRepDateMap.set(data.remId, currentIncRem.nextRepDate);
+      // (only relevant when powerup is still present, so direct rem read is fine)
+      if (!currentIncRem && !capturedHistory) {
+        // Skip nextRepDate capture — powerup is gone, this was a removal event
+      } else {
+        const incRemForDate = currentIncRem || (cachedIncRem as any);
+        if (incRemForDate && incRemForDate.nextRepDate) {
+          if (!pendingNextRepDateMap.has(data.remId)) {
+            pendingNextRepDateMap.set(data.remId, incRemForDate.nextRepDate);
+          }
         }
       }
 

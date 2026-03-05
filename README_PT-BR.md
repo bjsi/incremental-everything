@@ -71,8 +71,9 @@ Este README cobre o básico. Para os guias completos, visite o **Manual do Usuá
 
 ### Agendamento
 
-- O plugin usa um algoritmo de agendamento extremamente simples: `const newInterval = Math.ceil(multiplier ** Math.max(repHistory.length, 1));` onde o multiplicador é 1.5 por padrão.
-- Note que você pode definir manualmente a próxima data de repetição usando o comando **Reagendar** (**Ctrl+J**), ou os recursos de tabelas e propriedades do RemNote.
+- **Agendador Padrão**: Usa uma fórmula exponencial — `intervalo = ⌈Multiplicador ^ N⌉` dias (o multiplicador é 1.5 por padrão). Simples e eficaz para itens que precisam de poucas revisões.
+- **Agendador Beta (Curva de Saturação)**: Uma alternativa opcional onde os intervalos começam em um *Intervalo da Primeira Revisão* configurável (padrão 5 dias) e se aproximam gradualmente de um *Intervalo Máximo* (padrão 30 dias). Ideal para itens que precisam de muitas revisões (livros, capítulos). Consulte a página wiki [IncRem Scheduler](https://github.com/bjsi/incremental-everything/wiki/IncRem-Scheduler) para detalhes.
+- Você pode definir manualmente a próxima data de repetição usando o comando **Reagendar** (**Ctrl+J**), ou os recursos de tabelas e propriedades do RemNote.
 
 ### 📱 Suporte Móvel
 O plugin agora possui **Modo Leve Automático**.

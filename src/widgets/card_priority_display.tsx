@@ -20,7 +20,7 @@ import {
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
-import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, formatStabilityDays } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, formatStabilityDays, getRetrievabilityColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge } from '../components';
 import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
@@ -395,7 +395,7 @@ export function CardPriorityDisplay() {
                   {' · '}
                   S: <strong>{formatStabilityDays(fsrsState.s)}</strong>
                   {' · '}
-                  R: <strong style={{ color: fsrsState.r >= 0.9 ? 'var(--rn-clr-green, #22c55e)' : fsrsState.r >= 0.7 ? 'var(--rn-clr-yellow, #eab308)' : 'var(--rn-clr-red, #ef4444)' }}>
+                  R: <strong style={{ color: getRetrievabilityColor(fsrsState.r) }}>
                     {(fsrsState.r * 100).toFixed(1)}%
                   </strong>
                 </span>

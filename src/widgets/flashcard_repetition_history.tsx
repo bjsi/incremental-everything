@@ -10,9 +10,10 @@ import {
     WidgetLocation,
     QueueInteractionScore,
 } from '@remnote/plugin-sdk';
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { computeFSRSStatesPerReview, computeFSRSState, parseWeightsString, FSRSStepState } from '../lib/fsrs';
-import { formatStabilityDays } from '../lib/utils';
+import { formatStabilityDays, formatTimeAgo, getRetrievabilityColor } from '../lib/utils';
+import { safeRemTextToString } from '../lib/pdfUtils';
 import { displayFsrsDsrId, fsrsWeightsId } from '../lib/consts';
 
 function scoreLabel(score: QueueInteractionScore): string {
@@ -93,16 +94,25 @@ function FlashcardRepetitionHistory() {
             const card = await rp.card.findOne(cardId);
             if (card) cards = [card];
         }
+        let remName = '';
         if (cards.length === 0 && remId) {
             const rem = await rp.rem.findOne(remId);
             if (rem) {
                 cards = await rem.getCards();
+                remName = await safeRemTextToString(rp, rem.text);
+            }
+        } else if (cards.length > 0 && cards[0].remId) {
+            // If we found cards via cardId, fetch the parent rem to get its name
+            const rem = await rp.rem.findOne(cards[0].remId);
+            if (rem) {
+                remName = await safeRemTextToString(rp, rem.text);
             }
         }
 
         return {
             cardId,
             remId,
+            remName,
             cards: cards.map((c: any) => ({
                 _id: c._id,
                 type: c.type,
@@ -124,6 +134,16 @@ function FlashcardRepetitionHistory() {
         }));
     }, [data, fsrsWeightsRaw]);
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                plugin.widget.closePopup();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [plugin]);
+
     if (!data) {
         return (
             <div style={{ padding: 16, color: 'var(--rn-clr-content-secondary)', fontSize: 13 }}>
@@ -138,12 +158,43 @@ function FlashcardRepetitionHistory() {
                 📊 Flashcard Repetition History
             </h3>
             <div style={{ marginBottom: 8, color: 'var(--rn-clr-content-tertiary)', fontSize: 10 }}>
+                {data.remName && (
+                    <span title={data.remName}>
+                        <strong>{data.remName.length > 100 ? `${data.remName.substring(0, 100)}…` : data.remName}</strong> ·{' '}
+                    </span>
+                )}
                 Card ID: <code>{data.cardId || '—'}</code> · Rem ID: <code>{data.remId || '—'}</code>
             </div>
 
             {data.cards.map((card, ci) => {
                 const fsrs = fsrsData?.[ci];
                 const sortedHistory = [...card.history].sort((a: any, b: any) => a.date - b.date);
+
+                const gradeableReps = sortedHistory.filter((h: any) =>
+                    h.score === QueueInteractionScore.AGAIN ||
+                    h.score === QueueInteractionScore.HARD ||
+                    h.score === QueueInteractionScore.GOOD ||
+                    h.score === QueueInteractionScore.EASY
+                );
+                const totalMs = gradeableReps.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
+                const totalMinutes = Math.round(totalMs / 6000) / 10;
+
+                // --- Calculate Stale and Dates ---
+                const lastRep = sortedHistory.length > 0 ? sortedHistory[sortedHistory.length - 1] : null;
+                const lastPracticeDate = lastRep ? new Date(lastRep.date) : null;
+                const nextRepDate = card.nextRepetitionTime ? new Date(card.nextRepetitionTime) : null;
+
+                let isStale = false;
+                let staleDate: Date | null = null;
+                let nextIntervalMs: number | null = null;
+
+                if (lastRep && nextRepDate) {
+                    nextIntervalMs = nextRepDate.getTime() - lastRep.date;
+                    // Stale means overdue by more than twice the last interval.
+                    // This means passing: Scheduled Date + Last Interval = Last Practice Date + 2 * Last Interval
+                    staleDate = new Date(lastRep.date + 2 * nextIntervalMs);
+                    isStale = Date.now() > staleDate.getTime();
+                }
 
                 return (
                     <div key={card._id} style={{ marginBottom: 16 }}>
@@ -161,8 +212,71 @@ function FlashcardRepetitionHistory() {
                                 ? card.type.charAt(0).toUpperCase() + card.type.slice(1) + ' Card'
                                 : `Cloze Card (${card.type?.clozeId})`}
                             <span style={{ fontWeight: 400, marginLeft: 8, color: 'var(--rn-clr-content-tertiary)' }}>
-                                ({sortedHistory.length} reviews)
+                                ({sortedHistory.length} reviews, {totalMinutes} min)
                             </span>
+                            {isStale && (
+                                <span style={{
+                                    marginLeft: 8,
+                                    padding: '2px 6px',
+                                    backgroundColor: '#ef4444',
+                                    color: 'white',
+                                    borderRadius: 4,
+                                    fontSize: 10,
+                                    fontWeight: 'bold',
+                                    verticalAlign: 'text-top'
+                                }}>
+                                    STALE
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Dates summary */}
+                        <div style={{
+                            padding: '4px 8px',
+                            marginBottom: 4,
+                            fontSize: 11,
+                            color: 'var(--rn-clr-content-secondary)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px'
+                        }}>
+                            {nextRepDate && (
+                                <div>
+                                    <strong>Next repetition scheduled date:</strong> {nextRepDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}> ({formatTimeAgo(nextRepDate.getTime(), Date.now())})</span>
+                                </div>
+                            )}
+                            {lastPracticeDate && fsrs?.finalState?.s && (
+                                <div>
+                                    <strong
+                                        title="Based on the current FSRS memory models, this is the optimal date you should review things to achive 90% chance of recall. If it's different from the scheduled date, it's either because the original scheduler was not FSRS or had different weights set, or because of fuzz (randomness), load balancing, or RemNote's internal constraints."
+                                        style={{ cursor: 'help', textDecoration: 'underline dotted', textUnderlineOffset: '2px' }}
+                                    >Optimum Next repetition date:</strong> {new Date(lastPracticeDate.getTime() + fsrs.finalState.s * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}> ({formatTimeAgo(lastPracticeDate.getTime() + fsrs.finalState.s * 24 * 60 * 60 * 1000, Date.now())})</span>
+                                </div>
+                            )}
+                            {staleDate && (
+                                <div>
+                                    <strong>Date at which becomes stale:</strong> {staleDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}> ({formatTimeAgo(staleDate.getTime(), Date.now())})</span>
+                                </div>
+                            )}
+                            {lastPracticeDate && (
+                                <div>
+                                    <strong>Last practice date:</strong> {lastPracticeDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    <span style={{ color: 'var(--rn-clr-content-tertiary)' }}> ({formatTimeAgo(lastPracticeDate.getTime(), Date.now())})</span>
+                                </div>
+                            )}
+                            {nextIntervalMs !== null && (
+                                <div>
+                                    <strong>Current interval:</strong> {formatInterval(nextIntervalMs)}
+                                    {fsrs?.finalState?.s && (
+                                        <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                                            {' '}({Math.round((nextIntervalMs / (1000 * 60 * 60 * 24)) / fsrs.finalState.s * 100)}% of predicted Stability)
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* FSRS summary */}
@@ -173,12 +287,12 @@ function FlashcardRepetitionHistory() {
                                 fontSize: 11,
                                 color: 'var(--rn-clr-content-secondary)',
                             }}>
-                                <strong>D:</strong> {fsrs.finalState.d.toFixed(4)}
+                                <strong>D:</strong> {fsrs.finalState.d.toFixed(2)}
                                 {' · '}
-                                <strong>S:</strong> {fsrs.finalState.s.toFixed(2)}d{formatStabilityDays(fsrs.finalState.s) !== `${fsrs.finalState.s.toFixed(2)}d` ? ` (${formatStabilityDays(fsrs.finalState.s)})` : ''}
+                                <strong>S:</strong> {fsrs.finalState.s.toFixed(1)}d{formatStabilityDays(fsrs.finalState.s) !== `${fsrs.finalState.s.toFixed(2)}d` ? ` (${formatStabilityDays(fsrs.finalState.s)})` : ''}
                                 {' · '}
                                 <strong>R:</strong>{' '}
-                                <span style={{ color: fsrs.finalState.r >= 0.9 ? '#22c55e' : fsrs.finalState.r >= 0.7 ? '#eab308' : '#ef4444' }}>
+                                <span style={{ color: getRetrievabilityColor(fsrs.finalState.r) }}>
                                     {(fsrs.finalState.r * 100).toFixed(1)}%
                                 </span>
                                 {' · '}
@@ -245,7 +359,7 @@ function FlashcardRepetitionHistory() {
                                                     {scoreLabel(rep.score)}
                                                 </td>
                                                 <td style={{ ...cellStyle, textAlign: 'right' }}>
-                                                    {rep.responseTime != null ? `${(rep.responseTime / 1000).toFixed(1)}s` : '—'}
+                                                    {rep.responseTime != null ? `${(rep.responseTime / 1000).toFixed(0)}s` : '—'}
                                                 </td>
                                                 <td style={cellStyle}>
                                                     {rep.scheduled ? new Date(rep.scheduled).toLocaleDateString() : '—'}
@@ -265,7 +379,7 @@ function FlashcardRepetitionHistory() {
                                                 </td>
                                                 {showFsrsDsr && (
                                                     <td style={{ ...cellStyle, textAlign: 'right' }}>
-                                                        {stepState ? stepState.d.toFixed(2) : '—'}
+                                                        {stepState ? stepState.d.toFixed(1) : '—'}
                                                     </td>
                                                 )}
                                                 {showFsrsDsr && (
@@ -280,7 +394,7 @@ function FlashcardRepetitionHistory() {
                                                 {showFsrsDsr && (
                                                     <td style={{ ...cellStyle, textAlign: 'right' }}>
                                                         {stepState?.r != null ? (
-                                                            <span style={{ color: stepState.r >= 0.9 ? '#22c55e' : stepState.r >= 0.7 ? '#eab308' : '#ef4444' }}>
+                                                            <span style={{ color: getRetrievabilityColor(stepState.r) }}>
                                                                 {(stepState.r * 100).toFixed(1)}%
                                                             </span>
                                                         ) : '—'}

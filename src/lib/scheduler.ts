@@ -1,5 +1,13 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
-import { multiplierId, nextRepDateSlotCode, powerupCode, repHistorySlotCode } from './consts';
+import {
+  multiplierId,
+  nextRepDateSlotCode,
+  powerupCode,
+  repHistorySlotCode,
+  betaSchedulerEnabledId,
+  betaFirstReviewIntervalId,
+  betaMaxIntervalId,
+} from './consts';
 import { IncrementalRep } from './incremental_rem';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
@@ -102,6 +110,15 @@ export const getMultiplier = async (plugin: RNPlugin) => {
   return multiplier;
 };
 
+export const getBetaSchedulerSettings = async (plugin: RNPlugin) => {
+  const enabled = await plugin.settings.getSetting<boolean>(betaSchedulerEnabledId);
+  const firstReviewInterval =
+    (await plugin.settings.getSetting<number>(betaFirstReviewIntervalId)) || 5;
+  const maxInterval =
+    (await plugin.settings.getSetting<number>(betaMaxIntervalId)) || 30;
+  return { enabled: !!enabled, firstReviewInterval, maxInterval };
+};
+
 export const removeLastInteraction = (history: IncrementalRep[]): IncrementalRep[] => {
   if (history.length === 0) {
     return history;
@@ -122,7 +139,6 @@ export async function getNextSpacingDateForRem(
   if (!incrementalRemInfo) {
     return;
   }
-  const multiplier = await getMultiplier(plugin);
 
   const rawHistory = incrementalRemInfo.history || [];
   const cleansedHistory = _.pipe(
@@ -137,8 +153,22 @@ export async function getNextSpacingDateForRem(
   const sessionHistory = getRepsSinceLastMadeIncremental(cleansedHistory);
 
   // NOTE: if you change to use nextRepDate, you'll need to handle lookback mode
-  // it's a simple exponential, but shouldn't explode if you do a bunch of practice-all
-  const newInterval = Math.ceil(multiplier ** Math.max(sessionHistory.length + 1, 1));
+  const beta = await getBetaSchedulerSettings(plugin);
+  let newInterval: number;
+  if (beta.enabled) {
+    // Saturating curve: starts at firstReviewInterval, asymptotically approaches maxInterval
+    // k=4 controls how fast saturation happens (at review k+1 you're halfway)
+    const k = 4;
+    const N = Math.max(sessionHistory.length + 1, 1); // review number
+    newInterval = Math.ceil(
+      beta.firstReviewInterval +
+      (beta.maxInterval - beta.firstReviewInterval) * ((N - 1) / (N - 1 + k))
+    );
+  } else {
+    // Original exponential scheduler
+    const multiplier = await getMultiplier(plugin);
+    newInterval = Math.ceil(multiplier ** Math.max(sessionHistory.length + 1, 1));
+  }
   const newNextRepDate = Date.now() + newInterval * 1000 * 60 * 60 * 24;
 
   // Calculate if review was early/late and by how many days

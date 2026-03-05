@@ -71,8 +71,9 @@ Este README cubre lo básico. Para las guías completas, por favor visita el **M
 
 ### Programación
 
-- El complemento usa un algoritmo de programación extremadamente simple: `const newInterval = Math.ceil(multiplier ** Math.max(repHistory.length, 1));` donde el multiplicador es 1.5 por defecto.
-- Ten en cuenta que puedes establecer manualmente la próxima fecha de repetición usando el comando **Reprogramar** (**Ctrl+J**), o las funciones de tablas y propiedades de RemNote.
+- **Programador Predeterminado**: Usa una fórmula exponencial — `intervalo = ⌈Multiplicador ^ N⌉` días (el multiplicador es 1.5 por defecto). Simple y eficaz para elementos que necesitan pocas revisiones.
+- **Programador Beta (Curva de Saturación)**: Una alternativa opcional en la que los intervalos comienzan en un *Intervalo de Primera Revisión* configurable (por defecto 5 días) y se acercan gradualmente a un *Intervalo Máximo* (por defecto 30 días). Ideal para elementos que necesitan muchas revisiones (libros, capítulos). Consulta la página wiki [IncRem Scheduler](https://github.com/bjsi/incremental-everything/wiki/IncRem-Scheduler) para más detalles.
+- Puedes establecer manualmente la próxima fecha de repetición usando el comando **Reprogramar** (**Ctrl+J**), o las funciones de tablas y propiedades de RemNote.
 
 ### 📱 Soporte Móvil
 El complemento ahora cuenta con **Modo Ligero Automático**.

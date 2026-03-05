@@ -237,6 +237,38 @@ export function timeSince(date: Date) {
 }
 
 /**
+ * Format a relative time based on date passing.
+ */
+export function formatTimeAgo(timestampMs: number, nowMs: number = Date.now()): string {
+  const isFuture = timestampMs > nowMs;
+  const diffMs = Math.abs(timestampMs - nowMs);
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffMonths = Math.floor(diffDays / 30.436875); /* Average days per month */
+  const diffYears = Math.floor(diffDays / 365.25);
+
+  let formatted = '';
+
+  if (diffYears > 0) {
+    formatted = `${diffYears} year${diffYears > 1 ? 's' : ''}`;
+  } else if (diffMonths > 0) {
+    formatted = `${diffMonths} month${diffMonths > 1 ? 's' : ''}`;
+  } else if (diffDays > 0) {
+    formatted = `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+  } else if (diffHours > 0) {
+    formatted = `${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+  } else if (diffMinutes > 0) {
+    formatted = `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
+  } else {
+    formatted = `${diffSeconds} second${diffSeconds !== 1 ? 's' : ''}`;
+  }
+
+  return isFuture ? `in ${formatted}` : `${formatted} ago`;
+}
+
+/**
  * Format FSRS stability (in days) as a friendly human-readable string.
  * Examples: 0.3d, 5d, 3.5m, 2y, 1.2y
  */
@@ -244,4 +276,17 @@ export function formatStabilityDays(days: number): string {
   if (days < 30) return `${days.toFixed(1)}d`;
   if (days < 365) return `${(days / 30.44).toFixed(1)}m`;
   return `${(days / 365.25).toFixed(1)}y`;
+}
+
+/**
+ * Converts a retrievability score (0-1) into an HSL color string gradient.
+ * 100% maps to green (~120 deg).
+ * 70% maps to red (0 deg).
+ * Below 70% remains red.
+ */
+export function getRetrievabilityColor(r: number): string {
+  if (r <= 0.70) return 'var(--rn-clr-red, #ef4444)';
+  const clampedR = Math.min(1.0, r);
+  const hue = Math.round(((clampedR - 0.70) / 0.30) * 120);
+  return `hsl(${hue}, 80%, 45%)`;
 }
