@@ -8,6 +8,7 @@ import { CardPriorityInfo } from '../lib/card_priority';
 import { extractText, determineIncRemType, getTotalTimeSpent, getTopLevelDocument, getBreadcrumbText } from '../lib/incRemHelpers';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
+import { getSortingRandomness } from '../lib/sorting';
 import { IncRemTable, IncRemWithDetails, DocumentInfo } from '../components';
 import type { IncRemListState } from '../components';
 import { buildDocumentScope } from '../lib/scope_helpers';
@@ -78,7 +79,7 @@ export function IncRemMainView() {
   const [stateCheckDone, setStateCheckDone] = useState(false);
   const initialStateLoaded = useRef(false);
 
-  useTrackerPlugin(
+  const initialData = useTrackerPlugin(
     async (rp) => {
       if (initialStateLoaded.current) return null;
       initialStateLoaded.current = true;
@@ -95,8 +96,11 @@ export function IncRemMainView() {
         setFilteredByDocument(scope);
         await rp.storage.setSession(INC_REM_MAIN_VIEW_DOC_FILTER_KEY, undefined);
       }
+
+      const randomness = await getSortingRandomness(rp as any);
+
       setStateCheckDone(true);
-      return null;
+      return { randomness };
     },
     []
   );
@@ -234,7 +238,7 @@ export function IncRemMainView() {
     await plugin.app.toast(`Priority updated to ${newPriority}`);
   };
 
-  const handleReviewAndOpen = async (remId: string) => {
+  const handleReviewAndOpen = async (remId: string, subsequentRemIds?: string[]) => {
     const rem = await plugin.rem.findOne(remId);
     if (!rem) return;
 
@@ -245,6 +249,13 @@ export function IncRemMainView() {
     // Also store the document filter (exclusive to main view)
     if (selectedDocumentId) {
       await plugin.storage.setSession(INC_REM_MAIN_VIEW_DOC_FILTER_KEY, selectedDocumentId);
+    }
+
+    // Store the subsequent queue list for sequential review
+    if (subsequentRemIds) {
+      await plugin.storage.setSession('editor-review-timer-queue-list', subsequentRemIds);
+    } else {
+      await plugin.storage.setSession('editor-review-timer-queue-list', undefined);
     }
 
     // Compute the scheduler's suggested interval (like editor_review does)
@@ -433,6 +444,7 @@ export function IncRemMainView() {
             onReviewAndOpen={handleReviewAndOpen}
             initialState={initialState}
             onStateChange={handleStateChange}
+            sortingRandomness={initialData?.randomness ?? 0}
           />
         )}
       </div>

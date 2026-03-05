@@ -14,6 +14,7 @@ import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { safeRemTextToString, findPDFinRem, getIncrementalReadingPosition, addPageToHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
+import { addToIncrementalHistory } from '../lib/history_utils';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 
@@ -66,6 +67,7 @@ async function handleEditorReview(
   ];
 
   await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
+  await addToIncrementalHistory(plugin, remId);
 
   const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
   if (updatedIncRem) {

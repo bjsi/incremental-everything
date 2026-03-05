@@ -8,6 +8,7 @@ import { buildDocumentScope } from '../lib/scope_helpers';
 import { extractText, determineIncRemType, getTotalTimeSpent, getBreadcrumbText } from '../lib/incRemHelpers';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { getNextSpacingDateForRem } from '../lib/scheduler';
+import { getSortingRandomness } from '../lib/sorting';
 import { IncRemTable, IncRemWithDetails } from '../components';
 import type { IncRemListState } from '../components';
 import '../style.css';
@@ -33,7 +34,7 @@ export function IncRemList() {
   const initialStateLoaded = useRef(false);
 
   // Load initial state from session on first render
-  useTrackerPlugin(
+  const initialData = useTrackerPlugin(
     async (rp) => {
       if (initialStateLoaded.current) return null;
       initialStateLoaded.current = true;
@@ -43,8 +44,11 @@ export function IncRemList() {
         // Clear it so it doesn't persist for future opens
         await rp.storage.setSession(INC_REM_LIST_STATE_KEY, undefined);
       }
+
+      const randomness = await getSortingRandomness(rp as any);
+
       setStateCheckDone(true);
-      return null;
+      return { randomness };
     },
     []
   );
@@ -195,13 +199,20 @@ export function IncRemList() {
     await plugin.app.toast(`Priority updated to ${newPriority}`);
   };
 
-  const handleReviewAndOpen = async (remId: string) => {
+  const handleReviewAndOpen = async (remId: string, subsequentRemIds?: string[]) => {
     const rem = await plugin.rem.findOne(remId);
     if (!rem) return;
 
     // Store the current list state so the timer can reopen with the same filters/sorting
     if (currentListState.current) {
       await plugin.storage.setSession(INC_REM_LIST_STATE_KEY, currentListState.current);
+    }
+
+    // Store the subsequent queue list for sequential review
+    if (subsequentRemIds) {
+      await plugin.storage.setSession('editor-review-timer-queue-list', subsequentRemIds);
+    } else {
+      await plugin.storage.setSession('editor-review-timer-queue-list', undefined);
     }
 
     // Compute the scheduler's suggested interval (like editor_review does)
@@ -259,6 +270,7 @@ export function IncRemList() {
       onReviewAndOpen={handleReviewAndOpen}
       initialState={initialState}
       onStateChange={handleStateChange}
+      sortingRandomness={initialData?.randomness ?? 0}
     />
   );
 }

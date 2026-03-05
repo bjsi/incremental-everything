@@ -6,11 +6,12 @@ import {
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { updateSRSDataForRem } from '../lib/scheduler';
+import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, currentSubQueueIdKey, remnoteEnvironmentId, pageRangeWidgetId } from '../lib/consts';
+import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
-import { findPDFinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory } from '../lib/pdfUtils';
+import { findPDFinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, safeRemTextToString } from '../lib/pdfUtils';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import dayjs from 'dayjs';
@@ -35,6 +36,7 @@ function EditorReviewTimer() {
       const remName = await rp.storage.getSession<string>('editor-review-timer-rem-name');
       const fromQueue = await rp.storage.getSession<boolean>('editor-review-timer-from-queue');
       const origin = await rp.storage.getSession<string>('editor-review-timer-origin');
+      const queueList = await rp.storage.getSession<string[]>('editor-review-timer-queue-list');
 
       return {
         remId,
@@ -44,6 +46,7 @@ function EditorReviewTimer() {
         remName: remName || 'Unnamed Rem',
         fromQueue,
         origin: origin || (fromQueue ? 'queue' : 'editor'),
+        queueList: queueList || [],
       };
     },
     []
@@ -126,6 +129,7 @@ function EditorReviewTimer() {
       }
 
       await updateSRSDataForRem(plugin, timerData.remId, incRem.nextRepDate, updatedHistory);
+      await addToIncrementalHistory(plugin, timerData.remId);
       await plugin.app.toast(`✓ ${timerData.remName}: Repetition updated (${timeDisplay})`);
     } else {
       // Mode 2: Started from Editor command. We need to create the repetition right now.
@@ -153,6 +157,7 @@ function EditorReviewTimer() {
       ];
 
       await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
+      await addToIncrementalHistory(plugin, timerData.remId);
       const dateStr = dayjs(newNextRepDate).format('MMMM D, YYYY');
       await plugin.app.toast(`✓ ${timerData.remName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
     }
@@ -197,6 +202,104 @@ function EditorReviewTimer() {
     }
   };
 
+  const handleNextReview = async () => {
+    if (!timerData || timerData.queueList.length === 0) return;
+
+    // 1. First, save the repetition for the CURRENT item (matching handleEndReview Mode 2 logic)
+    const currentRem = await plugin.rem.findOne(timerData.remId);
+    if (!currentRem) {
+      await plugin.app.toast('Error: Current Rem not found');
+      return;
+    }
+
+    const currentIncRem = await getIncrementalRemFromRem(plugin, currentRem);
+    if (!currentIncRem) {
+      await plugin.app.toast('Error: Not an Incremental Rem');
+      return;
+    }
+
+    // Update priority if changed
+    if (timerData.priority !== undefined && timerData.priority !== null) {
+      await currentRem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+    }
+
+    // Calculate review time and sync PDF page
+    const reviewTimeSeconds = Math.round(elapsedMs / 1000);
+    if (isPdfNote && pdfRemId) {
+      await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
+    }
+
+    // Always create a new repetition, just like Mode 2
+    const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
+    const scheduledDate = currentIncRem.nextRepDate;
+    const actualDate = Date.now();
+    const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+    const wasEarly = daysDifference < 0;
+    const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+
+    const newHistory: IncrementalRep[] = [
+      ...(currentIncRem.history || []),
+      {
+        date: actualDate,
+        scheduled: scheduledDate,
+        interval: timerData.interval || 0,
+        wasEarly: wasEarly,
+        daysEarlyOrLate: daysEarlyOrLate,
+        reviewTimeSeconds: reviewTimeSeconds,
+        priority: currentIncRem.priority,
+        eventType: 'executeRepetition' as const,
+      },
+    ];
+
+    await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
+    await addToIncrementalHistory(plugin, timerData.remId);
+
+    // Update cache
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, currentRem);
+    if (updatedIncRem) {
+      await updateIncrementalRemCache(plugin, updatedIncRem);
+    }
+
+    // 2. Setup next item in queue
+    const nextRemId = timerData.queueList[0];
+    const newQueueList = timerData.queueList.slice(1);
+
+    const nextRem = await plugin.rem.findOne(nextRemId);
+    if (!nextRem) {
+      await plugin.app.toast(`Next Rem not found. Queue has ${newQueueList.length} items left.`);
+      // Update queue list so we can try the next one if the user clicks again
+      await plugin.storage.setSession('editor-review-timer-queue-list', newQueueList);
+      return;
+    }
+
+    // Calculate interval for the next rem
+    const nextIncRemInfo = await getIncrementalRemFromRem(plugin, nextRem);
+    const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+    const scheduleData = await getNextSpacingDateForRem(plugin, nextRemId, inLookbackMode);
+    const nextInterval = scheduleData?.newInterval || 1;
+    const nextRemName = await safeRemTextToString(plugin, nextRem.text);
+
+    // 3. Update all session storage keys
+    await plugin.storage.setSession('editor-review-timer-rem-id', nextRemId);
+    await plugin.storage.setSession('editor-review-timer-start', Date.now()); // Reset start time
+    await plugin.storage.setSession('editor-review-timer-interval', nextInterval);
+    await plugin.storage.setSession('editor-review-timer-priority', nextIncRemInfo?.priority ?? 10);
+    await plugin.storage.setSession('editor-review-timer-rem-name', nextRemName || 'Unnamed Rem');
+    await plugin.storage.setSession('editor-review-timer-queue-list', newQueueList);
+
+    await plugin.app.toast(`✓ Saved: ${timerData.remName}. Starting: ${nextRemName}`);
+
+    // 4. Open the next rem
+    const nextIncRemType = await determineIncRemType(plugin, nextRem);
+    if (nextIncRemType === 'pdf-note') {
+      await nextRem.openRemAsPage();
+    } else {
+      await plugin.window.openRem(nextRem);
+    }
+
+    // The widget will automatically refresh due to useTrackerPlugin dependency changes
+  };
+
   const handleGoToRem = async () => {
     if (!timerData) return;
 
@@ -227,6 +330,7 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('inc-rem-list-state', undefined);
     await plugin.storage.setSession('inc-rem-main-view-state', undefined);
     await plugin.storage.setSession('inc-rem-main-view-doc-filter', undefined);
+    await plugin.storage.setSession('editor-review-timer-queue-list', undefined);
 
     await plugin.app.toast('Timer cancelled');
   };
@@ -287,10 +391,10 @@ function EditorReviewTimer() {
       )}
 
       <div style={{ display: 'flex', gap: '8px' }}>
-        {/* "Back to..." button — shown when origin is queue or inc-rem-list/main-view */}
-        {(timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
+        {/* "Next" button — shown sequentially when queue list has items */}
+        {timerData.queueList && timerData.queueList.length > 0 && (
           <button
-            onClick={() => handleEndReview(true)}
+            onClick={handleNextReview}
             style={{
               padding: '6px 14px',
               fontSize: '13px',
@@ -306,6 +410,33 @@ function EditorReviewTimer() {
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = '#10b981';
+            }}
+            title={`Save & move to next item (${timerData.queueList.length} left)`}
+            autoFocus
+          >
+            Next ({timerData.queueList.length}) →
+          </button>
+        )}
+
+        {/* "Back to..." button — shown when origin is queue or inc-rem-list/main-view */}
+        {(timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
+          <button
+            onClick={() => handleEndReview(true)}
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              backgroundColor: timerData.queueList && timerData.queueList.length > 0 ? '#6b7280' : '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = timerData.queueList && timerData.queueList.length > 0 ? '#4b5563' : '#059669';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = timerData.queueList && timerData.queueList.length > 0 ? '#6b7280' : '#10b981';
             }}
           >
             ✓ {timerData.origin === 'queue'
