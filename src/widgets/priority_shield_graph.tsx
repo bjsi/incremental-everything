@@ -615,9 +615,14 @@ function PriorityShieldGraph() {
         )}
 
         <p className="mb-3">
-          <b>Universe Size (dashed line):</b> Shows the total number of <b>IncRems</b> or <b>Rems with Cards</b> in the respective scope. When this number decreases, it often indicates successful processing and removal of items (e.g., removing the Incremental tag after processing). This explains why priority percentiles might suddenly change - a smaller universe means each remaining item represents a larger percentage of the whole.
-          <br></br>
-          <i>Note:</i> The universe shown in the <b>Card Shield</b> is total number of <b>Rems with Cards</b>, which is <i>different</i> from the total number of <b>flashcards</b> shown in other RemNote UI (remember that a Rem can have several flashcards!). `cardPriority` powerup (and its priority) is assigned per rem, not per flashcard. The total number of flashcards is larger them the universe shown here.
+          <b>Universe Size:</b> This metric is represented differently depending on the graph type:
+          <ul className="list-disc pl-5 mt-1">
+            <li><b>For Incremental Rems:</b> The chart tracks your processing lifecycle using three layered components:<br />
+              - <b>Total Universe (Black dashed line):</b> The absolute maximum volume of material you have managed in this scope (Active + Dismissed).<br />
+              - <b>Active Universe (Green line):</b> The physical volume of IncRems currently in your queue awaiting review.<br />
+              - <b>Dismissed Area (Yellow shading):</b> The accumulated volume of material you have permanently marked with the `dismissed` powerup. The wider this area gets, the more backlog you've cleared!</li>
+            <li><b>For Cards:</b> It shows the <b>Universe Size (Dashed line)</b>, which is the total number of Rems with Cards. <i>Note:</i> The universe shown in the Card Shield is the number of <i>Rems</i> with cards, which is different from the total number of <i>flashcards</i> shown in other RemNote UI (since a single Rem can generate several flashcards). The `cardPriority` powerup is assigned per rem, not per individual flashcard.</li>
+          </ul>
         </p>
 
         <p className="mb-3">
@@ -633,7 +638,12 @@ function PriorityShieldGraph() {
 
         <p>
           <b>Understanding Universe Size Changes:</b> <br></br>
-          For <b>Incremental Rems</b>, when the universe size drops, it typically means you're successfully processing items and removing them from the queue. Conversely, when universe size increases, new IncRems are being added to your learning queue (increasing your to-do list of material to process), which may affect priority percentiles even if absolute priorities remain the same.
+          For <b>Incremental Rems</b>, tracking the visual layers paints a clear picture of your workflow:
+          <ul className="list-disc pl-5 mt-1">
+            <li>If the <b>Active Universe (Green)</b> drops but the <b>Total Universe (Black)</b> remains steady and the <b>Dismissed Area (Yellow)</b> expands, you are efficiently processing and dismissing items faster than you add them!</li>
+            <li>If the <b>Active Universe (Green)</b> climbs while the <b>Dismissed Area (Yellow)</b> stays flat, you are continuously adding new IncRems without clearing older ones. This influx automatically lowers your priority shield percentiles, as each item is now a smaller percentage of a larger workload.</li>
+            <li>If the <b>Total Universe (Black)</b> drops natively, it means you have physically structurally deleted IncRems from your Knowledge Base, or fully removed the `Incremental` tag spanning outside the `Dismissed` review queue standard logic.</li>
+          </ul>
           <br></br>
           For <b>Flashcards</b>, this number will usually only increase (unless you delete cards). The evolution will show you the size of your knowledge (considering you keep control of your due cards).
         </p>
