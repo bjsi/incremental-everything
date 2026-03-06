@@ -1,6 +1,7 @@
 import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote/plugin-sdk';
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -23,6 +24,7 @@ interface ShieldHistoryEntry {
   absolute: number | null;
   percentile: number | null;
   universeSize?: number; // NEW: Track the total count of items in scope
+  dismissedCount?: number;
 }
 
 interface ChartData {
@@ -30,6 +32,9 @@ interface ChartData {
   absolute: number | null;
   relative: number | null;
   universeSize: number; // NEW: Universe size for the chart
+  dismissedCount?: number;
+  totalUniverse?: number;
+  processingPercentage?: number;
 }
 
 function PriorityShieldGraph() {
@@ -40,6 +45,7 @@ function PriorityShieldGraph() {
     endIndex: number | null;
     refAreaLeft: string | null;
     refAreaRight: string | null;
+    autoFit?: boolean;
   }>>({});
 
   const getZState = (title: string) => {
@@ -48,6 +54,7 @@ function PriorityShieldGraph() {
       endIndex: null,
       refAreaLeft: null,
       refAreaRight: null,
+      autoFit: false,
     };
   };
 
@@ -75,17 +82,33 @@ function PriorityShieldGraph() {
   const documentName = useRunAsync(async () => {
     if (!effectiveDocScopeId) return null;
     const rem = await plugin.rem.findOne(effectiveDocScopeId);
-    return rem?.text?.join('') || 'Document';
+    if (!rem?.text) return 'Document';
+    return await plugin.richText.toString(rem.text) || 'Document';
   }, [effectiveDocScopeId]);
 
   const processHistoryData = (history: Record<string, ShieldHistoryEntry> | undefined) => {
     if (!history) return [];
-    const unsortedData = Object.entries(history).map(([date, values]) => ({
-      date: date,
-      absolute: values.absolute,
-      relative: values.percentile,
-      universeSize: values.universeSize || 0, // NEW: Include universe size with default
-    }));
+    const unsortedData = Object.entries(history).map(([date, values]) => {
+      const universeSize = values.universeSize || 0;
+      const isIncRem = 'dismissedCount' in values;
+
+      const item: any = {
+        date: date,
+        absolute: values.absolute,
+        relative: values.percentile,
+        universeSize: universeSize,
+      };
+
+      if (isIncRem) {
+        const dismissedCount = values.dismissedCount || 0;
+        const totalUniverse = universeSize + dismissedCount;
+        item.dismissedCount = dismissedCount;
+        item.totalUniverse = totalUniverse;
+        item.processingPercentage = totalUniverse > 0 ? (dismissedCount / totalUniverse) * 100 : 0;
+      }
+      return item;
+    });
+
     const sortedData = unsortedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return sortedData.map(item => ({
       ...item,
@@ -224,25 +247,40 @@ function PriorityShieldGraph() {
   // Custom tooltip to show all three values clearly
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0]?.payload;
+      const isIncRem = data && 'dismissedCount' in data;
+
       return (
-        <div className="bg-white p-2 border border-gray-300 rounded shadow">
-          <p className="font-semibold">{`Date: ${label}`}</p>
+        <div className="bg-white p-2 border border-gray-300 rounded shadow text-sm tooltip-container">
+          <p className="font-semibold mb-1">{`Date: ${label}`}</p>
           {payload.map((entry: any, index: number) => {
-            if (entry.dataKey === 'universeSize') {
+            if (entry.dataKey === 'absolute' || entry.dataKey === 'relative') {
+              return (
+                <p key={index} style={{ color: entry.color }}>
+                  {`${entry.name}: ${entry.value !== null ?
+                    (entry.dataKey === 'relative' ? `${entry.value}%` : entry.value)
+                    : 'N/A'}`}
+                </p>
+              );
+            }
+            if (!isIncRem && entry.dataKey === 'universeSize') {
               return (
                 <p key={index} style={{ color: entry.color }}>
                   {`${entry.name}: ${entry.value.toLocaleString()}`}
                 </p>
               );
             }
-            return (
-              <p key={index} style={{ color: entry.color }}>
-                {`${entry.name}: ${entry.value !== null ?
-                  (entry.dataKey === 'relative' ? `${entry.value}%` : entry.value)
-                  : 'N/A'}`}
-              </p>
-            );
+            return null;
           })}
+
+          {isIncRem && data && (
+            <div className="mt-1 pt-1 border-t border-gray-100">
+              <p style={{ color: '#10b981' }}>{`Universe of Incremental Rems: ${(data.universeSize || 0).toLocaleString()}`}</p>
+              <p style={{ color: '#d97706' }}>{`Universe of Dismissed Rems: ${(data.dismissedCount || 0).toLocaleString()}`}</p>
+              <p style={{ color: '#333' }} className="font-medium">{`Total Universe: ${(data.totalUniverse || 0).toLocaleString()}`}</p>
+              <p className="text-[11px] text-gray-500 mt-1 uppercase tracking-wider">{`Processing: ${data.processingPercentage ? data.processingPercentage.toFixed(1) : 0}%`}</p>
+            </div>
+          )}
         </div>
       );
     }
@@ -250,6 +288,7 @@ function PriorityShieldGraph() {
   };
 
   const renderChart = (data: ChartData[], title: string, color1: string, color2: string, color3: string) => {
+    const isIncRemChart = title.includes('IncRem');
     const zState = getZState(title);
 
     const zoomOut = () => {
@@ -311,8 +350,41 @@ function PriorityShieldGraph() {
     }
 
     // Find the maximum universe size for better y-axis scaling based on visible data
-    const maxUniverse = Math.max(...displayData.map(d => d.universeSize || 0));
+    const maxUniverse = Math.max(...displayData.map(d => isIncRemChart && d.totalUniverse !== undefined ? d.totalUniverse : (d.universeSize || 0)));
     const universeAxisMax = Math.ceil(maxUniverse * 1.1) || 10; // Add 10% padding
+
+    let absoluteMin = 0;
+    let absoluteMax = 100;
+    let relativeMin = 0;
+    let relativeMax = 100;
+
+    if (zState.autoFit && displayData.length > 0) {
+      const absValues = displayData.map(d => d.absolute).filter((v): v is number => v !== null);
+      const relValues = displayData.map(d => d.relative).filter((v): v is number => v !== null);
+
+      const allValues = [...absValues, ...relValues];
+
+      if (allValues.length > 0) {
+        const globalMin = Math.max(0, Math.floor(Math.min(...allValues) - 5));
+        let globalMax = Math.min(100, Math.ceil(Math.max(...allValues) + 5));
+
+        if (globalMax === globalMin) {
+          globalMax = Math.min(100, globalMax + 5);
+        }
+
+        absoluteMin = globalMin;
+        absoluteMax = globalMax;
+        relativeMin = globalMin;
+        relativeMax = globalMax;
+      }
+    }
+
+    const toggleAutoFit = () => {
+      setZoomState(prev => ({
+        ...prev,
+        [title]: { ...getZState(title), autoFit: !getZState(title).autoFit }
+      }));
+    };
 
     return (
       <div
@@ -320,19 +392,30 @@ function PriorityShieldGraph() {
         style={{ userSelect: 'none' }}
         onDragStart={(e) => e.preventDefault()}
       >
-        <h4 className="text-md font-semibold text-center mb-2">{title}</h4>
+        <h4 className="text-md font-semibold text-center mb-2 mt-2">{title}</h4>
 
-        {zState.startIndex !== null && (
+        <div className="absolute top-0 right-4 flex gap-2 z-10 justify-end items-center pointer-events-auto w-max" style={{ top: '6px' }}>
           <button
-            className="absolute top-0 right-4 p-1 text-xs border rounded bg-white hover:bg-gray-100 shadow-sm z-10 rn-clr-content-primary"
-            onClick={zoomOut}
+            className="rn-button rn-button--secondary shadow-sm relative"
+            style={{ margin: 0, fontSize: '11px', minHeight: '22px', padding: '0 8px' }}
+            onClick={toggleAutoFit}
           >
-            Reset Zoom
+            {zState.autoFit ? 'Reset Y-Axis' : 'Optimize Priorities Zoom'}
           </button>
-        )}
+
+          {zState.startIndex !== null && (
+            <button
+              className="rn-button rn-button--secondary shadow-sm relative"
+              style={{ margin: 0, fontSize: '11px', minHeight: '22px', padding: '0 8px' }}
+              onClick={zoomOut}
+            >
+              Reset Data Range
+            </button>
+          )}
+        </div>
 
         <ResponsiveContainer width="100%" height={300} debounce={50}>
-          <LineChart
+          <ComposedChart
             data={displayData}
             margin={{ top: 5, right: 50, left: 10, bottom: 5 }}
             onMouseDown={(e: any) => {
@@ -367,7 +450,7 @@ function PriorityShieldGraph() {
               yAxisId="left"
               orientation="left"
               stroke={color1}
-              domain={[0, 100]}
+              domain={[absoluteMin, absoluteMax]}
               allowDataOverflow
               width={30}
             />
@@ -377,7 +460,7 @@ function PriorityShieldGraph() {
               yAxisId="middle"
               orientation="right"
               stroke={color2}
-              domain={[0, 100]}
+              domain={[relativeMin, relativeMax]}
               allowDataOverflow
               tickFormatter={(tick) => `${tick}%`}
               width={60}
@@ -420,17 +503,45 @@ function PriorityShieldGraph() {
               dot={{ r: 3 }}
             />
 
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="universeSize"
-              name="Universe Size"
-              stroke={color3}
-              strokeWidth={2}
-              strokeDasharray="5 5" // Dashed line to differentiate
-              dot={{ r: 3 }}
-              animationDuration={300}
-            />
+            {isIncRemChart ? (
+              <>
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="universeSize"
+                  name="Universe Size (IncRems)"
+                  stackId="1"
+                  stroke="#10b981"
+                  fill="transparent"
+                  strokeWidth={2}
+                  animationDuration={300}
+                />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="dismissedCount"
+                  name="Dismissed Rems"
+                  stackId="1"
+                  stroke="#333"
+                  fill="rgba(250, 204, 21, 0.4)"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  animationDuration={300}
+                />
+              </>
+            ) : (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="universeSize"
+                name="Universe Size"
+                stroke={color3}
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={{ r: 3 }}
+                animationDuration={300}
+              />
+            )}
 
             {zState.refAreaLeft && zState.refAreaRight ? (
               <ReferenceArea
@@ -441,7 +552,7 @@ function PriorityShieldGraph() {
                 fill="#8884d8"
               />
             ) : null}
-          </LineChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
     );
@@ -490,7 +601,7 @@ function PriorityShieldGraph() {
 
       <div className="mt-4 text-sm rn-clr-content-secondary text-justify">
         <p className="mb-3">
-          <b>Graph Controls:</b> Click and drag on any graph to zoom into a specific period. A "Reset Zoom" button will appear in the top-right corner to return to the full view.
+          <b>Graph Controls:</b> Click and drag on any graph to zoom into a specific period. Use the "Optimize Priorities Zoom" button to perfectly frame the vertical priority lines within your zoomed date range. A "Reset" button will appear in the top-right corner to return to the full view.
         </p>
 
         <p className="mb-3">
@@ -504,9 +615,14 @@ function PriorityShieldGraph() {
         )}
 
         <p className="mb-3">
-          <b>Universe Size (dashed line):</b> Shows the total number of <b>IncRems</b> or <b>Rems with Cards</b> in the respective scope. When this number decreases, it often indicates successful processing and removal of items (e.g., removing the Incremental tag after processing). This explains why priority percentiles might suddenly change - a smaller universe means each remaining item represents a larger percentage of the whole.
-          <br></br>
-          <i>Note:</i> The universe shown in the <b>Card Shield</b> is total number of <b>Rems with Cards</b>, which is <i>different</i> from the total number of <b>flashcards</b> shown in other RemNote UI (remember that a Rem can have several flashcards!). `cardPriority` powerup (and its priority) is assigned per rem, not per flashcard. The total number of flashcards is larger them the universe shown here.
+          <b>Universe Size:</b> This metric is represented differently depending on the graph type:
+          <ul className="list-disc pl-5 mt-1">
+            <li><b>For Incremental Rems:</b> The chart tracks your processing lifecycle using three layered components:<br />
+              - <b>Total Universe (Black dashed line):</b> The absolute maximum volume of material you have managed in this scope (Active + Dismissed).<br />
+              - <b>Active Universe (Green line):</b> The physical volume of IncRems currently in your queue awaiting review.<br />
+              - <b>Dismissed Area (Yellow shading):</b> The accumulated volume of material you have permanently marked with the `dismissed` powerup. The wider this area gets, the more backlog you've cleared!</li>
+            <li><b>For Cards:</b> It shows the <b>Universe Size (Dashed line)</b>, which is the total number of Rems with Cards. <i>Note:</i> The universe shown in the Card Shield is the number of <i>Rems</i> with cards, which is different from the total number of <i>flashcards</i> shown in other RemNote UI (since a single Rem can generate several flashcards). The `cardPriority` powerup is assigned per rem, not per individual flashcard.</li>
+          </ul>
         </p>
 
         <p className="mb-3">
@@ -522,7 +638,12 @@ function PriorityShieldGraph() {
 
         <p>
           <b>Understanding Universe Size Changes:</b> <br></br>
-          For <b>Incremental Rems</b>, when the universe size drops, it typically means you're successfully processing items and removing them from the queue. Conversely, when universe size increases, new IncRems are being added to your learning queue (increasing your to-do list of material to process), which may affect priority percentiles even if absolute priorities remain the same.
+          For <b>Incremental Rems</b>, tracking the visual layers paints a clear picture of your workflow:
+          <ul className="list-disc pl-5 mt-1">
+            <li>If the <b>Active Universe (Green)</b> drops but the <b>Total Universe (Black)</b> remains steady and the <b>Dismissed Area (Yellow)</b> expands, you are efficiently processing and dismissing items faster than you add them!</li>
+            <li>If the <b>Active Universe (Green)</b> climbs while the <b>Dismissed Area (Yellow)</b> stays flat, you are continuously adding new IncRems without clearing older ones. This influx automatically lowers your priority shield percentiles, as each item is now a smaller percentage of a larger workload.</li>
+            <li>If the <b>Total Universe (Black)</b> drops natively, it means you have physically structurally deleted IncRems from your Knowledge Base, or fully removed the `Incremental` tag spanning outside the `Dismissed` review queue standard logic.</li>
+          </ul>
           <br></br>
           For <b>Flashcards</b>, this number will usually only increase (unless you delete cards). The evolution will show you the size of your knowledge (considering you keep control of your due cards).
         </p>

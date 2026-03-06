@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { renderWidget, usePlugin, WidgetLocation, useRunAsync, PluginRem } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, WidgetLocation, useRunAsync, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
@@ -25,7 +25,7 @@ interface NodeStats {
     childrenIds: string[]; // IDs of direct children
 
     // For display
-    remName: string;
+    remText: any;
 }
 
 interface TreeData {
@@ -200,8 +200,14 @@ const TreeNode = ({
     data: TreeData,
     depth?: number
 }) => {
+    const plugin = usePlugin();
     const [expanded, setExpanded] = useState(false);
     const node = data.nodes[nodeId];
+
+    const remName = useRunAsync(async () => {
+        if (!node) return 'Untitled';
+        return await safeRemTextToString(plugin, node.remText) || 'Untitled';
+    }, [node?.remText]) || 'Loading...';
 
     if (!node) return null;
 
@@ -247,7 +253,7 @@ const TreeNode = ({
                     <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {node.isIncremental && <span style={{ color: 'var(--rn-clr-green, #22c55e)', marginRight: '4px' }}>●</span>}
                         {node.isDismissed && <span style={{ color: 'var(--rn-clr-orange, #f59e0b)', marginRight: '4px' }}>●</span>}
-                        {node.remName}
+                        {remName}
                     </div>
 
                     <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', minWidth: '40px', textAlign: 'right' }}>
@@ -255,6 +261,36 @@ const TreeNode = ({
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', minWidth: '50px', textAlign: 'right' }}>
                         {node.aggrTime > 0 ? formatDuration(node.aggrTime) : ''}
+                    </div>
+                    <div
+                        style={{
+                            marginLeft: '8px',
+                            marginTop: '2px',
+                            opacity: 0.4,
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                        }}
+                        onClick={async (e) => {
+                            e.stopPropagation();
+
+                            const rem = await plugin.rem.findOne(node.id);
+                            if (rem) {
+                                // Just like in inc_rem_list.tsx, check if this is a PDF to open it correctly
+                                const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+                                const isPdfExtract = await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile);
+
+                                if (isPdfHighlight || isPdfExtract) {
+                                    await rem.openRemAsPage();
+                                } else {
+                                    await plugin.window.openRem(rem);
+                                }
+
+                                await plugin.widget.closePopup();
+                            }
+                        }}
+                        title="Open Rem"
+                    >
+                        ↗
                     </div>
                 </div>
             )}
@@ -298,66 +334,57 @@ function AggregatedRepetitionHistoryPopup() {
                 remIndexMap[r._id] = index;
             });
 
+            // Process in chunks to parallelize RPC calls
+            const chunkSize = 50;
+            for (let i = 0; i < allRems.length; i += chunkSize) {
+                const chunk = allRems.slice(i, i + chunkSize);
+                await Promise.all(chunk.map(async (r) => {
+                    let isInc = false;
+                    let isDism = false;
+                    let history: IncrementalRep[] = [];
 
-            for (const r of allRems) {
-                // Determine if Inc/Dism
-                let isInc = false;
-                let isDism = false;
-                let history: IncrementalRep[] = [];
-
-                // Check Inc
-                const incInfo = await getIncrementalRemFromRem(plugin, r);
-                if (incInfo) {
-                    isInc = true;
-                    history = incInfo.history || [];
-                } else {
-                    // Check Dism
-                    const dismInfo = await getDismissedHistoryFromRem(plugin, r);
-                    if (dismInfo) {
-                        isDism = true;
-                        history = dismInfo.history || [];
+                    // Check Inc
+                    const incInfo = await getIncrementalRemFromRem(plugin, r);
+                    if (incInfo) {
+                        isInc = true;
+                        history = incInfo.history || [];
+                    } else {
+                        // Check Dism
+                        const dismInfo = await getDismissedHistoryFromRem(plugin, r);
+                        if (dismInfo) {
+                            isDism = true;
+                            history = dismInfo.history || [];
+                        }
                     }
-                }
 
-                const reps = getRepCount(history);
-                const time = getTotalTime(history);
-                const name = await safeRemTextToString(plugin, r.text);
+                    const reps = getRepCount(history);
+                    const time = getTotalTime(history);
 
+                    nodes[r._id] = {
+                        id: r._id,
+                        isIncremental: isInc,
+                        isDismissed: isDism,
+                        reps,
+                        time,
+                        history,
+                        aggrReps: reps, // Start with self
+                        aggrTime: time,
+                        aggrIncCount: isInc ? 1 : 0,
+                        aggrDismCount: isDism ? 1 : 0,
+                        childrenIds: [], // Will populate next
+                        remText: r.text,
+                    };
+                }));
+            }
 
-
-                nodes[r._id] = {
-                    id: r._id,
-                    isIncremental: isInc,
-                    isDismissed: isDism,
-                    reps,
-                    time,
-                    history,
-                    aggrReps: reps, // Start with self
-                    aggrTime: time,
-                    aggrIncCount: isInc ? 1 : 0,
-                    aggrDismCount: isDism ? 1 : 0,
-                    childrenIds: [], // Will populate next
-                    remName: name || 'Untitled',
-                };
-
-                // Populate child map for hierarchy reconstruction
-                // We only care about parent-child relationships WITHIN the fetched set
-                // descendants list might not be in order, but `r.parent` gives parent.
-                // NOTE: `r.parent` needs to be fetched or is it a property?
-                // In PluginRem, `parent` is a property that returns Promise<PluginRem | undefined>
-                // OR `parentId`. Let's use `parentId`.
-                // Actually `allRems` includes root. Root's parent is outside scope.
-                // For descendants, their parent should be in `allRems` (unless structure changed async).
+            // Populate child map for hierarchy reconstruction
+            // We only care about parent-child relationships WITHIN the fetched set
+            for (const r of allRems) {
                 if (r._id !== rootRem._id) {
-                    // FIX: Use `r.parent`, not `r.parentId`. `parent` is the standard SDK property.
                     const parentId = r.parent;
                     if (parentId && nodes[parentId]) {
                         if (!childMap[parentId]) childMap[parentId] = [];
                         childMap[parentId].push(r._id);
-                    } else if (parentId && !nodes[parentId]) {
-                        // Console log if parent is missing (should not happen for descendants usually)
-                        // But for root's children, root needs to be in nodes (it is).
-                        // console.warn(`[AggHistory] Parent ${parentId} not found in nodes for child ${r._id} (${name})`);
                     }
                 }
             }

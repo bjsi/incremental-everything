@@ -4,11 +4,13 @@ import * as _ from 'remeda';
 import { calculateVolumeBasedPercentile } from './utils';
 import { IncrementalRem } from './incremental_rem';
 import { CardPriorityInfo } from './card_priority';
+import { dismissedPowerupCode } from './consts';
 
 export type ShieldHistoryEntry = {
   absolute: number | null;
   percentile: number | null;
   universeSize: number;
+  dismissedCount?: number;
 };
 
 export type ShieldHistory = Record<string, ShieldHistoryEntry>;
@@ -50,12 +52,14 @@ function calculateShieldStatus<T extends PriorityItem>(
   allItems: T[],
   unreviewedDue: T[],
   isDue: (item: T) => boolean,
-  seenIds: string[]
+  seenIds: string[],
+  dismissedCount: number = 0
 ): ShieldHistoryEntry {
   const status: ShieldHistoryEntry = {
     absolute: null,
     percentile: 100,
     universeSize: allItems.length,
+    dismissedCount,
   };
 
   if (unreviewedDue.length > 0) {
@@ -255,9 +259,13 @@ export async function saveKBShield<T extends PriorityItem>(
     return;
   }
 
+  const dismissedPowerup = await plugin.powerup.getPowerupByCode(dismissedPowerupCode);
+  const dismissedRems = (await dismissedPowerup?.taggedRem()) || [];
+  const dismissedCount = dismissedRems.length;
+
   const today = dayjs().format('YYYY-MM-DD');
   const unreviewedDue = filterUnreviewedDue(allItems, isDue, seenIds);
-  const status = calculateShieldStatus(allItems, unreviewedDue, isDue, seenIds);
+  const status = calculateShieldStatus(allItems, unreviewedDue, isDue, seenIds, dismissedCount);
 
   await saveKBShieldHistory(plugin, storageKey, status, today);
   console.log(`[QueueExit] Saved KB ${label} shield:`, status);
@@ -299,13 +307,17 @@ export async function saveDocumentShield<T extends PriorityItem>(
   const unreviewedDueInScope = filterUnreviewedDue(scopedItems, isDue, seenIds);
   console.log(`[QueueExit] Found ${unreviewedDueInScope.length} due ${label} items in priority calculation scope`);
 
+  const dismissedPowerup = await plugin.powerup.getPowerupByCode(dismissedPowerupCode);
+  const globalDismissedRems = (await dismissedPowerup?.taggedRem()) || [];
+  const scopedDismissedCount = globalDismissedRems.filter(rem => scopeSet.has(rem._id)).length;
+
   const today = dayjs().format('YYYY-MM-DD');
-  const status = calculateShieldStatus(scopedItems, unreviewedDueInScope, isDue, seenIds);
+  const status = calculateShieldStatus(scopedItems, unreviewedDueInScope, isDue, seenIds, scopedDismissedCount);
 
   await saveScopedShieldHistory(plugin, storageKey, historyKey, status, today);
   console.log(
     `[QueueExit] ${label} doc shield - Priority: ${status.absolute}, ` +
-    `Percentile: ${status.percentile}%, Universe: ${status.universeSize}`
+    `Percentile: ${status.percentile}%, Universe: ${status.universeSize}, Dismissed: ${scopedDismissedCount}`
   );
   console.log(`Saved ${label} document history for original scope ${historyKey}:`, status);
 }
