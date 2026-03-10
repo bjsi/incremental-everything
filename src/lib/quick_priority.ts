@@ -1,4 +1,4 @@
-import { ReactRNPlugin } from '@remnote/plugin-sdk';
+import { ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
 import {
     currentIncRemKey,
     powerupCode,
@@ -41,11 +41,42 @@ export async function handleQuickPriorityChange(
 
     if (isQueue) {
         const card = await plugin.queue.getCurrentCard();
-        if (card) {
-            remId = card.remId;
+        const sel = await plugin.editor.getSelection();
+        const selType = sel?.type;
+
+        let isTargetingQueueContext = false;
+
+        if (!selType) {
+            isTargetingQueueContext = true;
+        } else if (card) {
+            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(card.remId)) {
+                isTargetingQueueContext = true;
+            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === card.remId) {
+                isTargetingQueueContext = true;
+            }
         } else {
-            // Fallback for non-native queue (our IncRem queue)
-            remId = await plugin.storage.getSession(currentIncRemKey);
+            const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+            if (currentIncRemId) {
+                if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
+                    isTargetingQueueContext = true;
+                } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
+                    isTargetingQueueContext = true;
+                }
+            }
+        }
+
+        if (isTargetingQueueContext) {
+            if (card) {
+                remId = card.remId;
+            } else {
+                remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
+            }
+        } else {
+            if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
+                remId = sel.remIds[0];
+            } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
+                remId = sel.remId;
+            }
         }
     } else {
         // Editor context

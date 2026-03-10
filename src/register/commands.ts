@@ -2,6 +2,7 @@ import {
   ReactRNPlugin,
   RNPlugin,
   SelectionType,
+  PluginRem,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -101,26 +102,55 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const url = await plugin.window.getURL();
       console.log('Current URL:', url);
 
-      // Check if we are in the queue
+      // Check if we are in the queue AND targeting the flashcard explicitly
       if (url.includes('/flashcards')) {
         console.log('In flashcards view.');
-        // First, try to get the current native flashcard. This works for regular cards.
         const currentQueueItem = await plugin.queue.getCurrentCard();
-        console.log('Result of getCurrentCard():', currentQueueItem);
+        const sel = await plugin.editor.getSelection();
+        const selType = sel?.type;
 
-        if (currentQueueItem) {
-          remId = currentQueueItem.remId;
-          console.log('Found native card. remId:', remId);
+        let isTargetingQueueContext = false;
+
+        // If no editor selection, we assume queue context
+        if (!selType) {
+          isTargetingQueueContext = true;
+        } else if (currentQueueItem) { // We have a native card AND a selection
+          if (selType === SelectionType.Rem && sel.remIds.includes(currentQueueItem.remId)) {
+            isTargetingQueueContext = true;
+          } else if (selType === SelectionType.Text && sel.remId === currentQueueItem.remId) {
+            isTargetingQueueContext = true;
+          }
         } else {
-          console.log('Not a native card. Checking session storage for incremental rem...');
-          // If it's not a native card, it's our plugin's queue view.
-          // The source of truth is the remId stored in session by queue.tsx.
-          remId = await plugin.storage.getSession(currentIncRemKey);
-          console.log('remId from session storage (currentIncRemKey):', remId);
+          // No current native card, maybe our Incremental Rem view
+          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+          if (currentIncRemId) {
+            if (selType === SelectionType.Rem && sel.remIds.includes(currentIncRemId)) {
+              isTargetingQueueContext = true;
+            } else if (selType === SelectionType.Text && sel.remId === currentIncRemId) {
+              isTargetingQueueContext = true;
+            }
+          }
+        }
+
+        if (isTargetingQueueContext) {
+          if (currentQueueItem) {
+            remId = currentQueueItem.remId;
+            console.log('Found native card. remId:', remId);
+          } else {
+            console.log('Not a native card. Checking session storage for incremental rem...');
+            remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
+            console.log('remId from session storage (currentIncRemKey):', remId);
+          }
+        } else {
+          console.log('In flashcards view, but explicit selection detected. Using selection.');
+          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
+            remId = (sel as any).remIds[0];
+          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
+            remId = (sel as any).remId;
+          }
         }
       } else {
         console.log('Not in flashcards view. Getting focused editor rem.');
-        // If not in the queue, get the focused Rem from the editor
         const focusedRem = await plugin.focus.getFocusedRem();
         remId = focusedRem?._id;
         console.log('Focused editor remId:', remId);
@@ -154,10 +184,42 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       // Context detection logic (Same as main command)
       if (url.includes('/flashcards')) {
         const currentQueueItem = await plugin.queue.getCurrentCard();
-        if (currentQueueItem) {
-          remId = currentQueueItem.remId;
+        const sel = await plugin.editor.getSelection();
+        const selType = sel?.type;
+
+        let isTargetingQueueContext = false;
+
+        if (!selType) {
+          isTargetingQueueContext = true;
+        } else if (currentQueueItem) {
+          if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentQueueItem.remId)) {
+            isTargetingQueueContext = true;
+          } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentQueueItem.remId) {
+            isTargetingQueueContext = true;
+          }
         } else {
-          remId = await plugin.storage.getSession(currentIncRemKey);
+          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+          if (currentIncRemId) {
+            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
+              isTargetingQueueContext = true;
+            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
+              isTargetingQueueContext = true;
+            }
+          }
+        }
+
+        if (isTargetingQueueContext) {
+          if (currentQueueItem) {
+            remId = currentQueueItem.remId;
+          } else {
+            remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
+          }
+        } else {
+          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
+            remId = sel.remIds[0];
+          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
+            remId = sel.remId;
+          }
         }
       } else {
         const focusedRem = await plugin.focus.getFocusedRem();
@@ -187,25 +249,56 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const url = await plugin.window.getURL();
       console.log('Current URL:', url);
 
-      // Check if we are in the queue
+      let isTargetingQueueContext = false;
+
+      // Check if we are in the queue AND targeting the flashcard explicitly
       if (url.includes('/flashcards')) {
         console.log('In flashcards view.');
-        // First, try to get the current native flashcard
         const currentQueueItem = await plugin.queue.getCurrentCard();
         console.log('Result of getCurrentCard():', currentQueueItem);
+        const sel = await plugin.editor.getSelection();
+        const selType = sel?.type;
 
-        if (currentQueueItem) {
-          remId = currentQueueItem.remId;
-          console.log('Found native card. remId:', remId);
+        // If no editor selection, we assume queue context
+        if (!selType) {
+          isTargetingQueueContext = true;
+        } else if (currentQueueItem) { // We have a native card AND a selection
+          if (selType === SelectionType.Rem && sel.remIds.includes(currentQueueItem.remId)) {
+            isTargetingQueueContext = true;
+          } else if (selType === SelectionType.Text && sel.remId === currentQueueItem.remId) {
+            isTargetingQueueContext = true;
+          }
         } else {
-          console.log('Not a native card. Checking session storage for incremental rem...');
-          // If it's not a native card, it might be our plugin's queue view
-          remId = await plugin.storage.getSession(currentIncRemKey);
-          console.log('remId from session storage (currentIncRemKey):', remId);
+          // No current native card, maybe our Incremental Rem view
+          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+          if (currentIncRemId) {
+            if (selType === SelectionType.Rem && sel.remIds.includes(currentIncRemId)) {
+              isTargetingQueueContext = true;
+            } else if (selType === SelectionType.Text && sel.remId === currentIncRemId) {
+              isTargetingQueueContext = true;
+            }
+          }
+        }
+
+        if (isTargetingQueueContext) {
+          if (currentQueueItem) {
+            remId = currentQueueItem.remId;
+            console.log('Found native card. remId:', remId);
+          } else {
+            console.log('Not a native card. Checking session storage for incremental rem...');
+            remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
+            console.log('remId from session storage (currentIncRemKey):', remId);
+          }
+        } else {
+          console.log('In flashcards view, but explicit selection detected. Using selection.');
+          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
+            remId = (sel as any).remIds[0];
+          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
+            remId = (sel as any).remId;
+          }
         }
       } else {
         console.log('Not in flashcards view. Getting focused editor rem.');
-        // If not in the queue, get the focused Rem from the editor
         const focusedRem = await plugin.focus.getFocusedRem();
         remId = focusedRem?._id;
         console.log('Focused editor remId:', remId);
@@ -245,7 +338,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // Determine context (queue vs editor) for event type
       const isQueue = url.includes('/flashcards');
-      const context = isQueue ? 'queue' : 'editor';
+      const context = (isQueue && isTargetingQueueContext) ? 'queue' : 'editor';
 
       console.log(`Opening 'reschedule' popup for remId: ${remId}, context: ${context}`);
       await plugin.widget.openPopup('reschedule', {
@@ -710,16 +803,48 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const url = await plugin.window.getURL();
       const isQueue = url.includes('/flashcards');
 
-      // Check if we are in the queue
+      // Check if we are in the queue AND explicitly targeting the card
       if (isQueue) {
-        // First, try to get the current native flashcard
         const card = await plugin.queue.getCurrentCard();
-        if (card) {
-          remId = card.remId;
-          cardId = card._id;
+        const sel = await plugin.editor.getSelection();
+        const selType = sel?.type;
+
+        // Use Selection-Aware targeting identical to setting priority
+        let isTargetingQueueContext = false;
+
+        if (!selType) {
+          isTargetingQueueContext = true;
+        } else if (card) {
+          if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(card.remId)) {
+            isTargetingQueueContext = true;
+          } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === card.remId) {
+            isTargetingQueueContext = true;
+          }
         } else {
-          // If it's not a native card, it might be our plugin's queue view
-          remId = await plugin.storage.getSession(currentIncRemKey);
+          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+          if (currentIncRemId) {
+            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
+              isTargetingQueueContext = true;
+            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
+              isTargetingQueueContext = true;
+            }
+          }
+        }
+
+        if (isTargetingQueueContext) {
+          if (card) {
+            remId = card.remId;
+            cardId = card._id;
+          } else {
+            remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
+          }
+        } else {
+          // Explicitly focused on another editor element (like in Preview)
+          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
+            remId = (sel as any).remIds[0];
+          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
+            remId = (sel as any).remId;
+          }
         }
       } else {
         // If not in the queue, get the focused Rem from the editor
@@ -834,16 +959,50 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       let incRemInfo;
 
       if (isQueue) {
-        // Queue context: get current incremental rem from session storage
-        const currentQueueItem = await plugin.queue.getCurrentCard();
-        let remId = currentQueueItem?.remId;
+        // Queue context: check for explicit selection first
+        const card = await plugin.queue.getCurrentCard();
+        const sel = await plugin.editor.getSelection();
+        const selType = sel?.type;
 
-        if (!remId) {
-          remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+        let isTargetingQueueContext = false;
+
+        if (!selType) {
+          isTargetingQueueContext = true;
+        } else if (card) {
+          if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(card.remId)) {
+            isTargetingQueueContext = true;
+          } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === card.remId) {
+            isTargetingQueueContext = true;
+          }
+        } else {
+          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+          if (currentIncRemId) {
+            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
+              isTargetingQueueContext = true;
+            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
+              isTargetingQueueContext = true;
+            }
+          }
+        }
+
+        let remId: string | undefined;
+
+        if (isTargetingQueueContext) {
+          if (card) {
+            remId = card.remId;
+          } else {
+            remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+          }
+        } else {
+          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
+            remId = (sel as any).remIds[0];
+          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
+            remId = (sel as any).remId;
+          }
         }
 
         if (!remId) {
-          await plugin.app.toast('No Incremental Rem currently active in the queue.');
+          await plugin.app.toast('No Incremental Rem currently active in the queue or selected.');
           return;
         }
 
@@ -890,19 +1049,23 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // 5. Remove from session cache
         await removeIncrementalRemCache(plugin, rem._id);
 
-        // 6. Remove incremental powerup AND advance queue simultaneously.
+        // 6. Remove incremental powerup AND conditionally advance queue simultaneously.
         // removePowerup destroys the widget sandbox on the next microtask,
-        // so both IPC messages must be sent in the same tick.
-        await Promise.allSettled([
-          rem.removePowerup(powerupCode),
-          plugin.queue.removeCurrentCardFromQueue(true),
-        ]);
+        // so both IPC messages must be sent in the same tick if targeting queue.
+        if (isTargetingQueueContext) {
+          await Promise.allSettled([
+            rem.removePowerup(powerupCode),
+            plugin.queue.removeCurrentCardFromQueue(true),
+          ]);
+        } else {
+          await rem.removePowerup(powerupCode);
+        }
 
       } else {
         // Editor context: dismiss focused Incremental Rem(s)
         // Supports both single-focus and multi-select
         const selection = await plugin.editor.getSelection();
-        const remsToDissmiss: Rem[] = [];
+        const remsToDissmiss: PluginRem[] = [];
 
         if (selection?.type === SelectionType.Rem) {
           // Multi-select: gather all selected rems
