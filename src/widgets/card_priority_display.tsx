@@ -196,10 +196,15 @@ export function CardPriorityDisplay() {
   // --- Compute review stats from repetition history ---
   const historyStats = useMemo(() => {
     if (!cardRepData?.history || cardRepData.history.length === 0) {
-      return { reps: 0, totalMinutes: 0 };
+      return { reps: 0, totalMinutes: 0, lapses: 0 };
     }
+
+    const sorted = [...cardRepData.history].sort((a: any, b: any) => a.date - b.date);
+    const lastResetIndex = sorted.map((h: any) => h.score).lastIndexOf(QueueInteractionScore.RESET);
+    const historyAfterReset = lastResetIndex !== -1 ? sorted.slice(lastResetIndex + 1) : sorted;
+
     // Count only gradeable repetitions (Again, Hard, Good, Easy)
-    const gradeable = cardRepData.history.filter(
+    const gradeable = historyAfterReset.filter(
       (h: any) => {
         const s = h.score;
         return s === QueueInteractionScore.AGAIN ||
@@ -209,9 +214,10 @@ export function CardPriorityDisplay() {
       }
     );
     const reps = gradeable.length;
+    const lapses = gradeable.filter((h: any) => h.score === QueueInteractionScore.AGAIN).length;
     const totalMs = gradeable.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
     const totalMinutes = Math.round(totalMs / 6000) / 10; // ms → min, 1 decimal
-    return { reps, totalMinutes };
+    return { reps, totalMinutes, lapses };
   }, [cardRepData?.history]);
 
   // --- Compute FSRS state ---
@@ -383,8 +389,11 @@ export function CardPriorityDisplay() {
         <>
           <span style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.4 }}>|</span>
           <div className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
-            <span>
-              <strong>{historyStats.reps}</strong> Reps, <strong>{historyStats.totalMinutes}</strong> min
+            <span
+              title={`Total number of gradeable repetitions.\n\nThe number in red parentheses — (${historyStats.lapses}) — is the number of lapses (AGAIN ratings).\n\nThe final number is the total time spent reviewing this card.`}
+              style={{ cursor: 'help' }}
+            >
+              <strong>{historyStats.reps}</strong> Reps <span style={{ color: '#ef4444' }}>({historyStats.lapses})</span>, <strong>{historyStats.totalMinutes}</strong> min
             </span>
 
             {showFsrsDsr && fsrsState && (
