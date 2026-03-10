@@ -399,10 +399,10 @@ export function CardPriorityDisplay() {
             {showFsrsDsr && fsrsState && (
               <>
                 <span style={{ opacity: 0.4 }}>|</span>
-                <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nBased on ${fsrsState.reviewCount} reviews.`}>
+                <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nThe number inside the parenthesis after Stability tells you how much time has passed since your last review of this card.\n\nNext Difficulty:\nAgain: ${fsrsState.nextD.again.toFixed(2)}\nHard: ${fsrsState.nextD.hard.toFixed(2)}\nGood: ${fsrsState.nextD.good.toFixed(2)}\nEasy: ${fsrsState.nextD.easy.toFixed(2)}\n\nBased on ${fsrsState.reviewCount} reviews.`}>
                   D: <strong>{fsrsState.d.toFixed(2)}</strong>
                   {' · '}
-                  S: <strong>{formatStabilityDays(fsrsState.s)}</strong>
+                  S: <strong>{formatStabilityDays(fsrsState.s)}</strong> ({formatStabilityDays(fsrsState.daysSinceLastReview)} passed)
                   {' · '}
                   R: <strong style={{ color: getRetrievabilityColor(fsrsState.r) }}>
                     {(fsrsState.r * 100).toFixed(1)}%
