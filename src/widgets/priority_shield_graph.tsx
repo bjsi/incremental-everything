@@ -86,11 +86,11 @@ function PriorityShieldGraph() {
     return await plugin.richText.toString(rem.text) || 'Document';
   }, [effectiveDocScopeId]);
 
-  const processHistoryData = (history: Record<string, ShieldHistoryEntry> | undefined) => {
+  const processHistoryData = (history: Record<string, ShieldHistoryEntry> | undefined, isIncRemChart: boolean = true) => {
     if (!history) return [];
     const unsortedData = Object.entries(history).map(([date, values]) => {
       const universeSize = values.universeSize || 0;
-      const isIncRem = 'dismissedCount' in values;
+      const isIncRem = isIncRemChart && 'dismissedCount' in values;
 
       const item: any = {
         date: date,
@@ -126,7 +126,7 @@ function PriorityShieldGraph() {
 
     // 1. Check for explicit KB partition
     if (rawHistory[currentKbId]) {
-      return processHistoryData(rawHistory[currentKbId]);
+      return processHistoryData(rawHistory[currentKbId], true);
     }
 
     // 2. Fallback to legacy (if keys are dates) - strict Primary KB check
@@ -143,7 +143,7 @@ function PriorityShieldGraph() {
             cleanLegacy[k] = rawHistory[k];
           }
         }
-        return processHistoryData(cleanLegacy);
+        return processHistoryData(cleanLegacy, true);
       }
     }
 
@@ -162,7 +162,7 @@ function PriorityShieldGraph() {
     // 1. Check for explicit KB partition
     if (rawAllDocHistory[currentKbId]) {
       // Structure: { kbId: { scopeId: { date: entry } } }
-      return processHistoryData(rawAllDocHistory[currentKbId][effectiveDocScopeId]);
+      return processHistoryData(rawAllDocHistory[currentKbId][effectiveDocScopeId], true);
     }
 
     // 2. Fallback to legacy (keys are scopeIds, values are {date: entry})
@@ -174,7 +174,7 @@ function PriorityShieldGraph() {
       if (dateKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
         const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
         if (isPrimary) {
-          return processHistoryData(potentialScopeData);
+          return processHistoryData(potentialScopeData, true);
         }
       }
     }
@@ -192,7 +192,7 @@ function PriorityShieldGraph() {
 
     // 1. Check for explicit KB partition
     if (rawHistory[currentKbId]) {
-      return processHistoryData(rawHistory[currentKbId]);
+      return processHistoryData(rawHistory[currentKbId], false);
     }
 
     // 2. Fallback to legacy
@@ -208,7 +208,7 @@ function PriorityShieldGraph() {
             cleanLegacy[k] = rawHistory[k];
           }
         }
-        return processHistoryData(cleanLegacy);
+        return processHistoryData(cleanLegacy, false);
       }
     }
 
@@ -226,7 +226,7 @@ function PriorityShieldGraph() {
 
     // 1. Check for explicit KB partition
     if (rawAllDocHistory[currentKbId]) {
-      return processHistoryData(rawAllDocHistory[currentKbId][effectiveDocScopeId]);
+      return processHistoryData(rawAllDocHistory[currentKbId][effectiveDocScopeId], false);
     }
 
     // 2. Fallback to legacy
@@ -236,7 +236,7 @@ function PriorityShieldGraph() {
       if (dateKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
         const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
         if (isPrimary) {
-          return processHistoryData(potentialScopeData);
+          return processHistoryData(potentialScopeData, false);
         }
       }
     }

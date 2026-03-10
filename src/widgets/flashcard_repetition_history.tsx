@@ -170,7 +170,10 @@ function FlashcardRepetitionHistory() {
                 const fsrs = fsrsData?.[ci];
                 const sortedHistory = [...card.history].sort((a: any, b: any) => a.date - b.date);
 
-                const gradeableReps = sortedHistory.filter((h: any) =>
+                const lastResetIndex = sortedHistory.map((h: any) => h.score).lastIndexOf(QueueInteractionScore.RESET);
+                const activeHistory = lastResetIndex !== -1 ? sortedHistory.slice(lastResetIndex + 1) : sortedHistory;
+
+                const gradeableReps = activeHistory.filter((h: any) =>
                     h.score === QueueInteractionScore.AGAIN ||
                     h.score === QueueInteractionScore.HARD ||
                     h.score === QueueInteractionScore.GOOD ||
@@ -212,7 +215,7 @@ function FlashcardRepetitionHistory() {
                                 ? card.type.charAt(0).toUpperCase() + card.type.slice(1) + ' Card'
                                 : `Cloze Card (${card.type?.clozeId})`}
                             <span style={{ fontWeight: 400, marginLeft: 8, color: 'var(--rn-clr-content-tertiary)' }}>
-                                ({sortedHistory.length} reviews, {totalMinutes} min)
+                                ({activeHistory.length} reviews, {totalMinutes} min)
                             </span>
                             {isStale && (
                                 <span style={{

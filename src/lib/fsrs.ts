@@ -200,6 +200,15 @@ export function computeFSRSState(
     let state: CardState = 'new';
 
     for (const rep of sorted) {
+        if (rep.score === QueueInteractionScore.RESET) {
+            d = null;
+            s = null;
+            lastReviewDate = null;
+            reviewCount = 0;
+            state = 'new';
+            continue;
+        }
+
         const rating = fsrsRatingFromScore(rep.score);
         if (rating === null) continue;
 
@@ -282,6 +291,15 @@ export function computeFSRSStatesPerReview(
     let state: CardState = 'new';
 
     for (const rep of sorted) {
+        if (rep.score === QueueInteractionScore.RESET) {
+            d = null;
+            s = null;
+            lastReviewDate = null;
+            state = 'new';
+            result.push({ d: 0, s: 0, r: null, state, sInc: null });
+            continue;
+        }
+
         const rating = fsrsRatingFromScore(rep.score);
         if (rating === null) {
             // Non-gradeable — pass through with null state
