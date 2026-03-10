@@ -1136,7 +1136,7 @@ function Priority() {
               <span>🎴</span>
               Flashcard Priority
             </h3>
-            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={cardUseAbsoluteColoring} />
+            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={cardUseAbsoluteColoring} source={cardInfo?.source} isCardPriority={true} />
           </div>
 
           <div className="flex flex-col gap-3">
@@ -1224,7 +1224,7 @@ function Priority() {
               <span>🌿</span>
               Inheritance Priority
             </h3>
-            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={cardUseAbsoluteColoring} />
+            <PriorityBadge priority={safeCardAbsPriority} percentile={cardRelPriority} useAbsoluteColoring={cardUseAbsoluteColoring} source={cardInfo?.source} isCardPriority={true} />
           </div>
 
           <p className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>

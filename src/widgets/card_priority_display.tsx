@@ -343,7 +343,7 @@ export function CardPriorityDisplay() {
       {/* Priority */}
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
-        <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode || !cacheReady} />
+        <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode || !cacheReady} source={finalCardInfo.source} isCardPriority={true} />
         {!useLightMode && cacheReady && kbPercentile !== undefined && (
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
             ({kbPercentile}% KB
