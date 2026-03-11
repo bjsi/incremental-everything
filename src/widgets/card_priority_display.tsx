@@ -196,12 +196,17 @@ export function CardPriorityDisplay() {
   // --- Compute review stats from repetition history ---
   const historyStats = useMemo(() => {
     if (!cardRepData?.history || cardRepData.history.length === 0) {
-      return { reps: 0, totalMinutes: 0, lapses: 0 };
+      return { reps: 0, totalMinutes: 0, lapses: 0, cardAgeText: '0 days', costText: '' };
     }
 
     const sorted = [...cardRepData.history].sort((a: any, b: any) => a.date - b.date);
     const lastResetIndex = sorted.map((h: any) => h.score).lastIndexOf(QueueInteractionScore.RESET);
     const historyAfterReset = lastResetIndex !== -1 ? sorted.slice(lastResetIndex + 1) : sorted;
+
+    const firstRepDate = historyAfterReset.length > 0 ? historyAfterReset[0].date : null;
+    const cardAgeMs = firstRepDate ? Date.now() - firstRepDate : 0;
+    const cardAgeDays = Math.max(0, Math.floor(cardAgeMs / (1000 * 60 * 60 * 24)));
+    const cardAgeText = formatStabilityDays(cardAgeDays);
 
     // Count only gradeable repetitions (Again, Hard, Good, Easy)
     const gradeable = historyAfterReset.filter(
@@ -215,9 +220,20 @@ export function CardPriorityDisplay() {
     );
     const reps = gradeable.length;
     const lapses = gradeable.filter((h: any) => h.score === QueueInteractionScore.AGAIN).length;
+    
+    let costText = '';
     const totalMs = gradeable.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
     const totalMinutes = Math.round(totalMs / 6000) / 10; // ms → min, 1 decimal
-    return { reps, totalMinutes, lapses };
+
+    if (firstRepDate && totalMinutes > 0) {
+      const ageYears = cardAgeMs / (1000 * 60 * 60 * 24 * 365);
+      if (ageYears > 0) {
+        const cost = totalMinutes / ageYears;
+        costText = `${cost.toFixed(1)} min/year`;
+      }
+    }
+
+    return { reps, totalMinutes, lapses, cardAgeText, costText };
   }, [cardRepData?.history]);
 
   // --- Compute FSRS state ---
@@ -390,16 +406,16 @@ export function CardPriorityDisplay() {
           <span style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.4 }}>|</span>
           <div className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
             <span
-              title={`Total number of gradeable repetitions.\n\nThe number in red parentheses — (${historyStats.lapses}) — is the number of lapses (AGAIN ratings).\n\nThe final number is the total time spent reviewing this card.`}
+              title={`Total number of gradeable repetitions.\n\nThe number in red parentheses — (${historyStats.lapses}) — is the number of lapses (AGAIN ratings).\n\nThe following number is the total time spent reviewing this card.\n\nThe card age is the time elapsed since the first repetition.\n\nThe cost is the average time spent reviewing this card per year.`}
               style={{ cursor: 'help' }}
             >
-              <strong>{historyStats.reps}</strong> Reps <span style={{ color: '#ef4444' }}>({historyStats.lapses})</span>, <strong>{historyStats.totalMinutes}</strong> min
+              <strong>{historyStats.reps}</strong> Reps <span style={{ color: '#ef4444' }}>({historyStats.lapses})</span>, ⏳ <strong>{historyStats.totalMinutes}</strong> min, <strong>{historyStats.cardAgeText}</strong> age{historyStats.costText && <>, 💰 <strong>{historyStats.costText}</strong></>}
             </span>
 
             {showFsrsDsr && fsrsState && (
               <>
                 <span style={{ opacity: 0.4 }}>|</span>
-                <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nThe number inside the parenthesis after Stability tells you how much time has passed since your last review of this card.\n\nNext Difficulty:\nAgain: ${fsrsState.nextD.again.toFixed(2)}\nHard: ${fsrsState.nextD.hard.toFixed(2)}\nGood: ${fsrsState.nextD.good.toFixed(2)}\nEasy: ${fsrsState.nextD.easy.toFixed(2)}\n\nBased on ${fsrsState.reviewCount} reviews.`}>
+                <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nThe number inside the parenthesis after Stability tells you how much time has passed since your last review of this card.\n\nBased on ${fsrsState.reviewCount} reviews.\n\nNext Difficulty:\nAgain: ${fsrsState.nextD.again.toFixed(2)}\nHard: ${fsrsState.nextD.hard.toFixed(2)}\nGood: ${fsrsState.nextD.good.toFixed(2)}\nEasy: ${fsrsState.nextD.easy.toFixed(2)}`}>
                   D: <strong>{fsrsState.d.toFixed(2)}</strong>
                   {' · '}
                   S: <strong>{formatStabilityDays(fsrsState.s)}</strong> ({formatStabilityDays(fsrsState.daysSinceLastReview)} passed)

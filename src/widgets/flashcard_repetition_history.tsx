@@ -182,6 +182,20 @@ function FlashcardRepetitionHistory() {
                 const totalMs = gradeableReps.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
                 const totalMinutes = Math.round(totalMs / 6000) / 10;
 
+                const firstRepDate = activeHistory.length > 0 ? activeHistory[0].date : null;
+                const cardAgeMs = firstRepDate ? Date.now() - firstRepDate : 0;
+                const cardAgeDays = Math.max(0, Math.floor(cardAgeMs / (1000 * 60 * 60 * 24)));
+                const cardAgeText = formatStabilityDays(cardAgeDays);
+
+                let costText = '';
+                if (firstRepDate && totalMinutes > 0) {
+                    const ageYears = cardAgeMs / (1000 * 60 * 60 * 24 * 365);
+                    if (ageYears > 0) {
+                        const cost = totalMinutes / ageYears;
+                        costText = `, 💰 Cost: ${cost.toFixed(1)} min/year`;
+                    }
+                }
+
                 // --- Calculate Stale and Dates ---
                 const lastRep = sortedHistory.length > 0 ? sortedHistory[sortedHistory.length - 1] : null;
                 const lastPracticeDate = lastRep ? new Date(lastRep.date) : null;
@@ -215,7 +229,7 @@ function FlashcardRepetitionHistory() {
                                 ? card.type.charAt(0).toUpperCase() + card.type.slice(1) + ' Card'
                                 : `Cloze Card (${card.type?.clozeId})`}
                             <span style={{ fontWeight: 400, marginLeft: 8, color: 'var(--rn-clr-content-tertiary)' }}>
-                                ({activeHistory.length} reviews, {totalMinutes} min)
+                                ({activeHistory.length} reviews, ⏳ {totalMinutes} min, {cardAgeText} age{costText})
                             </span>
                             {isStale && (
                                 <span style={{
