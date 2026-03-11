@@ -205,6 +205,14 @@ function FlashcardRepetitionHistory() {
                 let staleDate: Date | null = null;
                 let nextIntervalMs: number | null = null;
 
+                let coverageText = '';
+                if (firstRepDate && nextRepDate) {
+                    const coverageMs = nextRepDate.getTime() - firstRepDate;
+                    if (coverageMs > 0) {
+                        const coverageDays = Math.max(0, Math.floor(coverageMs / (1000 * 60 * 60 * 24)));
+                        coverageText = `, 📊 Coverage: ${formatStabilityDays(coverageDays)}`;
+                    }
+                }
                 if (lastRep && nextRepDate) {
                     nextIntervalMs = nextRepDate.getTime() - lastRep.date;
                     // Stale means overdue by more than twice the last interval.
@@ -229,7 +237,7 @@ function FlashcardRepetitionHistory() {
                                 ? card.type.charAt(0).toUpperCase() + card.type.slice(1) + ' Card'
                                 : `Cloze Card (${card.type?.clozeId})`}
                             <span style={{ fontWeight: 400, marginLeft: 8, color: 'var(--rn-clr-content-tertiary)' }}>
-                                ({activeHistory.length} reviews, ⏳ {totalMinutes} min, {cardAgeText} age{costText})
+                                ({activeHistory.length} reviews, ⏳ {totalMinutes} min, {cardAgeText} age{costText}{coverageText})
                             </span>
                             {isStale && (
                                 <span style={{
