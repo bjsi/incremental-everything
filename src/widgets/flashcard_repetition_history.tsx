@@ -187,32 +187,44 @@ function FlashcardRepetitionHistory() {
                 const cardAgeDays = Math.max(0, Math.floor(cardAgeMs / (1000 * 60 * 60 * 24)));
                 const cardAgeText = formatStabilityDays(cardAgeDays);
 
-                let costText = '';
-                if (firstRepDate && totalMinutes > 0) {
-                    const ageYears = cardAgeMs / (1000 * 60 * 60 * 24 * 365);
-                    if (ageYears > 0) {
-                        const cost = totalMinutes / ageYears;
-                        costText = `, 💰 Cost: ${cost.toFixed(1)} min/year`;
-                    }
-                }
-
                 // --- Calculate Stale and Dates ---
                 const lastRep = sortedHistory.length > 0 ? sortedHistory[sortedHistory.length - 1] : null;
                 const lastPracticeDate = lastRep ? new Date(lastRep.date) : null;
                 const nextRepDate = card.nextRepetitionTime ? new Date(card.nextRepetitionTime) : null;
 
-                let isStale = false;
-                let staleDate: Date | null = null;
-                let nextIntervalMs: number | null = null;
-
                 let coverageText = '';
+                let coverageMsForCost = 0;
                 if (firstRepDate && nextRepDate) {
                     const coverageMs = nextRepDate.getTime() - firstRepDate;
                     if (coverageMs > 0) {
                         const coverageDays = Math.max(0, Math.floor(coverageMs / (1000 * 60 * 60 * 24)));
                         coverageText = `, 📊 Coverage: ${formatStabilityDays(coverageDays)}`;
+                        coverageMsForCost = coverageMs;
                     }
                 }
+
+                let costText = '';
+                const isNextRepInFuture = nextRepDate && nextRepDate.getTime() > Date.now();
+
+                if (firstRepDate && totalMinutes > 0) {
+                    if (isNextRepInFuture && coverageMsForCost > 0) {
+                        const coverageYears = coverageMsForCost / (1000 * 60 * 60 * 24 * 365);
+                        if (coverageYears > 0) {
+                            const cost = totalMinutes / coverageYears;
+                            costText = `, 💰 Cost: ${cost.toFixed(1)} min/year`;
+                        }
+                    } else {
+                        const ageYears = cardAgeMs / (1000 * 60 * 60 * 24 * 365);
+                        if (ageYears > 0) {
+                            const cost = totalMinutes / ageYears;
+                            costText = `, 💰 Cost: ${cost.toFixed(1)} min/year`;
+                        }
+                    }
+                }
+
+                let isStale = false;
+                let staleDate: Date | null = null;
+                let nextIntervalMs: number | null = null;
                 if (lastRep && nextRepDate) {
                     nextIntervalMs = nextRepDate.getTime() - lastRep.date;
                     // Stale means overdue by more than twice the last interval.
@@ -237,7 +249,7 @@ function FlashcardRepetitionHistory() {
                                 ? card.type.charAt(0).toUpperCase() + card.type.slice(1) + ' Card'
                                 : `Cloze Card (${card.type?.clozeId})`}
                             <span style={{ fontWeight: 400, marginLeft: 8, color: 'var(--rn-clr-content-tertiary)' }}>
-                                ({activeHistory.length} reviews, ⏳ {totalMinutes} min, {cardAgeText} age{costText}{coverageText})
+                                ({activeHistory.length} reviews, ⏳ {totalMinutes} min, {cardAgeText} age{coverageText}{costText})
                             </span>
                             {isStale && (
                                 <span style={{

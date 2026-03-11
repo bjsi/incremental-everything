@@ -190,6 +190,7 @@ export function CardPriorityDisplay() {
     return {
       cardId: card._id as string,
       history: card.repetitionHistory || [],
+      nextRepetitionTime: card.nextRepetitionTime,
     };
   }, []);
 
@@ -225,16 +226,28 @@ export function CardPriorityDisplay() {
     const totalMs = gradeable.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
     const totalMinutes = Math.round(totalMs / 6000) / 10; // ms → min, 1 decimal
 
+    const nextRepDate = cardRepData?.nextRepetitionTime ? new Date(cardRepData.nextRepetitionTime) : null;
+    const isNextRepInFuture = nextRepDate && nextRepDate.getTime() > Date.now();
+
     if (firstRepDate && totalMinutes > 0) {
-      const ageYears = cardAgeMs / (1000 * 60 * 60 * 24 * 365);
-      if (ageYears > 0) {
-        const cost = totalMinutes / ageYears;
-        costText = `${cost.toFixed(1)} min/year`;
+      if (isNextRepInFuture) {
+        const coverageMs = nextRepDate.getTime() - firstRepDate;
+        const coverageYears = coverageMs / (1000 * 60 * 60 * 24 * 365);
+        if (coverageYears > 0) {
+          const cost = totalMinutes / coverageYears;
+          costText = `${cost.toFixed(1)} min/year`;
+        }
+      } else {
+        const ageYears = cardAgeMs / (1000 * 60 * 60 * 24 * 365);
+        if (ageYears > 0) {
+          const cost = totalMinutes / ageYears;
+          costText = `${cost.toFixed(1)} min/year`;
+        }
       }
     }
 
     return { reps, totalMinutes, lapses, cardAgeText, costText };
-  }, [cardRepData?.history]);
+  }, [cardRepData?.history, cardRepData?.nextRepetitionTime]);
 
   // --- Compute FSRS state ---
   const fsrsState: FSRSState | null = useMemo(() => {
