@@ -20,7 +20,7 @@ import {
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
-import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, formatStabilityDays, getRetrievabilityColor } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge } from '../components';
 import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
@@ -221,7 +221,7 @@ export function CardPriorityDisplay() {
     );
     const reps = gradeable.length;
     const lapses = gradeable.filter((h: any) => h.score === QueueInteractionScore.AGAIN).length;
-    
+
     let costText = '';
     const totalMs = gradeable.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
     const totalMinutes = Math.round(totalMs / 6000) / 10; // ms → min, 1 decimal
@@ -338,6 +338,8 @@ export function CardPriorityDisplay() {
   const cacheReady = !!(cardInfo && allPrioritizedCardInfo && allPrioritizedCardInfo.length > 0);
   const kbPercentile = (!useLightMode && cacheReady && cardInfo) ? cardInfo.kbPercentile : undefined;
 
+  const priorityColor = kbPercentile !== undefined ? percentileToHslColor(kbPercentile) : '#6b7280';
+
   const handleClick = async () => {
     if (!rem) return;
     await plugin.widget.openPopup('priority', { remId: rem._id });
@@ -358,6 +360,7 @@ export function CardPriorityDisplay() {
       style={{
         backgroundColor: 'var(--rn-clr-background-secondary)',
         border: '1px solid var(--rn-clr-border-primary)',
+        borderLeft: `4px solid ${priorityColor}`,
         borderRadius: '8px',
         margin: '4px 0',
         cursor: 'pointer',
