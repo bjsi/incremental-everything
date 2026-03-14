@@ -6,14 +6,19 @@ interface PriorityBadgeProps {
   percentile?: number;
   compact?: boolean;
   useAbsoluteColoring?: boolean;
+  source?: string;
+  isCardPriority?: boolean;
 }
 
-export function PriorityBadge({ priority, percentile, compact = false, useAbsoluteColoring = false }: PriorityBadgeProps) {
+export function PriorityBadge({ priority, percentile, compact = false, useAbsoluteColoring = false, source, isCardPriority = false }: PriorityBadgeProps) {
   // Use percentile for color if available (including 0), otherwise fallback to gray
   // If useAbsoluteColoring is true, we use the priority itself (0-100) for color mapping
   const bgColor = useAbsoluteColoring
     ? percentileToHslColor(priority)
     : (percentile !== undefined ? percentileToHslColor(percentile) : '#6b7280');
+
+  const isBoldNumber = isCardPriority && (source === 'manual' || source === 'incremental');
+  const numberNode = isBoldNumber ? <strong className="font-extrabold">{priority}</strong> : priority;
 
   if (compact) {
     return (
@@ -26,7 +31,7 @@ export function PriorityBadge({ priority, percentile, compact = false, useAbsolu
         }}
         title={`Priority: ${priority}${percentile ? ` (top ${percentile}%)` : ''}`}
       >
-        P{priority}
+        P{numberNode}
       </span>
     );
   }
@@ -41,7 +46,7 @@ export function PriorityBadge({ priority, percentile, compact = false, useAbsolu
       }}
       title={`Priority: ${priority}${percentile ? ` (top ${percentile}%)` : ''}`}
     >
-      P{priority}
+      P{numberNode}
     </span>
   );
 }

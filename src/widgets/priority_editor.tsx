@@ -27,7 +27,7 @@ const adjustButtonStyle: React.CSSProperties = {
 
 export function PriorityEditor() {
   const plugin = usePlugin();
-  const widgetContext = useRunAsync(async () => await plugin.widget.getWidgetContext(), []);
+  const widgetContext = useRunAsync(async () => await plugin.widget.getWidgetContext<any>(), []);
   const remId = widgetContext?.remId;
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -181,7 +181,7 @@ export function PriorityEditor() {
             <PriorityBadge priority={incRemInfo.priority} percentile={incRemRelativePriority ?? undefined} compact />
           )}
           {showCardEditor && (
-            <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact />
+            <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact source={cardInfo?.source} isCardPriority={true} />
           )}
         </div>
       ) : (
@@ -287,7 +287,7 @@ export function PriorityEditor() {
                     </span>
                   )}
                 </div>
-                <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact />
+                <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact source={cardInfo?.source} isCardPriority={true} />
               </div>
               <div className="flex items-center justify-center gap-1">
                 <button

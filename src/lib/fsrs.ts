@@ -58,8 +58,11 @@ export interface FSRSState {
     s: number;         // Stability (days)
     r: number;         // Retrievability [0, 1]
     reviewCount: number;
+    /** Expected difficulty after grading with 1(again), 2(hard), 3(good), 4(easy) */
+    nextD: { again: number; hard: number; good: number; easy: number };
     /** Stability Increase ratio (nextS / currentS) for each recall grade */
     sInc: { hard: number; good: number; easy: number };
+    daysSinceLastReview: number;
 }
 
 export interface FSRSStepState {
@@ -268,7 +271,14 @@ export function computeFSRSState(
         easy: computeSInc(RATINGS.easy),
     };
 
-    return { d, s, r, reviewCount, sInc };
+    const nextD = {
+        again: nextDifficulty(w, d, RATINGS.again),
+        hard: nextDifficulty(w, d, RATINGS.hard),
+        good: nextDifficulty(w, d, RATINGS.good),
+        easy: nextDifficulty(w, d, RATINGS.easy),
+    };
+
+    return { d, s, r, reviewCount, sInc, daysSinceLastReview, nextD };
 }
 
 // ---------------------------------------------------------------------------
