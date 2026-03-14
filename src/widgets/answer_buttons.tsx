@@ -240,6 +240,11 @@ export function AnswerButtons() {
   const priorityColor = percentiles.kb ? percentileToHslColor(percentiles.kb) : '#6b7280';
   const buttonStyles = getButtonStyles();
 
+  // --- NEW: Check if current IncRem is directly impacting the shield ---
+  const isKbShieldActive = shieldStatusAsync?.kb && incRemInfo.priority === shieldStatusAsync.kb.absolute;
+  const isDocShieldActive = shieldStatusAsync?.doc && incRemInfo.priority === shieldStatusAsync.doc.absolute;
+  const isAnyShieldActive = isKbShieldActive || isDocShieldActive;
+
   // Container styles using RemNote CSS variables
   const containerStyle: React.CSSProperties = {
     display: 'flex',
@@ -681,17 +686,29 @@ export function AnswerButtons() {
               <>
                 <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontWeight: 600 }}>🛡️ IncRem Shield:</span>
+                  <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
+                    }}>🛡️</span>
+                    <span>IncRem Shield:</span>
+                  </span>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     {shieldStatusAsync.kb ? (
-                      <span>
+                      <span style={{
+                        animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                        color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
+                      }}>
                         KB: <strong>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile?.toFixed(1)}%)
                       </span>
                     ) : (
                       <span>KB: 100%</span>
                     )}
                     {shieldStatusAsync.doc ? (
-                      <span>
+                      <span style={{
+                        animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                        color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
+                      }}>
                         Doc: <strong>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile?.toFixed(1)}%)
                       </span>
                     ) : (
@@ -699,8 +716,19 @@ export function AnswerButtons() {
                     )}
                   </div>
                 </div>
+                <style>{`
+                  @keyframes shieldPulse {
+                    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(59, 130, 246, 0)); }
+                    50% { transform: scale(1.15); filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6)); }
+                  }
+                  @keyframes shieldTextGlow {
+                    0%, 100% { filter: brightness(1); }
+                    50% { filter: brightness(1.3); text-shadow: 0 0 4px rgba(59, 130, 246, 0.3); }
+                  }
+                `}</style>
               </>
             )}
+
             {/* Separator before History */}
             <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
 
