@@ -340,6 +340,11 @@ export function CardPriorityDisplay() {
 
   const priorityColor = kbPercentile !== undefined ? percentileToHslColor(kbPercentile) : '#6b7280';
 
+  // --- NEW: Check if current card is directly impacting the shield ---
+  const isKbShieldActive = shieldStatus?.kb && finalCardInfo.priority === shieldStatus.kb.absolute;
+  const isDocShieldActive = shieldStatus?.doc && finalCardInfo.priority === shieldStatus.doc.absolute;
+  const isAnyShieldActive = isKbShieldActive || isDocShieldActive;
+
   const handleClick = async () => {
     if (!rem) return;
     await plugin.widget.openPopup('priority', { remId: rem._id });
@@ -397,22 +402,46 @@ export function CardPriorityDisplay() {
         <>
           <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>🛡️ Card Shield:</span>
+            <span className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+              <span style={{
+                display: 'inline-block',
+                animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
+              }}>🛡️</span>
+              <span>Card Shield:</span>
+            </span>
             <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               {shieldStatus.kb && (
-                <span>
+                <span style={{
+                  animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                  fontWeight: isKbShieldActive ? 700 : 'inherit',
+                  color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
+                }}>
                   KB: <PriorityBadge priority={shieldStatus.kb.absolute} percentile={shieldStatus.kb.percentile} compact />
                   {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile.toFixed(1)}%)`}
                 </span>
               )}
               {shieldStatus.doc && (
-                <span>
+                <span style={{
+                  animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                  fontWeight: isDocShieldActive ? 700 : 'inherit',
+                  color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
+                }}>
                   Doc: <PriorityBadge priority={shieldStatus.doc.absolute} percentile={shieldStatus.doc.percentile} compact />
                   {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile.toFixed(1)}%)`}
                 </span>
               )}
             </div>
           </div>
+          <style>{`
+            @keyframes shieldPulse {
+              0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(59, 130, 246, 0)); }
+              50% { transform: scale(1.15); filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6)); }
+            }
+            @keyframes shieldTextGlow {
+              0%, 100% { filter: brightness(1); }
+              50% { filter: brightness(1.3); text-shadow: 0 0 4px rgba(59, 130, 246, 0.3); }
+            }
+          `}</style>
         </>
       )}
 
