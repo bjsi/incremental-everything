@@ -21,17 +21,19 @@ import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
 
 
 const QUEUE_LAYOUT_FIX_CSS = `
+  /* Fix the height of the queue content wrapper for incremental-everything */
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) {
     height: 100% !important;
   }
+  
+  /* Target the exact wrapper chain causing the height collapse *in both KBs* */
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content,
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content .rn-flashcard,
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content .rn-flashcard__content,
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content > .box-border,
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content div.fade-in-first-load:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]),
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content div.fade-in-first-load:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) > div,
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"] {
+  .rn-queue__content:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .box-border.flex.flex-col,
+  .rn-queue__content:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .fade-in-first-load,
+  .rn-queue__content:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .fade-in-first-load > div,
+  iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"] {
     flex-grow: 1 !important;
+    height: 100% !important;
   }
 
   /* Hide unwanted UI elements during incremental rem review */
