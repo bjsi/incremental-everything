@@ -38,8 +38,6 @@ interface IncrementalRemData {
   path: string[];
   pathIds: string[];
   isChecked: boolean;
-  pathIds: string[];
-  isChecked: boolean;
   percentile: number | null;
   originalIndex: number;
 }
@@ -81,6 +79,7 @@ function BatchPriority() {
   const [appliedCount, setAppliedCount] = useState(0);
   const [totalToApply, setTotalToApply] = useState(0);
   const [previousStates, setPreviousStates] = useState<IncrementalRemData[][]>([]);
+  const isApplyingRef = useRef(false);
 
   // Get all incremental rems from storage
   const allIncrementalRems = useTrackerPlugin(
@@ -94,6 +93,12 @@ function BatchPriority() {
   // Load incremental rems in the focused rem's hierarchy
   useEffect(() => {
     const loadIncrementalRems = async () => {
+      // Skip reload if we are mid-apply — the cache update triggers this effect
+      // but we want to keep showing the progress bar, not reset to loading.
+      if (isApplyingRef.current) {
+        console.log('⚠️ BatchPriority: Skipping reload — apply in progress');
+        return;
+      }
       console.log('🔄 BatchPriority: Starting to load incremental rems');
       console.log('   - focusedRemId:', focusedRemId);
 
@@ -172,7 +177,6 @@ function BatchPriority() {
                   depth: depth,
                   path: path,
                   pathIds: pathIds,
-                  isChecked: true,
                   isChecked: true,
                   percentile: allIncrementalRems ?
                     calculateRelativePercentile(allIncrementalRems, rem._id) : null,
@@ -294,8 +298,11 @@ function BatchPriority() {
     // Save current state for undo
     setPreviousStates(prev => [...prev, incrementalRems]);
 
-    const checkedRems = incrementalRems.filter(r => r.isChecked);
-    console.log('   - Checked rems:', checkedRems.length);
+    // When filters are active, only consider filtered items
+    const scope = hasActiveFilters ? filteredRems : incrementalRems;
+    const scopeIds = hasActiveFilters ? new Set(filteredRems.map(r => r.remId)) : null;
+    const checkedRems = scope.filter(r => r.isChecked);
+    console.log('   - Checked rems:', checkedRems.length, 'hasActiveFilters:', hasActiveFilters);
 
     if (checkedRems.length === 0) {
       console.log('   ⚠️ No items selected');
@@ -304,6 +311,8 @@ function BatchPriority() {
     }
 
     let updatedRems = [...incrementalRems];
+    // Helper to check if a rem is in scope
+    const isInScope = (rem: IncrementalRemData) => !scopeIds || scopeIds.has(rem.remId);
 
     switch (operation) {
       case 'increase': {
@@ -311,8 +320,8 @@ function BatchPriority() {
         console.log('   - Increase multiplier:', multiplier);
         updatedRems = updatedRems.map(rem => ({
           ...rem,
-          newPriority: rem.isChecked ?
-            Math.max(0, Math.round(rem.currentPriority * multiplier)) : null
+          newPriority: (isInScope(rem) && rem.isChecked) ?
+            Math.max(0, Math.round(rem.currentPriority * multiplier)) : (isInScope(rem) ? null : rem.newPriority)
         }));
         break;
       }
@@ -322,8 +331,8 @@ function BatchPriority() {
         console.log('   - Decrease multiplier:', multiplier);
         updatedRems = updatedRems.map(rem => ({
           ...rem,
-          newPriority: rem.isChecked ?
-            Math.min(100, Math.round(rem.currentPriority * multiplier)) : null
+          newPriority: (isInScope(rem) && rem.isChecked) ?
+            Math.min(100, Math.round(rem.currentPriority * multiplier)) : (isInScope(rem) ? null : rem.newPriority)
         }));
         break;
       }
@@ -344,12 +353,13 @@ function BatchPriority() {
         let currentIndex = 0;
 
         updatedRems = updatedRems.map(rem => {
-          if (rem.isChecked) {
+          if (isInScope(rem) && rem.isChecked) {
             const newPriority = Math.round(spreadStart + (currentIndex * step));
             currentIndex++;
             return { ...rem, newPriority };
           }
-          return { ...rem, newPriority: null };
+          if (isInScope(rem)) return { ...rem, newPriority: null };
+          return rem;
         });
         break;
       }
@@ -365,12 +375,13 @@ function BatchPriority() {
         console.log('   - Adjust: current range', currentRange, 'new range:', newRange);
 
         updatedRems = updatedRems.map(rem => {
-          if (rem.isChecked) {
+          if (isInScope(rem) && rem.isChecked) {
             const relativePosition = (rem.currentPriority - minCurrent) / currentRange;
             const newPriority = Math.round(spreadStart + (relativePosition * newRange));
             return { ...rem, newPriority };
           }
-          return { ...rem, newPriority: null };
+          if (isInScope(rem)) return { ...rem, newPriority: null };
+          return rem;
         });
         break;
       }
@@ -382,10 +393,11 @@ function BatchPriority() {
     setHasCalculated(true);
   };
 
-  // Apply the new priorities with progress indicator
+  // Apply the new priorities with progress indicator — filter-aware
   const applyChanges = async () => {
-    console.log('💾 BatchPriority: Applying changes');
-    const toUpdate = incrementalRems.filter(r => r.isChecked && r.newPriority !== null);
+    console.log('💾 BatchPriority: Applying changes, hasActiveFilters:', hasActiveFilters);
+    const scope = hasActiveFilters ? filteredRems : incrementalRems;
+    const toUpdate = scope.filter(r => r.isChecked && r.newPriority !== null);
     console.log('   - Rems to update:', toUpdate.length);
 
     if (toUpdate.length === 0) {
@@ -395,6 +407,7 @@ function BatchPriority() {
     }
 
     setIsApplying(true);
+    isApplyingRef.current = true;
     setTotalToApply(toUpdate.length);
     setAppliedCount(0);
 
@@ -430,6 +443,7 @@ function BatchPriority() {
       await plugin.app.toast('Error applying changes');
     } finally {
       setIsApplying(false);
+      isApplyingRef.current = false;
     }
   };
 
@@ -487,14 +501,31 @@ function BatchPriority() {
     }));
   };
 
-  // Toggle all checkboxes
+  // Determine whether filters are active
+  const hasActiveFilters = useMemo(() => {
+    return searchTerm !== '' || typeFilter !== 'all' || priorityRangeMin > 0 || priorityRangeMax < 100;
+  }, [searchTerm, typeFilter, priorityRangeMin, priorityRangeMax]);
+
+  // Toggle all checkboxes — filter-aware
   const toggleAll = (checked: boolean) => {
-    console.log('☑️ BatchPriority: Toggle all checkboxes to:', checked);
-    setIncrementalRems(prev => prev.map(rem => ({
-      ...rem,
-      isChecked: checked,
-      newPriority: checked ? rem.newPriority : null
-    })));
+    console.log('☑️ BatchPriority: Toggle all checkboxes to:', checked, 'hasActiveFilters:', hasActiveFilters);
+    if (hasActiveFilters) {
+      const filteredIds = new Set(filteredRems.map(r => r.remId));
+      setIncrementalRems(prev => prev.map(rem => {
+        if (!filteredIds.has(rem.remId)) return rem;
+        return {
+          ...rem,
+          isChecked: checked,
+          newPriority: checked ? rem.newPriority : null
+        };
+      }));
+    } else {
+      setIncrementalRems(prev => prev.map(rem => ({
+        ...rem,
+        isChecked: checked,
+        newPriority: checked ? rem.newPriority : null
+      })));
+    }
   };
 
   // Toggle node expansion
@@ -923,13 +954,13 @@ function BatchPriority() {
             onClick={() => toggleAll(true)}
             style={{ ...styles.button, ...styles.primaryButton }}
           >
-            Check All
+            {hasActiveFilters ? 'Check All Filtered' : 'Check All'}
           </button>
           <button
             onClick={() => toggleAll(false)}
             style={{ ...styles.button, ...styles.secondaryButton }}
           >
-            Uncheck All
+            {hasActiveFilters ? 'Uncheck All Filtered' : 'Uncheck All'}
           </button>
 
           {previousStates.length > 0 && (
@@ -947,7 +978,7 @@ function BatchPriority() {
                 onClick={calculateNewPriorities}
                 style={{ ...styles.button, ...styles.primaryButton }}
               >
-                Preview Changes
+                {hasActiveFilters ? 'Preview Filtered' : 'Preview Changes'}
               </button>
             )}
             {isPreviewMode && (
@@ -968,7 +999,7 @@ function BatchPriority() {
                   style={{ ...styles.button, ...styles.successButton }}
                   disabled={isApplying}
                 >
-                  {isApplying ? `Applying... (${appliedCount}/${totalToApply})` : 'Accept and Apply'}
+                  {isApplying ? `Applying... (${appliedCount}/${totalToApply})` : (hasActiveFilters ? 'Apply to Filtered' : 'Accept and Apply')}
                 </button>
               </>
             )}
