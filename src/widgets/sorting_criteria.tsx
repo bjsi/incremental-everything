@@ -24,7 +24,7 @@ const cardsToSliderValue = (cards: CardsPerRem): number => {
   if (cards === 'no-cards') return ONLY_INC_VALUE;
   if (cards === 'no-rem') return ONLY_FLASHCARDS_VALUE;
   if (typeof cards === 'number') return cards;
-  return DEFAULT_CARDS_PER_REM; 
+  return DEFAULT_CARDS_PER_REM;
 };
 
 // Convert the slider position back to a value for storage
@@ -41,6 +41,13 @@ const sliderValueToLabel = (value: number): string => {
   return `${value} card${value !== 1 ? 's' : ''} for every incremental rem`;
 };
 
+const sliderTicks = (
+  <div className="flex justify-between w-full px-2 text-[10px] text-gray-400 mt-[-4px] pointer-events-none">
+    {[...Array(21)].map((_, i) => (
+      <span key={i}>{i % 5 === 0 ? '|' : '·'}</span>
+    ))}
+  </div>
+);
 
 export function SortingCriteria() {
   const plugin = usePlugin();
@@ -48,7 +55,7 @@ export function SortingCriteria() {
   // --- ALL HOOKS MOVED TO THE TOP ---
   const sortingRandomness = useTrackerPlugin(async (rp) => await getSortingRandomness(rp), []);
   const storedCards = useTrackerPlugin(async (rp) => await getCardsPerRem(rp), []);
-  
+
   //No Inc Rem timer
   const noIncRemTimerEnd = useTrackerPlugin(
     async (rp) => await rp.storage.getSynced<number>(noIncRemTimerKey),
@@ -56,7 +63,7 @@ export function SortingCriteria() {
   );
 
   const cardRandomness = useTrackerPlugin(
-    async (rp) => await getCardRandomness(rp), 
+    async (rp) => await getCardRandomness(rp),
     []
   );
 
@@ -70,7 +77,7 @@ export function SortingCriteria() {
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
     }, 1000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -89,7 +96,7 @@ export function SortingCriteria() {
   // --- CONDITIONAL RETURN ---
 
   if (sliderValue === undefined) {
-    return null; 
+    return null;
   }
 
   // --- RENDER LOGIC ---
@@ -138,7 +145,7 @@ export function SortingCriteria() {
           </button>
         </div>
       )}
-      
+
       <div className="text-2xl font-bold">Sorting Criteria</div>
 
       {/* Randomness slider is unchanged */}
@@ -148,19 +155,24 @@ export function SortingCriteria() {
             Incremental Rem Randomness
           </label>
         </div>
-        <div className="rn-clr-content-secondary">Higher = ignores priority more</div>
+        <div className="rn-clr-content-secondary">
+          {Math.round((sortingRandomness ?? DEFAULT_RANDOMNESS) * 100)}% of Items Swapped
+        </div>
         <input
+          className="w-full"
           min={0}
           step={0.01}
           max={1}
           onChange={(e) => {
-            setSortingRandomness(plugin, Number(e.target.value));
+            const sliderPosition = Number(e.target.value);
+            setSortingRandomness(plugin, Math.pow(sliderPosition, 3));
           }}
-          value={sortingRandomness == null ? DEFAULT_RANDOMNESS : sortingRandomness}
+          value={sortingRandomness == null ? DEFAULT_RANDOMNESS : Math.cbrt(sortingRandomness)}
           type="range"
           id="randomness"
           name="randomness"
         />
+        {sliderTicks}
       </div>
 
       {/* Flashcard Randomness slider */}
@@ -170,21 +182,27 @@ export function SortingCriteria() {
             Flashcard Randomness
           </label>
         </div>
+        <div className="rn-clr-content-secondary text-xs italic">
+          For Priority Review Documents (do not affect regular RemNote Queue!)
+        </div>
         <div className="rn-clr-content-secondary">
-          For Priority Review Documents (do not apply to regular RemNote Queue!)
+          {Math.round((cardRandomness ?? DEFAULT_CARD_RANDOMNESS) * 100)}% of Items Swapped
         </div>
         <input
+          className="w-full"
           min={0}
           step={0.01}
           max={1}
           onChange={(e) => {
-            setCardRandomness(plugin, Number(e.target.value));
+            const sliderPosition = Number(e.target.value);
+            setCardRandomness(plugin, Math.pow(sliderPosition, 3));
           }}
-          value={cardRandomness == null ? DEFAULT_CARD_RANDOMNESS : cardRandomness}
+          value={cardRandomness == null ? DEFAULT_CARD_RANDOMNESS : Math.cbrt(cardRandomness)}
           type="range"
           id="card-randomness"
           name="card-randomness"
         />
+        {sliderTicks}
       </div>
 
       {/* Simplified Flashcard Ratio Section */}
