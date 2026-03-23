@@ -103,7 +103,8 @@ function getOrdinalSuffix(num: number): string {
  */
 export async function findClosestAncestorWithAnyPriority(
   plugin: RNPlugin,
-  rem: PluginRem | undefined
+  rem: PluginRem | undefined,
+  targetType: 'IncRem' | 'Card' = 'Card'
 ): Promise<{
   priority: number;
   ancestorName: string;
@@ -131,43 +132,67 @@ export async function findClosestAncestorWithAnyPriority(
 
     currentLevel++; // Increment level for each parent we check
 
-    // Fetch Card Priority details first
+    // Fetch Card Priority details
     const parentCardPriorityValue = await parent.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
     const parentCardSource = await parent.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
+    const parentIncInfo = await getIncrementalRemFromRem(plugin, parent);
 
-    // 1. Check for explicit CardPriority: MANUAL or INCREMENTAL source (Highest Precedence)
-    // If source is "manual" or "incremental", we use this priority immediately,
-    // overriding any IncRem priority on the same node.
-    if (parentCardPriorityValue && (parentCardSource === 'manual' || parentCardSource === 'incremental')) {
-      const priority = parseInt(parentCardPriorityValue);
-      if (!isNaN(priority)) {
-        const parentName = await safeRemTextToString(plugin, parent.text);
-        const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
+    const hasCardPriority = parentCardPriorityValue && (parentCardSource === 'manual' || parentCardSource === 'incremental');
+    const hasIncRemPriority = !!parentIncInfo;
 
+    const getFormattedName = async () => {
+      const parentName = await safeRemTextToString(plugin, parent.text);
+      return parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
+    };
+
+    if (targetType === 'IncRem') {
+      // 1. Prefer IncRem Priority
+      if (hasIncRemPriority) {
         return {
-          priority: priority,
-          ancestorName: truncatedName,
-          sourceType: 'Card',
+          priority: parentIncInfo.priority,
+          ancestorName: await getFormattedName(),
+          sourceType: 'IncRem',
           level: currentLevel,
           levelDescription: getLevelDescription(currentLevel)
         };
       }
-    }
-
-    // 2. Check for Incremental Rem priority (Medium Precedence)
-    // If source was not "manual", we check for IncRem. This overrides "inherited" or "default" Card Priorities.
-    const parentIncInfo = await getIncrementalRemFromRem(plugin, parent);
-    if (parentIncInfo) {
-      const parentName = await safeRemTextToString(plugin, parent.text);
-      const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
-
-      return {
-        priority: parentIncInfo.priority,
-        ancestorName: truncatedName,
-        sourceType: 'IncRem',
-        level: currentLevel,
-        levelDescription: getLevelDescription(currentLevel)
-      };
+      // 2. Fallback to explicit Card Priority
+      if (hasCardPriority) {
+        const priority = parseInt(parentCardPriorityValue as string);
+        if (!isNaN(priority)) {
+          return {
+            priority: priority,
+            ancestorName: await getFormattedName(),
+            sourceType: 'Card',
+            level: currentLevel,
+            levelDescription: getLevelDescription(currentLevel)
+          };
+        }
+      }
+    } else {
+      // 1. Prefer explicit Card Priority (Default behavior)
+      if (hasCardPriority) {
+        const priority = parseInt(parentCardPriorityValue as string);
+        if (!isNaN(priority)) {
+          return {
+            priority: priority,
+            ancestorName: await getFormattedName(),
+            sourceType: 'Card',
+            level: currentLevel,
+            levelDescription: getLevelDescription(currentLevel)
+          };
+        }
+      }
+      // 2. Fallback to IncRem Priority
+      if (hasIncRemPriority) {
+        return {
+          priority: parentIncInfo.priority,
+          ancestorName: await getFormattedName(),
+          sourceType: 'IncRem',
+          level: currentLevel,
+          levelDescription: getLevelDescription(currentLevel)
+        };
+      }
     }
 
     // 3. Check for INHERITED CardPriority (Lowest Precedence - Fallback)
@@ -212,7 +237,7 @@ export async function getInitialPriority(
   rem: PluginRem,
   defaultPriority: number
 ): Promise<number> {
-  const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem);
+  const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem, 'IncRem');
 
   if (ancestorInfo) {
     console.log(`Inheriting priority ${ancestorInfo.priority} from ${ancestorInfo.sourceType} ancestor: ${ancestorInfo.ancestorName}`);

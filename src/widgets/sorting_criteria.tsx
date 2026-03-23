@@ -49,6 +49,14 @@ const sliderTicks = (
   </div>
 );
 
+const formatPercentage = (val: number) => {
+  const pct = val * 100;
+  if (pct > 0 && pct < 1) {
+    return pct.toFixed(1);
+  }
+  return Math.round(pct).toString();
+};
+
 export function SortingCriteria() {
   const plugin = usePlugin();
 
@@ -156,7 +164,7 @@ export function SortingCriteria() {
           </label>
         </div>
         <div className="rn-clr-content-secondary">
-          {Math.round((sortingRandomness ?? DEFAULT_RANDOMNESS) * 100)}% of Items Swapped
+          {formatPercentage(sortingRandomness ?? DEFAULT_RANDOMNESS)}% of Items Swapped
         </div>
         <input
           className="w-full"
@@ -186,7 +194,7 @@ export function SortingCriteria() {
           For Priority Review Documents (do not affect regular RemNote Queue!)
         </div>
         <div className="rn-clr-content-secondary">
-          {Math.round((cardRandomness ?? DEFAULT_CARD_RANDOMNESS) * 100)}% of Items Swapped
+          {formatPercentage(cardRandomness ?? DEFAULT_CARD_RANDOMNESS)}% of Items Swapped
         </div>
         <input
           className="w-full"
