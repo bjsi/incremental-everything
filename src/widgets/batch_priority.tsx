@@ -15,7 +15,7 @@ import {
 } from '../lib/consts';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, CardPriorityInfo } from '../lib/card_priority/types';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
-import { setCardPriority, recalculateTreeInheritance } from '../lib/card_priority';
+import { setCardPriority } from '../lib/card_priority';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -603,32 +603,34 @@ function BatchPriority() {
       }
       console.log(`⏱️ Phase 2 (IncRem cache sync): ${Math.round(performance.now() - t2)}ms`);
 
-      // Phase 3: Cascade inherited card priorities
-      const t3 = performance.now();
-      console.log('📊 BatchPriority: Cascading inherited priorities');
-      if (focusedRemId) {
-        const focusedRem = await plugin.rem.findOne(focusedRemId);
-        if (focusedRem) {
-          await recalculateTreeInheritance(plugin, focusedRem);
-        }
+      // Phase 3: Delegate inheritance cascade to the persistent index widget
+      // Popup widgets are killed on close, so we can't run long tasks here.
+      // Instead, write the rem ID to session storage — the tracker in tracker.ts
+      // will pick it up and run recalculateTreeInheritance in the background.
+      // The batch_priority_active flag stays UP until the tracker finishes.
+      const capturedFocusedRemId = focusedRemId;
+      if (capturedFocusedRemId) {
+        console.log('📊 BatchPriority: Delegating inheritance cascade to background tracker...');
+        await plugin.storage.setSession('pendingInheritanceCascade', capturedFocusedRemId);
+      } else {
+        await plugin.storage.setSession('batch_priority_active', false);
       }
-      console.log(`⏱️ Phase 3 (Inheritance cascade): ${Math.round(performance.now() - t3)}ms`);
 
-      // Flush the cache properly after all calculations
+      // Flush the direct priority writes immediately (Phase 1+2 data)
       const { flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
       await flushCacheUpdatesNow(plugin);
 
-      console.log('✅ BatchPriority: Successfully applied all changes');
-      await plugin.app.toast(`Successfully updated priority for ${toUpdate.length} rem(s)`);
+      console.log('✅ BatchPriority: Applied all changes (cascade delegated to background)');
+      await plugin.app.toast(`Updated ${toUpdate.length} priorities. Inheritance cascade running in background...`);
       plugin.widget.closePopup();
 
     } catch (error) {
       console.error('❌ BatchPriority: Error applying changes:', error);
       await plugin.app.toast('Error applying changes');
+      await plugin.storage.setSession('batch_priority_active', false);
     } finally {
       setIsApplying(false);
       isApplyingRef.current = false;
-      await plugin.storage.setSession('batch_priority_active', false);
     }
   };
 
