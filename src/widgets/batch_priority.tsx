@@ -556,7 +556,8 @@ function BatchPriority() {
     await plugin.storage.setSession('batch_priority_active', true);
 
     try {
-      // Update each rem's priority
+      // Phase 1: Update each rem's priority
+      const t1 = performance.now();
       for (let i = 0; i < toUpdate.length; i++) {
         const remData = toUpdate[i];
 
@@ -583,31 +584,27 @@ function BatchPriority() {
           setAppliedCount(i + 1);
         }
       }
+      console.log(`⏱️ Phase 1 (DB writes): ${Math.round(performance.now() - t1)}ms`);
 
-      // Update the session storage and cascade priorities
+      // Phase 2: Update the IncRem session cache in bulk (single write)
+      const t2 = performance.now();
       console.log('📊 BatchPriority: Updating session storage for IncRems');
-      const currentIncCache = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-      let incCacheModified = false;
-
-      for (const remData of toUpdate) {
-        if (remData.hasIncRem && remData.newIncPriority !== null) {
-          const updatedIncRem = await getIncrementalRemFromRem(plugin, remData.rem);
-          if (updatedIncRem) {
-             const index = currentIncCache.findIndex(r => r.remId === updatedIncRem.remId);
-             if (index !== -1) {
-               currentIncCache[index] = updatedIncRem;
-             } else {
-               currentIncCache.push(updatedIncRem);
-             }
-             incCacheModified = true;
+      const incRemsToUpdate = toUpdate.filter(r => r.hasIncRem && r.newIncPriority !== null);
+      if (incRemsToUpdate.length > 0) {
+        const currentIncCache = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+        for (const remData of incRemsToUpdate) {
+          const index = currentIncCache.findIndex(r => r.remId === remData.remId);
+          if (index !== -1) {
+            // Update priority in-place without re-querying the rem
+            currentIncCache[index] = { ...currentIncCache[index], priority: remData.newIncPriority! };
           }
         }
+        await plugin.storage.setSession(allIncrementalRemKey, currentIncCache);
       }
+      console.log(`⏱️ Phase 2 (IncRem cache sync): ${Math.round(performance.now() - t2)}ms`);
 
-      if (incCacheModified) {
-         await plugin.storage.setSession(allIncrementalRemKey, currentIncCache);
-      }
-
+      // Phase 3: Cascade inherited card priorities
+      const t3 = performance.now();
       console.log('📊 BatchPriority: Cascading inherited priorities');
       if (focusedRemId) {
         const focusedRem = await plugin.rem.findOne(focusedRemId);
@@ -615,6 +612,7 @@ function BatchPriority() {
           await recalculateTreeInheritance(plugin, focusedRem);
         }
       }
+      console.log(`⏱️ Phase 3 (Inheritance cascade): ${Math.round(performance.now() - t3)}ms`);
 
       // Flush the cache properly after all calculations
       const { flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
