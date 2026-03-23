@@ -510,10 +510,6 @@ async function getDueCardsWithPrioritiesSlow(
   return results;
 }
 
-/**
- * Batch update priorities for multiple rems
- * Useful when changing priority of a parent with many descendants
- */
 export async function batchUpdateInheritedPriorities(
   plugin: RNPlugin,
   parentRem: PluginRem,
@@ -543,6 +539,45 @@ export async function batchUpdateInheritedPriorities(
     );
   }
 
+  return updatedCount;
+}
+
+/**
+ * Recalculates inherited priorities for an entire tree dynamically.
+ * Highly optimized for batch operations where multiple ancestors changed.
+ */
+export async function recalculateTreeInheritance(
+  plugin: RNPlugin,
+  rootRem: PluginRem
+): Promise<number> {
+  let updatedCount = 0;
+  const descendants = await rootRem.getDescendants();
+  
+  const batchSize = 50;
+  for (let i = 0; i < descendants.length; i += batchSize) {
+    const batch = descendants.slice(i, i + batchSize);
+    
+    await Promise.all(batch.map(async (descendant) => {
+      const incInfo = await getIncrementalRemFromRem(plugin, descendant);
+      if (incInfo) return;
+      
+      const cardInfo = await getCardPriority(plugin, descendant);
+      if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
+        const closerAncestor = await findClosestAncestorWithPriority(plugin, descendant);
+        const targetPriority = closerAncestor ? closerAncestor.priority : ((await plugin.settings.getSetting<number>('defaultCardPriority')) || 50);
+        const targetSource = closerAncestor ? 'inherited' : 'default';
+        
+        if (!cardInfo || cardInfo.priority !== targetPriority || cardInfo.source !== targetSource) {
+           await setCardPriority(plugin, descendant, targetPriority, targetSource);
+           // We let the caller flush the cache updates
+           // Import updateCardPriorityCache locally to avoid circular dependencies if necessary
+           const { updateCardPriorityCache } = await import('./cache');
+           await updateCardPriorityCache(plugin, descendant._id);
+           updatedCount++;
+        }
+      }
+    }));
+  }
   return updatedCount;
 }
 
