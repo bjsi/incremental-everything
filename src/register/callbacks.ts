@@ -27,9 +27,9 @@ const QUEUE_LAYOUT_FIX_CSS = `
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content,
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content .rn-flashcard,
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content .rn-flashcard__content,
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content > .box-border,
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content div.fade-in-first-load:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]),
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .rn-queue__content div.fade-in-first-load:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) > div,
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) .box-border:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]),
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) div.fade-in-first-load:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]),
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) div.fade-in-first-load:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) > div,
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"] {
     flex-grow: 1 !important;
   }
@@ -49,7 +49,9 @@ export const resetSessionItemCounter = () => {
   sessionItemCounter = 0;
 };
 
-export function registerCallbacks(plugin: ReactRNPlugin) {
+  export function registerCallbacks(plugin: ReactRNPlugin) {
+  plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
+
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
     async (queueInfo) => {
@@ -72,7 +74,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         const remainingSeconds = Math.ceil((noIncRemTimerEnd - now) / 1000);
         // console.log('⚠️ TIMER IS ACTIVE - BLOCKING INCREM! Time remaining:', remainingSeconds, 'seconds');
 
-        await plugin.app.registerCSS(queueLayoutFixId, '');
+        // Removed dynamic unregistration: plugin.app.registerCSS(queueLayoutFixId, '');
         await plugin.app.registerCSS(queueCounterId, '');
 
         return null;
@@ -189,7 +191,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
 
         if (filtered.length === 0) {
           // console.log('⚠️ FILTERED LENGTH IS 0 - Returning null, will show a flashcard.');
-          await plugin.app.registerCSS(queueLayoutFixId, '');
+          // Removed dynamic unregistration: plugin.app.registerCSS(queueLayoutFixId, '');
           sessionItemCounter++;
           return null;
         }
@@ -213,7 +215,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           }
           first = filtered[0];
         }
-        await plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
+        // Removed dynamic registration: plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
         await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
 
         await plugin.storage.setSession(incremReviewStartTimeKey, Date.now());
@@ -242,7 +244,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         //       : 'N/A',
         // });
         sessionItemCounter++;
-        await plugin.app.registerCSS(queueLayoutFixId, '');
+        // Removed dynamic unregistration: plugin.app.registerCSS(queueLayoutFixId, '');
         // Bullet-proof mid-session reset: if the previous IncRem widget unmounted
         // unceremoniously (skipping its useEffect cleanup), ensure the flag is cleared
         // so regular flashcards can render their widgets (like CardPriorityDisplay).
