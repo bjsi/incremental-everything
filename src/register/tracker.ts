@@ -4,6 +4,10 @@ import { incrementalQueueActiveKey, currentIncRemKey, powerupCode } from '../lib
 
 export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
+    // Suppress caching operations while a batch tool is aggressively writing
+    const isBatchActive = await rp.storage.getSession<boolean>('batch_priority_active');
+    if (isBatchActive) return;
+
     console.log('[Tracker] IncRem cache load triggered by plugin.track()');
     await loadIncrementalRemCache(rp as any);
     console.log('[Tracker] IncRem cache load completed.');
@@ -79,6 +83,38 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       // Queue not active, reset state
       lastCheckedRemId = null;
       pollCount = 0;
+    }
+  });
+
+  // Background inheritance cascade watcher
+  // The batch_priority popup can't run long tasks because closing the popup kills them.
+  // Instead, it writes 'pendingInheritanceCascade' to session storage, and THIS tracker
+  // (running in the persistent index widget) picks it up and runs the cascade.
+  let cascadeRunning = false;
+  plugin.track(async (rp) => {
+    const pendingRemId = await rp.storage.getSession<string>('pendingInheritanceCascade');
+    if (!pendingRemId || cascadeRunning) return;
+
+    cascadeRunning = true;
+    // Clear the flag immediately so we don't re-trigger
+    await plugin.storage.setSession('pendingInheritanceCascade', null);
+
+    console.log('[Tracker] Background inheritance cascade started for remId:', pendingRemId);
+    try {
+      const { recalculateTreeInheritance } = await import('../lib/card_priority');
+      const { flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
+      const rem = await plugin.rem.findOne(pendingRemId);
+      if (rem) {
+        const t = performance.now();
+        await recalculateTreeInheritance(plugin as any, rem);
+        await flushCacheUpdatesNow(plugin as any);
+        console.log(`[Tracker] Background inheritance cascade complete in ${Math.round(performance.now() - t)}ms`);
+      }
+    } catch (err) {
+      console.error('[Tracker] Background inheritance cascade failed:', err);
+    } finally {
+      cascadeRunning = false;
+      await plugin.storage.setSession('batch_priority_active', false);
     }
   });
 }

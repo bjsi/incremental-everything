@@ -15,7 +15,7 @@ import {
 } from '../lib/consts';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, CardPriorityInfo } from '../lib/card_priority/types';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
-import { setCardPriority, recalculateTreeInheritance } from '../lib/card_priority';
+import { setCardPriority } from '../lib/card_priority';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -57,15 +57,26 @@ function BatchPriority() {
   console.log('🚀 BatchPriority: Component rendering');
   const plugin = usePlugin();
 
+  const cachedFocusedRemIdRef = useRef<string | undefined>(undefined);
+
   // Get the focused rem from session storage
   const focusedRemId = useTrackerPlugin(
     async (rp) => {
+      if (isApplyingRef.current) {
+        return cachedFocusedRemIdRef.current;
+      }
       const id = await rp.storage.getSession<string>('batchPriorityFocusedRem');
       console.log('📌 BatchPriority: Focused rem ID from session:', id);
       return id;
     },
     []
   );
+
+  useEffect(() => {
+    if (!isApplyingRef.current && focusedRemId) {
+      cachedFocusedRemIdRef.current = focusedRemId;
+    }
+  }, [focusedRemId]);
 
   // State management
   const [incrementalRems, setIncrementalRems] = useState<PrioritizedItemData[]>([]);
@@ -94,23 +105,46 @@ function BatchPriority() {
   const [previousStates, setPreviousStates] = useState<PrioritizedItemData[][]>([]);
   const isApplyingRef = useRef(false);
 
-  // Get all incremental rems from storage
+  // Cached refs for freezing reactive hooks during batch apply
+  const cachedIncRemsRef = useRef<IncrementalRem[] | null>(null);
+  const cachedCardInfosRef = useRef<CardPriorityInfo[] | null>(null);
+
+  // Get all incremental rems from storage (frozen during apply)
   const allIncrementalRems = useTrackerPlugin(
-    (rp) => {
+    async (rp) => {
+      if (isApplyingRef.current) {
+        return cachedIncRemsRef.current ?? undefined;
+      }
       console.log('📊 BatchPriority: Fetching all incremental rems from storage');
       return rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);
     },
     []
   );
 
-  // Get all card priorities from storage
+  // Get all card priorities from storage (frozen during apply)
   const allCardInfos = useTrackerPlugin(
-    (rp) => {
+    async (rp) => {
+      if (isApplyingRef.current) {
+        return cachedCardInfosRef.current ?? undefined;
+      }
       console.log('📊 BatchPriority: Fetching all card priorities from storage');
       return rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
     },
     []
   );
+
+  // Keep cached refs in sync when not applying
+  useEffect(() => {
+    if (!isApplyingRef.current && Array.isArray(allIncrementalRems)) {
+      cachedIncRemsRef.current = allIncrementalRems;
+    }
+  }, [allIncrementalRems]);
+
+  useEffect(() => {
+    if (!isApplyingRef.current && Array.isArray(allCardInfos)) {
+      cachedCardInfosRef.current = allCardInfos;
+    }
+  }, [allCardInfos]);
 
   // Load incremental rems in the focused rem's hierarchy
   useEffect(() => {
@@ -217,8 +251,8 @@ function BatchPriority() {
               const depth = rem._id === focusedRemId ? 0 : path.length - 1;
 
               let cardStatus: 'Has Cards' | 'Inheritance only' | null = null;
-              if (hasValidCardPriority && allCardInfos) {
-                const cardInfo = allCardInfos.find(ci => ci.remId === rem._id);
+              if (hasValidCardPriority && Array.isArray(allCardInfos)) {
+                const cardInfo = allCardInfos.find((ci: CardPriorityInfo) => ci.remId === rem._id);
                 if (cardInfo) {
                   cardStatus = cardInfo.cardCount > 0 ? 'Has Cards' : 'Inheritance only';
                 }
@@ -243,9 +277,9 @@ function BatchPriority() {
                 path,
                 pathIds,
                 isChecked: true,
-                incPercentile: allIncrementalRems ?
+                incPercentile: Array.isArray(allIncrementalRems) ?
                   calculateRelativePercentile(allIncrementalRems, rem._id) : null,
-                cardPercentile: allCardInfos ?
+                cardPercentile: Array.isArray(allCardInfos) ?
                   calculateRelativePercentile(allCardInfos, rem._id) : null,
                 originalIndex: remIndexMap.get(rem._id) ?? 0
               });
@@ -522,7 +556,8 @@ function BatchPriority() {
     await plugin.storage.setSession('batch_priority_active', true);
 
     try {
-      // Update each rem's priority
+      // Phase 1: Update each rem's priority
+      const t1 = performance.now();
       for (let i = 0; i < toUpdate.length; i++) {
         const remData = toUpdate[i];
 
@@ -541,46 +576,61 @@ function BatchPriority() {
             ? remData.cardPrioritySource
             : 'manual';
           await setCardPriority(plugin, remData.rem, remData.newCardPriority, source as any);
-          await updateCardPriorityCache(plugin, remData.remId);
         }
 
-        setAppliedCount(i + 1);
+        // Only update the progress bar every 10% (or on the last item) to avoid re-renders
+        const progressStep = Math.max(1, Math.floor(toUpdate.length / 10));
+        if ((i + 1) % progressStep === 0 || i === toUpdate.length - 1) {
+          setAppliedCount(i + 1);
+        }
       }
+      console.log(`⏱️ Phase 1 (DB writes): ${Math.round(performance.now() - t1)}ms`);
 
-      // Update the session storage and cascade priorities
+      // Phase 2: Update the IncRem session cache in bulk (single write)
+      const t2 = performance.now();
       console.log('📊 BatchPriority: Updating session storage for IncRems');
-      for (const remData of toUpdate) {
-        if (remData.hasIncRem && remData.newIncPriority !== null) {
-          const updatedIncRem = await getIncrementalRemFromRem(plugin, remData.rem);
-          if (updatedIncRem) {
-            await updateIncrementalRemCache(plugin, updatedIncRem);
+      const incRemsToUpdate = toUpdate.filter(r => r.hasIncRem && r.newIncPriority !== null);
+      if (incRemsToUpdate.length > 0) {
+        const currentIncCache = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+        for (const remData of incRemsToUpdate) {
+          const index = currentIncCache.findIndex(r => r.remId === remData.remId);
+          if (index !== -1) {
+            // Update priority in-place without re-querying the rem
+            currentIncCache[index] = { ...currentIncCache[index], priority: remData.newIncPriority! };
           }
         }
+        await plugin.storage.setSession(allIncrementalRemKey, currentIncCache);
+      }
+      console.log(`⏱️ Phase 2 (IncRem cache sync): ${Math.round(performance.now() - t2)}ms`);
+
+      // Phase 3: Delegate inheritance cascade to the persistent index widget
+      // Popup widgets are killed on close, so we can't run long tasks here.
+      // Instead, write the rem ID to session storage — the tracker in tracker.ts
+      // will pick it up and run recalculateTreeInheritance in the background.
+      // The batch_priority_active flag stays UP until the tracker finishes.
+      const capturedFocusedRemId = focusedRemId;
+      if (capturedFocusedRemId) {
+        console.log('📊 BatchPriority: Delegating inheritance cascade to background tracker...');
+        await plugin.storage.setSession('pendingInheritanceCascade', capturedFocusedRemId);
+      } else {
+        await plugin.storage.setSession('batch_priority_active', false);
       }
 
-      console.log('📊 BatchPriority: Cascading inherited priorities');
-      if (focusedRemId) {
-        const focusedRem = await plugin.rem.findOne(focusedRemId);
-        if (focusedRem) {
-          await recalculateTreeInheritance(plugin, focusedRem);
-        }
-      }
-
-      // Flush the cache properly after all calculations
+      // Flush the direct priority writes immediately (Phase 1+2 data)
       const { flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
       await flushCacheUpdatesNow(plugin);
 
-      console.log('✅ BatchPriority: Successfully applied all changes');
-      await plugin.app.toast(`Successfully updated priority for ${toUpdate.length} rem(s)`);
+      console.log('✅ BatchPriority: Applied all changes (cascade delegated to background)');
+      await plugin.app.toast(`Updated ${toUpdate.length} priorities. Inheritance cascade running in background...`);
       plugin.widget.closePopup();
 
     } catch (error) {
       console.error('❌ BatchPriority: Error applying changes:', error);
       await plugin.app.toast('Error applying changes');
+      await plugin.storage.setSession('batch_priority_active', false);
     } finally {
       setIsApplying(false);
       isApplyingRef.current = false;
-      await plugin.storage.setSession('batch_priority_active', false);
     }
   };
 
@@ -1379,7 +1429,7 @@ function BatchPriority() {
                     )}
                   </div>
                   <div style={{ padding: '8px', fontSize: '12px' }}>
-                    {dayjs(remData.nextRepDate).format('MMM D, YY')}
+                    {remData.hasIncRem && remData.nextRepDate ? dayjs(remData.nextRepDate).format('MMM D, YY') : '-'}
                   </div>
                   <div style={{ padding: '8px', fontSize: '12px' }}>
                     {remData.hasIncRem ? remData.repetitions : '-'}
