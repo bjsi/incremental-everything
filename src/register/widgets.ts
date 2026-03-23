@@ -27,8 +27,8 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('batch_priority', WidgetLocation.Popup, {
     dimensions: {
-      width: 1000,
-      height: 950,
+      width: 1200,
+      height: 1150,
     },
   });
 
@@ -143,17 +143,17 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
   // Register incremental rem list popup
   plugin.app.registerWidget('inc_rem_list', WidgetLocation.Popup, {
-    dimensions: { height: '600px', width: '800px' },
+    dimensions: { height: 600, width: 800 },
   });
 
   // Register incremental rem main view - comprehensive view with filters
   plugin.app.registerWidget('inc_rem_main_view', WidgetLocation.Popup, {
-    dimensions: { height: '800px', width: '1000px' },
+    dimensions: { height: 800, width: 1000 },
   });
 
   // Register parent selector popup for creating rems under incremental rems
   plugin.app.registerWidget(parentSelectorWidgetId, WidgetLocation.Popup, {
-    dimensions: { height: '850px', width: '400px' },
+    dimensions: { height: 850, width: 400 },
   });
 
   plugin.app.registerWidget('priority_review_graph', WidgetLocation.UnderRemEditor, {
