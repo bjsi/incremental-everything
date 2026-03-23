@@ -473,6 +473,9 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
     AppEvents.GlobalRemChanged,
     undefined,
     async (data) => {
+      const isBatchActive = await plugin.storage.getSession<boolean>('batch_priority_active');
+      if (isBatchActive) return;
+
       clearTimeout(remChangeDebounceTimer);
 
       const rem = await plugin.rem.findOne(data.remId);
@@ -593,11 +596,6 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
 
         // Original logic continues below
         const inQueue = !!(await plugin.storage.getSession(currentSubQueueIdKey));
-        const isBatchActive = await plugin.storage.getSession<boolean>('batch_priority_active');
-
-        if (isBatchActive) {
-          return;
-        }
 
         const manualPendingRems = await plugin.storage.getSession<string[]>('manual_priority_pending_rems') || [];
         const isManualUpdate = manualPendingRems.includes(data.remId);

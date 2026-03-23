@@ -4,6 +4,10 @@ import { incrementalQueueActiveKey, currentIncRemKey, powerupCode } from '../lib
 
 export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
+    // Suppress caching operations while a batch tool is aggressively writing
+    const isBatchActive = await rp.storage.getSession<boolean>('batch_priority_active');
+    if (isBatchActive) return;
+
     console.log('[Tracker] IncRem cache load triggered by plugin.track()');
     await loadIncrementalRemCache(rp as any);
     console.log('[Tracker] IncRem cache load completed.');

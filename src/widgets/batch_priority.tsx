@@ -57,15 +57,26 @@ function BatchPriority() {
   console.log('🚀 BatchPriority: Component rendering');
   const plugin = usePlugin();
 
+  const cachedFocusedRemIdRef = useRef<string | undefined>(undefined);
+
   // Get the focused rem from session storage
   const focusedRemId = useTrackerPlugin(
     async (rp) => {
+      if (isApplyingRef.current) {
+        return cachedFocusedRemIdRef.current;
+      }
       const id = await rp.storage.getSession<string>('batchPriorityFocusedRem');
       console.log('📌 BatchPriority: Focused rem ID from session:', id);
       return id;
     },
     []
   );
+
+  useEffect(() => {
+    if (!isApplyingRef.current && focusedRemId) {
+      cachedFocusedRemIdRef.current = focusedRemId;
+    }
+  }, [focusedRemId]);
 
   // State management
   const [incrementalRems, setIncrementalRems] = useState<PrioritizedItemData[]>([]);
@@ -94,23 +105,46 @@ function BatchPriority() {
   const [previousStates, setPreviousStates] = useState<PrioritizedItemData[][]>([]);
   const isApplyingRef = useRef(false);
 
-  // Get all incremental rems from storage
+  // Cached refs for freezing reactive hooks during batch apply
+  const cachedIncRemsRef = useRef<IncrementalRem[] | null>(null);
+  const cachedCardInfosRef = useRef<CardPriorityInfo[] | null>(null);
+
+  // Get all incremental rems from storage (frozen during apply)
   const allIncrementalRems = useTrackerPlugin(
-    (rp) => {
+    async (rp) => {
+      if (isApplyingRef.current) {
+        return cachedIncRemsRef.current ?? undefined;
+      }
       console.log('📊 BatchPriority: Fetching all incremental rems from storage');
       return rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);
     },
     []
   );
 
-  // Get all card priorities from storage
+  // Get all card priorities from storage (frozen during apply)
   const allCardInfos = useTrackerPlugin(
-    (rp) => {
+    async (rp) => {
+      if (isApplyingRef.current) {
+        return cachedCardInfosRef.current ?? undefined;
+      }
       console.log('📊 BatchPriority: Fetching all card priorities from storage');
       return rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
     },
     []
   );
+
+  // Keep cached refs in sync when not applying
+  useEffect(() => {
+    if (!isApplyingRef.current && Array.isArray(allIncrementalRems)) {
+      cachedIncRemsRef.current = allIncrementalRems;
+    }
+  }, [allIncrementalRems]);
+
+  useEffect(() => {
+    if (!isApplyingRef.current && Array.isArray(allCardInfos)) {
+      cachedCardInfosRef.current = allCardInfos;
+    }
+  }, [allCardInfos]);
 
   // Load incremental rems in the focused rem's hierarchy
   useEffect(() => {
@@ -217,8 +251,8 @@ function BatchPriority() {
               const depth = rem._id === focusedRemId ? 0 : path.length - 1;
 
               let cardStatus: 'Has Cards' | 'Inheritance only' | null = null;
-              if (hasValidCardPriority && allCardInfos) {
-                const cardInfo = allCardInfos.find(ci => ci.remId === rem._id);
+              if (hasValidCardPriority && Array.isArray(allCardInfos)) {
+                const cardInfo = allCardInfos.find((ci: CardPriorityInfo) => ci.remId === rem._id);
                 if (cardInfo) {
                   cardStatus = cardInfo.cardCount > 0 ? 'Has Cards' : 'Inheritance only';
                 }
@@ -243,9 +277,9 @@ function BatchPriority() {
                 path,
                 pathIds,
                 isChecked: true,
-                incPercentile: allIncrementalRems ?
+                incPercentile: Array.isArray(allIncrementalRems) ?
                   calculateRelativePercentile(allIncrementalRems, rem._id) : null,
-                cardPercentile: allCardInfos ?
+                cardPercentile: Array.isArray(allCardInfos) ?
                   calculateRelativePercentile(allCardInfos, rem._id) : null,
                 originalIndex: remIndexMap.get(rem._id) ?? 0
               });
@@ -541,21 +575,37 @@ function BatchPriority() {
             ? remData.cardPrioritySource
             : 'manual';
           await setCardPriority(plugin, remData.rem, remData.newCardPriority, source as any);
-          await updateCardPriorityCache(plugin, remData.remId);
         }
 
-        setAppliedCount(i + 1);
+        // Only update the progress bar every 10% (or on the last item) to avoid re-renders
+        const progressStep = Math.max(1, Math.floor(toUpdate.length / 10));
+        if ((i + 1) % progressStep === 0 || i === toUpdate.length - 1) {
+          setAppliedCount(i + 1);
+        }
       }
 
       // Update the session storage and cascade priorities
       console.log('📊 BatchPriority: Updating session storage for IncRems');
+      const currentIncCache = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+      let incCacheModified = false;
+
       for (const remData of toUpdate) {
         if (remData.hasIncRem && remData.newIncPriority !== null) {
           const updatedIncRem = await getIncrementalRemFromRem(plugin, remData.rem);
           if (updatedIncRem) {
-            await updateIncrementalRemCache(plugin, updatedIncRem);
+             const index = currentIncCache.findIndex(r => r.remId === updatedIncRem.remId);
+             if (index !== -1) {
+               currentIncCache[index] = updatedIncRem;
+             } else {
+               currentIncCache.push(updatedIncRem);
+             }
+             incCacheModified = true;
           }
         }
+      }
+
+      if (incCacheModified) {
+         await plugin.storage.setSession(allIncrementalRemKey, currentIncCache);
       }
 
       console.log('📊 BatchPriority: Cascading inherited priorities');
@@ -1379,7 +1429,7 @@ function BatchPriority() {
                     )}
                   </div>
                   <div style={{ padding: '8px', fontSize: '12px' }}>
-                    {dayjs(remData.nextRepDate).format('MMM D, YY')}
+                    {remData.hasIncRem && remData.nextRepDate ? dayjs(remData.nextRepDate).format('MMM D, YY') : '-'}
                   </div>
                   <div style={{ padding: '8px', fontSize: '12px' }}>
                     {remData.hasIncRem ? remData.repetitions : '-'}
