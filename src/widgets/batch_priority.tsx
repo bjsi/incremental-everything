@@ -41,6 +41,7 @@ interface PrioritizedItemData {
   newCardPriority: number | null;
   cardPrioritySource: string | null;
   type: ActionItemType | 'rem';
+  cardStatus: 'Has Cards' | 'Inheritance only' | null;
   nextRepDate: number;
   repetitions: number;
   depth: number;
@@ -215,6 +216,14 @@ function BatchPriority() {
               const { path, pathIds } = await getRemPathWithIds(plugin, rem, focusedRemId);
               const depth = rem._id === focusedRemId ? 0 : path.length - 1;
 
+              let cardStatus: 'Has Cards' | 'Inheritance only' | null = null;
+              if (hasValidCardPriority && allCardInfos) {
+                 const cardInfo = allCardInfos.find(ci => ci.remId === rem._id);
+                 if (cardInfo) {
+                   cardStatus = cardInfo.cardCount > 0 ? 'Has Cards' : 'Inheritance only';
+                 }
+              }
+
               prioritizedData.push({
                 remId: rem._id,
                 rem: rem,
@@ -227,6 +236,7 @@ function BatchPriority() {
                 newCardPriority: null,
                 cardPrioritySource,
                 type: remType,
+                cardStatus,
                 nextRepDate,
                 repetitions,
                 depth,
@@ -740,10 +750,13 @@ function BatchPriority() {
       'pdf': 'PDF',
       'html': 'HTML',
       'youtube': 'YouTube',
-      'youtube-highlight': 'Video Extract',
+      'youtube-highlight': 'Youtube Extract',
+      'video': 'Video',
       'rem': 'Extract',
       'pdf-highlight': 'PDF Highlight',
-      'html-highlight': 'HTML Highlight'
+      'html-highlight': 'HTML Highlight',
+      'pdf-note': 'PDF Note',
+      'unknown': 'Unknown'
     };
     return typeMap[type] || type;
   };
@@ -1316,8 +1329,24 @@ function BatchPriority() {
                       </span>
                     )}
                   </div>
-                  <div style={{ padding: '8px', fontSize: '12px' }}>
-                    {getDisplayType(remData.type)}
+                  <div style={{ padding: '8px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {remData.hasIncRem && (
+                      <div style={{ whiteSpace: 'nowrap' }}>
+                        {remData.hasIncRem && remData.hasCardPriority && <span style={{color:'#6b7280',fontSize:'10px'}}>Inc: </span>}
+                        {getDisplayType(remData.type)}
+                      </div>
+                    )}
+                    {remData.hasCardPriority && remData.cardStatus && (
+                      <div style={{ whiteSpace: 'nowrap' }}>
+                        {remData.hasIncRem && remData.hasCardPriority && <span style={{color:'#6b7280',fontSize:'10px'}}>Card: </span>}
+                        {remData.cardStatus}
+                      </div>
+                    )}
+                    {!remData.hasIncRem && !remData.hasCardPriority && (
+                      <div style={{ whiteSpace: 'nowrap' }}>
+                        {getDisplayType(remData.type)}
+                      </div>
+                    )}
                   </div>
                   <div style={{ padding: '8px', fontSize: '12px' }}>
                     {dayjs(remData.nextRepDate).format('MMM D, YY')}
