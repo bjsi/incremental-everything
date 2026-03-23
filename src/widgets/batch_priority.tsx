@@ -10,9 +10,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   powerupCode,
   prioritySlotCode,
-  allIncrementalRemKey
+  allIncrementalRemKey,
+  allCardPriorityInfoKey
 } from '../lib/consts';
-import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from '../lib/card_priority/types';
+import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, CardPriorityInfo } from '../lib/card_priority/types';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { setCardPriority, recalculateTreeInheritance } from '../lib/card_priority';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
@@ -46,7 +47,8 @@ interface PrioritizedItemData {
   path: string[];
   pathIds: string[];
   isChecked: boolean;
-  percentile: number | null;
+  incPercentile: number | null;
+  cardPercentile: number | null;
   originalIndex: number;
 }
 
@@ -96,6 +98,15 @@ function BatchPriority() {
     (rp) => {
       console.log('📊 BatchPriority: Fetching all incremental rems from storage');
       return rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);
+    },
+    []
+  );
+
+  // Get all card priorities from storage
+  const allCardInfos = useTrackerPlugin(
+    (rp) => {
+      console.log('📊 BatchPriority: Fetching all card priorities from storage');
+      return rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
     },
     []
   );
@@ -222,8 +233,10 @@ function BatchPriority() {
                 path,
                 pathIds,
                 isChecked: true,
-                percentile: allIncrementalRems ?
+                incPercentile: allIncrementalRems ?
                   calculateRelativePercentile(allIncrementalRems, rem._id) : null,
+                cardPercentile: allCardInfos ?
+                  calculateRelativePercentile(allCardInfos, rem._id) : null,
                 originalIndex: remIndexMap.get(rem._id) ?? 0
               });
             }
@@ -260,7 +273,7 @@ function BatchPriority() {
     };
 
     loadIncrementalRems();
-  }, [focusedRemId, plugin, allIncrementalRems]);
+  }, [focusedRemId, plugin, allIncrementalRems, allCardInfos]);
 
   // Apply filters and sorting
   useEffect(() => {
@@ -339,7 +352,7 @@ function BatchPriority() {
             compareValue = a.repetitions - b.repetitions;
             break;
           case 'percentile':
-            compareValue = (a.percentile ?? 100) - (b.percentile ?? 100);
+            compareValue = (a.incPercentile ?? a.cardPercentile ?? 100) - (b.incPercentile ?? b.cardPercentile ?? 100);
             break;
         }
 
@@ -576,7 +589,7 @@ function BatchPriority() {
       rem.newIncPriority ?? '',
       rem.newCardPriority ?? '',
       rem.cardPrioritySource ?? '',
-      rem.percentile || '',
+      (rem.incPercentile ?? rem.cardPercentile) || '',
       getDisplayType(rem.type),
       dayjs(rem.nextRepDate).format('YYYY-MM-DD'),
       rem.repetitions
@@ -1192,8 +1205,8 @@ function BatchPriority() {
 
               const hasChildNodes = hasChildren(remData.remId);
               const isExpanded = expandedNodes.has(remData.remId);
-              const priorityColor = remData.percentile ?
-                percentileToHslColor(remData.percentile) : 'transparent';
+              const incColor = remData.incPercentile ? percentileToHslColor(remData.incPercentile) : 'transparent';
+              const cardColor = remData.cardPercentile ? percentileToHslColor(remData.cardPercentile) : 'transparent';
 
               return (
                 <div
@@ -1271,19 +1284,37 @@ function BatchPriority() {
                       </span>
                     )}
                   </div>
-                  <div style={{ padding: '8px' }}>
-                    <span
-                      style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        color: 'white',
-                        backgroundColor: priorityColor,
-                        display: 'inline-block'
-                      }}
-                    >
-                      {remData.percentile}%
-                    </span>
+                  <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                    {remData.incPercentile !== null && (
+                      <span
+                        style={{
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          color: 'white',
+                          backgroundColor: incColor,
+                          display: 'inline-block',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {remData.incPercentile !== null && remData.cardPercentile !== null ? `Inc: ${Math.round(remData.incPercentile)}` : remData.incPercentile}%
+                      </span>
+                    )}
+                    {remData.cardPercentile !== null && (
+                      <span
+                        style={{
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          color: 'white',
+                          backgroundColor: cardColor,
+                          display: 'inline-block',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {remData.incPercentile !== null && remData.cardPercentile !== null ? `Card: ${Math.round(remData.cardPercentile)}` : remData.cardPercentile}%
+                      </span>
+                    )}
                   </div>
                   <div style={{ padding: '8px', fontSize: '12px' }}>
                     {getDisplayType(remData.type)}
