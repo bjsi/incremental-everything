@@ -1382,7 +1382,7 @@ function BatchPriority() {
                     {dayjs(remData.nextRepDate).format('MMM D, YY')}
                   </div>
                   <div style={{ padding: '8px', fontSize: '12px' }}>
-                    {remData.repetitions}
+                    {remData.hasIncRem ? remData.repetitions : '-'}
                   </div>
                 </div>
               );
