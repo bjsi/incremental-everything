@@ -45,6 +45,68 @@ export async function calculateCardPriorityShield(
 ): Promise<CardPriorityShieldStatus> {
   const status: CardPriorityShieldStatus = { kb: null, doc: null };
   const seenRemIds = (await plugin.storage.getSession<RemId[]>(seenCardInSessionKey)) || [];
+  const MAX_TOTAL_VERIFY_CALLS = 20;
+  const now = Date.now();
+
+  /**
+   * Verify candidates grouped by priority level.
+   * Checks ALL candidates at each level before escalating to next.
+   * Caps total rem.getCards() calls at MAX_TOTAL_VERIFY_CALLS.
+   */
+  async function verifyTopMissedByPriorityLevel(
+    candidates: CardPriorityInfo[],
+    label: string
+  ): Promise<CardPriorityInfo | undefined> {
+    const sorted = _.sortBy(candidates, (info) => info.priority);
+    let totalChecks = 0;
+    let idx = 0;
+
+    while (idx < sorted.length && totalChecks < MAX_TOTAL_VERIFY_CALLS) {
+      const currentPriority = sorted[idx].priority;
+
+      // Collect all candidates at this priority level
+      const group: CardPriorityInfo[] = [];
+      while (idx < sorted.length && sorted[idx].priority === currentPriority) {
+        group.push(sorted[idx]);
+        idx++;
+      }
+
+      // Verify every candidate in this priority group
+      let staleCount = 0;
+      for (const candidate of group) {
+        if (totalChecks >= MAX_TOTAL_VERIFY_CALLS) {
+          console.warn(`[CardPriorityShield] ${label}: Hit verification cap (${MAX_TOTAL_VERIFY_CALLS}) at priority ${currentPriority}. Trusting remaining cache.`);
+          return candidate;
+        }
+
+        const rem = await plugin.rem.findOne(candidate.remId);
+        if (!rem) {
+          console.warn(`[CardPriorityShield] ⚠️ ${label} Ghost: rem ${candidate.remId} not found (cached priority ${candidate.priority})`);
+          totalChecks++;
+          staleCount++;
+          continue;
+        }
+        const cards = await rem.getCards();
+        totalChecks++;
+        const actualDue = cards.filter((c) => (c.nextRepetitionTime ?? Infinity) <= now).length;
+
+        if (actualDue > 0) {
+          if (staleCount > 0) {
+            console.log(`[CardPriorityShield] ✅ ${label} verified at priority ${currentPriority} after skipping ${staleCount} stale entries.`);
+          }
+          return candidate;
+        } else {
+          console.warn(`[CardPriorityShield] ⚠️ ${label} Stale: rem ${candidate.remId} cached dueCards=${candidate.dueCards}, actual=${actualDue} (priority ${candidate.priority})`);
+          staleCount++;
+        }
+      }
+
+      // All candidates at this priority level are stale — escalate
+      console.log(`[CardPriorityShield] ${label}: All ${group.length} entries at priority ${currentPriority} are stale. Moving to next priority level...`);
+    }
+
+    return undefined;
+  }
 
   // 1. Find all unreviewed due cards in the KB from the FAST cache.
   const unreviewedDueKb = allPrioritizedCardInfo.filter(
@@ -52,20 +114,21 @@ export async function calculateCardPriorityShield(
   );
 
   if (unreviewedDueKb.length > 0) {
-    const topMissedInKb = _.minBy(unreviewedDueKb, (info) => info.priority);
-    if (topMissedInKb) {
+    const verifiedTopMissed = await verifyTopMissedByPriorityLevel(unreviewedDueKb, 'KB');
+
+    if (verifiedTopMissed) {
       const percentile = calculateVolumeBasedPercentile(
         allPrioritizedCardInfo,
-        topMissedInKb.priority,
+        verifiedTopMissed.priority,
         (info) => info.dueCards > 0 && (!seenRemIds.includes(info.remId) || info.remId === currentRemId)
       );
 
       status.kb = {
-        absolute: topMissedInKb.priority,
+        absolute: verifiedTopMissed.priority,
         percentile: percentile,
-        universeSize: allPrioritizedCardInfo.length, // NEW: Track KB universe size
+        universeSize: allPrioritizedCardInfo.length,
       };
-      console.log(`[CardPriorityShield] KB Shield: Priority ${topMissedInKb.priority}, Percentile ${percentile}%, Universe ${allPrioritizedCardInfo.length}`);
+      console.log(`[CardPriorityShield] KB Shield: Priority ${verifiedTopMissed.priority}, Percentile ${percentile}%, Universe ${allPrioritizedCardInfo.length}, Triggered by remId: ${verifiedTopMissed.remId}`);
     }
   } else if (allPrioritizedCardInfo.length > 0) {
     // Even if no unreviewed due cards, still track universe size
@@ -137,20 +200,21 @@ export async function calculateCardPriorityShield(
       );
 
       if (unreviewedDueDoc.length > 0) {
-        const topMissedInDoc = _.minBy(unreviewedDueDoc, (info) => info.priority);
-        if (topMissedInDoc) {
+        const verifiedTopDoc = await verifyTopMissedByPriorityLevel(unreviewedDueDoc, 'Doc');
+
+        if (verifiedTopDoc) {
           const percentile = calculateVolumeBasedPercentile(
             docPrioritizedCardInfo,
-            topMissedInDoc.priority,
+            verifiedTopDoc.priority,
             (info) => info.dueCards > 0 && (!seenRemIds.includes(info.remId) || info.remId === currentRemId)
           );
 
           status.doc = {
-            absolute: topMissedInDoc.priority,
+            absolute: verifiedTopDoc.priority,
             percentile: percentile,
-            universeSize: docPrioritizedCardInfo.length, // NEW: Track doc universe size
+            universeSize: docPrioritizedCardInfo.length,
           };
-          console.log(`[CardPriorityShield] Doc Shield: Priority ${topMissedInDoc.priority}, Percentile ${percentile}%, Universe ${docPrioritizedCardInfo.length}`);
+          console.log(`[CardPriorityShield] Doc Shield: Priority ${verifiedTopDoc.priority}, Percentile ${percentile}%, Universe ${docPrioritizedCardInfo.length}, Triggered by remId: ${verifiedTopDoc.remId}`);
         }
       } else if (docPrioritizedCardInfo.length > 0) {
         // Even if no unreviewed due cards, still track universe size
