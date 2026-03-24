@@ -222,34 +222,6 @@ export async function calculateNewPriority(
   return { priority: defaultPriority, source: 'default' };
 }
 
-/**
- * Update inherited priorities when parent changes
- * This recursively updates all descendants that have inherited or default priority
- */
-export async function updateInheritedPriorities(
-  plugin: RNPlugin,
-  parentRem: PluginRem,
-  newPriority: number
-): Promise<void> {
-  const descendants = await parentRem.getDescendants();
-
-  for (const descendant of descendants) {
-    const descendantIncInfo = await getIncrementalRemFromRem(plugin, descendant);
-    if (descendantIncInfo) {
-      continue;
-    }
-
-    const cardInfo = await getCardPriority(plugin, descendant);
-
-    if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
-      const closerAncestor = await findClosestAncestorWithPriority(plugin, descendant);
-
-      if (!closerAncestor || closerAncestor.priority === newPriority) {
-        await setCardPriority(plugin, descendant, newPriority, 'inherited');
-      }
-    }
-  }
-}
 
 /**
  * Get all due cards with priorities from a scope (used in priorityReviewDocument.ts)
@@ -510,37 +482,6 @@ async function getDueCardsWithPrioritiesSlow(
   return results;
 }
 
-export async function batchUpdateInheritedPriorities(
-  plugin: RNPlugin,
-  parentRem: PluginRem,
-  newPriority: number
-): Promise<number> {
-  let updatedCount = 0;
-  const descendants = await parentRem.getDescendants();
-
-  const batchSize = 50;
-  for (let i = 0; i < descendants.length; i += batchSize) {
-    const batch = descendants.slice(i, i + batchSize);
-
-    await Promise.all(
-      batch.map(async (descendant) => {
-        const incInfo = await getIncrementalRemFromRem(plugin, descendant);
-        if (incInfo) return;
-
-        const cardInfo = await getCardPriority(plugin, descendant);
-        if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
-          const closerAncestor = await findClosestAncestorWithPriority(plugin, descendant);
-          if (!closerAncestor || closerAncestor.priority === newPriority) {
-            await setCardPriority(plugin, descendant, newPriority, 'inherited');
-            updatedCount++;
-          }
-        }
-      })
-    );
-  }
-
-  return updatedCount;
-}
 
 /**
  * Recalculates inherited priorities for an entire tree dynamically.
@@ -552,28 +493,28 @@ export async function recalculateTreeInheritance(
 ): Promise<number> {
   let updatedCount = 0;
   const descendants = await rootRem.getDescendants();
-  
+
   const batchSize = 50;
   for (let i = 0; i < descendants.length; i += batchSize) {
     const batch = descendants.slice(i, i + batchSize);
-    
+
     await Promise.all(batch.map(async (descendant) => {
       const incInfo = await getIncrementalRemFromRem(plugin, descendant);
       if (incInfo) return;
-      
+
       const cardInfo = await getCardPriority(plugin, descendant);
       if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
         const closerAncestor = await findClosestAncestorWithPriority(plugin, descendant);
         const targetPriority = closerAncestor ? closerAncestor.priority : ((await plugin.settings.getSetting<number>('defaultCardPriority')) || 50);
         const targetSource = closerAncestor ? 'inherited' : 'default';
-        
+
         if (!cardInfo || cardInfo.priority !== targetPriority || cardInfo.source !== targetSource) {
-           await setCardPriority(plugin, descendant, targetPriority, targetSource);
-           // We let the caller flush the cache updates
-           // Import updateCardPriorityCache locally to avoid circular dependencies if necessary
-           const { updateCardPriorityCache } = await import('./cache');
-           await updateCardPriorityCache(plugin, descendant._id);
-           updatedCount++;
+          await setCardPriority(plugin, descendant, targetPriority, targetSource);
+          // We let the caller flush the cache updates
+          // Import updateCardPriorityCache locally to avoid circular dependencies if necessary
+          const { updateCardPriorityCache } = await import('./cache');
+          await updateCardPriorityCache(plugin, descendant._id);
+          updatedCount++;
         }
       }
     }));
