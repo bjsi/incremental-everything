@@ -584,6 +584,17 @@ function Priority() {
 
       plugin.storage.setSession(queueSessionCacheKey, updatedCache).catch(console.error);
     }
+
+
+    // 🌲 Cascade inherited card priorities to descendants (fire-and-forget, unconditional)
+    // Changing an IncRem priority can affect descendant card rems with source 'inherited'
+    // (cards that inherit from this IncRem because no closer card priority anchor exists).
+    // Always triggered regardless of derivedData — that hook may not have resolved yet when
+    // the user saves quickly. Cost is just a setSession write; tracker.ts is protected by
+    // cascadeRunning serialization and returns instantly for leaf rems with no descendants.
+    if (performanceMode === PERFORMANCE_MODE_FULL) {
+      plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
+    }
   }, [rem, incRemInfo, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
   const saveCardPriority = useCallback(async (priority: number) => {
@@ -660,6 +671,15 @@ function Priority() {
 
     // Now we can fire-and-forget the property updates safely, passing true for knownHasPowerup
     setCardPriority(plugin, rem, priority, 'manual', true).catch(console.error);
+
+    // 🌲 Cascade inherited card priorities to descendants (fire-and-forget, unconditional)
+    // Triggered for any card priority save — this rem may be an anchor for descendants.
+    // Always triggered to avoid missing cascades when derivedData hasn't resolved yet.
+    // Cost is just a setSession write; tracker.ts is protected by cascadeRunning serialization
+    // and returns instantly for leaf rems.
+    if (performanceMode === PERFORMANCE_MODE_FULL) {
+      plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
+    }
 
   }, [rem, plugin, sessionCache, originalScopeId, performanceMode, cardInfo, hasCardPriorityPowerup]); // 🔌 Add performanceMode
 

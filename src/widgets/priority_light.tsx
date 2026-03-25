@@ -24,6 +24,7 @@ import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_pri
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { initIncrementalRem } from '../lib/incremental_rem';
+import { isFullPerformanceMode } from '../lib/utils';
 
 function PriorityLight() {
     const plugin = usePlugin();
@@ -161,9 +162,12 @@ function PriorityLight() {
 
         // Save Card Priority - ONLY if the Card section was shown to the user
         const showCardSection = data.hasCards || data.hasCardPowerup;
+        let cardPrioritySaved = false;
         if (showCardSection) {
             const effectiveCard = cardVal ?? data.defaults.card;
             if (effectiveCard !== data.cardPriority || !data.hasCardPowerup) {
+                cardPrioritySaved = true;
+
                 // Signal events.ts to allow this update even if in queue (Global Context Survivor)
                 plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
 
@@ -193,6 +197,19 @@ function PriorityLight() {
                 // Explicitly signal refresh as a fail-safe (mirrors priority.tsx behavior)
                 plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
             }
+        }
+
+        // 🌲 Cascade inherited card priorities to descendants (fire-and-forget, unconditional)
+        // Cascade whenever card priority was saved — this rem may be an anchor for descendants.
+        // Also cascade when IncRem priority changes (descendants may have source 'inherited' via this IncRem).
+        // No derivedData available here, so always fire in full mode; tracker.ts returns instantly for leaf rems.
+        const incPrioritySaved = data.hasIncPowerup && (incVal ?? data.defaults.inc) !== data.incPriority;
+        if (cardPrioritySaved || incPrioritySaved) {
+            isFullPerformanceMode(plugin).then(isFull => {
+                if (isFull) {
+                    plugin.storage.setSession('pendingInheritanceCascade', data.rem._id).catch(console.error);
+                }
+            });
         }
 
         // Ensure all DB writes are completed before closing to prevent race conditions

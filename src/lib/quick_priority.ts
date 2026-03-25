@@ -15,6 +15,7 @@ import {
     setCardPriority,
 } from './card_priority';
 import { updateCardPriorityCache, flushLightCacheUpdates } from './card_priority/cache';
+import { isFullPerformanceMode } from './utils';
 
 export async function handleQuickPriorityChange(
     plugin: ReactRNPlugin,
@@ -97,6 +98,7 @@ export async function handleQuickPriorityChange(
 
     // --- A. Incremental Rem Priority ---
     const hasIncPowerup = await rem.hasPowerup(powerupCode);
+    let incPriorityCascadeNeeded = false;
     if (hasIncPowerup) {
         const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
         if (incRemInfo) {
@@ -112,6 +114,7 @@ export async function handleQuickPriorityChange(
                 if (updatedIncRem) {
                     await updateIncrementalRemCache(plugin, updatedIncRem);
                 }
+                incPriorityCascadeNeeded = true;
 
                 const arrow = newPriority < oldPriority ? '🔺' : '🔽';
                 const importanceMsg = newPriority < oldPriority ? 'made more important' : 'made less important';
@@ -125,6 +128,7 @@ export async function handleQuickPriorityChange(
     const hasCards = (await rem.getCards()).length > 0;
     const hasCardPriorityPowerup = await rem.hasPowerup('cardPriority');
 
+    let cardPriorityCascadeNeeded = false;
     if (hasCards || hasCardPriorityPowerup) {
         const cardInfo = await getCardPriority(plugin, rem);
         if (cardInfo) {
@@ -139,6 +143,7 @@ export async function handleQuickPriorityChange(
                 await setCardPriority(plugin, rem, newPriority, 'manual');
                 await updateCardPriorityCache(plugin, rem._id, true, { remId: rem._id, priority: newPriority, source: 'manual' } as any);
                 await flushLightCacheUpdates(plugin);
+                cardPriorityCascadeNeeded = true;
 
                 const arrow = newPriority < oldPriority ? '🔺' : '🔽';
                 const importanceMsg = newPriority < oldPriority ? 'made more important' : 'made less important';
@@ -157,11 +162,24 @@ export async function handleQuickPriorityChange(
             await setCardPriority(plugin, rem, newPriority, 'manual');
             await updateCardPriorityCache(plugin, rem._id, true, { remId: rem._id, priority: newPriority, source: 'manual' } as any);
             await flushLightCacheUpdates(plugin);
+            cardPriorityCascadeNeeded = true;
 
             const arrow = newPriority < oldPriority ? '🔺' : '🔽';
             const importanceMsg = newPriority < oldPriority ? 'made more important' : 'made less important';
             messages.push(`cardPriority ${oldPriority} ➡️ ${newPriority} (${importanceMsg} ${arrow})`);
         }
+    }
+
+    // 🌲 Cascade inherited card priorities to descendants (fire-and-forget)
+    // If card priority changed, descendants with 'inherited' source need recalculation.
+    // Also cascade if IncRem priority changed (descendants may have source 'inherited' via this IncRem).
+    // tracker.ts handles serialization and returns instantly for leaf rems.
+    if (cardPriorityCascadeNeeded || incPriorityCascadeNeeded) {
+        isFullPerformanceMode(plugin).then(isFull => {
+            if (isFull) {
+                plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
+            }
+        });
     }
 
     // 4. Notify User
