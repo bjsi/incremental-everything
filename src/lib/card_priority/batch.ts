@@ -26,6 +26,9 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   console.log('Starting CardPriority cleanup...');
   await plugin.app.toast('Starting CardPriority cleanup...');
 
+  // Suppress GlobalRemChanged listener during bulk writes
+  await plugin.storage.setSession('batch_priority_active', true);
+
   try {
     const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
     const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
@@ -95,6 +98,8 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
       'Some tags may not have been removed.\n' +
       'Please check the console for details.'
     );
+  } finally {
+    await plugin.storage.setSession('batch_priority_active', false);
   }
 }
 
@@ -115,6 +120,9 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
 
   console.log('Starting Card Priorities Update...');
   await plugin.app.toast('Starting Card Priorities Update. This may take a few minutes...');
+
+  // Suppress GlobalRemChanged listener during bulk writes
+  await plugin.storage.setSession('batch_priority_active', true);
 
   try {
     const startTime = Date.now();
@@ -295,5 +303,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
     alert(
       'An error occurred during Card Priorities Update.\n\n' + 'Please check the console for details:\n' + String(error)
     );
+  } finally {
+    await plugin.storage.setSession('batch_priority_active', false);
   }
 }
