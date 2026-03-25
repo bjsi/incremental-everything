@@ -86,7 +86,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
       // Clear stale session storage to prevent race condition with widget context
       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
-      await plugin.widget.openPopup('priority_light', {
+      await plugin.widget.openPopup('priority_interval', {
         remId: rem._id,
       });
     },
@@ -762,7 +762,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // Clear stale session storage to prevent race condition with widget context
         await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
         await plugin.storage.setSession('forceOpenPriorityTargetRemId', undefined); // Clear the argument
-        await plugin.widget.openPopup('priority_light', {
+        await plugin.widget.openPopup('priority_interval', {
           remId: remId,
         });
       } else {
