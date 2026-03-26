@@ -96,8 +96,11 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     if (!pendingRemId || cascadeRunning) return;
 
     cascadeRunning = true;
-    // Clear the flag immediately so we don't re-trigger
+    // Clear the pending flag immediately so we don't re-trigger on the next track() tick
     await plugin.storage.setSession('pendingInheritanceCascade', null);
+    // Suppress GlobalRemChanged listener for the duration of the cascade.
+    // Without this, every setCardPriority write fires GlobalRemChanged → cache reload (thousands of times).
+    await plugin.storage.setSession('batch_priority_active', true);
 
     console.log('[Tracker] Background inheritance cascade started for remId:', pendingRemId);
     try {
