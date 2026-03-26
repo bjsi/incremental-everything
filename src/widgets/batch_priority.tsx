@@ -911,12 +911,12 @@ function BatchPriority() {
     );
   }
 
-  if (incrementalRems.length === 0) {
+  if (incrementalRems.length === 0 && allCardInfos !== undefined) {
     return (
       <div style={{ padding: '16px' }}>
-        <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>No Incremental Rems Found</div>
+        <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>No Prioritized Items Found</div>
         <div style={{ fontSize: '14px', color: '#6b7280' }}>
-          The selected rem and its descendants contain no incremental rems.
+          The selected rem and its descendants contain no prioritized items (Incremental Rems or Flashcards with a Card Priority tag).
         </div>
         <button
           onClick={() => plugin.widget.closePopup()}
@@ -926,6 +926,11 @@ function BatchPriority() {
         </button>
       </div>
     );
+  }
+
+  // Card info cache is still hydrating — keep showing the loading spinner
+  if (incrementalRems.length === 0 && allCardInfos === undefined) {
+    return <div style={{ padding: '16px' }}>Loading incremental rems...</div>;
   }
 
   return (

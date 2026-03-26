@@ -10,16 +10,18 @@ import { safeRemTextToString } from '../lib/pdfUtils';
 import { getCardPriority } from '../lib/card_priority';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
-import { updateCardPriorityCache } from '../lib/card_priority/cache'; // <-- 1. IMPORT ADDED
+import { updateCardPriorityCache } from '../lib/card_priority/cache';
+
+type ScopeMode = 'tagged' | 'referenced' | 'both';
 
 interface RemWithPriority {
   remId: string;
   rem: PluginRem;
   name: string;
   hasCardPriority: boolean;
-  hasManualCardPriority: boolean; // New field to track manual source
+  hasManualCardPriority: boolean;
   cardPriority: number | null;
-  cardPrioritySource: string | null; // Track the source
+  cardPrioritySource: string | null;
   hasIncRem: boolean;
   incRemPriority: number | null;
   isChecked: boolean;
@@ -28,8 +30,8 @@ interface RemWithPriority {
 function BatchCardPriority() {
   const plugin = usePlugin();
 
-  // Get the tag rem ID from session storage
-  const tagRemId = useTrackerPlugin(
+  // Get the anchor rem ID from session storage (formerly "tagRemId")
+  const anchorRemId = useTrackerPlugin(
     async (rp) => {
       const id = await rp.storage.getSession<string>('batchCardPriorityTagRem');
       return id;
@@ -38,7 +40,8 @@ function BatchCardPriority() {
   );
 
   // State management
-  const [tagName, setTagName] = useState<string>('');
+  const [scopeMode, setScopeMode] = useState<ScopeMode>('tagged');
+  const [anchorName, setAnchorName] = useState<string>('');
   const [remsWithTag, setRemsWithTag] = useState<RemWithPriority[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [priorityMin, setPriorityMin] = useState<number>(1);
@@ -59,15 +62,15 @@ function BatchCardPriority() {
   // Count selected rems
   const selectedCount = remsWithTag.filter((r) => r.isChecked).length;
 
-  // Load rems tagged with the target tag
+  // Load rems based on scope mode
   useEffect(() => {
-    let isMounted = true; // Track if component is still mounted
+    let isMounted = true;
 
-    const loadTaggedRems = async () => {
-      if (!tagRemId) {
+    const loadRems = async () => {
+      if (!anchorRemId) {
         if (isMounted) {
           setIsLoading(false);
-          setErrorMessage('No tag rem ID found in session');
+          setErrorMessage('No anchor rem ID found in session');
         }
         return;
       }
@@ -77,55 +80,74 @@ function BatchCardPriority() {
         setErrorMessage('');
         setSuccessMessage('');
 
-        // Get the tag rem
-        const tagRem = await plugin.rem.findOne(tagRemId);
-        if (!tagRem) {
+        // Get the anchor rem
+        const anchorRem = await plugin.rem.findOne(anchorRemId);
+        if (!anchorRem) {
           if (isMounted) {
-            setErrorMessage(`Could not find tag rem with ID: ${tagRemId}`);
+            setErrorMessage(`Could not find rem with ID: ${anchorRemId}`);
             setIsLoading(false);
           }
           return;
         }
 
-        const tagText = await safeRemTextToString(plugin, tagRem.text);
+        const anchorText = await safeRemTextToString(plugin, anchorRem.text);
         if (isMounted) {
-          setTagName(tagText);
+          setAnchorName(anchorText);
         }
 
-        // Get all rems tagged with this tag
-        const taggedRems = await tagRem.taggedRem();
+        // --- Collect rems based on scope ---
+        let scopedRems: PluginRem[] = [];
 
-        if (!taggedRems || taggedRems.length === 0) {
+        if (scopeMode === 'tagged' || scopeMode === 'both') {
+          const tagged = await anchorRem.taggedRem();
+          if (tagged) scopedRems.push(...tagged);
+        }
+
+        if (scopeMode === 'referenced' || scopeMode === 'both') {
+          const referenced = await anchorRem.remsReferencingThis();
+          if (referenced) scopedRems.push(...referenced);
+        }
+
+        // Deduplicate by rem._id
+        const seen = new Set<string>();
+        scopedRems = scopedRems.filter((r) => {
+          if (seen.has(r._id)) return false;
+          seen.add(r._id);
+          return true;
+        });
+
+        if (scopedRems.length === 0) {
           if (isMounted) {
-            setErrorMessage(`No rems found with tag "${tagText}"`);
+            const modeLabel =
+              scopeMode === 'tagged' ? `tagged with "${anchorText}"` :
+                scopeMode === 'referenced' ? `referencing "${anchorText}"` :
+                  `tagged with or referencing "${anchorText}"`;
+            setErrorMessage(`No rems found ${modeLabel}`);
             setIsLoading(false);
           }
           return;
         }
 
-        // Process each tagged rem
+        // Process each rem
         const processedRems: RemWithPriority[] = [];
 
-        for (const rem of taggedRems) {
+        for (const rem of scopedRems) {
           try {
             const remText = await safeRemTextToString(plugin, rem.text);
 
-            // Check for cardPriority
             const cardPriorityInfo = await getCardPriority(plugin, rem);
             const hasCardPriority = cardPriorityInfo !== null;
-            // Extract just the priority number from the object - use ?? to handle 0 correctly
             const cardPriorityValue = cardPriorityInfo?.priority ?? null;
             const cardPrioritySource = cardPriorityInfo?.source ?? null;
-            // Check if it's manually or incrementally set (not inherited or default)
-            const hasManualCardPriority = hasCardPriority && (cardPrioritySource === 'manual' || cardPrioritySource === 'incremental');
+            const hasManualCardPriority =
+              hasCardPriority &&
+              (cardPrioritySource === 'manual' || cardPrioritySource === 'incremental');
 
-            // Check for Incremental Rem powerup directly
             const hasIncremental = await rem.hasPowerup(powerupCode);
             let incRemPriority = null;
 
             if (hasIncremental) {
               const incInfo = await getIncrementalRemFromRem(plugin, rem);
-              console.log(`IncRem detected for "${remText}":`, { hasIncremental, incInfo });
               if (incInfo && incInfo.priority !== undefined) {
                 incRemPriority = incInfo.priority;
               }
@@ -133,15 +155,14 @@ function BatchCardPriority() {
 
             processedRems.push({
               remId: rem._id,
-              rem: rem,
+              rem,
               name: remText,
-              hasCardPriority: hasCardPriority,
-              hasManualCardPriority: hasManualCardPriority,
-              cardPriority: cardPriorityValue, // Use the extracted priority value
-              cardPrioritySource: cardPrioritySource,
+              hasCardPriority,
+              hasManualCardPriority,
+              cardPriority: cardPriorityValue,
+              cardPrioritySource,
               hasIncRem: hasIncremental,
-              incRemPriority: incRemPriority,
-              // Select by default only if it doesn't have manual/incremental cardPriority
+              incRemPriority,
               isChecked: !hasManualCardPriority,
             });
           } catch (error) {
@@ -149,50 +170,28 @@ function BatchCardPriority() {
           }
         }
 
-        // Sort by name for better display
+        // Sort by name
         processedRems.sort((a, b) => a.name.localeCompare(b.name));
-
-        // Debug summary
-        const actualManual = processedRems.filter((r) => r.hasManualCardPriority);
-        const actualIncRem = processedRems.filter((r) => r.hasIncRem && !r.hasManualCardPriority);
-        const actualWithout = processedRems.filter(
-          (r) => !r.hasManualCardPriority && !r.hasIncRem
-        );
-
-        console.log('Category distribution (UI Sections):', {
-          total: processedRems.length,
-          section1_Manual: actualManual.length,
-          section2_IncRemOnly: actualIncRem.length,
-          section3_Other: actualWithout.length,
-          incRemDetails: processedRems
-            .filter((r) => r.hasIncRem)
-            .map((r) => ({
-              name: r.name,
-              incRemPriority: r.incRemPriority,
-              hasManualCardPriority: r.hasManualCardPriority,
-            })),
-        });
 
         if (isMounted) {
           setRemsWithTag(processedRems);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Error loading tagged rems:', error);
+        console.error('Error loading rems:', error);
         if (isMounted) {
-          setErrorMessage('Failed to load tagged rems');
+          setErrorMessage('Failed to load rems');
           setIsLoading(false);
         }
       }
     };
 
-    loadTaggedRems();
+    loadRems();
 
-    // Cleanup function to prevent state updates after unmount
     return () => {
       isMounted = false;
     };
-  }, [tagRemId, plugin]);
+  }, [anchorRemId, scopeMode, plugin]);
 
   const toggleCheck = (remId: string) => {
     setRemsWithTag((prev) =>
@@ -221,7 +220,6 @@ function BatchCardPriority() {
   };
 
   const validateAndApply = async () => {
-    // Validation
     if (priorityMin < 0 || priorityMin > 100) {
       setErrorMessage('Minimum priority must be between 0 and 100');
       return;
@@ -241,7 +239,6 @@ function BatchCardPriority() {
       return;
     }
 
-    // Check if any selected rems already have manual/incremental cardPriority and overwrite is off
     const selectedWithManualCardPriority = selectedRems.filter((r) => r.hasManualCardPriority);
     if (selectedWithManualCardPriority.length > 0 && !overwriteExisting) {
       const confirmed = confirm(
@@ -252,7 +249,6 @@ function BatchCardPriority() {
       if (!confirmed) return;
     }
 
-    // Apply priorities
     setIsApplying(true);
     setErrorMessage('');
 
@@ -283,17 +279,13 @@ function BatchCardPriority() {
                 Math.floor(Math.random() * (priorityMax - priorityMin + 1)) + priorityMin;
             }
 
-            // Add the cardPriority powerup and set the priority
             await remData.rem.addPowerup('cardPriority');
-            await remData.rem.setPowerupProperty('cardPriority', 'priority', [
-              priority.toString(),
-            ]);
+            await remData.rem.setPowerupProperty('cardPriority', 'priority', [priority.toString()]);
             await remData.rem.setPowerupProperty('cardPriority', 'prioritySource', ['manual']);
             await remData.rem.setPowerupProperty('cardPriority', 'lastUpdated', [
               new Date().toISOString(),
             ]);
 
-            // <-- 2. CALL CACHE UPDATE HERE -->
             await updateCardPriorityCache(plugin, remData.remId);
 
             appliedCount++;
@@ -307,7 +299,6 @@ function BatchCardPriority() {
 
       setSuccessMessage(`✅ Successfully applied cardPriority to ${appliedCount} rem(s)`);
 
-      // <-- 3. CLOSE POPUP INSTEAD OF RELOADING -->
       setTimeout(() => {
         plugin.widget.closePopup();
       }, 2000);
@@ -439,10 +430,15 @@ function BatchCardPriority() {
     },
   };
 
+  const scopeSubtitle =
+    scopeMode === 'tagged' ? `Rems tagged with "${anchorName}"` :
+      scopeMode === 'referenced' ? `Rems referencing "${anchorName}"` :
+        `Rems tagged with or referencing "${anchorName}"`;
+
   if (isLoading) {
     return (
       <div style={styles.container}>
-        <div>Loading rems tagged with "{tagName}"...</div>
+        <div>Loading rems for "{anchorName}"...</div>
       </div>
     );
   }
@@ -450,9 +446,29 @@ function BatchCardPriority() {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <div style={styles.title}>Batch Card Priority Assignment for Tagged Rems</div>
-        <div style={styles.subtitle}>Tag: {tagName}</div>
-        <div style={styles.subtitle}>(This widget allows bulk assignment of card priorities to all rems tagged with the {tagName} tag) </div>
+        <div style={styles.title}>Batch Card Priority Assignment</div>
+        <div style={styles.subtitle}>Anchor: {anchorName}</div>
+        <div style={styles.subtitle}>{scopeSubtitle}</div>
+      </div>
+
+      {/* Scope Selector */}
+      <div style={{ ...styles.section, marginBottom: '16px' }}>
+        <div style={{ ...styles.sectionTitle, marginBottom: '8px' }}>Scope</div>
+        <div style={{ display: 'flex', gap: '24px', fontSize: '14px' }}>
+          {(['tagged', 'referenced', 'both'] as ScopeMode[]).map((mode) => (
+            <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: isApplying ? 'not-allowed' : 'pointer' }}>
+              <input
+                type="radio"
+                name="scopeMode"
+                value={mode}
+                checked={scopeMode === mode}
+                onChange={() => setScopeMode(mode)}
+                disabled={isApplying}
+              />
+              {mode === 'tagged' ? 'Tagged Rems' : mode === 'referenced' ? 'Rem References' : 'Both'}
+            </label>
+          ))}
+        </div>
       </div>
 
       {/* Priority Range Input */}
@@ -609,7 +625,7 @@ function BatchCardPriority() {
         </button>
 
         <button
-          onClick={() => plugin.widget.closePopup()} // <-- Use closePopup()
+          onClick={() => plugin.widget.closePopup()}
           style={{ ...styles.button, ...styles.secondaryButton }}
           disabled={isApplying}
         >

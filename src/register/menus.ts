@@ -175,7 +175,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
   plugin.app.registerMenuItem({
     id: 'batch_card_priority_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
-    name: 'Batch Assign Card Priority for tagged Rems',
+    name: 'Batch Assign Card Priority for tagged/referencing Rems',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) {
@@ -183,9 +183,17 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         return;
       }
 
-      const taggedRems = await rem.taggedRem();
-      if (!taggedRems || taggedRems.length === 0) {
-        await plugin.app.toast('This rem is not used as a tag. No rems are tagged with it.');
+      // Allow opening if this rem is used as a tag OR is referenced by other rems
+      const [taggedRems, referencingRems] = await Promise.all([
+        rem.taggedRem(),
+        rem.remsReferencingThis(),
+      ]);
+
+      const hasTagged = taggedRems && taggedRems.length > 0;
+      const hasReferencing = referencingRems && referencingRems.length > 0;
+
+      if (!hasTagged && !hasReferencing) {
+        await plugin.app.toast('No rems are tagged with or referencing this rem.');
         return;
       }
 
