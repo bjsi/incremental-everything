@@ -32,6 +32,8 @@ interface RemWithPriority {
   originalIndex: number;
   // card presence
   hasCards: boolean; // true = this rem or any descendant has ≥1 card
+  breadcrumb: string;  // e.g. "PSCPP › SH › Geometria do navio"
+  breadcrumbSort: string; // same but lowercased for stable sorting
 }
 
 // ── helper: depth + pathIds ──────────────────────────────────────────────────
@@ -52,6 +54,25 @@ async function getPathIds(
   // depth is how many ancestors are in our scoped list
   // We don't know that yet, so we just store the raw pathIds; depth is computed later.
   return { depth: pathIds.length - 1, pathIds };
+}
+
+// ── helper: 5-level ancestor breadcrumb ─────────────────────────────────────
+const MAX_BREADCRUMB_DEPTH = 5;
+async function getBreadcrumb(plugin: RNPlugin, rem: PluginRem): Promise<string> {
+  const parts: string[] = [];
+  let current: PluginRem | undefined = rem.parent
+    ? await plugin.rem.findOne(rem.parent)
+    : undefined;
+
+  for (let i = 0; i < MAX_BREADCRUMB_DEPTH && current; i++) {
+    const label = current.text
+      ? await plugin.richText.toString(current.text)
+      : 'Untitled';
+    parts.unshift(label.substring(0, 40)); // cap label length
+    current = current.parent ? await plugin.rem.findOne(current.parent) : undefined;
+  }
+
+  return parts.join(' › ');
 }
 
 // ── helper: does rem or any descendant have ≥1 card? ────────────────────────
@@ -126,6 +147,7 @@ function BatchCardPriority() {
         setIsLoading(true);
         setErrorMessage('');
         setSuccessMessage('');
+        setAllRems([]);  // clear stale list immediately on scope change
 
         const anchorRem = await plugin.rem.findOne(anchorRemId);
         if (!anchorRem) {
@@ -167,8 +189,8 @@ function BatchCardPriority() {
           if (isMounted) {
             const modeLabel =
               scopeMode === 'tagged' ? `tagged with "${anchorText}"` :
-              scopeMode === 'referenced' ? `referencing "${anchorText}"` :
-              `tagged with or referencing "${anchorText}"`;
+                scopeMode === 'referenced' ? `referencing "${anchorText}"` :
+                  `tagged with or referencing "${anchorText}"`;
             setErrorMessage(`No rems found ${modeLabel}`);
             setIsLoading(false);
           }
@@ -218,6 +240,9 @@ function BatchCardPriority() {
             // depth = number of scoped-rem ancestors above this rem
             const depth = pathIds.filter((id, i) => i < pathIds.length - 1 && topLevelIds.has(id)).length;
 
+            // Ancestor breadcrumb (up to 3 levels above this rem in the KB)
+            const breadcrumb = await getBreadcrumb(plugin, rem);
+
             processed.push({
               remId: rem._id,
               rem,
@@ -233,14 +258,19 @@ function BatchCardPriority() {
               pathIds,
               originalIndex: remIndexMap.get(rem._id) ?? 0,
               hasCards,
+              breadcrumb,
+              breadcrumbSort: breadcrumb.toLowerCase(),
             });
           } catch (err) {
             console.error(`Error processing rem ${rem._id}:`, err);
           }
         }
 
-        // Sort by document order
-        processed.sort((a, b) => a.originalIndex - b.originalIndex);
+        // Sort by breadcrumb first (clusters KB siblings), then by document order within the same location
+        processed.sort((a, b) => {
+          const bc = a.breadcrumbSort.localeCompare(b.breadcrumbSort);
+          return bc !== 0 ? bc : a.originalIndex - b.originalIndex;
+        });
 
         if (isMounted) {
           setAllRems(processed);
@@ -433,7 +463,14 @@ function BatchCardPriority() {
               {expanded ? '▾' : '▸'}
             </span>
           )}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{remData.name}</span>
+          <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{remData.name}</span>
+            {remData.breadcrumb && (
+              <span style={{ fontSize: '10px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {remData.breadcrumb}
+              </span>
+            )}
+          </span>
           {cardBadge(remData)}
         </div>
         <div style={s.tcell}>{priorityBadge(remData)}</div>
@@ -446,8 +483,8 @@ function BatchCardPriority() {
 
   const scopeSubtitle =
     scopeMode === 'tagged' ? `tagged with "${anchorName}"` :
-    scopeMode === 'referenced' ? `referencing "${anchorName}"` :
-    `tagged with or referencing "${anchorName}"`;
+      scopeMode === 'referenced' ? `referencing "${anchorName}"` :
+        `tagged with or referencing "${anchorName}"`;
 
   // ── early returns ──────────────────────────────────────────────────────────
   if (isLoading) {
