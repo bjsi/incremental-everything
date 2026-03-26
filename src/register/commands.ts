@@ -379,24 +379,31 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // Register command for batch card priority assignment
   plugin.app.registerCommand({
     id: 'batch-card-priority',
-    name: 'Batch Assign Card Priority for tagged rems',
+    name: 'Batch Assign Card Priority for tagged/referencing rems',
     keyboardShortcut: 'opt+shift+c',
     action: async () => {
       const focused = await plugin.focus.getFocusedRem();
 
       if (!focused) {
-        await plugin.app.toast('Please focus on a tag rem first');
+        await plugin.app.toast('Please focus on a rem first');
         return;
       }
 
-      // Check if this rem is actually being used as a tag
-      const taggedRems = await focused.taggedRem();
-      if (!taggedRems || taggedRems.length === 0) {
-        await plugin.app.toast('The focused rem is not used as a tag. No rems are tagged with it.');
+      // Allow opening if this rem is used as a tag OR is referenced by other rems
+      const [taggedRems, referencingRems] = await Promise.all([
+        focused.taggedRem(),
+        focused.remsReferencingThis(),
+      ]);
+
+      const hasTagged = taggedRems && taggedRems.length > 0;
+      const hasReferencing = referencingRems && referencingRems.length > 0;
+
+      if (!hasTagged && !hasReferencing) {
+        await plugin.app.toast('No rems are tagged with or referencing this rem.');
         return;
       }
 
-      // Store the tag rem ID in session storage
+      // Store the anchor rem ID in session storage
       await plugin.storage.setSession('batchCardPriorityTagRem', focused._id);
 
       // Open the batch card priority widget
