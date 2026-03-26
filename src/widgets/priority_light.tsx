@@ -12,6 +12,7 @@ import {
     defaultPriorityId,
     defaultCardPriorityId,
     cardPriorityCacheRefreshKey,
+    pendingPrioritySaveKey,
 } from '../lib/consts';
 import {
     CARD_PRIORITY_CODE,
@@ -20,11 +21,11 @@ import {
     getCardPriorityValue,
 } from '../lib/card_priority';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
+import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { initIncrementalRem } from '../lib/incremental_rem';
-import { shouldUseLightMode } from '../lib/mobileUtils';
+
 
 function PriorityLight() {
     const plugin = usePlugin();
@@ -44,6 +45,7 @@ function PriorityLight() {
     // We only fetch the primitive values needed to render the sliders.
     // We avoid heavy object construction (like getIncrementalRemFromRem or card stats).
     const data = useTrackerPlugin(async (rp) => {
+        const t0 = performance.now();
         // Resolve remId: from context OR from session storage (fallback for Create Incremental Rem flow)
         let remId = context?.contextData?.remId;
         if (!remId) {
@@ -53,9 +55,11 @@ function PriorityLight() {
 
         const rem = await rp.rem.findOne(remId);
         if (!rem) return null;
+        console.log(`[PriorityLight] remId resolved + findOne: ${Math.round(performance.now() - t0)}ms`);
 
         // Parallel fetch for speed
         // Parallel fetch for speed - Step 1: Fetch raw data
+        const t1 = performance.now();
         const [
             incPStr,
             hasIncPowerup,
@@ -73,12 +77,16 @@ function PriorityLight() {
             rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT), // Get raw string check
             rp.settings.getSetting<number>(defaultPriorityId),
         ]);
+        console.log(`[PriorityLight] parallel SDK fetches: ${Math.round(performance.now() - t1)}ms (cards: ${cards.length})`);
 
         // Step 2: Fetch content
+        const t2 = performance.now();
         const remContent = await getRemCardContent(rp, rem);
+        console.log(`[PriorityLight] getRemCardContent: ${Math.round(performance.now() - t2)}ms`);
 
         const hasCards = cards.length > 0;
 
+        console.log(`[PriorityLight] total data load: ${Math.round(performance.now() - t0)}ms`);
         return {
             rem,
             incPriority: incPStr ? parseInt(incPStr) : null,
@@ -146,77 +154,55 @@ function PriorityLight() {
     // Save Handlers
     const handleSave = useCallback(async () => {
         if (!data || !data.rem) return;
+        const tSave = performance.now();
+        console.log('[PriorityLight] handleSave started');
         isSaving.current = true;
 
-        const promises: Promise<any>[] = [];
+        // --- Compute what changed ---
+        const effectiveInc = data.hasIncPowerup ? (incVal ?? data.defaults.inc) : null;
+        const incChanged = effectiveInc !== null && effectiveInc !== data.incPriority;
 
-        // Save Inc Priority
-        if (data.hasIncPowerup) {
-            const effectiveInc = incVal ?? data.defaults.inc;
-            if (effectiveInc !== data.incPriority) {
-                // Fire and forget
-                promises.push(data.rem.setPowerupProperty(powerupCode, prioritySlotCode, [effectiveInc.toString()]));
-                updateIncrementalRemCache(plugin, { remId: data.rem._id, priority: effectiveInc } as any);
-            }
-        }
-
-        // Save Card Priority - ONLY if the Card section was shown to the user
         const showCardSection = data.hasCards || data.hasCardPowerup;
-        let cardPrioritySaved = false;
-        if (showCardSection) {
-            const effectiveCard = cardVal ?? data.defaults.card;
-            if (effectiveCard !== data.cardPriority || !data.hasCardPowerup) {
-                cardPrioritySaved = true;
+        const effectiveCard = showCardSection ? (cardVal ?? data.defaults.card) : null;
+        const cardChanged = effectiveCard !== null && (effectiveCard !== data.cardPriority || !data.hasCardPowerup);
 
-                // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-                plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
+        // --- Optimistic UI updates (sync session writes — safe in popup context) ---
+        if (incChanged) {
+            updateIncrementalRemCache(plugin, { remId: data.rem._id, priority: effectiveInc! } as any);
+        }
+        if (cardChanged) {
+            // Signal events.ts to allow this update even if in queue
+            plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
 
-                // Fire and forget DB write
-                if (!data.hasCardPowerup) {
-                    // CRITICAL: We MUST await the powerup addition here.
-                    await data.rem.addPowerup(CARD_PRIORITY_CODE);
-                }
+            // Lightweight in-memory optimistic override (5s TTL) — read by getPendingCacheUpdate
+            updateCardPriorityCache(plugin, data.rem._id, true, {
+                remId: data.rem._id,
+                priority: effectiveCard!,
+                source: 'manual',
+                cardCount: data.cardCount,
+                dueCards: data.dueCards,
+            } as any);
 
-                promises.push(setCardPriority(plugin, data.rem, effectiveCard, 'manual', true));
-
-                // Optimistic Cache Update
-                // We provide cardCount and dueCards from our initial fetch to avoid a DB read in the cache updater.
-                // This allows the update to be synchronous, ensuring flushLightCacheUpdates picks it up immediately.
-                updateCardPriorityCache(plugin, data.rem._id, true, {
-                    remId: data.rem._id,
-                    priority: effectiveCard,
-                    source: 'manual',
-                    cardCount: data.cardCount,
-                    dueCards: data.dueCards,
-                } as any);
-
-                // FLUSH IMMEDIATELY to resolve race condition and signal listeners
-                // This replaces the manual 'cardPriorityCacheRefreshKey' set
-                flushLightCacheUpdates(plugin).catch(console.error);
-
-                // Explicitly signal refresh as a fail-safe (mirrors priority.tsx behavior)
-                plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
-            }
+            // Signal listeners (e.g. display widget) to refresh immediately
+            plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
         }
 
-        // 🌲 Cascade inherited card priorities to descendants (fire-and-forget, unconditional)
-        // Cascade whenever card priority was saved — this rem may be an anchor for descendants.
-        // Also cascade when IncRem priority changes (descendants may have source 'inherited' via this IncRem).
-        // Uses shouldUseLightMode (not just the setting) so mobile/web device overrides are respected.
-        const incPrioritySaved = data.hasIncPowerup && (incVal ?? data.defaults.inc) !== data.incPriority;
-        if (cardPrioritySaved || incPrioritySaved) {
-            shouldUseLightMode(plugin).then(isLight => {
-                if (!isLight) {
-                    plugin.storage.setSession('pendingInheritanceCascade', data.rem._id).catch(console.error);
-                }
-            });
+        // --- Write the DB job to session storage for tracker.ts to execute ---
+        // tracker.ts runs in the persistent index widget (not killed by popup close)
+        // and will set batch_priority_active=true before writing to suppress GlobalRemChanged.
+        if (incChanged || cardChanged) {
+            plugin.storage.setSession(pendingPrioritySaveKey, {
+                remId: data.rem._id,
+                incPriority: incChanged ? effectiveInc : null,
+                cardPriority: cardChanged ? effectiveCard : null,
+                cardSource: 'manual',
+                needsAddPowerup: cardChanged && !data.hasCardPowerup,
+                triggerCascade: incChanged || cardChanged,
+            }).catch(console.error);
         }
 
-        // Ensure all DB writes are completed before closing to prevent race conditions
-        // where the background listener consumes stale data.
-        await Promise.all(promises).catch(e => console.error("Error saving priority:", e));
-
-        // Close immediately after save
+        // ⚡ Close immediately — optimistic cache is already in place, DB writes happen in tracker.ts
+        console.log(`[PriorityLight] handleSave total before closePopup: ${Math.round(performance.now() - tSave)}ms`);
         plugin.widget.closePopup();
     }, [data, incVal, cardVal, plugin]);
 

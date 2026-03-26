@@ -178,6 +178,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     description: 'Instant popup to set Incremental and Card priorities',
     keyboardShortcut: 'ctrl+opt+p', // Shortcuts: Ctrl + Option + P
     action: async () => {
+      const tCmd = performance.now();
+      console.log('[set-priority-light] Command triggered');
       let remId: string | undefined;
       const url = await plugin.window.getURL();
 
@@ -226,6 +228,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         remId = focusedRem?._id;
       }
 
+      console.log(`[set-priority-light] context detection done: ${Math.round(performance.now() - tCmd)}ms, remId: ${remId}`);
+
       if (!remId) {
         await plugin.app.toast('No Rem found to set priority.');
         return;
@@ -233,9 +237,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // Clear stale session storage to prevent race condition with widget context
       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+      console.log(`[set-priority-light] session cleared: ${Math.round(performance.now() - tCmd)}ms`);
+
       await plugin.widget.openPopup('priority_light', {
         remId: remId,
       });
+      console.log(`[set-priority-light] openPopup returned: ${Math.round(performance.now() - tCmd)}ms`);
     },
   });
 

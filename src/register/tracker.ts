@@ -1,6 +1,6 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey } from '../lib/consts';
 
 export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
@@ -117,6 +117,83 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       console.error('[Tracker] Background inheritance cascade failed:', err);
     } finally {
       cascadeRunning = false;
+      await plugin.storage.setSession('batch_priority_active', false);
+    }
+  });
+
+  // Pending priority save watcher
+  // priority_light.tsx writes a job here before closing, so that DB writes survive popup teardown.
+  // This watcher runs in the persistent index widget, sets batch_priority_active to suppress
+  // GlobalRemChanged during writes, then triggers the inheritance cascade if needed.
+  let prioritySaveRunning = false;
+  plugin.track(async (rp) => {
+    const job = await rp.storage.getSession<{
+      remId: string;
+      incPriority: number | null;
+      cardPriority: number | null;
+      cardSource: string;
+      needsAddPowerup: boolean;
+      triggerCascade: boolean;
+    }>(pendingPrioritySaveKey);
+
+    if (!job || prioritySaveRunning) return;
+
+    prioritySaveRunning = true;
+    // Clear the job immediately so we don't re-trigger
+    await plugin.storage.setSession(pendingPrioritySaveKey, null);
+    // Suppress GlobalRemChanged for the duration of the writes
+    await plugin.storage.setSession('batch_priority_active', true);
+
+    console.log('[Tracker] pendingPrioritySave picked up for remId:', job.remId);
+    try {
+      const rem = await plugin.rem.findOne(job.remId);
+      if (!rem) {
+        console.warn('[Tracker] pendingPrioritySave: rem not found', job.remId);
+        return;
+      }
+
+      // 1. IncRem priority write
+      if (job.incPriority !== null) {
+        await rem.setPowerupProperty(powerupCode, 'priority', [job.incPriority.toString()]);
+        const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
+        const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
+        const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
+        if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
+        console.log(`[Tracker] IncRem priority written: ${job.incPriority}`);
+      }
+
+      // 2. Card priority write (addPowerup first if this is a first-time assignment)
+      if (job.cardPriority !== null) {
+        if (job.needsAddPowerup) {
+          await rem.addPowerup('cardPriority');
+        }
+        const { setCardPriority } = await import('../lib/card_priority');
+        await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true);
+        const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
+        updateCardPriorityCache(plugin as any, rem._id, true, {
+          remId: rem._id,
+          priority: job.cardPriority,
+          source: job.cardSource,
+        } as any);
+        await flushCacheUpdatesNow(plugin as any);
+        console.log(`[Tracker] Card priority written: ${job.cardPriority}`);
+      }
+
+      // 3. Trigger inheritance cascade if requested (handled by existing cascade watcher)
+      if (job.triggerCascade) {
+        const { shouldUseLightMode } = await import('../lib/mobileUtils');
+        const isLight = await shouldUseLightMode(plugin as any);
+        if (!isLight) {
+          // cascade watcher will pick this up after batch_priority_active is cleared
+          await plugin.storage.setSession('pendingInheritanceCascade', job.remId);
+        }
+      }
+
+      console.log('[Tracker] pendingPrioritySave complete for remId:', job.remId);
+    } catch (err) {
+      console.error('[Tracker] pendingPrioritySave failed:', err);
+    } finally {
+      prioritySaveRunning = false;
       await plugin.storage.setSession('batch_priority_active', false);
     }
   });
