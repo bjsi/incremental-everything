@@ -11,6 +11,14 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Combined Priority + Interval Widget (for new incremental rem creation flows)
+  plugin.app.registerWidget('priority_interval', WidgetLocation.Popup, {
+    dimensions: {
+      width: '370px',
+      height: 'auto',
+    },
+  });
+
   plugin.app.registerWidget('priority', WidgetLocation.Popup, {
     dimensions: {
       width: '500px',

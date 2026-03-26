@@ -76,6 +76,9 @@ export const noIncRemMenuItemId = 'no-inc-rem-15-min';
 export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
+// Pending priority save job: written by priority_light popup before closing,
+// picked up and executed by tracker.ts in the persistent index widget.
+export const pendingPrioritySaveKey = 'pendingPrioritySave';
 export const queueSessionCacheKey = 'queueSessionCache';
 export const priorityCalcScopeRemIdsKey = 'priority-calc-scope-rem-ids-key';
 

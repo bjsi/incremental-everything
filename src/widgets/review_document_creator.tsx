@@ -94,127 +94,30 @@ function ReviewDocumentCreator() {
     }
   };
 
-  // Styles matching batch_card_priority.tsx
-  const styles = {
-    container: {
-      padding: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      maxWidth: '800px',
-      margin: '0 auto',
-    },
-    header: {
-      marginBottom: '20px',
-    },
-    title: {
-      fontSize: '20px',
-      fontWeight: 600,
-      marginBottom: '8px',
-    },
-    subtitle: {
-      fontSize: '14px',
-      color: '#6b7280',
-    },
-    section: {
-      marginBottom: '20px',
-      padding: '16px',
-      border: '1px solid #e5e7eb',
-      borderRadius: '8px',
-      backgroundColor: '#f9fafb',
-    },
-    sectionTitle: {
-      fontSize: '16px',
-      fontWeight: 600,
-      marginBottom: '12px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-    },
-    input: {
-      padding: '8px 12px',
-      border: '1px solid #d1d5db',
-      borderRadius: '6px',
-      fontSize: '14px',
-      width: '100px',
-    },
-    radioGroup: {
-      display: 'flex',
-      flexDirection: 'column' as const,
-      gap: '8px',
-    },
-    radioOption: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      fontSize: '14px',
-    },
-    button: {
-      padding: '10px 20px',
-      borderRadius: '6px',
-      border: 'none',
-      fontWeight: 600,
-      fontSize: '14px',
-      cursor: 'pointer',
-      transition: 'background-color 0.2s',
-    },
-    primaryButton: {
-      backgroundColor: '#3b82f6',
-      color: 'white',
-    },
-    secondaryButton: {
-      backgroundColor: '#6b7280',
-      color: 'white',
-      marginLeft: '8px',
-    },
-    infoBox: {
-      padding: '12px',
-      backgroundColor: '#eff6ff',
-      border: '1px solid #bfdbfe',
-      borderRadius: '8px',
-      fontSize: '13px',
-      color: '#1e3a8a',
-    },
-    contentMixValue: {
-      padding: '8px 12px',
-      backgroundColor: 'white',
-      border: '1px solid #e5e7eb',
-      borderRadius: '6px',
-      fontSize: '14px',
-      marginBottom: '12px',
-    },
-    error: {
-      color: '#ef4444',
-      fontSize: '14px',
-      marginTop: '8px',
-    },
-    success: {
-      color: '#10b981',
-      fontSize: '14px',
-      marginTop: '8px',
-    },
-  };
-
   if (!context || flashcardRatio === undefined) {
     return (
-      <div style={styles.container}>
+      <div className="p-5">
         <div>Loading...</div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div style={styles.title}>Create Priority Review Document</div>
-        <div style={styles.subtitle}>
+    <div className="p-5 flex flex-col gap-4" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '800px', margin: '0 auto' }}>
+
+      {/* Header */}
+      <div>
+        <div className="text-xl font-semibold mb-1">Create Priority Review Document</div>
+        <div className="rn-clr-content-secondary text-sm">
           Build a scoped review document sorted by priority
         </div>
       </div>
 
       {/* Scope Selection */}
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>Scope</div>
-        <div style={styles.radioGroup}>
-          <label style={styles.radioOption}>
+      <div className="rn-clr-background-secondary rounded-lg border border-gray-300 p-4" style={{ borderColor: 'var(--rn-clr-border, #e5e7eb)' }}>
+        <div className="font-semibold mb-3">Scope</div>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="radio"
               checked={!useFullKB}
@@ -223,7 +126,7 @@ function ReviewDocumentCreator() {
             />
             <span>Current Document: {context.scopeName}</span>
           </label>
-          <label style={styles.radioOption}>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="radio"
               checked={useFullKB}
@@ -236,33 +139,57 @@ function ReviewDocumentCreator() {
       </div>
 
       {/* Item Count */}
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>Number of Items</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="rn-clr-background-secondary rounded-lg p-4" style={{ border: '1px solid var(--rn-clr-border, #e5e7eb)' }}>
+        <div className="font-semibold mb-3">Number of Items</div>
+        <div className="flex items-center gap-3">
           <input
             type="number"
             min={1}
             max={500}
             value={itemCount}
             onChange={(e) => setItemCount(Math.max(1, Math.min(500, parseInt(e.target.value) || 1)))}
-            style={styles.input}
+            className="rn-clr-background rounded"
+            style={{
+              padding: '8px 12px',
+              border: '1px solid var(--rn-clr-border, #d1d5db)',
+              fontSize: '14px',
+              width: '100px',
+            }}
             disabled={isCreating}
           />
-          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+          <span className="rn-clr-content-secondary text-xs">
             (Maximum items to include in the review document)
           </span>
         </div>
       </div>
 
       {/* Content Mix - READ ONLY with Settings Button */}
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>Content Mix (from Sorting Criteria)</div>
-        <div style={styles.contentMixValue}>
+      <div className="rn-clr-background-secondary rounded-lg p-4" style={{ border: '1px solid var(--rn-clr-border, #e5e7eb)' }}>
+        <div className="font-semibold mb-3">Content Mix (from Sorting Criteria)</div>
+        <div
+          className="rn-clr-background rn-clr-content-primary rounded mb-3"
+          style={{
+            padding: '8px 12px',
+            border: '1px solid var(--rn-clr-border, #e5e7eb)',
+            fontSize: '14px',
+          }}
+        >
           {ratioToLabel(flashcardRatio)}
         </div>
         <button
           onClick={handleOpenSortingSettings}
-          style={{ ...styles.button, ...styles.secondaryButton, marginLeft: 0, width: '100%' }}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '6px',
+            border: 'none',
+            fontWeight: 600,
+            fontSize: '14px',
+            cursor: 'pointer',
+            backgroundColor: '#6b7280',
+            color: 'white',
+            width: '100%',
+            transition: 'background-color 0.2s',
+          }}
           disabled={isCreating}
         >
           Change Sorting Criteria Settings
@@ -270,7 +197,17 @@ function ReviewDocumentCreator() {
       </div>
 
       {/* Info Box */}
-      <div style={styles.infoBox}>
+      <div
+        className="rounded-lg"
+        style={{
+          padding: '12px',
+          backgroundColor: 'rgba(59, 130, 246, 0.12)',
+          border: '1px solid rgba(59, 130, 246, 0.35)',
+          borderRadius: '8px',
+          fontSize: '13px',
+          color: 'var(--rn-clr-content-primary, #1e3a8a)',
+        }}
+      >
         <strong>How it works:</strong><br />
         • Items are selected based on priority and due date<br />
         • Sorting criteria (randomness and content mix) from your settings will be applied<br />
@@ -281,10 +218,20 @@ function ReviewDocumentCreator() {
       </div>
 
       {/* Summary and Actions */}
-      <div style={{ marginTop: '20px' }}>
+      <div className="flex items-center gap-2 flex-wrap mt-1">
         <button
           onClick={handleCreate}
-          style={{ ...styles.button, ...styles.primaryButton }}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '6px',
+            border: 'none',
+            fontWeight: 600,
+            fontSize: '14px',
+            cursor: 'pointer',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            transition: 'background-color 0.2s',
+          }}
           disabled={isCreating}
         >
           {isCreating ? 'Creating...' : 'Create Review Document'}
@@ -292,15 +239,29 @@ function ReviewDocumentCreator() {
 
         <button
           onClick={() => plugin.widget.closePopup()}
-          style={{ ...styles.button, ...styles.secondaryButton }}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '6px',
+            border: 'none',
+            fontWeight: 600,
+            fontSize: '14px',
+            cursor: 'pointer',
+            backgroundColor: '#6b7280',
+            color: 'white',
+            transition: 'background-color 0.2s',
+          }}
           disabled={isCreating}
         >
           Cancel
         </button>
-
-        {errorMessage && <div style={styles.error}>{errorMessage}</div>}
-        {successMessage && <div style={styles.success}>{successMessage}</div>}
       </div>
+
+      {errorMessage && (
+        <div style={{ color: '#ef4444', fontSize: '14px' }}>{errorMessage}</div>
+      )}
+      {successMessage && (
+        <div style={{ color: '#10b981', fontSize: '14px' }}>{successMessage}</div>
+      )}
     </div>
   );
 }

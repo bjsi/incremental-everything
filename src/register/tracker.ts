@@ -1,12 +1,23 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey } from '../lib/consts';
+
+// Module-level flag to suppress IncRem cache reloads during batch writes.
+// IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
+// plugin.track() only adds getSession/getSynced calls as reactive dependencies.
+// A module-level variable is invisible to the reactive system — setting it true→false
+// does NOT re-trigger plugin.track(), eliminating spurious IncRem cache reloads
+// after every card priority save (which was the bug when using batch_priority_active
+// session storage for this check).
+// Note: batch_priority_active session storage is kept separately for events.ts
+// GlobalRemChanged suppression (cross-iframe communication).
+let incRemBatchActive = false;
 
 export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
-    // Suppress caching operations while a batch tool is aggressively writing
-    const isBatchActive = await rp.storage.getSession<boolean>('batch_priority_active');
-    if (isBatchActive) return;
+    // Use module-level variable (non-reactive) — does NOT create a reactive dependency.
+    // This watcher will only re-run when actual rem data changes, not when the flag changes.
+    if (incRemBatchActive) return;
 
     console.log('[Tracker] IncRem cache load triggered by plugin.track()');
     await loadIncrementalRemCache(rp as any);
@@ -86,24 +97,26 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     }
   });
 
-  // Background inheritance cascade watcher
-  // The batch_priority popup can't run long tasks because closing the popup kills them.
-  // Instead, it writes 'pendingInheritanceCascade' to session storage, and THIS tracker
-  // (running in the persistent index widget) picks it up and runs the cascade.
+  // Background inheritance cascade watcher — with 5s debounce.
+  // All cascade triggers write to 'pendingInheritanceCascade'. This watcher:
+  //   1. Clears the key immediately (prevents re-triggering on the next track() tick).
+  //   2. Adds the remId to a Set (all rems accumulate — deduplication is free via Set).
+  //   3. Resets a 5s debounce timer. After 5s of quiet, cascades run for ALL collected rems.
+  //   4. If a cascade is already running, the remId is queued for a follow-up pass.
+  const CASCADE_DEBOUNCE_MS = 5000;
   let cascadeRunning = false;
-  plugin.track(async (rp) => {
-    const pendingRemId = await rp.storage.getSession<string>('pendingInheritanceCascade');
-    if (!pendingRemId || cascadeRunning) return;
+  let cascadeDebounceTimer: NodeJS.Timeout | null = null;
+  let pendingCascadeRemIds = new Set<string>();
 
+  const runCascade = async (remId: string) => {
     cascadeRunning = true;
-    // Clear the flag immediately so we don't re-trigger
-    await plugin.storage.setSession('pendingInheritanceCascade', null);
-
-    console.log('[Tracker] Background inheritance cascade started for remId:', pendingRemId);
+    incRemBatchActive = true;
+    await plugin.storage.setSession('batch_priority_active', true);
+    console.log('[Tracker] Background inheritance cascade started for remId:', remId);
     try {
       const { recalculateTreeInheritance } = await import('../lib/card_priority');
       const { flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
-      const rem = await plugin.rem.findOne(pendingRemId);
+      const rem = await plugin.rem.findOne(remId);
       if (rem) {
         const t = performance.now();
         await recalculateTreeInheritance(plugin as any, rem);
@@ -114,6 +127,126 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       console.error('[Tracker] Background inheritance cascade failed:', err);
     } finally {
       cascadeRunning = false;
+      incRemBatchActive = false;
+      await plugin.storage.setSession('batch_priority_active', false);
+      // If more remIds were queued while running, drain them now (no extra debounce wait).
+      if (pendingCascadeRemIds.size > 0) {
+        const queued = [...pendingCascadeRemIds];
+        pendingCascadeRemIds.clear();
+        console.log('[Tracker] Cascade queue: draining', queued.length, 'queued remId(s)');
+        for (const next of queued) {
+          await runCascade(next);
+        }
+      }
+    }
+  };
+
+  plugin.track(async (rp) => {
+    const pendingRemId = await rp.storage.getSession<string>('pendingInheritanceCascade');
+    if (!pendingRemId) return;
+
+    // Clear immediately to prevent re-trigger on the next track() tick
+    await plugin.storage.setSession('pendingInheritanceCascade', null);
+
+    if (cascadeRunning) {
+      // Cascade already in progress — add to the queue for a follow-up pass
+      pendingCascadeRemIds.add(pendingRemId);
+      console.log('[Tracker] Cascade queued (cascade running) for remId:', pendingRemId);
+      return;
+    }
+
+    // Debounce: accumulate remIds, reset the 5s timer
+    pendingCascadeRemIds.add(pendingRemId);
+    if (cascadeDebounceTimer) clearTimeout(cascadeDebounceTimer);
+    cascadeDebounceTimer = setTimeout(async () => {
+      cascadeDebounceTimer = null;
+      const remIds = [...pendingCascadeRemIds];
+      pendingCascadeRemIds.clear();
+      console.log(`[Tracker] Cascade debounce fired — running ${remIds.length} cascade(s)`);
+      for (const remId of remIds) {
+        await runCascade(remId);
+      }
+    }, CASCADE_DEBOUNCE_MS);
+    console.log(`[Tracker] Cascade debounce reset (${CASCADE_DEBOUNCE_MS}ms), pending: ${pendingCascadeRemIds.size} rem(s)`);
+  });
+
+  // Pending priority save watcher
+  // priority_light.tsx writes a job here before closing, so that DB writes survive popup teardown.
+  // This watcher runs in the persistent index widget, sets batch_priority_active to suppress
+  // GlobalRemChanged during writes, then triggers the inheritance cascade if needed.
+  let prioritySaveRunning = false;
+  plugin.track(async (rp) => {
+    const job = await rp.storage.getSession<{
+      remId: string;
+      incPriority: number | null;
+      cardPriority: number | null;
+      cardSource: string;
+      needsAddPowerup: boolean;
+      triggerCascade: boolean;
+    }>(pendingPrioritySaveKey);
+
+    if (!job || prioritySaveRunning) return;
+
+    prioritySaveRunning = true;
+    // Clear the job immediately so we don't re-trigger
+    await plugin.storage.setSession(pendingPrioritySaveKey, null);
+    // Suppress GlobalRemChanged (cross-iframe) and IncRem cache reload (module-level).
+    // incRemBatchActive is non-reactive: clearing it in finally does NOT re-trigger plugin.track().
+    incRemBatchActive = true;
+    await plugin.storage.setSession('batch_priority_active', true);
+
+    console.log('[Tracker] pendingPrioritySave picked up for remId:', job.remId);
+    try {
+      const rem = await plugin.rem.findOne(job.remId);
+      if (!rem) {
+        console.warn('[Tracker] pendingPrioritySave: rem not found', job.remId);
+        return;
+      }
+
+      // 1. IncRem priority write
+      if (job.incPriority !== null) {
+        await rem.setPowerupProperty(powerupCode, 'priority', [job.incPriority.toString()]);
+        const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
+        const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
+        const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
+        if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
+        console.log(`[Tracker] IncRem priority written: ${job.incPriority}`);
+      }
+
+      // 2. Card priority write (addPowerup first if this is a first-time assignment)
+      if (job.cardPriority !== null) {
+        if (job.needsAddPowerup) {
+          await rem.addPowerup('cardPriority');
+        }
+        const { setCardPriority } = await import('../lib/card_priority');
+        await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true);
+        const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
+        updateCardPriorityCache(plugin as any, rem._id, true, {
+          remId: rem._id,
+          priority: job.cardPriority,
+          source: job.cardSource,
+        } as any);
+        await flushCacheUpdatesNow(plugin as any);
+        console.log(`[Tracker] Card priority written: ${job.cardPriority}`);
+      }
+
+      // 3. Trigger inheritance cascade if requested (handled by existing cascade watcher)
+      if (job.triggerCascade) {
+        const { shouldUseLightMode } = await import('../lib/mobileUtils');
+        const isLight = await shouldUseLightMode(plugin as any);
+        if (!isLight) {
+          // Set pendingInheritanceCascade BEFORE clearing incRemBatchActive/batch_priority_active,
+          // so the cascade watcher can immediately re-set both flags when it fires.
+          await plugin.storage.setSession('pendingInheritanceCascade', job.remId);
+        }
+      }
+
+      console.log('[Tracker] pendingPrioritySave complete for remId:', job.remId);
+    } catch (err) {
+      console.error('[Tracker] pendingPrioritySave failed:', err);
+    } finally {
+      prioritySaveRunning = false;
+      incRemBatchActive = false; // non-reactive clear — does NOT re-trigger plugin.track()
       await plugin.storage.setSession('batch_priority_active', false);
     }
   });
