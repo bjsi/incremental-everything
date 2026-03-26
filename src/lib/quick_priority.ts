@@ -15,7 +15,7 @@ import {
     setCardPriority,
 } from './card_priority';
 import { updateCardPriorityCache, flushLightCacheUpdates } from './card_priority/cache';
-import { isFullPerformanceMode } from './utils';
+import { shouldUseLightMode } from './mobileUtils';
 
 export async function handleQuickPriorityChange(
     plugin: ReactRNPlugin,
@@ -173,10 +173,11 @@ export async function handleQuickPriorityChange(
     // 🌲 Cascade inherited card priorities to descendants (fire-and-forget)
     // If card priority changed, descendants with 'inherited' source need recalculation.
     // Also cascade if IncRem priority changed (descendants may have source 'inherited' via this IncRem).
+    // Uses shouldUseLightMode (not just the setting) so mobile/web device overrides are respected.
     // tracker.ts handles serialization and returns instantly for leaf rems.
     if (cardPriorityCascadeNeeded || incPriorityCascadeNeeded) {
-        isFullPerformanceMode(plugin).then(isFull => {
-            if (isFull) {
+        shouldUseLightMode(plugin).then(isLight => {
+            if (!isLight) {
                 plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
             }
         });

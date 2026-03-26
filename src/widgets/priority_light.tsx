@@ -24,7 +24,7 @@ import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_pri
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { initIncrementalRem } from '../lib/incremental_rem';
-import { isFullPerformanceMode } from '../lib/utils';
+import { shouldUseLightMode } from '../lib/mobileUtils';
 
 function PriorityLight() {
     const plugin = usePlugin();
@@ -202,11 +202,11 @@ function PriorityLight() {
         // 🌲 Cascade inherited card priorities to descendants (fire-and-forget, unconditional)
         // Cascade whenever card priority was saved — this rem may be an anchor for descendants.
         // Also cascade when IncRem priority changes (descendants may have source 'inherited' via this IncRem).
-        // No derivedData available here, so always fire in full mode; tracker.ts returns instantly for leaf rems.
+        // Uses shouldUseLightMode (not just the setting) so mobile/web device overrides are respected.
         const incPrioritySaved = data.hasIncPowerup && (incVal ?? data.defaults.inc) !== data.incPriority;
         if (cardPrioritySaved || incPrioritySaved) {
-            isFullPerformanceMode(plugin).then(isFull => {
-                if (isFull) {
+            shouldUseLightMode(plugin).then(isLight => {
+                if (!isLight) {
                     plugin.storage.setSession('pendingInheritanceCascade', data.rem._id).catch(console.error);
                 }
             });
