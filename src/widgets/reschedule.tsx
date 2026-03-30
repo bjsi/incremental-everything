@@ -81,6 +81,8 @@ async function handleRescheduleAndPriorityUpdate(
       await plugin.queue.removeCurrentCardFromQueue();
     }
 
+    plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
+
     await plugin.widget.closePopup();
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
