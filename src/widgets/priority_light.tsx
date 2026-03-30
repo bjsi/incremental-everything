@@ -172,7 +172,13 @@ function PriorityLight() {
         }
         if (cardChanged) {
             // Signal events.ts to allow this update even if in queue
-            plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
+            plugin.storage.getSession<string[]>('manual_priority_pending_rems').then(manualRems => {
+                const arr = manualRems || [];
+                if (!arr.includes(data.rem._id)) {
+                    arr.push(data.rem._id);
+                    plugin.storage.setSession('manual_priority_pending_rems', arr);
+                }
+            }).catch(console.error);
 
             // Lightweight in-memory optimistic override (5s TTL) — read by getPendingCacheUpdate
             updateCardPriorityCache(plugin, data.rem._id, true, {

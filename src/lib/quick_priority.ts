@@ -4,6 +4,7 @@ import {
     powerupCode,
     prioritySlotCode,
     priorityStepSizeId,
+    pendingPrioritySaveKey,
 } from './consts';
 import {
     getIncrementalRemFromRem,
@@ -95,10 +96,14 @@ export async function handleQuickPriorityChange(
 
     // 3. Identify Targets & Apply Changes
     const messages: string[] = [];
+    let jobIncPriority: number | null = null;
+    let jobCardPriority: number | null = null;
+    let needsAddPowerup = false;
+    let incPriorityCascadeNeeded = false;
+    let cardPriorityCascadeNeeded = false;
 
     // --- A. Incremental Rem Priority ---
     const hasIncPowerup = await rem.hasPowerup(powerupCode);
-    let incPriorityCascadeNeeded = false;
     if (hasIncPowerup) {
         const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
         if (incRemInfo) {
@@ -106,14 +111,9 @@ export async function handleQuickPriorityChange(
             const newPriority = Math.max(0, Math.min(100, oldPriority + delta));
 
             if (oldPriority !== newPriority) {
-                await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
-                await updateIncrementalRemCache(plugin, { ...incRemInfo, priority: newPriority }); // Optimistic update if valid?
-                // Actually getIncrementalRemFromRem returns object, we need to re-fetch or construct valid object for cache.
-                // Easier to just re-fetch for cache validity
-                const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-                if (updatedIncRem) {
-                    await updateIncrementalRemCache(plugin, updatedIncRem);
-                }
+                jobIncPriority = newPriority;
+                // Optimistic cache update
+                await updateIncrementalRemCache(plugin, { ...incRemInfo, priority: newPriority });
                 incPriorityCascadeNeeded = true;
 
                 const arrow = newPriority < oldPriority ? '🔺' : '🔽';
@@ -124,11 +124,9 @@ export async function handleQuickPriorityChange(
     }
 
     // --- B. Card Priority ---
-    // Check if it has cards OR has card priority powerup
     const hasCards = (await rem.getCards()).length > 0;
     const hasCardPriorityPowerup = await rem.hasPowerup('cardPriority');
 
-    let cardPriorityCascadeNeeded = false;
     if (hasCards || hasCardPriorityPowerup) {
         const cardInfo = await getCardPriority(plugin, rem);
         if (cardInfo) {
@@ -136,11 +134,10 @@ export async function handleQuickPriorityChange(
             const newPriority = Math.max(0, Math.min(100, oldPriority + delta));
 
             if (oldPriority !== newPriority) {
-                // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-                plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
-
-                // Only set if changed
-                await setCardPriority(plugin, rem, newPriority, 'manual');
+                jobCardPriority = newPriority;
+                needsAddPowerup = !hasCardPriorityPowerup;
+                
+                // Optimistic cache update
                 await updateCardPriorityCache(plugin, rem._id, true, { remId: rem._id, priority: newPriority, source: 'manual' } as any);
                 await flushLightCacheUpdates(plugin);
                 cardPriorityCascadeNeeded = true;
@@ -150,16 +147,13 @@ export async function handleQuickPriorityChange(
                 messages.push(`cardPriority ${oldPriority} ➡️ ${newPriority} (${importanceMsg} ${arrow})`);
             }
         } else {
-            // If no card info exists yet (e.g. inheritance), start from default (50?) or consider it 50.
-            // getCardPriority usually returns something if we ask it, falling back to defaults/inheritance.
-            // If we want to set it manually now:
-            const oldPriority = 50; // Or fetch default?
+            const oldPriority = 50; 
             const newPriority = Math.max(0, Math.min(100, oldPriority + delta));
 
-            // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-            plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
-
-            await setCardPriority(plugin, rem, newPriority, 'manual');
+            jobCardPriority = newPriority;
+            needsAddPowerup = !hasCardPriorityPowerup;
+            
+            // Optimistic cache update
             await updateCardPriorityCache(plugin, rem._id, true, { remId: rem._id, priority: newPriority, source: 'manual' } as any);
             await flushLightCacheUpdates(plugin);
             cardPriorityCascadeNeeded = true;
@@ -170,17 +164,27 @@ export async function handleQuickPriorityChange(
         }
     }
 
-    // 🌲 Cascade inherited card priorities to descendants (fire-and-forget)
-    // If card priority changed, descendants with 'inherited' source need recalculation.
-    // Also cascade if IncRem priority changed (descendants may have source 'inherited' via this IncRem).
-    // Uses shouldUseLightMode (not just the setting) so mobile/web device overrides are respected.
-    // tracker.ts handles serialization and returns instantly for leaf rems.
-    if (cardPriorityCascadeNeeded || incPriorityCascadeNeeded) {
-        shouldUseLightMode(plugin).then(isLight => {
-            if (!isLight) {
-                plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
+    // 🌲 Delegate SDK Writes and Inheritance to Background Tracker
+    if (jobIncPriority !== null || jobCardPriority !== null) {
+        // Global context survivor for manual edits
+        try {
+            const manualRems = await plugin.storage.getSession<string[]>('manual_priority_pending_rems') || [];
+            if (!manualRems.includes(rem._id)) {
+                manualRems.push(rem._id);
+                await plugin.storage.setSession('manual_priority_pending_rems', manualRems);
             }
-        });
+        } catch (err) {
+            console.error(err);
+        }
+
+        plugin.storage.setSession(pendingPrioritySaveKey, {
+            remId: rem._id,
+            incPriority: jobIncPriority,
+            cardPriority: jobCardPriority,
+            cardSource: 'manual',
+            needsAddPowerup: needsAddPowerup,
+            triggerCascade: incPriorityCascadeNeeded || cardPriorityCascadeNeeded
+        }).catch(console.error);
     }
 
     // 4. Notify User
