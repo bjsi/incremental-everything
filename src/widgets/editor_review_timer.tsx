@@ -134,10 +134,14 @@ function EditorReviewTimer() {
       return;
     }
 
-    // Update priority if changed
-    if (timerData.priority !== undefined && timerData.priority !== null) {
-      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
-    }
+    // Suppress GlobalRemChanged
+    await plugin.storage.setSession('plugin_operation_active', true);
+
+    try {
+      // Update priority if changed
+      if (timerData.priority !== undefined && timerData.priority !== null) {
+        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+      }
 
     // Calculate review time in seconds
     const reviewTimeSeconds = Math.round(elapsedMs / 1000);
@@ -189,9 +193,12 @@ function EditorReviewTimer() {
       await plugin.app.toast(`✓ ${timerData.remName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
     }
 
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-    if (updatedIncRem) {
-      await updateIncrementalRemCache(plugin, updatedIncRem);
+      const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
+      if (updatedIncRem) {
+        await updateIncrementalRemCache(plugin, updatedIncRem);
+      }
+    } finally {
+      await plugin.storage.setSession('plugin_operation_active', false);
     }
 
     // Clear timer data FIRST (to prevent navigation from interrupting cleanup)
@@ -247,10 +254,14 @@ function EditorReviewTimer() {
       return;
     }
 
-    // Update priority if changed
-    if (timerData.priority !== undefined && timerData.priority !== null) {
-      await currentRem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
-    }
+    // Suppress GlobalRemChanged
+    await plugin.storage.setSession('plugin_operation_active', true);
+
+    try {
+      // Update priority if changed
+      if (timerData.priority !== undefined && timerData.priority !== null) {
+        await currentRem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+      }
 
     // Calculate review time and sync PDF page
     const reviewTimeSeconds = Math.round(elapsedMs / 1000);
@@ -283,10 +294,13 @@ function EditorReviewTimer() {
     await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
     await addToIncrementalHistory(plugin, timerData.remId);
 
-    // Update cache
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, currentRem);
-    if (updatedIncRem) {
-      await updateIncrementalRemCache(plugin, updatedIncRem);
+      // Update cache
+      const updatedIncRem = await getIncrementalRemFromRem(plugin, currentRem);
+      if (updatedIncRem) {
+        await updateIncrementalRemCache(plugin, updatedIncRem);
+      }
+    } finally {
+      await plugin.storage.setSession('plugin_operation_active', false);
     }
 
     // 2. Setup next item in queue

@@ -472,7 +472,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
     AppEvents.GlobalRemChanged,
     undefined,
     async (data) => {
-      const isBatchActive = await plugin.storage.getSession<boolean>('batch_priority_active');
+      const isBatchActive = await plugin.storage.getSession<boolean>('plugin_operation_active');
       if (isBatchActive) return;
 
       clearTimeout(remChangeDebounceTimer);

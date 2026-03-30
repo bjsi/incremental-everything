@@ -553,7 +553,7 @@ function BatchPriority() {
     setAppliedCount(0);
 
     // Flag this session so events.ts's GlobalRemChanged ignores the chaotic property changes
-    await plugin.storage.setSession('batch_priority_active', true);
+    await plugin.storage.setSession('plugin_operation_active', true);
 
     try {
       // Phase 1: Update each rem's priority
@@ -607,13 +607,13 @@ function BatchPriority() {
       // Popup widgets are killed on close, so we can't run long tasks here.
       // Instead, write the rem ID to session storage — the tracker in tracker.ts
       // will pick it up and run recalculateTreeInheritance in the background.
-      // The batch_priority_active flag stays UP until the tracker finishes.
+      // The plugin_operation_active flag stays UP until the tracker finishes.
       const capturedFocusedRemId = focusedRemId;
       if (capturedFocusedRemId) {
         console.log('📊 BatchPriority: Delegating inheritance cascade to background tracker...');
         await plugin.storage.setSession('pendingInheritanceCascade', capturedFocusedRemId);
       } else {
-        await plugin.storage.setSession('batch_priority_active', false);
+        await plugin.storage.setSession('plugin_operation_active', false);
       }
 
       // Flush the direct priority writes immediately (Phase 1+2 data)
@@ -627,7 +627,7 @@ function BatchPriority() {
     } catch (error) {
       console.error('❌ BatchPriority: Error applying changes:', error);
       await plugin.app.toast('Error applying changes');
-      await plugin.storage.setSession('batch_priority_active', false);
+      await plugin.storage.setSession('plugin_operation_active', false);
     } finally {
       setIsApplying(false);
       isApplyingRef.current = false;

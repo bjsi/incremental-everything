@@ -23,61 +23,68 @@ async function handleRescheduleAndPriorityUpdate(
   newPriority: number,
   context: 'queue' | 'editor' = 'queue'
 ) {
-  const rem = await plugin.rem.findOne(remId);
-  if (!rem) return;
+  // Suppress GlobalRemChanged
+  await plugin.storage.setSession('plugin_operation_active', true);
 
-  const incRem = await getIncrementalRemFromRem(plugin, rem);
-  if (!incRem) return;
+  try {
+    const rem = await plugin.rem.findOne(remId);
+    if (!rem) return;
 
-  await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+    const incRem = await getIncrementalRemFromRem(plugin, rem);
+    if (!incRem) return;
 
-  const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
+    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
 
-  // Calculate early/late status
-  const scheduledDate = incRem.nextRepDate;
-  const actualDate = Date.now();
-  const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-  const wasEarly = daysDifference < 0;
-  const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+    const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
 
-  // Calculate review time only for queue context (editor reschedule doesn't imply actual review)
-  let reviewTimeSeconds: number | undefined;
-  if (context === 'queue') {
-    const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-    reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
+    // Calculate early/late status
+    const scheduledDate = incRem.nextRepDate;
+    const actualDate = Date.now();
+    const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+    const wasEarly = daysDifference < 0;
+    const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+
+    // Calculate review time only for queue context (editor reschedule doesn't imply actual review)
+    let reviewTimeSeconds: number | undefined;
+    if (context === 'queue') {
+      const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+      reviewTimeSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : undefined;
+    }
+
+    // Determine event type based on context
+    const eventType = context === 'queue' ? 'rescheduledInQueue' : 'rescheduledInEditor';
+
+    const newHistory: IncrementalRep[] = [
+      ...(incRem.history || []),
+      {
+        date: actualDate,
+        scheduled: scheduledDate,
+        interval: intervalDays,
+        wasEarly: wasEarly,
+        daysEarlyOrLate: daysEarlyOrLate,
+        reviewTimeSeconds: reviewTimeSeconds,
+        priority: newPriority, // Record the NEW priority set during reschedule
+        eventType: eventType as 'rescheduledInQueue' | 'rescheduledInEditor',
+      },
+    ];
+
+    await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
+
+    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
+    if (updatedIncRem) {
+      await updateIncrementalRemCache(plugin, updatedIncRem);
+    }
+
+    // Clear the start time (only relevant for queue context)
+    if (context === 'queue') {
+      await plugin.storage.setSession(incremReviewStartTimeKey, null);
+      await plugin.queue.removeCurrentCardFromQueue();
+    }
+
+    await plugin.widget.closePopup();
+  } finally {
+    await plugin.storage.setSession('plugin_operation_active', false);
   }
-
-  // Determine event type based on context
-  const eventType = context === 'queue' ? 'rescheduledInQueue' : 'rescheduledInEditor';
-
-  const newHistory: IncrementalRep[] = [
-    ...(incRem.history || []),
-    {
-      date: actualDate,
-      scheduled: scheduledDate,
-      interval: intervalDays,
-      wasEarly: wasEarly,
-      daysEarlyOrLate: daysEarlyOrLate,
-      reviewTimeSeconds: reviewTimeSeconds,
-      priority: newPriority, // Record the NEW priority set during reschedule
-      eventType: eventType as 'rescheduledInQueue' | 'rescheduledInEditor',
-    },
-  ];
-
-  await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
-
-  const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-  if (updatedIncRem) {
-    await updateIncrementalRemCache(plugin, updatedIncRem);
-  }
-
-  // Clear the start time (only relevant for queue context)
-  if (context === 'queue') {
-    await plugin.storage.setSession(incremReviewStartTimeKey, null);
-    await plugin.queue.removeCurrentCardFromQueue();
-  }
-
-  await plugin.widget.closePopup();
 }
 
 
