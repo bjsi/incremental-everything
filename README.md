@@ -85,7 +85,7 @@ The plugin now features **Automatic Light Mode**.
 ### Incremental Reading
 
 - You can tag PDFs, websites and highlights with the `Incremental` tag to do classic SuperMemo-style incremental reading.
-- It will work if you tag the PDF or website itself, or a Rem with a single PDF or website as a source.
+- It will work if you tag the PDF or website itself, a Rem with a single PDF or website as a source, or a Rem with multiple sources where exactly one PDF has the `#preferthispdf` tag.
 - The plugin will render the PDF or website reader view inside the queue.
 - If you want to turn a highlight into an incremental Rem, click on the highlight and click the puzzle piece icon.
 - ** 📄 PDFs & Web**
