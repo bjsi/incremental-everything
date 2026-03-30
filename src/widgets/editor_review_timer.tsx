@@ -37,6 +37,8 @@ function EditorReviewTimer() {
       const fromQueue = await rp.storage.getSession<boolean>('editor-review-timer-from-queue');
       const origin = await rp.storage.getSession<string>('editor-review-timer-origin');
       const queueList = await rp.storage.getSession<string[]>('editor-review-timer-queue-list');
+      const pausedAt = await rp.storage.getSession<number>('editor-review-timer-paused-at');
+      const accumulatedMs = await rp.storage.getSession<number>('editor-review-timer-accumulated-ms');
 
       return {
         remId,
@@ -47,6 +49,8 @@ function EditorReviewTimer() {
         fromQueue,
         origin: origin || (fromQueue ? 'queue' : 'editor'),
         queueList: queueList || [],
+        pausedAt: pausedAt ?? null,
+        accumulatedMs: accumulatedMs ?? 0,
       };
     },
     []
@@ -82,8 +86,16 @@ function EditorReviewTimer() {
     loadPdfData();
   }, [timerData?.remId, plugin]);
 
-  const elapsedMs = currentTime - (timerData?.startTime || currentTime);
-  const elapsedDuration = dayjs.duration(elapsedMs);
+  const isPaused = !!(timerData?.pausedAt);
+
+  // When paused, freeze at the moment we paused; otherwise count live.
+  const elapsedMs = isPaused
+    ? (timerData!.accumulatedMs + (timerData!.pausedAt! - (timerData?.startTime || timerData!.pausedAt!)))
+    : (timerData?.startTime
+        ? (timerData.accumulatedMs + (currentTime - timerData.startTime))
+        : 0);
+
+  const elapsedDuration = dayjs.duration(Math.max(0, elapsedMs));
   const hours = Math.floor(elapsedDuration.asHours());
   const minutes = elapsedDuration.minutes();
   const seconds = elapsedDuration.seconds();
@@ -91,6 +103,21 @@ function EditorReviewTimer() {
   const timeDisplay = hours > 0
     ? `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
     : `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+  const handlePause = async () => {
+    if (!timerData || isPaused) return;
+    await plugin.storage.setSession('editor-review-timer-paused-at', Date.now());
+  };
+
+  const handleResume = async () => {
+    if (!timerData || !isPaused) return;
+    // accumulatedMs grows by the segment we just completed before pausing
+    const segmentMs = timerData.pausedAt! - (timerData.startTime || timerData.pausedAt!);
+    const newAccumulated = timerData.accumulatedMs + segmentMs;
+    await plugin.storage.setSession('editor-review-timer-accumulated-ms', newAccumulated);
+    await plugin.storage.setSession('editor-review-timer-start', Date.now());
+    await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
+  };
 
   const handleEndReview = async (navigateBack: boolean = true) => {
     if (!timerData) return;
@@ -107,10 +134,14 @@ function EditorReviewTimer() {
       return;
     }
 
-    // Update priority if changed
-    if (timerData.priority !== undefined && timerData.priority !== null) {
-      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
-    }
+    // Suppress GlobalRemChanged
+    await plugin.storage.setSession('plugin_operation_active', true);
+
+    try {
+      // Update priority if changed
+      if (timerData.priority !== undefined && timerData.priority !== null) {
+        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+      }
 
     // Calculate review time in seconds
     const reviewTimeSeconds = Math.round(elapsedMs / 1000);
@@ -162,9 +193,12 @@ function EditorReviewTimer() {
       await plugin.app.toast(`✓ ${timerData.remName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
     }
 
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-    if (updatedIncRem) {
-      await updateIncrementalRemCache(plugin, updatedIncRem);
+      const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
+      if (updatedIncRem) {
+        await updateIncrementalRemCache(plugin, updatedIncRem);
+      }
+    } finally {
+      await plugin.storage.setSession('plugin_operation_active', false);
     }
 
     // Clear timer data FIRST (to prevent navigation from interrupting cleanup)
@@ -175,6 +209,8 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
     await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
     await plugin.storage.setSession('editor-review-timer-origin', undefined);
+    await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
+    await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
 
     // Perform navigation at the very end — only if requested
     if (navigateBack) {
@@ -218,10 +254,14 @@ function EditorReviewTimer() {
       return;
     }
 
-    // Update priority if changed
-    if (timerData.priority !== undefined && timerData.priority !== null) {
-      await currentRem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
-    }
+    // Suppress GlobalRemChanged
+    await plugin.storage.setSession('plugin_operation_active', true);
+
+    try {
+      // Update priority if changed
+      if (timerData.priority !== undefined && timerData.priority !== null) {
+        await currentRem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+      }
 
     // Calculate review time and sync PDF page
     const reviewTimeSeconds = Math.round(elapsedMs / 1000);
@@ -254,10 +294,13 @@ function EditorReviewTimer() {
     await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
     await addToIncrementalHistory(plugin, timerData.remId);
 
-    // Update cache
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, currentRem);
-    if (updatedIncRem) {
-      await updateIncrementalRemCache(plugin, updatedIncRem);
+      // Update cache
+      const updatedIncRem = await getIncrementalRemFromRem(plugin, currentRem);
+      if (updatedIncRem) {
+        await updateIncrementalRemCache(plugin, updatedIncRem);
+      }
+    } finally {
+      await plugin.storage.setSession('plugin_operation_active', false);
     }
 
     // 2. Setup next item in queue
@@ -326,6 +369,8 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
     await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
     await plugin.storage.setSession('editor-review-timer-origin', undefined);
+    await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
+    await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
     // Clear stored list state if cancelling
     await plugin.storage.setSession('inc-rem-list-state', undefined);
     await plugin.storage.setSession('inc-rem-main-view-state', undefined);
@@ -358,21 +403,21 @@ function EditorReviewTimer() {
         maxWidth: '100%',
       }}
     >
-      <span style={{ fontSize: '18px' }}>⏱️</span>
+      <span style={{ fontSize: '18px' }}>{isPaused ? '⏸️' : '⏱️'}</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: '13px',
           fontWeight: 600,
-          color: '#1e40af',
+          color: isPaused ? '#92400e' : '#1e40af',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}>
-          Reviewing: {displayName}
+          {isPaused ? 'Paused: ' : 'Reviewing: '}{displayName}
         </div>
         <div style={{
           fontSize: '16px',
-          color: '#1e3a8a',
+          color: isPaused ? '#78350f' : '#1e3a8a',
           fontVariantNumeric: 'tabular-nums',
           fontWeight: 700,
         }}>
@@ -391,6 +436,29 @@ function EditorReviewTimer() {
       )}
 
       <div style={{ display: 'flex', gap: '8px' }}>
+        {/* Pause / Continue button */}
+        <button
+          onClick={isPaused ? handleResume : handlePause}
+          style={{
+            padding: '6px 12px',
+            fontSize: '13px',
+            backgroundColor: isPaused ? '#f59e0b' : '#6b7280',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = isPaused ? '#d97706' : '#4b5563';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = isPaused ? '#f59e0b' : '#6b7280';
+          }}
+          title={isPaused ? 'Resume timer' : 'Pause timer'}
+        >
+          {isPaused ? '▶ Resume' : '⏸ Pause'}
+        </button>
         {/* "Next" button — shown sequentially when queue list has items */}
         {timerData.queueList && timerData.queueList.length > 0 && (
           <button

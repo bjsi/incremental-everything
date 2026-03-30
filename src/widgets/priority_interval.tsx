@@ -131,58 +131,64 @@ function PriorityInterval() {
         }
     };
 
-    // Save logic
     const handleSave = useCallback(async (overrideInterval?: number) => {
         if (!data || !data.rem || isSaving.current) return;
         isSaving.current = true;
 
-        const effectivePriority = priorityVal ?? data.defaultPriority;
-        const effectiveInterval = overrideInterval !== undefined
-            ? overrideInterval
-            : (intervalVal !== null ? parseInt(intervalVal) : data.defaultInterval);
+        // Suppress GlobalRemChanged
+        await plugin.storage.setSession('plugin_operation_active', true);
 
-        if (isNaN(effectiveInterval)) {
+        try {
+            const effectivePriority = priorityVal ?? data.defaultPriority;
+            const effectiveInterval = overrideInterval !== undefined
+                ? overrideInterval
+                : (intervalVal !== null ? parseInt(intervalVal) : data.defaultInterval);
+
+            if (isNaN(effectiveInterval)) {
+                return;
+            }
+
+            // Save priority
+            await data.rem.setPowerupProperty(powerupCode, prioritySlotCode, [effectivePriority.toString()]);
+
+            // Save interval (SRS schedule)
+            const incRem = await getIncrementalRemFromRem(plugin, data.rem);
+            if (incRem) {
+                const newNextRepDate = Date.now() + effectiveInterval * 1000 * 60 * 60 * 24;
+                const scheduledDate = incRem.nextRepDate || Date.now();
+                const actualDate = Date.now();
+                const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+                const wasEarly = daysDifference < 0;
+                const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+
+                const newHistory: IncrementalRep[] = [
+                    ...(incRem.history || []),
+                    {
+                        date: actualDate,
+                        scheduled: scheduledDate,
+                        interval: effectiveInterval,
+                        wasEarly,
+                        daysEarlyOrLate,
+                        reviewTimeSeconds: undefined,
+                        priority: effectivePriority,
+                        eventType: 'rescheduledInEditor',
+                    },
+                ];
+
+                await updateSRSDataForRem(plugin, data.remId, newNextRepDate, newHistory);
+            }
+
+            // Update cache
+            const updatedIncRem = await getIncrementalRemFromRem(plugin, data.rem);
+            if (updatedIncRem) {
+                await updateIncrementalRemCache(plugin, updatedIncRem);
+            }
+
+            plugin.widget.closePopup();
+        } finally {
             isSaving.current = false;
-            return;
+            await plugin.storage.setSession('plugin_operation_active', false);
         }
-
-        // Save priority
-        await data.rem.setPowerupProperty(powerupCode, prioritySlotCode, [effectivePriority.toString()]);
-
-        // Save interval (SRS schedule)
-        const incRem = await getIncrementalRemFromRem(plugin, data.rem);
-        if (incRem) {
-            const newNextRepDate = Date.now() + effectiveInterval * 1000 * 60 * 60 * 24;
-            const scheduledDate = incRem.nextRepDate || Date.now();
-            const actualDate = Date.now();
-            const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-            const wasEarly = daysDifference < 0;
-            const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-
-            const newHistory: IncrementalRep[] = [
-                ...(incRem.history || []),
-                {
-                    date: actualDate,
-                    scheduled: scheduledDate,
-                    interval: effectiveInterval,
-                    wasEarly,
-                    daysEarlyOrLate,
-                    reviewTimeSeconds: undefined,
-                    priority: effectivePriority,
-                    eventType: 'rescheduledInEditor',
-                },
-            ];
-
-            await updateSRSDataForRem(plugin, data.remId, newNextRepDate, newHistory);
-        }
-
-        // Update cache
-        const updatedIncRem = await getIncrementalRemFromRem(plugin, data.rem);
-        if (updatedIncRem) {
-            await updateIncrementalRemCache(plugin, updatedIncRem);
-        }
-
-        plugin.widget.closePopup();
     }, [data, priorityVal, intervalVal, plugin]);
 
     if (!data) {

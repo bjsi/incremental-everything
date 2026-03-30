@@ -189,7 +189,7 @@ function PriorityLight() {
 
         // --- Write the DB job to session storage for tracker.ts to execute ---
         // tracker.ts runs in the persistent index widget (not killed by popup close)
-        // and will set batch_priority_active=true before writing to suppress GlobalRemChanged.
+        // and will set plugin_operation_active=true before writing to suppress GlobalRemChanged.
         if (incChanged || cardChanged) {
             plugin.storage.setSession(pendingPrioritySaveKey, {
                 remId: data.rem._id,

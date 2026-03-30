@@ -339,7 +339,7 @@ function BatchCardPriority() {
     setErrorMessage('');
 
     // Suppress GlobalRemChanged listener during bulk writes
-    await plugin.storage.setSession('batch_priority_active', true);
+    await plugin.storage.setSession('plugin_operation_active', true);
 
     try {
       let appliedCount = 0;
@@ -383,7 +383,7 @@ function BatchCardPriority() {
       setErrorMessage('Failed to apply priorities. Check console for details.');
     } finally {
       setIsApplying(false);
-      await plugin.storage.setSession('batch_priority_active', false);
+      await plugin.storage.setSession('plugin_operation_active', false);
     }
   };
 

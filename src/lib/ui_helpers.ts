@@ -62,11 +62,13 @@ export async function registerQueueHidingCSS(plugin: ReactRNPlugin) {
 // This replaces the old manual color setting logic
 export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
   const css = `
-    [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"] { 
+    [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"],
+    [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] { 
       background-color: #75ccf8 !important;
       padding-bottom: 2.7px;
     } 
-    [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"] { 
+    [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"],
+    [data-rem-tags~="html-highlight"][data-rem-tags~="incremental"] { 
       background-color: #75f8b2 !important;
       padding-bottom: 2.7px;
     }

@@ -7,9 +7,9 @@ import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPriori
 // plugin.track() only adds getSession/getSynced calls as reactive dependencies.
 // A module-level variable is invisible to the reactive system — setting it true→false
 // does NOT re-trigger plugin.track(), eliminating spurious IncRem cache reloads
-// after every card priority save (which was the bug when using batch_priority_active
+// after every card priority save (which was the bug when using plugin_operation_active
 // session storage for this check).
-// Note: batch_priority_active session storage is kept separately for events.ts
+// Note: plugin_operation_active session storage is kept separately for events.ts
 // GlobalRemChanged suppression (cross-iframe communication).
 let incRemBatchActive = false;
 
@@ -111,7 +111,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   const runCascade = async (remId: string) => {
     cascadeRunning = true;
     incRemBatchActive = true;
-    await plugin.storage.setSession('batch_priority_active', true);
+    await plugin.storage.setSession('plugin_operation_active', true);
     console.log('[Tracker] Background inheritance cascade started for remId:', remId);
     try {
       const { recalculateTreeInheritance } = await import('../lib/card_priority');
@@ -128,7 +128,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     } finally {
       cascadeRunning = false;
       incRemBatchActive = false;
-      await plugin.storage.setSession('batch_priority_active', false);
+      await plugin.storage.setSession('plugin_operation_active', false);
       // If more remIds were queued while running, drain them now (no extra debounce wait).
       if (pendingCascadeRemIds.size > 0) {
         const queued = [...pendingCascadeRemIds];
@@ -172,7 +172,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
   // Pending priority save watcher
   // priority_light.tsx writes a job here before closing, so that DB writes survive popup teardown.
-  // This watcher runs in the persistent index widget, sets batch_priority_active to suppress
+  // This watcher runs in the persistent index widget, sets plugin_operation_active to suppress
   // GlobalRemChanged during writes, then triggers the inheritance cascade if needed.
   let prioritySaveRunning = false;
   plugin.track(async (rp) => {
@@ -193,7 +193,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     // Suppress GlobalRemChanged (cross-iframe) and IncRem cache reload (module-level).
     // incRemBatchActive is non-reactive: clearing it in finally does NOT re-trigger plugin.track().
     incRemBatchActive = true;
-    await plugin.storage.setSession('batch_priority_active', true);
+    await plugin.storage.setSession('plugin_operation_active', true);
 
     console.log('[Tracker] pendingPrioritySave picked up for remId:', job.remId);
     try {
@@ -235,7 +235,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         const { shouldUseLightMode } = await import('../lib/mobileUtils');
         const isLight = await shouldUseLightMode(plugin as any);
         if (!isLight) {
-          // Set pendingInheritanceCascade BEFORE clearing incRemBatchActive/batch_priority_active,
+          // Set pendingInheritanceCascade BEFORE clearing incRemBatchActive/plugin_operation_active,
           // so the cascade watcher can immediately re-set both flags when it fires.
           await plugin.storage.setSession('pendingInheritanceCascade', job.remId);
         }
@@ -247,7 +247,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     } finally {
       prioritySaveRunning = false;
       incRemBatchActive = false; // non-reactive clear — does NOT re-trigger plugin.track()
-      await plugin.storage.setSession('batch_priority_active', false);
+      await plugin.storage.setSession('plugin_operation_active', false);
     }
   });
 }

@@ -33,8 +33,6 @@ import { IncrementalRep } from '../lib/incremental_rem/types';
 import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from '../lib/priority_review_document';
 import {
   calculateAllPercentiles,
-  isFullPerformanceMode,
-  isLightPerformanceMode,
   getPerformanceMode,
 } from '../lib/utils';
 import {
@@ -46,6 +44,7 @@ import {
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
+import { shouldUseLightMode } from '../lib/mobileUtils';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -147,7 +146,7 @@ export function registerQueueExitListener(
     console.log('[QueueExit] Priority calculation scope:', priorityCalcScopeRemIds?.length || 0, 'rems');
     console.log('[QueueExit] Original scope ID for history:', originalScopeId);
 
-    if (await isFullPerformanceMode(plugin)) {
+    if (!(await shouldUseLightMode(plugin))) {
       console.log('[QueueExit] Full mode. Saving Priority Shield history...');
 
       const skipCardHistorySave = await plugin.storage.getSession<boolean>('skipCardHistorySave');
@@ -287,7 +286,7 @@ export function registerQueueEnterListener(
       await plugin.storage.setSession('skipCardHistorySave', false);
     }
 
-    const dueCardsInKB = (await isFullPerformanceMode(plugin)) ? allCardInfos.filter(info => info.dueCards > 0) : [];
+    const dueCardsInKB = !(await shouldUseLightMode(plugin)) ? allCardInfos.filter(info => info.dueCards > 0) : [];
 
     let docPercentiles: Record<RemId, number> = {};
     let dueCardsInScope: CardPriorityInfo[] = [];
@@ -338,7 +337,7 @@ export function registerQueueEnterListener(
 
         await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
 
-        if (await isFullPerformanceMode(plugin)) {
+        if (!(await shouldUseLightMode(plugin))) {
           console.log('QUEUE ENTER: Full mode. Calculating session cache...');
 
           const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
@@ -402,7 +401,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
     AppEvents.QueueCompleteCard,
     undefined,
     async (data: { cardId: RemId }) => {
-      if (await isLightPerformanceMode(plugin)) {
+      if (await shouldUseLightMode(plugin)) {
         return;
       }
 
@@ -473,7 +472,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
     AppEvents.GlobalRemChanged,
     undefined,
     async (data) => {
-      const isBatchActive = await plugin.storage.getSession<boolean>('batch_priority_active');
+      const isBatchActive = await plugin.storage.getSession<boolean>('plugin_operation_active');
       if (isBatchActive) return;
 
       clearTimeout(remChangeDebounceTimer);
@@ -614,7 +613,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           );
         }
 
-        if (await isLightPerformanceMode(plugin)) {
+        if (await shouldUseLightMode(plugin)) {
           // console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping (Light Mode).');
           return;
         }

@@ -88,26 +88,30 @@ function PriorityShieldGraph() {
 
   const processHistoryData = (history: Record<string, ShieldHistoryEntry> | undefined, isIncRemChart: boolean = true) => {
     if (!history) return [];
-    const unsortedData = Object.entries(history).map(([date, values]) => {
-      const universeSize = values.universeSize || 0;
-      const isIncRem = isIncRemChart && 'dismissedCount' in values;
 
-      const item: any = {
-        date: date,
-        absolute: values.absolute,
-        relative: values.percentile,
-        universeSize: universeSize,
-      };
+    const unsortedData = Object.entries(history)
+      // NEW: Filter out any flawed data where absolute priority is missing
+      .filter(([_, values]) => values.absolute !== null && values.absolute !== undefined)
+      .map(([date, values]) => {
+        const universeSize = values.universeSize || 0;
+        const isIncRem = isIncRemChart && 'dismissedCount' in values;
 
-      if (isIncRem) {
-        const dismissedCount = values.dismissedCount || 0;
-        const totalUniverse = universeSize + dismissedCount;
-        item.dismissedCount = dismissedCount;
-        item.totalUniverse = totalUniverse;
-        item.processingPercentage = totalUniverse > 0 ? (dismissedCount / totalUniverse) * 100 : 0;
-      }
-      return item;
-    });
+        const item: any = {
+          date: date,
+          absolute: values.absolute,
+          relative: values.percentile,
+          universeSize: universeSize,
+        };
+
+        if (isIncRem) {
+          const dismissedCount = values.dismissedCount || 0;
+          const totalUniverse = universeSize + dismissedCount;
+          item.dismissedCount = dismissedCount;
+          item.totalUniverse = totalUniverse;
+          item.processingPercentage = totalUniverse > 0 ? (dismissedCount / totalUniverse) * 100 : 0;
+        }
+        return item;
+      });
 
     const sortedData = unsortedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return sortedData.map(item => ({
