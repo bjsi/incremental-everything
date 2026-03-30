@@ -32,7 +32,8 @@ import {
   isMobileDeviceKey,
   alwaysUseLightModeOnMobileId,
   defaultPriorityId,
-  defaultCardPriorityId
+  defaultCardPriorityId,
+  pendingPrioritySaveKey
 } from '../lib/consts';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
@@ -540,13 +541,9 @@ function Priority() {
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
 
-    // Use initIncrementalRem to ensure proper initialization if not already an IncRem
-    if (!incRemInfo) {
-      await initIncrementalRem(plugin as any, rem);
-    }
-
-    // Fire-and-forget write
-    rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+    // We no longer trigger direct SDK Database writes from the popup (such as setPowerupProperty).
+    // All SDK network writes are gracefully deferred to the background tracker via `pendingPrioritySaveKey`.
+    // This function now solely focuses on instantaneous optimistic cache updates.
 
     // Construct Optimistic IncRem Object
     const currentNow = Date.now();
@@ -660,23 +657,12 @@ function Priority() {
       console.error(err);
     }
 
-    // Perform the actual DB write
-    if (!hasCardPriorityPowerup) {
-      // CRITICAL: We MUST await the powerup addition here.
-      // If we don't, the 'await rem.hasPowerup' check inside setCardPriority will yield control,
-      // and saveAndClose will immediately close the popup, destroying the widget context
-      // before the powerup is added.
-      await rem.addPowerup(CARD_PRIORITY_CODE);
-    }
+    // Notice: We NO LONGER perform `rem.addPowerup` or `setCardPriority` here!
+    // The intensive SDK writes and event wrapping have been successfully deferred 
+    // to the persistent background tracker via `pendingPrioritySaveKey` in saveAndClose.
 
-    // Now we can fire-and-forget the property updates safely, passing true for knownHasPowerup
-    setCardPriority(plugin, rem, priority, 'manual', true).catch(console.error);
-
-    // 🌲 Cascade inherited card priorities to descendants (fire-and-forget, unconditional)
-    // Triggered for any card priority save — this rem may be an anchor for descendants.
-    // Always triggered to avoid missing cascades when derivedData hasn't resolved yet.
-    // Cost is just a setSession write; tracker.ts is protected by cascadeRunning serialization
-    // and returns instantly for leaf rems.
+    // 🌲 Cascade inherited card priorities to descendants
+    // This instructs the tracker to eventually trigger the inheritance cascade.
     if (performanceMode === PERFORMANCE_MODE_FULL) {
       plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
     }
@@ -689,28 +675,38 @@ function Priority() {
     showInheritanceForIncRem;
 
   const saveAndClose = useCallback(async (incP: number, cardP: number) => {
+    if (!rem) return;
     isSaving.current = true;
 
-    // Fire both save operations
-    const promises: Promise<any>[] = [];
+    // Define what actually needs writing
+    const incChanged = showIncSection && incP !== incRemInfo?.priority;
+    const cardChanged = (showCardSection || showInheritanceSection) && cardP !== cardInfo?.priority;
 
+    // 1. Fire-and-Forget Optimistic Saves (For UI responsiveness / Cache consistency)
     if (showIncSection) {
-      // Fire-and-forget inc priority (assuming it already exists if showIncSection is true)
       saveIncPriority(incP).catch(console.error);
     }
     if (showCardSection || showInheritanceSection) {
-      // CRITICAL: We must await saveCardPriority because it might need to add a powerup (async).
-      // If hasCardPriorityPowerup is true (normal case), the await returns immediately (fast).
-      // If false (inheritance case), it waits for addPowerup (necessary delay).
-      promises.push(saveCardPriority(cardP));
+      saveCardPriority(cardP).catch(console.error);
     }
 
-    // Wait for critical operations (like adding powerup) before closing
-    await Promise.all(promises);
+    // 2. Delegate the actual DB write and Event Suppression to the robust background tracker
+    // This allows the widget to close instantly without waiting for network/DB IO,
+    // while the tracker gracefully wraps the SDK writes in `plugin_operation_active`.
+    if (incChanged || cardChanged) {
+      plugin.storage.setSession(pendingPrioritySaveKey, {
+          remId: rem._id,
+          incPriority: incChanged ? incP : null,
+          cardPriority: cardChanged ? cardP : null,
+          cardSource: 'manual',
+          needsAddPowerup: cardChanged && !hasCardPriorityPowerup,
+          triggerCascade: incChanged || cardChanged,
+      }).catch(console.error);
+    }
 
-    // Close immediately
+    // Close immediately ("Fire and Forget")
     plugin.widget.closePopup();
-  }, [plugin, showIncSection, showCardSection, showInheritanceSection, saveIncPriority, saveCardPriority]);
+  }, [plugin, rem, incRemInfo, cardInfo, hasCardPriorityPowerup, showIncSection, showCardSection, showInheritanceSection, saveIncPriority, saveCardPriority]);
 
   const handleConfirmAndClose = useCallback(async () => {
     const bothSectionsVisible = showIncSection && (showCardSection || showInheritanceSection);
@@ -781,25 +777,37 @@ function Priority() {
   const removeFromIncremental = useCallback(async () => {
     if (!rem) return;
     isSaving.current = true;
-    await rem.removePowerup(powerupCode);
-    await removeIncrementalRemCache(plugin, rem._id);
-    await plugin.app.toast('Removed from Incremental Queue');
-    plugin.widget.closePopup();
+
+    await plugin.storage.setSession('plugin_operation_active', true);
+    try {
+      await rem.removePowerup(powerupCode);
+      await removeIncrementalRemCache(plugin, rem._id);
+      await plugin.app.toast('Removed from Incremental Queue');
+      plugin.widget.closePopup();
+    } finally {
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }
   }, [plugin, rem]);
 
   const removeCardPriority = useCallback(async () => {
     if (!rem) return;
     isSaving.current = true;
-    await rem.removePowerup('cardPriority');
-    // 🔌 Conditionally update cache
-    if (performanceMode === PERFORMANCE_MODE_FULL) {
-      // For removal, we don't have overrides, we assume the next read will see the powerup gone.
-      // Or we can force it? Ideally removal propagates fast enough or we accept a small delay on reset.
-      // But let's rely on standard read for removal for now.
-      await updateCardPriorityCache(plugin, rem._id);
+
+    await plugin.storage.setSession('plugin_operation_active', true);
+    try {
+      await rem.removePowerup('cardPriority');
+      // 🔌 Conditionally update cache
+      if (performanceMode === PERFORMANCE_MODE_FULL) {
+        // For removal, we don't have overrides, we assume the next read will see the powerup gone.
+        // Or we can force it? Ideally removal propagates fast enough or we accept a small delay on reset.
+        // But let's rely on standard read for removal for now.
+        await updateCardPriorityCache(plugin, rem._id);
+      }
+      await plugin.app.toast('Card Priority for inheritance removed.');
+      plugin.widget.closePopup();
+    } finally {
+      await plugin.storage.setSession('plugin_operation_active', false);
     }
-    await plugin.app.toast('Card Priority for inheritance removed.');
-    plugin.widget.closePopup();
   }, [plugin, rem, performanceMode]); // 🔌 Add performanceMode
 
   // --- EARLY RETURNS & FINAL DATA DE-STRUCTURING ---
