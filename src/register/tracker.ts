@@ -155,17 +155,32 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       return;
     }
 
-    // Debounce: accumulate remIds, reset the 5s timer
+    // Debounce: accumulate remIds, reset the 5s timer.
+    // Arm suppression flags immediately so GlobalRemChanged is suppressed for the
+    // entire debounce window, not just while runCascade is executing.
     pendingCascadeRemIds.add(pendingRemId);
+    const wasAlreadyArmed = cascadeDebounceTimer !== null;
     if (cascadeDebounceTimer) clearTimeout(cascadeDebounceTimer);
+    if (!wasAlreadyArmed) {
+      incRemBatchActive = true;
+      await plugin.storage.setSession('plugin_operation_active', true);
+      console.log('[Tracker] Cascade suppression flags armed (debounce window started)');
+    }
     cascadeDebounceTimer = setTimeout(async () => {
       cascadeDebounceTimer = null;
       const remIds = [...pendingCascadeRemIds];
       pendingCascadeRemIds.clear();
       console.log(`[Tracker] Cascade debounce fired — running ${remIds.length} cascade(s)`);
+      if (remIds.length === 0) {
+        // Nothing to run — clear flags defensively.
+        incRemBatchActive = false;
+        await plugin.storage.setSession('plugin_operation_active', false);
+        return;
+      }
       for (const remId of remIds) {
         await runCascade(remId);
       }
+      // runCascade's finally block clears flags after the last cascade completes.
     }, CASCADE_DEBOUNCE_MS);
     console.log(`[Tracker] Cascade debounce reset (${CASCADE_DEBOUNCE_MS}ms), pending: ${pendingCascadeRemIds.size} rem(s)`);
   });
