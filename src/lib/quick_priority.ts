@@ -2,20 +2,33 @@ import { ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
 import {
     currentIncRemKey,
     powerupCode,
-    prioritySlotCode,
     priorityStepSizeId,
+    pendingPriorityDeltaQueueKey,
 } from './consts';
+import { withQueueMutex } from './mutex';
 import {
-    getIncrementalRemFromRem,
     getCurrentIncrementalRem,
 } from './incremental_rem';
-import { updateIncrementalRemCache } from './incremental_rem/cache';
-import {
-    getCardPriority,
-    setCardPriority,
-} from './card_priority';
-import { updateCardPriorityCache, flushLightCacheUpdates } from './card_priority/cache';
-import { shouldUseLightMode } from './mobileUtils';
+
+// Module-level promise chain used as a mutex for the session-storage append.
+// All concurrent invocations of handleQuickPriorityChange chain onto this
+// promise, so each read-modify-write executes strictly after the previous one
+// completes — eliminating the TOCTOU race between rapid keystrokes.
+let appendLock: Promise<void> = Promise.resolve();
+
+// Shape of each entry pushed to the delta queue.
+// The tracker reads the live DB value and applies all accumulated deltas atomically,
+// so rapid keypresses compose correctly (3× decrease = −30 total).
+export interface PriorityDeltaEntry {
+    remId: string;
+    // Non-zero means the keypress targeted that priority type.
+    incDelta: number;
+    cardDelta: number;
+    // Whether the rem has the powerups (so the tracker can skip unnecessary checks).
+    hasIncPowerup: boolean;
+    hasCards: boolean;
+    hasCardPriorityPowerup: boolean;
+}
 
 export async function handleQuickPriorityChange(
     plugin: ReactRNPlugin,
@@ -24,15 +37,8 @@ export async function handleQuickPriorityChange(
     // 1. Get Step Size
     const stepSize = await plugin.settings.getSetting<number>(priorityStepSizeId) || 10;
 
-    // Determine numerical change:
-    // Direction 'increase' (Ctrl+Shift+Up) -> Quick Increase -> Number UP? 
-    // Wait, user request: "quick increase (Ctrl+Shift+Up Arrow) and decrease (Ctrl+Shift+Down Arrow) absolute priority number"
-    // "Ctrl+Shift+Up Arrow would change the absolute priority from 12 to 22" -> Number +10
-    // "red arrows when the absolute priority decrease (importance increase)"
-    // So:
-    // Up Arrow -> Number Increase (+Step) -> Less Important
-    // Down Arrow -> Number Decrease (-Step) -> More Important
-
+    // Up Arrow → Number Increase (+step) → Less Important
+    // Down Arrow → Number Decrease (−step) → More Important
     const delta = direction === 'increase' ? stepSize : -stepSize;
 
     // 2. Detect Context & Get Rem ID
@@ -93,108 +99,44 @@ export async function handleQuickPriorityChange(
     const rem = await plugin.rem.findOne(remId);
     if (!rem) return;
 
-    // 3. Identify Targets & Apply Changes
-    const messages: string[] = [];
-
-    // --- A. Incremental Rem Priority ---
+    // 3. Quick eligibility check — determine which priority types apply to this rem.
+    //    We only check powerup presence here (fast); the tracker reads the actual values.
     const hasIncPowerup = await rem.hasPowerup(powerupCode);
-    let incPriorityCascadeNeeded = false;
-    if (hasIncPowerup) {
-        const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
-        if (incRemInfo) {
-            const oldPriority = incRemInfo.priority;
-            const newPriority = Math.max(0, Math.min(100, oldPriority + delta));
-
-            if (oldPriority !== newPriority) {
-                await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
-                await updateIncrementalRemCache(plugin, { ...incRemInfo, priority: newPriority }); // Optimistic update if valid?
-                // Actually getIncrementalRemFromRem returns object, we need to re-fetch or construct valid object for cache.
-                // Easier to just re-fetch for cache validity
-                const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-                if (updatedIncRem) {
-                    await updateIncrementalRemCache(plugin, updatedIncRem);
-                }
-                incPriorityCascadeNeeded = true;
-
-                const arrow = newPriority < oldPriority ? '🔺' : '🔽';
-                const importanceMsg = newPriority < oldPriority ? 'made more important' : 'made less important';
-                messages.push(`IncRem priority ${oldPriority} ➡️ ${newPriority} (${importanceMsg} ${arrow})`);
-            }
-        }
-    }
-
-    // --- B. Card Priority ---
-    // Check if it has cards OR has card priority powerup
     const hasCards = (await rem.getCards()).length > 0;
     const hasCardPriorityPowerup = await rem.hasPowerup('cardPriority');
 
-    let cardPriorityCascadeNeeded = false;
-    if (hasCards || hasCardPriorityPowerup) {
-        const cardInfo = await getCardPriority(plugin, rem);
-        if (cardInfo) {
-            const oldPriority = cardInfo.priority;
-            const newPriority = Math.max(0, Math.min(100, oldPriority + delta));
+    const targetsInc = hasIncPowerup;
+    const targetsCard = hasCards || hasCardPriorityPowerup;
 
-            if (oldPriority !== newPriority) {
-                // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-                plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
-
-                // Only set if changed
-                await setCardPriority(plugin, rem, newPriority, 'manual');
-                await updateCardPriorityCache(plugin, rem._id, true, { remId: rem._id, priority: newPriority, source: 'manual' } as any);
-                await flushLightCacheUpdates(plugin);
-                cardPriorityCascadeNeeded = true;
-
-                const arrow = newPriority < oldPriority ? '🔺' : '🔽';
-                const importanceMsg = newPriority < oldPriority ? 'made more important' : 'made less important';
-                messages.push(`cardPriority ${oldPriority} ➡️ ${newPriority} (${importanceMsg} ${arrow})`);
-            }
-        } else {
-            // If no card info exists yet (e.g. inheritance), start from default (50?) or consider it 50.
-            // getCardPriority usually returns something if we ask it, falling back to defaults/inheritance.
-            // If we want to set it manually now:
-            const oldPriority = 50; // Or fetch default?
-            const newPriority = Math.max(0, Math.min(100, oldPriority + delta));
-
-            // Signal events.ts to allow this update even if in queue (Global Context Survivor)
-            plugin.storage.setSession('manual_priority_update_pending', true).catch(console.error);
-
-            await setCardPriority(plugin, rem, newPriority, 'manual');
-            await updateCardPriorityCache(plugin, rem._id, true, { remId: rem._id, priority: newPriority, source: 'manual' } as any);
-            await flushLightCacheUpdates(plugin);
-            cardPriorityCascadeNeeded = true;
-
-            const arrow = newPriority < oldPriority ? '🔺' : '🔽';
-            const importanceMsg = newPriority < oldPriority ? 'made more important' : 'made less important';
-            messages.push(`cardPriority ${oldPriority} ➡️ ${newPriority} (${importanceMsg} ${arrow})`);
-        }
+    if (!targetsInc && !targetsCard) {
+        await plugin.app.toast('Element is neither an Incremental Rem nor has Cards.');
+        return;
     }
 
-    // 🌲 Cascade inherited card priorities to descendants (fire-and-forget)
-    // If card priority changed, descendants with 'inherited' source need recalculation.
-    // Also cascade if IncRem priority changed (descendants may have source 'inherited' via this IncRem).
-    // Uses shouldUseLightMode (not just the setting) so mobile/web device overrides are respected.
-    // tracker.ts handles serialization and returns instantly for leaf rems.
-    if (cardPriorityCascadeNeeded || incPriorityCascadeNeeded) {
-        shouldUseLightMode(plugin).then(isLight => {
-            if (!isLight) {
-                plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
-            }
-        });
-    }
+    // 4. Serialize the append via the module-level lock so concurrent invocations
+    //    (e.g. 2 keystrokes fired 5 ms apart) never race on the same queue slot.
+    const doAppend = async () => {
+        const existing = await plugin.storage.getSession<PriorityDeltaEntry[]>(pendingPriorityDeltaQueueKey) || [];
+        const entry: PriorityDeltaEntry = {
+            remId,
+            incDelta: targetsInc ? delta : 0,
+            cardDelta: targetsCard ? delta : 0,
+            hasIncPowerup,
+            hasCards,
+            hasCardPriorityPowerup,
+        };
+        existing.push(entry);
+        await plugin.storage.setSession(pendingPriorityDeltaQueueKey, existing);
+        console.log(`[QuickPriority] Queued delta ${delta} for remId ${remId} (queue length: ${existing.length})`);
+    };
 
-    // 4. Notify User
-    if (messages.length > 0) {
-        await plugin.app.toast(messages.join('; '));
-    } else {
-        // If we found a rem but nothing was updated (maybe neither IncRem nor Card?)
-        // Or maybe priorities were already at bounds (0 or 100)
-        // We should probably inform if we detected nothing to update.
-        if (!hasIncPowerup && !hasCards && !hasCardPriorityPowerup) {
-            await plugin.app.toast('Element is neither an Incremental Rem nor has Cards.');
-        } else {
-            // Hit bounds
-            await plugin.app.toast('Priority already at limit.');
-        }
-    }
+    // Use the shared mutex
+    withQueueMutex(doAppend).catch((err) => {
+        console.error('[QuickPriority] Failed to push delta entry:', err);
+    });
+
+    // 5. Notify user with a directional hint (no raw numbers — those are applied by the tracker).
+    const arrow = delta < 0 ? '🔽' : '🔺';
+    const importanceMsg = delta < 0 ? 'more important' : 'less important';
+    await plugin.app.toast(`Priority ${arrow} (${importanceMsg})`);
 }

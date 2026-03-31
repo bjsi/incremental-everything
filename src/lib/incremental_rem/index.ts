@@ -307,6 +307,7 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
       }
 
       await updateIncrementalRemCache(plugin, newIncRem);
+      plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
     } finally {
       await plugin.storage.setSession('plugin_operation_active', false);
     }

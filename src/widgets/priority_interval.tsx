@@ -184,6 +184,8 @@ function PriorityInterval() {
                 await updateIncrementalRemCache(plugin, updatedIncRem);
             }
 
+            plugin.storage.setSession('pendingInheritanceCascade', data.rem._id).catch(console.error);
+
             plugin.widget.closePopup();
         } finally {
             isSaving.current = false;

@@ -1,5 +1,6 @@
 import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { powerupCode } from './consts';
+import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from './card_priority/types';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { safeRemTextToString } from './pdfUtils';
 
@@ -229,20 +230,42 @@ export async function findClosestAncestorWithAnyPriority(
 
 
 /**
- * Gets the initial priority for a new incremental rem
- * Tries to inherit from closest ancestor with any priority (IncRem or Card), otherwise uses default
+ * Gets the initial priority for a new incremental rem.
+ *
+ * Priority resolution order (mirrors the pattern in getCardPriority + handleCardPriorityInheritance):
+ *   1. Rem's own cardPriority slot — if source is 'manual' or 'incremental', use it directly.
+ *      This handles the case where a rem already had a card priority before being made incremental.
+ *   2. Closest ancestor with an IncRem priority (preferred).
+ *   3. Closest ancestor with an explicit Card priority (fallback).
+ *   4. defaultPriority from the plugin setting.
  */
 export async function getInitialPriority(
   plugin: RNPlugin,
   rem: PluginRem,
   defaultPriority: number
 ): Promise<number> {
-  const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem, 'IncRem');
+  // 1. Check own cardPriority slot first — same guard used in getCardPriority() and
+  //    handleCardPriorityInheritance(), so the precedence logic is unified across all paths.
+  const ownPriorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+  const ownSource = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
+  if (
+    ownPriorityValue &&
+    (ownSource === 'manual' || ownSource === 'incremental')
+  ) {
+    const parsed = parseInt(ownPriorityValue as string);
+    if (!isNaN(parsed)) {
+      console.log(`[getInitialPriority] Using own cardPriority (source=${ownSource}): ${parsed}`);
+      return parsed;
+    }
+  }
 
+  // 2 & 3. Walk ancestors — prefers IncRem priority, falls back to explicit Card priority.
+  const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem, 'IncRem');
   if (ancestorInfo) {
-    console.log(`Inheriting priority ${ancestorInfo.priority} from ${ancestorInfo.sourceType} ancestor: ${ancestorInfo.ancestorName}`);
+    console.log(`[getInitialPriority] Inheriting ${ancestorInfo.priority} from ${ancestorInfo.sourceType} ancestor: ${ancestorInfo.ancestorName}`);
     return ancestorInfo.priority;
   }
 
+  // 4. Plugin default.
   return defaultPriority;
 }

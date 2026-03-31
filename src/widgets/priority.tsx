@@ -33,7 +33,8 @@ import {
   alwaysUseLightModeOnMobileId,
   defaultPriorityId,
   defaultCardPriorityId,
-  pendingPrioritySaveKey
+  pendingPrioritySaveKey,
+  pendingCardPriorityRemovalKey
 } from '../lib/consts';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
@@ -793,22 +794,26 @@ function Priority() {
     if (!rem) return;
     isSaving.current = true;
 
-    await plugin.storage.setSession('plugin_operation_active', true);
-    try {
-      await rem.removePowerup('cardPriority');
-      // 🔌 Conditionally update cache
-      if (performanceMode === PERFORMANCE_MODE_FULL) {
-        // For removal, we don't have overrides, we assume the next read will see the powerup gone.
-        // Or we can force it? Ideally removal propagates fast enough or we accept a small delay on reset.
-        // But let's rely on standard read for removal for now.
-        await updateCardPriorityCache(plugin, rem._id);
+    // 1. Optimistic cache eviction — remove BEFORE closing so cross-iframe cache
+    //    is already correct when other widgets re-read it after popup teardown.
+    if (performanceMode === PERFORMANCE_MODE_FULL) {
+      try {
+        const currentCache = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
+        const newCache = currentCache.filter(i => i.remId !== rem._id);
+        await plugin.storage.setSession(allCardPriorityInfoKey, newCache);
+      } catch (err) {
+        console.error('[Priority] removeCardPriority optimistic eviction failed:', err);
       }
-      await plugin.app.toast('Card Priority for inheritance removed.');
-      plugin.widget.closePopup();
-    } finally {
-      await plugin.storage.setSession('plugin_operation_active', false);
+      plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
     }
-  }, [plugin, rem, performanceMode]); // 🔌 Add performanceMode
+
+    // 2. Delegate the actual removePowerup + cache refresh to the persistent tracker
+    //    (fire-and-forget — popup closes immediately after this write).
+    plugin.storage.setSession(pendingCardPriorityRemovalKey, rem._id).catch(console.error);
+
+    // 3. Close instantly.
+    plugin.widget.closePopup();
+  }, [plugin, rem, performanceMode]);
 
   // --- EARLY RETURNS & FINAL DATA DE-STRUCTURING ---
   if (!widgetContext || !rem) {
@@ -1297,13 +1302,18 @@ function Priority() {
             )}
           </div>
 
-          {cardInfo?.source === 'manual' && (
+          {/* Show "Clear Card Priority" only when the rem has the cardPriority powerup
+               but has no cards of its own — meaning the powerup is purely an inheritance anchor.
+               Strict `=== false` guards against the loading phase where hasCards is still undefined.
+               A rem that has its own cards must always keep a card priority; this button must
+               never appear for it, regardless of whether it's also an IncRem. */}
+          {hasCardPriorityPowerup && hasCards === false && (
             <button
               onClick={removeCardPriority}
               className="px-3 py-1.5 text-xs rounded transition-opacity hover:opacity-80 self-center"
-              style={{ backgroundColor: '#ef4444', color: 'white' }}
+              style={{ backgroundColor: '#6B7280', color: 'white' }}
             >
-              Remove Card Priority
+              Clear Card Priority
             </button>
           )}
         </div>

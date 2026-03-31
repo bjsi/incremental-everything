@@ -116,29 +116,66 @@ export const remToActionItemType = async (
         rem,
       };
     }
-  } else if ((await rem.getSources()).length === 1) {
-    const source = (await rem.getSources())[0];
-    const isLink = await source.hasPowerup(BuiltInPowerupCodes.Link);
-    const url = await source.getPowerupProperty<BuiltInPowerupCodes.Link>(
-      BuiltInPowerupCodes.Link,
-      'URL'
-    );
-    if (isLink && url && url.includes('youtube')) {
-      const data = await remToActionItemType(plugin, source);
-      if (data) {
-        return {
-          ...data,
-          rem,
-        };
+  } else {
+    const sources = await rem.getSources();
+    let selectedSource: PluginRem | null = null;
+
+    if (sources.length === 1) {
+      selectedSource = sources[0];
+    } else if (sources.length > 1) {
+      const preferredSources: PluginRem[] = [];
+      for (const source of sources) {
+        try {
+          const tags = await source.getTagRems();
+          for (const tagRem of tags) {
+            if (!tagRem.text) continue;
+            const tagText = await safeRemTextToString(plugin, tagRem.text);
+            const tagLower = tagText.toLowerCase().replace(/\s+/g, '');
+            if (tagLower === 'preferthispdf') {
+              preferredSources.push(source);
+              break;
+            }
+          }
+        } catch (e) {
+          // Ignore errors reading tags
+        }
       }
-    } else {
-      const data = await remToActionItemType(plugin, source);
-      if (data) {
-        return data;
+
+      if (preferredSources.length === 1) {
+        selectedSource = preferredSources[0];
+      } else if (preferredSources.length > 1) {
+        await plugin.app.toast('Multiple PDFs have the #preferthispdf tag. Opening in standard Rem view instead of Reader.');
       }
     }
-    return { rem, type: 'rem' };
-  } else {
+
+    if (selectedSource) {
+      const isLink = await selectedSource.hasPowerup(BuiltInPowerupCodes.Link);
+      let url = undefined;
+      try {
+        if (isLink) {
+          url = await selectedSource.getPowerupProperty<BuiltInPowerupCodes.Link>(
+            BuiltInPowerupCodes.Link,
+            'URL'
+          );
+        }
+      } catch (e) {}
+
+      if (isLink && url && url.includes('youtube')) {
+        const data = await remToActionItemType(plugin, selectedSource);
+        if (data) {
+          return {
+            ...data,
+            rem,
+          };
+        }
+      } else {
+        const data = await remToActionItemType(plugin, selectedSource);
+        if (data) {
+          return data;
+        }
+      }
+    }
+    
     return { rem, type: 'rem' };
   }
 };
