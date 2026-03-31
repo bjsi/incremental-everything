@@ -79,6 +79,9 @@ export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // Pending priority save job: written by priority_light popup before closing,
 // picked up and executed by tracker.ts in the persistent index widget.
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
+// Pending card priority removal job: written by the Priority popup before closing,
+// picked up and executed by tracker.ts. Allows instant popup close per fire-and-forget philosophy.
+export const pendingCardPriorityRemovalKey = 'pendingCardPriorityRemoval';
 export const queueSessionCacheKey = 'queueSessionCache';
 export const priorityCalcScopeRemIdsKey = 'priority-calc-scope-rem-ids-key';
 

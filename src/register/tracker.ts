@@ -1,6 +1,6 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey } from '../lib/consts';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
 // IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
@@ -262,6 +262,44 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     } finally {
       prioritySaveRunning = false;
       incRemBatchActive = false; // non-reactive clear — does NOT re-trigger plugin.track()
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }
+  });
+  // Pending card-priority removal watcher.
+  // priority.tsx writes the remId here before closing the popup (fire-and-forget).
+  // This watcher performs the actual removePowerup + cache refresh in the
+  // persistent index widget, safely wrapped in plugin_operation_active suppression.
+  let cardPriorityRemovalRunning = false;
+  plugin.track(async (rp) => {
+    const remId = await rp.storage.getSession<string>(pendingCardPriorityRemovalKey);
+    if (!remId || cardPriorityRemovalRunning) return;
+
+    cardPriorityRemovalRunning = true;
+    // Clear immediately so we don't re-trigger.
+    await plugin.storage.setSession(pendingCardPriorityRemovalKey, null);
+    incRemBatchActive = true;
+    await plugin.storage.setSession('plugin_operation_active', true);
+
+    console.log('[Tracker] pendingCardPriorityRemoval picked up for remId:', remId);
+    try {
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) {
+        console.warn('[Tracker] pendingCardPriorityRemoval: rem not found', remId);
+        return;
+      }
+      await rem.removePowerup('cardPriority');
+      // Patch the card-priority cache to evict the removed entry.
+      const { updateCardPriorityCache } = await import('../lib/card_priority/cache');
+      await updateCardPriorityCache(plugin as any, remId);
+      // Signal card-priority display widgets to refresh.
+      const { cardPriorityCacheRefreshKey } = await import('../lib/consts');
+      await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
+      console.log('[Tracker] pendingCardPriorityRemoval complete for remId:', remId);
+    } catch (err) {
+      console.error('[Tracker] pendingCardPriorityRemoval failed:', err);
+    } finally {
+      cardPriorityRemovalRunning = false;
+      incRemBatchActive = false;
       await plugin.storage.setSession('plugin_operation_active', false);
     }
   });
