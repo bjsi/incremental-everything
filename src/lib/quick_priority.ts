@@ -104,8 +104,8 @@ export async function handleQuickPriorityChange(
     const hasCards = (await rem.getCards()).length > 0;
     const hasCardPriorityPowerup = await rem.hasPowerup('cardPriority');
 
-    const targetsInc    = hasIncPowerup;
-    const targetsCard   = hasCards || hasCardPriorityPowerup;
+    const targetsInc = hasIncPowerup;
+    const targetsCard = hasCards || hasCardPriorityPowerup;
 
     if (!targetsInc && !targetsCard) {
         await plugin.app.toast('Element is neither an Incremental Rem nor has Cards.');
@@ -115,27 +115,27 @@ export async function handleQuickPriorityChange(
     // 4. Serialize the append via the module-level lock so concurrent invocations
     //    (e.g. 2 keystrokes fired 5 ms apart) never race on the same queue slot.
     const doAppend = async () => {
-      const existing = await plugin.storage.getSession<PriorityDeltaEntry[]>(pendingPriorityDeltaQueueKey) || [];
-      const entry: PriorityDeltaEntry = {
-        remId,
-        incDelta: targetsInc ? delta : 0,
-        cardDelta: targetsCard ? delta : 0,
-        hasIncPowerup,
-        hasCards,
-        hasCardPriorityPowerup,
-      };
-      existing.push(entry);
-      await plugin.storage.setSession(pendingPriorityDeltaQueueKey, existing);
-      console.log(`[QuickPriority] Queued delta ${delta} for remId ${remId} (queue length: ${existing.length})`);
+        const existing = await plugin.storage.getSession<PriorityDeltaEntry[]>(pendingPriorityDeltaQueueKey) || [];
+        const entry: PriorityDeltaEntry = {
+            remId,
+            incDelta: targetsInc ? delta : 0,
+            cardDelta: targetsCard ? delta : 0,
+            hasIncPowerup,
+            hasCards,
+            hasCardPriorityPowerup,
+        };
+        existing.push(entry);
+        await plugin.storage.setSession(pendingPriorityDeltaQueueKey, existing);
+        console.log(`[QuickPriority] Queued delta ${delta} for remId ${remId} (queue length: ${existing.length})`);
     };
     // Chain: appendLock = appendLock.then(doAppend) ensures serial execution.
     // We also await so that any error surfaces to the caller.
     appendLock = appendLock.then(doAppend).catch((err) => {
-      console.error('[QuickPriority] Failed to push delta entry:', err);
+        console.error('[QuickPriority] Failed to push delta entry:', err);
     });
 
     // 5. Notify user with a directional hint (no raw numbers — those are applied by the tracker).
-    const arrow = delta < 0 ? '🔺' : '🔽';
+    const arrow = delta < 0 ? '🔽' : '🔺';
     const importanceMsg = delta < 0 ? 'more important' : 'less important';
     await plugin.app.toast(`Priority ${arrow} (${importanceMsg})`);
 }
