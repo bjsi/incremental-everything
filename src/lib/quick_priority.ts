@@ -5,6 +5,7 @@ import {
     priorityStepSizeId,
     pendingPriorityDeltaQueueKey,
 } from './consts';
+import { withQueueMutex } from './mutex';
 import {
     getCurrentIncrementalRem,
 } from './incremental_rem';
@@ -128,9 +129,9 @@ export async function handleQuickPriorityChange(
         await plugin.storage.setSession(pendingPriorityDeltaQueueKey, existing);
         console.log(`[QuickPriority] Queued delta ${delta} for remId ${remId} (queue length: ${existing.length})`);
     };
-    // Chain: appendLock = appendLock.then(doAppend) ensures serial execution.
-    // We also await so that any error surfaces to the caller.
-    appendLock = appendLock.then(doAppend).catch((err) => {
+
+    // Use the shared mutex
+    withQueueMutex(doAppend).catch((err) => {
         console.error('[QuickPriority] Failed to push delta entry:', err);
     });
 

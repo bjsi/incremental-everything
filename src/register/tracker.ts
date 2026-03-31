@@ -1,6 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey } from '../lib/consts';
+import { withQueueMutex } from '../lib/mutex';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
 // IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
@@ -314,7 +315,8 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   //
   // Now each keypress atomically APPENDS a tiny {remId, incDelta, cardDelta}
   // entry to an array.  This watcher:
-  //   1. Snapshots the entire queue and clears it in one atomic read+write.
+  //   1. Snapshots the entire queue and clears it in one atomic read+write
+  //      using a shared mutex lock to prevent overwriting rapid keystrokes.
   //   2. Groups entries by remId and sums their deltas.
   //   3. Reads the *current live DB value* once per rem.
   //   4. Applies the net delta and performs a single DB write per rem.
@@ -323,35 +325,43 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   // -----------------------------------------------------------------------
   let deltaQueueRunning = false;
   plugin.track(async (rp) => {
-    const queue = await rp.storage.getSession<Array<{
-      remId: string;
-      incDelta: number;
-      cardDelta: number;
-      hasIncPowerup: boolean;
-      hasCards: boolean;
-      hasCardPriorityPowerup: boolean;
-    }>>(pendingPriorityDeltaQueueKey);
-
-    if (!queue || queue.length === 0 || deltaQueueRunning) return;
+    // Reactive read JUST to wake up the tracker when the queue length changes
+    const reactiveQueue = await rp.storage.getSession<Array<any>>(pendingPriorityDeltaQueueKey);
+    if (!reactiveQueue || reactiveQueue.length === 0 || deltaQueueRunning) return;
 
     deltaQueueRunning = true;
-    // Snapshot and clear atomically — new keypresses during processing will
-    // start a fresh queue and trigger another watcher invocation.
-    await plugin.storage.setSession(pendingPriorityDeltaQueueKey, null);
-    incRemBatchActive = true;
-    await plugin.storage.setSession('plugin_operation_active', true);
 
-    console.log(`[Tracker] deltaQueue: draining ${queue.length} entry/entries`);
     try {
+      let snapshot: any[] = [];
+
+      // Safely snapshot and clear inside the shared lock
+      await withQueueMutex(async () => {
+        // Non-reactive read inside the lock to get the absolute latest state
+        snapshot = await plugin.storage.getSession<any[]>(pendingPriorityDeltaQueueKey) || [];
+        if (snapshot.length > 0) {
+          await plugin.storage.setSession(pendingPriorityDeltaQueueKey, null);
+        }
+      });
+
+      // If another execution already cleared it, bail out
+      if (snapshot.length === 0) {
+        return;
+      }
+
+      incRemBatchActive = true;
+      await plugin.storage.setSession('plugin_operation_active', true);
+
+      console.log(`[Tracker] deltaQueue: draining ${snapshot.length} entry/entries`);
+
       // Group by remId and sum deltas.
       const byRem = new Map<string, {
         incDelta: number; cardDelta: number;
         hasIncPowerup: boolean; hasCards: boolean; hasCardPriorityPowerup: boolean;
       }>();
-      for (const entry of queue) {
+      for (const entry of snapshot) {
         const existing = byRem.get(entry.remId);
         if (existing) {
-          existing.incDelta  += entry.incDelta;
+          existing.incDelta += entry.incDelta;
           existing.cardDelta += entry.cardDelta;
         } else {
           byRem.set(entry.remId, {
@@ -382,8 +392,8 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         if (agg.hasIncPowerup && agg.incDelta !== 0) {
           const incRemInfo = await getIncrementalRemFromRem(plugin as any, rem);
           if (incRemInfo) {
-            const oldP  = incRemInfo.priority;
-            const newP  = Math.max(0, Math.min(100, oldP + agg.incDelta));
+            const oldP = incRemInfo.priority;
+            const newP = Math.max(0, Math.min(100, oldP + agg.incDelta));
             if (oldP !== newP) {
               await rem.setPowerupProperty(powerupCode, 'priority', [newP.toString()]);
               const updated = await getIncrementalRemFromRem(plugin as any, rem);
@@ -429,7 +439,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
               manualRems.push(remId);
               await plugin.storage.setSession('manual_priority_pending_rems', manualRems);
             }
-          } catch (_) {}
+          } catch (_) { }
 
           console.log(`[Tracker] deltaQueue applied for ${remId}: ${messages.join(', ')}`);
         }
