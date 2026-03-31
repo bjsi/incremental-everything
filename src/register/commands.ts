@@ -786,12 +786,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   // NEW: Quick Priority Shortcuts
+  // Module-level counter to confirm how many times RemNote actually fires the command.
+  // Open DevTools → Console and filter by '[QuickPriority]' to count invocations.
+  let _quickPriorityCallCount = 0;
+
   plugin.app.registerCommand({
     id: 'quick-increase-priority',
     name: 'Quick Increase Priority Number (Less Important)',
     description: 'Increases the priority number by the step size (default 10), making it LESS important.',
     keyboardShortcut: 'ctrl+opt+up',
     action: async () => {
+      console.log(`[QuickPriority] #${++_quickPriorityCallCount} increase fired at ${Date.now()}`);
       await handleQuickPriorityChange(plugin, 'increase');
     },
   });
@@ -802,6 +807,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     description: 'Decreases the priority number by the step size (default 10), making it MORE important.',
     keyboardShortcut: 'ctrl+opt+down',
     action: async () => {
+      console.log(`[QuickPriority] #${++_quickPriorityCallCount} decrease fired at ${Date.now()}`);
       await handleQuickPriorityChange(plugin, 'decrease');
     },
   });

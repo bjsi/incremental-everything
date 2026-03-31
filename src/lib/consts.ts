@@ -82,6 +82,10 @@ export const pendingPrioritySaveKey = 'pendingPrioritySave';
 // Pending card priority removal job: written by the Priority popup before closing,
 // picked up and executed by tracker.ts. Allows instant popup close per fire-and-forget philosophy.
 export const pendingCardPriorityRemovalKey = 'pendingCardPriorityRemoval';
+// Delta queue for quick increase/decrease priority commands.
+// Each keypress APPENDS a delta entry here; the tracker drains them all atomically.
+// This prevents the last-write-wins race that plagued the single-slot pendingPrioritySaveKey approach.
+export const pendingPriorityDeltaQueueKey = 'pendingPriorityDeltaQueue';
 export const queueSessionCacheKey = 'queueSessionCache';
 export const priorityCalcScopeRemIdsKey = 'priority-calc-scope-rem-ids-key';
 
