@@ -88,7 +88,7 @@ The plugin now features **Automatic Light Mode**.
 - It will work if you tag the PDF or website itself, a Rem with a single PDF or website as a source, or a Rem with multiple sources where exactly one PDF has the `#preferthispdf` tag.
 - The plugin will render the PDF or website reader view inside the queue.
 - If you want to turn a highlight into an incremental Rem, click on the highlight and click the puzzle piece icon.
-- ** 📄 PDFs & Web**
+- 📄 **PDFs & Web**
   - **Visual Status**: Highlights turn **Green** when toggled as Incremental, and **Blue** when extracted.
   - **Create Incremental Rem**: Select text in a PDF -> Highlight it -> Click the Puzzle Icon -> **"Create Incremental Rem"**. This extracts the text to a new Rem under a parent of your choice (using the smart parent selector).
 ![Highlight](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)

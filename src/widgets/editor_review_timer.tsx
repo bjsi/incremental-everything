@@ -5,9 +5,11 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, currentSubQueueIdKey, remnoteEnvironmentId, pageRangeWidgetId } from '../lib/consts';
+import { transferToDismissed } from '../lib/dismissed';
+import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
@@ -343,6 +345,93 @@ function EditorReviewTimer() {
     // The widget will automatically refresh due to useTrackerPlugin dependency changes
   };
 
+  const handleDoneAndNext = async () => {
+    if (!timerData || timerData.queueList.length === 0) return;
+
+    const currentRem = await plugin.rem.findOne(timerData.remId);
+    if (!currentRem) {
+      await plugin.app.toast('Error: Current Rem not found');
+      return;
+    }
+
+    const currentIncRem = await getIncrementalRemFromRem(plugin, currentRem);
+    if (!currentIncRem) {
+      await plugin.app.toast('Error: Not an Incremental Rem');
+      return;
+    }
+
+    // Suppress GlobalRemChanged
+    await plugin.storage.setSession('plugin_operation_active', true);
+
+    try {
+      // Cascade priority inheritance to children (same as Done in answer_buttons)
+      await handleCardPriorityInheritance(plugin, currentRem, currentIncRem);
+
+      // Build the final history entry for this review session
+      const reviewTimeSeconds = Math.round(elapsedMs / 1000);
+
+      // Sync PDF page history if applicable
+      if (isPdfNote && pdfRemId) {
+        await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
+      }
+
+      const finalRep: IncrementalRep = {
+        date: Date.now(),
+        scheduled: currentIncRem.nextRepDate,
+        reviewTimeSeconds: reviewTimeSeconds,
+        eventType: 'rep' as const,
+        priority: currentIncRem.priority,
+      };
+
+      const updatedHistory = [...(currentIncRem.history || []), finalRep];
+
+      // Transfer history to Dismissed powerup and remove Incremental powerup
+      await transferToDismissed(plugin, currentRem, updatedHistory);
+      await removeIncrementalRemCache(plugin, currentRem._id);
+      await currentRem.removePowerup(powerupCode);
+    } finally {
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }
+
+    await plugin.app.toast(`✓ Done: ${timerData.remName} dismissed.`);
+
+    // Advance to the next item in queue
+    const nextRemId = timerData.queueList[0];
+    const newQueueList = timerData.queueList.slice(1);
+
+    const nextRem = await plugin.rem.findOne(nextRemId);
+    if (!nextRem) {
+      await plugin.app.toast(`Next Rem not found. Queue has ${newQueueList.length} items left.`);
+      await plugin.storage.setSession('editor-review-timer-queue-list', newQueueList);
+      return;
+    }
+
+    const nextIncRemInfo = await getIncrementalRemFromRem(plugin, nextRem);
+    const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+    const scheduleData = await getNextSpacingDateForRem(plugin, nextRemId, inLookbackMode);
+    const nextInterval = scheduleData?.newInterval || 1;
+    const nextRemName = await safeRemTextToString(plugin, nextRem.text);
+
+    await plugin.storage.setSession('editor-review-timer-rem-id', nextRemId);
+    await plugin.storage.setSession('editor-review-timer-start', Date.now());
+    await plugin.storage.setSession('editor-review-timer-interval', nextInterval);
+    await plugin.storage.setSession('editor-review-timer-priority', nextIncRemInfo?.priority ?? 10);
+    await plugin.storage.setSession('editor-review-timer-rem-name', nextRemName || 'Unnamed Rem');
+    await plugin.storage.setSession('editor-review-timer-queue-list', newQueueList);
+    // Reset pause state for next item
+    await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
+    await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
+
+    await plugin.app.toast(`Starting: ${nextRemName}`);
+
+    const nextIncRemType = await determineIncRemType(plugin, nextRem);
+    if (nextIncRemType === 'pdf-note') {
+      await nextRem.openRemAsPage();
+    } else {
+      await plugin.window.openRem(nextRem);
+    }
+  };
+
   const handleGoToRem = async () => {
     if (!timerData) return;
 
@@ -394,7 +483,9 @@ function EditorReviewTimer() {
       style={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: '12px',
+        rowGap: '8px',
         padding: '8px 16px',
         backgroundColor: '#dbeafe',
         borderRadius: '6px',
@@ -403,8 +494,8 @@ function EditorReviewTimer() {
         maxWidth: '100%',
       }}
     >
-      <span style={{ fontSize: '18px' }}>{isPaused ? '⏸️' : '⏱️'}</span>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+      <span style={{ fontSize: '18px', flexShrink: 0 }}>{isPaused ? '⏸️' : '⏱️'}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: '140px' }}>
         <div style={{
           fontSize: '13px',
           fontWeight: 600,
@@ -435,7 +526,7 @@ function EditorReviewTimer() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', rowGap: '6px' }}>
         {/* Pause / Continue button */}
         <button
           onClick={isPaused ? handleResume : handlePause}
@@ -486,19 +577,48 @@ function EditorReviewTimer() {
           </button>
         )}
 
-        {/* "Back to..." button — shown when origin is queue or inc-rem-list/main-view */}
-        {(timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
+        {/* "Done" button — shown alongside "Next" when queue has items (inc-rem-list/main-view origin) */}
+        {timerData.queueList && timerData.queueList.length > 0 &&
+          (timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
           <button
-            onClick={() => handleEndReview(true)}
+            onClick={handleDoneAndNext}
             style={{
               padding: '6px 14px',
               fontSize: '13px',
-              backgroundColor: timerData.queueList && timerData.queueList.length > 0 ? '#6b7280' : '#10b981',
+              backgroundColor: '#ef4444',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
               fontWeight: 600,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#dc2626';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ef4444';
+            }}
+            title="Done: Remove incremental status, add Dismissed powerup, and advance to next item"
+          >
+            ✓ Done
+          </button>
+        )}
+
+        {/* "Back to..." button — shown when origin is queue or inc-rem-list/main-view */}
+        {(timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
+          <button
+            onClick={() => handleEndReview(true)}
+            style={{
+              padding: '5px 12px',
+              backgroundColor: timerData.queueList && timerData.queueList.length > 0 ? '#6b7280' : '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = timerData.queueList && timerData.queueList.length > 0 ? '#4b5563' : '#059669';
@@ -507,9 +627,10 @@ function EditorReviewTimer() {
               e.currentTarget.style.backgroundColor = timerData.queueList && timerData.queueList.length > 0 ? '#6b7280' : '#10b981';
             }}
           >
-            ✓ {timerData.origin === 'queue'
-              ? 'End Review and Back to Queue'
-              : 'End Review and Back to IncRem List'}
+            <span style={{ fontSize: '13px', fontWeight: 700, lineHeight: 1.2 }}>✓ End Review</span>
+            <span style={{ fontSize: '10px', fontWeight: 500, opacity: 0.9, lineHeight: 1.2 }}>
+              {timerData.origin === 'queue' ? 'and Back to Queue' : 'and Back to IncRem List'}
+            </span>
           </button>
         )}
 
