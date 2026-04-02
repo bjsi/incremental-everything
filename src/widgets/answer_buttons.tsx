@@ -386,7 +386,6 @@ export function AnswerButtons() {
           title="Dismiss (Ctrl+D): Permanently finish item by removing its Incremental power-up"
         >
           <div style={buttonStyles.label}>Dismiss</div>
-          <div style={buttonStyles.sublabel}>Untag</div>
         </Button>
 
         {/* Divider */}
