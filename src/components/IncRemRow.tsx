@@ -29,8 +29,8 @@ interface IncRemRowProps {
   onPriorityChange?: (value: number) => void;
   onPrioritySave?: (remId: string) => void;
   onPriorityCancel?: () => void;
-  // Review & Open action
-  onReviewAndOpen?: (remId: string) => void;
+  // Review in Editor action
+  onReviewInEditor?: (remId: string) => void;
 }
 
 export function IncRemRow({
@@ -42,7 +42,7 @@ export function IncRemRow({
   onPriorityChange,
   onPrioritySave,
   onPriorityCancel,
-  onReviewAndOpen,
+  onReviewInEditor,
 }: IncRemRowProps) {
   return (
     <div>
@@ -96,12 +96,12 @@ export function IncRemRow({
         <TimeBadge nextRepDate={incRem.nextRepDate} />
 
         {/* Review in Editor icon */}
-        {onReviewAndOpen && (
+        {onReviewInEditor && (
           <span
             role="button"
             onClick={(e) => {
               e.stopPropagation();
-              onReviewAndOpen(incRem.remId);
+              onReviewInEditor(incRem.remId);
             }}
             style={{
               cursor: 'pointer',

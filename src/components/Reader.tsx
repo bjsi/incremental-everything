@@ -163,7 +163,7 @@ export function Reader(props: ReaderProps) {
   }, [pdfControls.currentPage]);
 
   // NOTE: Session history is saved by the "Next" button handler in answer_buttons.tsx
-  // and by handleReviewAndOpenRem. We do NOT save on unmount to avoid duplicate entries.
+  // and by handleReviewInEditorRem. We do NOT save on unmount to avoid duplicate entries.
 
 
 

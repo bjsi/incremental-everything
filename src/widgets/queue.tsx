@@ -143,7 +143,7 @@ export function QueueComponent() {
   }, [remAndType?.type, shouldRenderEditorForRemType, plugin]);
 
   // Track if this Rem still has the incremental powerup.
-  // When a user presses "Done", the powerup is removed and we should proactively advance.
+  // When a user presses "Dismiss", the powerup is removed and we should proactively advance.
   const hasIncrementalPowerup = useTrackerPlugin(async (rp) => {
     if (!ctx?.remId) return true; // Default true while loading to prevent premature skips
     const rem = await rp.rem.findOne(ctx.remId);

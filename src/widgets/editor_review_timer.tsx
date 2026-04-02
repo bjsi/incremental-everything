@@ -94,8 +94,8 @@ function EditorReviewTimer() {
   const elapsedMs = isPaused
     ? (timerData!.accumulatedMs + (timerData!.pausedAt! - (timerData?.startTime || timerData!.pausedAt!)))
     : (timerData?.startTime
-        ? (timerData.accumulatedMs + (currentTime - timerData.startTime))
-        : 0);
+      ? (timerData.accumulatedMs + (currentTime - timerData.startTime))
+      : 0);
 
   const elapsedDuration = dayjs.duration(Math.max(0, elapsedMs));
   const hours = Math.floor(elapsedDuration.asHours());
@@ -145,55 +145,55 @@ function EditorReviewTimer() {
         await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
       }
 
-    // Calculate review time in seconds
-    const reviewTimeSeconds = Math.round(elapsedMs / 1000);
+      // Calculate review time in seconds
+      const reviewTimeSeconds = Math.round(elapsedMs / 1000);
 
-    // Synchronize time spent reading directly to the PDF reading history tracker
-    if (isPdfNote && pdfRemId) {
-      await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
-    }
-
-    if (timerData.origin === 'queue') {
-      // Mode 1: Started from queue "Review in Editor". Repetition was already created.
-      // We just update the reviewTimeSeconds of the last history entry.
-      const updatedHistory = [...(incRem.history || [])];
-      if (updatedHistory.length > 0) {
-        updatedHistory[updatedHistory.length - 1].reviewTimeSeconds = reviewTimeSeconds;
+      // Synchronize time spent reading directly to the PDF reading history tracker
+      if (isPdfNote && pdfRemId) {
+        await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
       }
 
-      await updateSRSDataForRem(plugin, timerData.remId, incRem.nextRepDate, updatedHistory);
-      await addToIncrementalHistory(plugin, timerData.remId);
-      await plugin.app.toast(`✓ ${timerData.remName}: Repetition updated (${timeDisplay})`);
-    } else {
-      // Mode 2: Started from Editor command. We need to create the repetition right now.
-      const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
+      if (timerData.origin === 'queue') {
+        // Mode 1: Started from queue "Review in Editor". Repetition was already created.
+        // We just update the reviewTimeSeconds of the last history entry.
+        const updatedHistory = [...(incRem.history || [])];
+        if (updatedHistory.length > 0) {
+          updatedHistory[updatedHistory.length - 1].reviewTimeSeconds = reviewTimeSeconds;
+        }
 
-      // Calculate early/late status
-      const scheduledDate = incRem.nextRepDate;
-      const actualDate = Date.now();
-      const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-      const wasEarly = daysDifference < 0;
-      const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+        await updateSRSDataForRem(plugin, timerData.remId, incRem.nextRepDate, updatedHistory);
+        await addToIncrementalHistory(plugin, timerData.remId);
+        await plugin.app.toast(`✓ ${timerData.remName}: Repetition updated (${timeDisplay})`);
+      } else {
+        // Mode 2: Started from Editor command. We need to create the repetition right now.
+        const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
 
-      const newHistory: IncrementalRep[] = [
-        ...(incRem.history || []),
-        {
-          date: actualDate,
-          scheduled: scheduledDate,
-          interval: timerData.interval || 0,
-          wasEarly: wasEarly,
-          daysEarlyOrLate: daysEarlyOrLate,
-          reviewTimeSeconds: reviewTimeSeconds,
-          priority: incRem.priority, // Record priority at time of rep
-          eventType: 'executeRepetition' as const,
-        },
-      ];
+        // Calculate early/late status
+        const scheduledDate = incRem.nextRepDate;
+        const actualDate = Date.now();
+        const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+        const wasEarly = daysDifference < 0;
+        const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
 
-      await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
-      await addToIncrementalHistory(plugin, timerData.remId);
-      const dateStr = dayjs(newNextRepDate).format('MMMM D, YYYY');
-      await plugin.app.toast(`✓ ${timerData.remName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
-    }
+        const newHistory: IncrementalRep[] = [
+          ...(incRem.history || []),
+          {
+            date: actualDate,
+            scheduled: scheduledDate,
+            interval: timerData.interval || 0,
+            wasEarly: wasEarly,
+            daysEarlyOrLate: daysEarlyOrLate,
+            reviewTimeSeconds: reviewTimeSeconds,
+            priority: incRem.priority, // Record priority at time of rep
+            eventType: 'executeRepetition' as const,
+          },
+        ];
+
+        await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
+        await addToIncrementalHistory(plugin, timerData.remId);
+        const dateStr = dayjs(newNextRepDate).format('MMMM D, YYYY');
+        await plugin.app.toast(`✓ ${timerData.remName}: Repetition stored (${timeDisplay}), next review: ${dateStr}`);
+      }
 
       const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
       if (updatedIncRem) {
@@ -265,36 +265,36 @@ function EditorReviewTimer() {
         await currentRem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
       }
 
-    // Calculate review time and sync PDF page
-    const reviewTimeSeconds = Math.round(elapsedMs / 1000);
-    if (isPdfNote && pdfRemId) {
-      await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
-    }
+      // Calculate review time and sync PDF page
+      const reviewTimeSeconds = Math.round(elapsedMs / 1000);
+      if (isPdfNote && pdfRemId) {
+        await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
+      }
 
-    // Always create a new repetition, just like Mode 2
-    const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
-    const scheduledDate = currentIncRem.nextRepDate;
-    const actualDate = Date.now();
-    const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-    const wasEarly = daysDifference < 0;
-    const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+      // Always create a new repetition, just like Mode 2
+      const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
+      const scheduledDate = currentIncRem.nextRepDate;
+      const actualDate = Date.now();
+      const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+      const wasEarly = daysDifference < 0;
+      const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
 
-    const newHistory: IncrementalRep[] = [
-      ...(currentIncRem.history || []),
-      {
-        date: actualDate,
-        scheduled: scheduledDate,
-        interval: timerData.interval || 0,
-        wasEarly: wasEarly,
-        daysEarlyOrLate: daysEarlyOrLate,
-        reviewTimeSeconds: reviewTimeSeconds,
-        priority: currentIncRem.priority,
-        eventType: 'executeRepetition' as const,
-      },
-    ];
+      const newHistory: IncrementalRep[] = [
+        ...(currentIncRem.history || []),
+        {
+          date: actualDate,
+          scheduled: scheduledDate,
+          interval: timerData.interval || 0,
+          wasEarly: wasEarly,
+          daysEarlyOrLate: daysEarlyOrLate,
+          reviewTimeSeconds: reviewTimeSeconds,
+          priority: currentIncRem.priority,
+          eventType: 'executeRepetition' as const,
+        },
+      ];
 
-    await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
-    await addToIncrementalHistory(plugin, timerData.remId);
+      await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
+      await addToIncrementalHistory(plugin, timerData.remId);
 
       // Update cache
       const updatedIncRem = await getIncrementalRemFromRem(plugin, currentRem);
@@ -345,7 +345,7 @@ function EditorReviewTimer() {
     // The widget will automatically refresh due to useTrackerPlugin dependency changes
   };
 
-  const handleDoneAndNext = async () => {
+  const handleDismissAndNext = async () => {
     if (!timerData || timerData.queueList.length === 0) return;
 
     const currentRem = await plugin.rem.findOne(timerData.remId);
@@ -364,7 +364,7 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('plugin_operation_active', true);
 
     try {
-      // Cascade priority inheritance to children (same as Done in answer_buttons)
+      // Cascade priority inheritance to children (same as Dismiss in answer_buttons)
       await handleCardPriorityInheritance(plugin, currentRem, currentIncRem);
 
       // Build the final history entry for this review session
@@ -393,7 +393,7 @@ function EditorReviewTimer() {
       await plugin.storage.setSession('plugin_operation_active', false);
     }
 
-    await plugin.app.toast(`✓ Done: ${timerData.remName} dismissed.`);
+    await plugin.app.toast(`✓ Dismissed: ${timerData.remName}`);
 
     // Advance to the next item in queue
     const nextRemId = timerData.queueList[0];
@@ -577,32 +577,32 @@ function EditorReviewTimer() {
           </button>
         )}
 
-        {/* "Done" button — shown alongside "Next" when queue has items (inc-rem-list/main-view origin) */}
+        {/* "Dismiss" button — shown alongside "Next" when queue has items (inc-rem-list/main-view origin) */}
         {timerData.queueList && timerData.queueList.length > 0 &&
           (timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
-          <button
-            onClick={handleDoneAndNext}
-            style={{
-              padding: '6px 14px',
-              fontSize: '13px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#dc2626';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ef4444';
-            }}
-            title="Done: Remove incremental status, add Dismissed powerup, and advance to next item"
-          >
-            ✓ Done
-          </button>
-        )}
+            <button
+              onClick={handleDismissAndNext}
+              style={{
+                padding: '6px 14px',
+                fontSize: '13px',
+                backgroundColor: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#dc2626';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#ef4444';
+              }}
+              title="Dismiss: Remove incremental status, add Dismissed powerup, and advance to next item"
+            >
+              ✓ Dismiss
+            </button>
+          )}
 
         {/* "Back to..." button — shown when origin is queue or inc-rem-list/main-view */}
         {(timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (

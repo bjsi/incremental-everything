@@ -44,7 +44,7 @@ import {
 } from '../lib/card_priority';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { getPerformanceMode } from '../lib/utils';
-import { handleReviewAndOpenRem } from '../lib/review_actions';
+import { handleReviewInEditorRem } from '../lib/review_actions';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async () => {
@@ -533,7 +533,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
   plugin.app.registerCommand({
     id: 'review-increm-in-editor',
-    name: 'Execute Incremental Rem Repetition (Review in Editor)',
+    name: 'Review in Editor (Execute Repetition)',
     keyboardShortcut: 'ctrl+shift+j',
     action: async () => {
       console.log('--- Review Incremental Rem in Editor Command Triggered ---');
@@ -566,8 +566,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
-        // Delegate to exact function used by "Review & Open"
-        await handleReviewAndOpenRem(plugin, rem, null);
+        // Delegate to exact function used by "Review in Editor"
+        await handleReviewInEditorRem(plugin, rem, null);
       } else {
         // Editor context behavior
         // Get focused Rem
@@ -965,11 +965,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   // Dismiss Incremental Rem command (Ctrl+D)
-  // In Queue: replicates the Done button (card priority inheritance, review time, transfer to dismissed, remove powerup)
+  // In Queue: replicates the Dismiss button (card priority inheritance, review time, transfer to dismissed, remove powerup)
   // In Editor: dismisses the focused Incremental Rem (transfer history to dismissed, remove powerup)
   plugin.app.registerCommand({
     id: dismissIncRemCommandId,
-    name: 'Dismiss Incremental Rem (Untag)',
+    name: 'Dismiss Incremental Rem',
     keyboardShortcut: 'ctrl+d',
     action: async () => {
       const url = await plugin.window.getURL();
@@ -1044,7 +1044,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
-        // Replicate the Done button logic from answer_buttons.tsx
+        // Replicate the Dismiss button logic from answer_buttons.tsx
         // 1. Handle card priority inheritance
         await handleCardPriorityInheritance(plugin, rem, incRemInfo);
 

@@ -61,7 +61,7 @@ Este README cobre o básico. Para os guias completos, visite o **Manual do Usuá
 
 2. **Priorize**: Use `Alt+P` para definir sua importância.
 3. **Revise**: O plugin intercala esses itens na sua fila regular de flashcards.
-4. **Desative**: Remova a etiqueta `Incremental` ou pressione o botão **Done** (Feito) na fila se tiver terminado de revisar.
+4. **Desative**: Remova a etiqueta `Incremental` ou pressione o botão **Dismiss** (Descartar) na fila se tiver terminado de revisar.
 
 ### ⚡ Priorização e Ordenação
 - 0 é para seu material mais importante e 100 é para o menos importante.
@@ -146,7 +146,7 @@ Ao ler um PDF grande (como um livro) como um Rem incremental regular, o plugin p
 
 ### Conflito de Atalhos de Teclado:
 
-Ao visualizar um cartão Rem regular na fila, o editor aparece corretamente. No entanto, os atalhos de teclado nativos da fila terão precedência sobre a digitação no editor. Isso parece ser devido a uma limitação na API atual do plugin que impede que um plugin capture completamente a entrada do teclado dentro do ambiente da fila. O botão "Pressione 'P' para Editar" foi adicionado como uma solução alternativa. Você também pode usar o botão recém-criado "Revisar e Abrir".
+Ao visualizar um cartão Rem regular na fila, o editor aparece corretamente. No entanto, os atalhos de teclado nativos da fila terão precedência sobre a digitação no editor. Isso parece ser devido a uma limitação na API atual do plugin que impede que um plugin capture completamente a entrada do teclado dentro do ambiente da fila. O botão "Pressione 'P' para Editar" foi adicionado como uma solução alternativa. Você também pode usar o botão recém-criado "Revisar no Editor".
 
 
 ## Detalhes de Desenvolvimento

@@ -1,4 +1,4 @@
-import { ReactRNPlugin } from '@remnote/plugin-sdk';
+import { ReactRNPlugin, PluginNumberSetting } from '@remnote/plugin-sdk';
 import {
   initialIntervalId,
   multiplierId,
@@ -130,7 +130,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
         arg: 100,
       },
     ],
-  });
+  } as PluginNumberSetting);
 
   plugin.settings.registerNumberSetting({
     id: defaultCardPriorityId,
@@ -142,7 +142,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
       { type: 'gte' as const, arg: 0 },
       { type: 'lte' as const, arg: 100 },
     ],
-  });
+  } as PluginNumberSetting);
 
   plugin.settings.registerNumberSetting({
     id: 'priority-step-size',
@@ -154,7 +154,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
       { type: 'gte' as const, arg: 1 },
       { type: 'lte' as const, arg: 50 },
     ],
-  });
+  } as PluginNumberSetting);
 
 
   plugin.settings.registerDropdownSetting({
@@ -234,7 +234,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: 'showDismissedIndicator',
     title: 'Show Yellow Left Border for Dismissed Rems',
     description:
-      'If enabled, Rems that have been dismissed from Incremental learning (via Done button) will show a yellow left border to indicate they have preserved history.',
+      'If enabled, Rems that have been dismissed from Incremental learning (via Dismiss button) will show a yellow left border to indicate they have preserved history.',
     defaultValue: true,
   });
 

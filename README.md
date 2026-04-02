@@ -62,7 +62,7 @@ This README covers the basics. For the comprehensive guides, please visit the **
 
 2. **Prioritize it**: Use `Alt+P` to set its importance.
 3. **Review it**: The plugin interleaves these items into your regular flashcard queue.
-4. **Disable it**: Remove the `Incremental` tag or press the **Done** button in the queue if you are done reviewing it.
+4. **Disable it**: Remove the `Incremental` tag or press the **Dismiss** button in the queue if you are done reviewing it.
 
 ### ⚡ Prioritization & Sorting
 - 0 is for your most important material and 100 is for the least important.
@@ -147,7 +147,7 @@ When reading a large PDF (like a book) as a regular incremental Rem, the plugin 
 
 ### Keyboard Shortcut Conflict:
 
-When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround. You can also use the newly created button "Review & Open".
+When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround. You can also use the newly created button "Review in Editor".
 
 
 ## Development Details

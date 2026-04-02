@@ -199,7 +199,7 @@ export function IncRemList() {
     await plugin.app.toast(`Priority updated to ${newPriority}`);
   };
 
-  const handleReviewAndOpen = async (remId: string, subsequentRemIds?: string[]) => {
+  const handleReviewInEditor = async (remId: string, subsequentRemIds?: string[]) => {
     const rem = await plugin.rem.findOne(remId);
     if (!rem) return;
 
@@ -267,7 +267,7 @@ export function IncRemList() {
       onRemClick={handleRemClick}
       onClose={handleClose}
       onPriorityChange={handlePriorityChange}
-      onReviewAndOpen={handleReviewAndOpen}
+      onReviewInEditor={handleReviewInEditor}
       initialState={initialState}
       onStateChange={handleStateChange}
       sortingRandomness={initialData?.randomness ?? 0}

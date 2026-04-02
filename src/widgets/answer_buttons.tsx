@@ -36,7 +36,7 @@ import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
-import { handleReviewAndOpenRem } from '../lib/review_actions';
+import { handleReviewInEditorRem } from '../lib/review_actions';
 
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 
@@ -376,16 +376,16 @@ export function AnswerButtons() {
             // shortly after resolving, so any subsequent await never completes.
             // By initiating both calls at once, both IPC messages reach RemNote
             // before either can trigger sandbox destruction.
-            console.log('[Done] Firing removePowerup + removeCurrentCardFromQueue simultaneously for rem:', rem._id);
+            console.log('[Dismiss] Firing removePowerup + removeCurrentCardFromQueue simultaneously for rem:', rem._id);
             await Promise.allSettled([
               rem.removePowerup(powerupCode),
               plugin.queue.removeCurrentCardFromQueue(true),
             ]);
-            console.log('[Done] Both operations settled');
+            console.log('[Dismiss] Both operations settled');
           }}
-          title="Done (Ctrl+D): Permanently finish item by removing its Incremental power-up"
+          title="Dismiss (Ctrl+D): Permanently finish item by removing its Incremental power-up"
         >
-          <div style={buttonStyles.label}>Done</div>
+          <div style={buttonStyles.label}>Dismiss</div>
           <div style={buttonStyles.sublabel}>Untag</div>
         </Button>
 
@@ -404,7 +404,7 @@ export function AnswerButtons() {
         </Button>
 
         <Button
-          onClick={() => handleReviewAndOpenRem(plugin, rem, remType)}
+          onClick={() => handleReviewInEditorRem(plugin, rem, remType)}
           title="Review in Editor (Ctrl+Shift+J): Reschedule item, open in editor, and start Editor Review Timer"
         >
           <div style={buttonStyles.label}>Review</div>
