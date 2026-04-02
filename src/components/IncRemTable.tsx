@@ -87,6 +87,12 @@ export function IncRemTable({
   const [editingPriorityValue, setEditingPriorityValue] = useState<number>(0);
   const editingPriorityValueRef = useRef<number>(0);
 
+  // Warning state: holds pending review info when user clicks without Due filter
+  type PendingReview =
+    | { type: 'header'; callback: () => void }
+    | { type: 'row'; triggerRemId: string; queueCount: number; dueCountInQueue: number; callback: () => void };
+  const [pendingReview, setPendingReview] = useState<PendingReview | null>(null);
+
   // Force filters when 'queueOrder' is selected
   const effectiveFilterStatus = sortBy === 'queueOrder' ? 'due' : filterStatus;
   const effectiveSortOrder = sortBy === 'queueOrder' ? 'asc' : sortOrder;
@@ -260,8 +266,15 @@ export function IncRemTable({
           {onReviewAndOpen && filteredAndSortedRems.length > 0 && (
             <button
               onClick={() => {
-                // Determine the next rems sequence and invoke the callback with the first one
-                onReviewAndOpen(filteredAndSortedRems[0].remId, filteredAndSortedRems.slice(1).map(r => r.remId));
+                const doReview = () =>
+                  onReviewAndOpen(filteredAndSortedRems[0].remId, filteredAndSortedRems.slice(1).map(r => r.remId));
+
+                // Warn if not filtered to Due items
+                if (effectiveFilterStatus !== 'due') {
+                  setPendingReview({ type: 'header', callback: doReview });
+                } else {
+                  doReview();
+                }
               }}
               className="px-3 py-1 text-xs rounded transition-colors font-semibold ml-1"
               style={{
@@ -292,6 +305,89 @@ export function IncRemTable({
           )}
         </div>
       </div>
+
+      {/* Due-filter warning banner — header level only */}
+      {pendingReview?.type === 'header' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '8px 16px',
+            backgroundColor: '#fef3c7',
+            borderBottom: '1px solid #f59e0b',
+            flexWrap: 'wrap',
+            rowGap: '6px',
+          }}
+        >
+          <span style={{ fontSize: '16px', flexShrink: 0 }}>⚠️</span>
+          <span style={{ flex: 1, fontSize: '12px', color: '#92400e', fontWeight: 500, minWidth: '180px' }}>
+            You are about to review <strong>{filteredAndSortedRems.length}</strong> items — but the list is not
+            filtered to <strong>Due</strong> items only. Usually you only want to review what's due
+            {dueCount > 0 ? ` (${dueCount} due right now)` : ''}.
+          </span>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            <button
+              onClick={() => {
+                setFilterStatus('due');
+                setPendingReview(null);
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                backgroundColor: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#d97706'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f59e0b'; }}
+              title={`Switch to Due filter (${dueCount} due)`}
+            >
+              Filter to Due Only
+            </button>
+            <button
+              onClick={() => {
+                const cb = pendingReview.callback;
+                setPendingReview(null);
+                cb();
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                backgroundColor: '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4b5563'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6b7280'; }}
+              title="Proceed with the current list as-is"
+            >
+              Proceed As-Is
+            </button>
+            <button
+              onClick={() => setPendingReview(null)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '12px',
+                backgroundColor: 'transparent',
+                color: '#92400e',
+                border: '1px solid #f59e0b',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+              title="Dismiss warning"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div
@@ -425,47 +521,148 @@ export function IncRemTable({
         ) : (
           <div className="flex flex-col gap-2">
             {filteredAndSortedRems.map((incRem) => (
-              <IncRemRow
-                key={incRem.remId}
-                incRem={{
-                  ...incRem,
-                  historyCount: incRem.history?.length,
-                  totalTimeSpent: incRem.totalTimeSpent,
-                  lastReviewDate: incRem.lastReviewDate,
-                  breadcrumb: incRem.breadcrumb,
-                } as IncRemRowData}
-                onClick={() => onRemClick(incRem.remId)}
-                // Priority editing
-                onPriorityClick={onPriorityChange ? (remId) => {
-                  if (editingPriorityRemId === remId) {
+              <React.Fragment key={incRem.remId}>
+                <IncRemRow
+                  incRem={{
+                    ...incRem,
+                    historyCount: incRem.history?.length,
+                    totalTimeSpent: incRem.totalTimeSpent,
+                    lastReviewDate: incRem.lastReviewDate,
+                    breadcrumb: incRem.breadcrumb,
+                  } as IncRemRowData}
+                  onClick={() => onRemClick(incRem.remId)}
+                  // Priority editing
+                  onPriorityClick={onPriorityChange ? (remId) => {
+                    if (editingPriorityRemId === remId) {
+                      setEditingPriorityRemId(null);
+                    } else {
+                      setEditingPriorityRemId(remId);
+                      setEditingPriorityValue(incRem.priority);
+                      editingPriorityValueRef.current = incRem.priority;
+                    }
+                  } : undefined}
+                  editingPriority={editingPriorityRemId === incRem.remId ? { value: editingPriorityValue } : undefined}
+                  onPriorityChange={(value) => {
+                    setEditingPriorityValue(value);
+                    editingPriorityValueRef.current = value;
+                  }}
+                  onPrioritySave={async (remId) => {
+                    if (onPriorityChange) {
+                      await onPriorityChange(remId, editingPriorityValueRef.current);
+                    }
                     setEditingPriorityRemId(null);
-                  } else {
-                    setEditingPriorityRemId(remId);
-                    setEditingPriorityValue(incRem.priority);
-                    editingPriorityValueRef.current = incRem.priority;
-                  }
-                } : undefined}
-                editingPriority={editingPriorityRemId === incRem.remId ? { value: editingPriorityValue } : undefined}
-                onPriorityChange={(value) => {
-                  setEditingPriorityValue(value);
-                  editingPriorityValueRef.current = value;
-                }}
-                onPrioritySave={async (remId) => {
-                  if (onPriorityChange) {
-                    await onPriorityChange(remId, editingPriorityValueRef.current);
-                  }
-                  setEditingPriorityRemId(null);
-                }}
-                onPriorityCancel={() => setEditingPriorityRemId(null)}
-                // Review & Open
-                onReviewAndOpen={(remId) => {
-                  if (onReviewAndOpen) {
-                    const idx = filteredAndSortedRems.findIndex(r => r.remId === remId);
-                    const subsequentIds = idx >= 0 ? filteredAndSortedRems.slice(idx + 1).map(r => r.remId) : [];
-                    onReviewAndOpen(remId, subsequentIds);
-                  }
-                }}
-              />
+                  }}
+                  onPriorityCancel={() => setEditingPriorityRemId(null)}
+                  // Review & Open
+                  onReviewAndOpen={(remId) => {
+                    if (onReviewAndOpen) {
+                      const idx = filteredAndSortedRems.findIndex(r => r.remId === remId);
+                      // Queue = clicked item + everything after it
+                      const queueSlice = idx >= 0 ? filteredAndSortedRems.slice(idx) : [];
+                      const subsequentIds = queueSlice.slice(1).map(r => r.remId);
+                      const doReview = () => onReviewAndOpen(remId, subsequentIds);
+                      if (effectiveFilterStatus !== 'due') {
+                        const now = Date.now();
+                        const dueCountInQueue = queueSlice.filter(r => r.nextRepDate <= now).length;
+                        setPendingReview({
+                          type: 'row',
+                          triggerRemId: remId,
+                          queueCount: queueSlice.length,
+                          dueCountInQueue,
+                          callback: doReview,
+                        });
+                      } else {
+                        doReview();
+                      }
+                    }
+                  }}
+                />
+
+                {/* Inline row-level due-filter warning */}
+                {pendingReview?.type === 'row' && pendingReview.triggerRemId === incRem.remId && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 12px',
+                      backgroundColor: '#fef3c7',
+                      border: '1px solid #f59e0b',
+                      borderRadius: '6px',
+                      flexWrap: 'wrap',
+                      rowGap: '6px',
+                      marginTop: '-4px',
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', flexShrink: 0 }}>⚠️</span>
+                    <span style={{ flex: 1, fontSize: '11px', color: '#92400e', fontWeight: 500, minWidth: '160px' }}>
+                      Reviewing <strong>{pendingReview.queueCount}</strong> items from here onwards —
+                      only <strong>{pendingReview.dueCountInQueue}</strong> of them {pendingReview.dueCountInQueue === 1 ? 'is' : 'are'} due.
+                      Consider filtering to <strong>Due</strong> only first.
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                      <button
+                        onClick={() => {
+                          setFilterStatus('due');
+                          setPendingReview(null);
+                        }}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          backgroundColor: '#f59e0b',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#d97706'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f59e0b'; }}
+                        title="Switch to Due filter"
+                      >
+                        Filter to Due Only
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cb = pendingReview.callback;
+                          setPendingReview(null);
+                          cb();
+                        }}
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '11px',
+                          backgroundColor: '#6b7280',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4b5563'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6b7280'; }}
+                        title="Proceed with current list"
+                      >
+                        Proceed As-Is
+                      </button>
+                      <button
+                        onClick={() => setPendingReview(null)}
+                        style={{
+                          padding: '3px 6px',
+                          fontSize: '11px',
+                          backgroundColor: 'transparent',
+                          color: '#92400e',
+                          border: '1px solid #f59e0b',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                        }}
+                        title="Dismiss"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </div>
         )}

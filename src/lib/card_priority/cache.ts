@@ -381,6 +381,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
   const delayBetweenBatches = 100;
 
   try {
+    await plugin.storage.setSession('plugin_operation_active', true);
     for (let i = 0; i < untaggedRemIds.length; i += batchSize) {
       const batch = untaggedRemIds.slice(i, i + batchSize);
       const newPriorities: CardPriorityInfo[] = [];
@@ -456,5 +457,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
   } catch (error) {
     console.error('DEFERRED: Fatal error during background processing:', error);
     await plugin.app.toast('⚠️ Background processing encountered an error. Some cards may not be cached.');
+  } finally {
+    await plugin.storage.setSession('plugin_operation_active', false);
   }
 }
