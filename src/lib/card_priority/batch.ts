@@ -367,31 +367,60 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
     return;
   }
 
-  // Group by remId for a clear summary
+  // Group confirmed orphan cards by remId for a readable summary
   const byRemId: Record<string, number> = {};
   for (const card of confirmedOrphanCards) {
     byRemId[card.remId] = (byRemId[card.remId] || 0) + 1;
   }
 
-  const remSummaryLines = Object.entries(byRemId)
-    .map(([remId, count]) => `  • ${count} card(s) — Rem: ${remId}`)
-    .join('\n');
+  // ── Batched confirmation ─────────────────────────────────────────────
+  // Show native confirm() in pages of 25 entries so the dialog stays
+  // short enough to fit on screen without needing to scroll.
+  const confirmPageSize = 25;
+  const entries = Object.entries(byRemId); // [ [remId, count], ... ]
+  const totalPages = Math.ceil(entries.length / confirmPageSize);
 
-  const confirmed = confirm(
+  // First: a summary dialog so the user knows the total scope
+  const overviewOk = confirm(
     `🗑️ Remove Orphan Cards\n\n` +
-    `Found ${confirmedOrphanCards.length} card(s) whose parent Rem no longer exists.\n\n` +
-    `${remSummaryLines}\n\n` +
+    `Found ${confirmedOrphanCards.length} card(s) across ${entries.length} missing Rem(s).\n\n` +
     `These cards are no longer reviewable and take up space in your queue.\n\n` +
     `⚠️ This action cannot be undone.\n\n` +
-    `Remove these orphan cards?`
+    `You will be shown the list ${totalPages > 1 ? `in ${totalPages} pages of ${confirmPageSize}` : 'now'} to confirm.\n\n` +
+    `Continue?`
   );
 
-  if (!confirmed) {
-    console.log('Orphan card removal cancelled by user.');
+  if (!overviewOk) {
+    console.log('Orphan card removal cancelled by user (overview).');
     await plugin.app.toast('Orphan card removal cancelled.');
     return;
   }
 
+  // Page-by-page detail confirmation
+  for (let p = 0; p < totalPages; p++) {
+    const pageEntries = entries.slice(p * confirmPageSize, (p + 1) * confirmPageSize);
+    const lines = pageEntries
+      .map(([remId, count]) => `  • ${count} card(s) — Rem: ${remId}`)
+      .join('\n');
+
+    const pageHeader = totalPages > 1
+      ? `Page ${p + 1} of ${totalPages}:\n\n`
+      : '';
+
+    const pageOk = confirm(
+      `🗑️ Remove Orphan Cards — ${pageHeader}` +
+      `${lines}\n\n` +
+      `Confirm removal of these ${pageEntries.reduce((s, [, c]) => s + c, 0)} card(s)?`
+    );
+
+    if (!pageOk) {
+      console.log(`Orphan card removal cancelled by user at page ${p + 1}.`);
+      await plugin.app.toast('Orphan card removal cancelled.');
+      return;
+    }
+  }
+
+  // ── Removal ──────────────────────────────────────────────────────────
   // Suppress GlobalRemChanged listener during bulk writes
   await plugin.storage.setSession('plugin_operation_active', true);
 
@@ -435,3 +464,4 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   await plugin.app.toast(`🗑️ Removed ${removed} orphan card(s).`);
   alert(resultMessage);
 }
+
