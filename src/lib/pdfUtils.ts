@@ -609,7 +609,7 @@ export const getAllIncrementsForPDF = async (
       processedRemIds.add(rem._id);
 
       const remText = await safeRemTextToString(plugin, rem.text);
-      console.log(`Checking rem: "${remText}" (${rem._id})`);
+      // console.log(`Checking rem: "${remText}" (${rem._id})`);
 
       const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
 
@@ -655,7 +655,7 @@ export const getAllIncrementsForPDF = async (
       const remText = await safeRemTextToString(plugin, rem.text);
 
       // Check if this is a PDF highlight (skip if it is)
-      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
       if (isPdfHighlight) {
         console.log(`Skipping "${remText}" (PDF highlight, not a reading incremental)`);
         continue;
@@ -764,7 +764,7 @@ export const findAllRemsForPDF = async (
       if (!rem) continue;
 
       // Skip PDF highlights - we want parent rems only
-      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
       if (isPdfHighlight) continue;
 
       // Check if this incremental rem has the target PDF
@@ -792,7 +792,7 @@ export const findAllRemsForPDF = async (
       if (!rem) continue;
 
       // Skip PDF highlights
-      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
       if (isPdfHighlight) continue;
 
       const isIncremental = await rem.hasPowerup(powerupCode);
