@@ -299,8 +299,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
       `• Errors: ${errors}${errorBreakdown}\n` +
       `• Total time: ${totalTime}s\n` +
       `• Cache build time: ${cacheTime}s\n\n` +
-      `${errors > 0 ? 'Check console for detailed error log.\n\n' : ''}` +
-      `Future startups will be much faster!`;
+      `${errors > 0 ? 'Check console for detailed error log.\n\n' : ''}`;
 
     console.log(message);
     await plugin.app.toast('✅ Card Priorities Update complete! See console for details.');
