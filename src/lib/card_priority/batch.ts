@@ -257,6 +257,7 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
     const cacheTime = Math.round((Date.now() - cacheStartTime) / 1000);
 
     let errorBreakdown = '';
+    const notFoundRemIds: string[] = [];
     if (errorDetails.length > 0) {
       const notFoundErrors = errorDetails.filter((e) => e.reason.includes('not found')).length;
       const exceptionErrors = errorDetails.filter((e) => e.reason.includes('Exception')).length;
@@ -281,6 +282,13 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
       console.log('=== FAILED REM IDs (for investigation) ===');
       console.log(errorDetails.map((e) => e.remId).join('\n'));
       console.log('=== END FAILED REM IDs ===\n');
+
+      // Collect the remIds that were not found (potential orphan cards)
+      for (const e of errorDetails) {
+        if (e.reason.includes('not found')) {
+          notFoundRemIds.push(e.remId);
+        }
+      }
     }
 
     const message =
@@ -297,6 +305,11 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
     console.log(message);
     await plugin.app.toast('✅ Card Priorities Update complete! See console for details.');
     alert(message);
+
+    // Offer to clean up orphan cards whose parent Rem no longer exists
+    if (notFoundRemIds.length > 0) {
+      await removeOrphanCards(plugin, notFoundRemIds);
+    }
   } catch (error) {
     console.error('Error during Card Priorities Update:', error);
     await plugin.app.toast('❌ Error during Card Priorities Update. Check console for details.');
@@ -306,4 +319,119 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
   }
+}
+
+/**
+ * Finds all cards that belong to Rems that no longer exist (orphan cards),
+ * asks the user for confirmation, and removes them.
+ *
+ * @param plugin     The RNPlugin instance.
+ * @param orphanRemIds  RemIds that were not found during the priority update
+ *                      (i.e. `rem not found` errors).
+ */
+async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Promise<void> {
+  await plugin.app.toast('🔍 Scanning for orphan cards...');
+  console.log(`\n=== ORPHAN CARD CLEANUP ===`);
+  console.log(`Checking ${orphanRemIds.length} missing remIds for associated orphan cards...`);
+
+  // Build a fast lookup set
+  const orphanRemIdSet = new Set(orphanRemIds);
+
+  // Get every card in the knowledge base and filter to those whose rem is in our orphan set
+  const allCards = await plugin.card.getAll();
+  const candidateCards = allCards.filter((card) => orphanRemIdSet.has(card.remId));
+
+  if (candidateCards.length === 0) {
+    console.log('No orphan cards found — nothing to clean up.');
+    await plugin.app.toast('ℹ️ No orphan cards found.');
+    return;
+  }
+
+  console.log(`Found ${candidateCards.length} candidate orphan cards across ${orphanRemIds.length} missing remIds.`);
+
+  // Double-check: re-verify that each remId truly doesn't exist right now
+  // (the rem might have been loaded lazily or was a transient error)
+  const confirmedOrphanCards: typeof candidateCards = [];
+  for (const card of candidateCards) {
+    const remCheck = await plugin.rem.findOne(card.remId);
+    if (!remCheck) {
+      confirmedOrphanCards.push(card);
+    } else {
+      console.log(`  ⚠️ Card ${card._id} skipped — rem ${card.remId} now resolves (transient error).`);
+    }
+  }
+
+  if (confirmedOrphanCards.length === 0) {
+    console.log('All candidate orphan cards resolved to valid rems — nothing to remove.');
+    await plugin.app.toast('ℹ️ No confirmed orphan cards after re-check.');
+    return;
+  }
+
+  // Group by remId for a clear summary
+  const byRemId: Record<string, number> = {};
+  for (const card of confirmedOrphanCards) {
+    byRemId[card.remId] = (byRemId[card.remId] || 0) + 1;
+  }
+
+  const remSummaryLines = Object.entries(byRemId)
+    .map(([remId, count]) => `  • ${count} card(s) — Rem: ${remId}`)
+    .join('\n');
+
+  const confirmed = confirm(
+    `🗑️ Remove Orphan Cards\n\n` +
+    `Found ${confirmedOrphanCards.length} card(s) whose parent Rem no longer exists.\n\n` +
+    `${remSummaryLines}\n\n` +
+    `These cards are no longer reviewable and take up space in your queue.\n\n` +
+    `⚠️ This action cannot be undone.\n\n` +
+    `Remove these orphan cards?`
+  );
+
+  if (!confirmed) {
+    console.log('Orphan card removal cancelled by user.');
+    await plugin.app.toast('Orphan card removal cancelled.');
+    return;
+  }
+
+  // Suppress GlobalRemChanged listener during bulk writes
+  await plugin.storage.setSession('plugin_operation_active', true);
+
+  let removed = 0;
+  let removalErrors = 0;
+  const batchSize = 25;
+
+  try {
+    for (let i = 0; i < confirmedOrphanCards.length; i += batchSize) {
+      const batch = confirmedOrphanCards.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async (card) => {
+          try {
+            await card.remove();
+            removed++;
+            console.log(`  ✅ Removed orphan card ${card._id} (remId: ${card.remId})`);
+          } catch (err) {
+            removalErrors++;
+            console.error(`  ❌ Failed to remove card ${card._id}:`, err);
+          }
+        })
+      );
+
+      const progress = Math.round(((i + batch.length) / confirmedOrphanCards.length) * 100);
+      await plugin.app.toast(`Removing orphan cards: ${progress}% (${i + batch.length}/${confirmedOrphanCards.length})`);
+    }
+  } finally {
+    await plugin.storage.setSession('plugin_operation_active', false);
+  }
+
+  const resultMessage =
+    `🗑️ Orphan Card Cleanup Complete\n\n` +
+    `• Removed: ${removed} card(s)\n` +
+    `${removalErrors > 0 ? `• Failed: ${removalErrors} card(s) — check console\n` : ''}` +
+    `\nThese cards belonged to Rems that no longer exist in your knowledge base.`;
+
+  console.log(`\n=== ORPHAN CARD CLEANUP COMPLETE ===`);
+  console.log(`Removed: ${removed}, Failed: ${removalErrors}`);
+  console.log(`=== END ORPHAN CARD CLEANUP ===\n`);
+
+  await plugin.app.toast(`🗑️ Removed ${removed} orphan card(s).`);
+  alert(resultMessage);
 }
