@@ -594,9 +594,28 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                   newHistoryEntry,
                 ];
 
+                // IMPORTANT: Set the suppression flag BEFORE writing the history property.
+                // Writing repHistorySlotCode fires a new GlobalRemChanged for this same rem.
+                // Without this flag, that new event passes all guards and triggers another
+                // "manual date reset" detection → infinite loop.
+                // We use the same flag + delayed-clear pattern as updateSRSDataForRem so that
+                // the existing guard at line ~571 suppresses the follow-up event.
+                await plugin.storage.setSession('plugin_updating_srs_data', true);
+
                 // Update just the history slot (date already changed by user)
                 await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(updatedHistory)]);
                 console.log('[GlobalRemChanged] Added manualDateReset event to history');
+
+                // Update the in-memory IncRem cache so any subsequent event pre-captures
+                // the correct (new) history/date and doesn't see stale baseline values.
+                const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
+                await updateIncrementalRemCache(plugin, { ...currentIncRem, history: updatedHistory });
+
+                // Clear suppression flag after a delay longer than the debounce window (1000ms)
+                // so it stays active for any follow-up GlobalRemChanged from the property write.
+                setTimeout(async () => {
+                  await plugin.storage.setSession('plugin_updating_srs_data', false);
+                }, 3000);
               }
             }
           }
