@@ -47,7 +47,7 @@ import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
-  const createExtract = async () => {
+  const createExtract = async (): Promise<PluginRem | PluginRem[] | undefined> => {
     const selection = await plugin.editor.getSelection();
     if (!selection) {
       return;
@@ -77,6 +77,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           await plugin.storage.setSession('plugin_operation_active', false);
         }
       }
+      return rems;
     } else {
       const highlight = await plugin.reader.addHighlight();
       if (!highlight) {
@@ -94,15 +95,29 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Extract with Priority',
     keyboardShortcut: 'opt+shift+x',
     action: async () => {
-      const rem = await createExtract();
-      if (!rem) {
+      const result = await createExtract();
+      if (!result) {
         return;
       }
       // Clear stale session storage to prevent race condition with widget context
       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
-      await plugin.widget.openPopup('priority_interval', {
-        remId: rem._id,
-      });
+
+      if (Array.isArray(result)) {
+        // Multi-rem selection: store all remIds for the popup to apply in batch
+        const remIds = result.map(r => r._id);
+        if (remIds.length === 0) return;
+        await plugin.storage.setSession('batchPriorityIntervalRemIds', remIds);
+        await plugin.widget.openPopup('priority_interval', {
+          remId: remIds[0], // First rem as reference for defaults
+          batchMode: true,
+        });
+      } else {
+        // Single rem
+        await plugin.storage.setSession('batchPriorityIntervalRemIds', null);
+        await plugin.widget.openPopup('priority_interval', {
+          remId: result._id,
+        });
+      }
     },
   });
 

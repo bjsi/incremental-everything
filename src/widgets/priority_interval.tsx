@@ -33,6 +33,13 @@ function PriorityInterval() {
         return await plugin.widget.getWidgetContext<any>();
     }, []);
 
+    // Batch mode: read batch remIds from session storage (set by extract-with-priority)
+    const isBatchMode = context?.contextData?.batchMode === true;
+    const batchRemIds = useRunAsync(async () => {
+        if (!isBatchMode) return null;
+        return await plugin.storage.getSession<string[]>('batchPriorityIntervalRemIds');
+    }, [isBatchMode]);
+
     // Data from DB
     const data = useTrackerPlugin(async (rp) => {
         let remId = context?.contextData?.remId;
@@ -131,6 +138,54 @@ function PriorityInterval() {
         }
     };
 
+    // Helper: apply priority + interval to a single rem
+    const applyPriorityAndInterval = async (
+        remId: string,
+        effectivePriority: number,
+        effectiveInterval: number,
+    ) => {
+        const rem = await plugin.rem.findOne(remId);
+        if (!rem) return;
+
+        // Save priority
+        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [effectivePriority.toString()]);
+
+        // Save interval (SRS schedule)
+        const incRem = await getIncrementalRemFromRem(plugin, rem);
+        if (incRem) {
+            const newNextRepDate = Date.now() + effectiveInterval * 1000 * 60 * 60 * 24;
+            const scheduledDate = incRem.nextRepDate || Date.now();
+            const actualDate = Date.now();
+            const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+            const wasEarly = daysDifference < 0;
+            const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+
+            const newHistory: IncrementalRep[] = [
+                ...(incRem.history || []),
+                {
+                    date: actualDate,
+                    scheduled: scheduledDate,
+                    interval: effectiveInterval,
+                    wasEarly,
+                    daysEarlyOrLate,
+                    reviewTimeSeconds: undefined,
+                    priority: effectivePriority,
+                    eventType: 'rescheduledInEditor',
+                },
+            ];
+
+            await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
+        }
+
+        // Update cache
+        const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
+        if (updatedIncRem) {
+            await updateIncrementalRemCache(plugin, updatedIncRem);
+        }
+
+        plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
+    };
+
     const handleSave = useCallback(async (overrideInterval?: number) => {
         if (!data || !data.rem || isSaving.current) return;
         isSaving.current = true;
@@ -149,44 +204,21 @@ function PriorityInterval() {
                 return;
             }
 
-            // Save priority
-            await data.rem.setPowerupProperty(powerupCode, prioritySlotCode, [effectivePriority.toString()]);
+            // Determine which rems to update
+            const remIdsToUpdate = (isBatchMode && batchRemIds && batchRemIds.length > 0)
+                ? batchRemIds
+                : [data.remId];
 
-            // Save interval (SRS schedule)
-            const incRem = await getIncrementalRemFromRem(plugin, data.rem);
-            if (incRem) {
-                const newNextRepDate = Date.now() + effectiveInterval * 1000 * 60 * 60 * 24;
-                const scheduledDate = incRem.nextRepDate || Date.now();
-                const actualDate = Date.now();
-                const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-                const wasEarly = daysDifference < 0;
-                const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-
-                const newHistory: IncrementalRep[] = [
-                    ...(incRem.history || []),
-                    {
-                        date: actualDate,
-                        scheduled: scheduledDate,
-                        interval: effectiveInterval,
-                        wasEarly,
-                        daysEarlyOrLate,
-                        reviewTimeSeconds: undefined,
-                        priority: effectivePriority,
-                        eventType: 'rescheduledInEditor',
-                    },
-                ];
-
-                await updateSRSDataForRem(plugin, data.remId, newNextRepDate, newHistory);
+            for (const remId of remIdsToUpdate) {
+                await applyPriorityAndInterval(remId, effectivePriority, effectiveInterval);
             }
 
-            // Update cache
-            const updatedIncRem = await getIncrementalRemFromRem(plugin, data.rem);
-            if (updatedIncRem) {
-                await updateIncrementalRemCache(plugin, updatedIncRem);
-            }
-
-            plugin.storage.setSession('pendingInheritanceCascade', data.rem._id).catch(console.error);
             triggeredCascade = true;
+
+            // Clean up batch session storage
+            if (isBatchMode) {
+                await plugin.storage.setSession('batchPriorityIntervalRemIds', null);
+            }
 
             plugin.widget.closePopup();
         } finally {
@@ -197,7 +229,7 @@ function PriorityInterval() {
                 await plugin.storage.setSession('plugin_operation_active', false);
             }
         }
-    }, [data, priorityVal, intervalVal, plugin]);
+    }, [data, priorityVal, intervalVal, plugin, isBatchMode, batchRemIds]);
 
     if (!data) {
         return <div className="h-20 flex items-center justify-center text-sm">Loading...</div>;
@@ -234,16 +266,29 @@ function PriorityInterval() {
                         onClick={() => plugin.widget.closePopup()}
                     >✕</button>
                 </div>
-                <div
-                    className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
-                    title={`${data.front}${data.back ? ` → ${data.back}` : ''}`}
-                    style={{ width: '100%' }}
-                >
-                    <span className="text-sm font-medium">
-                        {data.front}
-                        {data.back && <span className="opacity-80"> → {data.back}</span>}
-                    </span>
-                </div>
+                {isBatchMode && batchRemIds && batchRemIds.length > 1 ? (
+                    <div
+                        className="mt-1 px-2 py-1 rounded text-xs font-semibold text-center"
+                        style={{
+                            backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                            color: '#3B82F6',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                        }}
+                    >
+                        📋 {batchRemIds.length} rems selected — priority & interval will apply to all
+                    </div>
+                ) : (
+                    <div
+                        className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={`${data.front}${data.back ? ` → ${data.back}` : ''}`}
+                        style={{ width: '100%' }}
+                    >
+                        <span className="text-sm font-medium">
+                            {data.front}
+                            {data.back && <span className="opacity-80"> → {data.back}</span>}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Priority Section */}
