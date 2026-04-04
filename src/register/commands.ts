@@ -3,6 +3,7 @@ import {
   RNPlugin,
   SelectionType,
   PluginRem,
+  BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -22,7 +23,7 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory } from '../lib/pdfUtils';
+import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import dayjs from 'dayjs';
@@ -1263,6 +1264,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const sourceIds = sources.map(s => s._id);
       await plugin.storage.setSession(COPIED_SOURCES_KEY, sourceIds);
 
+      // Register the focused rem in the known_pdf_rems_ index for each PDF source,
+      // so the template rem itself is discoverable by the PDF Control Panel.
+      for (const source of sources) {
+        const isPdf = await source.hasPowerup(BuiltInPowerupCodes.UploadedFile);
+        if (isPdf) {
+          await registerRemsAsPdfKnown(plugin, source._id, [rem._id]);
+        }
+      }
+
       await plugin.app.toast(
         sources.length === 1
           ? '📋 1 source copied. Select target Rems and run "Paste Rem Sources".'
@@ -1324,6 +1334,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           }
           await target.addSource(source);
           totalAdded++;
+
+          // If the added source is a PDF, register this target rem in the
+          // known_pdf_rems_ synced index so it appears in the PDF Control Panel
+          // without needing a full incremental-rem-cache scan first.
+          const isPdf = await source.hasPowerup(BuiltInPowerupCodes.UploadedFile);
+          if (isPdf) {
+            await registerRemsAsPdfKnown(plugin, source._id, [target._id]);
+          }
         }
       }
 

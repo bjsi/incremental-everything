@@ -496,7 +496,34 @@ export const findPDFinRem = async (
 /**
  * Generate key for storing a persistent list of rems known to be associated with a PDF.
  */
-const getKnownPdfRemsKey = (pdfRemId: string) => `known_pdf_rems_${pdfRemId}`;
+export const getKnownPdfRemsKey = (pdfRemId: string) => `known_pdf_rems_${pdfRemId}`;
+
+/**
+ * Register one or more rem IDs as known users of a specific PDF in synced storage.
+ * This is the index that getAllIncrementsForPDF and findAllRemsForPDF rely on to
+ * discover rems that were not found via the local parent/sibling search.
+ *
+ * Idempotent — existing IDs are not re-added.
+ */
+export const registerRemsAsPdfKnown = async (
+  plugin: RNPlugin,
+  pdfRemId: string,
+  remIds: string[]
+): Promise<void> => {
+  const key = getKnownPdfRemsKey(pdfRemId);
+  const existing = (await plugin.storage.getSynced<string[]>(key)) || [];
+  const existingSet = new Set(existing);
+  let changed = false;
+  for (const id of remIds) {
+    if (!existingSet.has(id)) {
+      existingSet.add(id);
+      changed = true;
+    }
+  }
+  if (changed) {
+    await plugin.storage.setSynced(key, Array.from(existingSet));
+  }
+};
 
 /**
  * Get descendants up to a specified depth

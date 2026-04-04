@@ -58,11 +58,24 @@ function PageRangeWidget() {
 
       await initIncrementalRem(plugin, rem);
 
-      await reloadRelatedRems();
-
+      // Optimistic patch: mark this rem as incremental and fetch its new priority,
+      // rather than re-running the entire getAllIncrementsForPDF search.
       const remName = rem.text ? await plugin.richText.toString(rem.text) : 'Rem';
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+
+      setRelatedRems(prev => prev.map(r =>
+        r.remId === remId ? { ...r, isIncremental: true } : r
+      ));
+
       if (incRemInfo) {
+        const remsForCalc = allIncrementalRems || [];
+        const percentile = remsForCalc.length > 0
+          ? calculateRelativePercentile(remsForCalc, remId)
+          : null;
+        setRemPriorities(prev => ({
+          ...prev,
+          [remId]: { absolute: incRemInfo.priority, percentile },
+        }));
         await plugin.app.toast(`Made "${remName}" incremental with priority ${incRemInfo.priority}`);
       }
     } catch (error) {
@@ -82,7 +95,7 @@ function PageRangeWidget() {
     }
   };
 
-  // Save priority inline
+  // Save priority inline — optimistic patch, no full reload needed
   const savePriority = async (remId: string) => {
     if (editingState.type !== 'priority') return;
     const priority = editingState.value;
@@ -91,14 +104,23 @@ function PageRangeWidget() {
     if (rem) {
       await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
 
-      // Update the incremental rem list
+      // Update the incremental rem cache for other widgets
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (incRemInfo) {
         await updateIncrementalRemCache(plugin, incRemInfo);
       }
 
+      // Patch only the priority entry for this rem in-place
+      const remsForCalc = allIncrementalRems || [];
+      const percentile = remsForCalc.length > 0
+        ? calculateRelativePercentile(remsForCalc, remId)
+        : null;
+      setRemPriorities(prev => ({
+        ...prev,
+        [remId]: { absolute: priority, percentile },
+      }));
+
       setEditingState({ type: 'none' });
-      await reloadRelatedRems();
       await plugin.app.toast(`Priority updated to ${priority}`);
     }
   };
@@ -184,7 +206,7 @@ function PageRangeWidget() {
     setEditingState({ type: 'range', remId, start, end });
   };
 
-  // Save page range for a specific rem
+  // Save page range for a specific rem — optimistic patch, no full reload needed
   const saveRemRange = async (remId: string) => {
     if (!contextData?.pdfRemId || editingState.type !== 'range') return;
 
@@ -193,14 +215,20 @@ function PageRangeWidget() {
 
     if (start > 1 || end > 0) {
       await plugin.storage.setSynced(rangeKey, { start, end });
+      // Patch the range for this rem in the local list in-place
+      setRelatedRems(prev => prev.map(r =>
+        r.remId === remId ? { ...r, range: { start, end } } : r
+      ));
       await plugin.app.toast(`Saved page range: ${start}-${end || '∞'}`);
     } else {
       await plugin.storage.setSynced(rangeKey, null);
+      setRelatedRems(prev => prev.map(r =>
+        r.remId === remId ? { ...r, range: null } : r
+      ));
       await plugin.app.toast('Cleared page range');
     }
 
     setEditingState({ type: 'none' });
-    await reloadRelatedRems();
   };
 
   // Start editing history
@@ -218,7 +246,7 @@ function PageRangeWidget() {
     setEditingState({ type: 'history', remId, page });
   };
 
-  // Save reading history record
+  // Save reading history record — optimistic patch, no full reload needed
   const saveReadingHistory = async (remId: string) => {
     if (editingState.type !== 'history') return;
     const page = editingState.page;
@@ -233,9 +261,26 @@ function PageRangeWidget() {
     await addPageToHistory(plugin, remId, contextData.pdfRemId, page, false);
 
     await plugin.app.toast(`Updated reading position to page ${page}`);
-
     setEditingState({ type: 'none' });
-    await reloadRelatedRems();
+
+    // Patch only this rem's history and statistics in-place
+    const newHistory = await getPageHistory(plugin, remId, contextData.pdfRemId);
+    const newStats = await getReadingStatistics(plugin, remId, contextData.pdfRemId);
+
+    setRemHistories(prev => ({ ...prev, [remId]: newHistory }));
+    setRemStatistics(prev => ({ ...prev, [remId]: newStats }));
+    setRelatedRems(prev => prev.map(r =>
+      r.remId === remId ? { ...r, currentPage: page } : r
+    ));
+    // Recompute total reading time from updated statistics
+    setRemStatistics(prev => {
+      const updated = { ...prev, [remId]: newStats };
+      const total = Object.values(updated).reduce(
+        (sum: number, s: any) => sum + (s?.totalTimeSeconds || 0), 0
+      );
+      setTotalPdfReadingTime(total);
+      return updated;
+    });
   };
 
 
