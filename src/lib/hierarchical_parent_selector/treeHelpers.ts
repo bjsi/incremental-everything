@@ -206,7 +206,7 @@ async function performFullPDFSearch(
     const rem = await plugin.rem.findOne(incRemInfo.remId);
     if (!rem) continue;
 
-    const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+    const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
     if (isPdfHighlight) continue;
 
     const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
@@ -230,7 +230,7 @@ async function performFullPDFSearch(
     const rem = await plugin.rem.findOne(remId);
     if (!rem) continue;
 
-    const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+    const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
     if (isPdfHighlight) continue;
 
     const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);

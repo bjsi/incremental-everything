@@ -4,7 +4,7 @@ import { getIncrementalRemFromRem, updateReviewRemData } from './incremental_rem
 import { incremReviewStartTimeKey } from './consts';
 import { determineIncRemType } from './incRemHelpers';
 
-export const handleReviewAndOpenRem = async (
+export const handleReviewInEditorRem = async (
     plugin: RNPlugin,
     rem: PluginRem | undefined,
     remType: string | null | undefined

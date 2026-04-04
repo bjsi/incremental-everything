@@ -276,7 +276,7 @@ const TreeNode = ({
                             const rem = await plugin.rem.findOne(node.id);
                             if (rem) {
                                 // Just like in inc_rem_list.tsx, check if this is a PDF to open it correctly
-                                const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.Highlight);
+                                const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
                                 const isPdfExtract = await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile);
 
                                 if (isPdfHighlight || isPdfExtract) {

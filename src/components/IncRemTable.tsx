@@ -48,7 +48,7 @@ interface IncRemTableProps {
   selectedDocumentId?: string | null;
   onDocumentFilterChange?: (documentId: string | null) => void;
   onPriorityChange?: (remId: string, newPriority: number) => Promise<void>;
-  onReviewAndOpen?: (remId: string, subsequentRemIds?: string[]) => void;
+  onReviewInEditor?: (remId: string, subsequentRemIds?: string[]) => void;
   initialState?: IncRemListState;
   onStateChange?: (state: IncRemListState) => void;
   subtitle?: string;
@@ -68,7 +68,7 @@ export function IncRemTable({
   selectedDocumentId,
   onDocumentFilterChange,
   onPriorityChange,
-  onReviewAndOpen,
+  onReviewInEditor,
   initialState,
   onStateChange,
   subtitle,
@@ -263,11 +263,11 @@ export function IncRemTable({
           </button>
 
           {/* Top-Level Review Button */}
-          {onReviewAndOpen && filteredAndSortedRems.length > 0 && (
+          {onReviewInEditor && filteredAndSortedRems.length > 0 && (
             <button
               onClick={() => {
                 const doReview = () =>
-                  onReviewAndOpen(filteredAndSortedRems[0].remId, filteredAndSortedRems.slice(1).map(r => r.remId));
+                  onReviewInEditor(filteredAndSortedRems[0].remId, filteredAndSortedRems.slice(1).map(r => r.remId));
 
                 // Warn if not filtered to Due items
                 if (effectiveFilterStatus !== 'due') {
@@ -553,14 +553,14 @@ export function IncRemTable({
                     setEditingPriorityRemId(null);
                   }}
                   onPriorityCancel={() => setEditingPriorityRemId(null)}
-                  // Review & Open
-                  onReviewAndOpen={(remId) => {
-                    if (onReviewAndOpen) {
+                  // Review in Editor
+                  onReviewInEditor={(remId) => {
+                    if (onReviewInEditor) {
                       const idx = filteredAndSortedRems.findIndex(r => r.remId === remId);
                       // Queue = clicked item + everything after it
                       const queueSlice = idx >= 0 ? filteredAndSortedRems.slice(idx) : [];
                       const subsequentIds = queueSlice.slice(1).map(r => r.remId);
-                      const doReview = () => onReviewAndOpen(remId, subsequentIds);
+                      const doReview = () => onReviewInEditor(remId, subsequentIds);
                       if (effectiveFilterStatus !== 'due') {
                         const now = Date.now();
                         const dueCountInQueue = queueSlice.filter(r => r.nextRepDate <= now).length;

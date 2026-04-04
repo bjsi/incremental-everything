@@ -61,7 +61,7 @@ Este README cubre lo básico. Para las guías completas, por favor visita el **M
 
 2. **Priorízalo**: Usa `Alt+P` para establecer su importancia.
 3. **Repásalo**: El complemento intercala estos elementos en tu cola regular de tarjetas.
-4. **Desactívalo**: Elimina la etiqueta `Incremental` o presiona el botón **Done** (Hecho) en la cola si has terminado de repasarlo.
+4. **Desactívalo**: Elimina la etiqueta `Incremental` o presiona el botón **Dismiss** (Descartar) en la cola si has terminado de repasarlo.
 
 ### ⚡ Priorización y Ordenamiento
 - 0 es para tu material más importante y 100 es para el menos importante.
@@ -146,7 +146,7 @@ Al leer un PDF grande (como un libro) como un Rem incremental regular, el comple
 
 ### Conflicto de Atajos de Teclado:
 
-Al ver una tarjeta Rem regular en la cola, el editor aparece correctamente. Sin embargo, los atajos de teclado nativos de la cola tendrán prioridad sobre escribir en el editor. Esto parece deberse a una limitación en la API actual del complemento que impide que un complemento capture completamente la entrada del teclado dentro del entorno de la cola. El botón "Presiona 'P' para Editar" se ha añadido como una solución alternativa. También puedes usar el botón recién creado "Revisar y Abrir".
+Al ver una tarjeta Rem regular en la cola, el editor aparece correctamente. Sin embargo, los atajos de teclado nativos de la cola tendrán prioridad sobre escribir en el editor. Esto parece deberse a una limitación en la API actual del complemento que impide que un complemento capture completamente la entrada del teclado dentro del entorno de la cola. El botón "Presiona 'P' para Editar" se ha añadido como una solución alternativa. También puedes usar el botón recién creado "Revisar en Editor".
 
 
 ## Detalles de Desarrollo
