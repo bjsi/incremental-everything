@@ -481,9 +481,7 @@ function PageRangeWidget() {
     type TreeItem = typeof sorted[0] & {
       depth: number;
       parentId: string | null;
-      isLastChild: boolean;
       hasOverlap: boolean;
-      ancestorDepths: number[];
     };
 
     const contains = (
@@ -509,9 +507,7 @@ function PageRangeWidget() {
       ...item,
       depth: 0,
       parentId: null,
-      isLastChild: false,
       hasOverlap: false,
-      ancestorDepths: [] as number[],
     }));
 
     for (let i = 0; i < items.length; i++) {
@@ -545,10 +541,10 @@ function PageRangeWidget() {
 
     for (const siblings of childrenOf.values()) {
       if (siblings.length === 0) continue;
-      siblings[siblings.length - 1].isLastChild = true;
+
+      const withRange = siblings.filter(s => s.range);
 
       // Overlap detection among siblings with ranges
-      const withRange = siblings.filter(s => s.range);
       for (let i = 0; i < withRange.length; i++) {
         for (let j = i + 1; j < withRange.length; j++) {
           if (overlaps(withRange[i].range!, withRange[j].range!)) {
@@ -559,28 +555,11 @@ function PageRangeWidget() {
       }
     }
 
-    // Step 4: compute ancestorDepths — which depth columns still have siblings
-    // below this row and therefore need a continuing vertical guide line.
-    const lastChildSet = new Set(items.filter(i => i.isLastChild).map(i => i.remId));
-    for (const item of items) {
-      const ancestor: number[] = [];
-      let parentId = item.parentId;
-      while (parentId) {
-        const parent = items.find(i => i.remId === parentId);
-        if (!parent) break;
-        if (!lastChildSet.has(parent.remId)) ancestor.push(parent.depth);
-        parentId = parent.parentId;
-      }
-      item.ancestorDepths = ancestor;
-    }
-
     return items;
   };
 
   const treeItems = buildRangeTree();
   const INDENT_PX = 16;
-  // Visible slate-400 color — avoids the near-invisible theme border variable
-  const GUIDE_COLOR = '#94a3b8';
 
   return (
     <div
@@ -742,35 +721,10 @@ function PageRangeWidget() {
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>Click to expand</span>
         </div>
         <div className="flex flex-col gap-1">
-          {treeItems.map((item) => {
-            const indent = item.depth * INDENT_PX;
-            return (
-              <div key={item.remId} className="relative" style={{ marginLeft: indent }}>
-                {/* Continuing vertical guide lines for open ancestor columns */}
-                {item.ancestorDepths.map((d: number) => (
-                  <div key={d} style={{
-                    position: 'absolute',
-                    left: -(indent - d * INDENT_PX) + INDENT_PX / 2 - 0.5,
-                    top: 0,
-                    bottom: 0,
-                    width: 1,
-                    backgroundColor: GUIDE_COLOR,
-                    opacity: 0.6,
-                    pointerEvents: 'none',
-                  }} />
-                ))}
-                {/* Elbow connector: vertical + horizontal segment for this item */}
-                {item.depth > 0 && (
-                  <div style={{ position: 'absolute', left: -INDENT_PX, top: 0, width: INDENT_PX, height: '50%', pointerEvents: 'none' }}>
-                    <div style={{ position: 'absolute', left: INDENT_PX / 2 - 0.5, top: 0, width: 1,
-                      height: item.isLastChild ? '100%' : 'calc(100% + 999px)',
-                      backgroundColor: GUIDE_COLOR, opacity: 0.6 }} />
-                    <div style={{ position: 'absolute', left: INDENT_PX / 2, top: '50%', width: INDENT_PX / 2, height: 1,
-                      backgroundColor: GUIDE_COLOR, opacity: 0.6 }} />
-                  </div>
-                )}
-                {/* Overlap warning inline via hasOverlap prop */}
-                <PdfRemItem
+          {treeItems.map((item) => (
+            <div key={item.remId} className="relative" style={{ marginLeft: item.depth * INDENT_PX }}>
+              {/* Overlap warning inline via hasOverlap prop */}
+              <PdfRemItem
                   item={item}
                   isCurrentRem={item.remId === contextData?.incrementalRemId}
                   isExpanded={expandedRems.has(item.remId)}
@@ -798,9 +752,8 @@ function PageRangeWidget() {
                     pageRangeInputRefs.current[item.remId].end = el;
                   }}
                 />
-              </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
       </div>
