@@ -483,7 +483,7 @@ function PageRangeWidget() {
       parentId: string | null;
       isLastChild: boolean;
       hasOverlap: boolean;
-      ancestorDepths: number[]; // which depth columns need a continuing guide line
+      ancestorDepths: number[];
     };
 
     const contains = (
@@ -511,7 +511,7 @@ function PageRangeWidget() {
       parentId: null,
       isLastChild: false,
       hasOverlap: false,
-      ancestorDepths: [],
+      ancestorDepths: [] as number[],
     }));
 
     for (let i = 0; i < items.length; i++) {
@@ -559,19 +559,16 @@ function PageRangeWidget() {
       }
     }
 
-    // Step 4: compute ancestorDepths (which depth-column guide lines should
-    // continue through this row because the parent still has more siblings below)
+    // Step 4: compute ancestorDepths — which depth columns still have siblings
+    // below this row and therefore need a continuing vertical guide line.
     const lastChildSet = new Set(items.filter(i => i.isLastChild).map(i => i.remId));
     for (const item of items) {
       const ancestor: number[] = [];
-      // Walk up through the items to find open ancestors
       let parentId = item.parentId;
       while (parentId) {
         const parent = items.find(i => i.remId === parentId);
         if (!parent) break;
-        if (!lastChildSet.has(parent.remId)) {
-          ancestor.push(parent.depth);
-        }
+        if (!lastChildSet.has(parent.remId)) ancestor.push(parent.depth);
         parentId = parent.parentId;
       }
       item.ancestorDepths = ancestor;
@@ -581,8 +578,9 @@ function PageRangeWidget() {
   };
 
   const treeItems = buildRangeTree();
-  const INDENT_PX = 16; // px per depth level
-  const GUIDE_COLOR = 'var(--rn-clr-border-primary)';
+  const INDENT_PX = 16;
+  // Visible slate-400 color — avoids the near-invisible theme border variable
+  const GUIDE_COLOR = '#94a3b8';
 
   return (
     <div
@@ -748,57 +746,30 @@ function PageRangeWidget() {
             const indent = item.depth * INDENT_PX;
             return (
               <div key={item.remId} className="relative" style={{ marginLeft: indent }}>
-                {/* Vertical guide lines for open ancestor columns that still have siblings below */}
-                {item.ancestorDepths.map((ancestorDepth: number) => (
-                  <div
-                    key={ancestorDepth}
-                    style={{
-                      position: 'absolute',
-                      // Position relative to this container (which is already indented by item.depth * INDENT_PX).
-                      // The guide for ancestor at depth `d` should appear at column d, i.e.
-                      // left = -(item.depth - d) * INDENT_PX + INDENT_PX / 2
-                      left: -(item.depth - ancestorDepth) * INDENT_PX + INDENT_PX / 2 - 0.5,
-                      top: 0,
-                      bottom: 0,
-                      width: 1,
-                      backgroundColor: GUIDE_COLOR,
-                      opacity: 0.4,
-                    }}
-                  />
-                ))}
-                {/* Elbow connector for indented items */}
-                {item.depth > 0 && (
-                  <div style={{
+                {/* Continuing vertical guide lines for open ancestor columns */}
+                {item.ancestorDepths.map((d: number) => (
+                  <div key={d} style={{
                     position: 'absolute',
-                    left: -INDENT_PX,
+                    left: -(indent - d * INDENT_PX) + INDENT_PX / 2 - 0.5,
                     top: 0,
-                    width: INDENT_PX,
-                    height: '50%',
+                    bottom: 0,
+                    width: 1,
+                    backgroundColor: GUIDE_COLOR,
+                    opacity: 0.6,
                     pointerEvents: 'none',
-                  }}>
-                    {/* Vertical segment */}
-                    <div style={{
-                      position: 'absolute',
-                      left: INDENT_PX / 2 - 0.5,
-                      top: 0,
-                      width: 1,
+                  }} />
+                ))}
+                {/* Elbow connector: vertical + horizontal segment for this item */}
+                {item.depth > 0 && (
+                  <div style={{ position: 'absolute', left: -INDENT_PX, top: 0, width: INDENT_PX, height: '50%', pointerEvents: 'none' }}>
+                    <div style={{ position: 'absolute', left: INDENT_PX / 2 - 0.5, top: 0, width: 1,
                       height: item.isLastChild ? '100%' : 'calc(100% + 999px)',
-                      backgroundColor: GUIDE_COLOR,
-                      opacity: 0.5,
-                    }} />
-                    {/* Horizontal segment */}
-                    <div style={{
-                      position: 'absolute',
-                      left: INDENT_PX / 2,
-                      top: '50%',
-                      width: INDENT_PX / 2,
-                      height: 1,
-                      backgroundColor: GUIDE_COLOR,
-                      opacity: 0.5,
-                    }} />
+                      backgroundColor: GUIDE_COLOR, opacity: 0.6 }} />
+                    <div style={{ position: 'absolute', left: INDENT_PX / 2, top: '50%', width: INDENT_PX / 2, height: 1,
+                      backgroundColor: GUIDE_COLOR, opacity: 0.6 }} />
                   </div>
                 )}
-                {/* Overlap warning inline in PdfRemItem via hasOverlap prop — no absolute overlay needed */}
+                {/* Overlap warning inline via hasOverlap prop */}
                 <PdfRemItem
                   item={item}
                   isCurrentRem={item.remId === contextData?.incrementalRemId}
