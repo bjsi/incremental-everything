@@ -16,6 +16,7 @@ import {
   defaultPriorityId,
   currentIncRemKey,
   incremReviewStartTimeKey,
+  incRemCacheReloadKey,
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
@@ -310,6 +311,10 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
       }
 
       await updateIncrementalRemCache(plugin, newIncRem);
+      // Bump the reload trigger so the tracker picks up the new IncRem.
+      // The tracker reads incRemCacheReloadKey reactively; writing a new timestamp
+      // here causes it to re-run loadIncrementalRemCache (via non-reactive plugin ref).
+      await plugin.storage.setSession(incRemCacheReloadKey, Date.now());
       plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
       triggeredCascade = true;
     } finally {

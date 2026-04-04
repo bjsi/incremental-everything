@@ -31,6 +31,10 @@ export const allIncrementalRemKey = 'all-incremental-rem';
 export const currentIncRemKey = 'current-inc-rem';
 export const allCardPriorityInfoKey = 'all-card-priority-info-key';
 export const incremReviewStartTimeKey = 'increm-review-start-time';
+// Intentional reactive signal: bump this key (via setSession) to trigger an IncRem cache reload.
+// The tracker reads it via `rp` (reactive), but calls loadIncrementalRemCache with the
+// non-reactive `plugin` reference so that taggedRem() does NOT register broad subscriptions.
+export const incRemCacheReloadKey = 'inc-rem-cache-reload-trigger';
 
 // widgets
 export const scrollToHighlightId = 'scroll-to-highlight';

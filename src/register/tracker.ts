@@ -1,6 +1,6 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
@@ -20,8 +20,21 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     // This watcher will only re-run when actual rem data changes, not when the flag changes.
     if (incRemBatchActive) return;
 
+    // Lightweight reactive read: the tracker re-runs ONLY when this key is explicitly bumped
+    // (e.g., after initIncrementalRem adds a powerup). We do NOT pass `rp` into the cache
+    // loader because powerup.getPowerupByCode(rp) + taggedRem(rp) would subscribe the entire
+    // powerup-membership list as a reactive dependency, causing a 2s reload on every rem
+    // open/search. Reading this controlled key is the only subscription we want.
+    await rp.storage.getSession(incRemCacheReloadKey);
+
     console.log('[Tracker] IncRem cache load triggered by plugin.track()');
-    await loadIncrementalRemCache(rp as any);
+    // Pass the non-reactive `plugin` reference (NOT `rp`) so that
+    // powerup.getPowerupByCode() and taggedRem() inside the cache loader
+    // do NOT register as reactive dependencies on the tracker.
+    // Using `rp` here caused every rem open/search to re-trigger a full
+    // 2s cache reload because `taggedRem()` subscribed the tracker to
+    // the entire powerup membership list.
+    await loadIncrementalRemCache(plugin);
     console.log('[Tracker] IncRem cache load completed.');
   });
 
