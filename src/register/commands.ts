@@ -23,7 +23,7 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown } from '../lib/pdfUtils';
+import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import dayjs from 'dayjs';
@@ -450,12 +450,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      // 1. Find the associated PDF Rem within the focused Rem or its descendants
-      const pdfRem = await findPDFinRem(plugin, rem);
+      // 1. Find the associated PDF Rem, honouring #preferthispdf when multiple sources exist
+      const pdfRem = await findPreferredPDFInRem(plugin, rem);
 
-      // 2. If no PDF is found, inform the user and stop.
+      // 2. If no PDF is found (or multiple #preferthispdf tags conflict), inform the user and stop.
       if (!pdfRem) {
-        await plugin.app.toast('No PDF found in the focused Rem or its children.');
+        // findPreferredPDFInRem already showed a toast for the multi-tag conflict case;
+        // only show the generic message when truly no PDF was found.
+        const hasSomePdf = await findPDFinRem(plugin, rem);
+        if (!hasSomePdf) {
+          await plugin.app.toast('No PDF found in the focused Rem or its sources.');
+        }
         return;
       }
 

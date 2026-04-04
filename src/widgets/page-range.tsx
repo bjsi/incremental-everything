@@ -3,6 +3,7 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
+  ReactRNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
 import {
@@ -13,7 +14,8 @@ import {
   setIncrementalReadingPosition,
   addPageToHistory,
   getReadingStatistics,
-  PageHistoryEntry
+  PageHistoryEntry,
+  PageRangeContext,
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
 import { calculateRelativePercentile, formatDuration } from '../lib/utils';
@@ -30,7 +32,7 @@ function PageRangeWidget() {
   const contextData = useTrackerPlugin(
     async (rp) => rp.storage.getSession('pageRangeContext'),
     []
-  );
+  ) as PageRangeContext | null | undefined;
 
   const allIncrementalRems = useTrackerPlugin(
     (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
@@ -56,7 +58,7 @@ function PageRangeWidget() {
       const rem = await plugin.rem.findOne(remId);
       if (!rem) return;
 
-      await initIncrementalRem(plugin, rem);
+      await initIncrementalRem(plugin as unknown as ReactRNPlugin, rem);
 
       // Optimistic patch: mark this rem as incremental and fetch its new priority,
       // rather than re-running the entire getAllIncrementsForPDF search.
@@ -258,7 +260,7 @@ function PageRangeWidget() {
 
     // Update both the current reading position (for the queue) and the history log
     await setIncrementalReadingPosition(plugin, remId, contextData.pdfRemId, page);
-    await addPageToHistory(plugin, remId, contextData.pdfRemId, page, false);
+    await addPageToHistory(plugin, remId, contextData.pdfRemId, page, undefined);
 
     await plugin.app.toast(`Updated reading position to page ${page}`);
     setEditingState({ type: 'none' });
@@ -321,7 +323,7 @@ function PageRangeWidget() {
 
       } catch (error) {
         console.error('PageRange: Error loading data:', error);
-        await plugin.app.toast(`Error loading data: ${error.message}`);
+        await plugin.app.toast(`Error loading data: ${(error as Error).message}`);
       } finally {
         setIsLoading(false);
       }
@@ -393,7 +395,7 @@ function PageRangeWidget() {
       plugin.widget.closePopup();
     } catch (error) {
       console.error('PageRange: Error saving:', error);
-      await plugin.app.toast(`Error saving: ${error.message}`);
+      await plugin.app.toast(`Error saving: ${(error as Error).message}`);
     }
   };
 

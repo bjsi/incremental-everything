@@ -494,6 +494,87 @@ export const findPDFinRem = async (
 };
 
 /**
+ * Finds the best PDF for a given rem, respecting the `#preferthispdf` tag.
+ *
+ * Resolution order:
+ *  1. If the rem has no PDF sources → null.
+ *  2. If the rem has exactly one PDF source → return it.
+ *  3. If one source is tagged `#preferthispdf` → return that one.
+ *  4. If multiple sources carry the tag → toast a warning and return null
+ *     (caller should fall back to the standard ExtractViewer path).
+ *  5. If no source has the tag → return the first PDF found (legacy behaviour).
+ *
+ * This mirrors the logic in `action_items.ts` but is exposed here so any
+ * command or widget can call it without duplicating the tag-check loop.
+ */
+export const findPreferredPDFInRem = async (
+  plugin: RNPlugin,
+  rem: PluginRem,
+  /** If true, show a toast when multiple #preferthispdf tags are found */
+  showWarningToast: boolean = true
+): Promise<PluginRem | null> => {
+  // Collect all PDF sources on this rem
+  const allPdfs: PluginRem[] = [];
+
+  // Rem itself may be a PDF
+  const isUploadedPdf = async (r: PluginRem) => {
+    if (!(await r.hasPowerup(BuiltInPowerupCodes.UploadedFile))) return false;
+    try {
+      const url = await r.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
+      return typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
+    } catch {
+      return false;
+    }
+  };
+
+  if (await isUploadedPdf(rem)) {
+    allPdfs.push(rem);
+  }
+
+  const sources = await rem.getSources();
+  for (const source of sources) {
+    if (await isUploadedPdf(source)) {
+      allPdfs.push(source);
+    }
+  }
+
+  if (allPdfs.length === 0) return null;
+  if (allPdfs.length === 1) return allPdfs[0];
+
+  // Multiple PDFs — look for #preferthispdf tag
+  const preferred: PluginRem[] = [];
+  for (const pdf of allPdfs) {
+    try {
+      const tags = await pdf.getTagRems();
+      for (const tagRem of tags) {
+        if (!tagRem.text) continue;
+        const tagText = (await safeRemTextToString(plugin, tagRem.text))
+          .toLowerCase()
+          .replace(/\s+/g, '');
+        if (tagText === 'preferthispdf') {
+          preferred.push(pdf);
+          break;
+        }
+      }
+    } catch {
+      // Ignore tag-read errors for individual PDFs
+    }
+  }
+
+  if (preferred.length === 1) return preferred[0];
+
+  if (preferred.length > 1 && showWarningToast) {
+    await plugin.app.toast(
+      'Multiple PDFs have the #preferthispdf tag — cannot determine which to open. Add the tag to exactly one PDF source.'
+    );
+    return null;
+  }
+
+  // No tag found — fall back to first PDF (legacy behaviour)
+  return allPdfs[0];
+};
+
+/**
  * Generate key for storing a persistent list of rems known to be associated with a PDF.
  */
 export const getKnownPdfRemsKey = (pdfRemId: string) => `known_pdf_rems_${pdfRemId}`;
