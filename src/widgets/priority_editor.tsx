@@ -4,15 +4,26 @@ import {
   useRunAsync,
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../lib/consts';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, cardPriorityCacheRefreshKey, pageRangeWidgetId } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { calculateRelativePercentile } from '../lib/utils';
+import { calculateRelativePercentile, formatDuration } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { PriorityBadge } from '../components';
+import {
+  findPreferredPDFInRem,
+  getIncrementalPageRange,
+  getPageHistory,
+  getReadingStatistics,
+  setIncrementalReadingPosition,
+  addPageToHistory,
+  getPageRangeKey,
+  safeRemTextToString,
+  PageHistoryEntry,
+} from '../lib/pdfUtils';
 
 // Move styles outside component to avoid recreation on every render
 const adjustButtonStyle: React.CSSProperties = {
@@ -32,6 +43,16 @@ export function PriorityEditor() {
 
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // PDF range editing state
+  type PdfEditMode
+    = { mode: 'none' }
+    | { mode: 'range'; start: number; end: number }
+    | { mode: 'history'; page: number };
+  const [pdfEdit, setPdfEdit] = useState<PdfEditMode>({ mode: 'none' });
+  const pdfStartRef = useRef<HTMLInputElement>(null);
+  const pdfEndRef = useRef<HTMLInputElement>(null);
+  const pdfPageRef = useRef<HTMLInputElement>(null);
+
   // Listen for cache refresh signal to force re-evaluation of all data
   const refreshSignal = useTrackerPlugin(
     (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
@@ -48,15 +69,35 @@ export function PriorityEditor() {
       if (!rem) return null;
 
       // Execute ALL queries in parallel for maximum performance
-      const [incRemInfo, cardInfo, cards, hasPowerup, allIncRems, allPrioritizedCardInfo, displayMode] = await Promise.all([
+      const [incRemInfo, cardInfo, cards, hasPowerup, allIncRems, allPrioritizedCardInfo, displayMode, pdfRem] = await Promise.all([
         getIncrementalRemFromRem(plugin, rem),
         getCardPriority(plugin, rem),
         rem.getCards(),
         rem.hasPowerup('cardPriority'),
         plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
         plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-        plugin.settings.getSetting<string>('priorityEditorDisplayMode')
+        plugin.settings.getSetting<string>('priorityEditorDisplayMode'),
+        findPreferredPDFInRem(plugin as any, rem, false),
       ]);
+
+      // Fetch PDF range / history / stats if a PDF source was found
+      let pdfRemId: string | null = null;
+      let pdfRemName: string | null = null;
+      let pdfRange: { start: number; end: number | null } | null = null;
+      let pdfHistory: PageHistoryEntry[] = [];
+      let pdfStats: any = null;
+      if (pdfRem) {
+        pdfRemId = pdfRem._id;
+        pdfRemName = pdfRem.text ? await safeRemTextToString(plugin as any, pdfRem.text) : null;
+        const [range, history, stats] = await Promise.all([
+          getIncrementalPageRange(plugin as any, rem._id, pdfRem._id),
+          getPageHistory(plugin as any, rem._id, pdfRem._id),
+          getReadingStatistics(plugin as any, rem._id, pdfRem._id),
+        ]);
+        pdfRange = range;
+        pdfHistory = history;
+        pdfStats = stats;
+      }
 
       // Calculate relative priorities inline
       const incRemRelativePriority = (incRemInfo && allIncRems && allIncRems.length > 0)
@@ -76,7 +117,12 @@ export function PriorityEditor() {
         incRemRelativePriority,
         cardRelativePriority,
         allPrioritizedCardInfo: allPrioritizedCardInfo || [],
-        displayMode: displayMode || 'all'
+        displayMode: displayMode || 'all',
+        pdfRemId,
+        pdfRemName,
+        pdfRange,
+        pdfHistory,
+        pdfStats,
       };
     },
     [remId, refreshSignal]
@@ -124,6 +170,42 @@ export function PriorityEditor() {
     () => cardInfo?.source === 'manual',
     [cardInfo?.source]
   );
+
+  // PDF callbacks
+  const pdfSaveRange = useCallback(async () => {
+    if (pdfEdit.mode !== 'range' || !remId || !remData?.pdfRemId) return;
+    const { start, end } = pdfEdit;
+    const rangeKey = getPageRangeKey(remId, remData.pdfRemId);
+    if (start > 1 || end > 0) {
+      await plugin.storage.setSynced(rangeKey, { start, end });
+      await plugin.app.toast(`Saved page range: ${start}–${end || '∞'}`);
+    } else {
+      await plugin.storage.setSynced(rangeKey, null);
+      await plugin.app.toast('Cleared page range');
+    }
+    setPdfEdit({ mode: 'none' });
+  }, [pdfEdit, remId, remData?.pdfRemId, plugin]);
+
+  const pdfSaveHistory = useCallback(async () => {
+    if (pdfEdit.mode !== 'history' || !remId || !remData?.pdfRemId) return;
+    const { page } = pdfEdit;
+    if (page <= 0) { await plugin.app.toast('Enter a valid page number.'); return; }
+    await setIncrementalReadingPosition(plugin as any, remId, remData.pdfRemId, page);
+    await addPageToHistory(plugin as any, remId, remData.pdfRemId, page, undefined);
+    await plugin.app.toast(`Reading position set to page ${page}`);
+    setPdfEdit({ mode: 'none' });
+  }, [pdfEdit, remId, remData?.pdfRemId, plugin]);
+
+  const openPdfPanel = useCallback(async () => {
+    if (!remId || !remData?.pdfRemId) return;
+    await plugin.storage.setSession('pageRangeContext', {
+      incrementalRemId: remId,
+      pdfRemId: remData.pdfRemId,
+      totalPages: undefined,
+      currentPage: undefined,
+    });
+    await plugin.widget.openPopup(pageRangeWidgetId, { remId });
+  }, [remId, remData?.pdfRemId, plugin]);
 
   // Memoize computed values
   const showCardEditor = useMemo(
@@ -182,6 +264,21 @@ export function PriorityEditor() {
           )}
           {showCardEditor && (
             <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact source={cardInfo?.source} isCardPriority={true} />
+          )}
+          {remData?.pdfRemId && (
+            <span
+              title={remData.pdfRange ? `PDF: p.${remData.pdfRange.start}–${remData.pdfRange.end || '∞'}` : 'PDF source — no range set'}
+              style={{
+                fontSize: '10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 2,
+                color: remData.pdfRange ? 'var(--rn-clr-content-secondary)' : 'var(--rn-clr-content-tertiary)',
+                opacity: remData.pdfRange ? 1 : 0.55,
+              }}
+            >
+              📄{remData.pdfRange ? ` p.${remData.pdfRange.start}–${remData.pdfRange.end || '∞'}` : ' —'}
+            </span>
           )}
         </div>
       ) : (
@@ -326,6 +423,123 @@ export function PriorityEditor() {
               <div className="text-[10px] text-center mt-2" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
                 {!hasCards && hasCardPriorityPowerup ? "Set for inheritance" : `Source: ${cardInfo?.source}`}
               </div>
+            </div>
+          )}
+
+          {/* PDF Range Section */}
+          {remData?.pdfRemId && (
+            <div
+              className="p-3 rounded-lg"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              {/* Header row */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">📄</span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>PDF Range</span>
+                  {remData.pdfRemName && (
+                    <span className="text-[10px] truncate max-w-[100px]" style={{ color: 'var(--rn-clr-content-tertiary)' }}
+                      title={remData.pdfRemName}>{remData.pdfRemName}</span>
+                  )}
+                </div>
+                {remData.pdfRange ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                    style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-secondary)' }}>
+                    p.{remData.pdfRange.start}–{remData.pdfRange.end || '∞'}
+                  </span>
+                ) : (
+                  <span className="text-[10px]" style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.6 }}>No range</span>
+                )}
+              </div>
+
+              {/* Editing area */}
+              {pdfEdit.mode === 'range' ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px]" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start</label>
+                    <input ref={pdfStartRef} type="number" min="1" value={pdfEdit.start}
+                      onChange={(e) => setPdfEdit({ ...pdfEdit, start: parseInt(e.target.value) || 1 })}
+                      className="w-14 text-center p-1 rounded text-[11px]"
+                      style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }} />
+                    <label className="text-[10px]" style={{ color: 'var(--rn-clr-content-secondary)' }}>End</label>
+                    <input ref={pdfEndRef} type="number" min={pdfEdit.start} value={pdfEdit.end || ''}
+                      placeholder="∞"
+                      onChange={(e) => setPdfEdit({ ...pdfEdit, end: parseInt(e.target.value) || 0 })}
+                      className="w-14 text-center p-1 rounded text-[11px]"
+                      style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }} />
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={pdfSaveRange} className="px-2 py-1 text-[11px] rounded" style={{ backgroundColor: '#3b82f6', color: 'white' }}>Save</button>
+                    <button onClick={() => setPdfEdit({ mode: 'none' })} className="px-2 py-1 text-[11px] rounded"
+                      style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
+                  </div>
+                </div>
+              ) : pdfEdit.mode === 'history' ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px]" style={{ color: 'var(--rn-clr-content-secondary)' }}>Page</label>
+                    <input ref={pdfPageRef} type="number" min="1" value={pdfEdit.page}
+                      onChange={(e) => setPdfEdit({ ...pdfEdit, page: parseInt(e.target.value) || 1 })}
+                      className="w-20 text-center p-1 rounded text-[11px]"
+                      style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }} />
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={pdfSaveHistory} className="px-2 py-1 text-[11px] rounded" style={{ backgroundColor: '#10b981', color: 'white' }}>Save Position</button>
+                    <button onClick={() => setPdfEdit({ mode: 'none' })} className="px-2 py-1 text-[11px] rounded"
+                      style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-1 flex-wrap">
+                  <button
+                    onClick={() => setPdfEdit({ mode: 'range', start: remData.pdfRange?.start || 1, end: remData.pdfRange?.end || 0 })}
+                    className="px-2 py-1 text-[11px] rounded transition-colors"
+                    style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#3b82f6' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#3b82f6'; e.currentTarget.style.color = 'white'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#3b82f6'; }}
+                  >📄 Range</button>
+                  <button
+                    onClick={() => {
+                      const lastPage = remData.pdfHistory?.slice(-1)[0]?.page || 1;
+                      setPdfEdit({ mode: 'history', page: lastPage });
+                    }}
+                    className="px-2 py-1 text-[11px] rounded transition-colors"
+                    style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#10b981' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#10b981'; e.currentTarget.style.color = 'white'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#10b981'; }}
+                  >📖 Position</button>
+                </div>
+              )}
+
+              {/* Stats + last session */}
+              {(remData.pdfStats?.totalTimeSeconds > 0 || remData.pdfHistory?.length > 0) && (
+                <div className="mt-2 flex items-center gap-3 flex-wrap">
+                  {remData.pdfStats?.totalTimeSeconds > 0 && (
+                    <span className="text-[10px]" style={{ color: '#10b981' }}
+                      title="Total reading time">⏱️{formatDuration(remData.pdfStats.totalTimeSeconds)}</span>
+                  )}
+                  {remData.pdfHistory?.length > 0 && (
+                    <span className="text-[10px]" style={{ color: 'var(--rn-clr-content-tertiary)' }}
+                      title={`Last: page ${remData.pdfHistory[remData.pdfHistory.length - 1].page}`}>
+                      Last p.{remData.pdfHistory[remData.pdfHistory.length - 1].page}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Full panel link */}
+              <button
+                onClick={openPdfPanel}
+                className="w-full mt-2 py-1 rounded text-[11px] transition-colors"
+                style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-tertiary)', border: '1px solid var(--rn-clr-border-primary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--rn-clr-content-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--rn-clr-content-tertiary)'; }}
+              >
+                PDF Control Panel ↗
+              </button>
             </div>
           )}
 
