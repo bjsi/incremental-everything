@@ -27,6 +27,7 @@ interface PdfRemItemProps {
   item: PdfRemItemData;
   isCurrentRem: boolean;
   isExpanded: boolean;
+  hasOverlap?: boolean;
   priorityInfo?: { absolute: number; percentile: number | null };
   statistics?: { totalTimeSeconds: number; sessionsWithTime: number };
   history?: PageHistoryEntry[];
@@ -49,6 +50,7 @@ export function PdfRemItem({
   item,
   isCurrentRem,
   isExpanded,
+  hasOverlap,
   priorityInfo,
   statistics,
   history,
@@ -100,6 +102,22 @@ export function PdfRemItem({
         {item.range && (
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-secondary)' }} title="Page range">
             p.{item.range.start}-{item.range.end || '∞'}
+          </span>
+        )}
+        {hasOverlap && (
+          <span
+            title="Page range overlaps with a sibling rem"
+            style={{
+              fontSize: '10px',
+              backgroundColor: '#fef3c7',
+              color: '#92400e',
+              borderRadius: 3,
+              padding: '1px 5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            ⚠ overlap
           </span>
         )}
         {item.currentPage && (

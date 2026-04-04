@@ -456,32 +456,134 @@ function PageRangeWidget() {
     return unassignedRanges;
   };
 
-  // Sort related rems: current first, then by page range, then alphabetically
-  const sortedRelatedRems = [...relatedRems].sort((a, b) => {
-    // Current rem always first
-    if (a.remId === contextData?.incrementalRemId) return -1;
-    if (b.remId === contextData?.incrementalRemId) return 1;
-    
-    // Incremental rems before non-incremental
-    if (a.isIncremental !== b.isIncremental) {
-      return a.isIncremental ? -1 : 1;
+  // ─── Build containment tree ──────────────────────────────────────────────
+  // Algorithm:
+  //  1. Sort with current rem first, then by start page (no-range items last).
+  //  2. Walk the sorted list assigning each item the tightest parent whose
+  //     range fully contains this item's range.
+  //  3. Assign depth = parent.depth + 1, or 0 for root items.
+  //  4. Mark the last child of each parent for the "└─" corner elbow.
+  //  5. Flag sibling items (same parent, same depth) whose ranges overlap
+  //     (not containment — that's the child case).
+
+  const buildRangeTree = () => {
+    // Step 1: base sort
+    const sorted = [...relatedRems].sort((a, b) => {
+      if (a.remId === contextData?.incrementalRemId) return -1;
+      if (b.remId === contextData?.incrementalRemId) return 1;
+      if (a.isIncremental !== b.isIncremental) return a.isIncremental ? -1 : 1;
+      if (a.range && b.range) return a.range.start - b.range.start;
+      if (a.range && !b.range) return -1;
+      if (!a.range && b.range) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    type TreeItem = typeof sorted[0] & {
+      depth: number;
+      parentId: string | null;
+      isLastChild: boolean;
+      hasOverlap: boolean;
+      ancestorDepths: number[]; // which depth columns need a continuing guide line
+    };
+
+    const contains = (
+      outer: { start: number; end: number | null },
+      inner: { start: number; end: number | null }
+    ) =>
+      inner.start >= outer.start &&
+      (outer.end === null || inner.end === null || inner.end <= outer.end) &&
+      // Must actually be narrower (not identical)
+      (inner.start > outer.start || (inner.end !== null && (outer.end === null || inner.end < outer.end)));
+
+    const overlaps = (
+      a: { start: number; end: number | null },
+      b: { start: number; end: number | null }
+    ) => {
+      const aEnd = a.end ?? Infinity;
+      const bEnd = b.end ?? Infinity;
+      return a.start < bEnd && b.start < aEnd && !contains(a, b) && !contains(b, a);
+    };
+
+    // Step 2: assign parents (tightest containing range)
+    const items: TreeItem[] = sorted.map(item => ({
+      ...item,
+      depth: 0,
+      parentId: null,
+      isLastChild: false,
+      hasOverlap: false,
+      ancestorDepths: [],
+    }));
+
+    for (let i = 0; i < items.length; i++) {
+      if (!items[i].range) continue;
+      let bestParentIdx = -1;
+      let bestParentSize = Infinity;
+      for (let j = 0; j < i; j++) {
+        if (!items[j].range) continue;
+        if (contains(items[j].range!, items[i].range!)) {
+          const parentSize = (items[j].range!.end ?? Infinity) - items[j].range!.start;
+          if (parentSize < bestParentSize) {
+            bestParentSize = parentSize;
+            bestParentIdx = j;
+          }
+        }
+      }
+      if (bestParentIdx >= 0) {
+        items[i].parentId = items[bestParentIdx].remId;
+        items[i].depth = items[bestParentIdx].depth + 1;
+      }
     }
-    
-    // Both have page ranges: sort by start page
-    if (a.range && b.range) {
-      return a.range.start - b.range.start;
+
+    // Step 3: mark isLastChild and detect sibling overlaps
+    // Group children by parent
+    const childrenOf = new Map<string | null, TreeItem[]>();
+    for (const item of items) {
+      const key = item.parentId;
+      if (!childrenOf.has(key)) childrenOf.set(key, []);
+      childrenOf.get(key)!.push(item);
     }
-    
-    // Only a has page range: a comes first
-    if (a.range && !b.range) return -1;
-    
-    // Only b has page range: b comes first
-    if (!a.range && b.range) return 1;
-    
-    // Neither has page range: sort alphabetically
-    return a.name.localeCompare(b.name);
-  });
-  
+
+    for (const siblings of childrenOf.values()) {
+      if (siblings.length === 0) continue;
+      siblings[siblings.length - 1].isLastChild = true;
+
+      // Overlap detection among siblings with ranges
+      const withRange = siblings.filter(s => s.range);
+      for (let i = 0; i < withRange.length; i++) {
+        for (let j = i + 1; j < withRange.length; j++) {
+          if (overlaps(withRange[i].range!, withRange[j].range!)) {
+            withRange[i].hasOverlap = true;
+            withRange[j].hasOverlap = true;
+          }
+        }
+      }
+    }
+
+    // Step 4: compute ancestorDepths (which depth-column guide lines should
+    // continue through this row because the parent still has more siblings below)
+    const lastChildSet = new Set(items.filter(i => i.isLastChild).map(i => i.remId));
+    for (const item of items) {
+      const ancestor: number[] = [];
+      // Walk up through the items to find open ancestors
+      let parentId = item.parentId;
+      while (parentId) {
+        const parent = items.find(i => i.remId === parentId);
+        if (!parent) break;
+        if (!lastChildSet.has(parent.remId)) {
+          ancestor.push(parent.depth);
+        }
+        parentId = parent.parentId;
+      }
+      item.ancestorDepths = ancestor;
+    }
+
+    return items;
+  };
+
+  const treeItems = buildRangeTree();
+  const INDENT_PX = 16; // px per depth level
+  const GUIDE_COLOR = 'var(--rn-clr-border-primary)';
+
   return (
     <div
       className="flex flex-col"
@@ -631,47 +733,103 @@ function PageRangeWidget() {
         );
       })()}
 
-      {/* All Rems Using This PDF */}
+      {/* All Rems Using This PDF — hierarchical tree view */}
       <div>
         <div className="flex items-center justify-between py-1 px-1 mb-1">
           <div className="flex items-center gap-2">
             <span className="text-xs">📑</span>
             <span className="font-semibold text-xs" style={{ color: 'var(--rn-clr-content-primary)' }}>All Rems Using This PDF</span>
-            <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>{sortedRelatedRems.length}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>{treeItems.length}</span>
           </div>
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>Click to expand</span>
         </div>
         <div className="flex flex-col gap-1">
-          {sortedRelatedRems.map((item) => (
-            <PdfRemItem
-              key={item.remId}
-              item={item}
-              isCurrentRem={item.remId === contextData?.incrementalRemId}
-              isExpanded={expandedRems.has(item.remId)}
-              priorityInfo={remPriorities[item.remId]}
-              statistics={remStatistics[item.remId]}
-              history={remHistories[item.remId]}
-              editingState={editingState}
-              onToggleExpanded={toggleExpanded}
-              onInitIncremental={handleInitIncrementalRem}
-              onStartEditingRem={startEditingRem}
-              onStartEditingPriority={startEditingPriority}
-              onStartEditingHistory={startEditingHistory}
-              onSaveRemRange={saveRemRange}
-              onSavePriority={savePriority}
-              onSaveHistory={saveReadingHistory}
-              onCancelEditing={() => setEditingState({ type: 'none' })}
-              onEditingStateChange={setEditingState}
-              startInputRef={(el) => {
-                if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
-                pageRangeInputRefs.current[item.remId].start = el;
-              }}
-              endInputRef={(el) => {
-                if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
-                pageRangeInputRefs.current[item.remId].end = el;
-              }}
-            />
-          ))}
+          {treeItems.map((item) => {
+            const indent = item.depth * INDENT_PX;
+            return (
+              <div key={item.remId} className="relative" style={{ marginLeft: indent }}>
+                {/* Vertical guide lines for open ancestor columns that still have siblings below */}
+                {item.ancestorDepths.map((ancestorDepth: number) => (
+                  <div
+                    key={ancestorDepth}
+                    style={{
+                      position: 'absolute',
+                      // Position relative to this container (which is already indented by item.depth * INDENT_PX).
+                      // The guide for ancestor at depth `d` should appear at column d, i.e.
+                      // left = -(item.depth - d) * INDENT_PX + INDENT_PX / 2
+                      left: -(item.depth - ancestorDepth) * INDENT_PX + INDENT_PX / 2 - 0.5,
+                      top: 0,
+                      bottom: 0,
+                      width: 1,
+                      backgroundColor: GUIDE_COLOR,
+                      opacity: 0.4,
+                    }}
+                  />
+                ))}
+                {/* Elbow connector for indented items */}
+                {item.depth > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    left: -INDENT_PX,
+                    top: 0,
+                    width: INDENT_PX,
+                    height: '50%',
+                    pointerEvents: 'none',
+                  }}>
+                    {/* Vertical segment */}
+                    <div style={{
+                      position: 'absolute',
+                      left: INDENT_PX / 2 - 0.5,
+                      top: 0,
+                      width: 1,
+                      height: item.isLastChild ? '100%' : 'calc(100% + 999px)',
+                      backgroundColor: GUIDE_COLOR,
+                      opacity: 0.5,
+                    }} />
+                    {/* Horizontal segment */}
+                    <div style={{
+                      position: 'absolute',
+                      left: INDENT_PX / 2,
+                      top: '50%',
+                      width: INDENT_PX / 2,
+                      height: 1,
+                      backgroundColor: GUIDE_COLOR,
+                      opacity: 0.5,
+                    }} />
+                  </div>
+                )}
+                {/* Overlap warning inline in PdfRemItem via hasOverlap prop — no absolute overlay needed */}
+                <PdfRemItem
+                  item={item}
+                  isCurrentRem={item.remId === contextData?.incrementalRemId}
+                  isExpanded={expandedRems.has(item.remId)}
+                  hasOverlap={item.hasOverlap}
+                  priorityInfo={remPriorities[item.remId]}
+                  statistics={remStatistics[item.remId]}
+                  history={remHistories[item.remId]}
+                  editingState={editingState}
+                  onToggleExpanded={toggleExpanded}
+                  onInitIncremental={handleInitIncrementalRem}
+                  onStartEditingRem={startEditingRem}
+                  onStartEditingPriority={startEditingPriority}
+                  onStartEditingHistory={startEditingHistory}
+                  onSaveRemRange={saveRemRange}
+                  onSavePriority={savePriority}
+                  onSaveHistory={saveReadingHistory}
+                  onCancelEditing={() => setEditingState({ type: 'none' })}
+                  onEditingStateChange={setEditingState}
+                  startInputRef={(el) => {
+                    if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                    pageRangeInputRefs.current[item.remId].start = el;
+                  }}
+                  endInputRef={(el) => {
+                    if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                    pageRangeInputRefs.current[item.remId].end = el;
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
       </div>
