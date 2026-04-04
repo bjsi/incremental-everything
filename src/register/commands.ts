@@ -1229,4 +1229,111 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await handleNextRepetitionClick(plugin, incRemInfo);
     },
   });
+
+  // ─── Copy / Paste Rem Sources ────────────────────────────────────────────
+  // Designed for the PDF-split workflow: give multiple IncRems the same PDF
+  // source so the page-range widget can assign each rem a different page range.
+  //
+  //   1. Focus the "template" rem (the one whose sources you want to replicate).
+  //   2. Run "Copy Rem Sources" → source IDs are saved to session storage.
+  //   3. Select one or more target rems.
+  //   4. Run "Paste Rem Sources" → every selected rem receives all copied sources
+  //      (already-present sources are silently skipped to keep it idempotent).
+
+  const COPIED_SOURCES_KEY = 'copiedRemSourceIds';
+
+  plugin.app.registerCommand({
+    id: 'copy-rem-sources',
+    name: 'Copy Rem Sources',
+    description: 'Copies the sources of the focused Rem to the clipboard (session storage) for pasting onto other Rems.',
+    keyboardShortcut: 'ctrl+shift+F1',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('No Rem focused.');
+        return;
+      }
+
+      const sources = await rem.getSources();
+      if (!sources || sources.length === 0) {
+        await plugin.app.toast('This Rem has no sources to copy.');
+        return;
+      }
+
+      const sourceIds = sources.map(s => s._id);
+      await plugin.storage.setSession(COPIED_SOURCES_KEY, sourceIds);
+
+      await plugin.app.toast(
+        sources.length === 1
+          ? '📋 1 source copied. Select target Rems and run "Paste Rem Sources".'
+          : `📋 ${sources.length} sources copied. Select target Rems and run "Paste Rem Sources".`
+      );
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'paste-rem-sources',
+    name: 'Paste Rem Sources',
+    description: 'Adds the previously copied sources to all selected Rems (or the focused Rem). Skips sources already present.',
+    keyboardShortcut: 'opt+shift+v',
+    action: async () => {
+      const copiedIds = await plugin.storage.getSession<string[]>(COPIED_SOURCES_KEY);
+      if (!copiedIds || copiedIds.length === 0) {
+        await plugin.app.toast('No sources copied yet. Run "Copy Rem Sources" first.');
+        return;
+      }
+
+      // Resolve the copied source RemObjects once (shared across all targets)
+      const copiedSources = (await plugin.rem.findMany(copiedIds)) || [];
+      if (copiedSources.length === 0) {
+        await plugin.app.toast('Could not resolve the copied sources. They may have been deleted.');
+        return;
+      }
+
+      // Determine target rems: multi-select → all selected; otherwise → focused rem
+      const selection = await plugin.editor.getSelection();
+      let targetRems: PluginRem[] = [];
+
+      if (selection?.type === SelectionType.Rem && selection.remIds.length > 0) {
+        targetRems = (await plugin.rem.findMany(selection.remIds)) || [];
+      } else {
+        const focused = await plugin.focus.getFocusedRem();
+        if (!focused) {
+          await plugin.app.toast('No Rem focused or selected.');
+          return;
+        }
+        targetRems = [focused];
+      }
+
+      if (targetRems.length === 0) {
+        await plugin.app.toast('Could not resolve target Rems.');
+        return;
+      }
+
+      let totalAdded = 0;
+      let totalSkipped = 0;
+
+      for (const target of targetRems) {
+        const existingSources = await target.getSources();
+        const existingIds = new Set(existingSources.map(s => s._id));
+
+        for (const source of copiedSources) {
+          if (existingIds.has(source._id)) {
+            totalSkipped++;
+            continue;
+          }
+          await target.addSource(source);
+          totalAdded++;
+        }
+      }
+
+      const remLabel = targetRems.length === 1 ? '1 Rem' : `${targetRems.length} Rems`;
+      if (totalAdded === 0) {
+        await plugin.app.toast(`✅ All sources already present on ${remLabel}.`);
+      } else {
+        const skippedNote = totalSkipped > 0 ? ` (${totalSkipped} already present, skipped)` : '';
+        await plugin.app.toast(`✅ Added ${totalAdded} source(s) to ${remLabel}${skippedNote}.`);
+      }
+    },
+  });
 }
