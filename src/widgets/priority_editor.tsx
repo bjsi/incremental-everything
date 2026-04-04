@@ -456,18 +456,28 @@ export function PriorityEditor() {
               </div>
 
               {/* Editing area */}
-              {pdfEdit.mode === 'range' ? (
-                <div className="flex flex-col gap-2">
+              {pdfEdit.mode === 'range' && (
+                <div
+                  className="flex flex-col gap-2"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); pdfSaveRange(); } }}
+                >
                   <div className="flex items-center gap-2">
                     <label className="text-[10px]" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start</label>
-                    <input ref={pdfStartRef} type="number" min="1" value={pdfEdit.start}
+                    <input
+                      ref={pdfStartRef}
+                      autoFocus
+                      type="number" min="1" value={pdfEdit.start}
                       onChange={(e) => setPdfEdit({ ...pdfEdit, start: parseInt(e.target.value) || 1 })}
+                      onKeyDown={(e) => { if (e.key === 'Tab') { e.preventDefault(); pdfEndRef.current?.focus(); } }}
                       className="w-14 text-center p-1 rounded text-[11px]"
                       style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }} />
                     <label className="text-[10px]" style={{ color: 'var(--rn-clr-content-secondary)' }}>End</label>
-                    <input ref={pdfEndRef} type="number" min={pdfEdit.start} value={pdfEdit.end || ''}
+                    <input
+                      ref={pdfEndRef}
+                      type="number" min={pdfEdit.start} value={pdfEdit.end || ''}
                       placeholder="∞"
                       onChange={(e) => setPdfEdit({ ...pdfEdit, end: parseInt(e.target.value) || 0 })}
+                      onKeyDown={(e) => { if (e.key === 'Tab') { e.preventDefault(); pdfStartRef.current?.focus(); } }}
                       className="w-14 text-center p-1 rounded text-[11px]"
                       style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }} />
                   </div>
@@ -477,22 +487,48 @@ export function PriorityEditor() {
                       style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
                   </div>
                 </div>
-              ) : pdfEdit.mode === 'history' ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <label className="text-[10px]" style={{ color: 'var(--rn-clr-content-secondary)' }}>Page</label>
-                    <input ref={pdfPageRef} type="number" min="1" value={pdfEdit.page}
-                      onChange={(e) => setPdfEdit({ ...pdfEdit, page: parseInt(e.target.value) || 1 })}
-                      className="w-20 text-center p-1 rounded text-[11px]"
-                      style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }} />
+              )}
+              {pdfEdit.mode === 'history' && (() => {
+                const rangeStart = remData.pdfRange?.start ?? 1;
+                const rangeEnd = remData.pdfRange?.end ?? null;
+                const outOfRange = pdfEdit.page < rangeStart || (rangeEnd !== null && pdfEdit.page > rangeEnd);
+                return (
+                  <div
+                    className="flex flex-col gap-2"
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (!outOfRange) pdfSaveHistory(); } }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px]" style={{ color: 'var(--rn-clr-content-secondary)' }}>Page</label>
+                      <input
+                        ref={pdfPageRef}
+                        autoFocus
+                        type="number"
+                        min={rangeStart}
+                        max={rangeEnd ?? undefined}
+                        value={pdfEdit.page}
+                        onChange={(e) => setPdfEdit({ ...pdfEdit, page: parseInt(e.target.value) || rangeStart })}
+                        className="w-20 text-center p-1 rounded text-[11px]"
+                        style={{
+                          border: `1px solid ${outOfRange ? '#ef4444' : 'var(--rn-clr-border-primary)'}`,
+                          backgroundColor: 'var(--rn-clr-background-primary)',
+                          color: 'var(--rn-clr-content-primary)',
+                        }} />
+                      {outOfRange && (
+                        <span className="text-[10px]" style={{ color: '#ef4444' }}>
+                          {rangeEnd !== null ? `${rangeStart}–${rangeEnd}` : `≥${rangeStart}`}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={pdfSaveHistory} disabled={outOfRange} className="px-2 py-1 text-[11px] rounded"
+                        style={{ backgroundColor: outOfRange ? '#6b7280' : '#10b981', color: 'white', cursor: outOfRange ? 'not-allowed' : 'pointer' }}>Save Position</button>
+                      <button onClick={() => setPdfEdit({ mode: 'none' })} className="px-2 py-1 text-[11px] rounded"
+                        style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button onClick={pdfSaveHistory} className="px-2 py-1 text-[11px] rounded" style={{ backgroundColor: '#10b981', color: 'white' }}>Save Position</button>
-                    <button onClick={() => setPdfEdit({ mode: 'none' })} className="px-2 py-1 text-[11px] rounded"
-                      style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
+                );
+              })()}
+              {pdfEdit.mode === 'none' && (
                 <div className="flex gap-1 flex-wrap">
                   <button
                     onClick={() => setPdfEdit({ mode: 'range', start: remData.pdfRange?.start || 1, end: remData.pdfRange?.end || 0 })}
@@ -503,7 +539,9 @@ export function PriorityEditor() {
                   >📄 Range</button>
                   <button
                     onClick={() => {
-                      const lastPage = remData.pdfHistory?.slice(-1)[0]?.page || 1;
+                      const lastPage = remData.pdfHistory?.slice(-1)[0]?.page
+                        ?? remData.pdfRange?.start
+                        ?? 1;
                       setPdfEdit({ mode: 'history', page: lastPage });
                     }}
                     className="px-2 py-1 text-[11px] rounded transition-colors"
