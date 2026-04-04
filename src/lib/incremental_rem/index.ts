@@ -246,13 +246,16 @@ export const getIncrementalRemFromRem = async (
  * @param rem PluginRem to initialize.
  * @returns Promise that resolves after the Rem is initialized or skipped if already incremental.
  */
-export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) {
+export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean }) {
   const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
 
   if (!isAlreadyIncremental) {
-    // Suppress GlobalRemChanged
-    await plugin.storage.setSession('plugin_operation_active', true);
+    // Suppress GlobalRemChanged (skip if caller already holds the flag)
+    if (!options?.skipFlagManagement) {
+      await plugin.storage.setSession('plugin_operation_active', true);
+    }
 
+    let triggeredCascade = false;
     try {
       // Check for dismissed history to import (merge from previous learning sessions)
       const dismissedHistory = await mergeHistoryFromDismissed(plugin, rem);
@@ -308,8 +311,14 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem) 
 
       await updateIncrementalRemCache(plugin, newIncRem);
       plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
+      triggeredCascade = true;
     } finally {
-      await plugin.storage.setSession('plugin_operation_active', false);
+      // Only clear the flag if no cascade was triggered.
+      // If cascade IS pending, leave the flag up — the cascade tracker will clear it.
+      // (Matches the correct pattern from batch_priority.tsx)
+      if (!options?.skipFlagManagement && !triggeredCascade) {
+        await plugin.storage.setSession('plugin_operation_active', false);
+      }
     }
   }
 }

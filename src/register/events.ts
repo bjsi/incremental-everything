@@ -524,6 +524,15 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       }
 
       remChangeDebounceTimer = setTimeout(async () => {
+        // Re-check suppression flag — the event may have been enqueued
+        // before the flag was set, but fires inside a batch operation.
+        const isBatchActiveNow = await plugin.storage.getSession<boolean>('plugin_operation_active');
+        if (isBatchActiveNow) {
+          pendingHistoryMap.delete(data.remId);
+          pendingNextRepDateMap.delete(data.remId);
+          return;
+        }
+
         const rem = await plugin.rem.findOne(data.remId);
         if (!rem) {
           pendingHistoryMap.delete(data.remId);

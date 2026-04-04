@@ -138,6 +138,7 @@ function PriorityInterval() {
         // Suppress GlobalRemChanged
         await plugin.storage.setSession('plugin_operation_active', true);
 
+        let triggeredCascade = false;
         try {
             const effectivePriority = priorityVal ?? data.defaultPriority;
             const effectiveInterval = overrideInterval !== undefined
@@ -185,11 +186,16 @@ function PriorityInterval() {
             }
 
             plugin.storage.setSession('pendingInheritanceCascade', data.rem._id).catch(console.error);
+            triggeredCascade = true;
 
             plugin.widget.closePopup();
         } finally {
             isSaving.current = false;
-            await plugin.storage.setSession('plugin_operation_active', false);
+            // Only clear the flag if no cascade was triggered.
+            // If cascade IS pending, leave the flag up — the cascade tracker will clear it.
+            if (!triggeredCascade) {
+                await plugin.storage.setSession('plugin_operation_active', false);
+            }
         }
     }, [data, priorityVal, intervalVal, plugin]);
 

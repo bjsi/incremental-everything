@@ -62,7 +62,21 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       return focused;
     } else if (selection.type === SelectionType.Rem) {
       const rems = (await plugin.rem.findMany(selection.remIds)) || [];
-      await Promise.all(rems.map((rem) => initIncrementalRem(plugin, rem)));
+      // Single outer flag bracket for the entire batch — each initIncrementalRem
+      // skips its own flag management so the flag stays UP for the whole loop.
+      await plugin.storage.setSession('plugin_operation_active', true);
+      try {
+        for (const rem of rems) {
+          await initIncrementalRem(plugin, rem, { skipFlagManagement: true });
+        }
+      } finally {
+        // Don't clear the flag — each initIncrementalRem fires pendingInheritanceCascade,
+        // and the cascade tracker will clear the flag when the cascade completes.
+        // Only clear defensively if no rems were processed (e.g., empty selection).
+        if (rems.length === 0) {
+          await plugin.storage.setSession('plugin_operation_active', false);
+        }
+      }
     } else {
       const highlight = await plugin.reader.addHighlight();
       if (!highlight) {
