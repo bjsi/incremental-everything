@@ -26,9 +26,9 @@ import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
-  const pageRangeInputRefs = React.useRef<Record<string, {start: HTMLInputElement | null, end: HTMLInputElement | null}>>({});
+  const pageRangeInputRefs = React.useRef<Record<string, { start: HTMLInputElement | null, end: HTMLInputElement | null }>>({});
   const inputStartRef = React.useRef<HTMLInputElement>(null);
-  
+
   const contextData = useTrackerPlugin(
     async (rp) => rp.storage.getSession('pageRangeContext'),
     []
@@ -47,7 +47,7 @@ function PageRangeWidget() {
   const [isCurrentRemIncremental, setIsCurrentRemIncremental] = useState<boolean>(false);
   const [remHistories, setRemHistories] = useState<Record<string, PageHistoryEntry[]>>({});
   const [expandedRems, setExpandedRems] = useState<Set<string>>(new Set());
-  const [remPriorities, setRemPriorities] = useState<Record<string, {absolute: number, percentile: number | null}>>({});
+  const [remPriorities, setRemPriorities] = useState<Record<string, { absolute: number, percentile: number | null }>>({});
   const [remStatistics, setRemStatistics] = useState<Record<string, any>>({});
 
   const [editingState, setEditingState] = useState<EditingState>({ type: 'none' });
@@ -129,7 +129,7 @@ function PageRangeWidget() {
 
   // Calculate priority info for each incremental rem
   const calculatePriorities = async (rems: any[]) => {
-    const priorities: Record<string, {absolute: number, percentile: number | null}> = {};
+    const priorities: Record<string, { absolute: number, percentile: number | null }> = {};
 
     // Use allIncrementalRems from tracker
     const remsForCalculation = allIncrementalRems || [];
@@ -150,37 +150,37 @@ function PageRangeWidget() {
         }
       }
     }
-    
+
     setRemPriorities(priorities);
   };
 
-    const reloadRelatedRems = async () => {
+  const reloadRelatedRems = async () => {
     if (!contextData?.pdfRemId) return;
-    
+
     const related = await getAllIncrementsForPDF(plugin, contextData.pdfRemId);
     setRelatedRems(related);
 
     // Calculate priorities using tracker data
     await calculatePriorities(related);
-    
+
     // Fetch reading histories and statistics for each related rem
     const histories: Record<string, PageHistoryEntry[]> = {};
     const statistics: Record<string, any> = {};
     let totalTime = 0;
-    
+
     for (const item of related) {
-        // Always fetch stats if it's a related rem
-        const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
-        if (history.length > 0) {
-            histories[item.remId] = history;
-        }
-        
-        const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
-        statistics[item.remId] = stats;
-        totalTime += stats.totalTimeSeconds;
-        
+      // Always fetch stats if it's a related rem
+      const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
+      if (history.length > 0) {
+        histories[item.remId] = history;
+      }
+
+      const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
+      statistics[item.remId] = stats;
+      totalTime += stats.totalTimeSeconds;
+
     }
-    
+
     setRemHistories(histories);
     setRemStatistics(statistics);
     setTotalPdfReadingTime(totalTime);
@@ -294,11 +294,11 @@ function PageRangeWidget() {
         setIsLoading(false);
         return;
       }
-      
+
       try {
         setIsLoading(true);
         const { incrementalRemId, pdfRemId } = contextData;
-        
+
         // Fetch current rem details
         const currentRem = await plugin.rem.findOne(incrementalRemId);
         if (currentRem) {
@@ -307,7 +307,7 @@ function PageRangeWidget() {
           setCurrentRemName(remText);
           setIsCurrentRemIncremental(isIncremental);
         }
-        
+
         // Load page range for current rem
         const savedRange = await getIncrementalPageRange(plugin, incrementalRemId, pdfRemId);
         if (savedRange) {
@@ -317,7 +317,7 @@ function PageRangeWidget() {
           setPageRangeStart(1);
           setPageRangeEnd(0);
         }
-        
+
         // Load related rems with priorities
         await reloadRelatedRems();
 
@@ -378,11 +378,11 @@ function PageRangeWidget() {
 
   const handleSave = async () => {
     if (!contextData?.incrementalRemId || !contextData?.pdfRemId) return;
-    
+
     try {
       const { incrementalRemId, pdfRemId } = contextData;
       const rangeKey = getPageRangeKey(incrementalRemId, pdfRemId);
-      
+
       if (pageRangeStart > 1 || pageRangeEnd > 0) {
         const range = { start: pageRangeStart, end: pageRangeEnd };
         await plugin.storage.setSynced(rangeKey, range);
@@ -391,7 +391,7 @@ function PageRangeWidget() {
         await plugin.storage.setSynced(rangeKey, null);
         await plugin.app.toast('Cleared page range');
       }
-      
+
       plugin.widget.closePopup();
     } catch (error) {
       console.error('PageRange: Error saving:', error);
@@ -421,7 +421,7 @@ function PageRangeWidget() {
     );
   }
 
-  
+
   // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
     const assignedRanges = relatedRems
@@ -429,10 +429,10 @@ function PageRangeWidget() {
       .map((item) => item.range)
       .filter(Boolean)
       .sort((a, b) => a.start - b.start);
-  
+
     const unassignedRanges = [];
     let lastEnd = 0;
-  
+
     for (const range of assignedRanges) {
       if (range.start > lastEnd + 1) {
         unassignedRanges.push({
@@ -442,9 +442,9 @@ function PageRangeWidget() {
       }
       lastEnd = Math.max(lastEnd, range.end || range.start);
     }
-  
+
     const totalPages = contextData?.totalPages;
-  
+
     // Only add a final open range if not all pages are covered.
     if (!totalPages || lastEnd < totalPages) {
       unassignedRanges.push({
@@ -452,7 +452,7 @@ function PageRangeWidget() {
         end: null, // `null` represents the end of the document
       });
     }
-  
+
     return unassignedRanges;
   };
 
@@ -592,7 +592,7 @@ function PageRangeWidget() {
           <span className="text-lg">📄</span>
           <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>PDF Control</span>
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-            {currentRemName ? `· ${currentRemName.length > 30 ? currentRemName.substring(0, 30) + '...' : currentRemName}` : ''}
+            {currentRemName ? `· ${currentRemName.length > 50 ? currentRemName.substring(0, 50) + '...' : currentRemName}` : ''}
           </span>
           {isCurrentRemIncremental && (
             <span className="text-xs" style={{ color: '#3b82f6' }} title="Incremental Rem">⚡</span>
@@ -617,114 +617,114 @@ function PageRangeWidget() {
 
       <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
 
-      {/* Current Rem - Quick Edit */}
-      <div className="mb-3 p-3 rounded" style={{
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        border: '2px solid #3b82f6',
-      }}>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs">✏️</span>
-          <span className="font-semibold text-xs" style={{ color: '#3b82f6' }}>Quick Edit: Current Rem</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start page:</label>
-            <input
-              ref={inputStartRef}
-              type="number"
-              min="1"
-              value={pageRangeStart}
-              onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
-              className="w-16 text-center p-1.5 rounded text-xs"
-              style={{
-                border: '1px solid var(--rn-clr-border-primary)',
-                backgroundColor: 'var(--rn-clr-background-primary)',
-                color: 'var(--rn-clr-content-primary)',
-              }}
-            />
+        {/* Current Rem - Quick Edit */}
+        <div className="mb-3 p-3 rounded" style={{
+          backgroundColor: 'var(--rn-clr-background-secondary)',
+          border: '2px solid #3b82f6',
+        }}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs">✏️</span>
+            <span className="font-semibold text-xs" style={{ color: '#3b82f6' }}>Quick Edit: Current Rem</span>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>End page:</label>
-            <input
-              type="number"
-              min={pageRangeStart}
-              value={pageRangeEnd || ''}
-              onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
-              placeholder="∞"
-              className="w-16 text-center p-1.5 rounded text-xs"
-              style={{
-                border: '1px solid var(--rn-clr-border-primary)',
-                backgroundColor: 'var(--rn-clr-background-primary)',
-                color: 'var(--rn-clr-content-primary)',
-              }}
-            />
-          </div>
-          <div className="flex-1" />
-          {pageRangeStart > 1 || pageRangeEnd > 0 ? (
-            <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>
-              Pages {pageRangeStart}-{pageRangeEnd || '∞'}
-            </span>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-tertiary)' }}>
-              All pages
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Available Ranges - Hint */}
-      {(() => {
-        const unassignedRanges = getUnassignedRanges();
-        return unassignedRanges.length > 0 ? (
-          <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
-            backgroundColor: '#fefce8',
-            border: '1px solid #fde047',
-          }}>
-            <span className="text-xs">💡</span>
-            <span className="text-xs font-medium" style={{ color: '#92400e' }}>Available ranges:</span>
-            <div className="text-xs flex flex-wrap gap-1">
-              {unassignedRanges.map((range, idx) => {
-                const endPageDisplay =
-                  range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
-                return (
-                  <span key={idx} className="px-1.5 py-0.5 rounded font-medium" style={{
-                    backgroundColor: '#fef9c3',
-                    color: '#854d0e',
-                  }}>
-                    {range.start}-{endPageDisplay}
-                  </span>
-                );
-              })}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start page:</label>
+              <input
+                ref={inputStartRef}
+                type="number"
+                min="1"
+                value={pageRangeStart}
+                onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
+                className="w-16 text-center p-1.5 rounded text-xs"
+                style={{
+                  border: '1px solid var(--rn-clr-border-primary)',
+                  backgroundColor: 'var(--rn-clr-background-primary)',
+                  color: 'var(--rn-clr-content-primary)',
+                }}
+              />
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>End page:</label>
+              <input
+                type="number"
+                min={pageRangeStart}
+                value={pageRangeEnd || ''}
+                onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
+                placeholder="∞"
+                className="w-16 text-center p-1.5 rounded text-xs"
+                style={{
+                  border: '1px solid var(--rn-clr-border-primary)',
+                  backgroundColor: 'var(--rn-clr-background-primary)',
+                  color: 'var(--rn-clr-content-primary)',
+                }}
+              />
+            </div>
+            <div className="flex-1" />
+            {pageRangeStart > 1 || pageRangeEnd > 0 ? (
+              <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>
+                Pages {pageRangeStart}-{pageRangeEnd || '∞'}
+              </span>
+            ) : (
+              <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-tertiary)' }}>
+                All pages
+              </span>
+            )}
           </div>
-        ) : (
-          <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
-            backgroundColor: '#fee2e2',
-            border: '1px solid #fca5a5',
-          }}>
-            <span className="text-xs">⚠️</span>
-            <span className="text-xs" style={{ color: '#991b1b' }}>
-              All pages are already assigned to other rems
-            </span>
-          </div>
-        );
-      })()}
-
-      {/* All Rems Using This PDF — hierarchical tree view */}
-      <div>
-        <div className="flex items-center justify-between py-1 px-1 mb-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs">📑</span>
-            <span className="font-semibold text-xs" style={{ color: 'var(--rn-clr-content-primary)' }}>All Rems Using This PDF</span>
-            <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>{treeItems.length}</span>
-          </div>
-          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>Click to expand</span>
         </div>
-        <div className="flex flex-col gap-1">
-          {treeItems.map((item) => (
-            <div key={item.remId} className="relative" style={{ marginLeft: item.depth * INDENT_PX }}>
-              {/* Overlap warning inline via hasOverlap prop */}
-              <PdfRemItem
+
+        {/* Available Ranges - Hint */}
+        {(() => {
+          const unassignedRanges = getUnassignedRanges();
+          return unassignedRanges.length > 0 ? (
+            <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
+              backgroundColor: '#fefce8',
+              border: '1px solid #fde047',
+            }}>
+              <span className="text-xs">💡</span>
+              <span className="text-xs font-medium" style={{ color: '#92400e' }}>Available ranges:</span>
+              <div className="text-xs flex flex-wrap gap-1">
+                {unassignedRanges.map((range, idx) => {
+                  const endPageDisplay =
+                    range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
+                  return (
+                    <span key={idx} className="px-1.5 py-0.5 rounded font-medium" style={{
+                      backgroundColor: '#fef9c3',
+                      color: '#854d0e',
+                    }}>
+                      {range.start}-{endPageDisplay}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
+              backgroundColor: '#fee2e2',
+              border: '1px solid #fca5a5',
+            }}>
+              <span className="text-xs">⚠️</span>
+              <span className="text-xs" style={{ color: '#991b1b' }}>
+                All pages are already assigned to other rems
+              </span>
+            </div>
+          );
+        })()}
+
+        {/* All Rems Using This PDF — hierarchical tree view */}
+        <div>
+          <div className="flex items-center justify-between py-1 px-1 mb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs">📑</span>
+              <span className="font-semibold text-xs" style={{ color: 'var(--rn-clr-content-primary)' }}>All Rems Using This PDF</span>
+              <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>{treeItems.length}</span>
+            </div>
+            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>Click to expand</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {treeItems.map((item) => (
+              <div key={item.remId} className="relative" style={{ marginLeft: item.depth * INDENT_PX }}>
+                {/* Overlap warning inline via hasOverlap prop */}
+                <PdfRemItem
                   item={item}
                   isCurrentRem={item.remId === contextData?.incrementalRemId}
                   isExpanded={expandedRems.has(item.remId)}
@@ -752,10 +752,10 @@ function PageRangeWidget() {
                     pageRangeInputRefs.current[item.remId].end = el;
                   }}
                 />
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
       </div>
 
       {/* Footer */}
