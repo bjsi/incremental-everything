@@ -468,6 +468,7 @@ export function PriorityEditor() {
                       autoFocus
                       type="number" min="1" value={pdfEdit.start}
                       onChange={(e) => setPdfEdit({ ...pdfEdit, start: parseInt(e.target.value) || 1 })}
+                      onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => { if (e.key === 'Tab') { e.preventDefault(); pdfEndRef.current?.focus(); } }}
                       className="w-14 text-center p-1 rounded text-[11px]"
                       style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }} />
@@ -477,6 +478,7 @@ export function PriorityEditor() {
                       type="number" min={pdfEdit.start} value={pdfEdit.end || ''}
                       placeholder="∞"
                       onChange={(e) => setPdfEdit({ ...pdfEdit, end: parseInt(e.target.value) || 0 })}
+                      onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => { if (e.key === 'Tab') { e.preventDefault(); pdfStartRef.current?.focus(); } }}
                       className="w-14 text-center p-1 rounded text-[11px]"
                       style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }} />
@@ -507,6 +509,7 @@ export function PriorityEditor() {
                         max={rangeEnd ?? undefined}
                         value={pdfEdit.page}
                         onChange={(e) => setPdfEdit({ ...pdfEdit, page: parseInt(e.target.value) || rangeStart })}
+                        onFocus={(e) => e.target.select()}
                         className="w-20 text-center p-1 rounded text-[11px]"
                         style={{
                           border: `1px solid ${outOfRange ? '#ef4444' : 'var(--rn-clr-border-primary)'}`,
