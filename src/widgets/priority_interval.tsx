@@ -11,13 +11,10 @@ import {
     prioritySlotCode,
     defaultPriorityId,
     initialIntervalId,
+    pendingIntervalBatchSaveKey,
 } from '../lib/consts';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
-import { updateSRSDataForRem } from '../lib/scheduler';
-import { IncrementalRep } from '../lib/incremental_rem/types';
 import dayjs from 'dayjs';
 
 function PriorityInterval() {
@@ -138,82 +135,34 @@ function PriorityInterval() {
         }
     };
 
-    // Helper: apply priority + interval to a single rem
-    const applyPriorityAndInterval = async (
-        remId: string,
-        effectivePriority: number,
-        effectiveInterval: number,
-    ) => {
-        const rem = await plugin.rem.findOne(remId);
-        if (!rem) return;
-
-        // Save priority
-        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [effectivePriority.toString()]);
-
-        // Save interval (SRS schedule)
-        const incRem = await getIncrementalRemFromRem(plugin, rem);
-        if (incRem) {
-            const newNextRepDate = Date.now() + effectiveInterval * 1000 * 60 * 60 * 24;
-            const scheduledDate = incRem.nextRepDate || Date.now();
-            const actualDate = Date.now();
-            const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-            const wasEarly = daysDifference < 0;
-            const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-
-            const newHistory: IncrementalRep[] = [
-                ...(incRem.history || []),
-                {
-                    date: actualDate,
-                    scheduled: scheduledDate,
-                    interval: effectiveInterval,
-                    wasEarly,
-                    daysEarlyOrLate,
-                    reviewTimeSeconds: undefined,
-                    priority: effectivePriority,
-                    eventType: 'rescheduledInEditor',
-                },
-            ];
-
-            await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
-        }
-
-        // Update cache
-        const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-        if (updatedIncRem) {
-            await updateIncrementalRemCache(plugin, updatedIncRem);
-        }
-
-        plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
-    };
-
+    // handleSave: writes job to session storage, closes popup immediately.
+    // ALL heavy work (DB writes, cache, cascade) is delegated to the tracker
+    // watcher in tracker.ts, which runs in the persistent index iframe and
+    // cannot be killed by popup teardown.
     const handleSave = useCallback(async (overrideInterval?: number) => {
         if (!data || !data.rem || isSaving.current) return;
         isSaving.current = true;
 
-        // Suppress GlobalRemChanged
-        await plugin.storage.setSession('plugin_operation_active', true);
-
-        let triggeredCascade = false;
         try {
             const effectivePriority = priorityVal ?? data.defaultPriority;
             const effectiveInterval = overrideInterval !== undefined
                 ? overrideInterval
                 : (intervalVal !== null ? parseInt(intervalVal) : data.defaultInterval);
 
-            if (isNaN(effectiveInterval)) {
-                return;
-            }
+            if (isNaN(effectiveInterval)) return;
 
-            // Determine which rems to update
             const remIdsToUpdate = (isBatchMode && batchRemIds && batchRemIds.length > 0)
                 ? batchRemIds
                 : [data.remId];
 
-            for (const remId of remIdsToUpdate) {
-                await applyPriorityAndInterval(remId, effectivePriority, effectiveInterval);
-            }
+            if (remIdsToUpdate.length === 0) return;
 
-            triggeredCascade = true;
+            // Write the job — one await, then close immediately.
+            await plugin.storage.setSession(pendingIntervalBatchSaveKey, {
+                remIds: remIdsToUpdate,
+                priority: effectivePriority,
+                interval: effectiveInterval,
+            });
 
             // Clean up batch session storage
             if (isBatchMode) {
@@ -223,11 +172,6 @@ function PriorityInterval() {
             plugin.widget.closePopup();
         } finally {
             isSaving.current = false;
-            // Only clear the flag if no cascade was triggered.
-            // If cascade IS pending, leave the flag up — the cascade tracker will clear it.
-            if (!triggeredCascade) {
-                await plugin.storage.setSession('plugin_operation_active', false);
-            }
         }
     }, [data, priorityVal, intervalVal, plugin, isBatchMode, batchRemIds]);
 

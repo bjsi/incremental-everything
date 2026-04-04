@@ -86,6 +86,10 @@ export const pendingPrioritySaveKey = 'pendingPrioritySave';
 // Pending card priority removal job: written by the Priority popup before closing,
 // picked up and executed by tracker.ts. Allows instant popup close per fire-and-forget philosophy.
 export const pendingCardPriorityRemovalKey = 'pendingCardPriorityRemoval';
+// Batch priority+interval save job: written by priority_interval.tsx (popup) before closing,
+// picked up by tracker.ts in the persistent index widget. Contains all remIds + the chosen
+// priority and interval so the popup can close instantly and let the tracker do all DB writes.
+export const pendingIntervalBatchSaveKey = 'pendingIntervalBatchSave';
 // Delta queue for quick increase/decrease priority commands.
 // Each keypress APPENDS a delta entry here; the tracker drains them all atomically.
 // This prevents the last-write-wins race that plagued the single-slot pendingPrioritySaveKey approach.
