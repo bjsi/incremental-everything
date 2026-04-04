@@ -28,6 +28,7 @@ interface PdfRemItemProps {
   isCurrentRem: boolean;
   isExpanded: boolean;
   hasOverlap?: boolean;
+  coverageInfo?: { coveredPages: number; parentPages: number };
   priorityInfo?: { absolute: number; percentile: number | null };
   statistics?: { totalTimeSeconds: number; sessionsWithTime: number };
   history?: PageHistoryEntry[];
@@ -51,6 +52,7 @@ export function PdfRemItem({
   isCurrentRem,
   isExpanded,
   hasOverlap,
+  coverageInfo,
   priorityInfo,
   statistics,
   history,
@@ -118,6 +120,40 @@ export function PdfRemItem({
             }}
           >
             ⚠ overlap
+          </span>
+        )}
+        {coverageInfo && (
+          <span
+            title={`${coverageInfo.coveredPages} of ${coverageInfo.parentPages} pages covered by sub-rems (${Math.round((coverageInfo.coveredPages / coverageInfo.parentPages) * 100)}%)`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: '10px',
+              color: 'var(--rn-clr-content-tertiary)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {/* Mini fill bar */}
+            <span style={{
+              display: 'inline-block',
+              width: 28,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: '#cbd5e1',
+              overflow: 'hidden',
+              flexShrink: 0,
+            }}>
+              <span style={{
+                display: 'block',
+                width: `${Math.round((coverageInfo.coveredPages / coverageInfo.parentPages) * 100)}%`,
+                height: '100%',
+                backgroundColor: '#3b82f6',
+                borderRadius: 2,
+              }} />
+            </span>
+            {coverageInfo.coveredPages}/{coverageInfo.parentPages}pp
           </span>
         )}
         {item.currentPage && (

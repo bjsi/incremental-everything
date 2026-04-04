@@ -482,6 +482,7 @@ function PageRangeWidget() {
       depth: number;
       parentId: string | null;
       hasOverlap: boolean;
+      childCoverage?: { coveredPages: number; parentPages: number };
     };
 
     const contains = (
@@ -552,6 +553,46 @@ function PageRangeWidget() {
             withRange[j].hasOverlap = true;
           }
         }
+      }
+    }
+
+    // Step 4: compute child coverage for each parent with a finite range.
+    // We take the union of direct children's ranges (merged intervals), clamp
+    // to the parent's bounds, and sum the covered page count.
+    for (const [parentId, children] of childrenOf.entries()) {
+      if (!parentId) continue; // skip root group
+      const parent = items.find(i => i.remId === parentId);
+      if (!parent?.range || parent.range.end === null) continue; // need finite bounds
+
+      const childRanges = children
+        .filter(c => c.range && c.range.end !== null)
+        .map(c => ({ start: c.range!.start, end: c.range!.end as number }))
+        .sort((a, b) => a.start - b.start);
+      if (childRanges.length === 0) continue;
+
+      // Merge overlapping child intervals
+      const merged: { start: number; end: number }[] = [];
+      for (const r of childRanges) {
+        if (merged.length === 0 || r.start > merged[merged.length - 1].end) {
+          merged.push({ ...r });
+        } else {
+          merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, r.end);
+        }
+      }
+
+      // Sum pages covered within parent range
+      const pStart = parent.range.start;
+      const pEnd = parent.range.end;
+      let coveredPages = 0;
+      for (const r of merged) {
+        const lo = Math.max(r.start, pStart);
+        const hi = Math.min(r.end, pEnd);
+        if (hi >= lo) coveredPages += hi - lo + 1;
+      }
+
+      const parentPages = pEnd - pStart + 1;
+      if (coveredPages > 0) {
+        parent.childCoverage = { coveredPages, parentPages };
       }
     }
 
@@ -729,6 +770,7 @@ function PageRangeWidget() {
                   isCurrentRem={item.remId === contextData?.incrementalRemId}
                   isExpanded={expandedRems.has(item.remId)}
                   hasOverlap={item.hasOverlap}
+                  coverageInfo={item.childCoverage}
                   priorityInfo={remPriorities[item.remId]}
                   statistics={remStatistics[item.remId]}
                   history={remHistories[item.remId]}
