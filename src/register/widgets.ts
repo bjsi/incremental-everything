@@ -107,6 +107,13 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerWidget('queue_toolbar_priority', WidgetLocation.QueueToolbar, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
+
   plugin.app.registerWidget('review_document_creator', WidgetLocation.Popup, {
     dimensions: {
       width: 500,

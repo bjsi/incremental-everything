@@ -15,6 +15,7 @@ import {
   showRemsAsIsolatedInQueueId,
   displayFsrsDsrId,
   fsrsWeightsId,
+  displayQueueToolbarPriorityId,
 } from '../lib/consts';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
@@ -197,6 +198,14 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Display Priority Shield in Queue',
     description:
       'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
+    defaultValue: true,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: displayQueueToolbarPriorityId,
+    title: 'Display Priority in Queue Toolbar',
+    description:
+      'If enabled, exhibits the PriorityBadge of the current flashcard or IncRem at the top right of the queue.',
     defaultValue: true,
   });
 
