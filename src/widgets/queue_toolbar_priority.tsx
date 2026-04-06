@@ -43,10 +43,10 @@ function QueueToolbarPriority() {
         // ignore
       }
     };
-    
+
     checkCard();
     const intervalId = setInterval(checkCard, 500);
-    
+
     return () => {
       isMounted = false;
       clearInterval(intervalId);
@@ -92,7 +92,7 @@ function QueueToolbarPriority() {
     },
     [useLightMode]
   );
-  
+
   // Card light data
   const lightCardInfo = useTrackerPlugin(async (rp) => {
     if (!contextData?.rem || contextData.incRemInfo) return null;
@@ -117,13 +117,13 @@ function QueueToolbarPriority() {
     priority = incRemInfo.priority;
     source = 'incremental';
     if (!useLightMode && allIncRems.length > 0) {
-       percentile = calculateRelativePercentile(allIncRems, incRemInfo.remId);
+      percentile = calculateRelativePercentile(allIncRems, incRemInfo.remId);
     }
   } else {
     // Card logic
     const cardCacheInfo = allPrioritizedCardInfo?.find(info => info.remId === rem._id);
     const finalCardInfo = cardCacheInfo || lightCardInfo;
-    
+
     if (finalCardInfo) {
       priority = finalCardInfo.priority;
       source = finalCardInfo.source;
@@ -141,7 +141,9 @@ function QueueToolbarPriority() {
       style={{
         display: 'flex',
         alignItems: 'center',
-        padding: '0 8px',
+        justifyContent: 'center',
+        padding: '0.5rem 0',
+        margin: '0 0.5rem',
         cursor: 'pointer',
       }}
       onClick={async () => {
@@ -149,13 +151,13 @@ function QueueToolbarPriority() {
       }}
       title="Click to change priority for this item"
     >
-      <PriorityBadge 
-         priority={priority} 
-         percentile={percentile === null ? undefined : percentile} 
-         compact 
-         useAbsoluteColoring={useLightMode || (percentile === null || percentile === undefined)} 
-         source={source} 
-         isCardPriority={!incRemInfo} 
+      <PriorityBadge
+        priority={priority}
+        percentile={percentile === null ? undefined : percentile}
+        compact
+        useAbsoluteColoring={useLightMode || (percentile === null || percentile === undefined)}
+        source={source}
+        isCardPriority={!incRemInfo}
       />
     </div>
   );
