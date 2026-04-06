@@ -252,6 +252,7 @@ function Priority() {
 
 
 
+      console.log(`[Priority Widget Diagnostics] Rem ${rem._id} card data fetched. hasPowerup: ${hasPowerup}, hasCards: ${hasCards}, priority: ${cardPriorityInfo?.priority}, source: ${cardPriorityInfo?.source}`);
       return {
         hasCards,
         cardInfo: cardPriorityInfo,
@@ -270,7 +271,8 @@ function Priority() {
   // but we will conditionally *show* the UI in 'full' mode only.
   const ancestorPriorityInfo = useTrackerPlugin(async (plugin) => {
     if (!rem) return null;
-    return await findClosestAncestorWithAnyPriority(plugin, rem);
+    const result = await findClosestAncestorWithAnyPriority(plugin, rem);
+    return result;
   }, [rem]);
 
   // Asynchronous Derived Data Hook
