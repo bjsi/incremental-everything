@@ -275,9 +275,19 @@ export function PriorityEditor() {
                 gap: 2,
                 color: remData.pdfRange ? 'var(--rn-clr-content-secondary)' : 'var(--rn-clr-content-tertiary)',
                 opacity: remData.pdfRange ? 1 : 0.55,
+                whiteSpace: 'nowrap',
               }}
             >
-              📄{remData.pdfRange ? ` p.${remData.pdfRange.start}–${remData.pdfRange.end || '∞'}` : ' —'}
+              📄{remData.pdfRange ? (
+                <>
+                  {` p.${remData.pdfRange.start}–${remData.pdfRange.end || '∞'}`}
+                  {remData.pdfHistory && remData.pdfHistory.length > 0 && (
+                    <span style={{ color: '#10b981', marginLeft: '2px' }}>
+                      ({remData.pdfHistory[remData.pdfHistory.length - 1].page})
+                    </span>
+                  )}
+                </>
+              ) : ' —'}
             </span>
           )}
         </div>
@@ -447,8 +457,13 @@ export function PriorityEditor() {
                 </div>
                 {remData.pdfRange ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                    style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-secondary)' }}>
+                    style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-secondary)', whiteSpace: 'nowrap' }}>
                     p.{remData.pdfRange.start}–{remData.pdfRange.end || '∞'}
+                    {remData.pdfHistory && remData.pdfHistory.length > 0 && (
+                      <span style={{ color: '#10b981', marginLeft: '2px' }}>
+                        ({remData.pdfHistory[remData.pdfHistory.length - 1].page})
+                      </span>
+                    )}
                   </span>
                 ) : (
                   <span className="text-[10px]" style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.6 }}>No range</span>
