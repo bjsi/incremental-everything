@@ -145,7 +145,7 @@ export async function findAllRemsForPDFAsTree(
   plugin: RNPlugin,
   pdfRemId: string
 ): Promise<ParentTreeNode[]> {
-  console.log('[ParentSelector:TreeHelpers] findAllRemsForPDFAsTree called with pdfRemId:', pdfRemId);
+  // console.log('[ParentSelector:TreeHelpers] findAllRemsForPDFAsTree called with pdfRemId:', pdfRemId);
 
   const cacheKey = getRootCandidatesCacheKey(pdfRemId);
   const cachedData = await plugin.storage.getSession<RootCandidatesCache>(cacheKey);
@@ -153,21 +153,21 @@ export async function findAllRemsForPDFAsTree(
   // Check if we have valid cached data
   if (cachedData && cachedData.sourceRemId === pdfRemId) {
     const age = Date.now() - cachedData.timestamp;
-    console.log('[ParentSelector:TreeHelpers] ✓ CACHE HIT! Age:', Math.round(age / 1000), 'seconds');
+    // console.log('[ParentSelector:TreeHelpers] ✓ CACHE HIT! Age:', Math.round(age / 1000), 'seconds');
 
     if (age < ROOT_CANDIDATES_CACHE_TTL) {
       // Cache is fresh - return immediately and refresh in background
-      console.log('[ParentSelector:TreeHelpers] Returning cached candidates:', cachedData.candidates.length);
+      // console.log('[ParentSelector:TreeHelpers] Returning cached candidates:', cachedData.candidates.length);
 
       // Trigger background refresh (don't await)
       refreshRootCandidatesForPDFInBackground(plugin, pdfRemId);
 
       return cachedData.candidates;
     } else {
-      console.log('[ParentSelector:TreeHelpers] Cache expired, performing full search');
+      // console.log('[ParentSelector:TreeHelpers] Cache expired, performing full search');
     }
   } else {
-    console.log('[ParentSelector:TreeHelpers] ✗ CACHE MISS - performing full search');
+    // console.log('[ParentSelector:TreeHelpers] ✗ CACHE MISS - performing full search');
   }
 
   // Cache miss or expired - perform full search
@@ -180,7 +180,7 @@ export async function findAllRemsForPDFAsTree(
     timestamp: Date.now()
   };
   await plugin.storage.setSession(cacheKey, newCache);
-  console.log('[ParentSelector:TreeHelpers] Stored', result.length, 'candidates in cache');
+  // console.log('[ParentSelector:TreeHelpers] Stored', result.length, 'candidates in cache');
 
   return result;
 }
@@ -197,7 +197,7 @@ async function performFullPDFSearch(
   const processedRemIds = new Set<string>();
 
   const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-  console.log('[ParentSelector:TreeHelpers] [FullSearch] Found', allIncrementalRems.length, 'incremental rems in cache');
+  // console.log('[ParentSelector:TreeHelpers] [FullSearch] Found', allIncrementalRems.length, 'incremental rems in cache');
 
   // PART 1: Search all incremental rems from cache
   for (const incRemInfo of allIncrementalRems) {
@@ -215,14 +215,14 @@ async function performFullPDFSearch(
       const node = await createTreeNode(plugin, rem, allIncrementalRems, 0, null);
       result.push(node);
       processedRemIds.add(rem._id);
-      console.log('[ParentSelector:TreeHelpers] [FullSearch] Added root candidate (incremental):', node.name);
+      // console.log('[ParentSelector:TreeHelpers] [FullSearch] Added root candidate (incremental):', node.name);
     }
   }
 
   // PART 2: Check known rems from storage
   const knownRemsKey = `known_pdf_rems_${pdfRemId}`;
   const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
-  console.log('[ParentSelector:TreeHelpers] [FullSearch] Found', knownRemIds.length, 'known rems in storage');
+  // console.log('[ParentSelector:TreeHelpers] [FullSearch] Found', knownRemIds.length, 'known rems in storage');
 
   for (const remId of knownRemIds) {
     if (processedRemIds.has(remId)) continue;
@@ -238,7 +238,7 @@ async function performFullPDFSearch(
       const node = await createTreeNode(plugin, rem, allIncrementalRems, 0, null);
       result.push(node);
       processedRemIds.add(rem._id);
-      console.log('[ParentSelector:TreeHelpers] [FullSearch] Added root candidate (known):', node.name);
+      // console.log('[ParentSelector:TreeHelpers] [FullSearch] Added root candidate (known):', node.name);
     }
   }
 
@@ -255,7 +255,7 @@ async function performFullPDFSearch(
     return a.name.localeCompare(b.name);
   });
 
-  console.log('[ParentSelector:TreeHelpers] [FullSearch] Total root candidates:', result.length);
+  // console.log('[ParentSelector:TreeHelpers] [FullSearch] Total root candidates:', result.length);
   return result;
 }
 
@@ -267,7 +267,7 @@ export async function refreshRootCandidatesForPDFInBackground(
   plugin: RNPlugin,
   pdfRemId: string
 ): Promise<void> {
-  console.log('[ParentSelector:TreeHelpers] [Background] Starting refresh for PDF:', pdfRemId);
+  // console.log('[ParentSelector:TreeHelpers] [Background] Starting refresh for PDF:', pdfRemId);
 
   try {
     const result = await performFullPDFSearch(plugin, pdfRemId);
@@ -284,7 +284,7 @@ export async function refreshRootCandidatesForPDFInBackground(
     const signalKey = getCacheRefreshSignalKey(pdfRemId);
     await plugin.storage.setSession(signalKey, Date.now());
 
-    console.log('[ParentSelector:TreeHelpers] [Background] Refresh complete. Candidates:', result.length);
+    // console.log('[ParentSelector:TreeHelpers] [Background] Refresh complete. Candidates:', result.length);
   } catch (error) {
     console.error('[ParentSelector:TreeHelpers] [Background] Error during refresh:', error);
   }
@@ -301,7 +301,7 @@ export async function findAllRemsForHTMLAsTree(
   plugin: RNPlugin,
   htmlRemId: string
 ): Promise<ParentTreeNode[]> {
-  console.log('[ParentSelector:TreeHelpers] findAllRemsForHTMLAsTree called with htmlRemId:', htmlRemId);
+  // console.log('[ParentSelector:TreeHelpers] findAllRemsForHTMLAsTree called with htmlRemId:', htmlRemId);
 
   const cacheKey = getRootCandidatesCacheKey(htmlRemId);
   const cachedData = await plugin.storage.getSession<RootCandidatesCache>(cacheKey);
@@ -309,20 +309,20 @@ export async function findAllRemsForHTMLAsTree(
   // Check if we have valid cached data
   if (cachedData && cachedData.sourceRemId === htmlRemId) {
     const age = Date.now() - cachedData.timestamp;
-    console.log('[ParentSelector:TreeHelpers] ✓ HTML CACHE HIT! Age:', Math.round(age / 1000), 'seconds');
+    // console.log('[ParentSelector:TreeHelpers] ✓ HTML CACHE HIT! Age:', Math.round(age / 1000), 'seconds');
 
     if (age < ROOT_CANDIDATES_CACHE_TTL) {
-      console.log('[ParentSelector:TreeHelpers] Returning cached HTML candidates:', cachedData.candidates.length);
+      // console.log('[ParentSelector:TreeHelpers] Returning cached HTML candidates:', cachedData.candidates.length);
 
       // Trigger background refresh (don't await)
       refreshRootCandidatesForHTMLInBackground(plugin, htmlRemId);
 
       return cachedData.candidates;
     } else {
-      console.log('[ParentSelector:TreeHelpers] HTML cache expired, performing full search');
+      // console.log('[ParentSelector:TreeHelpers] HTML cache expired, performing full search');
     }
   } else {
-    console.log('[ParentSelector:TreeHelpers] ✗ HTML CACHE MISS - performing full search');
+    // console.log('[ParentSelector:TreeHelpers] ✗ HTML CACHE MISS - performing full search');
   }
 
   // Cache miss or expired - perform full search
@@ -335,7 +335,7 @@ export async function findAllRemsForHTMLAsTree(
     timestamp: Date.now()
   };
   await plugin.storage.setSession(cacheKey, newCache);
-  console.log('[ParentSelector:TreeHelpers] Stored', result.length, 'HTML candidates in cache');
+  // console.log('[ParentSelector:TreeHelpers] Stored', result.length, 'HTML candidates in cache');
 
   return result;
 }
@@ -351,7 +351,7 @@ async function performFullHTMLSearch(
   const processedRemIds = new Set<string>();
 
   const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
-  console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Found', allIncrementalRems.length, 'incremental rems in cache');
+  // console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Found', allIncrementalRems.length, 'incremental rems in cache');
 
   // PART 1: Search all incremental rems from cache
   for (const incRemInfo of allIncrementalRems) {
@@ -371,14 +371,14 @@ async function performFullHTMLSearch(
       const node = await createTreeNode(plugin, rem, allIncrementalRems, 0, null);
       result.push(node);
       processedRemIds.add(rem._id);
-      console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Added root candidate (incremental):', node.name);
+      // console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Added root candidate (incremental):', node.name);
     }
   }
 
   // PART 2: Check known rems from storage
   const knownRemsKey = getKnownHtmlRemsKey(htmlRemId);
   const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
-  console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Found', knownRemIds.length, 'known HTML rems in storage');
+  // console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Found', knownRemIds.length, 'known HTML rems in storage');
 
   for (const remId of knownRemIds) {
     if (processedRemIds.has(remId)) continue;
@@ -395,7 +395,7 @@ async function performFullHTMLSearch(
       const node = await createTreeNode(plugin, rem, allIncrementalRems, 0, null);
       result.push(node);
       processedRemIds.add(rem._id);
-      console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Added root candidate (known):', node.name);
+      // console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Added root candidate (known):', node.name);
     }
   }
 
@@ -412,7 +412,7 @@ async function performFullHTMLSearch(
     return a.name.localeCompare(b.name);
   });
 
-  console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Total root candidates:', result.length);
+  // console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Total root candidates:', result.length);
   return result;
 }
 
@@ -423,7 +423,7 @@ export async function refreshRootCandidatesForHTMLInBackground(
   plugin: RNPlugin,
   htmlRemId: string
 ): Promise<void> {
-  console.log('[ParentSelector:TreeHelpers] [Background] Starting refresh for HTML:', htmlRemId);
+  // console.log('[ParentSelector:TreeHelpers] [Background] Starting refresh for HTML:', htmlRemId);
 
   try {
     const result = await performFullHTMLSearch(plugin, htmlRemId);
@@ -440,7 +440,7 @@ export async function refreshRootCandidatesForHTMLInBackground(
     const signalKey = getCacheRefreshSignalKey(htmlRemId);
     await plugin.storage.setSession(signalKey, Date.now());
 
-    console.log('[ParentSelector:TreeHelpers] [Background] HTML refresh complete. Candidates:', result.length);
+    // console.log('[ParentSelector:TreeHelpers] [Background] HTML refresh complete. Candidates:', result.length);
   } catch (error) {
     console.error('[ParentSelector:TreeHelpers] [Background] Error during HTML refresh:', error);
   }
@@ -459,15 +459,15 @@ export async function getLastSelectedDestination(
 ): Promise<RemId | null> {
   const key = getLastDestinationKey(pdfRemId, contextRemId);
 
-  console.log('[ParentSelector:TreeHelpers] ========== GET LAST DESTINATION ==========');
-  console.log('[ParentSelector:TreeHelpers] pdfRemId:', pdfRemId);
-  console.log('[ParentSelector:TreeHelpers] contextRemId:', contextRemId);
-  console.log('[ParentSelector:TreeHelpers] Generated storage key:', key);
+  // console.log('[ParentSelector:TreeHelpers] ========== GET LAST DESTINATION ==========');
+  // console.log('[ParentSelector:TreeHelpers] pdfRemId:', pdfRemId);
+  // console.log('[ParentSelector:TreeHelpers] contextRemId:', contextRemId);
+  // console.log('[ParentSelector:TreeHelpers] Generated storage key:', key);
 
   const stored = await plugin.storage.getSynced<RemId | null>(key);
 
-  console.log('[ParentSelector:TreeHelpers] Retrieved value:', stored);
-  console.log('[ParentSelector:TreeHelpers] ==========================================');
+  // console.log('[ParentSelector:TreeHelpers] Retrieved value:', stored);
+  // console.log('[ParentSelector:TreeHelpers] ==========================================');
 
   return stored || null;
 }
@@ -485,19 +485,19 @@ export async function saveLastSelectedDestination(
 ): Promise<void> {
   const key = getLastDestinationKey(pdfRemId, contextRemId);
 
-  console.log('[ParentSelector:TreeHelpers] ========== SAVE LAST DESTINATION ==========');
-  console.log('[ParentSelector:TreeHelpers] pdfRemId:', pdfRemId);
-  console.log('[ParentSelector:TreeHelpers] contextRemId:', contextRemId);
-  console.log('[ParentSelector:TreeHelpers] destinationRemId:', destinationRemId);
-  console.log('[ParentSelector:TreeHelpers] Generated storage key:', key);
+  // console.log('[ParentSelector:TreeHelpers] ========== SAVE LAST DESTINATION ==========');
+  // console.log('[ParentSelector:TreeHelpers] pdfRemId:', pdfRemId);
+  // console.log('[ParentSelector:TreeHelpers] contextRemId:', contextRemId);
+  // console.log('[ParentSelector:TreeHelpers] destinationRemId:', destinationRemId);
+  // console.log('[ParentSelector:TreeHelpers] Generated storage key:', key);
 
   await plugin.storage.setSynced(key, destinationRemId);
 
   // Verify it was saved
   const verification = await plugin.storage.getSynced<RemId | null>(key);
-  console.log('[ParentSelector:TreeHelpers] Verification - stored value:', verification);
-  console.log('[ParentSelector:TreeHelpers] Save successful:', verification === destinationRemId);
-  console.log('[ParentSelector:TreeHelpers] ===========================================');
+  // console.log('[ParentSelector:TreeHelpers] Verification - stored value:', verification);
+  // console.log('[ParentSelector:TreeHelpers] Save successful:', verification === destinationRemId);
+  // console.log('[ParentSelector:TreeHelpers] ===========================================');
 }
 
 /**
@@ -512,30 +512,30 @@ export async function expandToLastDestination(
   lastDestinationId: RemId,
   allIncrementalRems: IncrementalRem[]
 ): Promise<{ tree: ParentTreeNode[]; foundIndex: number }> {
-  console.log('[ParentSelector:TreeHelpers] ========== EXPAND TO LAST DESTINATION ==========');
-  console.log('[ParentSelector:TreeHelpers] lastDestinationId:', lastDestinationId);
-  console.log('[ParentSelector:TreeHelpers] Root candidates:', tree.map(n => ({ id: n.remId, name: n.name })));
+  // console.log('[ParentSelector:TreeHelpers] ========== EXPAND TO LAST DESTINATION ==========');
+  // console.log('[ParentSelector:TreeHelpers] lastDestinationId:', lastDestinationId);
+  // console.log('[ParentSelector:TreeHelpers] Root candidates:', tree.map(n => ({ id: n.remId, name: n.name })));
 
   // Build a Set of root candidate IDs for quick lookup
   const rootCandidateIds = new Set(tree.map(n => n.remId));
-  console.log('[ParentSelector:TreeHelpers] Root candidate IDs:', Array.from(rootCandidateIds));
+  // console.log('[ParentSelector:TreeHelpers] Root candidate IDs:', Array.from(rootCandidateIds));
 
   // First, check if the destination is in the root level
   const rootIndex = tree.findIndex(node => node.remId === lastDestinationId);
   if (rootIndex !== -1) {
-    console.log('[ParentSelector:TreeHelpers] Found in root level at index:', rootIndex);
+    // console.log('[ParentSelector:TreeHelpers] Found in root level at index:', rootIndex);
     return { tree, foundIndex: rootIndex };
   }
 
   // Not in root - need to find the path from destination up to a root candidate
   const destinationRem = await plugin.rem.findOne(lastDestinationId);
   if (!destinationRem) {
-    console.log('[ParentSelector:TreeHelpers] ERROR: Destination rem not found!');
+    // console.log('[ParentSelector:TreeHelpers] ERROR: Destination rem not found!');
     return { tree, foundIndex: -1 };
   }
 
   const destName = await safeRemTextToString(plugin, destinationRem.text);
-  console.log('[ParentSelector:TreeHelpers] Destination rem found:', destName);
+  // console.log('[ParentSelector:TreeHelpers] Destination rem found:', destName);
 
   // Build the path from destination UP to a root candidate
   // pathFromRootToDestination will be [rootCandidate, child1, child2, ..., destination]
@@ -545,18 +545,18 @@ export async function expandToLastDestination(
   let iterations = 0;
   const maxIterations = 50; // Safety limit
 
-  console.log('[ParentSelector:TreeHelpers] Building ancestry path...');
+  // console.log('[ParentSelector:TreeHelpers] Building ancestry path...');
 
   while (currentRem && currentRem.parent && iterations < maxIterations) {
     iterations++;
     const parentId = currentRem.parent;
 
-    console.log('[ParentSelector:TreeHelpers]   Checking parent:', parentId);
+    // console.log('[ParentSelector:TreeHelpers]   Checking parent:', parentId);
 
     // Check if this parent is a root candidate
     if (rootCandidateIds.has(parentId)) {
       foundRootId = parentId;
-      console.log('[ParentSelector:TreeHelpers]   FOUND ROOT CANDIDATE:', parentId);
+      // console.log('[ParentSelector:TreeHelpers]   FOUND ROOT CANDIDATE:', parentId);
       break;
     }
 
@@ -565,7 +565,7 @@ export async function expandToLastDestination(
 
     const parentRem = await plugin.rem.findOne(parentId);
     if (!parentRem) {
-      console.log('[ParentSelector:TreeHelpers]   Parent rem not found, stopping');
+      // console.log('[ParentSelector:TreeHelpers]   Parent rem not found, stopping');
       break;
     }
 
@@ -573,8 +573,8 @@ export async function expandToLastDestination(
   }
 
   if (!foundRootId) {
-    console.log('[ParentSelector:TreeHelpers] ERROR: Could not find a root candidate in ancestry chain');
-    console.log('[ParentSelector:TreeHelpers] Path traversed:', pathFromDestToRoot);
+    // console.log('[ParentSelector:TreeHelpers] ERROR: Could not find a root candidate in ancestry chain');
+    // console.log('[ParentSelector:TreeHelpers] Path traversed:', pathFromDestToRoot);
     return { tree, foundIndex: -1 };
   }
 
@@ -587,11 +587,11 @@ export async function expandToLastDestination(
   // We need to expand: rootCandidate -> pathFromDestToRoot[0] -> ... -> destination
   const fullPathToExpand = [foundRootId, ...pathFromDestToRoot];
 
-  console.log('[ParentSelector:TreeHelpers] Full path to expand (root to destination):');
+  // console.log('[ParentSelector:TreeHelpers] Full path to expand (root to destination):');
   for (const id of fullPathToExpand) {
     const rem = await plugin.rem.findOne(id);
     const name = rem ? await safeRemTextToString(plugin, rem.text) : 'unknown';
-    console.log('[ParentSelector:TreeHelpers]   -', id, ':', name);
+    // console.log('[ParentSelector:TreeHelpers]   -', id, ':', name);
   }
 
   // Now expand each node along the path (except the last one, which is the destination)
@@ -627,7 +627,7 @@ export async function expandToLastDestination(
     const nodeIdToExpand = fullPathToExpand[i];
     const nextNodeId = fullPathToExpand[i + 1];
 
-    console.log('[ParentSelector:TreeHelpers] Expanding node:', nodeIdToExpand, 'to reveal:', nextNodeId);
+    // console.log('[ParentSelector:TreeHelpers] Expanding node:', nodeIdToExpand, 'to reveal:', nextNodeId);
 
     // Find the node to expand (either in root or nested)
     let nodeToExpand: ParentTreeNode | undefined;
@@ -646,20 +646,20 @@ export async function expandToLastDestination(
     nodeToExpand = findNode(updatedTree);
 
     if (!nodeToExpand) {
-      console.log('[ParentSelector:TreeHelpers] ERROR: Could not find node to expand:', nodeIdToExpand);
+      // console.log('[ParentSelector:TreeHelpers] ERROR: Could not find node to expand:', nodeIdToExpand);
       break;
     }
 
     // Load children if not already loaded
     if (!nodeToExpand.childrenLoaded) {
-      console.log('[ParentSelector:TreeHelpers] Loading children for:', nodeToExpand.name);
+      // console.log('[ParentSelector:TreeHelpers] Loading children for:', nodeToExpand.name);
       const children = await loadChildrenForNode(
         plugin,
         nodeToExpand.remId,
         allIncrementalRems,
         nodeToExpand.depth
       );
-      console.log('[ParentSelector:TreeHelpers] Loaded', children.length, 'children');
+      // console.log('[ParentSelector:TreeHelpers] Loaded', children.length, 'children');
 
       // Update the tree with the new children and expanded state
       updatedTree = findAndExpandNode(updatedTree, nodeIdToExpand, children);
@@ -694,9 +694,9 @@ export async function expandToLastDestination(
   const flatList = flattenTreeForDisplay(updatedTree);
   const finalIndex = flatList.findIndex(n => n.remId === lastDestinationId);
 
-  console.log('[ParentSelector:TreeHelpers] Final flattened list has', flatList.length, 'items');
-  console.log('[ParentSelector:TreeHelpers] Destination found at index:', finalIndex);
-  console.log('[ParentSelector:TreeHelpers] ================================================');
+  // console.log('[ParentSelector:TreeHelpers] Final flattened list has', flatList.length, 'items');
+  // console.log('[ParentSelector:TreeHelpers] Destination found at index:', finalIndex);
+  // console.log('[ParentSelector:TreeHelpers] ================================================');
 
   return { tree: updatedTree, foundIndex: finalIndex };
 }

@@ -53,6 +53,7 @@ const listContainerStyle: React.CSSProperties = {
   maxHeight: '600px',
   overflowY: 'auto',
   padding: '8px 0',
+  position: 'relative', // Ensures children's offsetTop is relative precisely to this container
 };
 
 const kbdStyle: React.CSSProperties = {
@@ -203,7 +204,7 @@ interface TreeNodeRowProps {
   onAddChild: () => void;
 }
 
-const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
+const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>(({
   node,
   isSelected,
   isLoadingChildren,
@@ -211,11 +212,12 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   onToggleExpand,
   onMouseEnter,
   onAddChild,
-}) => {
+}, ref) => {
   const indentPadding = 16 + node.depth * 20;
 
   return (
     <div
+      ref={ref}
       onClick={onSelect}
       onMouseEnter={onMouseEnter}
       style={{
@@ -278,7 +280,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
       />
     </div>
   );
-};
+});
 
 // ============================================================================
 // NEW CHILD INPUT COMPONENT
@@ -414,6 +416,9 @@ function ParentSelectorWidget() {
   const [isCreating, setIsCreating] = useState(false);
   const [loadingNodeId, setLoadingNodeId] = useState<RemId | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const hasInitiallyScrolled = useRef(false);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
   // NEW: State for inline child creation
   const [creatingChildForNodeId, setCreatingChildForNodeId] = useState<RemId | null>(null);
@@ -453,6 +458,71 @@ function ParentSelectorWidget() {
 
   const displayList = useMemo(() => flattenTreeForDisplay(tree), [tree]);
   const selectedNode = displayList[selectedIndex] || null;
+
+  // Scroll to selected item whenever selectedIndex changes or after initialization
+  useEffect(() => {
+    if (!isInitialized || itemRefs.current.length === 0) return;
+    
+    let attempts = 0;
+    const maxAttempts = 20; // Allow up to 1 second of retries to outlast UI animations
+    
+    // We use a retry mechanism because inside the sandboxed iframe, the DOM layout 
+    // might not have non-zero dimensions immediately after the render commit.
+    const tryScroll = () => {
+      const selectedEl = itemRefs.current[selectedIndex];
+      const container = listContainerRef.current;
+      
+      console.log(`[ParentSelector:Scroll] attempt ${attempts} at index ${selectedIndex}`, { 
+        hasScrolled: hasInitiallyScrolled.current, 
+        elFound: !!selectedEl, 
+        containerFound: !!container,
+        clientHeight: selectedEl?.clientHeight,
+      });
+      
+      if (selectedEl && container) {
+        // If layout hasn't populated, wait for next paint
+        if (selectedEl.clientHeight === 0 && attempts < maxAttempts) {
+          attempts++;
+          setTimeout(tryScroll, 50);
+          return;
+        }
+
+        if (hasInitiallyScrolled.current) {
+          // Manual nearest block logic for keyboard navigation
+          const elRect = selectedEl.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          
+          if (elRect.top < containerRect.top) {
+            container.scrollTop -= (containerRect.top - elRect.top);
+          } else if (elRect.bottom > containerRect.bottom) {
+            container.scrollTop += (elRect.bottom - containerRect.bottom);
+          }
+        } else {
+          // Manual center block logic for initial load
+          // We use offsetTop because getBoundingClientRect gives incorrect warped 
+          // coordinates while the popup is scaling/animating into view natively.
+          const scrollOffset = selectedEl.offsetTop - container.clientHeight / 2 + selectedEl.clientHeight / 2;
+          
+          console.log(`[ParentSelector:Scroll] Initial load centering:`, {
+             offsetTop: selectedEl.offsetTop,
+             containerHeight: container.clientHeight,
+             calcScrollOffset: scrollOffset
+          });
+          
+          container.scrollTop = scrollOffset;
+          hasInitiallyScrolled.current = true;
+        }
+      } else if (attempts < maxAttempts) {
+        attempts++;
+        setTimeout(tryScroll, 50);
+      }
+    };
+    
+    // Wait slightly bit initially to allow DOM to attach inside the plugin iframe
+    const initialTimer = setTimeout(tryScroll, 100);
+    
+    return () => clearTimeout(initialTimer);
+  }, [selectedIndex, isInitialized, displayList.length]);
 
   // ---------------------------------------------------------------------------
   // INITIALIZATION - FIXED VERSION
@@ -882,6 +952,11 @@ function ParentSelectorWidget() {
     const elements: React.ReactNode[] = [];
     let inputRendered = false;
 
+    // We just maintain the length to avoid keeping dead references
+    if (itemRefs.current.length > displayList.length) {
+      itemRefs.current.length = displayList.length;
+    }
+
     for (let index = 0; index < displayList.length; index++) {
       const node = displayList[index];
 
@@ -889,6 +964,11 @@ function ParentSelectorWidget() {
       elements.push(
         <TreeNodeRow
           key={`${node.remId}-${node.depth}`}
+          ref={(el) => {
+            if (itemRefs.current) {
+              itemRefs.current[index] = el;
+            }
+          }}
           node={node}
           isSelected={index === selectedIndex && !creatingChildForNodeId}
           isLoadingChildren={loadingNodeId === node.remId}
@@ -1047,7 +1127,7 @@ function ParentSelectorWidget() {
       </div>
 
       {/* Tree List */}
-      <div style={listContainerStyle}>
+      <div style={listContainerStyle} ref={listContainerRef}>
         {renderTreeWithInput()}
       </div>
 
