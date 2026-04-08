@@ -1,7 +1,7 @@
 import { ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
 import dayjs from 'dayjs';
 import * as _ from 'remeda';
-import { calculateVolumeBasedPercentile } from './utils';
+import { calculateVolumeBasedPercentile, calculateWeightedShield } from './utils';
 import { IncrementalRem } from './incremental_rem';
 import { CardPriorityInfo } from './card_priority';
 import { dismissedPowerupCode } from './consts';
@@ -11,6 +11,7 @@ export type ShieldHistoryEntry = {
   percentile: number | null;
   universeSize: number;
   dismissedCount?: number;
+  weightedShield?: number | null;
 };
 
 export type ShieldHistory = Record<string, ShieldHistoryEntry>;
@@ -53,7 +54,8 @@ function calculateShieldStatus<T extends PriorityItem>(
   unreviewedDue: T[],
   isDue: (item: T) => boolean,
   seenIds: string[],
-  dismissedCount: number = 0
+  dismissedCount: number = 0,
+  computeWeighted: boolean = false
 ): ShieldHistoryEntry {
   const status: ShieldHistoryEntry = {
     absolute: null,
@@ -72,6 +74,13 @@ function calculateShieldStatus<T extends PriorityItem>(
         (item) => isDue(item) && !seenIds.includes(item.remId)
       );
     }
+  }
+
+  if (computeWeighted) {
+    status.weightedShield = calculateWeightedShield(
+      allItems as any,
+      (item: any) => isDue(item) && !seenIds.includes(item.remId)
+    );
   }
 
   return status;
@@ -252,7 +261,8 @@ export async function saveKBShield<T extends PriorityItem>(
   isDue: (item: T) => boolean,
   seenIds: string[],
   storageKey: string,
-  label: string
+  label: string,
+  computeWeighted: boolean = false
 ): Promise<void> {
   if (allItems.length === 0) {
     console.log(`[QueueExit] No ${label} items found, skipping KB shield save`);
@@ -265,7 +275,7 @@ export async function saveKBShield<T extends PriorityItem>(
 
   const today = dayjs().format('YYYY-MM-DD');
   const unreviewedDue = filterUnreviewedDue(allItems, isDue, seenIds);
-  const status = calculateShieldStatus(allItems, unreviewedDue, isDue, seenIds, dismissedCount);
+  const status = calculateShieldStatus(allItems, unreviewedDue, isDue, seenIds, dismissedCount, computeWeighted);
 
   await saveKBShieldHistory(plugin, storageKey, status, today);
   console.log(`[QueueExit] Saved KB ${label} shield:`, status);
@@ -291,7 +301,8 @@ export async function saveDocumentShield<T extends PriorityItem>(
   seenIds: string[],
   storageKey: string,
   historyKey: string,
-  label: string
+  label: string,
+  computeWeighted: boolean = false
 ): Promise<void> {
   if (!scopeRemIds || scopeRemIds.length === 0) {
     console.log(`[QueueExit] No scope RemIds found, skipping ${label} document shield save`);
@@ -312,7 +323,7 @@ export async function saveDocumentShield<T extends PriorityItem>(
   const scopedDismissedCount = globalDismissedRems.filter(rem => scopeSet.has(rem._id)).length;
 
   const today = dayjs().format('YYYY-MM-DD');
-  const status = calculateShieldStatus(scopedItems, unreviewedDueInScope, isDue, seenIds, scopedDismissedCount);
+  const status = calculateShieldStatus(scopedItems, unreviewedDueInScope, isDue, seenIds, scopedDismissedCount, computeWeighted);
 
   await saveScopedShieldHistory(plugin, storageKey, historyKey, status, today);
   console.log(

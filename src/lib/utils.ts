@@ -151,6 +151,59 @@ export function calculateVolumeBasedPercentile<T extends { priority: number }>(
 }
 
 /**
+ * Calculates a weighted priority completion metric across all items.
+ *
+ * The metric represents "what fraction of the total priority weight has been processed",
+ * using exponential decay W(p) = e^(-k * p/100) with k ≈ 2.3026 so that
+ * a 0-percentile item weighs ~10× a 100-percentile item.
+ *
+ * Shield = (processedWeight / totalWeight) × 100
+ *
+ * This ALWAYS increases as items are processed, with bigger jumps for
+ * high-priority items. 100 = fully processed, 0 = nothing processed.
+ *
+ * @param allItems Full universe of items (KB or doc scope).
+ * @param isDuePredicate Returns true if the item is due and unreviewed.
+ * @returns Weighted completion percentage (0–100), or 100 if no items / no due items.
+ */
+export function calculateWeightedShield<T extends { priority: number; remId: string }>(
+  allItems: T[],
+  isDuePredicate: (item: T) => boolean
+): number {
+  if (!allItems || allItems.length === 0) return 100;
+
+  // 1. Sort by priority to compute each item's percentile rank
+  const sorted = [...allItems].sort((a, b) => a.priority - b.priority);
+  const percentileMap = new Map<string, number>();
+  sorted.forEach((item, idx) => {
+    percentileMap.set(item.remId, ((idx + 1) / sorted.length) * 100);
+  });
+
+  // 2. Compute total weight and due (unprocessed) weight
+  // k = ln(10) ≈ 2.3026 → a 0% item weighs 10× more than a 100% item
+  const k = 2.3026;
+  let totalWeight = 0;
+  let dueWeight = 0;
+
+  for (const item of allItems) {
+    const p = percentileMap.get(item.remId) ?? 50;
+    const weight = Math.exp(-k * p / 100);
+    totalWeight += weight;
+
+    if (isDuePredicate(item)) {
+      dueWeight += weight;
+    }
+  }
+
+  if (totalWeight === 0) return 100;
+
+  // Shield = fraction of total weight that's been processed
+  const processedFraction = (totalWeight - dueWeight) / totalWeight;
+  const result = processedFraction * 100;
+  return Math.round(result * 10) / 10; // 1 decimal
+}
+
+/**
  * Calculates percentiles for all items in a list at once.
  * More efficient than calling calculateRelativePercentile repeatedly.
  * @param items The list of items to calculate percentiles for.

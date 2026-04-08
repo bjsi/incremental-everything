@@ -73,6 +73,13 @@ export const currentSubQueueIdKey = 'current-sub-queue-id-key';
 export const cardPriorityShieldHistoryKey = 'card-priority-shield-history-key';
 export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shield-history-key';
 
+// --- Keys for the Weighted Priority Shield ---
+export const displayWeightedShieldId = 'display-weighted-shield';
+export const weightedShieldHistoryKey = 'weighted-shield-history-key';
+export const documentWeightedShieldHistoryKey = 'document-weighted-shield-history-key';
+export const cardWeightedShieldHistoryKey = 'card-weighted-shield-history-key';
+export const documentCardWeightedShieldHistoryKey = 'document-card-weighted-shield-history-key';
+
 // --- Keys for Open Editor in a new tab/window (PDFs) ---
 export const remnoteEnvironmentId = 'remnote-environment';
 

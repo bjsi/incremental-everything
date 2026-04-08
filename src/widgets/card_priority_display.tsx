@@ -11,6 +11,7 @@ import {
   allCardPriorityInfoKey,
   queueSessionCacheKey,
   displayPriorityShieldId,
+  displayWeightedShieldId,
   cardPriorityCacheRefreshKey,
   seenCardInSessionKey,
   priorityCalcScopeRemIdsKey,
@@ -20,7 +21,7 @@ import {
 } from '../lib/consts';
 import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
-import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
+import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge } from '../components';
 import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
@@ -116,6 +117,12 @@ export function CardPriorityDisplay() {
     (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
     []
   ) ?? true;
+
+  // ✅ Get the display weighted shield setting
+  const displayWeightedShield = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(displayWeightedShieldId),
+    []
+  ) ?? false;
 
   // 2. Add a new tracker to listen for the refresh signal.
   const refreshSignal = useTrackerPlugin(
@@ -295,6 +302,30 @@ export function CardPriorityDisplay() {
     return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds, scopeRemIds);
   }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds]);
 
+  // --- Weighted Shield: computed dynamically so it stays fresh as seenCardIds changes ---
+  const weightedShieldStatus = useMemo(() => {
+    if (!displayWeightedShield || useLightMode || !rem || !allPrioritizedCardInfo || allPrioritizedCardInfo.length === 0) return null;
+
+    const kbWeighted = calculateWeightedShield(
+      allPrioritizedCardInfo,
+      (info) => info.dueCards > 0 && (!seenCardIds.includes(info.remId) || info.remId === rem._id)
+    );
+
+    let docWeighted: number | null = null;
+    if (scopeRemIds) {
+      const scopeSet = new Set(scopeRemIds);
+      const docItems = allPrioritizedCardInfo.filter(c => scopeSet.has(c.remId));
+      if (docItems.length > 0) {
+        docWeighted = calculateWeightedShield(
+          docItems,
+          (info) => info.dueCards > 0 && (!seenCardIds.includes(info.remId) || info.remId === rem._id)
+        );
+      }
+    }
+
+    return { kb: kbWeighted, doc: docWeighted };
+  }, [displayWeightedShield, useLightMode, rem, allPrioritizedCardInfo, seenCardIds, scopeRemIds]);
+
 
   // --- 🔌 ON-DEMAND PATH (Light Mode OR Full Mode fallback when cache not ready) ---
   const lightCardInfo = useTrackerPlugin(async (rp) => {
@@ -438,6 +469,24 @@ export function CardPriorityDisplay() {
               50% { filter: brightness(1.3); text-shadow: 0 0 4px rgba(59, 130, 246, 0.3); }
             }
           `}</style>
+        </>
+      )}
+
+      {/* Weighted Shield */}
+      {displayWeightedShield && !useLightMode && cacheReady && weightedShieldStatus && (
+        <>
+          <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+              ⚖️ Weighted:
+            </span>
+            <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              <span>KB: {weightedShieldStatus.kb.toFixed(1)}%</span>
+              {weightedShieldStatus.doc !== null && (
+                <span>Doc: {weightedShieldStatus.doc.toFixed(1)}%</span>
+              )}
+            </div>
+          </div>
         </>
       )}
 

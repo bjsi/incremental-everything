@@ -17,6 +17,7 @@ import {
   dismissedPowerupCode,
   repHistorySlotCode,
   incrementalQueueActiveKey,
+  displayWeightedShieldId,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -34,6 +35,7 @@ import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from
 import {
   calculateAllPercentiles,
   getPerformanceMode,
+  calculateWeightedShield,
 } from '../lib/utils';
 import {
   saveKBShield,
@@ -163,15 +165,17 @@ export function registerQueueExitListener(
       const seenRemIds = (await plugin.storage.getSession<string[]>(seenRemInSessionKey)) || [];
       const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
 
+      const displayWeighted = await plugin.settings.getSetting<boolean>(displayWeightedShieldId) ?? false;
+
       // Save KB-level shields
       if (shouldSaveIncRem) {
-        await saveKBShield(plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem');
+        await saveKBShield(plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem', displayWeighted);
       } else {
         console.warn('[QueueExit] Skipping KB IncRem shield save because cache was incomplete');
       }
 
       if (shouldSaveCard) {
-        await saveKBShield(plugin, allCardInfos, isCardDue, seenCardIds, cardPriorityShieldHistoryKey, 'Card');
+        await saveKBShield(plugin, allCardInfos, isCardDue, seenCardIds, cardPriorityShieldHistoryKey, 'Card', displayWeighted);
       } else {
         console.warn('[QueueExit] Skipping KB Card shield save because cache was incomplete');
       }
@@ -189,7 +193,8 @@ export function registerQueueExitListener(
             seenRemIds,
             documentPriorityShieldHistoryKey,
             historyKey,
-            'IncRem'
+            'IncRem',
+            displayWeighted
           );
         }
 
@@ -202,7 +207,8 @@ export function registerQueueExitListener(
             seenCardIds,
             documentCardPriorityShieldHistoryKey,
             historyKey,
-            'Card'
+            'Card',
+            displayWeighted
           );
         }
       } else {
@@ -369,6 +375,57 @@ export function registerQueueEnterListener(
       dueIncRemsInKB,
       incRemDocPercentiles,
     };
+
+    // Pre-compute Weighted Shield values if the setting is enabled
+    const displayWeighted = await plugin.settings.getSetting<boolean>(displayWeightedShieldId) ?? false;
+    if (displayWeighted && !(await shouldUseLightMode(plugin))) {
+      const allIncRems_ws = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+      const seenRemIds_ws = (await plugin.storage.getSession<string[]>(seenRemInSessionKey)) || [];
+      const seenCardIds_ws = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
+      const storedScopeIds = (await plugin.storage.getSession<RemId[]>(priorityCalcScopeRemIdsKey)) || [];
+
+      // Card KB weighted shield
+      if (allCardInfos.length > 0) {
+        sessionCache.weightedShieldCardKB = calculateWeightedShield(
+          allCardInfos,
+          (info) => info.dueCards > 0 && !seenCardIds_ws.includes(info.remId)
+        );
+      }
+
+      // Card Doc weighted shield
+      if (dueCardsInScope.length > 0 && storedScopeIds.length > 0) {
+        const scopeSet = new Set(storedScopeIds);
+        const docCardItems = allCardInfos.filter(info => scopeSet.has(info.remId));
+        if (docCardItems.length > 0) {
+          sessionCache.weightedShieldCardDoc = calculateWeightedShield(
+            docCardItems,
+            (info) => info.dueCards > 0 && !seenCardIds_ws.includes(info.remId)
+          );
+        }
+      }
+
+      // IncRem KB weighted shield
+      if (allIncRems_ws.length > 0) {
+        sessionCache.weightedShieldIncRemKB = calculateWeightedShield(
+          allIncRems_ws,
+          (rem) => Date.now() >= rem.nextRepDate && !seenRemIds_ws.includes(rem.remId)
+        );
+      }
+
+      // IncRem Doc weighted shield
+      if (dueIncRemsInScope.length > 0 && storedScopeIds.length > 0) {
+        const scopeSet = new Set(storedScopeIds);
+        const docIncRemItems = allIncRems_ws.filter(rem => scopeSet.has(rem.remId));
+        if (docIncRemItems.length > 0) {
+          sessionCache.weightedShieldIncRemDoc = calculateWeightedShield(
+            docIncRemItems,
+            (rem) => Date.now() >= rem.nextRepDate && !seenRemIds_ws.includes(rem.remId)
+          );
+        }
+      }
+
+      console.log(`QUEUE ENTER: Weighted shields computed - CardKB: ${sessionCache.weightedShieldCardKB}, CardDoc: ${sessionCache.weightedShieldCardDoc}, IncRemKB: ${sessionCache.weightedShieldIncRemKB}, IncRemDoc: ${sessionCache.weightedShieldIncRemDoc}`);
+    }
 
     await plugin.storage.setSession(queueSessionCacheKey, sessionCache);
     console.log('QUEUE ENTER: Pre-calculation complete. Session cache has been saved.');

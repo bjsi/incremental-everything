@@ -16,6 +16,7 @@ import {
   displayFsrsDsrId,
   fsrsWeightsId,
   displayQueueToolbarPriorityId,
+  displayWeightedShieldId,
 } from '../lib/consts';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
@@ -199,6 +200,16 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     description:
       'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
     defaultValue: true,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: displayWeightedShieldId,
+    title: 'Display Weighted Priority Shield in Queue',
+    description:
+      'If enabled, shows what fraction of your total priority-weighted workload has been processed. ' +
+      'High-priority items carry exponentially more weight (~10× at the top vs bottom), so processing ' +
+      'them gives a bigger boost. Always increases as you review items.',
+    defaultValue: false,
   });
 
   plugin.settings.registerBooleanSetting({
