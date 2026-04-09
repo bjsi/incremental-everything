@@ -60,14 +60,14 @@ export function WeightedShieldTooltip({
       onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
       title="Click for detailed breakdown"
     >
-      <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+      <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--rn-clr-content-secondary)' }}>
         <span>⚖️</span>
         <span>Weighted:</span>
       </span>
-      <div style={{ display: 'flex', gap: '12px', fontSize: '12px' }}>
-        <span>KB: <strong>{kbValue.toFixed(1)}%</strong></span>
+      <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--rn-clr-content-tertiary)' }}>
+        <span>KB: <strong style={{ color: 'var(--rn-clr-content-secondary)' }}>{kbValue.toFixed(1)}%</strong></span>
         {docValue !== null && docValue !== undefined && (
-          <span>Doc: <strong>{docValue.toFixed(1)}%</strong></span>
+          <span>Doc: <strong style={{ color: 'var(--rn-clr-content-secondary)' }}>{docValue.toFixed(1)}%</strong></span>
         )}
       </div>
     </div>

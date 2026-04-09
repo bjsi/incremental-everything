@@ -77,7 +77,7 @@ function BreakdownSection({
       }}>
         <div>
           <span style={{ fontWeight: 600 }}>Total: </span>
-          {breakdown.totalItems.toLocaleString()} {itemLabel}
+          {breakdown.totalItems.toLocaleString()} {itemLabel.toLowerCase() === 'cards' ? 'Rems with Cards' : 'Incremental Rems'}
         </div>
         <div>
           <span style={{ fontWeight: 600, color: breakdown.dueItems > 0 ? '#ef4444' : 'inherit' }}>Due: </span>
