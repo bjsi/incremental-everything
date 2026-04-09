@@ -121,30 +121,24 @@ export function calculateVolumeBasedPercentile<T extends { priority: number }>(
     return 100; // Empty universe is considered complete/100%
   }
 
+  // Pre-filter: Ignore rems that explicitly have 0 cards (e.g. Disabled Cards)
+  // so they don't artificially inflate the completion metric.
+  const validItems = allItems.filter((item: any) => item.cardCount === undefined || item.cardCount > 0);
+
+  if (validItems.length === 0) {
+    return 100;
+  }
+
   // 1. Count items with strictly higher priority (lower priority value number)
-  const higherPriorityCount = allItems.filter((x) => x.priority < topMissedPriority).length;
+  const higherPriorityCount = validItems.filter((x) => x.priority < topMissedPriority).length;
 
   // 2. Count items with the SAME priority that are ALREADY PROCESSED (not due)
-  // We want to give credit for the work done *within* this priority block.
-  // Note: We assume "topMissedPriority" is the level where the first due item exists.
-  // So any item with this priority that is NOT due is considered "behind us" (processed).
-  const samePriorityProcessedCount = allItems.filter(
+  const samePriorityProcessedCount = validItems.filter(
     (x) => x.priority === topMissedPriority && !isDuePredicate(x)
   ).length;
 
-  // 3. Current Rank in the processed queue
-  // If we have 100 items total:
-  // - 10 are Priority 1 (all done) -> higherPriorityCount = 10
-  // - 50 are Priority 2.
-  //   - Current Shield is at Priority 2.
-  //   - 20 of them are NOT due (processed).
-  //   - 30 of them ARE due.
-  // Rank = 10 (higher) + 20 (same processed) = 30.
   const currentRank = higherPriorityCount + samePriorityProcessedCount;
-
-  // 4. Calculate Percentile
-  // 30 / 100 = 30%.
-  const percentile = (currentRank / allItems.length) * 100;
+  const percentile = (currentRank / validItems.length) * 100;
 
   // Round to 1 decimal place
   return Math.round(percentile * 10) / 10;
@@ -172,8 +166,12 @@ export function calculateWeightedShield<T extends { priority: number; remId: str
 ): number {
   if (!allItems || allItems.length === 0) return 100;
 
+  // Pre-filter: Ignore rems that explicitly have 0 cards
+  const validItems = allItems.filter((item: any) => item.cardCount === undefined || item.cardCount > 0);
+  if (validItems.length === 0) return 100;
+
   // 1. Sort by priority to compute each item's percentile rank
-  const sorted = [...allItems].sort((a, b) => a.priority - b.priority);
+  const sorted = [...validItems].sort((a, b) => a.priority - b.priority);
   const percentileMap = new Map<string, number>();
   sorted.forEach((item, idx) => {
     percentileMap.set(item.remId, ((idx + 1) / sorted.length) * 100);
@@ -185,7 +183,7 @@ export function calculateWeightedShield<T extends { priority: number; remId: str
   let totalWeight = 0;
   let dueWeight = 0;
 
-  for (const item of allItems) {
+  for (const item of validItems) {
     const p = percentileMap.get(item.remId) ?? 50;
     const weight = Math.exp(-k * p / 100);
     totalWeight += weight;
@@ -261,8 +259,11 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
 ): WeightedShieldBreakdown {
   const k = 2.3026;
 
+  // Pre-filter: Ignore rems that explicitly have 0 cards
+  const validItems = allItems.filter((item: any) => item.cardCount === undefined || item.cardCount > 0);
+
   // Sort and compute percentiles
-  const sorted = [...allItems].sort((a, b) => a.priority - b.priority);
+  const sorted = [...validItems].sort((a, b) => a.priority - b.priority);
   const percentileMap = new Map<string, number>();
   sorted.forEach((item, idx) => {
     percentileMap.set(item.remId, ((idx + 1) / sorted.length) * 100);
@@ -276,7 +277,7 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
   let dueWeight = 0;
   let dueCount = 0;
 
-  for (const item of allItems) {
+  for (const item of validItems) {
     const p = percentileMap.get(item.remId) ?? 50;
     const weight = Math.exp(-k * p / 100);
     const bucketIdx = Math.min(Math.floor(p / 10), 9); // 0-9
@@ -313,9 +314,9 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
   }));
 
   return {
-    totalItems: allItems.length,
+    totalItems: validItems.length,
     dueItems: dueCount,
-    duePct: allItems.length > 0 ? Math.round((dueCount / allItems.length) * 1000) / 10 : 0,
+    duePct: validItems.length > 0 ? Math.round((dueCount / validItems.length) * 1000) / 10 : 0,
     shieldValue,
     totalWeight: Math.round(totalWeight * 100) / 100,
     dueWeight: Math.round(dueWeight * 100) / 100,

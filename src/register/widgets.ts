@@ -63,8 +63,8 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('debug', WidgetLocation.Popup, {
     dimensions: {
-      width: '350px',
-      height: 'auto',
+      width: 400,
+      height: 800,
     },
   });
 

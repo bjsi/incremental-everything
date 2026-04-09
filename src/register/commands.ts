@@ -26,6 +26,7 @@ import { IncrementalRep } from '../lib/incremental_rem/types';
 import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
+import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import dayjs from 'dayjs';
 import {
   getOperatingSystem,
@@ -505,7 +506,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem) {
         return;
       }
-      if (!(await rem.hasPowerup(powerupCode))) {
+      if (!(await rem.hasPowerup(powerupCode)) && !(await rem.hasPowerup(CARD_PRIORITY_CODE)) && !(await rem.hasPowerup(dismissedPowerupCode))) {
         return;
       }
       await plugin.widget.openPopup('debug', {
