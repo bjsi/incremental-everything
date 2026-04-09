@@ -17,6 +17,7 @@ import {
   dismissedPowerupCode,
   repHistorySlotCode,
   incrementalQueueActiveKey,
+  displayWeightedShieldId,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -34,6 +35,7 @@ import { isPriorityReviewDocument, extractOriginalScopeFromPriorityReview } from
 import {
   calculateAllPercentiles,
   getPerformanceMode,
+  calculateWeightedShield,
 } from '../lib/utils';
 import {
   saveKBShield,
@@ -163,15 +165,17 @@ export function registerQueueExitListener(
       const seenRemIds = (await plugin.storage.getSession<string[]>(seenRemInSessionKey)) || [];
       const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
 
+      const displayWeighted = await plugin.settings.getSetting<boolean>(displayWeightedShieldId) ?? false;
+
       // Save KB-level shields
       if (shouldSaveIncRem) {
-        await saveKBShield(plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem');
+        await saveKBShield(plugin, allIncRems as any, isIncRemDue, seenRemIds, priorityShieldHistoryKey, 'IncRem', displayWeighted);
       } else {
         console.warn('[QueueExit] Skipping KB IncRem shield save because cache was incomplete');
       }
 
       if (shouldSaveCard) {
-        await saveKBShield(plugin, allCardInfos, isCardDue, seenCardIds, cardPriorityShieldHistoryKey, 'Card');
+        await saveKBShield(plugin, allCardInfos, isCardDue, seenCardIds, cardPriorityShieldHistoryKey, 'Card', displayWeighted);
       } else {
         console.warn('[QueueExit] Skipping KB Card shield save because cache was incomplete');
       }
@@ -189,7 +193,8 @@ export function registerQueueExitListener(
             seenRemIds,
             documentPriorityShieldHistoryKey,
             historyKey,
-            'IncRem'
+            'IncRem',
+            displayWeighted
           );
         }
 
@@ -202,7 +207,8 @@ export function registerQueueExitListener(
             seenCardIds,
             documentCardPriorityShieldHistoryKey,
             historyKey,
-            'Card'
+            'Card',
+            displayWeighted
           );
         }
       } else {
@@ -370,6 +376,57 @@ export function registerQueueEnterListener(
       incRemDocPercentiles,
     };
 
+    // Pre-compute Weighted Shield values if the setting is enabled
+    const displayWeighted = await plugin.settings.getSetting<boolean>(displayWeightedShieldId) ?? false;
+    if (displayWeighted && !(await shouldUseLightMode(plugin))) {
+      const allIncRems_ws = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+      const seenRemIds_ws = (await plugin.storage.getSession<string[]>(seenRemInSessionKey)) || [];
+      const seenCardIds_ws = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
+      const storedScopeIds = (await plugin.storage.getSession<RemId[]>(priorityCalcScopeRemIdsKey)) || [];
+
+      // Card KB weighted shield
+      if (allCardInfos.length > 0) {
+        sessionCache.weightedShieldCardKB = calculateWeightedShield(
+          allCardInfos,
+          (info) => info.dueCards > 0 && !seenCardIds_ws.includes(info.remId)
+        );
+      }
+
+      // Card Doc weighted shield
+      if (dueCardsInScope.length > 0 && storedScopeIds.length > 0) {
+        const scopeSet = new Set(storedScopeIds);
+        const docCardItems = allCardInfos.filter(info => scopeSet.has(info.remId));
+        if (docCardItems.length > 0) {
+          sessionCache.weightedShieldCardDoc = calculateWeightedShield(
+            docCardItems,
+            (info) => info.dueCards > 0 && !seenCardIds_ws.includes(info.remId)
+          );
+        }
+      }
+
+      // IncRem KB weighted shield
+      if (allIncRems_ws.length > 0) {
+        sessionCache.weightedShieldIncRemKB = calculateWeightedShield(
+          allIncRems_ws,
+          (rem) => Date.now() >= rem.nextRepDate && !seenRemIds_ws.includes(rem.remId)
+        );
+      }
+
+      // IncRem Doc weighted shield
+      if (dueIncRemsInScope.length > 0 && storedScopeIds.length > 0) {
+        const scopeSet = new Set(storedScopeIds);
+        const docIncRemItems = allIncRems_ws.filter(rem => scopeSet.has(rem.remId));
+        if (docIncRemItems.length > 0) {
+          sessionCache.weightedShieldIncRemDoc = calculateWeightedShield(
+            docIncRemItems,
+            (rem) => Date.now() >= rem.nextRepDate && !seenRemIds_ws.includes(rem.remId)
+          );
+        }
+      }
+
+      console.log(`QUEUE ENTER: Weighted shields computed - CardKB: ${sessionCache.weightedShieldCardKB}, CardDoc: ${sessionCache.weightedShieldCardDoc}, IncRemKB: ${sessionCache.weightedShieldIncRemKB}, IncRemDoc: ${sessionCache.weightedShieldIncRemDoc}`);
+    }
+
     await plugin.storage.setSession(queueSessionCacheKey, sessionCache);
     console.log('QUEUE ENTER: Pre-calculation complete. Session cache has been saved.');
 
@@ -459,7 +516,9 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
  * @param plugin Plugin instance for storage, settings, and Rem lookups.
  */
 export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
-  let remChangeDebounceTimer: NodeJS.Timeout;
+  // Per-remId debounce timers: prevents cross-rem timer stomping during
+  // search/navigation bursts where many different remIds fire in rapid succession.
+  const remChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
 
   // Store captured history per remId (captured before debounce to avoid race condition)
   // Key: remId, Value: cloned history array
@@ -475,7 +534,8 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       const isBatchActive = await plugin.storage.getSession<boolean>('plugin_operation_active');
       if (isBatchActive) return;
 
-      clearTimeout(remChangeDebounceTimer);
+      const existingTimer = remChangeDebounceTimers.get(data.remId);
+      if (existingTimer) clearTimeout(existingTimer);
 
       const rem = await plugin.rem.findOne(data.remId);
       if (!rem) return;
@@ -523,7 +583,17 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         }
       }
 
-      remChangeDebounceTimer = setTimeout(async () => {
+      const debounceTimer = setTimeout(async () => {
+        remChangeDebounceTimers.delete(data.remId);
+        // Re-check suppression flag — the event may have been enqueued
+        // before the flag was set, but fires inside a batch operation.
+        const isBatchActiveNow = await plugin.storage.getSession<boolean>('plugin_operation_active');
+        if (isBatchActiveNow) {
+          pendingHistoryMap.delete(data.remId);
+          pendingNextRepDateMap.delete(data.remId);
+          return;
+        }
+
         const rem = await plugin.rem.findOne(data.remId);
         if (!rem) {
           pendingHistoryMap.delete(data.remId);
@@ -581,9 +651,28 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                   newHistoryEntry,
                 ];
 
+                // IMPORTANT: Set the suppression flag BEFORE writing the history property.
+                // Writing repHistorySlotCode fires a new GlobalRemChanged for this same rem.
+                // Without this flag, that new event passes all guards and triggers another
+                // "manual date reset" detection → infinite loop.
+                // We use the same flag + delayed-clear pattern as updateSRSDataForRem so that
+                // the existing guard at line ~571 suppresses the follow-up event.
+                await plugin.storage.setSession('plugin_updating_srs_data', true);
+
                 // Update just the history slot (date already changed by user)
                 await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(updatedHistory)]);
                 console.log('[GlobalRemChanged] Added manualDateReset event to history');
+
+                // Update the in-memory IncRem cache so any subsequent event pre-captures
+                // the correct (new) history/date and doesn't see stale baseline values.
+                const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
+                await updateIncrementalRemCache(plugin, { ...currentIncRem, history: updatedHistory });
+
+                // Clear suppression flag after a delay longer than the debounce window (1000ms)
+                // so it stays active for any follow-up GlobalRemChanged from the property write.
+                setTimeout(async () => {
+                  await plugin.storage.setSession('plugin_updating_srs_data', false);
+                }, 3000);
               }
             }
           }
@@ -639,7 +728,18 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           }
         }
 
-        // Compare against existing cache to prevent useless UI rebuilds and overwrites
+        // Compare against existing cache to prevent useless UI rebuilds and overwrites.
+        //
+        // Skip entirely if this rem has no cards and no existing cache entry:
+        // these are non-card rems (opened documents, search results, etc.) that fire
+        // GlobalRemChanged constantly but have nothing to update in the priority cache.
+        // Without this guard, `!cachedEntry` was unconditionally true for them, causing
+        // thousands of false "property drift" logs and updateCardPriorityCache calls.
+        if (targetPriority === null && targetSource === null) {
+          // No cards on this rem — nothing to track in the card priority cache.
+          return;
+        }
+
         const allInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
         const cachedEntry = allInfos.find((info) => info.remId === data.remId);
 
@@ -653,6 +753,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         }
 
       }, REM_CHANGE_DEBOUNCE_MS);
+      remChangeDebounceTimers.set(data.remId, debounceTimer);
     }
   );
 }

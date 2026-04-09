@@ -3,6 +3,7 @@ import {
   RNPlugin,
   SelectionType,
   PluginRem,
+  BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -22,9 +23,10 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory } from '../lib/pdfUtils';
+import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
+import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import dayjs from 'dayjs';
 import {
   getOperatingSystem,
@@ -47,7 +49,7 @@ import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
-  const createExtract = async () => {
+  const createExtract = async (): Promise<PluginRem | PluginRem[] | undefined> => {
     const selection = await plugin.editor.getSelection();
     if (!selection) {
       return;
@@ -62,7 +64,22 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       return focused;
     } else if (selection.type === SelectionType.Rem) {
       const rems = (await plugin.rem.findMany(selection.remIds)) || [];
-      await Promise.all(rems.map((rem) => initIncrementalRem(plugin, rem)));
+      // Single outer flag bracket for the entire batch — each initIncrementalRem
+      // skips its own flag management so the flag stays UP for the whole loop.
+      await plugin.storage.setSession('plugin_operation_active', true);
+      try {
+        for (const rem of rems) {
+          await initIncrementalRem(plugin, rem, { skipFlagManagement: true });
+        }
+      } finally {
+        // Don't clear the flag — each initIncrementalRem fires pendingInheritanceCascade,
+        // and the cascade tracker will clear the flag when the cascade completes.
+        // Only clear defensively if no rems were processed (e.g., empty selection).
+        if (rems.length === 0) {
+          await plugin.storage.setSession('plugin_operation_active', false);
+        }
+      }
+      return rems;
     } else {
       const highlight = await plugin.reader.addHighlight();
       if (!highlight) {
@@ -80,15 +97,29 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Extract with Priority',
     keyboardShortcut: 'opt+shift+x',
     action: async () => {
-      const rem = await createExtract();
-      if (!rem) {
+      const result = await createExtract();
+      if (!result) {
         return;
       }
       // Clear stale session storage to prevent race condition with widget context
       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
-      await plugin.widget.openPopup('priority_interval', {
-        remId: rem._id,
-      });
+
+      if (Array.isArray(result)) {
+        // Multi-rem selection: store all remIds for the popup to apply in batch
+        const remIds = result.map(r => r._id);
+        if (remIds.length === 0) return;
+        await plugin.storage.setSession('batchPriorityIntervalRemIds', remIds);
+        await plugin.widget.openPopup('priority_interval', {
+          remId: remIds[0], // First rem as reference for defaults
+          batchMode: true,
+        });
+      } else {
+        // Single rem
+        await plugin.storage.setSession('batchPriorityIntervalRemIds', null);
+        await plugin.widget.openPopup('priority_interval', {
+          remId: result._id,
+        });
+      }
     },
   });
 
@@ -420,12 +451,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      // 1. Find the associated PDF Rem within the focused Rem or its descendants
-      const pdfRem = await findPDFinRem(plugin, rem);
+      // 1. Find the associated PDF Rem, honouring #preferthispdf when multiple sources exist
+      const pdfRem = await findPreferredPDFInRem(plugin, rem);
 
-      // 2. If no PDF is found, inform the user and stop.
+      // 2. If no PDF is found (or multiple #preferthispdf tags conflict), inform the user and stop.
       if (!pdfRem) {
-        await plugin.app.toast('No PDF found in the focused Rem or its children.');
+        // findPreferredPDFInRem already showed a toast for the multi-tag conflict case;
+        // only show the generic message when truly no PDF was found.
+        const hasSomePdf = await findPDFinRem(plugin, rem);
+        if (!hasSomePdf) {
+          await plugin.app.toast('No PDF found in the focused Rem or its sources.');
+        }
         return;
       }
 
@@ -470,7 +506,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem) {
         return;
       }
-      if (!(await rem.hasPowerup(powerupCode))) {
+      if (!(await rem.hasPowerup(powerupCode)) && !(await rem.hasPowerup(CARD_PRIORITY_CODE)) && !(await rem.hasPowerup(dismissedPowerupCode))) {
         return;
       }
       await plugin.widget.openPopup('debug', {
@@ -1198,6 +1234,130 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // Advance the queue (updates SRS data + removes current card)
       await handleNextRepetitionClick(plugin, incRemInfo);
+    },
+  });
+
+  // ─── Copy / Paste Rem Sources ────────────────────────────────────────────
+  // Designed for the PDF-split workflow: give multiple IncRems the same PDF
+  // source so the page-range widget can assign each rem a different page range.
+  //
+  //   1. Focus the "template" rem (the one whose sources you want to replicate).
+  //   2. Run "Copy Rem Sources" → source IDs are saved to session storage.
+  //   3. Select one or more target rems.
+  //   4. Run "Paste Rem Sources" → every selected rem receives all copied sources
+  //      (already-present sources are silently skipped to keep it idempotent).
+
+  const COPIED_SOURCES_KEY = 'copiedRemSourceIds';
+
+  plugin.app.registerCommand({
+    id: 'copy-rem-sources',
+    name: 'Copy Rem Sources',
+    description: 'Copies the sources of the focused Rem to the clipboard (session storage) for pasting onto other Rems.',
+    keyboardShortcut: 'ctrl+shift+F1',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('No Rem focused.');
+        return;
+      }
+
+      const sources = await rem.getSources();
+      if (!sources || sources.length === 0) {
+        await plugin.app.toast('This Rem has no sources to copy.');
+        return;
+      }
+
+      const sourceIds = sources.map(s => s._id);
+      await plugin.storage.setSession(COPIED_SOURCES_KEY, sourceIds);
+
+      // Register the focused rem in the known_pdf_rems_ index for each PDF source,
+      // so the template rem itself is discoverable by the PDF Control Panel.
+      for (const source of sources) {
+        const isPdf = await source.hasPowerup(BuiltInPowerupCodes.UploadedFile);
+        if (isPdf) {
+          await registerRemsAsPdfKnown(plugin, source._id, [rem._id]);
+        }
+      }
+
+      await plugin.app.toast(
+        sources.length === 1
+          ? '📋 1 source copied. Select target Rems and run "Paste Rem Sources".'
+          : `📋 ${sources.length} sources copied. Select target Rems and run "Paste Rem Sources".`
+      );
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'paste-rem-sources',
+    name: 'Paste Rem Sources',
+    description: 'Adds the previously copied sources to all selected Rems (or the focused Rem). Skips sources already present.',
+    keyboardShortcut: 'opt+shift+v',
+    action: async () => {
+      const copiedIds = await plugin.storage.getSession<string[]>(COPIED_SOURCES_KEY);
+      if (!copiedIds || copiedIds.length === 0) {
+        await plugin.app.toast('No sources copied yet. Run "Copy Rem Sources" first.');
+        return;
+      }
+
+      // Resolve the copied source RemObjects once (shared across all targets)
+      const copiedSources = (await plugin.rem.findMany(copiedIds)) || [];
+      if (copiedSources.length === 0) {
+        await plugin.app.toast('Could not resolve the copied sources. They may have been deleted.');
+        return;
+      }
+
+      // Determine target rems: multi-select → all selected; otherwise → focused rem
+      const selection = await plugin.editor.getSelection();
+      let targetRems: PluginRem[] = [];
+
+      if (selection?.type === SelectionType.Rem && selection.remIds.length > 0) {
+        targetRems = (await plugin.rem.findMany(selection.remIds)) || [];
+      } else {
+        const focused = await plugin.focus.getFocusedRem();
+        if (!focused) {
+          await plugin.app.toast('No Rem focused or selected.');
+          return;
+        }
+        targetRems = [focused];
+      }
+
+      if (targetRems.length === 0) {
+        await plugin.app.toast('Could not resolve target Rems.');
+        return;
+      }
+
+      let totalAdded = 0;
+      let totalSkipped = 0;
+
+      for (const target of targetRems) {
+        const existingSources = await target.getSources();
+        const existingIds = new Set(existingSources.map(s => s._id));
+
+        for (const source of copiedSources) {
+          if (existingIds.has(source._id)) {
+            totalSkipped++;
+            continue;
+          }
+          await target.addSource(source);
+          totalAdded++;
+
+          // If the added source is a PDF, register this target rem in the
+          // known_pdf_rems_ synced index so it appears in the PDF Control Panel
+          // without needing a full incremental-rem-cache scan first.
+          const isPdf = await source.hasPowerup(BuiltInPowerupCodes.UploadedFile);
+          if (isPdf) {
+            await registerRemsAsPdfKnown(plugin, source._id, [target._id]);
+          }
+        }
+      }
+
+      const remLabel = targetRems.length === 1 ? '1 Rem' : `${targetRems.length} Rems`;
+      if (totalAdded === 0) {
+        await plugin.app.toast(`✅ All sources already present on ${remLabel}.`);
+      } else {
+        const skippedNote = totalSkipped > 0 ? ` (${totalSkipped} already present, skipped)` : '';
+        await plugin.app.toast(`✅ Added ${totalAdded} source(s) to ${remLabel}${skippedNote}.`);
+      }
     },
   });
 }

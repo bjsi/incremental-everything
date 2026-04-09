@@ -15,3 +15,4 @@ export { PdfRemItem } from './PdfRemItem';
 export type { EditingState } from './PdfRemItem';
 export { IncRemTable } from './IncRemTable';
 export type { IncRemWithDetails, DocumentInfo, IncRemListState } from './IncRemTable';
+export { WeightedShieldTooltip } from './WeightedShieldTooltip';

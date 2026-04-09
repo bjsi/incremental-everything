@@ -121,33 +121,208 @@ export function calculateVolumeBasedPercentile<T extends { priority: number }>(
     return 100; // Empty universe is considered complete/100%
   }
 
+  // Pre-filter: Ignore rems that explicitly have 0 cards (e.g. Disabled Cards)
+  // so they don't artificially inflate the completion metric.
+  const validItems = allItems.filter((item: any) => item.cardCount === undefined || item.cardCount > 0);
+
+  if (validItems.length === 0) {
+    return 100;
+  }
+
   // 1. Count items with strictly higher priority (lower priority value number)
-  const higherPriorityCount = allItems.filter((x) => x.priority < topMissedPriority).length;
+  const higherPriorityCount = validItems.filter((x) => x.priority < topMissedPriority).length;
 
   // 2. Count items with the SAME priority that are ALREADY PROCESSED (not due)
-  // We want to give credit for the work done *within* this priority block.
-  // Note: We assume "topMissedPriority" is the level where the first due item exists.
-  // So any item with this priority that is NOT due is considered "behind us" (processed).
-  const samePriorityProcessedCount = allItems.filter(
+  const samePriorityProcessedCount = validItems.filter(
     (x) => x.priority === topMissedPriority && !isDuePredicate(x)
   ).length;
 
-  // 3. Current Rank in the processed queue
-  // If we have 100 items total:
-  // - 10 are Priority 1 (all done) -> higherPriorityCount = 10
-  // - 50 are Priority 2.
-  //   - Current Shield is at Priority 2.
-  //   - 20 of them are NOT due (processed).
-  //   - 30 of them ARE due.
-  // Rank = 10 (higher) + 20 (same processed) = 30.
   const currentRank = higherPriorityCount + samePriorityProcessedCount;
-
-  // 4. Calculate Percentile
-  // 30 / 100 = 30%.
-  const percentile = (currentRank / allItems.length) * 100;
+  const percentile = (currentRank / validItems.length) * 100;
 
   // Round to 1 decimal place
   return Math.round(percentile * 10) / 10;
+}
+
+/**
+ * Calculates a weighted priority completion metric across all items.
+ *
+ * The metric represents "what fraction of the total priority weight has been processed",
+ * using exponential decay W(p) = e^(-k * p/100) with k ≈ 2.3026 so that
+ * a 0-percentile item weighs ~10× a 100-percentile item.
+ *
+ * Shield = (processedWeight / totalWeight) × 100
+ *
+ * This ALWAYS increases as items are processed, with bigger jumps for
+ * high-priority items. 100 = fully processed, 0 = nothing processed.
+ *
+ * @param allItems Full universe of items (KB or doc scope).
+ * @param isDuePredicate Returns true if the item is due and unreviewed.
+ * @returns Weighted completion percentage (0–100), or 100 if no items / no due items.
+ */
+export function calculateWeightedShield<T extends { priority: number; remId: string }>(
+  allItems: T[],
+  isDuePredicate: (item: T) => boolean
+): number {
+  if (!allItems || allItems.length === 0) return 100;
+
+  // Pre-filter: Ignore rems that explicitly have 0 cards
+  const validItems = allItems.filter((item: any) => item.cardCount === undefined || item.cardCount > 0);
+  if (validItems.length === 0) return 100;
+
+  // 1. Sort by priority to compute each item's percentile rank
+  const sorted = [...validItems].sort((a, b) => a.priority - b.priority);
+  const percentileMap = new Map<string, number>();
+  sorted.forEach((item, idx) => {
+    percentileMap.set(item.remId, ((idx + 1) / sorted.length) * 100);
+  });
+
+  // 2. Compute total weight and due (unprocessed) weight
+  // k = ln(10) ≈ 2.3026 → a 0% item weighs 10× more than a 100% item
+  const k = 2.3026;
+  let totalWeight = 0;
+  let dueWeight = 0;
+
+  for (const item of validItems) {
+    const p = percentileMap.get(item.remId) ?? 50;
+    const weight = Math.exp(-k * p / 100);
+    totalWeight += weight;
+
+    if (isDuePredicate(item)) {
+      dueWeight += weight;
+    }
+  }
+
+  if (totalWeight === 0) return 100;
+
+  // Shield = fraction of total weight that's been processed
+  const processedFraction = (totalWeight - dueWeight) / totalWeight;
+  const result = processedFraction * 100;
+  return Math.round(result * 10) / 10; // 1 decimal
+}
+
+/**
+ * A single bucket in the weighted shield breakdown (e.g. 0-10%, 10-20%, ...).
+ */
+export interface WeightedShieldBucket {
+  /** e.g. "0-10%" */
+  label: string;
+  /** e.g. "0-5" */
+  priorityRange: string;
+  /** Total items in this bucket */
+  total: number;
+  /** Items processed (not due) in this bucket */
+  processed: number;
+  /** Items due (unprocessed) in this bucket */
+  due: number;
+  /** Percentage of items processed (0-100) */
+  processedPct: number;
+  /** Mean exponential weight of items in this bucket */
+  meanWeight: number;
+  /** This bucket's share of total weight (0-100%) */
+  weightShare: number;
+}
+
+/**
+ * Full breakdown data for the weighted shield tooltip/popup.
+ */
+export interface WeightedShieldBreakdown {
+  /** Total items in the universe */
+  totalItems: number;
+  /** Total due (unprocessed) items */
+  dueItems: number;
+  /** Percentage of items that are due */
+  duePct: number;
+  /** The weighted shield value (0-100) */
+  shieldValue: number;
+  /** Total exponential weight of all items */
+  totalWeight: number;
+  /** Total exponential weight of due items */
+  dueWeight: number;
+  /** Weighted processing fraction (same as shieldValue, for display) */
+  processedWeightPct: number;
+  /** 10 buckets of percentile ranges */
+  buckets: WeightedShieldBucket[];
+}
+
+/**
+ * Computes a detailed breakdown of the weighted shield for display in a tooltip.
+ * Divides items into 10 percentile buckets and computes per-bucket processing stats.
+ *
+ * @param allItems Full universe of items (KB or doc scope).
+ * @param isDuePredicate Returns true if the item is due and unreviewed.
+ * @returns Detailed breakdown including buckets, totals, and weights.
+ */
+export function computeWeightedShieldBreakdown<T extends { priority: number; remId: string }>(
+  allItems: T[],
+  isDuePredicate: (item: T) => boolean
+): WeightedShieldBreakdown {
+  const k = 2.3026;
+
+  // Pre-filter: Ignore rems that explicitly have 0 cards
+  const validItems = allItems.filter((item: any) => item.cardCount === undefined || item.cardCount > 0);
+
+  // Sort and compute percentiles
+  const sorted = [...validItems].sort((a, b) => a.priority - b.priority);
+  const percentileMap = new Map<string, number>();
+  sorted.forEach((item, idx) => {
+    percentileMap.set(item.remId, ((idx + 1) / sorted.length) * 100);
+  });
+
+  // Initialize 10 buckets
+  const bucketData: { total: number; processed: number; due: number; weightSum: number; minPriority: number; maxPriority: number }[] =
+    Array.from({ length: 10 }, () => ({ total: 0, processed: 0, due: 0, weightSum: 0, minPriority: Infinity, maxPriority: -Infinity }));
+
+  let totalWeight = 0;
+  let dueWeight = 0;
+  let dueCount = 0;
+
+  for (const item of validItems) {
+    const p = percentileMap.get(item.remId) ?? 50;
+    const weight = Math.exp(-k * p / 100);
+    const bucketIdx = Math.min(Math.floor(p / 10), 9); // 0-9
+    const isDue = isDuePredicate(item);
+
+    totalWeight += weight;
+    bucketData[bucketIdx].total++;
+    bucketData[bucketIdx].weightSum += weight;
+    bucketData[bucketIdx].minPriority = Math.min(bucketData[bucketIdx].minPriority, item.priority);
+    bucketData[bucketIdx].maxPriority = Math.max(bucketData[bucketIdx].maxPriority, item.priority);
+
+    if (isDue) {
+      dueWeight += weight;
+      dueCount++;
+      bucketData[bucketIdx].due++;
+    } else {
+      bucketData[bucketIdx].processed++;
+    }
+  }
+
+  const shieldValue = totalWeight > 0
+    ? Math.round(((totalWeight - dueWeight) / totalWeight) * 1000) / 10
+    : 100;
+
+  const buckets: WeightedShieldBucket[] = bucketData.map((b, i) => ({
+    label: `${i * 10}-${(i + 1) * 10}%`,
+    priorityRange: b.total > 0 ? `${b.minPriority}-${b.maxPriority}` : '—',
+    total: b.total,
+    processed: b.processed,
+    due: b.due,
+    processedPct: b.total > 0 ? Math.round((b.processed / b.total) * 1000) / 10 : 100,
+    meanWeight: b.total > 0 ? Math.round((b.weightSum / b.total) * 1000) / 1000 : 0,
+    weightShare: totalWeight > 0 ? Math.round((b.weightSum / totalWeight) * 1000) / 10 : 0,
+  }));
+
+  return {
+    totalItems: validItems.length,
+    dueItems: dueCount,
+    duePct: validItems.length > 0 ? Math.round((dueCount / validItems.length) * 1000) / 10 : 0,
+    shieldValue,
+    totalWeight: Math.round(totalWeight * 100) / 100,
+    dueWeight: Math.round(dueWeight * 100) / 100,
+    processedWeightPct: shieldValue,
+    buckets,
+  };
 }
 
 /**

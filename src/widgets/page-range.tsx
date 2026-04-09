@@ -3,6 +3,7 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
+  ReactRNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
 import {
@@ -13,7 +14,8 @@ import {
   setIncrementalReadingPosition,
   addPageToHistory,
   getReadingStatistics,
-  PageHistoryEntry
+  PageHistoryEntry,
+  PageRangeContext,
 } from '../lib/pdfUtils';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
 import { calculateRelativePercentile, formatDuration } from '../lib/utils';
@@ -24,13 +26,13 @@ import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 
 function PageRangeWidget() {
   const plugin = usePlugin();
-  const pageRangeInputRefs = React.useRef<Record<string, {start: HTMLInputElement | null, end: HTMLInputElement | null}>>({});
+  const pageRangeInputRefs = React.useRef<Record<string, { start: HTMLInputElement | null, end: HTMLInputElement | null }>>({});
   const inputStartRef = React.useRef<HTMLInputElement>(null);
-  
+
   const contextData = useTrackerPlugin(
     async (rp) => rp.storage.getSession('pageRangeContext'),
     []
-  );
+  ) as PageRangeContext | null | undefined;
 
   const allIncrementalRems = useTrackerPlugin(
     (rp) => rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
@@ -45,7 +47,7 @@ function PageRangeWidget() {
   const [isCurrentRemIncremental, setIsCurrentRemIncremental] = useState<boolean>(false);
   const [remHistories, setRemHistories] = useState<Record<string, PageHistoryEntry[]>>({});
   const [expandedRems, setExpandedRems] = useState<Set<string>>(new Set());
-  const [remPriorities, setRemPriorities] = useState<Record<string, {absolute: number, percentile: number | null}>>({});
+  const [remPriorities, setRemPriorities] = useState<Record<string, { absolute: number, percentile: number | null }>>({});
   const [remStatistics, setRemStatistics] = useState<Record<string, any>>({});
 
   const [editingState, setEditingState] = useState<EditingState>({ type: 'none' });
@@ -56,13 +58,26 @@ function PageRangeWidget() {
       const rem = await plugin.rem.findOne(remId);
       if (!rem) return;
 
-      await initIncrementalRem(plugin, rem);
+      await initIncrementalRem(plugin as unknown as ReactRNPlugin, rem);
 
-      await reloadRelatedRems();
-
+      // Optimistic patch: mark this rem as incremental and fetch its new priority,
+      // rather than re-running the entire getAllIncrementsForPDF search.
       const remName = rem.text ? await plugin.richText.toString(rem.text) : 'Rem';
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
+
+      setRelatedRems(prev => prev.map(r =>
+        r.remId === remId ? { ...r, isIncremental: true } : r
+      ));
+
       if (incRemInfo) {
+        const remsForCalc = allIncrementalRems || [];
+        const percentile = remsForCalc.length > 0
+          ? calculateRelativePercentile(remsForCalc, remId)
+          : null;
+        setRemPriorities(prev => ({
+          ...prev,
+          [remId]: { absolute: incRemInfo.priority, percentile },
+        }));
         await plugin.app.toast(`Made "${remName}" incremental with priority ${incRemInfo.priority}`);
       }
     } catch (error) {
@@ -82,7 +97,7 @@ function PageRangeWidget() {
     }
   };
 
-  // Save priority inline
+  // Save priority inline — optimistic patch, no full reload needed
   const savePriority = async (remId: string) => {
     if (editingState.type !== 'priority') return;
     const priority = editingState.value;
@@ -91,21 +106,30 @@ function PageRangeWidget() {
     if (rem) {
       await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
 
-      // Update the incremental rem list
+      // Update the incremental rem cache for other widgets
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
       if (incRemInfo) {
         await updateIncrementalRemCache(plugin, incRemInfo);
       }
 
+      // Patch only the priority entry for this rem in-place
+      const remsForCalc = allIncrementalRems || [];
+      const percentile = remsForCalc.length > 0
+        ? calculateRelativePercentile(remsForCalc, remId)
+        : null;
+      setRemPriorities(prev => ({
+        ...prev,
+        [remId]: { absolute: priority, percentile },
+      }));
+
       setEditingState({ type: 'none' });
-      await reloadRelatedRems();
       await plugin.app.toast(`Priority updated to ${priority}`);
     }
   };
 
   // Calculate priority info for each incremental rem
   const calculatePriorities = async (rems: any[]) => {
-    const priorities: Record<string, {absolute: number, percentile: number | null}> = {};
+    const priorities: Record<string, { absolute: number, percentile: number | null }> = {};
 
     // Use allIncrementalRems from tracker
     const remsForCalculation = allIncrementalRems || [];
@@ -126,37 +150,37 @@ function PageRangeWidget() {
         }
       }
     }
-    
+
     setRemPriorities(priorities);
   };
 
-    const reloadRelatedRems = async () => {
+  const reloadRelatedRems = async () => {
     if (!contextData?.pdfRemId) return;
-    
+
     const related = await getAllIncrementsForPDF(plugin, contextData.pdfRemId);
     setRelatedRems(related);
 
     // Calculate priorities using tracker data
     await calculatePriorities(related);
-    
+
     // Fetch reading histories and statistics for each related rem
     const histories: Record<string, PageHistoryEntry[]> = {};
     const statistics: Record<string, any> = {};
     let totalTime = 0;
-    
+
     for (const item of related) {
-        // Always fetch stats if it's a related rem
-        const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
-        if (history.length > 0) {
-            histories[item.remId] = history;
-        }
-        
-        const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
-        statistics[item.remId] = stats;
-        totalTime += stats.totalTimeSeconds;
-        
+      // Always fetch stats if it's a related rem
+      const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
+      if (history.length > 0) {
+        histories[item.remId] = history;
+      }
+
+      const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
+      statistics[item.remId] = stats;
+      totalTime += stats.totalTimeSeconds;
+
     }
-    
+
     setRemHistories(histories);
     setRemStatistics(statistics);
     setTotalPdfReadingTime(totalTime);
@@ -184,7 +208,7 @@ function PageRangeWidget() {
     setEditingState({ type: 'range', remId, start, end });
   };
 
-  // Save page range for a specific rem
+  // Save page range for a specific rem — optimistic patch, no full reload needed
   const saveRemRange = async (remId: string) => {
     if (!contextData?.pdfRemId || editingState.type !== 'range') return;
 
@@ -193,14 +217,20 @@ function PageRangeWidget() {
 
     if (start > 1 || end > 0) {
       await plugin.storage.setSynced(rangeKey, { start, end });
+      // Patch the range for this rem in the local list in-place
+      setRelatedRems(prev => prev.map(r =>
+        r.remId === remId ? { ...r, range: { start, end } } : r
+      ));
       await plugin.app.toast(`Saved page range: ${start}-${end || '∞'}`);
     } else {
       await plugin.storage.setSynced(rangeKey, null);
+      setRelatedRems(prev => prev.map(r =>
+        r.remId === remId ? { ...r, range: null } : r
+      ));
       await plugin.app.toast('Cleared page range');
     }
 
     setEditingState({ type: 'none' });
-    await reloadRelatedRems();
   };
 
   // Start editing history
@@ -218,7 +248,7 @@ function PageRangeWidget() {
     setEditingState({ type: 'history', remId, page });
   };
 
-  // Save reading history record
+  // Save reading history record — optimistic patch, no full reload needed
   const saveReadingHistory = async (remId: string) => {
     if (editingState.type !== 'history') return;
     const page = editingState.page;
@@ -230,12 +260,29 @@ function PageRangeWidget() {
 
     // Update both the current reading position (for the queue) and the history log
     await setIncrementalReadingPosition(plugin, remId, contextData.pdfRemId, page);
-    await addPageToHistory(plugin, remId, contextData.pdfRemId, page, false);
+    await addPageToHistory(plugin, remId, contextData.pdfRemId, page, undefined);
 
     await plugin.app.toast(`Updated reading position to page ${page}`);
-
     setEditingState({ type: 'none' });
-    await reloadRelatedRems();
+
+    // Patch only this rem's history and statistics in-place
+    const newHistory = await getPageHistory(plugin, remId, contextData.pdfRemId);
+    const newStats = await getReadingStatistics(plugin, remId, contextData.pdfRemId);
+
+    setRemHistories(prev => ({ ...prev, [remId]: newHistory }));
+    setRemStatistics(prev => ({ ...prev, [remId]: newStats }));
+    setRelatedRems(prev => prev.map(r =>
+      r.remId === remId ? { ...r, currentPage: page } : r
+    ));
+    // Recompute total reading time from updated statistics
+    setRemStatistics(prev => {
+      const updated = { ...prev, [remId]: newStats };
+      const total = Object.values(updated).reduce(
+        (sum: number, s: any) => sum + (s?.totalTimeSeconds || 0), 0
+      );
+      setTotalPdfReadingTime(total);
+      return updated;
+    });
   };
 
 
@@ -247,11 +294,11 @@ function PageRangeWidget() {
         setIsLoading(false);
         return;
       }
-      
+
       try {
         setIsLoading(true);
         const { incrementalRemId, pdfRemId } = contextData;
-        
+
         // Fetch current rem details
         const currentRem = await plugin.rem.findOne(incrementalRemId);
         if (currentRem) {
@@ -260,7 +307,7 @@ function PageRangeWidget() {
           setCurrentRemName(remText);
           setIsCurrentRemIncremental(isIncremental);
         }
-        
+
         // Load page range for current rem
         const savedRange = await getIncrementalPageRange(plugin, incrementalRemId, pdfRemId);
         if (savedRange) {
@@ -270,13 +317,13 @@ function PageRangeWidget() {
           setPageRangeStart(1);
           setPageRangeEnd(0);
         }
-        
+
         // Load related rems with priorities
         await reloadRelatedRems();
 
       } catch (error) {
         console.error('PageRange: Error loading data:', error);
-        await plugin.app.toast(`Error loading data: ${error.message}`);
+        await plugin.app.toast(`Error loading data: ${(error as Error).message}`);
       } finally {
         setIsLoading(false);
       }
@@ -331,11 +378,11 @@ function PageRangeWidget() {
 
   const handleSave = async () => {
     if (!contextData?.incrementalRemId || !contextData?.pdfRemId) return;
-    
+
     try {
       const { incrementalRemId, pdfRemId } = contextData;
       const rangeKey = getPageRangeKey(incrementalRemId, pdfRemId);
-      
+
       if (pageRangeStart > 1 || pageRangeEnd > 0) {
         const range = { start: pageRangeStart, end: pageRangeEnd };
         await plugin.storage.setSynced(rangeKey, range);
@@ -344,11 +391,11 @@ function PageRangeWidget() {
         await plugin.storage.setSynced(rangeKey, null);
         await plugin.app.toast('Cleared page range');
       }
-      
+
       plugin.widget.closePopup();
     } catch (error) {
       console.error('PageRange: Error saving:', error);
-      await plugin.app.toast(`Error saving: ${error.message}`);
+      await plugin.app.toast(`Error saving: ${(error as Error).message}`);
     }
   };
 
@@ -374,7 +421,7 @@ function PageRangeWidget() {
     );
   }
 
-  
+
   // Calculate unassigned ranges (excluding current rem's range)
   const getUnassignedRanges = () => {
     const assignedRanges = relatedRems
@@ -382,10 +429,10 @@ function PageRangeWidget() {
       .map((item) => item.range)
       .filter(Boolean)
       .sort((a, b) => a.start - b.start);
-  
+
     const unassignedRanges = [];
     let lastEnd = 0;
-  
+
     for (const range of assignedRanges) {
       if (range.start > lastEnd + 1) {
         unassignedRanges.push({
@@ -395,9 +442,9 @@ function PageRangeWidget() {
       }
       lastEnd = Math.max(lastEnd, range.end || range.start);
     }
-  
+
     const totalPages = contextData?.totalPages;
-  
+
     // Only add a final open range if not all pages are covered.
     if (!totalPages || lastEnd < totalPages) {
       unassignedRanges.push({
@@ -405,36 +452,156 @@ function PageRangeWidget() {
         end: null, // `null` represents the end of the document
       });
     }
-  
+
     return unassignedRanges;
   };
 
-  // Sort related rems: current first, then by page range, then alphabetically
-  const sortedRelatedRems = [...relatedRems].sort((a, b) => {
-    // Current rem always first
-    if (a.remId === contextData?.incrementalRemId) return -1;
-    if (b.remId === contextData?.incrementalRemId) return 1;
-    
-    // Incremental rems before non-incremental
-    if (a.isIncremental !== b.isIncremental) {
-      return a.isIncremental ? -1 : 1;
+  // ─── Build containment tree ──────────────────────────────────────────────
+  // Algorithm:
+  //  1. Sort with current rem first, then by start page (no-range items last).
+  //  2. Walk the sorted list assigning each item the tightest parent whose
+  //     range fully contains this item's range.
+  //  3. Assign depth = parent.depth + 1, or 0 for root items.
+  //  4. Mark the last child of each parent for the "└─" corner elbow.
+  //  5. Flag sibling items (same parent, same depth) whose ranges overlap
+  //     (not containment — that's the child case).
+
+  const buildRangeTree = () => {
+    // Step 1: base sort
+    const sorted = [...relatedRems].sort((a, b) => {
+      if (a.remId === contextData?.incrementalRemId) return -1;
+      if (b.remId === contextData?.incrementalRemId) return 1;
+      if (a.isIncremental !== b.isIncremental) return a.isIncremental ? -1 : 1;
+      if (a.range && b.range) return a.range.start - b.range.start;
+      if (a.range && !b.range) return -1;
+      if (!a.range && b.range) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    type TreeItem = typeof sorted[0] & {
+      depth: number;
+      parentId: string | null;
+      hasOverlap: boolean;
+      childCoverage?: { coveredPages: number; parentPages: number };
+    };
+
+    const contains = (
+      outer: { start: number; end: number | null },
+      inner: { start: number; end: number | null }
+    ) =>
+      inner.start >= outer.start &&
+      (outer.end === null || inner.end === null || inner.end <= outer.end) &&
+      // Must actually be narrower (not identical)
+      (inner.start > outer.start || (inner.end !== null && (outer.end === null || inner.end < outer.end)));
+
+    const overlaps = (
+      a: { start: number; end: number | null },
+      b: { start: number; end: number | null }
+    ) => {
+      const aEnd = a.end ?? Infinity;
+      const bEnd = b.end ?? Infinity;
+      return a.start < bEnd && b.start < aEnd && !contains(a, b) && !contains(b, a);
+    };
+
+    // Step 2: assign parents (tightest containing range)
+    const items: TreeItem[] = sorted.map(item => ({
+      ...item,
+      depth: 0,
+      parentId: null,
+      hasOverlap: false,
+    }));
+
+    for (let i = 0; i < items.length; i++) {
+      if (!items[i].range) continue;
+      let bestParentIdx = -1;
+      let bestParentSize = Infinity;
+      for (let j = 0; j < i; j++) {
+        if (!items[j].range) continue;
+        if (contains(items[j].range!, items[i].range!)) {
+          const parentSize = (items[j].range!.end ?? Infinity) - items[j].range!.start;
+          if (parentSize < bestParentSize) {
+            bestParentSize = parentSize;
+            bestParentIdx = j;
+          }
+        }
+      }
+      if (bestParentIdx >= 0) {
+        items[i].parentId = items[bestParentIdx].remId;
+        items[i].depth = items[bestParentIdx].depth + 1;
+      }
     }
-    
-    // Both have page ranges: sort by start page
-    if (a.range && b.range) {
-      return a.range.start - b.range.start;
+
+    // Step 3: mark isLastChild and detect sibling overlaps
+    // Group children by parent
+    const childrenOf = new Map<string | null, TreeItem[]>();
+    for (const item of items) {
+      const key = item.parentId;
+      if (!childrenOf.has(key)) childrenOf.set(key, []);
+      childrenOf.get(key)!.push(item);
     }
-    
-    // Only a has page range: a comes first
-    if (a.range && !b.range) return -1;
-    
-    // Only b has page range: b comes first
-    if (!a.range && b.range) return 1;
-    
-    // Neither has page range: sort alphabetically
-    return a.name.localeCompare(b.name);
-  });
-  
+
+    for (const siblings of childrenOf.values()) {
+      if (siblings.length === 0) continue;
+
+      const withRange = siblings.filter(s => s.range);
+
+      // Overlap detection among siblings with ranges
+      for (let i = 0; i < withRange.length; i++) {
+        for (let j = i + 1; j < withRange.length; j++) {
+          if (overlaps(withRange[i].range!, withRange[j].range!)) {
+            withRange[i].hasOverlap = true;
+            withRange[j].hasOverlap = true;
+          }
+        }
+      }
+    }
+
+    // Step 4: compute child coverage for each parent with a finite range.
+    // We take the union of direct children's ranges (merged intervals), clamp
+    // to the parent's bounds, and sum the covered page count.
+    for (const [parentId, children] of childrenOf.entries()) {
+      if (!parentId) continue; // skip root group
+      const parent = items.find(i => i.remId === parentId);
+      if (!parent?.range || parent.range.end === null) continue; // need finite bounds
+
+      const childRanges = children
+        .filter(c => c.range && c.range.end !== null)
+        .map(c => ({ start: c.range!.start, end: c.range!.end as number }))
+        .sort((a, b) => a.start - b.start);
+      if (childRanges.length === 0) continue;
+
+      // Merge overlapping child intervals
+      const merged: { start: number; end: number }[] = [];
+      for (const r of childRanges) {
+        if (merged.length === 0 || r.start > merged[merged.length - 1].end) {
+          merged.push({ ...r });
+        } else {
+          merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, r.end);
+        }
+      }
+
+      // Sum pages covered within parent range
+      const pStart = parent.range.start;
+      const pEnd = parent.range.end;
+      let coveredPages = 0;
+      for (const r of merged) {
+        const lo = Math.max(r.start, pStart);
+        const hi = Math.min(r.end, pEnd);
+        if (hi >= lo) coveredPages += hi - lo + 1;
+      }
+
+      const parentPages = pEnd - pStart + 1;
+      if (coveredPages > 0) {
+        parent.childCoverage = { coveredPages, parentPages };
+      }
+    }
+
+    return items;
+  };
+
+  const treeItems = buildRangeTree();
+  const INDENT_PX = 16;
+
   return (
     <div
       className="flex flex-col"
@@ -466,7 +633,7 @@ function PageRangeWidget() {
           <span className="text-lg">📄</span>
           <span className="font-semibold text-sm" style={{ color: 'var(--rn-clr-content-primary)' }}>PDF Control</span>
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-            {currentRemName ? `· ${currentRemName.length > 30 ? currentRemName.substring(0, 30) + '...' : currentRemName}` : ''}
+            {currentRemName ? `· ${currentRemName.length > 50 ? currentRemName.substring(0, 50) + '...' : currentRemName}` : ''}
           </span>
           {isCurrentRemIncremental && (
             <span className="text-xs" style={{ color: '#3b82f6' }} title="Incremental Rem">⚡</span>
@@ -491,142 +658,146 @@ function PageRangeWidget() {
 
       <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
 
-      {/* Current Rem - Quick Edit */}
-      <div className="mb-3 p-3 rounded" style={{
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        border: '2px solid #3b82f6',
-      }}>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs">✏️</span>
-          <span className="font-semibold text-xs" style={{ color: '#3b82f6' }}>Quick Edit: Current Rem</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start page:</label>
-            <input
-              ref={inputStartRef}
-              type="number"
-              min="1"
-              value={pageRangeStart}
-              onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
-              className="w-16 text-center p-1.5 rounded text-xs"
-              style={{
-                border: '1px solid var(--rn-clr-border-primary)',
-                backgroundColor: 'var(--rn-clr-background-primary)',
-                color: 'var(--rn-clr-content-primary)',
-              }}
-            />
+        {/* Current Rem - Quick Edit */}
+        <div className="mb-3 p-3 rounded" style={{
+          backgroundColor: 'var(--rn-clr-background-secondary)',
+          border: '2px solid #3b82f6',
+        }}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs">✏️</span>
+            <span className="font-semibold text-xs" style={{ color: '#3b82f6' }}>Quick Edit: Current Rem</span>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>End page:</label>
-            <input
-              type="number"
-              min={pageRangeStart}
-              value={pageRangeEnd || ''}
-              onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
-              placeholder="∞"
-              className="w-16 text-center p-1.5 rounded text-xs"
-              style={{
-                border: '1px solid var(--rn-clr-border-primary)',
-                backgroundColor: 'var(--rn-clr-background-primary)',
-                color: 'var(--rn-clr-content-primary)',
-              }}
-            />
-          </div>
-          <div className="flex-1" />
-          {pageRangeStart > 1 || pageRangeEnd > 0 ? (
-            <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>
-              Pages {pageRangeStart}-{pageRangeEnd || '∞'}
-            </span>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-tertiary)' }}>
-              All pages
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Available Ranges - Hint */}
-      {(() => {
-        const unassignedRanges = getUnassignedRanges();
-        return unassignedRanges.length > 0 ? (
-          <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
-            backgroundColor: '#fefce8',
-            border: '1px solid #fde047',
-          }}>
-            <span className="text-xs">💡</span>
-            <span className="text-xs font-medium" style={{ color: '#92400e' }}>Available ranges:</span>
-            <div className="text-xs flex flex-wrap gap-1">
-              {unassignedRanges.map((range, idx) => {
-                const endPageDisplay =
-                  range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
-                return (
-                  <span key={idx} className="px-1.5 py-0.5 rounded font-medium" style={{
-                    backgroundColor: '#fef9c3',
-                    color: '#854d0e',
-                  }}>
-                    {range.start}-{endPageDisplay}
-                  </span>
-                );
-              })}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Start page:</label>
+              <input
+                ref={inputStartRef}
+                type="number"
+                min="1"
+                value={pageRangeStart}
+                onChange={(e) => setPageRangeStart(parseInt(e.target.value) || 1)}
+                className="w-16 text-center p-1.5 rounded text-xs"
+                style={{
+                  border: '1px solid var(--rn-clr-border-primary)',
+                  backgroundColor: 'var(--rn-clr-background-primary)',
+                  color: 'var(--rn-clr-content-primary)',
+                }}
+              />
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>End page:</label>
+              <input
+                type="number"
+                min={pageRangeStart}
+                value={pageRangeEnd || ''}
+                onChange={(e) => setPageRangeEnd(parseInt(e.target.value) || 0)}
+                placeholder="∞"
+                className="w-16 text-center p-1.5 rounded text-xs"
+                style={{
+                  border: '1px solid var(--rn-clr-border-primary)',
+                  backgroundColor: 'var(--rn-clr-background-primary)',
+                  color: 'var(--rn-clr-content-primary)',
+                }}
+              />
+            </div>
+            <div className="flex-1" />
+            {pageRangeStart > 1 || pageRangeEnd > 0 ? (
+              <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}>
+                Pages {pageRangeStart}-{pageRangeEnd || '∞'}
+              </span>
+            ) : (
+              <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-tertiary)' }}>
+                All pages
+              </span>
+            )}
           </div>
-        ) : (
-          <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
-            backgroundColor: '#fee2e2',
-            border: '1px solid #fca5a5',
-          }}>
-            <span className="text-xs">⚠️</span>
-            <span className="text-xs" style={{ color: '#991b1b' }}>
-              All pages are already assigned to other rems
-            </span>
-          </div>
-        );
-      })()}
+        </div>
 
-      {/* All Rems Using This PDF */}
-      <div>
-        <div className="flex items-center justify-between py-1 px-1 mb-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs">📑</span>
-            <span className="font-semibold text-xs" style={{ color: 'var(--rn-clr-content-primary)' }}>All Rems Using This PDF</span>
-            <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>{sortedRelatedRems.length}</span>
+        {/* Available Ranges - Hint */}
+        {(() => {
+          const unassignedRanges = getUnassignedRanges();
+          return unassignedRanges.length > 0 ? (
+            <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
+              backgroundColor: '#fefce8',
+              border: '1px solid #fde047',
+            }}>
+              <span className="text-xs">💡</span>
+              <span className="text-xs font-medium" style={{ color: '#92400e' }}>Available ranges:</span>
+              <div className="text-xs flex flex-wrap gap-1">
+                {unassignedRanges.map((range, idx) => {
+                  const endPageDisplay =
+                    range.end || (contextData?.totalPages > 0 ? contextData.totalPages : '∞');
+                  return (
+                    <span key={idx} className="px-1.5 py-0.5 rounded font-medium" style={{
+                      backgroundColor: '#fef9c3',
+                      color: '#854d0e',
+                    }}>
+                      {range.start}-{endPageDisplay}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="mb-3 p-2 rounded flex items-center gap-2" style={{
+              backgroundColor: '#fee2e2',
+              border: '1px solid #fca5a5',
+            }}>
+              <span className="text-xs">⚠️</span>
+              <span className="text-xs" style={{ color: '#991b1b' }}>
+                All pages are already assigned to other rems
+              </span>
+            </div>
+          );
+        })()}
+
+        {/* All Rems Using This PDF — hierarchical tree view */}
+        <div>
+          <div className="flex items-center justify-between py-1 px-1 mb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs">📑</span>
+              <span className="font-semibold text-xs" style={{ color: 'var(--rn-clr-content-primary)' }}>All Rems Using This PDF</span>
+              <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-secondary)' }}>{treeItems.length}</span>
+            </div>
+            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>Click to expand</span>
           </div>
-          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>Click to expand</span>
+          <div className="flex flex-col gap-1">
+            {treeItems.map((item) => (
+              <div key={item.remId} className="relative" style={{ marginLeft: item.depth * INDENT_PX }}>
+                {/* Overlap warning inline via hasOverlap prop */}
+                <PdfRemItem
+                  item={item}
+                  isCurrentRem={item.remId === contextData?.incrementalRemId}
+                  isExpanded={expandedRems.has(item.remId)}
+                  hasOverlap={item.hasOverlap}
+                  coverageInfo={item.childCoverage}
+                  priorityInfo={remPriorities[item.remId]}
+                  statistics={remStatistics[item.remId]}
+                  history={remHistories[item.remId]}
+                  editingState={editingState}
+                  onToggleExpanded={toggleExpanded}
+                  onInitIncremental={handleInitIncrementalRem}
+                  onStartEditingRem={startEditingRem}
+                  onStartEditingPriority={startEditingPriority}
+                  onStartEditingHistory={startEditingHistory}
+                  onSaveRemRange={saveRemRange}
+                  onSavePriority={savePriority}
+                  onSaveHistory={saveReadingHistory}
+                  onCancelEditing={() => setEditingState({ type: 'none' })}
+                  onEditingStateChange={setEditingState}
+                  startInputRef={(el) => {
+                    if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                    pageRangeInputRefs.current[item.remId].start = el;
+                  }}
+                  endInputRef={(el) => {
+                    if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
+                    pageRangeInputRefs.current[item.remId].end = el;
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          {sortedRelatedRems.map((item) => (
-            <PdfRemItem
-              key={item.remId}
-              item={item}
-              isCurrentRem={item.remId === contextData?.incrementalRemId}
-              isExpanded={expandedRems.has(item.remId)}
-              priorityInfo={remPriorities[item.remId]}
-              statistics={remStatistics[item.remId]}
-              history={remHistories[item.remId]}
-              editingState={editingState}
-              onToggleExpanded={toggleExpanded}
-              onInitIncremental={handleInitIncrementalRem}
-              onStartEditingRem={startEditingRem}
-              onStartEditingPriority={startEditingPriority}
-              onStartEditingHistory={startEditingHistory}
-              onSaveRemRange={saveRemRange}
-              onSavePriority={savePriority}
-              onSaveHistory={saveReadingHistory}
-              onCancelEditing={() => setEditingState({ type: 'none' })}
-              onEditingStateChange={setEditingState}
-              startInputRef={(el) => {
-                if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
-                pageRangeInputRefs.current[item.remId].start = el;
-              }}
-              endInputRef={(el) => {
-                if (!pageRangeInputRefs.current[item.remId]) pageRangeInputRefs.current[item.remId] = { start: null, end: null };
-                pageRangeInputRefs.current[item.remId].end = el;
-              }}
-            />
-          ))}
-        </div>
-      </div>
       </div>
 
       {/* Footer */}

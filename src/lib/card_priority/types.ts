@@ -55,4 +55,28 @@ export interface QueueSessionCache {
    * Pre-calculated for every IncRem in the current document scope.
    */
   incRemDocPercentiles: Record<RemId, number>;
+
+  /**
+   * Pre-computed weighted shield value for cards at KB scope.
+   * null when not enabled or not yet computed.
+   */
+  weightedShieldCardKB?: number | null;
+
+  /**
+   * Pre-computed weighted shield value for cards at document scope.
+   * null when not enabled or not yet computed.
+   */
+  weightedShieldCardDoc?: number | null;
+
+  /**
+   * Pre-computed weighted shield value for IncRems at KB scope.
+   * null when not enabled or not yet computed.
+   */
+  weightedShieldIncRemKB?: number | null;
+
+  /**
+   * Pre-computed weighted shield value for IncRems at document scope.
+   * null when not enabled or not yet computed.
+   */
+  weightedShieldIncRemDoc?: number | null;
 }

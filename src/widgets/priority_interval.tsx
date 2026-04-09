@@ -11,13 +11,10 @@ import {
     prioritySlotCode,
     defaultPriorityId,
     initialIntervalId,
+    pendingIntervalBatchSaveKey,
 } from '../lib/consts';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
-import { updateSRSDataForRem } from '../lib/scheduler';
-import { IncrementalRep } from '../lib/incremental_rem/types';
 import dayjs from 'dayjs';
 
 function PriorityInterval() {
@@ -32,6 +29,13 @@ function PriorityInterval() {
     const context = useRunAsync(async () => {
         return await plugin.widget.getWidgetContext<any>();
     }, []);
+
+    // Batch mode: read batch remIds from session storage (set by extract-with-priority)
+    const isBatchMode = context?.contextData?.batchMode === true;
+    const batchRemIds = useRunAsync(async () => {
+        if (!isBatchMode) return null;
+        return await plugin.storage.getSession<string[]>('batchPriorityIntervalRemIds');
+    }, [isBatchMode]);
 
     // Data from DB
     const data = useTrackerPlugin(async (rp) => {
@@ -131,12 +135,13 @@ function PriorityInterval() {
         }
     };
 
+    // handleSave: writes job to session storage, closes popup immediately.
+    // ALL heavy work (DB writes, cache, cascade) is delegated to the tracker
+    // watcher in tracker.ts, which runs in the persistent index iframe and
+    // cannot be killed by popup teardown.
     const handleSave = useCallback(async (overrideInterval?: number) => {
         if (!data || !data.rem || isSaving.current) return;
         isSaving.current = true;
-
-        // Suppress GlobalRemChanged
-        await plugin.storage.setSession('plugin_operation_active', true);
 
         try {
             const effectivePriority = priorityVal ?? data.defaultPriority;
@@ -144,54 +149,31 @@ function PriorityInterval() {
                 ? overrideInterval
                 : (intervalVal !== null ? parseInt(intervalVal) : data.defaultInterval);
 
-            if (isNaN(effectiveInterval)) {
-                return;
+            if (isNaN(effectiveInterval)) return;
+
+            const remIdsToUpdate = (isBatchMode && batchRemIds && batchRemIds.length > 0)
+                ? batchRemIds
+                : [data.remId];
+
+            if (remIdsToUpdate.length === 0) return;
+
+            // Write the job — one await, then close immediately.
+            await plugin.storage.setSession(pendingIntervalBatchSaveKey, {
+                remIds: remIdsToUpdate,
+                priority: effectivePriority,
+                interval: effectiveInterval,
+            });
+
+            // Clean up batch session storage
+            if (isBatchMode) {
+                await plugin.storage.setSession('batchPriorityIntervalRemIds', null);
             }
-
-            // Save priority
-            await data.rem.setPowerupProperty(powerupCode, prioritySlotCode, [effectivePriority.toString()]);
-
-            // Save interval (SRS schedule)
-            const incRem = await getIncrementalRemFromRem(plugin, data.rem);
-            if (incRem) {
-                const newNextRepDate = Date.now() + effectiveInterval * 1000 * 60 * 60 * 24;
-                const scheduledDate = incRem.nextRepDate || Date.now();
-                const actualDate = Date.now();
-                const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
-                const wasEarly = daysDifference < 0;
-                const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
-
-                const newHistory: IncrementalRep[] = [
-                    ...(incRem.history || []),
-                    {
-                        date: actualDate,
-                        scheduled: scheduledDate,
-                        interval: effectiveInterval,
-                        wasEarly,
-                        daysEarlyOrLate,
-                        reviewTimeSeconds: undefined,
-                        priority: effectivePriority,
-                        eventType: 'rescheduledInEditor',
-                    },
-                ];
-
-                await updateSRSDataForRem(plugin, data.remId, newNextRepDate, newHistory);
-            }
-
-            // Update cache
-            const updatedIncRem = await getIncrementalRemFromRem(plugin, data.rem);
-            if (updatedIncRem) {
-                await updateIncrementalRemCache(plugin, updatedIncRem);
-            }
-
-            plugin.storage.setSession('pendingInheritanceCascade', data.rem._id).catch(console.error);
 
             plugin.widget.closePopup();
         } finally {
             isSaving.current = false;
-            await plugin.storage.setSession('plugin_operation_active', false);
         }
-    }, [data, priorityVal, intervalVal, plugin]);
+    }, [data, priorityVal, intervalVal, plugin, isBatchMode, batchRemIds]);
 
     if (!data) {
         return <div className="h-20 flex items-center justify-center text-sm">Loading...</div>;
@@ -228,16 +210,29 @@ function PriorityInterval() {
                         onClick={() => plugin.widget.closePopup()}
                     >✕</button>
                 </div>
-                <div
-                    className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
-                    title={`${data.front}${data.back ? ` → ${data.back}` : ''}`}
-                    style={{ width: '100%' }}
-                >
-                    <span className="text-sm font-medium">
-                        {data.front}
-                        {data.back && <span className="opacity-80"> → {data.back}</span>}
-                    </span>
-                </div>
+                {isBatchMode && batchRemIds && batchRemIds.length > 1 ? (
+                    <div
+                        className="mt-1 px-2 py-1 rounded text-xs font-semibold text-center"
+                        style={{
+                            backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                            color: '#3B82F6',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                        }}
+                    >
+                        📋 {batchRemIds.length} rems selected — priority & interval will apply to all
+                    </div>
+                ) : (
+                    <div
+                        className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={`${data.front}${data.back ? ` → ${data.back}` : ''}`}
+                        style={{ width: '100%' }}
+                    >
+                        <span className="text-sm font-medium">
+                            {data.front}
+                            {data.back && <span className="opacity-80"> → {data.back}</span>}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Priority Section */}

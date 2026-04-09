@@ -15,6 +15,8 @@ import {
   showRemsAsIsolatedInQueueId,
   displayFsrsDsrId,
   fsrsWeightsId,
+  displayQueueToolbarPriorityId,
+  displayWeightedShieldId,
 } from '../lib/consts';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
@@ -147,8 +149,8 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   plugin.settings.registerNumberSetting({
     id: 'priority-step-size',
     title: 'Priority Step Size',
-    description: 'Sets the step size for quick priority increase/decrease shortcuts (Ctrl+Shift+Up/Down). Default: 10',
-    defaultValue: 10,
+    description: 'Sets the step size for quick priority increase/decrease shortcuts (Ctrl+Shift+Up/Down). Default: 5',
+    defaultValue: 5,
     validators: [
       { type: 'int' as const },
       { type: 'gte' as const, arg: 1 },
@@ -197,6 +199,24 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Display Priority Shield in Queue',
     description:
       'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
+    defaultValue: true,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: displayWeightedShieldId,
+    title: 'Display Weighted Priority Shield in Queue',
+    description:
+      'If enabled, shows what fraction of your total priority-weighted workload has been processed. ' +
+      'High-priority items carry exponentially more weight (~10× at the top vs bottom), so processing ' +
+      'them gives a bigger boost. Always increases as you review items.',
+    defaultValue: true,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: displayQueueToolbarPriorityId,
+    title: 'Display Priority in Queue Toolbar',
+    description:
+      'If enabled, exhibits the PriorityBadge of the current flashcard or IncRem at the top right of the queue.',
     defaultValue: true,
   });
 

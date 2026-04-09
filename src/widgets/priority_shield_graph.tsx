@@ -35,6 +35,7 @@ interface ChartData {
   dismissedCount?: number;
   totalUniverse?: number;
   processingPercentage?: number;
+  weightedShield?: number | null;
 }
 
 function PriorityShieldGraph() {
@@ -47,6 +48,8 @@ function PriorityShieldGraph() {
     refAreaRight: string | null;
     autoFit?: boolean;
   }>>({});
+
+  const [showWeightedShield, setShowWeightedShield] = useState(false);
 
   const getZState = (title: string) => {
     return zoomState[title] || {
@@ -101,6 +104,7 @@ function PriorityShieldGraph() {
           absolute: values.absolute,
           relative: values.percentile,
           universeSize: universeSize,
+          weightedShield: (values as any).weightedShield ?? null,
         };
 
         if (isIncRem) {
@@ -267,6 +271,13 @@ function PriorityShieldGraph() {
                 </p>
               );
             }
+            if (entry.dataKey === 'weightedShield' && entry.value !== null && entry.value !== undefined) {
+              return (
+                <p key={index} style={{ color: entry.color }}>
+                  {`${entry.name}: ${entry.value}%`}
+                </p>
+              );
+            }
             if (!isIncRem && entry.dataKey === 'universeSize') {
               return (
                 <p key={index} style={{ color: entry.color }}>
@@ -399,6 +410,7 @@ function PriorityShieldGraph() {
         <h4 className="text-md font-semibold text-center mb-2 mt-2">{title}</h4>
 
         <div className="absolute top-0 right-4 flex gap-2 z-10 justify-end items-center pointer-events-auto w-max" style={{ top: '6px' }}>
+
           <button
             className="rn-button rn-button--secondary shadow-sm relative"
             style={{ margin: 0, fontSize: '11px', minHeight: '22px', padding: '0 8px' }}
@@ -547,6 +559,20 @@ function PriorityShieldGraph() {
               />
             )}
 
+            {showWeightedShield && (
+              <Line
+                yAxisId="middle"
+                type="monotone"
+                dataKey="weightedShield"
+                name="Weighted Shield (%)"
+                stroke="#ff6b6b"
+                strokeWidth={2}
+                strokeDasharray="8 4"
+                dot={{ r: 2 }}
+                connectNulls
+              />
+            )}
+
             {zState.refAreaLeft && zState.refAreaRight ? (
               <ReferenceArea
                 yAxisId="left"
@@ -574,7 +600,18 @@ function PriorityShieldGraph() {
   // Remove the fixed height and scrolling - let the container size naturally
   return (
     <div className="p-4 flex flex-col" style={{ width: '1030px' }}>
-      <h3 className="text-lg font-bold text-center mb-4">Priority Shield History</h3>
+      <div className="flex flex-col items-center mb-6 relative">
+        <h3 className="text-lg font-bold">Priority Shield History</h3>
+        <label className="flex items-center gap-1.5 mt-2 text-sm cursor-pointer select-none" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+          <input
+            type="checkbox"
+            checked={showWeightedShield}
+            onChange={(e) => setShowWeightedShield(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+          />
+          Show Weighted Shield
+        </label>
+      </div>
 
       {/* Show document-level charts if we have an effective scope (original or current) */}
       {effectiveDocScopeId && hasDocData && renderChart(
@@ -638,6 +675,10 @@ function PriorityShieldGraph() {
           The higher the percentile of your Relative Priority shield, the more your top priority material is safeguarded and processed.
           If your graph oscillates around priority of 4%, you will know that only top 4% of your learning material is guaranteed a timely repetition.
           You can increase that number by doing more work, reducing inflow of new material, deprioritizing less important Incremental Rems / Flashcards, or reducing the randomization degree for the due Incremental Rems queue / Flashcards queue in the <b>Sorting Criteria</b> queue menu (the three-dot icon).
+        </p>
+
+        <p className="mb-3">
+          <b>Weighted Shield</b> (⚖️) measures the fraction of your total priority-weighted workload that has been processed. Each item is weighted exponentially by priority: high-priority items (low percentile) carry ~10× the weight of low-priority items. Processing any item increases the shield, and processing high-priority items gives a bigger boost. 100% means everything is processed; a low value means significant high-priority material remains unreviewed. Toggle its display with the "Show Weighted Shield" checkbox at the top of the widget.
         </p>
 
         <p>

@@ -27,6 +27,8 @@ interface PdfRemItemProps {
   item: PdfRemItemData;
   isCurrentRem: boolean;
   isExpanded: boolean;
+  hasOverlap?: boolean;
+  coverageInfo?: { coveredPages: number; parentPages: number };
   priorityInfo?: { absolute: number; percentile: number | null };
   statistics?: { totalTimeSeconds: number; sessionsWithTime: number };
   history?: PageHistoryEntry[];
@@ -49,6 +51,8 @@ export function PdfRemItem({
   item,
   isCurrentRem,
   isExpanded,
+  hasOverlap,
+  coverageInfo,
   priorityInfo,
   statistics,
   history,
@@ -100,6 +104,56 @@ export function PdfRemItem({
         {item.range && (
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-secondary)' }} title="Page range">
             p.{item.range.start}-{item.range.end || '∞'}
+          </span>
+        )}
+        {hasOverlap && (
+          <span
+            title="Page range overlaps with a sibling rem"
+            style={{
+              fontSize: '10px',
+              backgroundColor: '#fef3c7',
+              color: '#92400e',
+              borderRadius: 3,
+              padding: '1px 5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            ⚠ overlap
+          </span>
+        )}
+        {coverageInfo && (
+          <span
+            title={`${coverageInfo.coveredPages} of ${coverageInfo.parentPages} pages covered by sub-rems (${Math.round((coverageInfo.coveredPages / coverageInfo.parentPages) * 100)}%)`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: '10px',
+              color: 'var(--rn-clr-content-tertiary)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {/* Mini fill bar */}
+            <span style={{
+              display: 'inline-block',
+              width: 28,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: '#cbd5e1',
+              overflow: 'hidden',
+              flexShrink: 0,
+            }}>
+              <span style={{
+                display: 'block',
+                width: `${Math.round((coverageInfo.coveredPages / coverageInfo.parentPages) * 100)}%`,
+                height: '100%',
+                backgroundColor: '#3b82f6',
+                borderRadius: 2,
+              }} />
+            </span>
+            {coverageInfo.coveredPages}/{coverageInfo.parentPages}pp
           </span>
         )}
         {item.currentPage && (

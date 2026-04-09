@@ -1,6 +1,6 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
@@ -20,8 +20,21 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     // This watcher will only re-run when actual rem data changes, not when the flag changes.
     if (incRemBatchActive) return;
 
+    // Lightweight reactive read: the tracker re-runs ONLY when this key is explicitly bumped
+    // (e.g., after initIncrementalRem adds a powerup). We do NOT pass `rp` into the cache
+    // loader because powerup.getPowerupByCode(rp) + taggedRem(rp) would subscribe the entire
+    // powerup-membership list as a reactive dependency, causing a 2s reload on every rem
+    // open/search. Reading this controlled key is the only subscription we want.
+    await rp.storage.getSession(incRemCacheReloadKey);
+
     console.log('[Tracker] IncRem cache load triggered by plugin.track()');
-    await loadIncrementalRemCache(rp as any);
+    // Pass the non-reactive `plugin` reference (NOT `rp`) so that
+    // powerup.getPowerupByCode() and taggedRem() inside the cache loader
+    // do NOT register as reactive dependencies on the tracker.
+    // Using `rp` here caused every rem open/search to re-trigger a full
+    // 2s cache reload because `taggedRem()` subscribed the tracker to
+    // the entire powerup membership list.
+    await loadIncrementalRemCache(plugin);
     console.log('[Tracker] IncRem cache load completed.');
   });
 
@@ -266,6 +279,105 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       await plugin.storage.setSession('plugin_operation_active', false);
     }
   });
+
+  // Pending interval+priority batch save watcher.
+  // priority_interval.tsx writes a job { remIds, priority, interval } here before closing.
+  // This watcher runs in the persistent index iframe — safe from popup teardown.
+  let intervalBatchSaveRunning = false;
+  plugin.track(async (rp) => {
+    const job = await rp.storage.getSession<{
+      remIds: string[];
+      priority: number;
+      interval: number;
+    }>(pendingIntervalBatchSaveKey);
+
+    if (!job || intervalBatchSaveRunning) return;
+
+    intervalBatchSaveRunning = true;
+    // Clear immediately to prevent re-trigger on the next track() tick.
+    await plugin.storage.setSession(pendingIntervalBatchSaveKey, null);
+    incRemBatchActive = true;
+    await plugin.storage.setSession('plugin_operation_active', true);
+
+    console.log(`[Tracker] intervalBatchSave: ${job.remIds.length} rem(s), priority=${job.priority}, interval=${job.interval}`);
+    try {
+      const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
+      const { updateSRSDataForRem } = await import('../lib/scheduler');
+      const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
+      const { allIncrementalRemKey } = await import('../lib/consts');
+      const { powerupCode: pc, prioritySlotCode } = await import('../lib/consts');
+
+      const patchedIncRems: import('../lib/incremental_rem/types').IncrementalRem[] = [];
+
+      for (const remId of job.remIds) {
+        const rem = await plugin.rem.findOne(remId);
+        if (!rem) { console.warn('[Tracker] intervalBatchSave: rem not found', remId); continue; }
+
+        // 1. Write priority powerup property
+        await rem.setPowerupProperty(pc, prioritySlotCode, [job.priority.toString()]);
+
+        // 2. Compute and write SRS schedule
+        const incRem = await getIncrementalRemFromRem(plugin as any, rem);
+        if (!incRem) continue;
+
+        const newNextRepDate = Date.now() + job.interval * 1000 * 60 * 60 * 24;
+        const scheduledDate = incRem.nextRepDate || Date.now();
+        const actualDate = Date.now();
+        const daysDifference = (actualDate - scheduledDate) / (1000 * 60 * 60 * 24);
+        const wasEarly = daysDifference < 0;
+        const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
+
+        const newHistory = [
+          ...(incRem.history || []),
+          {
+            date: actualDate,
+            scheduled: scheduledDate,
+            interval: job.interval,
+            wasEarly,
+            daysEarlyOrLate,
+            reviewTimeSeconds: undefined as number | undefined,
+            priority: job.priority,
+            eventType: 'rescheduledInEditor' as const,
+          },
+        ];
+
+        await updateSRSDataForRem(plugin as any, remId, newNextRepDate, newHistory);
+
+        patchedIncRems.push({
+          ...incRem,
+          priority: job.priority,
+          nextRepDate: newNextRepDate,
+          history: newHistory,
+        });
+      }
+
+      // 3. Batch-write updated IncRem cache entries (one read + one write for all N rems)
+      if (patchedIncRems.length > 0) {
+        const allRems: import('../lib/incremental_rem/types').IncrementalRem[] =
+          (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+        const patchMap = new Map(patchedIncRems.map(r => [r.remId, r]));
+        const merged = allRems.map(r => patchMap.get(r.remId) ?? r);
+        for (const p of patchedIncRems) {
+          if (!merged.find(r => r.remId === p.remId)) merged.push(p);
+        }
+        await plugin.storage.setSession(allIncrementalRemKey, merged);
+      }
+
+      // 4. Trigger inheritance cascade for the last rem (cascade walks the whole subtree)
+      if (job.remIds.length > 0) {
+        await plugin.storage.setSession('pendingInheritanceCascade', job.remIds[job.remIds.length - 1]);
+      }
+
+      console.log('[Tracker] intervalBatchSave complete');
+    } catch (err) {
+      console.error('[Tracker] intervalBatchSave failed:', err);
+    } finally {
+      intervalBatchSaveRunning = false;
+      incRemBatchActive = false;
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }
+  });
+
   // Pending card-priority removal watcher.
   // priority.tsx writes the remId here before closing the popup (fire-and-forget).
   // This watcher performs the actual removePowerup + cache refresh in the

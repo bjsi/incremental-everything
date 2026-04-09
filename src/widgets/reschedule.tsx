@@ -26,6 +26,7 @@ async function handleRescheduleAndPriorityUpdate(
   // Suppress GlobalRemChanged
   await plugin.storage.setSession('plugin_operation_active', true);
 
+  let triggeredCascade = false;
   try {
     const rem = await plugin.rem.findOne(remId);
     if (!rem) return;
@@ -82,10 +83,15 @@ async function handleRescheduleAndPriorityUpdate(
     }
 
     plugin.storage.setSession('pendingInheritanceCascade', remId).catch(console.error);
+    triggeredCascade = true;
 
     await plugin.widget.closePopup();
   } finally {
-    await plugin.storage.setSession('plugin_operation_active', false);
+    // Only clear the flag if no cascade was triggered.
+    // If cascade IS pending, leave the flag up — the cascade tracker will clear it.
+    if (!triggeredCascade) {
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }
   }
 }
 

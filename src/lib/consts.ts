@@ -31,6 +31,10 @@ export const allIncrementalRemKey = 'all-incremental-rem';
 export const currentIncRemKey = 'current-inc-rem';
 export const allCardPriorityInfoKey = 'all-card-priority-info-key';
 export const incremReviewStartTimeKey = 'increm-review-start-time';
+// Intentional reactive signal: bump this key (via setSession) to trigger an IncRem cache reload.
+// The tracker reads it via `rp` (reactive), but calls loadIncrementalRemCache with the
+// non-reactive `plugin` reference so that taggedRem() does NOT register broad subscriptions.
+export const incRemCacheReloadKey = 'inc-rem-cache-reload-trigger';
 
 // widgets
 export const scrollToHighlightId = 'scroll-to-highlight';
@@ -61,12 +65,20 @@ export const currentScopeRemIdsKey = 'current-scope-rem-ids-key';
 export const seenRemInSessionKey = 'seen-rem-in-session-key';
 export const seenCardInSessionKey = 'seen-card-in-session-key';
 export const displayPriorityShieldId = 'display-priority-shield';
+export const displayQueueToolbarPriorityId = 'display-queue-toolbar-priority';
 export const priorityShieldHistoryKey = 'priority-shield-history-key';
 export const priorityShieldHistoryMenuItemId = 'priority-shield-history-menu-item-id';
 export const documentPriorityShieldHistoryKey = 'document-priority-shield-history-key';
 export const currentSubQueueIdKey = 'current-sub-queue-id-key';
 export const cardPriorityShieldHistoryKey = 'card-priority-shield-history-key';
 export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shield-history-key';
+
+// --- Keys for the Weighted Priority Shield ---
+export const displayWeightedShieldId = 'display-weighted-shield';
+export const weightedShieldHistoryKey = 'weighted-shield-history-key';
+export const documentWeightedShieldHistoryKey = 'document-weighted-shield-history-key';
+export const cardWeightedShieldHistoryKey = 'card-weighted-shield-history-key';
+export const documentCardWeightedShieldHistoryKey = 'document-card-weighted-shield-history-key';
 
 // --- Keys for Open Editor in a new tab/window (PDFs) ---
 export const remnoteEnvironmentId = 'remnote-environment';
@@ -82,6 +94,10 @@ export const pendingPrioritySaveKey = 'pendingPrioritySave';
 // Pending card priority removal job: written by the Priority popup before closing,
 // picked up and executed by tracker.ts. Allows instant popup close per fire-and-forget philosophy.
 export const pendingCardPriorityRemovalKey = 'pendingCardPriorityRemoval';
+// Batch priority+interval save job: written by priority_interval.tsx (popup) before closing,
+// picked up by tracker.ts in the persistent index widget. Contains all remIds + the chosen
+// priority and interval so the popup can close instantly and let the tracker do all DB writes.
+export const pendingIntervalBatchSaveKey = 'pendingIntervalBatchSave';
 // Delta queue for quick increase/decrease priority commands.
 // Each keypress APPENDS a delta entry here; the tracker drains them all atomically.
 // This prevents the last-write-wins race that plagued the single-slot pendingPrioritySaveKey approach.

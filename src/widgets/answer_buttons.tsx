@@ -21,6 +21,7 @@ import {
   activeHighlightIdKey,
   currentIncrementalRemTypeKey,
   displayPriorityShieldId,
+  displayWeightedShieldId,
   seenRemInSessionKey,
   remnoteEnvironmentId,
   queueSessionCacheKey,
@@ -30,9 +31,10 @@ import {
 import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetitionManualOffset, updateReviewRemData } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
+import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, calculateWeightedShield, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { safeRemTextToString, findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
+import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
@@ -58,6 +60,11 @@ export function AnswerButtons() {
     (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
     []
   ) ?? true;
+
+  const shouldDisplayWeightedShield = useTrackerPlugin(
+    (rp) => rp.settings.getSetting<boolean>(displayWeightedShieldId),
+    []
+  ) ?? false;
 
   const activeHighlightId = useTrackerPlugin(
     (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey),
@@ -144,6 +151,29 @@ export function AnswerButtons() {
       }
     }
 
+    // Weighted Shield Calculation
+    let weightedKB: number | null = null;
+    let weightedDoc: number | null = null;
+    let docIncRems: IncrementalRem[] | null = null;
+
+    if (shouldDisplayWeightedShield && allIncRems.length > 0) {
+      weightedKB = calculateWeightedShield(
+        allIncRems,
+        (r) => Date.now() >= r.nextRepDate && (!seenRemIds.includes(r.remId) || r.remId === rem._id)
+      );
+
+      if (scopeRemIds) {
+        const scopeSet2 = new Set(scopeRemIds);
+        docIncRems = allIncRems.filter(r => scopeSet2.has(r.remId));
+        if (docIncRems.length > 0) {
+          weightedDoc = calculateWeightedShield(
+            docIncRems,
+            (r) => Date.now() >= r.nextRepDate && (!seenRemIds.includes(r.remId) || r.remId === rem._id)
+          );
+        }
+      }
+    }
+
     return {
       kb: topMissedInKb ? {
         absolute: topMissedInKb.priority,
@@ -153,8 +183,12 @@ export function AnswerButtons() {
         absolute: topMissedInDoc.priority,
         percentile: docPercentile,
       } : null,
+      weightedKB,
+      weightedDoc,
+      docIncRems,
+      seenRemIds,
     };
-  }, [shouldDisplayShield, coreData?.sessionCache, allIncRems, coreData?.rem?._id, useLightMode]);
+  }, [shouldDisplayShield, shouldDisplayWeightedShield, coreData?.sessionCache, allIncRems, coreData?.rem?._id, useLightMode, scopeRemIds]);
 
   const htmlSourceUrl = useTrackerPlugin(async (rp) => {
     // console.log('[htmlSourceUrl] rem:', baseData?.rem?._id, 'remType:', remType);
@@ -727,6 +761,23 @@ export function AnswerButtons() {
                 `}</style>
               </>
             )}
+
+            {/* Weighted Shield Display */}
+            {!useLightMode && shouldDisplayWeightedShield && shieldStatusAsync &&
+              shieldStatusAsync.weightedKB !== null && shieldStatusAsync.weightedKB !== undefined && (
+                <>
+                  <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+                  <WeightedShieldTooltip
+                    kbValue={shieldStatusAsync.weightedKB}
+                    docValue={shieldStatusAsync.weightedDoc}
+                    allItems={allIncRems}
+                    isDuePredicate={(r: any) => Date.now() >= r.nextRepDate && (!(shieldStatusAsync.seenRemIds || []).includes(r.remId) || r.remId === coreData?.rem?._id)}
+                    docItems={shieldStatusAsync.docIncRems}
+                    itemLabel="IncRem"
+                  />
+                </>
+              )
+            }
 
             {/* Separator before History */}
             <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>

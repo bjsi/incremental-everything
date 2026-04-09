@@ -56,15 +56,15 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget(pageRangeWidgetId, WidgetLocation.Popup, {
     dimensions: {
-      width: 600,
+      width: 700,
       height: 1100,
     },
   });
 
   plugin.app.registerWidget('debug', WidgetLocation.Popup, {
     dimensions: {
-      width: '350px',
-      height: 'auto',
+      width: 400,
+      height: 800,
     },
   });
 
@@ -101,6 +101,13 @@ export function registerWidgets(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerWidget('no_inc_timer_indicator', WidgetLocation.QueueToolbar, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerWidget('queue_toolbar_priority', WidgetLocation.QueueToolbar, {
     dimensions: {
       width: 'auto',
       height: 'auto',
@@ -201,6 +208,13 @@ export function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('flashcard_repetition_history', WidgetLocation.Popup, {
     dimensions: {
       width: '1150px',
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerWidget('weighted_shield_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: '560px',
       height: 'auto',
     },
   });
