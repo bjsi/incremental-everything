@@ -209,6 +209,8 @@ export function calculateWeightedShield<T extends { priority: number; remId: str
 export interface WeightedShieldBucket {
   /** e.g. "0-10%" */
   label: string;
+  /** e.g. "0-5" */
+  priorityRange: string;
   /** Total items in this bucket */
   total: number;
   /** Items processed (not due) in this bucket */
@@ -267,8 +269,8 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
   });
 
   // Initialize 10 buckets
-  const bucketData: { total: number; processed: number; due: number; weightSum: number }[] =
-    Array.from({ length: 10 }, () => ({ total: 0, processed: 0, due: 0, weightSum: 0 }));
+  const bucketData: { total: number; processed: number; due: number; weightSum: number; minPriority: number; maxPriority: number }[] =
+    Array.from({ length: 10 }, () => ({ total: 0, processed: 0, due: 0, weightSum: 0, minPriority: Infinity, maxPriority: -Infinity }));
 
   let totalWeight = 0;
   let dueWeight = 0;
@@ -283,6 +285,8 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
     totalWeight += weight;
     bucketData[bucketIdx].total++;
     bucketData[bucketIdx].weightSum += weight;
+    bucketData[bucketIdx].minPriority = Math.min(bucketData[bucketIdx].minPriority, item.priority);
+    bucketData[bucketIdx].maxPriority = Math.max(bucketData[bucketIdx].maxPriority, item.priority);
 
     if (isDue) {
       dueWeight += weight;
@@ -299,6 +303,7 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
 
   const buckets: WeightedShieldBucket[] = bucketData.map((b, i) => ({
     label: `${i * 10}-${(i + 1) * 10}%`,
+    priorityRange: b.total > 0 ? `${b.minPriority}-${b.maxPriority}` : '—',
     total: b.total,
     processed: b.processed,
     due: b.due,

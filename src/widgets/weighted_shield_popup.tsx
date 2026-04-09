@@ -85,7 +85,8 @@ function BreakdownSection({
         </div>
         <div>
           <span style={{ fontWeight: 600, color: '#22c55e' }}>Processed: </span>
-          {(breakdown.totalItems - breakdown.dueItems).toLocaleString()}
+          {(breakdown.totalItems - breakdown.dueItems).toLocaleString()} 
+          ({breakdown.totalItems > 0 ? (100 - breakdown.duePct).toFixed(1) : 0}%)
         </div>
       </div>
 
@@ -117,6 +118,7 @@ function BreakdownSection({
             letterSpacing: '0.04em',
           }}>
             <th style={{ textAlign: 'left', padding: '3px 6px' }}>Percentile bucket</th>
+            <th style={{ textAlign: 'center', padding: '3px 6px' }} title="Absolute priority range covered by this bucket">Absolute Pri.</th>
             <th style={{ textAlign: 'right', padding: '3px 6px' }}>Items</th>
             <th style={{ textAlign: 'right', padding: '3px 6px' }}>Due</th>
             <th style={{ textAlign: 'center', padding: '3px 6px', minWidth: '110px' }}>Done</th>
@@ -135,6 +137,7 @@ function BreakdownSection({
               }}
             >
               <td style={{ padding: '3px 6px', fontWeight: 500 }}>{bucket.label}</td>
+              <td style={{ textAlign: 'center', padding: '3px 6px', color: 'var(--rn-clr-content-tertiary)', fontSize: '11px' }}>{bucket.priorityRange}</td>
               <td style={{ textAlign: 'right', padding: '3px 6px' }}>{bucket.total}</td>
               <td style={{
                 textAlign: 'right',
