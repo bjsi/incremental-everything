@@ -209,7 +209,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
       'If enabled, shows what fraction of your total priority-weighted workload has been processed. ' +
       'High-priority items carry exponentially more weight (~10× at the top vs bottom), so processing ' +
       'them gives a bigger boost. Always increases as you review items.',
-    defaultValue: false,
+    defaultValue: true,
   });
 
   plugin.settings.registerBooleanSetting({
