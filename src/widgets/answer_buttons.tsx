@@ -34,6 +34,7 @@ import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, calculateWeightedShield, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
 import { safeRemTextToString, findPDFinRem, addPageToHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
+import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
@@ -153,6 +154,7 @@ export function AnswerButtons() {
     // Weighted Shield Calculation
     let weightedKB: number | null = null;
     let weightedDoc: number | null = null;
+    let docIncRems: IncrementalRem[] | null = null;
 
     if (shouldDisplayWeightedShield && allIncRems.length > 0) {
       weightedKB = calculateWeightedShield(
@@ -162,7 +164,7 @@ export function AnswerButtons() {
 
       if (scopeRemIds) {
         const scopeSet2 = new Set(scopeRemIds);
-        const docIncRems = allIncRems.filter(r => scopeSet2.has(r.remId));
+        docIncRems = allIncRems.filter(r => scopeSet2.has(r.remId));
         if (docIncRems.length > 0) {
           weightedDoc = calculateWeightedShield(
             docIncRems,
@@ -183,6 +185,8 @@ export function AnswerButtons() {
       } : null,
       weightedKB,
       weightedDoc,
+      docIncRems,
+      seenRemIds,
     };
   }, [shouldDisplayShield, shouldDisplayWeightedShield, coreData?.sessionCache, allIncRems, coreData?.rem?._id, useLightMode, scopeRemIds]);
 
@@ -763,18 +767,14 @@ export function AnswerButtons() {
               shieldStatusAsync.weightedKB !== null && shieldStatusAsync.weightedKB !== undefined && (
                 <>
                   <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span>⚖️</span>
-                      <span>Weighted:</span>
-                    </span>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <span>KB: <strong>{shieldStatusAsync.weightedKB.toFixed(1)}%</strong></span>
-                      {shieldStatusAsync.weightedDoc !== null && shieldStatusAsync.weightedDoc !== undefined && (
-                        <span>Doc: <strong>{shieldStatusAsync.weightedDoc.toFixed(1)}%</strong></span>
-                      )}
-                    </div>
-                  </div>
+                  <WeightedShieldTooltip
+                    kbValue={shieldStatusAsync.weightedKB}
+                    docValue={shieldStatusAsync.weightedDoc}
+                    allItems={allIncRems}
+                    isDuePredicate={(r: any) => Date.now() >= r.nextRepDate && (!(shieldStatusAsync.seenRemIds || []).includes(r.remId) || r.remId === coreData?.rem?._id)}
+                    docItems={shieldStatusAsync.docIncRems}
+                    itemLabel="IncRem"
+                  />
                 </>
               )
             }

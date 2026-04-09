@@ -204,6 +204,122 @@ export function calculateWeightedShield<T extends { priority: number; remId: str
 }
 
 /**
+ * A single bucket in the weighted shield breakdown (e.g. 0-10%, 10-20%, ...).
+ */
+export interface WeightedShieldBucket {
+  /** e.g. "0-10%" */
+  label: string;
+  /** Total items in this bucket */
+  total: number;
+  /** Items processed (not due) in this bucket */
+  processed: number;
+  /** Items due (unprocessed) in this bucket */
+  due: number;
+  /** Percentage of items processed (0-100) */
+  processedPct: number;
+  /** Mean exponential weight of items in this bucket */
+  meanWeight: number;
+  /** This bucket's share of total weight (0-100%) */
+  weightShare: number;
+}
+
+/**
+ * Full breakdown data for the weighted shield tooltip/popup.
+ */
+export interface WeightedShieldBreakdown {
+  /** Total items in the universe */
+  totalItems: number;
+  /** Total due (unprocessed) items */
+  dueItems: number;
+  /** Percentage of items that are due */
+  duePct: number;
+  /** The weighted shield value (0-100) */
+  shieldValue: number;
+  /** Total exponential weight of all items */
+  totalWeight: number;
+  /** Total exponential weight of due items */
+  dueWeight: number;
+  /** Weighted processing fraction (same as shieldValue, for display) */
+  processedWeightPct: number;
+  /** 10 buckets of percentile ranges */
+  buckets: WeightedShieldBucket[];
+}
+
+/**
+ * Computes a detailed breakdown of the weighted shield for display in a tooltip.
+ * Divides items into 10 percentile buckets and computes per-bucket processing stats.
+ *
+ * @param allItems Full universe of items (KB or doc scope).
+ * @param isDuePredicate Returns true if the item is due and unreviewed.
+ * @returns Detailed breakdown including buckets, totals, and weights.
+ */
+export function computeWeightedShieldBreakdown<T extends { priority: number; remId: string }>(
+  allItems: T[],
+  isDuePredicate: (item: T) => boolean
+): WeightedShieldBreakdown {
+  const k = 2.3026;
+
+  // Sort and compute percentiles
+  const sorted = [...allItems].sort((a, b) => a.priority - b.priority);
+  const percentileMap = new Map<string, number>();
+  sorted.forEach((item, idx) => {
+    percentileMap.set(item.remId, ((idx + 1) / sorted.length) * 100);
+  });
+
+  // Initialize 10 buckets
+  const bucketData: { total: number; processed: number; due: number; weightSum: number }[] =
+    Array.from({ length: 10 }, () => ({ total: 0, processed: 0, due: 0, weightSum: 0 }));
+
+  let totalWeight = 0;
+  let dueWeight = 0;
+  let dueCount = 0;
+
+  for (const item of allItems) {
+    const p = percentileMap.get(item.remId) ?? 50;
+    const weight = Math.exp(-k * p / 100);
+    const bucketIdx = Math.min(Math.floor(p / 10), 9); // 0-9
+    const isDue = isDuePredicate(item);
+
+    totalWeight += weight;
+    bucketData[bucketIdx].total++;
+    bucketData[bucketIdx].weightSum += weight;
+
+    if (isDue) {
+      dueWeight += weight;
+      dueCount++;
+      bucketData[bucketIdx].due++;
+    } else {
+      bucketData[bucketIdx].processed++;
+    }
+  }
+
+  const shieldValue = totalWeight > 0
+    ? Math.round(((totalWeight - dueWeight) / totalWeight) * 1000) / 10
+    : 100;
+
+  const buckets: WeightedShieldBucket[] = bucketData.map((b, i) => ({
+    label: `${i * 10}-${(i + 1) * 10}%`,
+    total: b.total,
+    processed: b.processed,
+    due: b.due,
+    processedPct: b.total > 0 ? Math.round((b.processed / b.total) * 1000) / 10 : 100,
+    meanWeight: b.total > 0 ? Math.round((b.weightSum / b.total) * 1000) / 1000 : 0,
+    weightShare: totalWeight > 0 ? Math.round((b.weightSum / totalWeight) * 1000) / 10 : 0,
+  }));
+
+  return {
+    totalItems: allItems.length,
+    dueItems: dueCount,
+    duePct: allItems.length > 0 ? Math.round((dueCount / allItems.length) * 1000) / 10 : 0,
+    shieldValue,
+    totalWeight: Math.round(totalWeight * 100) / 100,
+    dueWeight: Math.round(dueWeight * 100) / 100,
+    processedWeightPct: shieldValue,
+    buckets,
+  };
+}
+
+/**
  * Calculates percentiles for all items in a list at once.
  * More efficient than calling calculateRelativePercentile repeatedly.
  * @param items The list of items to calculate percentiles for.

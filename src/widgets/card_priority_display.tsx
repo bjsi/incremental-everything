@@ -5,7 +5,7 @@ import {
   WidgetLocation,
   QueueInteractionScore,
 } from '@remnote/plugin-sdk';
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   powerupCode,
   allCardPriorityInfoKey,
@@ -23,7 +23,7 @@ import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/car
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
-import { PriorityBadge } from '../components';
+import { PriorityBadge, WeightedShieldTooltip } from '../components';
 import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
 import * as _ from 'remeda';
 
@@ -303,28 +303,28 @@ export function CardPriorityDisplay() {
   }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds]);
 
   // --- Weighted Shield: computed dynamically so it stays fresh as seenCardIds changes ---
+  const weightedIsDuePredicate = useCallback(
+    (info: CardPriorityInfo) => info.dueCards > 0 && (!seenCardIds.includes(info.remId) || info.remId === rem?._id),
+    [seenCardIds, rem?._id]
+  );
+
   const weightedShieldStatus = useMemo(() => {
     if (!displayWeightedShield || useLightMode || !rem || !allPrioritizedCardInfo || allPrioritizedCardInfo.length === 0) return null;
 
-    const kbWeighted = calculateWeightedShield(
-      allPrioritizedCardInfo,
-      (info) => info.dueCards > 0 && (!seenCardIds.includes(info.remId) || info.remId === rem._id)
-    );
+    const kbWeighted = calculateWeightedShield(allPrioritizedCardInfo, weightedIsDuePredicate);
 
     let docWeighted: number | null = null;
+    let docItems: CardPriorityInfo[] | null = null;
     if (scopeRemIds) {
       const scopeSet = new Set(scopeRemIds);
-      const docItems = allPrioritizedCardInfo.filter(c => scopeSet.has(c.remId));
+      docItems = allPrioritizedCardInfo.filter(c => scopeSet.has(c.remId));
       if (docItems.length > 0) {
-        docWeighted = calculateWeightedShield(
-          docItems,
-          (info) => info.dueCards > 0 && (!seenCardIds.includes(info.remId) || info.remId === rem._id)
-        );
+        docWeighted = calculateWeightedShield(docItems, weightedIsDuePredicate);
       }
     }
 
-    return { kb: kbWeighted, doc: docWeighted };
-  }, [displayWeightedShield, useLightMode, rem, allPrioritizedCardInfo, seenCardIds, scopeRemIds]);
+    return { kb: kbWeighted, doc: docWeighted, docItems };
+  }, [displayWeightedShield, useLightMode, rem, allPrioritizedCardInfo, weightedIsDuePredicate, scopeRemIds]);
 
 
   // --- 🔌 ON-DEMAND PATH (Light Mode OR Full Mode fallback when cache not ready) ---
@@ -395,17 +395,19 @@ export function CardPriorityDisplay() {
         borderLeft: `4px solid ${priorityColor}`,
         borderRadius: '8px',
         margin: '4px 0',
-        cursor: 'pointer',
         transition: 'background-color 0.15s',
         flexWrap: 'wrap',
       }}
-      onClick={handleClick}
-      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'; }}
-      title="Click to set priority (Opt+P)"
     >
-      {/* Priority */}
-      <div className="flex items-center gap-2">
+      {/* Priority — clickable to open priority editor */}
+      <div
+        className="flex items-center gap-2"
+        onClick={handleClick}
+        style={{ cursor: 'pointer' }}
+        title="Click to set priority (Opt+P)"
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.75'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+      >
         <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
         <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode || !cacheReady} source={finalCardInfo.source} isCardPriority={true} />
         {!useLightMode && cacheReady && kbPercentile !== undefined && (
@@ -473,20 +475,17 @@ export function CardPriorityDisplay() {
       )}
 
       {/* Weighted Shield */}
-      {displayWeightedShield && !useLightMode && cacheReady && weightedShieldStatus && (
+      {displayWeightedShield && !useLightMode && cacheReady && weightedShieldStatus && allPrioritizedCardInfo && (
         <>
           <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-              ⚖️ Weighted:
-            </span>
-            <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-              <span>KB: {weightedShieldStatus.kb.toFixed(1)}%</span>
-              {weightedShieldStatus.doc !== null && (
-                <span>Doc: {weightedShieldStatus.doc.toFixed(1)}%</span>
-              )}
-            </div>
-          </div>
+          <WeightedShieldTooltip
+            kbValue={weightedShieldStatus.kb}
+            docValue={weightedShieldStatus.doc}
+            allItems={allPrioritizedCardInfo}
+            isDuePredicate={weightedIsDuePredicate}
+            docItems={weightedShieldStatus.docItems}
+            itemLabel="Cards"
+          />
         </>
       )}
 
