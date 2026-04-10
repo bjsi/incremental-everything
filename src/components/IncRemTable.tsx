@@ -134,16 +134,38 @@ interface DateFilterFieldProps {
 }
 
 function DateFilterField({ label, filter, onChange }: DateFilterFieldProps) {
-  const inputStyle: React.CSSProperties = {
-    backgroundColor: 'var(--rn-clr-background-primary)',
-    color: 'var(--rn-clr-content-primary)',
-    border: '1px solid var(--rn-clr-border-primary)',
-    borderRadius: 4,
-    padding: '1px 4px',
-    fontSize: 11,
-    width: 90,
-    outline: 'none',
+  // Validate: empty = ok, plain integer (N days ago) = ok, MM/DD/YYYY or MM/DD = ok, else invalid
+  const isValueInvalid = (v: string): boolean => {
+    const trimmed = v.trim();
+    if (!trimmed) return false;
+    // Pure integer → N days ago → always valid
+    if (/^\d+$/.test(trimmed)) return false;
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
+      const [m, d, y] = trimmed.split('/').map(Number);
+      return isNaN(new Date(y, m - 1, d).getTime());
+    }
+    if (/^\d{1,2}\/\d{1,2}$/.test(trimmed)) {
+      const [m, d] = trimmed.split('/').map(Number);
+      return isNaN(new Date(new Date().getFullYear(), m - 1, d).getTime());
+    }
+    return true; // anything else is invalid
   };
+
+  const makeInputStyle = (value: string): React.CSSProperties => {
+    const invalid = isValueInvalid(value);
+    return {
+      backgroundColor: invalid ? 'rgba(239,68,68,0.08)' : 'var(--rn-clr-background-primary)',
+      color: 'var(--rn-clr-content-primary)',
+      border: `1px solid ${invalid ? '#ef4444' : 'var(--rn-clr-border-primary)'}`,
+      borderRadius: 4,
+      padding: '1px 4px',
+      fontSize: 11,
+      width: 100,
+      outline: 'none',
+      transition: 'border-color 0.15s, background-color 0.15s',
+    };
+  };
+
   const selectStyle: React.CSSProperties = {
     backgroundColor: 'var(--rn-clr-background-primary)',
     color: 'var(--rn-clr-content-secondary)',
@@ -157,9 +179,33 @@ function DateFilterField({ label, filter, onChange }: DateFilterFieldProps) {
 
   const isBetween = filter.op === 'between';
   const hasValue = filter.value.trim() !== '';
+  const PLACEHOLDER = 'MM/DD/YYYY or N days';
+
+  // Normalize MM/DD/YYYY or MM/DD to YYYY-MM-DD for the native date picker value
+  const toPickerValue = (v: string): string => {
+    const full = v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (full) {
+      const [, m, d, y] = full;
+      return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    }
+    const short = v.trim().match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (short) {
+      const [, m, d] = short;
+      const y = new Date().getFullYear();
+      return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    }
+    return '';
+  };
+
+  // Convert YYYY-MM-DD from the picker back to MM/DD/YYYY
+  const fromPickerValue = (iso: string): string => {
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return iso;
+    return `${Number(m[2])}/${Number(m[3])}/${m[1]}`;
+  };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 3, position: 'relative' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
       <span style={{ color: 'var(--rn-clr-content-tertiary)', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
         {label}
       </span>
@@ -179,15 +225,14 @@ function DateFilterField({ label, filter, onChange }: DateFilterFieldProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <input
           type="text"
-          placeholder="YYYY-MM-DD or N days"
+          placeholder={PLACEHOLDER}
           value={filter.value}
           onChange={(e) => onChange({ ...filter, value: e.target.value })}
-          style={inputStyle}
-          title="Enter a date (YYYY-MM-DD) or number of days ago (e.g. 30)"
+          style={makeInputStyle(filter.value)}
         />
         <CalendarPickerButton
-          value={filter.value.match(/^\d{4}-\d{2}-\d{2}$/) ? filter.value : ''}
-          onPick={(date) => onChange({ ...filter, value: date })}
+          value={toPickerValue(filter.value)}
+          onPick={(iso) => onChange({ ...filter, value: fromPickerValue(iso) })}
         />
       </div>
       {isBetween && (
@@ -196,15 +241,14 @@ function DateFilterField({ label, filter, onChange }: DateFilterFieldProps) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <input
               type="text"
-              placeholder="YYYY-MM-DD or N days"
+              placeholder={PLACEHOLDER}
               value={filter.value2}
               onChange={(e) => onChange({ ...filter, value2: e.target.value })}
-              style={inputStyle}
-              title="End date for 'between' filter"
+              style={makeInputStyle(filter.value2)}
             />
             <CalendarPickerButton
-              value={filter.value2.match(/^\d{4}-\d{2}-\d{2}$/) ? filter.value2 : ''}
-              onPick={(date) => onChange({ ...filter, value2: date })}
+              value={toPickerValue(filter.value2)}
+              onPick={(iso) => onChange({ ...filter, value2: fromPickerValue(iso) })}
             />
           </div>
         </>
@@ -283,11 +327,6 @@ export function IncRemTable({
   const [lastReviewFilter, setLastReviewFilter] = useState<DateFilter>(initialState?.lastReviewFilter ?? defaultDateFilter());
   const [createdAtFilter, setCreatedAtFilter] = useState<DateFilter>(initialState?.createdAtFilter ?? defaultDateFilter());
 
-  // Calendar picker visibility per field
-  const [showDuePicker, setShowDuePicker] = useState(false);
-  const [showLastReviewPicker, setShowLastReviewPicker] = useState(false);
-  const [showCreatedAtPicker, setShowCreatedAtPicker] = useState(false);
-
   // Inline priority editing state
   const [editingPriorityRemId, setEditingPriorityRemId] = useState<string | null>(null);
   const [editingPriorityValue, setEditingPriorityValue] = useState<number>(0);
@@ -312,22 +351,37 @@ export function IncRemTable({
   }, [filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder, dueDateFilter, lastReviewFilter, createdAtFilter, onStateChange]);
 
   /**
-   * Parse a filter field value string → millisecond timestamp cutoff.
+   * Parse a filter field value string → millisecond timestamp.
    * Accepts:
-   *   - YYYY-MM-DD string → parsed as that calendar day (start of day, local time)
-   *   - A plain integer N → means "N days ago" from now
-   * Returns null if the string is empty or invalid.
+   *   - MM/DD/YYYY → that specific date
+   *   - MM/DD      → that month/day in the current year
+   * Returns null for empty or unrecognised input.
    */
   function parseDateValue(value: string): number | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
-    const asNum = Number(trimmed);
-    if (!isNaN(asNum) && trimmed !== '') {
-      // Treat as days ago; 0 = today's start
-      return Date.now() - asNum * 86_400_000;
+
+    // Plain integer N → N days ago from now
+    if (/^\d+$/.test(trimmed)) {
+      return Date.now() - Number(trimmed) * 86_400_000;
     }
-    const d = new Date(trimmed);
-    return isNaN(d.getTime()) ? null : d.getTime();
+
+    // MM/DD/YYYY
+    const fullMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (fullMatch) {
+      const d = new Date(Number(fullMatch[3]), Number(fullMatch[1]) - 1, Number(fullMatch[2]));
+      return isNaN(d.getTime()) ? null : d.getTime();
+    }
+
+    // MM/DD → current year
+    const shortMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (shortMatch) {
+      const year = new Date().getFullYear();
+      const d = new Date(year, Number(shortMatch[1]) - 1, Number(shortMatch[2]));
+      return isNaN(d.getTime()) ? null : d.getTime();
+    }
+
+    return null;
   }
 
   /**
@@ -778,27 +832,32 @@ export function IncRemTable({
 
       {/* Date filter bar */}
       <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 shrink-0"
-        style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}
+        className="flex flex-col px-4 py-1.5 shrink-0"
+        style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}
       >
-        {/* Due Date filter */}
-        <DateFilterField
-          label="Due"
-          filter={dueDateFilter}
-          onChange={setDueDateFilter}
-        />
-        {/* Last Review filter */}
-        <DateFilterField
-          label="Last Review"
-          filter={lastReviewFilter}
-          onChange={setLastReviewFilter}
-        />
-        {/* Created At filter */}
-        <DateFilterField
-          label="Created"
-          filter={createdAtFilter}
-          onChange={setCreatedAtFilter}
-        />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1" style={{ fontSize: '11px' }}>
+          {/* Due Date filter */}
+          <DateFilterField
+            label="Due"
+            filter={dueDateFilter}
+            onChange={setDueDateFilter}
+          />
+          {/* Last Review filter */}
+          <DateFilterField
+            label="Last Review"
+            filter={lastReviewFilter}
+            onChange={setLastReviewFilter}
+          />
+          {/* Created At filter */}
+          <DateFilterField
+            label="Created"
+            filter={createdAtFilter}
+            onChange={setCreatedAtFilter}
+          />
+        </div>
+        <div style={{ fontSize: 9, color: 'var(--rn-clr-content-tertiary)', marginTop: 2, letterSpacing: '0.01em' }}>
+          Date formats: MM/DD/YYYY · MM/DD (current year) · N (days ago). Use the 📅 button to pick from a calendar.
+        </div>
       </div>
 
       {/* Rem List */}
