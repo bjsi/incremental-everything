@@ -160,7 +160,7 @@ function DateFilterField({ label, filter, onChange }: DateFilterFieldProps) {
       borderRadius: 4,
       padding: '1px 4px',
       fontSize: 11,
-      width: 100,
+      width: 90,
       outline: 'none',
       transition: 'border-color 0.15s, background-color 0.15s',
     };
@@ -179,20 +179,20 @@ function DateFilterField({ label, filter, onChange }: DateFilterFieldProps) {
 
   const isBetween = filter.op === 'between';
   const hasValue = filter.value.trim() !== '';
-  const PLACEHOLDER = 'MM/DD/YYYY or N days';
+  const PLACEHOLDER = '';
 
   // Normalize MM/DD/YYYY or MM/DD to YYYY-MM-DD for the native date picker value
   const toPickerValue = (v: string): string => {
     const full = v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (full) {
       const [, m, d, y] = full;
-      return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
     }
     const short = v.trim().match(/^(\d{1,2})\/(\d{1,2})$/);
     if (short) {
       const [, m, d] = short;
       const y = new Date().getFullYear();
-      return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
     }
     return '';
   };
@@ -395,11 +395,11 @@ export function IncRemTable({
     if (cutoff === null) return true; // unparseable value — don't filter
     const t = ts ?? 0;
     switch (op) {
-      case 'is':          return t >= cutoff && t < cutoff + 86_400_000; // same day
-      case 'before':      return t < cutoff;
-      case 'after':       return t > cutoff + 86_399_999; // strictly after that day ends
+      case 'is': return t >= cutoff && t < cutoff + 86_400_000; // same day
+      case 'before': return t < cutoff;
+      case 'after': return t > cutoff + 86_399_999; // strictly after that day ends
       case 'on-or-before': return t < cutoff + 86_400_000;
-      case 'on-or-after':  return t >= cutoff;
+      case 'on-or-after': return t >= cutoff;
       case 'between': {
         const cutoff2 = parseDateValue(value2);
         if (cutoff2 === null) return t >= cutoff;
@@ -855,8 +855,8 @@ export function IncRemTable({
             onChange={setCreatedAtFilter}
           />
         </div>
-        <div style={{ fontSize: 9, color: 'var(--rn-clr-content-tertiary)', marginTop: 2, letterSpacing: '0.01em' }}>
-          Date formats: MM/DD/YYYY · MM/DD (current year) · N (days ago). Use the 📅 button to pick from a calendar.
+        <div style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary)', marginTop: 2, letterSpacing: '0.01em' }}>
+          Date formats: MM/DD/YYYY · MM/DD (current year) · N (days ago). Use the calendar button to pick from a calendar.
         </div>
       </div>
 

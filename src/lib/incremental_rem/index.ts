@@ -323,6 +323,8 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         if (todayRef) {
           await rem.setPowerupProperty(powerupCode, originalIncrementalDateSlotCode, todayRef);
         }
+        // Record creation event in incremental history (fire and forget)
+        addCreationToIncrementalHistory(plugin, rem._id).catch(console.error);
       }
 
       const newIncRem = await getIncrementalRemFromRem(plugin, rem);
@@ -360,7 +362,7 @@ export const getCurrentIncrementalRem = async (plugin: RNPlugin) => {
   return rem;
 };
 
-import { addToIncrementalHistory } from '../history_utils';
+import { addToIncrementalHistory, addCreationToIncrementalHistory } from '../history_utils';
 
 /**
  * Sets the current Incremental Rem in session storage.
