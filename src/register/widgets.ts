@@ -158,7 +158,7 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
   // Register incremental rem list popup
   plugin.app.registerWidget('inc_rem_list', WidgetLocation.Popup, {
-    dimensions: { height: 600, width: 800 },
+    dimensions: { height: 800, width: 1000 },
   });
 
   // Register incremental rem main view - comprehensive view with filters
