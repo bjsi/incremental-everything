@@ -93,6 +93,20 @@ function Debug() {
           />
           <Info className="priority" label="Priority" data={incrementalRem.priority} />
           <Info
+            className="created-at-raw"
+            label="Created At (Raw)"
+            data={incrementalRem.createdAt !== undefined
+              ? incrementalRem.createdAt
+              : <span style={{ color: 'var(--rn-clr-content-tertiary)', fontStyle: 'italic' }}>Not set (dismissed or legacy rem)</span>}
+          />
+          <Info
+            className="created-at-human"
+            label="Created At (Human)"
+            data={incrementalRem.createdAt !== undefined
+              ? `${dayjs(incrementalRem.createdAt).format('MMMM D, YYYY')} (${dayjs(incrementalRem.createdAt).fromNow()})`
+              : <span style={{ color: 'var(--rn-clr-content-tertiary)', fontStyle: 'italic' }}>Not set (dismissed or legacy rem)</span>}
+          />
+          <Info
             className="history"
             label="History"
             data={<pre style={preStyle}>{incrementalRem?.history ? JSON.stringify(incrementalRem.history, null, 2) : '[]'}</pre>}

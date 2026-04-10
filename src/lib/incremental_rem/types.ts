@@ -100,6 +100,12 @@ export const IncrementalRem = z.object({
   nextRepDate: z.number(),
   priority: z.number().min(0).max(100),
   history: z.array(IncrementalRep).optional(),
+  /**
+   * Timestamp (ms) when the Rem was first made Incremental.
+   * Corresponds to the `originalIncrementalDateSlotCode` powerup slot.
+   * Not set for rems that were re-incrementalized from a dismissed state.
+   */
+  createdAt: z.number().optional(),
 });
 
 export type IncrementalRem = z.infer<typeof IncrementalRem>;

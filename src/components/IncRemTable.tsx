@@ -12,11 +12,21 @@ export interface IncRemWithDetails extends IncrementalRem {
   documentName?: string;
   lastReviewDate?: number;
   breadcrumb?: string;
+  // createdAt is already part of IncrementalRem base type (from originalIncrementalDateSlotCode)
 }
 
 type FilterStatus = 'all' | 'due' | 'scheduled';
-type SortBy = 'priority' | 'date' | 'reviews' | 'time' | 'lastReview' | 'queueOrder';
+type SortBy = 'priority' | 'date' | 'reviews' | 'time' | 'lastReview' | 'createdAt' | 'queueOrder';
 type SortOrder = 'asc' | 'desc';
+type DateFilterOp = 'is' | 'before' | 'after' | 'on-or-before' | 'on-or-after' | 'between';
+
+interface DateFilter {
+  op: DateFilterOp;
+  value: string;   // YYYY-MM-DD or N (days ago)
+  value2: string;  // only used for 'between'
+}
+
+const defaultDateFilter = (): DateFilter => ({ op: 'on-or-after', value: '', value2: '' });
 
 export interface IncRemListState {
   filterStatus: FilterStatus;
@@ -26,6 +36,9 @@ export interface IncRemListState {
   searchText: string;
   sortBy: SortBy;
   sortOrder: SortOrder;
+  dueDateFilter?: DateFilter;
+  lastReviewFilter?: DateFilter;
+  createdAtFilter?: DateFilter;
 }
 
 export interface DocumentInfo {
@@ -34,6 +47,189 @@ export interface DocumentInfo {
   count: number;
   dueCount: number;
 }
+
+// ─── CalendarPickerButton ─────────────────────────────────────────────────────
+// Uses a ref to an always-mounted hidden <input type="date"> and calls
+// .showPicker() imperatively — the only reliable cross-browser way to open
+// the native calendar from a custom button.
+interface CalendarPickerButtonProps {
+  value: string;
+  onPick: (date: string) => void;
+}
+
+function CalendarPickerButton({ value, onPick }: CalendarPickerButtonProps) {
+  const pickerRef = useRef<HTMLInputElement>(null);
+
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const input = pickerRef.current;
+    if (!input) return;
+    // showPicker() is the standard imperative API (Chrome 99+, Firefox 101+, Safari 16+)
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+    } else {
+      // Fallback: make the input briefly interactive so the user can click it
+      input.style.opacity = '1';
+      input.style.height = '24px';
+      input.focus();
+      setTimeout(() => {
+        if (pickerRef.current) {
+          pickerRef.current.style.opacity = '0';
+          pickerRef.current.style.height = '0';
+        }
+      }, 2000);
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      {/* Always-mounted hidden native date input — positioned over the button */}
+      <input
+        ref={pickerRef}
+        type="date"
+        value={value}
+        onChange={(e) => onPick(e.target.value)}
+        tabIndex={-1}
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          width: '22px',
+          height: '22px',
+          opacity: 0,
+          cursor: 'pointer',
+          zIndex: 1,
+          // Hide the default calendar icon; we provide our own button
+          colorScheme: 'light dark',
+        }}
+      />
+      {/* Visual 📅 button sits below the invisible input in stacking order */}
+      <button
+        onClick={handleButtonClick}
+        title="Pick date from calendar"
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: '0 2px',
+          color: 'var(--rn-clr-content-tertiary)',
+          fontSize: 11,
+          lineHeight: 1,
+          position: 'relative',
+          zIndex: 0,
+        }}
+      >
+        📅
+      </button>
+    </div>
+  );
+}
+
+// ─── DateFilterField ─────────────────────────────────────────────────────────
+interface DateFilterFieldProps {
+  label: string;
+  filter: { op: string; value: string; value2: string };
+  onChange: (f: { op: any; value: string; value2: string }) => void;
+}
+
+function DateFilterField({ label, filter, onChange }: DateFilterFieldProps) {
+  const inputStyle: React.CSSProperties = {
+    backgroundColor: 'var(--rn-clr-background-primary)',
+    color: 'var(--rn-clr-content-primary)',
+    border: '1px solid var(--rn-clr-border-primary)',
+    borderRadius: 4,
+    padding: '1px 4px',
+    fontSize: 11,
+    width: 90,
+    outline: 'none',
+  };
+  const selectStyle: React.CSSProperties = {
+    backgroundColor: 'var(--rn-clr-background-primary)',
+    color: 'var(--rn-clr-content-secondary)',
+    border: '1px solid var(--rn-clr-border-primary)',
+    borderRadius: 4,
+    padding: '1px 2px',
+    fontSize: 11,
+    outline: 'none',
+    cursor: 'pointer',
+  };
+
+  const isBetween = filter.op === 'between';
+  const hasValue = filter.value.trim() !== '';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 3, position: 'relative' }}>
+      <span style={{ color: 'var(--rn-clr-content-tertiary)', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {label}
+      </span>
+      <select
+        value={filter.op}
+        onChange={(e) => onChange({ ...filter, op: e.target.value as any })}
+        style={selectStyle}
+        title="Filter comparison"
+      >
+        <option value="is">is</option>
+        <option value="before">is before</option>
+        <option value="after">is after</option>
+        <option value="on-or-before">is on/before</option>
+        <option value="on-or-after">is on/after</option>
+        <option value="between">is between</option>
+      </select>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <input
+          type="text"
+          placeholder="YYYY-MM-DD or N days"
+          value={filter.value}
+          onChange={(e) => onChange({ ...filter, value: e.target.value })}
+          style={inputStyle}
+          title="Enter a date (YYYY-MM-DD) or number of days ago (e.g. 30)"
+        />
+        <CalendarPickerButton
+          value={filter.value.match(/^\d{4}-\d{2}-\d{2}$/) ? filter.value : ''}
+          onPick={(date) => onChange({ ...filter, value: date })}
+        />
+      </div>
+      {isBetween && (
+        <>
+          <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>–</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <input
+              type="text"
+              placeholder="YYYY-MM-DD or N days"
+              value={filter.value2}
+              onChange={(e) => onChange({ ...filter, value2: e.target.value })}
+              style={inputStyle}
+              title="End date for 'between' filter"
+            />
+            <CalendarPickerButton
+              value={filter.value2.match(/^\d{4}-\d{2}-\d{2}$/) ? filter.value2 : ''}
+              onPick={(date) => onChange({ ...filter, value2: date })}
+            />
+          </div>
+        </>
+      )}
+      {hasValue && (
+        <button
+          onClick={() => onChange({ ...filter, value: '', value2: '' })}
+          title="Clear this date filter"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '0 2px',
+            color: 'var(--rn-clr-content-tertiary)',
+            fontSize: 11,
+            lineHeight: 1,
+          }}
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface IncRemTableProps {
   title: string;
@@ -82,6 +278,16 @@ export function IncRemTable({
   const [sortBy, setSortBy] = useState<SortBy>(initialState?.sortBy ?? 'priority');
   const [sortOrder, setSortOrder] = useState<SortOrder>(initialState?.sortOrder ?? 'asc');
 
+  // Date filters
+  const [dueDateFilter, setDueDateFilter] = useState<DateFilter>(initialState?.dueDateFilter ?? defaultDateFilter());
+  const [lastReviewFilter, setLastReviewFilter] = useState<DateFilter>(initialState?.lastReviewFilter ?? defaultDateFilter());
+  const [createdAtFilter, setCreatedAtFilter] = useState<DateFilter>(initialState?.createdAtFilter ?? defaultDateFilter());
+
+  // Calendar picker visibility per field
+  const [showDuePicker, setShowDuePicker] = useState(false);
+  const [showLastReviewPicker, setShowLastReviewPicker] = useState(false);
+  const [showCreatedAtPicker, setShowCreatedAtPicker] = useState(false);
+
   // Inline priority editing state
   const [editingPriorityRemId, setEditingPriorityRemId] = useState<string | null>(null);
   const [editingPriorityValue, setEditingPriorityValue] = useState<number>(0);
@@ -101,9 +307,55 @@ export function IncRemTable({
   // Use the actual state values, not the effective ones, so if they change sort they get their old filters back
   useEffect(() => {
     if (onStateChange) {
-      onStateChange({ filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder });
+      onStateChange({ filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder, dueDateFilter, lastReviewFilter, createdAtFilter });
     }
-  }, [filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder, onStateChange]);
+  }, [filterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, sortOrder, dueDateFilter, lastReviewFilter, createdAtFilter, onStateChange]);
+
+  /**
+   * Parse a filter field value string → millisecond timestamp cutoff.
+   * Accepts:
+   *   - YYYY-MM-DD string → parsed as that calendar day (start of day, local time)
+   *   - A plain integer N → means "N days ago" from now
+   * Returns null if the string is empty or invalid.
+   */
+  function parseDateValue(value: string): number | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const asNum = Number(trimmed);
+    if (!isNaN(asNum) && trimmed !== '') {
+      // Treat as days ago; 0 = today's start
+      return Date.now() - asNum * 86_400_000;
+    }
+    const d = new Date(trimmed);
+    return isNaN(d.getTime()) ? null : d.getTime();
+  }
+
+  /**
+   * Given a timestamp `ts` and a DateFilter, returns true if `ts` passes the filter.
+   * A missing / empty filter always passes.
+   */
+  function passesDateFilter(ts: number | undefined, filter: DateFilter): boolean {
+    const { op, value, value2 } = filter;
+    if (!value.trim()) return true; // no filter set
+    const cutoff = parseDateValue(value);
+    if (cutoff === null) return true; // unparseable value — don't filter
+    const t = ts ?? 0;
+    switch (op) {
+      case 'is':          return t >= cutoff && t < cutoff + 86_400_000; // same day
+      case 'before':      return t < cutoff;
+      case 'after':       return t > cutoff + 86_399_999; // strictly after that day ends
+      case 'on-or-before': return t < cutoff + 86_400_000;
+      case 'on-or-after':  return t >= cutoff;
+      case 'between': {
+        const cutoff2 = parseDateValue(value2);
+        if (cutoff2 === null) return t >= cutoff;
+        const lo = Math.min(cutoff, cutoff2);
+        const hi = Math.max(cutoff, cutoff2) + 86_399_999;
+        return t >= lo && t <= hi;
+      }
+      default: return true;
+    }
+  }
 
   // Apply sorting criteria, preserving a stable random order for 'queueOrder'
   const randomOrderCache = useRef<Record<string, number>>({});
@@ -126,6 +378,10 @@ export function IncRemTable({
       if (searchText && rem.remText && !rem.remText.toLowerCase().includes(searchText.toLowerCase())) {
         return false;
       }
+      // Date filters
+      if (!passesDateFilter(rem.nextRepDate, dueDateFilter)) return false;
+      if (!passesDateFilter(rem.lastReviewDate, lastReviewFilter)) return false;
+      if (!passesDateFilter(rem.createdAt, createdAtFilter)) return false;
       return true;
     });
 
@@ -176,15 +432,21 @@ export function IncRemTable({
           const aDate = a.lastReviewDate || 0;
           const bDate = b.lastReviewDate || 0;
           comparison = aDate - bDate;
+        } else if (sortBy === 'createdAt') {
+          const aDate = a.createdAt || 0;
+          const bDate = b.createdAt || 0;
+          comparison = aDate - bDate;
         }
         return effectiveSortOrder === 'asc' ? comparison : -comparison;
       });
     }
 
     return filtered;
-  }, [incRems, effectiveFilterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, effectiveSortOrder, sortingRandomness]);
+  }, [incRems, effectiveFilterStatus, filterType, priorityMin, priorityMax, searchText, sortBy, effectiveSortOrder, sortingRandomness, dueDateFilter, lastReviewFilter, createdAtFilter]);
 
-  const hasActiveFilters = filterStatus !== 'all' || filterType !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '' || selectedDocumentId;
+  const hasDateFilter = (f: DateFilter) => f.value.trim() !== '';
+  const hasActiveFilters = filterStatus !== 'all' || filterType !== 'all' || priorityMin !== 0 || priorityMax !== 100 || searchText !== '' || selectedDocumentId ||
+    hasDateFilter(dueDateFilter) || hasDateFilter(lastReviewFilter) || hasDateFilter(createdAtFilter);
 
   return (
     <div className="flex flex-col h-full" style={{
@@ -246,6 +508,7 @@ export function IncRemTable({
             <option value="reviews">Reviews</option>
             <option value="time">Time Spent</option>
             <option value="lastReview">Last Review Date</option>
+            <option value="createdAt">Created At</option>
             <option value="queueOrder">Sort for Review</option>
           </select>
           <button
@@ -497,6 +760,9 @@ export function IncRemTable({
               setPriorityMin(0);
               setPriorityMax(100);
               setSearchText('');
+              setDueDateFilter(defaultDateFilter());
+              setLastReviewFilter(defaultDateFilter());
+              setCreatedAtFilter(defaultDateFilter());
               onDocumentFilterChange?.(null);
             }}
             className="px-2 py-1 text-xs rounded transition-colors"
@@ -508,6 +774,31 @@ export function IncRemTable({
             ✕
           </button>
         )}
+      </div>
+
+      {/* Date filter bar */}
+      <div
+        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 shrink-0"
+        style={{ borderBottom: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}
+      >
+        {/* Due Date filter */}
+        <DateFilterField
+          label="Due"
+          filter={dueDateFilter}
+          onChange={setDueDateFilter}
+        />
+        {/* Last Review filter */}
+        <DateFilterField
+          label="Last Review"
+          filter={lastReviewFilter}
+          onChange={setLastReviewFilter}
+        />
+        {/* Created At filter */}
+        <DateFilterField
+          label="Created"
+          filter={createdAtFilter}
+          onChange={setCreatedAtFilter}
+        />
       </div>
 
       {/* Rem List */}
@@ -528,6 +819,7 @@ export function IncRemTable({
                     historyCount: incRem.history?.length,
                     totalTimeSpent: incRem.totalTimeSpent,
                     lastReviewDate: incRem.lastReviewDate,
+                    createdAt: incRem.createdAt,
                     breadcrumb: incRem.breadcrumb,
                   } as IncRemRowData}
                   onClick={() => onRemClick(incRem.remId)}

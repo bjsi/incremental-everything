@@ -219,11 +219,31 @@ export const getIncrementalRemFromRem = async (
     }
   }
 
+  // Read the original incremental date slot (Daily Document reference)
+  let createdAt: number | undefined;
+  const createdAtRichText = (await r.getPowerupPropertyAsRichText(
+    powerupCode,
+    originalIncrementalDateSlotCode
+  )) as RichTextElementRemInterface[];
+  if (createdAtRichText && createdAtRichText.length > 0 && createdAtRichText[0]?._id) {
+    const createdAtDoc = await plugin.rem.findOne(createdAtRichText[0]._id);
+    if (createdAtDoc) {
+      const createdAtYYYYMMDD = await createdAtDoc.getPowerupProperty<BuiltInPowerupCodes.DailyDocument>(
+        BuiltInPowerupCodes.DailyDocument,
+        'Date'
+      );
+      if (createdAtYYYYMMDD) {
+        createdAt = dayjs(createdAtYYYYMMDD, 'YYYY-MM-DD').valueOf();
+      }
+    }
+  }
+
   const rawData = {
     remId: r._id,
     nextRepDate: date.valueOf(),
     priority: priority,
     history: tryParseJson(await r.getPowerupProperty(powerupCode, repHistorySlotCode)),
+    createdAt,
   };
 
   const parsed = IncrementalRem.safeParse(rawData);
