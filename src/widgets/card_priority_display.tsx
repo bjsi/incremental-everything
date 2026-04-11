@@ -512,8 +512,7 @@ export function CardPriorityDisplay() {
             ref={statsSepRef}
             style={{
               color: 'var(--rn-clr-content-tertiary)',
-              opacity: statsSepVisible ? 0.4 : 0,
-              // Keep it in flow so the ResizeObserver can always measure its position
+              opacity: statsSepVisible ? 1 : 0,
               pointerEvents: 'none',
             }}
           >|</span>
