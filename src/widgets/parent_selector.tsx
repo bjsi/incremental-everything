@@ -679,9 +679,10 @@ function ParentSelectorWidget() {
           return;
         }
 
-        // Set the text and parent
+        // Set the text, parent, and font size (H3 so it appears as a section header)
         await newRem.setText([childName]);
         await newRem.setParent(creatingChildForNodeId);
+        await newRem.setFontSize('H3');
 
         console.log('[ParentSelector:Widget] Child rem created:', newRem._id);
 
