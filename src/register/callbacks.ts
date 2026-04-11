@@ -34,11 +34,14 @@ const QUEUE_LAYOUT_FIX_CSS = `
     flex-grow: 1 !important;
   }
 
-  /* Hide unwanted UI elements during incremental rem review */
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]):has([data-queue-rem-tags~="incremental"]) .rn-flashcard-insights,
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]):has([data-queue-rem-tags~="incremental"]) [data-cy="bottom-of-card-ai-suggestions"],
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]):has([data-queue-rem-tags~="incremental"]) div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
-  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]):has([data-queue-rem-tags~="incremental"]) div.fade-in-first-load:has(iframe[data-plugin-id="flashcard-repetition-history"]) {
+  /* Hide unwanted UI elements during incremental rem review.
+     NOTE: [data-queue-rem-tags~="incremental"] is used as a direct ancestor (not via :has()
+     on the queue root) to avoid hiding these elements in sibling flashcard containers that
+     RemNote keeps coexisting in the DOM (pre-rendered / cached items). */
+  [data-queue-rem-tags~="incremental"] .rn-flashcard-insights,
+  [data-queue-rem-tags~="incremental"] [data-cy="bottom-of-card-ai-suggestions"],
+  [data-queue-rem-tags~="incremental"] div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
+  [data-queue-rem-tags~="incremental"] div.fade-in-first-load:has(iframe[data-plugin-id="flashcard-repetition-history"]) {
     display: none !important;
   }
 `;
