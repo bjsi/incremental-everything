@@ -278,7 +278,8 @@ export async function saveKBShield<T extends PriorityItem>(
   const status = calculateShieldStatus(allItems, unreviewedDue, isDue, seenIds, dismissedCount, computeWeighted);
 
   await saveKBShieldHistory(plugin, storageKey, status, today);
-  console.log(`[QueueExit] Saved KB ${label} shield:`, status);
+  const kbTriggerItem = unreviewedDue.find(item => item.priority === status.absolute);
+  console.log(`[QueueExit] Saved KB ${label} shield:`, status, `Triggered by remId: ${kbTriggerItem?.remId ?? 'none'}`);
 }
 
 /**
@@ -326,9 +327,11 @@ export async function saveDocumentShield<T extends PriorityItem>(
   const status = calculateShieldStatus(scopedItems, unreviewedDueInScope, isDue, seenIds, scopedDismissedCount, computeWeighted);
 
   await saveScopedShieldHistory(plugin, storageKey, historyKey, status, today);
+  const docTriggerItem = unreviewedDueInScope.find(item => item.priority === status.absolute);
   console.log(
     `[QueueExit] ${label} doc shield - Priority: ${status.absolute}, ` +
-    `Percentile: ${status.percentile}%, Universe: ${status.universeSize}, Dismissed: ${scopedDismissedCount}`
+    `Percentile: ${status.percentile}%, Universe: ${status.universeSize}, Dismissed: ${scopedDismissedCount}, ` +
+    `Triggered by remId: ${docTriggerItem?.remId ?? 'none'}`
   );
   console.log(`Saved ${label} document history for original scope ${historyKey}:`, status);
 }
