@@ -349,6 +349,22 @@ export function CardPriorityDisplay() {
   // Prefer cache-based cardInfo; fall back to on-demand lightCardInfo (covers Light Mode + cache-not-ready)
   const finalCardInfo = cardInfo || lightCardInfo;
 
+  // Detect whether the stats separator `|` has flex-wrapped to a new line.
+  // CSS cannot observe line-breaks in a flex-wrap container, so we compare the
+  // vertical position of the separator span against the stats div with a ResizeObserver.
+  // The `|` stays in the DOM (opacity: 0 when hidden) so it's always measurable.
+  const statsSepRef = React.useRef<HTMLSpanElement>(null);
+  const statsContainerRef = React.useRef<HTMLDivElement>(null);
+  const [statsSepVisible, setStatsSepVisible] = React.useState(true);
+
+  React.useLayoutEffect(() => {
+    const sep = statsSepRef.current;
+    const stats = statsContainerRef.current;
+    if (!sep || !stats) return;
+    const sameRow = Math.abs(sep.getBoundingClientRect().top - stats.getBoundingClientRect().top) < 4;
+    setStatsSepVisible(sameRow);
+  }); // No deps — runs after every render so it catches the first render where refs are populated
+
   // Check isIncrementalQueueActive
   if (!rem || !finalCardInfo || isIncrementalQueueActive) {
     // console.log('[CardPriorityDisplay] Early return — rem:', !!rem, ', finalCardInfo:', !!finalCardInfo,
@@ -387,6 +403,7 @@ export function CardPriorityDisplay() {
   };
 
   return (
+    <div style={{ paddingTop: '10px', paddingBottom: '10px' }}>
     <div
       className="flex items-center justify-center gap-3 px-3 py-1.5"
       style={{
@@ -394,7 +411,6 @@ export function CardPriorityDisplay() {
         border: '1px solid var(--rn-clr-border-primary)',
         borderLeft: `4px solid ${priorityColor}`,
         borderRadius: '8px',
-        margin: '4px 0',
         transition: 'background-color 0.15s',
         flexWrap: 'wrap',
       }}
@@ -492,8 +508,16 @@ export function CardPriorityDisplay() {
       {/* Review Stats + FSRS DSR + Debug */}
       {(historyStats.reps > 0 || fsrsState) && (
         <>
-          <span style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.4 }}>|</span>
-          <div className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
+          <span
+            ref={statsSepRef}
+            style={{
+              color: 'var(--rn-clr-content-tertiary)',
+              opacity: statsSepVisible ? 0.4 : 0,
+              // Keep it in flow so the ResizeObserver can always measure its position
+              pointerEvents: 'none',
+            }}
+          >|</span>
+          <div ref={statsContainerRef} className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
             <span
               title={`Total number of gradeable repetitions.\n\nThe number in red parentheses — (${historyStats.lapses}) — is the number of lapses (AGAIN ratings).\n\nThe following number is the total time spent reviewing this card.\n\nThe card age is the time elapsed since the first repetition.\n\nThe cost is the average time spent reviewing this card per year.`}
               style={{ cursor: 'help' }}
@@ -542,6 +566,7 @@ export function CardPriorityDisplay() {
           </div>
         </>
       )}
+    </div>
     </div>
   );
 }
