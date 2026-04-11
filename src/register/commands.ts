@@ -56,6 +56,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     if (!selection) {
       return;
     }
+    if (selection.type === SelectionType.Text && selection.range.start === selection.range.end) {
+      // Fallback empty text selections to Rem selection behavior
+      (selection as any).type = SelectionType.Rem;
+      (selection as any).remIds = [selection.remId];
+    }
+
     // TODO: extract within extract support
     if (selection.type === SelectionType.Text) {
       // 1. Fetch the Rem
@@ -232,6 +238,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async () => {
       const selection = await plugin.editor.getSelection();
       if (!selection || selection.type !== SelectionType.Text) {
+        return;
+      }
+      if (selection.range.start === selection.range.end) {
+        await plugin.app.toast('Please select some text to create a cloze deletion.');
         return;
       }
       

@@ -71,6 +71,31 @@ const QUEUE_HIDE_ELEMENTS_CSS = `
   }
 `;
 
+const HIDE_PARENT_CSS = `
+  /* Hide Parent Styles */
+  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .RichTextViewer,
+  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-flashcard-delimiter,
+  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .RichTextViewer,
+  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rem-bullet__document {
+    display: none !important;
+  }
+
+  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rn-bullet-container,
+  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rem-bullet__document {
+    position: relative;
+  }
+
+  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rn-bullet-container:after,
+  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rem-bullet__document:after {
+    content: "Hidden in queue";
+    opacity: .3;
+    white-space: nowrap;
+    position: absolute;
+    left: 25px;
+    top: 0;
+  }
+`;
+
 let sessionItemCounter = 0;
 
 export const resetSessionItemCounter = () => {
@@ -79,6 +104,7 @@ export const resetSessionItemCounter = () => {
 
   export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
+  plugin.app.registerCSS('hide-parent-css', HIDE_PARENT_CSS);
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
