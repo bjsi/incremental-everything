@@ -377,19 +377,27 @@ function BatchCardPriority() {
       }
 
       setSuccessMessage(`✅ Applied cardPriority to ${appliedCount} rem(s)`);
+
+      // Delegate inheritance cascade to background tracker
+      if (anchorRemId) {
+        await plugin.storage.setSession('pendingInheritanceCascade', anchorRemId);
+      } else {
+        await plugin.storage.setSession('plugin_operation_active', false);
+      }
+
       setTimeout(() => plugin.widget.closePopup(), 2000);
     } catch (error) {
       console.error('Error applying priorities:', error);
       setErrorMessage('Failed to apply priorities. Check console for details.');
+      await plugin.storage.setSession('plugin_operation_active', false);
     } finally {
       setIsApplying(false);
-      await plugin.storage.setSession('plugin_operation_active', false);
     }
   };
 
   // ── styles ─────────────────────────────────────────────────────────────────
   const s = {
-    container: { padding: '16px', fontFamily: 'system-ui, -apple-system, sans-serif' },
+    container: { padding: '16px', fontFamily: 'system-ui, -apple-system, sans-serif', height: '100%', overflowY: 'auto' as const, boxSizing: 'border-box' as const },
     section: { marginBottom: '16px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: '#f9fafb' },
     sectionTitle: { fontSize: '14px', fontWeight: 600 as const, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' },
     input: { padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', width: '80px' },
@@ -399,7 +407,7 @@ function BatchCardPriority() {
     tableWrap: { border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' },
     thead: { display: 'grid', gridTemplateColumns: '32px 1fr 90px 90px', backgroundColor: '#f3f4f6', fontWeight: 600 as const, fontSize: '12px', color: '#374151', padding: '6px 0' },
     theadCell: { padding: '4px 8px' },
-    tbody: { maxHeight: '420px', overflowY: 'auto' as const },
+    tbody: { maxHeight: '400px', overflowY: 'auto' as const },
     trow: (depth: number): React.CSSProperties => ({
       display: 'grid',
       gridTemplateColumns: '32px 1fr 90px 90px',
@@ -500,6 +508,7 @@ function BatchCardPriority() {
         <div style={{ fontSize: '13px', color: '#6b7280' }}>Anchor: <strong>{anchorName}</strong> — {scopeSubtitle}</div>
       </div>
 
+
       {/* Scope selector */}
       <div style={{ ...s.section, marginBottom: '12px' }}>
         <div style={{ ...s.sectionTitle, marginBottom: '8px' }}>Scope</div>
@@ -552,6 +561,7 @@ function BatchCardPriority() {
           </label>
         </div>
       </div>
+
 
       {/* Tree table */}
       {displayedRems.length === 0 ? (
@@ -607,8 +617,8 @@ function BatchCardPriority() {
         </div>
       )}
 
-      {/* Actions */}
-      <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {/* Actions — pinned to bottom */}
+      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
         <button
           onClick={validateAndApply}
           style={{ ...s.btn, backgroundColor: '#3b82f6', color: 'white' }}
@@ -626,8 +636,8 @@ function BatchCardPriority() {
         <span style={{ fontSize: '13px', color: '#6b7280' }}>{selectedCount} selected / {displayedRems.length} shown / {allRems.length} total</span>
       </div>
 
-      {errorMessage && <div style={{ color: '#ef4444', fontSize: '13px', marginTop: '8px' }}>{errorMessage}</div>}
-      {successMessage && <div style={{ color: '#10b981', fontSize: '13px', marginTop: '8px' }}>{successMessage}</div>}
+      {errorMessage && <div style={{ color: '#ef4444', fontSize: '13px', marginTop: '6px', flexShrink: 0 }}>{errorMessage}</div>}
+      {successMessage && <div style={{ color: '#10b981', fontSize: '13px', marginTop: '6px', flexShrink: 0 }}>{successMessage}</div>}
     </div>
   );
 }

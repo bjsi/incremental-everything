@@ -154,6 +154,9 @@ export function PriorityEditor() {
     if (updatedIncRem) {
       await updateIncrementalRemCache(plugin, updatedIncRem);
     }
+    
+    // Trigger inheritance cascade in the background tracker
+    await plugin.storage.setSession('pendingInheritanceCascade', rem._id);
   }, [incRemInfo, rem, plugin]);
 
   const quickUpdateCardPriority = useCallback(async (delta: number) => {
@@ -163,6 +166,9 @@ export function PriorityEditor() {
 
     await setCardPriority(plugin, rem, newPriority, 'manual');
     await updateCardPriorityCache(plugin, rem._id);
+
+    // Trigger inheritance cascade in the background tracker
+    await plugin.storage.setSession('pendingInheritanceCascade', rem._id);
   }, [rem, cardInfo, plugin]);
 
   // Memoize whether card priority is manual (for visual indicator)
