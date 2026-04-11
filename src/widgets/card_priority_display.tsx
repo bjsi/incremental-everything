@@ -403,81 +403,81 @@ export function CardPriorityDisplay() {
   };
 
   return (
-    <div style={{ paddingTop: '10px', paddingBottom: '10px' }}>
-    <div
-      className="flex items-center justify-center gap-3 px-3 py-1.5"
-      style={{
-        backgroundColor: 'var(--rn-clr-background-secondary)',
-        border: '1px solid var(--rn-clr-border-primary)',
-        borderLeft: `4px solid ${priorityColor}`,
-        borderRadius: '8px',
-        transition: 'background-color 0.15s',
-        flexWrap: 'wrap',
-      }}
-    >
-      {/* Priority — clickable to open priority editor */}
+    <div style={{ paddingTop: '20px', paddingBottom: '10px' }}>
       <div
-        className="flex items-center gap-2"
-        onClick={handleClick}
-        style={{ cursor: 'pointer' }}
-        title="Click to set priority (Opt+P)"
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.75'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+        className="flex items-center justify-center gap-3 px-3 py-1.5"
+        style={{
+          backgroundColor: 'var(--rn-clr-background-secondary)',
+          border: '1px solid var(--rn-clr-border-primary)',
+          borderLeft: `4px solid ${priorityColor}`,
+          borderRadius: '8px',
+          transition: 'background-color 0.15s',
+          flexWrap: 'wrap',
+        }}
       >
-        <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
-        <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode || !cacheReady} source={finalCardInfo.source} isCardPriority={true} />
-        {!useLightMode && cacheReady && kbPercentile !== undefined && (
-          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-            ({kbPercentile}% KB
-            {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
-          </span>
-        )}
-        {!useLightMode && cacheReady && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
-          <span
-            className="text-sm opacity-60 cursor-help"
-            title="Doc percentile will be recalculated when you start a new queue session"
-          >
-            ⟳
-          </span>
-        )}
-      </div>
-
-      {/* Shield */}
-      {displayPriorityShield && !useLightMode && cacheReady && (shieldStatus?.kb || shieldStatus?.doc) && (
-        <>
-          <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-              <span style={{
-                display: 'inline-block',
-                animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
-              }}>🛡️</span>
-              <span>Card Shield:</span>
+        {/* Priority — clickable to open priority editor */}
+        <div
+          className="flex items-center gap-2"
+          onClick={handleClick}
+          style={{ cursor: 'pointer' }}
+          title="Click to set priority (Opt+P)"
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.75'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+        >
+          <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-secondary)' }}>Priority:</span>
+          <PriorityBadge priority={finalCardInfo.priority} percentile={kbPercentile} compact useAbsoluteColoring={useLightMode || !cacheReady} source={finalCardInfo.source} isCardPriority={true} />
+          {!useLightMode && cacheReady && kbPercentile !== undefined && (
+            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              ({kbPercentile}% KB
+              {docPercentile !== undefined && docPercentile !== null && `, ${docPercentile}% Doc`})
             </span>
-            <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-              {shieldStatus.kb && (
+          )}
+          {!useLightMode && cacheReady && (docPercentile === undefined || docPercentile === null) && kbPercentile !== undefined && (
+            <span
+              className="text-sm opacity-60 cursor-help"
+              title="Doc percentile will be recalculated when you start a new queue session"
+            >
+              ⟳
+            </span>
+          )}
+        </div>
+
+        {/* Shield */}
+        {displayPriorityShield && !useLightMode && cacheReady && (shieldStatus?.kb || shieldStatus?.doc) && (
+          <>
+            <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold flex items-center gap-1" style={{ color: 'var(--rn-clr-content-secondary)' }}>
                 <span style={{
-                  animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
-                  fontWeight: isKbShieldActive ? 700 : 'inherit',
-                  color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
-                }}>
-                  KB: <PriorityBadge priority={shieldStatus.kb.absolute} percentile={shieldStatus.kb.percentile} compact />
-                  {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile.toFixed(1)}%)`}
-                </span>
-              )}
-              {shieldStatus.doc && (
-                <span style={{
-                  animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
-                  fontWeight: isDocShieldActive ? 700 : 'inherit',
-                  color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
-                }}>
-                  Doc: <PriorityBadge priority={shieldStatus.doc.absolute} percentile={shieldStatus.doc.percentile} compact />
-                  {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile.toFixed(1)}%)`}
-                </span>
-              )}
+                  display: 'inline-block',
+                  animation: isAnyShieldActive ? 'shieldPulse 2s ease-in-out infinite' : 'none'
+                }}>🛡️</span>
+                <span>Card Shield:</span>
+              </span>
+              <div className="flex gap-3 text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                {shieldStatus.kb && (
+                  <span style={{
+                    animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                    fontWeight: isKbShieldActive ? 700 : 'inherit',
+                    color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
+                  }}>
+                    KB: <PriorityBadge priority={shieldStatus.kb.absolute} percentile={shieldStatus.kb.percentile} compact />
+                    {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile.toFixed(1)}%)`}
+                  </span>
+                )}
+                {shieldStatus.doc && (
+                  <span style={{
+                    animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
+                    fontWeight: isDocShieldActive ? 700 : 'inherit',
+                    color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
+                  }}>
+                    Doc: <PriorityBadge priority={shieldStatus.doc.absolute} percentile={shieldStatus.doc.percentile} compact />
+                    {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile.toFixed(1)}%)`}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-          <style>{`
+            <style>{`
             @keyframes shieldPulse {
               0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(59, 130, 246, 0)); }
               50% { transform: scale(1.15); filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6)); }
@@ -487,85 +487,85 @@ export function CardPriorityDisplay() {
               50% { filter: brightness(1.3); text-shadow: 0 0 4px rgba(59, 130, 246, 0.3); }
             }
           `}</style>
-        </>
-      )}
+          </>
+        )}
 
-      {/* Weighted Shield */}
-      {displayWeightedShield && !useLightMode && cacheReady && weightedShieldStatus && allPrioritizedCardInfo && (
-        <>
-          <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
-          <WeightedShieldTooltip
-            kbValue={weightedShieldStatus.kb}
-            docValue={weightedShieldStatus.doc}
-            allItems={allPrioritizedCardInfo}
-            isDuePredicate={weightedIsDuePredicate}
-            docItems={weightedShieldStatus.docItems}
-            itemLabel="Cards"
-          />
-        </>
-      )}
+        {/* Weighted Shield */}
+        {displayWeightedShield && !useLightMode && cacheReady && weightedShieldStatus && allPrioritizedCardInfo && (
+          <>
+            <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
+            <WeightedShieldTooltip
+              kbValue={weightedShieldStatus.kb}
+              docValue={weightedShieldStatus.doc}
+              allItems={allPrioritizedCardInfo}
+              isDuePredicate={weightedIsDuePredicate}
+              docItems={weightedShieldStatus.docItems}
+              itemLabel="Cards"
+            />
+          </>
+        )}
 
-      {/* Review Stats + FSRS DSR + Debug */}
-      {(historyStats.reps > 0 || fsrsState) && (
-        <>
-          <span
-            ref={statsSepRef}
-            style={{
-              color: 'var(--rn-clr-content-tertiary)',
-              opacity: statsSepVisible ? 1 : 0,
-              pointerEvents: 'none',
-            }}
-          >|</span>
-          <div ref={statsContainerRef} className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
+        {/* Review Stats + FSRS DSR + Debug */}
+        {(historyStats.reps > 0 || fsrsState) && (
+          <>
             <span
-              title={`Total number of gradeable repetitions.\n\nThe number in red parentheses — (${historyStats.lapses}) — is the number of lapses (AGAIN ratings).\n\nThe following number is the total time spent reviewing this card.\n\nThe card age is the time elapsed since the first repetition.\n\nThe cost is the average time spent reviewing this card per year.`}
-              style={{ cursor: 'help' }}
-            >
-              <strong>{historyStats.reps}</strong> Reps <span style={{ color: '#ef4444' }}>({historyStats.lapses})</span>, ⏳ <strong>{historyStats.totalMinutes}</strong> min, <strong>{historyStats.cardAgeText}</strong> age{historyStats.costText && <>, 💰 <strong>{historyStats.costText}</strong></>}
-            </span>
-
-            {showFsrsDsr && fsrsState && (
-              <>
-                <span style={{ opacity: 0.4 }}>|</span>
-                <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nThe number inside the parenthesis after Stability tells you how much time has passed since your last review of this card.\n\nBased on ${fsrsState.reviewCount} reviews.\n\nNext Difficulty:\nAgain: ${fsrsState.nextD.again.toFixed(2)}\nHard: ${fsrsState.nextD.hard.toFixed(2)}\nGood: ${fsrsState.nextD.good.toFixed(2)}\nEasy: ${fsrsState.nextD.easy.toFixed(2)}`}>
-                  D: <strong>{fsrsState.d.toFixed(2)}</strong>
-                  {' · '}
-                  S: <strong>{formatStabilityDays(fsrsState.s)}</strong> ({formatStabilityDays(fsrsState.daysSinceLastReview)} passed)
-                  {' · '}
-                  R: <strong style={{ color: getRetrievabilityColor(fsrsState.r) }}>
-                    {(fsrsState.r * 100).toFixed(1)}%
-                  </strong>
-                </span>
-                {' · '}
-                <span title={`SInc (Stability Increase) — how much your memory stability grows after answering.\n\nHard: ×${fsrsState.sInc.hard.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.hard)}\nGood: ×${fsrsState.sInc.good.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.good)}\nEasy: ×${fsrsState.sInc.easy.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.easy)}\n\nHigher = faster learning. A value of 1.0 means no growth.`}
-                  style={{ cursor: 'help' }}
-                >
-                  SInc: <strong>{fsrsState.sInc.good.toFixed(2)}×</strong>
-                </span>
-              </>
-            )}
-
-            <span
-              role="button"
+              ref={statsSepRef}
               style={{
-                cursor: 'pointer',
-                fontSize: '13px',
-                opacity: 0.5,
-                padding: '2px 4px',
-                borderRadius: '4px',
-                transition: 'opacity 0.15s, background-color 0.15s',
+                color: 'var(--rn-clr-content-tertiary)',
+                opacity: statsSepVisible ? 1 : 0,
+                pointerEvents: 'none',
               }}
-              onClick={handleDebugClick}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-              title="Inspect full repetition history"
-            >
-              🔬
-            </span>
-          </div>
-        </>
-      )}
-    </div>
+            >|</span>
+            <div ref={statsContainerRef} className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
+              <span
+                title={`Total number of gradeable repetitions.\n\nThe number in red parentheses — (${historyStats.lapses}) — is the number of lapses (AGAIN ratings).\n\nThe following number is the total time spent reviewing this card.\n\nThe card age is the time elapsed since the first repetition.\n\nThe cost is the average time spent reviewing this card per year.`}
+                style={{ cursor: 'help' }}
+              >
+                <strong>{historyStats.reps}</strong> Reps <span style={{ color: '#ef4444' }}>({historyStats.lapses})</span>, ⏳ <strong>{historyStats.totalMinutes}</strong> min, <strong>{historyStats.cardAgeText}</strong> age{historyStats.costText && <>, 💰 <strong>{historyStats.costText}</strong></>}
+              </span>
+
+              {showFsrsDsr && fsrsState && (
+                <>
+                  <span style={{ opacity: 0.4 }}>|</span>
+                  <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nThe number inside the parenthesis after Stability tells you how much time has passed since your last review of this card.\n\nBased on ${fsrsState.reviewCount} reviews.\n\nNext Difficulty:\nAgain: ${fsrsState.nextD.again.toFixed(2)}\nHard: ${fsrsState.nextD.hard.toFixed(2)}\nGood: ${fsrsState.nextD.good.toFixed(2)}\nEasy: ${fsrsState.nextD.easy.toFixed(2)}`}>
+                    D: <strong>{fsrsState.d.toFixed(2)}</strong>
+                    {' · '}
+                    S: <strong>{formatStabilityDays(fsrsState.s)}</strong> ({formatStabilityDays(fsrsState.daysSinceLastReview)} passed)
+                    {' · '}
+                    R: <strong style={{ color: getRetrievabilityColor(fsrsState.r) }}>
+                      {(fsrsState.r * 100).toFixed(1)}%
+                    </strong>
+                  </span>
+                  {' · '}
+                  <span title={`SInc (Stability Increase) — how much your memory stability grows after answering.\n\nHard: ×${fsrsState.sInc.hard.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.hard)}\nGood: ×${fsrsState.sInc.good.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.good)}\nEasy: ×${fsrsState.sInc.easy.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.easy)}\n\nHigher = faster learning. A value of 1.0 means no growth.`}
+                    style={{ cursor: 'help' }}
+                  >
+                    SInc: <strong>{fsrsState.sInc.good.toFixed(2)}×</strong>
+                  </span>
+                </>
+              )}
+
+              <span
+                role="button"
+                style={{
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  opacity: 0.5,
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  transition: 'opacity 0.15s, background-color 0.15s',
+                }}
+                onClick={handleDebugClick}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                title="Inspect full repetition history"
+              >
+                🔬
+              </span>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

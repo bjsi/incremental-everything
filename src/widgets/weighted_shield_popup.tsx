@@ -195,7 +195,9 @@ function WeightedShieldPopup() {
       fontSize: '13px',
       color: 'var(--rn-clr-content-primary)',
       background: 'var(--rn-clr-background-primary)',
-      minHeight: '100%',
+      height: '100%',
+      overflowY: 'auto',
+      boxSizing: 'border-box',
     }}>
       {/* Title */}
       <div style={{

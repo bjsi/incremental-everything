@@ -215,7 +215,7 @@ export function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('weighted_shield_popup', WidgetLocation.Popup, {
     dimensions: {
       width: '560px',
-      height: 'auto',
+      height: 700,
     },
   });
 }
