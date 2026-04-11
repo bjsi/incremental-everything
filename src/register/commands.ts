@@ -4,6 +4,8 @@ import {
   SelectionType,
   PluginRem,
   BuiltInPowerupCodes,
+  RICH_TEXT_FORMATTING,
+  RichTextInterface,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -54,14 +56,120 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     if (!selection) {
       return;
     }
+    if (selection.type === SelectionType.Text && selection.range.start === selection.range.end) {
+      // Fallback empty text selections to Rem selection behavior
+      (selection as any).type = SelectionType.Rem;
+      (selection as any).remIds = [selection.remId];
+    }
+
     // TODO: extract within extract support
     if (selection.type === SelectionType.Text) {
-      const focused = await plugin.focus.getFocusedRem();
-      if (!focused) {
-        return;
+      // 1. Fetch the Rem
+      const rem = await plugin.rem.findOne(selection.remId);
+      if (!rem) return;
+
+      // 2. Extract selected text
+      const extractRem = await plugin.rem.createRem();
+      if (!extractRem) return;
+
+      await extractRem.setText([
+        ...selection.richText,
+        { i: 'q', _id: rem._id, pin: true },
+      ]);
+      await extractRem.setParent(rem);
+
+      // 3. Add "remove-from-queue" tag to the parent
+      let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
+      if (!removeFromQueueTag) {
+        removeFromQueueTag = await plugin.rem.createRem();
+        if (removeFromQueueTag) {
+          await removeFromQueueTag.setText(['remove-from-queue']);
+        }
       }
-      await initIncrementalRem(plugin, focused);
-      return focused;
+      if (removeFromQueueTag) {
+        await rem.addTag(removeFromQueueTag._id);
+      }
+
+      // Make Incremental
+      await initIncrementalRem(plugin, extractRem);
+
+      // 4. Locate and Modify
+      const r_start = Math.min(selection.range.start, selection.range.end);
+      const r_end = Math.max(selection.range.start, selection.range.end);
+
+      const processRichText = (richText: RichTextInterface): RichTextInterface => {
+        const newArray: any[] = [];
+        let currIdx = 0;
+        for (const item of richText) {
+          const isString = typeof item === 'string';
+          const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
+          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
+          const nodeStart = currIdx;
+          const nodeEnd = currIdx + nodeLen;
+
+          if (nodeEnd <= r_start || nodeStart >= r_end) {
+            newArray.push(item);
+          } else {
+            if (textNode.i === 'm') {
+              const textStr = textNode.text || '';
+              const relStart = Math.max(0, r_start - nodeStart);
+              const relEnd = Math.min(nodeLen, r_end - nodeStart);
+
+              if (relStart > 0) {
+                newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
+              }
+              newArray.push({
+                ...textNode,
+                text: textStr.substring(relStart, relEnd),
+                [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6, // RemColor.Blue = 6
+              });
+
+              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) {
+                newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+              }
+
+              if (relEnd < nodeLen) {
+                newArray.push({ ...textNode, text: textStr.substring(relEnd) });
+              }
+            } else {
+              newArray.push({
+                ...textNode,
+                [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6,
+              });
+
+              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) {
+                newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+              }
+            }
+          }
+
+          currIdx += nodeLen;
+        }
+        if (r_end > currIdx && r_start < currIdx) {
+          newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+        }
+        return newArray;
+      };
+
+      // Detect if selection is in front or back
+      let isBack = false;
+      const remText = rem.text || [];
+      const frontMiddle = await plugin.richText.substring(remText, r_start, r_end);
+      if (!(await plugin.richText.equals(selection.richText, frontMiddle))) {
+        const backMiddle = await plugin.richText.substring(rem.backText || [], r_start, r_end);
+        if (await plugin.richText.equals(selection.richText, backMiddle)) {
+          isBack = true;
+        }
+      }
+
+      // 6. Save the Changes
+      if (isBack) {
+        await rem.setBackText(processRichText(rem.backText || []));
+      } else {
+        await rem.setText(processRichText(rem.text || []));
+      }
+
+      return extractRem;
     } else if (selection.type === SelectionType.Rem) {
       const rems = (await plugin.rem.findMany(selection.remIds)) || [];
       // Single outer flag bracket for the entire batch — each initIncrementalRem
@@ -119,6 +227,87 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         await plugin.widget.openPopup('priority_interval', {
           remId: result._id,
         });
+      }
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'create-cloze-deletion',
+    name: 'Create Cloze Deletion',
+    keyboardShortcut: 'opt+z',
+    action: async () => {
+      const selection = await plugin.editor.getSelection();
+      if (!selection || selection.type !== SelectionType.Text) {
+        return;
+      }
+      if (selection.range.start === selection.range.end) {
+        await plugin.app.toast('Please select some text to create a cloze deletion.');
+        return;
+      }
+      
+      const rem = await plugin.rem.findOne(selection.remId);
+      if (!rem) return;
+
+      const r_start = Math.min(selection.range.start, selection.range.end);
+      const r_end = Math.max(selection.range.start, selection.range.end);
+
+      const clozeId = Math.random().toString(36).substring(2, 10);
+
+      const processRichText = (richText: RichTextInterface): RichTextInterface => {
+        const newArray: any[] = [];
+        let currIdx = 0;
+        for (const item of richText) {
+          const isString = typeof item === 'string';
+          const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
+          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
+          const nodeStart = currIdx;
+          const nodeEnd = currIdx + nodeLen;
+          
+          if (nodeEnd <= r_start || nodeStart >= r_end) {
+            newArray.push(item);
+          } else {
+            if (textNode.i === 'm') {
+              const textStr = textNode.text || '';
+              const relStart = Math.max(0, r_start - nodeStart);
+              const relEnd = Math.min(nodeLen, r_end - nodeStart);
+              
+              if (relStart > 0) {
+                newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
+              }
+              newArray.push({
+                ...textNode,
+                text: textStr.substring(relStart, relEnd),
+                [RICH_TEXT_FORMATTING.CLOZE]: clozeId,
+              });
+              if (relEnd < nodeLen) {
+                newArray.push({ ...textNode, text: textStr.substring(relEnd) });
+              }
+            } else {
+              newArray.push({
+                ...textNode,
+                [RICH_TEXT_FORMATTING.CLOZE]: clozeId,
+              });
+            }
+          }
+          currIdx += nodeLen;
+        }
+        return newArray;
+      };
+
+      let isBack = false;
+      const remText = rem.text || [];
+      const frontMiddle = await plugin.richText.substring(remText, r_start, r_end);
+      if (!(await plugin.richText.equals(selection.richText, frontMiddle))) {
+        const backMiddle = await plugin.richText.substring(rem.backText || [], r_start, r_end);
+        if (await plugin.richText.equals(selection.richText, backMiddle)) {
+          isBack = true;
+        }
+      }
+
+      if (isBack) {
+        await rem.setBackText(processRichText(rem.backText || []));
+      } else {
+        await rem.setText(processRichText(rem.text || []));
       }
     },
   });

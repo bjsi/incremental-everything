@@ -43,7 +43,7 @@ export function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('batch_card_priority', WidgetLocation.Popup, {
     dimensions: {
       width: 1000,
-      height: 'auto',
+      height: 1100,
     },
   });
 
@@ -215,7 +215,7 @@ export function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('weighted_shield_popup', WidgetLocation.Popup, {
     dimensions: {
       width: '560px',
-      height: 'auto',
+      height: 700,
     },
   });
 }

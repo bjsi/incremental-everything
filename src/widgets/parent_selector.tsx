@@ -462,23 +462,23 @@ function ParentSelectorWidget() {
   // Scroll to selected item whenever selectedIndex changes or after initialization
   useEffect(() => {
     if (!isInitialized || itemRefs.current.length === 0) return;
-    
+
     let attempts = 0;
     const maxAttempts = 20; // Allow up to 1 second of retries to outlast UI animations
-    
+
     // We use a retry mechanism because inside the sandboxed iframe, the DOM layout 
     // might not have non-zero dimensions immediately after the render commit.
     const tryScroll = () => {
       const selectedEl = itemRefs.current[selectedIndex];
       const container = listContainerRef.current;
-      
-      console.log(`[ParentSelector:Scroll] attempt ${attempts} at index ${selectedIndex}`, { 
-        hasScrolled: hasInitiallyScrolled.current, 
-        elFound: !!selectedEl, 
+
+      console.log(`[ParentSelector:Scroll] attempt ${attempts} at index ${selectedIndex}`, {
+        hasScrolled: hasInitiallyScrolled.current,
+        elFound: !!selectedEl,
         containerFound: !!container,
         clientHeight: selectedEl?.clientHeight,
       });
-      
+
       if (selectedEl && container) {
         // If layout hasn't populated, wait for next paint
         if (selectedEl.clientHeight === 0 && attempts < maxAttempts) {
@@ -491,7 +491,7 @@ function ParentSelectorWidget() {
           // Manual nearest block logic for keyboard navigation
           const elRect = selectedEl.getBoundingClientRect();
           const containerRect = container.getBoundingClientRect();
-          
+
           if (elRect.top < containerRect.top) {
             container.scrollTop -= (containerRect.top - elRect.top);
           } else if (elRect.bottom > containerRect.bottom) {
@@ -502,13 +502,13 @@ function ParentSelectorWidget() {
           // We use offsetTop because getBoundingClientRect gives incorrect warped 
           // coordinates while the popup is scaling/animating into view natively.
           const scrollOffset = selectedEl.offsetTop - container.clientHeight / 2 + selectedEl.clientHeight / 2;
-          
+
           console.log(`[ParentSelector:Scroll] Initial load centering:`, {
-             offsetTop: selectedEl.offsetTop,
-             containerHeight: container.clientHeight,
-             calcScrollOffset: scrollOffset
+            offsetTop: selectedEl.offsetTop,
+            containerHeight: container.clientHeight,
+            calcScrollOffset: scrollOffset
           });
-          
+
           container.scrollTop = scrollOffset;
           hasInitiallyScrolled.current = true;
         }
@@ -517,10 +517,10 @@ function ParentSelectorWidget() {
         setTimeout(tryScroll, 50);
       }
     };
-    
+
     // Wait slightly bit initially to allow DOM to attach inside the plugin iframe
     const initialTimer = setTimeout(tryScroll, 100);
-    
+
     return () => clearTimeout(initialTimer);
   }, [selectedIndex, isInitialized, displayList.length]);
 
@@ -683,7 +683,14 @@ function ParentSelectorWidget() {
         await newRem.setText([childName]);
         await newRem.setParent(creatingChildForNodeId);
 
-        console.log('[ParentSelector:Widget] Child rem created:', newRem._id);
+        // Pick a heading level that respects the parent's heading hierarchy:
+        // H1 parent → H2 child; anything else → H3.
+        const parentRem = await plugin.rem.findOne(creatingChildForNodeId);
+        const parentFontSize = await parentRem?.getFontSize();
+        const headingLevel = parentFontSize === 'H1' ? 'H2' : 'H3';
+        await newRem.setFontSize(headingLevel);
+
+        console.log(`[ParentSelector:Widget] Child rem created: ${newRem._id} (${headingLevel}, parent was ${parentFontSize ?? 'normal'})`);
 
         // Create a tree node for the new child using the helper function
         // Note: We need to fetch the rem again to get the full PluginRem object
