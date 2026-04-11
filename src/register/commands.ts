@@ -226,6 +226,83 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerCommand({
+    id: 'create-cloze-deletion',
+    name: 'Create Cloze Deletion',
+    keyboardShortcut: 'opt+z',
+    action: async () => {
+      const selection = await plugin.editor.getSelection();
+      if (!selection || selection.type !== SelectionType.Text) {
+        return;
+      }
+      
+      const rem = await plugin.rem.findOne(selection.remId);
+      if (!rem) return;
+
+      const r_start = Math.min(selection.range.start, selection.range.end);
+      const r_end = Math.max(selection.range.start, selection.range.end);
+
+      const clozeId = Math.random().toString(36).substring(2, 10);
+
+      const processRichText = (richText: RichTextInterface): RichTextInterface => {
+        const newArray: any[] = [];
+        let currIdx = 0;
+        for (const item of richText) {
+          const isString = typeof item === 'string';
+          const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
+          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
+          const nodeStart = currIdx;
+          const nodeEnd = currIdx + nodeLen;
+          
+          if (nodeEnd <= r_start || nodeStart >= r_end) {
+            newArray.push(item);
+          } else {
+            if (textNode.i === 'm') {
+              const textStr = textNode.text || '';
+              const relStart = Math.max(0, r_start - nodeStart);
+              const relEnd = Math.min(nodeLen, r_end - nodeStart);
+              
+              if (relStart > 0) {
+                newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
+              }
+              newArray.push({
+                ...textNode,
+                text: textStr.substring(relStart, relEnd),
+                [RICH_TEXT_FORMATTING.CLOZE]: clozeId,
+              });
+              if (relEnd < nodeLen) {
+                newArray.push({ ...textNode, text: textStr.substring(relEnd) });
+              }
+            } else {
+              newArray.push({
+                ...textNode,
+                [RICH_TEXT_FORMATTING.CLOZE]: clozeId,
+              });
+            }
+          }
+          currIdx += nodeLen;
+        }
+        return newArray;
+      };
+
+      let isBack = false;
+      const remText = rem.text || [];
+      const frontMiddle = await plugin.richText.substring(remText, r_start, r_end);
+      if (!(await plugin.richText.equals(selection.richText, frontMiddle))) {
+        const backMiddle = await plugin.richText.substring(rem.backText || [], r_start, r_end);
+        if (await plugin.richText.equals(selection.richText, backMiddle)) {
+          isBack = true;
+        }
+      }
+
+      if (isBack) {
+        await rem.setBackText(processRichText(rem.backText || []));
+      } else {
+        await rem.setText(processRichText(rem.text || []));
+      }
+    },
+  });
+
+  plugin.app.registerCommand({
     id: 'set-priority',
     name: 'Set Priority',
     keyboardShortcut: 'opt+p',
