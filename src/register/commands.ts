@@ -4,6 +4,8 @@ import {
   SelectionType,
   PluginRem,
   BuiltInPowerupCodes,
+  RICH_TEXT_FORMATTING,
+  RichTextInterface,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -56,12 +58,109 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     }
     // TODO: extract within extract support
     if (selection.type === SelectionType.Text) {
-      const focused = await plugin.focus.getFocusedRem();
-      if (!focused) {
-        return;
+      // 1. Fetch the Rem
+      const rem = await plugin.rem.findOne(selection.remId);
+      if (!rem) return;
+
+      // 2. Extract selected text
+      const extractRem = await plugin.rem.createRem();
+      if (!extractRem) return;
+
+      await extractRem.setText(selection.richText);
+      await extractRem.setParent(rem);
+
+      // 3. Add "hide-parent" tag
+      let hideParentTag = await plugin.rem.findByName(['hide-parent'], null);
+      if (!hideParentTag) {
+        hideParentTag = await plugin.rem.createRem();
+        if (hideParentTag) {
+          await hideParentTag.setText(['hide-parent']);
+        }
       }
-      await initIncrementalRem(plugin, focused);
-      return focused;
+      if (hideParentTag) {
+        await extractRem.addTag(hideParentTag._id);
+      }
+
+      // Make Incremental
+      await initIncrementalRem(plugin, extractRem);
+
+      // 4. Locate and Modify
+      const r_start = Math.min(selection.range.start, selection.range.end);
+      const r_end = Math.max(selection.range.start, selection.range.end);
+
+      const processRichText = (richText: RichTextInterface): RichTextInterface => {
+        const newArray: any[] = [];
+        let currIdx = 0;
+        for (const item of richText) {
+          const isString = typeof item === 'string';
+          const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
+          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
+          const nodeStart = currIdx;
+          const nodeEnd = currIdx + nodeLen;
+          
+          if (nodeEnd <= r_start || nodeStart >= r_end) {
+            newArray.push(item);
+          } else {
+            if (textNode.i === 'm') {
+              const textStr = textNode.text || '';
+              const relStart = Math.max(0, r_start - nodeStart);
+              const relEnd = Math.min(nodeLen, r_end - nodeStart);
+              
+              if (relStart > 0) {
+                newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
+              }
+              newArray.push({
+                ...textNode,
+                text: textStr.substring(relStart, relEnd),
+                [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6, // RemColor.Blue = 6
+              });
+              
+              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) { 
+                  newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+              }
+
+              if (relEnd < nodeLen) {
+                newArray.push({ ...textNode, text: textStr.substring(relEnd) });
+              }
+            } else {
+              newArray.push({
+                ...textNode,
+                [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6,
+              });
+              
+              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) { 
+                  newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+              }
+            }
+          }
+          
+          currIdx += nodeLen;
+        }
+        if (r_end > currIdx && r_start < currIdx) {
+           newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+        }
+        return newArray;
+      };
+
+      // Detect if selection is in front or back
+      let isBack = false;
+      const remText = rem.text || [];
+      const frontMiddle = await plugin.richText.substring(remText, r_start, r_end);
+      if (!(await plugin.richText.equals(selection.richText, frontMiddle))) {
+        const backMiddle = await plugin.richText.substring(rem.backText || [], r_start, r_end);
+        if (await plugin.richText.equals(selection.richText, backMiddle)) {
+          isBack = true;
+        }
+      }
+
+      // 6. Save the Changes
+      if (isBack) {
+        await rem.setBackText(processRichText(rem.backText || []));
+      } else {
+        await rem.setText(processRichText(rem.text || []));
+      }
+
+      return extractRem;
     } else if (selection.type === SelectionType.Rem) {
       const rems = (await plugin.rem.findMany(selection.remIds)) || [];
       // Single outer flag bracket for the entire batch — each initIncrementalRem
