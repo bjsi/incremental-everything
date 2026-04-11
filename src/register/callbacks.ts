@@ -11,6 +11,7 @@ import {
   currentScopeRemIdsKey,
   queueCounterId,
   queueLayoutFixId,
+  queueHideElementsId,
   seenRemInSessionKey,
   noIncRemTimerKey,
   incremReviewStartTimeKey,
@@ -20,6 +21,8 @@ import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
 
 
+// Registered once globally — safe because all selectors are highly specific to the
+// incremental-everything plugin iframe and do not affect regular flashcard layout.
 const QUEUE_LAYOUT_FIX_CSS = `
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) {
     height: 100% !important;
@@ -33,15 +36,28 @@ const QUEUE_LAYOUT_FIX_CSS = `
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"] {
     flex-grow: 1 !important;
   }
+`;
 
+// Registered dynamically in GetNextCard — applied ONLY when we are returning a Plugin
+// (QueueItemType.Plugin) item so that rems that are both an IncRem and a flashcard
+// do NOT have these elements hidden when they appear on a regular flashcard turn.
+//
+// Belt-and-suspenders against the pre-fetch race (same pattern as QUEUE_LAYOUT_FIX_CSS):
+// all selectors are rooted at .rn-queue:has(iframe[data-plugin-id="incremental-everything"]).
+// This means even if a concurrent GetNextCard null-return fires registerCSS('') a few ms
+// late, the rules stop matching the instant RemNote removes the plugin iframe from the DOM —
+// the CSS is self-deactivating at the DOM level and does not depend solely on JS timing.
+const QUEUE_HIDE_ELEMENTS_CSS = `
   /* Hide unwanted UI elements during incremental rem review.
-     NOTE: [data-queue-rem-tags~="incremental"] is used as a direct ancestor (not via :has()
-     on the queue root) to avoid hiding these elements in sibling flashcard containers that
-     RemNote keeps coexisting in the DOM (pre-rendered / cached items). */
-  [data-queue-rem-tags~="incremental"] .rn-flashcard-insights,
-  [data-queue-rem-tags~="incremental"] [data-cy="bottom-of-card-ai-suggestions"],
-  [data-queue-rem-tags~="incremental"] div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
-  [data-queue-rem-tags~="incremental"] div.fade-in-first-load:has(iframe[data-plugin-id="flashcard-repetition-history"]) {
+     Gated on two conditions:
+       1. The plugin iframe is present (.rn-queue:has(iframe...)) — self-deactivates when
+          the iframe is removed, guarding against the pre-fetch GetNextCard race.
+       2. The item is tagged as incremental ([data-queue-rem-tags~="incremental"]) — ensures
+          rems that are both an IncRem and a flashcard are only affected on Plugin turns. */
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) [data-queue-rem-tags~="incremental"] .rn-flashcard-insights,
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) [data-queue-rem-tags~="incremental"] [data-cy="bottom-of-card-ai-suggestions"],
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) [data-queue-rem-tags~="incremental"] div.fade-in-first-load:has(div[data-cy="bottom-of-card-suggestions"]),
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) [data-queue-rem-tags~="incremental"] div.fade-in-first-load:has(iframe[data-plugin-id="flashcard-repetition-history"]) {
     display: none !important;
   }
 `;
@@ -77,7 +93,8 @@ export const resetSessionItemCounter = () => {
         const remainingSeconds = Math.ceil((noIncRemTimerEnd - now) / 1000);
         // console.log('⚠️ TIMER IS ACTIVE - BLOCKING INCREM! Time remaining:', remainingSeconds, 'seconds');
 
-        // Removed dynamic unregistration: plugin.app.registerCSS(queueLayoutFixId, '');
+        // Timer is blocking IncRem — this turn will be a flashcard; ensure hide CSS is cleared.
+        plugin.app.registerCSS(queueHideElementsId, '');
         await plugin.app.registerCSS(queueCounterId, '');
 
         return null;
@@ -194,7 +211,7 @@ export const resetSessionItemCounter = () => {
 
         if (filtered.length === 0) {
           // console.log('⚠️ FILTERED LENGTH IS 0 - Returning null, will show a flashcard.');
-          // Removed dynamic unregistration: plugin.app.registerCSS(queueLayoutFixId, '');
+          plugin.app.registerCSS(queueHideElementsId, '');
           sessionItemCounter++;
           return null;
         }
@@ -214,14 +231,16 @@ export const resetSessionItemCounter = () => {
           filtered.shift();
           if (filtered.length === 0) {
             console.log('❌ All filtered items were invalid after verification - Returning null');
+            plugin.app.registerCSS(queueHideElementsId, '');
             return null;
           }
           first = filtered[0];
         }
-        // Removed dynamic registration: plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
         await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
-
         await plugin.storage.setSession(incremReviewStartTimeKey, Date.now());
+
+        // Activate hide CSS now that we know we're genuinely showing a Plugin (IncRem) item.
+        plugin.app.registerCSS(queueHideElementsId, QUEUE_HIDE_ELEMENTS_CSS);
 
         // console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
         sessionItemCounter++;
@@ -247,10 +266,11 @@ export const resetSessionItemCounter = () => {
         //       : 'N/A',
         // });
         sessionItemCounter++;
-        // Removed dynamic unregistration: plugin.app.registerCSS(queueLayoutFixId, '');
-        // Bullet-proof mid-session reset: if the previous IncRem widget unmounted
-        // unceremoniously (skipping its useEffect cleanup), ensure the flag is cleared
-        // so regular flashcards can render their widgets (like CardPriorityDisplay).
+        // Flashcard turn — deactivate hide CSS so flashcard widgets remain visible.
+        // Also clears incrementalQueueActiveKey as a bullet-proof mid-session reset:
+        // if the previous IncRem widget unmounted unceremoniously (skipping its useEffect
+        // cleanup), this ensures CardPriorityDisplay and similar widgets can render.
+        plugin.app.registerCSS(queueHideElementsId, '');
         await plugin.storage.setSession(incrementalQueueActiveKey, false);
         return null;
       }
