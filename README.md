@@ -57,12 +57,14 @@ This README covers the basics. For the comprehensive guides, please visit the **
 
 ### Getting Started
 1. **Make Incremental**: Make any Rem, PDF, or Website `Incremental` using the `/Incremental Everything` command (Shortcut: `Alt+X`).
+   * **Extract Selection**: If you have text selected, `Alt+X` will extract that specific piece into a new child Rem and link it back.
 
 ![Make Incremental using the command](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/tag-inc-rem.gif)
 
-2. **Prioritize it**: Use `Alt+P` to set its importance.
-3. **Review it**: The plugin interleaves these items into your regular flashcard queue.
-4. **Disable it**: Remove the `Incremental` tag or press the **Dismiss** button in the queue if you are done reviewing it.
+2. **Prioritize it**: Use `Alt+P` or `Alt+Shift+X` (Extract with Priority) to set its importance.
+3. **Create Flashcards**: Use `Alt+Z` to quickly create a **Cloze Deletion** from selected text.
+4. **Review it**: The plugin interleaves these items into your regular flashcard queue.
+5. **Disable it**: Remove the `Incremental` tag or press the **Dismiss** button in the queue if you are done reviewing it.
 
 ### ⚡ Prioritization & Sorting
 - 0 is for your most important material and 100 is for the least important.

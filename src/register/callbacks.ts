@@ -71,28 +71,15 @@ const QUEUE_HIDE_ELEMENTS_CSS = `
   }
 `;
 
-const HIDE_PARENT_CSS = `
-  /* Hide Parent Styles */
-  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .RichTextViewer,
-  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-flashcard-delimiter,
-  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .RichTextViewer,
-  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rem-bullet__document {
-    display: none !important;
+const REMOVE_FROM_QUEUE_CSS = `
+  /* Remove from Queue Styles */
+  .rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem) > .rn-queue-rem {
+    display: none;
   }
 
-  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rn-bullet-container,
-  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rem-bullet__document {
-    position: relative;
-  }
-
-  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rn-bullet-container:after,
-  .rn-queue__content--answer-hidden .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="hide-parent"]) > .rn-queue-rem > .rem-bullet__document:after {
-    content: "Hidden in queue";
-    opacity: .3;
-    white-space: nowrap;
-    position: absolute;
-    left: 25px;
-    top: 0;
+  .rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem),
+  .rn-breadcrumb-item[data-rem-tags~="remove-from-queue"] {
+    margin-left: 0px !important; /* makes it look like its not indented to the removed parent */
   }
 `;
 
@@ -104,7 +91,7 @@ export const resetSessionItemCounter = () => {
 
   export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
-  plugin.app.registerCSS('hide-parent-css', HIDE_PARENT_CSS);
+  plugin.app.registerCSS('remove-from-queue-css', REMOVE_FROM_QUEUE_CSS);
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,

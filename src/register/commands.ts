@@ -78,16 +78,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       ]);
       await extractRem.setParent(rem);
 
-      // 3. Add "hide-parent" tag
-      let hideParentTag = await plugin.rem.findByName(['hide-parent'], null);
-      if (!hideParentTag) {
-        hideParentTag = await plugin.rem.createRem();
-        if (hideParentTag) {
-          await hideParentTag.setText(['hide-parent']);
+      // 3. Add "remove-from-queue" tag to the parent
+      let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
+      if (!removeFromQueueTag) {
+        removeFromQueueTag = await plugin.rem.createRem();
+        if (removeFromQueueTag) {
+          await removeFromQueueTag.setText(['remove-from-queue']);
         }
       }
-      if (hideParentTag) {
-        await extractRem.addTag(hideParentTag._id);
+      if (removeFromQueueTag) {
+        await rem.addTag(removeFromQueueTag._id);
       }
 
       // Make Incremental
