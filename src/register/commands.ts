@@ -66,7 +66,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const extractRem = await plugin.rem.createRem();
       if (!extractRem) return;
 
-      await extractRem.setText(selection.richText);
+      await extractRem.setText([
+        ...selection.richText,
+        { i: 'q', _id: rem._id, pin: true },
+      ]);
       await extractRem.setParent(rem);
 
       // 3. Add "hide-parent" tag
@@ -97,7 +100,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
           const nodeStart = currIdx;
           const nodeEnd = currIdx + nodeLen;
-          
+
           if (nodeEnd <= r_start || nodeStart >= r_end) {
             newArray.push(item);
           } else {
@@ -105,7 +108,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
               const textStr = textNode.text || '';
               const relStart = Math.max(0, r_start - nodeStart);
               const relEnd = Math.min(nodeLen, r_end - nodeStart);
-              
+
               if (relStart > 0) {
                 newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
               }
@@ -114,9 +117,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                 text: textStr.substring(relStart, relEnd),
                 [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6, // RemColor.Blue = 6
               });
-              
-              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) { 
-                  newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+
+              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) {
+                newArray.push({ i: 'q', _id: extractRem._id, pin: true });
               }
 
               if (relEnd < nodeLen) {
@@ -127,17 +130,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                 ...textNode,
                 [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6,
               });
-              
-              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) { 
-                  newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+
+              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) {
+                newArray.push({ i: 'q', _id: extractRem._id, pin: true });
               }
             }
           }
-          
+
           currIdx += nodeLen;
         }
         if (r_end > currIdx && r_start < currIdx) {
-           newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+          newArray.push({ i: 'q', _id: extractRem._id, pin: true });
         }
         return newArray;
       };
