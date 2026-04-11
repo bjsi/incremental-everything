@@ -16,6 +16,7 @@ export interface IncRemRowData {
   historyCount?: number;
   totalTimeSpent?: number;
   lastReviewDate?: number;
+  createdAt?: number;
   breadcrumb?: string;
 }
 
@@ -62,7 +63,7 @@ export function IncRemRow({
           <div className="truncate" title={incRem.breadcrumb ? `${incRem.breadcrumb} > ${incRem.remText}` : incRem.remText}>
             {incRem.remText || 'Loading...'}
           </div>
-          {(incRem.historyCount !== undefined && incRem.historyCount > 0) || (incRem.totalTimeSpent !== undefined && incRem.totalTimeSpent > 0) ? (
+          {((incRem.historyCount !== undefined && incRem.historyCount > 0) || (incRem.totalTimeSpent !== undefined && incRem.totalTimeSpent > 0) || incRem.lastReviewDate || incRem.createdAt) ? (
             <div className="text-xs mt-0.5 flex items-center gap-2" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               {incRem.historyCount !== undefined && incRem.historyCount > 0 && (
                 <span>{incRem.historyCount} review{incRem.historyCount !== 1 ? 's' : ''}</span>
@@ -75,6 +76,11 @@ export function IncRemRow({
               {incRem.lastReviewDate && (
                 <span style={{ color: 'var(--rn-clr-content-tertiary)' }} title="Last review date">
                   • Last reviewed: {timeSince(new Date(incRem.lastReviewDate))}
+                </span>
+              )}
+              {incRem.createdAt && (
+                <span style={{ color: 'var(--rn-clr-content-tertiary)' }} title={`Created at: ${new Date(incRem.createdAt).toLocaleString()}`}>
+                  • Created: {new Date(incRem.createdAt).toLocaleDateString()}
                 </span>
               )}
             </div>

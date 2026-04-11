@@ -78,7 +78,7 @@ function IncrementalHistory() {
         }
     }, [historyDataRaw, plugin]);
 
-    // Effect to filter data by Knowledge Base AND Search Text
+    // Effect to filter data by Knowledge Base AND Search Text, then sort chronologically
     useEffect(() => {
         async function filterData() {
             const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
@@ -117,6 +117,9 @@ function IncrementalHistory() {
                         return b.item.time - a.item.time;
                     })
                     .map(x => x.item);
+            } else {
+                // No search active: sort chronologically (most recent first)
+                filtered = [...filtered].sort((a, b) => b.time - a.time);
             }
 
             setFilteredData(filtered);
@@ -170,7 +173,7 @@ function IncrementalHistory() {
             </div>
             {filteredData.length === 0 && (
                 <div className="p-2 rn-clr-content-primary">
-                    Study some Incremental Rems to see your history here.
+                    Study or create Incremental Rems to see your history here.
                 </div>
             )}
             {filteredData.slice(0, NUM_TO_LOAD_IN_BATCH * numLoaded).map((data) => (
@@ -194,6 +197,30 @@ function IncrementalHistory() {
     );
 }
 
+/** Small pill badge to differentiate event types */
+function EventBadge({ eventType }: { eventType?: 'reviewed' | 'created' }) {
+    const isCreated = eventType === 'created';
+    return (
+        <span
+            style={{
+                display: 'inline-block',
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                padding: '1px 5px',
+                borderRadius: 3,
+                backgroundColor: isCreated ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.12)',
+                color: isCreated ? '#10b981' : '#818cf8',
+                flexShrink: 0,
+                alignSelf: 'center',
+            }}
+        >
+            {isCreated ? 'Created' : 'Reviewed'}
+        </span>
+    );
+}
+
 function HistoryItem({
     data,
     remId,
@@ -214,6 +241,11 @@ function HistoryItem({
         }
     };
 
+    const isCreated = data.eventType === 'created';
+    const timeLabel = isCreated
+        ? `Created ${timeSince(new Date(data.time))}`
+        : `Seen ${timeSince(new Date(data.time))}`;
+
     return (
         <div className="px-1 py-4 border-b border-gray-100" key={data.key}>
             <div className="flex gap-2 mb-2">
@@ -232,14 +264,16 @@ function HistoryItem({
                     />
                 </div>
                 <div className="flex-grow min-w-0" onClick={() => openRem(remId)}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                        <EventBadge eventType={data.eventType} />
+                    </div>
                     <RemViewer
                         remId={remId}
-                        constraintRef="parent"
                         width="100%"
                         className="font-light cursor-pointer line-clamp-2"
                     />
                     <div className="text-xs rn-clr-content-tertiary">
-                        Seen {timeSince(new Date(data.time))}
+                        {timeLabel}
                     </div>
                 </div>
                 <div
@@ -268,3 +302,4 @@ function HistoryItem({
 }
 
 renderWidget(IncrementalHistory);
+

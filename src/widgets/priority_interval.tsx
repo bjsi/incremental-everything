@@ -23,6 +23,9 @@ function PriorityInterval() {
     // Refs
     const prioritySliderRef = useRef<PrioritySliderRef>(null);
     const intervalInputRef = useRef<HTMLInputElement>(null);
+    const saveButtonRef = useRef<HTMLButtonElement>(null);
+    const next7ButtonRef = useRef<HTMLButtonElement>(null);
+    const next30ButtonRef = useRef<HTMLButtonElement>(null);
     const isSaving = useRef(false);
 
     // Context
@@ -121,18 +124,38 @@ function PriorityInterval() {
         }, 50);
     }, [!!data]);
 
-    // Tab cycling: priority → interval → priority
+    // Tab cycling: priority → interval → Save → Next 7 Days → Next 30 Days → priority
+    // Shift+Tab reverses the cycle.
+    const focusCycle = [
+        () => { prioritySliderRef.current?.focus(); prioritySliderRef.current?.select(); },
+        () => { intervalInputRef.current?.focus(); intervalInputRef.current?.select(); },
+        () => saveButtonRef.current?.focus(),
+        () => next7ButtonRef.current?.focus(),
+        () => next30ButtonRef.current?.focus(),
+    ];
+
     const handleTab = (e: React.KeyboardEvent) => {
-        if (e.key !== 'Tab' || e.shiftKey) return;
+        if (e.key !== 'Tab') return;
         e.preventDefault();
-        const active = document.activeElement;
-        if (active?.closest('[data-section="priority"]')) {
-            intervalInputRef.current?.focus();
-            intervalInputRef.current?.select();
-        } else {
-            prioritySliderRef.current?.focus();
-            prioritySliderRef.current?.select();
+        const active = document.activeElement as HTMLElement | null;
+        // Determine current position:
+        // - Priority slider: active element is inside [data-section="priority"]
+        // - Others: direct ref comparison
+        let currentIdx = 0;
+        if (active?.closest?.('[data-section="priority"]')) {
+            currentIdx = 0;
+        } else if (active === intervalInputRef.current) {
+            currentIdx = 1;
+        } else if (active === saveButtonRef.current) {
+            currentIdx = 2;
+        } else if (active === next7ButtonRef.current) {
+            currentIdx = 3;
+        } else if (active === next30ButtonRef.current) {
+            currentIdx = 4;
         }
+        const step = e.shiftKey ? -1 : 1;
+        const nextIdx = (currentIdx + step + focusCycle.length) % focusCycle.length;
+        focusCycle[nextIdx]?.();
     };
 
     // handleSave: writes job to session storage, closes popup immediately.
@@ -190,6 +213,9 @@ function PriorityInterval() {
             }}
             onKeyDown={(e) => {
                 if (e.key === 'Enter') {
+                    const active = document.activeElement;
+                    // Let preset buttons handle Enter themselves via native click
+                    if (active === next7ButtonRef.current || active === next30ButtonRef.current) return;
                     e.preventDefault();
                     handleSave();
                 } else if (e.key === 'Escape') {
@@ -304,24 +330,39 @@ function PriorityInterval() {
             {/* Buttons */}
             <div className="flex gap-2 mt-2 flex-wrap">
                 <button
+                    ref={saveButtonRef}
                     onClick={() => handleSave()}
+                    onKeyDown={handleTab}
+                    tabIndex={0}
                     className="px-3 py-1.5 text-xs font-bold rounded text-white transition-opacity hover:opacity-90 flex-1"
-                    style={{ backgroundColor: '#3B82F6' }}
+                    style={{ backgroundColor: '#3B82F6', outline: 'none' }}
+                    onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.6), 0 0 0 1px white'; }}
+                    onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
                 >
                     Save
                 </button>
                 <button
+                    ref={next7ButtonRef}
                     onClick={() => handleSave(7)}
+                    onKeyDown={handleTab}
+                    tabIndex={0}
                     className="px-3 py-1.5 text-xs font-bold rounded text-white transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: '#10B981' }}
+                    style={{ backgroundColor: '#10B981', outline: 'none' }}
+                    onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.6), 0 0 0 1px white'; }}
+                    onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
                     title="Set priority and schedule next review in 7 days"
                 >
                     Next 7 Days
                 </button>
                 <button
+                    ref={next30ButtonRef}
                     onClick={() => handleSave(30)}
+                    onKeyDown={handleTab}
+                    tabIndex={0}
                     className="px-3 py-1.5 text-xs font-bold rounded text-white transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: '#8B5CF6' }}
+                    style={{ backgroundColor: '#8B5CF6', outline: 'none' }}
+                    onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.6), 0 0 0 1px white'; }}
+                    onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
                     title="Set priority and schedule next review in 30 days"
                 >
                     Next 30 Days
