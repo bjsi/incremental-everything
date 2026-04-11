@@ -269,7 +269,6 @@ function HistoryItem({
                     </div>
                     <RemViewer
                         remId={remId}
-                        constraintRef="parent"
                         width="100%"
                         className="font-light cursor-pointer line-clamp-2"
                     />
