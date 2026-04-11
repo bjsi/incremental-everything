@@ -36,6 +36,15 @@ const QUEUE_LAYOUT_FIX_CSS = `
   .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"]) iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue"] {
     flex-grow: 1 !important;
   }
+
+  /* Ensure card_priority_display (our widget) renders above flashcard-repetition-history.
+     The parent flashcard container is already "flex flex-col", so flex order is sufficient.
+     Scoped to only activate when our card_priority_display iframe is present, so regular
+     flashcards without the plugin widget are not affected. */
+  .box-border.flex.flex-col:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=card_priority_display"])
+    .fade-in-first-load:has(iframe[data-plugin-id="flashcard-repetition-history"]) {
+    order: 1;
+  }
 `;
 
 // Registered dynamically in GetNextCard — applied ONLY when we are returning a Plugin
