@@ -115,51 +115,55 @@ function ReviewDocumentCreator() {
 
       {/* Scope Selection */}
       <div className="rn-clr-background-secondary rounded-lg border border-gray-300 p-4" style={{ borderColor: 'var(--rn-clr-border, #e5e7eb)' }}>
-        <div className="font-semibold mb-3">Scope</div>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              checked={!useFullKB}
-              onChange={() => setUseFullKB(false)}
-              disabled={!context.scopeRemId || isCreating}
-            />
-            <span>Current Document: {context.scopeName}</span>
-          </label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              checked={useFullKB}
-              onChange={() => setUseFullKB(true)}
-              disabled={isCreating}
-            />
-            <span>Full Knowledge Base</span>
-          </label>
+        <div className="flex items-start gap-6">
+          <div className="font-semibold whitespace-nowrap" style={{ width: '80px' }}>Scope</div>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                checked={!useFullKB}
+                onChange={() => setUseFullKB(false)}
+                disabled={!context.scopeRemId || isCreating}
+              />
+              <span>Current Document: {context.scopeName}</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                checked={useFullKB}
+                onChange={() => setUseFullKB(true)}
+                disabled={isCreating}
+              />
+              <span>Full Knowledge Base</span>
+            </label>
+          </div>
         </div>
       </div>
 
       {/* Item Count */}
       <div className="rn-clr-background-secondary rounded-lg p-4" style={{ border: '1px solid var(--rn-clr-border, #e5e7eb)' }}>
-        <div className="font-semibold mb-3">Number of Items</div>
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            min={1}
-            max={500}
-            value={itemCount}
-            onChange={(e) => setItemCount(Math.max(1, Math.min(500, parseInt(e.target.value) || 1)))}
-            className="rn-clr-background rounded"
-            style={{
-              padding: '8px 12px',
-              border: '1px solid var(--rn-clr-border, #d1d5db)',
-              fontSize: '14px',
-              width: '100px',
-            }}
-            disabled={isCreating}
-          />
-          <span className="rn-clr-content-secondary text-xs">
-            (Maximum items to include in the review document)
-          </span>
+        <div className="flex items-start gap-6">
+          <div className="font-semibold" style={{ width: '80px', lineHeight: '1.1', paddingTop: '4px' }}>Number of Items</div>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={itemCount}
+              onChange={(e) => setItemCount(Math.max(1, Math.min(500, parseInt(e.target.value) || 1)))}
+              className="rn-clr-background rounded"
+              style={{
+                padding: '8px 12px',
+                border: '1px solid var(--rn-clr-border, #d1d5db)',
+                fontSize: '14px',
+                width: '100px',
+              }}
+              disabled={isCreating}
+            />
+            <span className="rn-clr-content-secondary text-xs">
+              (Maximum items to include)
+            </span>
+          </div>
         </div>
       </div>
 
