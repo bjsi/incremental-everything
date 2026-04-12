@@ -68,7 +68,7 @@ export function CreateIncRemToolbar() {
       title="Create Incremental Rem from highlight"
     >
       <img
-        src="https://cdn-icons-png.flaticon.com/512/3626/3626838.png"
+        src="https://cdn-icons-png.flaticon.com/512/8365/8365483.png"
         alt="Create Incremental Rem"
         style={{ width: '16px', height: '16px', opacity: 0.85 }}
       />

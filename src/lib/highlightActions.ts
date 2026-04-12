@@ -50,7 +50,8 @@ const buildContextForSelector = (
   contextRemId: RemId | null,
   lastSelectedDestination: RemId | null,
   showPriorityPopupAfterCreate: boolean,
-  highlightWasAlreadyIncremental: boolean
+  highlightWasAlreadyIncremental: boolean,
+  highlightPageIndex: number | null
 ): ExtendedParentSelectorContext => {
   console.log('[ParentSelector:HighlightActions] Building context for selector:');
   console.log('[ParentSelector:HighlightActions]   pdfRemId:', pdfRemId);
@@ -59,6 +60,7 @@ const buildContextForSelector = (
   console.log('[ParentSelector:HighlightActions]   rootCandidates count:', rootCandidates.length);
   console.log('[ParentSelector:HighlightActions]   showPriorityPopupAfterCreate:', showPriorityPopupAfterCreate);
   console.log('[ParentSelector:HighlightActions]   highlightWasAlreadyIncremental:', highlightWasAlreadyIncremental);
+  console.log('[ParentSelector:HighlightActions]   highlightPageIndex:', highlightPageIndex);
 
   return {
     pdfRemId,
@@ -70,6 +72,7 @@ const buildContextForSelector = (
     lastSelectedDestination,
     showPriorityPopupAfterCreate,
     highlightWasAlreadyIncremental,
+    highlightPageIndex,
   };
 };
 
@@ -390,6 +393,9 @@ export const createRemFromHighlight = async (
 
   console.log('[ParentSelector:HighlightActions] DECISION: Showing hierarchical popup');
 
+  // Extract page index from the highlight for suggestion purposes
+  const { pageIndex: highlightPageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
+
   const context = buildContextForSelector(
     sourceDocument._id,  // This is used as "pdfRemId" but works for HTML too
     highlightRem,
@@ -398,7 +404,8 @@ export const createRemFromHighlight = async (
     normalizedContextRemId,
     lastSelectedDestination,
     shouldShowPriorityPopup,
-    highlightIsAlreadyIncremental
+    highlightIsAlreadyIncremental,
+    highlightPageIndex
   );
 
   console.log('[ParentSelector:HighlightActions] Storing context in session...');

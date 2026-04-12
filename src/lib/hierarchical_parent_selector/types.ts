@@ -35,6 +35,8 @@ export interface ParentSelectorContext {
   showPriorityPopupAfterCreate?: boolean;
   /** True if the original highlight was already an incremental rem */
   highlightWasAlreadyIncremental?: boolean;
+  /** Page index of the PDF highlight, used to suggest the tightest matching IncRem */
+  highlightPageIndex?: number | null;
 }
 
 /**
