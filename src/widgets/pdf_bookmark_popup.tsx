@@ -1,6 +1,7 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition } from '../lib/pdfUtils';
+import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, findPDFinRem } from '../lib/pdfUtils';
+import { incrementalQueueActiveKey } from '../lib/consts';
 
 export function PdfBookmarkPopup() {
   const plugin = usePlugin() as ReactRNPlugin;
@@ -38,10 +39,24 @@ export function PdfBookmarkPopup() {
         setPageIndex(pIndex);
 
         if (docId) {
-           // Queue Context Check
-           const queueCtx = await plugin.storage.getSession<PageRangeContext>('pageRangeContext');
-           if (queueCtx && queueCtx.pdfRemId === docId && queueCtx.incrementalRemId) {
-             setActiveQueueContext(queueCtx);
+           // Strict Queue Context Check: Ensure we truly are in the Active Queue
+           const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
+           
+           if (isQueueActive) {
+             const currentQueueRemId = await plugin.storage.getSession<string>('current-inc-rem');
+             if (currentQueueRemId) {
+                const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
+                const foundPdf = currentQueueRem ? await findPDFinRem(plugin, currentQueueRem, docId) : null;
+                
+                if (foundPdf && foundPdf._id === docId) {
+                  setActiveQueueContext({
+                    incrementalRemId: currentQueueRemId as any,
+                    pdfRemId: docId as any,
+                    totalPages: 0,
+                    currentPage: 1
+                  });
+                }
+             }
            }
            
            // Fetch all associated incremental reading rems globally
