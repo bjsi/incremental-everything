@@ -218,6 +218,7 @@ export function AnswerButtons() {
     return lastEntry?.highlightId ?? null;
   }, [baseData?.rem?._id, remType]);
 
+
   // ✅ MEMOIZE CALCULATIONS (but they must run every render, not conditionally)
   const percentiles = useMemo(() => {
     if (!coreData) return { kb: null, doc: null };
@@ -510,26 +511,6 @@ export function AnswerButtons() {
               <div style={buttonStyles.label}>Scroll to</div>
               <div style={buttonStyles.sublabel}>Highlight</div>
             </Button>
-
-            {bookmarkHighlightId && (
-              <Button
-                onClick={async () => {
-                  const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
-                  await bookmarkRem?.scrollToReaderHighlight();
-                }}
-                style={{
-                  backgroundColor: 'var(--rn-clr-background-secondary)',
-                  color: 'var(--rn-clr-blue, #3b82f6)',
-                  border: '2px solid var(--rn-clr-blue, #3b82f6)',
-                  fontWeight: 600,
-                }}
-                title="Scroll to Bookmark: Jump to your last saved reading position in the PDF"
-              >
-                <div style={buttonStyles.label}>🔖 Scroll</div>
-                <div style={buttonStyles.sublabel}>to Bookmark</div>
-              </Button>
-            )}
-
             <style>{`
               @keyframes highlightPulse {
                 0%, 100% {
@@ -544,6 +525,30 @@ export function AnswerButtons() {
             `}</style>
           </>
         )}
+
+        {/* Scroll to Bookmark: visible for both pdf and pdf-highlight types */}
+        {bookmarkHighlightId && (
+          <>
+            <div style={dividerStyle} />
+            <Button
+              onClick={async () => {
+                const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+                await bookmarkRem?.scrollToReaderHighlight();
+              }}
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                color: 'var(--rn-clr-blue, #3b82f6)',
+                border: '2px solid var(--rn-clr-blue, #3b82f6)',
+                fontWeight: 600,
+              }}
+              title="Scroll to Bookmark: Jump to your last saved reading position in the PDF"
+            >
+              <div style={buttonStyles.label}>🔖 Scroll</div>
+              <div style={buttonStyles.sublabel}>to Bookmark</div>
+            </Button>
+          </>
+        )}
+
 
 
         {/* Open URL for Clipper - Only for HTML type rems */}

@@ -145,6 +145,7 @@ export function PdfBookmarkPopup() {
     }
   };
 
+
   const jumpToBookmark = async (bookmarkHighlightId: string) => {
     const rem = await plugin.rem.findOne(bookmarkHighlightId);
     if (rem && typeof rem.scrollToReaderHighlight === 'function') {
