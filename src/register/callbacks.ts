@@ -45,6 +45,12 @@ const QUEUE_LAYOUT_FIX_CSS = `
     .fade-in-first-load:has(iframe[data-plugin-id="flashcard-repetition-history"]) {
     order: 1;
   }
+
+  /* Remove the default pt-6 top padding from the bottom action bar when our
+     answer_buttons widget is present — the widget provides its own internal spacing. */
+  .spaced-repetition__bottom:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=answer_buttons&"]) {
+    padding-top: 0 !important;
+  }
 `;
 
 // Registered once globally — safe because the :has(iframe[...widgetName=queue...]) gate
