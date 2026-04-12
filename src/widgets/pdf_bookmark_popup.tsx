@@ -64,8 +64,8 @@ export function PdfBookmarkPopup() {
             }
           }
 
-          // Fetch all associated incremental reading rems globally
-          const associated = await findAllRemsForPDF(plugin, docId);
+          // Fetch all associated incremental reading rems globally, filter to active IncRems only
+          const associated = (await findAllRemsForPDF(plugin, docId)).filter(a => a.isIncremental);
 
           // Fetch their page ranges to build hierarchy
           const associatedWithRanges = await Promise.all(
@@ -195,26 +195,54 @@ export function PdfBookmarkPopup() {
       {associatedRems.length > 0 && !activeQueueContext && (
         <div style={{ marginBottom: '16px' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--rn-clr-content-secondary)', marginBottom: '8px' }}>Save to Incremental Rem:</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {associatedRems.map((assoc) => (
-              <button
-                key={assoc.remId}
-                style={{
-                  textAlign: 'left', padding: '6px 8px', borderRadius: '4px',
-                  border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)',
-                  color: 'var(--rn-clr-content-primary)', cursor: 'pointer', fontSize: '11px',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  marginLeft: `${assoc.depth * 14}px`, transition: 'background-color 0.15s ease'
-                }}
-                onClick={() => saveBookmark(assoc.remId)}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-modifier-hover)'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'}
-                title={assoc.name}
-              >
-                {assoc.name}
-              </button>
-            ))}
-          </div>
+          {(() => {
+            // Find the best suggestion: shortest range that contains the current page
+            let suggestedRemId: string | null = null;
+            if (pageIndex !== null) {
+              let bestSize = Infinity;
+              for (const assoc of associatedRems) {
+                if (!assoc.range) continue;
+                const { start, end } = assoc.range;
+                const pageEnd = end ?? Infinity;
+                if (pageIndex >= start && pageIndex <= pageEnd) {
+                  const size = pageEnd - start;
+                  if (size < bestSize) {
+                    bestSize = size;
+                    suggestedRemId = assoc.remId;
+                  }
+                }
+              }
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {associatedRems.map((assoc) => {
+                  const isSuggested = assoc.remId === suggestedRemId;
+                  return (
+                    <button
+                      key={assoc.remId}
+                      style={{
+                        textAlign: 'left', padding: '6px 8px', borderRadius: '4px',
+                        border: isSuggested ? '1.5px solid var(--rn-clr-blue, #3b82f6)' : '1px solid var(--rn-clr-border-primary)',
+                        backgroundColor: isSuggested ? 'var(--rn-clr-blue-light, #eff6ff)' : 'var(--rn-clr-background-secondary)',
+                        color: isSuggested ? 'var(--rn-clr-blue, #1e40af)' : 'var(--rn-clr-content-primary)',
+                        cursor: 'pointer', fontSize: '11px',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        marginLeft: `${assoc.depth * 14}px`, transition: 'background-color 0.15s ease',
+                        fontWeight: isSuggested ? 600 : 400,
+                      }}
+                      onClick={() => saveBookmark(assoc.remId)}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-modifier-hover)'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = isSuggested ? 'var(--rn-clr-blue-light, #eff6ff)' : 'var(--rn-clr-background-secondary)'}
+                      title={isSuggested ? `Suggested — page ${pageIndex} is within this range` : assoc.name}
+                    >
+                      {isSuggested ? `★ ${assoc.name}` : assoc.name}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
