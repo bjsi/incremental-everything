@@ -17,6 +17,7 @@ export interface PageHistoryEntry {
   page: number;
   timestamp: number;
   sessionDuration?: number;   // Duration in seconds for this reading session
+  highlightId?: string;       // Rem ID of the specific highlight mapped to this bookmark
 }
 
 /**
@@ -196,7 +197,8 @@ export const getPageHistory = async (
         return {
           page: entry.page,
           timestamp: entry.timestamp || 0,
-          sessionDuration: entry.sessionDuration
+          sessionDuration: entry.sessionDuration,
+          highlightId: entry.highlightId
         };
       } else {
         // Invalid entry
@@ -222,7 +224,8 @@ export const addPageToHistory = async (
   incrementalRemId: string,
   pdfRemId: string,
   pageToRecord?: number,
-  sessionDurationOverride?: number
+  sessionDurationOverride?: number,
+  highlightId?: string
 ): Promise<void> => {
   console.log(`[addPageToHistory] Triggered for Rem: ${incrementalRemId}`);
 
@@ -279,7 +282,8 @@ export const addPageToHistory = async (
   const entry: PageHistoryEntry = {
     page,
     timestamp: Date.now(),
-    sessionDuration
+    sessionDuration,
+    highlightId
   };
 
   history.push(entry);
@@ -1061,3 +1065,52 @@ export async function getRemCardContent(
 
   return { front, back };
 }
+
+/**
+ * Extracts the associated PDF Document ID and native Page index from a PDF Highlight's Data slot.
+ */
+export const getPdfInfoFromHighlight = async (
+  plugin: RNPlugin,
+  highlightRem: PluginRem
+): Promise<{ pdfRemId: string | null; pageIndex: number | null }> => {
+  let pdfRemId: string | null = null;
+  let pageIndex: number | null = null;
+
+  try {
+    // 1. Resolve page index via Data slot JSON
+    const dataString = await highlightRem.getPowerupProperty(BuiltInPowerupCodes.PDFHighlight, 'Data');
+    if (dataString) {
+      const dataObj = JSON.parse(dataString);
+      if (typeof dataObj.pageIndex === 'number') {
+        pageIndex = dataObj.pageIndex + 1; // Native PDF pages are usually 0-indexed in PDFWebReader data
+      } else if (dataObj.position && typeof dataObj.position.pageNumber === 'number') {
+         pageIndex = dataObj.position.pageNumber; // as observed in test, might be 1-indexed
+      }
+    }
+
+    // 2. Resolve PDF Document ID by walking up to UploadedFile
+    let docRem: PluginRem | undefined = highlightRem;
+    while (docRem) {
+      const isPdf = await docRem.hasPowerup(BuiltInPowerupCodes.UploadedFile);
+      if (isPdf) {
+        pdfRemId = docRem._id;
+        break;
+      }
+      const parent = await docRem.getParentRem();
+      if (!parent) break;
+      docRem = parent;
+    }
+    
+    // Backup: use explicitly mapped document ID
+    if (!pdfRemId && highlightRem.document) {
+      const docAsRem = await plugin.rem.findOne(highlightRem.document);
+      if (docAsRem && await docAsRem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
+         pdfRemId = highlightRem.document;
+      }
+    }
+  } catch (e) {
+    console.error('[getPdfInfoFromHighlight] Error:', e);
+  }
+
+  return { pdfRemId, pageIndex };
+};

@@ -218,4 +218,19 @@ export function registerWidgets(plugin: ReactRNPlugin) {
       height: 700,
     },
   });
+
+  // PDF Highlight Tests
+  plugin.app.registerWidget('pdf_highlight_test', WidgetLocation.PDFHighlightToolbarLocation, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
+  
+  plugin.app.registerWidget('pdf_highlight_test_popup', WidgetLocation.PDFHighlightPopupLocation, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
 }
