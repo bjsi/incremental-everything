@@ -109,7 +109,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Collapse Queue Top Bar (IncRem Only)',
     description:
       'Creates extra vertical space during Incremental Rem review by collapsing the queue top bar to a thin strip. Hover over it to reveal the full bar. Has no effect on regular flashcard turns.',
-    defaultValue: true,
+    defaultValue: false,
   });
 
   const COLLAPSE_TOP_BAR_CSS = `
