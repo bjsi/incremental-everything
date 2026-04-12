@@ -114,14 +114,28 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
 
   const COLLAPSE_TOP_BAR_CSS = `
     /* Collapse the top bar only during IncRem (Plugin) turns.
-       Gated on the queue iframe so regular flashcard turns are unaffected. */
+       Gated on the queue iframe so regular flashcard turns are unaffected.
+       Two fixes over the naive max-height:0 approach:
+       1. Use max-height: 3px instead of 0 — gives a thin visible strip as a hover target
+          (a 0-height element receives no hover events).
+       2. Hide .rn-queue__progress-bar — the progress bar sits immediately below and has
+          an invisible absolute overlay that steals hover events. It also shows flashcard
+          queue progress which is not meaningful during IncRem turns. */
     .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title {
-      max-height: 0;
+      max-height: 3px;
       overflow: hidden;
-      transition: max-height 0.3s ease;
+      /* collapse: wait 0.6s after mouse leaves, then animate over 0.4s */
+      transition: max-height 0.4s ease 0.6s;
+      cursor: pointer;
     }
     .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title:hover {
-      max-height: 999px;
+      max-height: 180px;
+      overflow: visible;
+      /* expand: start immediately, smooth over 0.25s */
+      transition: max-height 0.25s ease 0s;
+    }
+    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .rn-queue__progress-bar {
+      display: none !important;
     }
   `;
 
