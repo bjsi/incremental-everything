@@ -11,7 +11,7 @@ import {
   noIncRemTimerKey,
   pageRangeWidgetId,
 } from '../lib/consts';
-import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF } from '../lib/pdfUtils';
+import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
 import { createRemFromHighlight } from '../lib/highlightActions';
 
@@ -96,6 +96,17 @@ export async function registerMenus(plugin: ReactRNPlugin) {
         await initIncrementalRem(plugin, rem);
         // Removed setHighlightColor -> CSS handles styling via "incremental" tag
         await plugin.app.toast('✅ Tagged as Incremental Rem');
+        
+        // NEW: Automatically set bookmark for this newly tagged highlight
+        const { pdfRemId, pageIndex } = await getPdfInfoFromHighlight(plugin, rem);
+        if (pdfRemId && pageIndex !== null) {
+          try {
+            await addPageToHistory(plugin, rem._id, pdfRemId, pageIndex, undefined, rem._id);
+          } catch(e) {
+            console.error('Error creating bookmark for tag_highlight', e);
+          }
+        }
+        
         // Clear stale session storage to prevent race condition with widget context
         await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
         await plugin.widget.openPopup('priority_interval', {

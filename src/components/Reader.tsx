@@ -3,7 +3,7 @@ import { usePlugin, RemId, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import { activeHighlightIdKey, pageRangeWidgetId } from '../lib/consts';
 import { HTMLActionItem, HTMLHighlightActionItem, PDFActionItem, PDFHighlightActionItem, RemActionItem } from '../lib/incremental_rem';
-import { getIncrementalReadingPosition, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
+import { getIncrementalReadingPosition, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext, getPageHistory } from '../lib/pdfUtils';
 import { Breadcrumb, BreadcrumbItem } from './Breadcrumb';
 import { useCriticalContext, useMetadataStats } from './reader/hooks';
 import { MemoizedPdfReader, PageControls, StatsGroup } from './reader/ui';
@@ -176,6 +176,27 @@ export function Reader(props: ReaderProps) {
         highlightExtract?.scrollToReaderHighlight();
         hasScrolled.current = true;
       }, 100);
+    } else if (actionType === 'pdf' && !hasScrolled.current && isReaderReady && criticalContext?.incrementalRemId) {
+      const checkAndScrollBookmark = async () => {
+        try {
+          const history = await getPageHistory(plugin as ReactRNPlugin, criticalContext.incrementalRemId!, pdfRemId);
+          if (history && history.length > 0) {
+            const lastEntry = history[history.length - 1];
+            if (lastEntry.highlightId && !hasScrolled.current) {
+              const hRem = await plugin.rem.findOne(lastEntry.highlightId);
+              if (hRem && typeof hRem.scrollToReaderHighlight === 'function') {
+                setTimeout(() => {
+                  hRem.scrollToReaderHighlight();
+                  hasScrolled.current = true;
+                }, 100);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error auto-scrolling bookmark:", e);
+        }
+      };
+      checkAndScrollBookmark();
     }
 
     const extractId = isHighlight ? highlightExtractId : null;
@@ -184,7 +205,7 @@ export function Reader(props: ReaderProps) {
     return () => {
       plugin.storage.setSession(activeHighlightIdKey, null);
     };
-  }, [actionType, highlightExtractId, plugin, isReaderReady]);
+  }, [actionType, highlightExtractId, plugin, isReaderReady, criticalContext?.incrementalRemId, pdfRemId]);
 
   // Initialize reader
   React.useEffect(() => {

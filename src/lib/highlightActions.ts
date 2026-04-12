@@ -19,7 +19,7 @@ import {
   getLastSelectedDestination,
   saveLastSelectedDestination,
 } from './hierarchical_parent_selector/treeHelpers';
-import { isHtmlSource } from './pdfUtils';
+import { isHtmlSource, getPdfInfoFromHighlight, addPageToHistory } from './pdfUtils';
 
 type CreateRemFromHighlightOptions = {
   makeIncremental: boolean;
@@ -229,6 +229,19 @@ export const createRemUnderParent = async (
   // Save this destination for future use
   console.log('[ParentSelector:HighlightActions] About to save last destination...');
   await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
+
+  // NEW: Save reading position/bookmark automatically for the new incremental rem
+  if (makeIncremental) {
+    const { pdfRemId: actualPdf, pageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
+    if (actualPdf && pageIndex !== null) {
+        try {
+            await addPageToHistory(plugin, newRem._id, actualPdf, pageIndex, undefined, highlightRem._id);
+            console.log('[ParentSelector:HighlightActions] Automatically created bookmark for new incremental rem');
+        } catch(e) {
+            console.error('[ParentSelector:HighlightActions] Error creating bookmark:', e);
+        }
+    }
+  }
 
   // Clean up the original highlight
   await removeIncrementalRemCache(plugin, highlightRem._id);
