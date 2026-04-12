@@ -6,6 +6,7 @@ import { powerupCode } from '../lib/consts';
 export function CreateIncRemToolbar() {
   const plugin = usePlugin();
   const [remId, setRemId] = useState<string | null>(null);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -63,14 +64,25 @@ export function CreateIncRemToolbar() {
         justifyContent: 'center',
         borderRadius: '4px',
         color: 'var(--rn-clr-content-primary)',
+        transition: 'box-shadow 0.15s ease, background-color 0.15s ease, transform 0.1s ease',
+        boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.18)' : 'none',
+        backgroundColor: hovered ? 'var(--rn-clr-background-secondary, rgba(0,0,0,0.06))' : 'transparent',
+        transform: hovered ? 'translateY(-1px)' : 'none',
       }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       onClick={handleClick}
-      title="Create Incremental Rem from highlight"
+      title="Create a standalone Incremental Rem from this highlight"
     >
       <img
         src="https://cdn-icons-png.flaticon.com/512/8365/8365483.png"
         alt="Create Incremental Rem"
-        style={{ width: '16px', height: '16px', opacity: 0.85 }}
+        style={{
+          width: '16px',
+          height: '16px',
+          opacity: hovered ? 1 : 0.85,
+          transition: 'opacity 0.15s ease',
+        }}
       />
     </div>
   );
