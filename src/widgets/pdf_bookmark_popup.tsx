@@ -50,9 +50,9 @@ export function PdfBookmarkPopup() {
               const foundPdf = currentQueueRem ? await findPDFinRem(plugin, currentQueueRem, docId) : null;
 
               if (foundPdf && foundPdf._id === docId) {
-                if (currentQueueRem && currentQueueRem.text) {
-                   const textStr = await plugin.richText.toString(currentQueueRem.text);
-                   setActiveQueueRemName(textStr);
+                if (currentQueueRem?.text) {
+                  const textStr = await plugin.richText.toString(currentQueueRem.text);
+                  setActiveQueueRemName(textStr);
                 }
                 setActiveQueueContext({
                   incrementalRemId: currentQueueRemId as any,
@@ -63,6 +63,7 @@ export function PdfBookmarkPopup() {
               }
             }
           }
+
 
           // Fetch all associated incremental reading rems globally, filter to active IncRems only
           const associated = (await findAllRemsForPDF(plugin, docId)).filter(a => a.isIncremental);

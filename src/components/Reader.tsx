@@ -11,6 +11,7 @@ import { usePdfPageControls } from './reader/usePdfPageControls';
 
 interface ReaderProps {
   actionItem: PDFActionItem | PDFHighlightActionItem | HTMLActionItem | HTMLHighlightActionItem;
+  queueIncRemId?: string;
 }
 
 const isIOS = /iPhone|iPod/.test(navigator.userAgent) && !/iPad/.test(navigator.userAgent);
@@ -36,7 +37,7 @@ export function Reader(props: ReaderProps) {
   );
 
   // useState (Deferred States)
-  const criticalContext = useCriticalContext(plugin as ReactRNPlugin, pdfRemId, pdfParentId, actionType, highlightExtractId || undefined);
+  const criticalContext = useCriticalContext(plugin as ReactRNPlugin, pdfRemId, pdfParentId, actionType, highlightExtractId || undefined, props.queueIncRemId);
   const metadata = useMetadataStats(plugin as ReactRNPlugin, criticalContext, pdfRemId);
 
   // --- PDF Controls Hook ---

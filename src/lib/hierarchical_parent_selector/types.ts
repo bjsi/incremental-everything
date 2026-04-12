@@ -1,4 +1,4 @@
-import { RemId } from '@remnote/plugin-sdk';
+import { RemId, RichTextInterface } from '@remnote/plugin-sdk';
 
 /**
  * Represents a node in the hierarchical parent selector tree.

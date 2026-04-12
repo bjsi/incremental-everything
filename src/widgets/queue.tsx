@@ -289,7 +289,7 @@ export function QueueComponent() {
           remAndType.type === 'html' ||
           remAndType.type === 'pdf-highlight' ||
           remAndType.type === 'html-highlight' ? (
-          <Reader actionItem={remAndType} />
+          <Reader actionItem={remAndType} queueIncRemId={ctx?.remId} />
         ) : remAndType.type === 'youtube' ? (
           <VideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'youtube-highlight' ? (

@@ -1101,13 +1101,7 @@ export const getPdfInfoFromHighlight = async (
       docRem = parent;
     }
     
-    // Backup: use explicitly mapped document ID
-    if (!pdfRemId && highlightRem.document) {
-      const docAsRem = await plugin.rem.findOne(highlightRem.document);
-      if (docAsRem && await docAsRem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
-         pdfRemId = highlightRem.document;
-      }
-    }
+    // (No further fallback — .document property does not exist on PluginRem)
   } catch (e) {
     console.error('[getPdfInfoFromHighlight] Error:', e);
   }
