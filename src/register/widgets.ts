@@ -219,10 +219,17 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // PDF Bookmark Popup
-  plugin.app.registerWidget('pdf_bookmark_popup', WidgetLocation.PDFHighlightPopupLocation, {
+  // PDF Bookmark Flow
+  plugin.app.registerWidget('pdf_bookmark_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
     dimensions: {
       width: 'auto',
+      height: 'auto',
+    },
+  });
+
+  plugin.app.registerWidget('pdf_bookmark_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: '350px',
       height: 'auto',
     },
   });
