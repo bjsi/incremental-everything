@@ -121,54 +121,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerMenuItem({
-    id: 'create_inc_rem_highlight',
-    location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
-    name: 'Create Incremental Rem',
-    iconUrl: "https://cdn-icons-png.flaticon.com/512/3626/3626838.png",
-    action: async (args: { remId: string }) => {
-      console.log('[ParentSelector:Menu] CREATE INCREMENTAL REM triggered for:', args.remId);
 
-      const highlight = await plugin.rem.findOne(args.remId);
-      if (!highlight) {
-        console.log('[ParentSelector:Menu] ERROR: Could not find highlight rem');
-        return;
-      }
-
-      // Get context for smart destination memory
-      const pageRangeContext = await plugin.storage.getSession<{
-        incrementalRemId: string | null;
-        pdfRemId: string | null;
-      }>('pageRangeContext');
-
-      const currentIncRemId = await plugin.storage.getSession<string>('current-inc-rem');
-
-      // Determine contextRemId
-      let contextRemId: string | null = null;
-
-      if (pageRangeContext?.incrementalRemId &&
-        pageRangeContext?.pdfRemId &&
-        pageRangeContext.incrementalRemId !== pageRangeContext.pdfRemId) {
-        contextRemId = pageRangeContext.incrementalRemId;
-      } else if (currentIncRemId) {
-        const incRem = await plugin.rem.findOne(currentIncRemId);
-        if (incRem && await incRem.hasPowerup(powerupCode)) {
-          contextRemId = currentIncRemId;
-        }
-      }
-
-      console.log('[ParentSelector:Menu] contextRemId:', contextRemId);
-
-      // Call createRemFromHighlight with the NEW option
-      await createRemFromHighlight(plugin, highlight, {
-        makeIncremental: true,
-        contextRemId,
-        // NEW: This tells the function to show the priority popup
-        // if the highlight is NOT already an incremental rem
-        showPriorityPopupIfNew: true,
-      });
-    },
-  });
 
   plugin.app.registerMenuItem({
     id: 'batch_priority_menuitem',

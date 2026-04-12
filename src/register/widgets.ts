@@ -227,6 +227,14 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Create Incremental Rem Toolbar Button
+  plugin.app.registerWidget('create_inc_rem_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
+
   plugin.app.registerWidget('pdf_bookmark_popup', WidgetLocation.Popup, {
     dimensions: {
       width: '350px',
