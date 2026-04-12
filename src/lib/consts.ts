@@ -57,6 +57,7 @@ export const nextInQueueCommandId = 'next-in-queue';
 // --- Keys for our successful fixes ---
 export const queueLayoutFixId = 'incremental-everything-queue-layout-fix';
 export const queueHideElementsId = 'incremental-everything-queue-hide-elements';
+export const collapseTopBarCssId = 'incremental-everything-collapse-top-bar'; // CSS registration ID
 export const incrementalQueueActiveKey = 'incremental-queue-active';
 export const activeHighlightIdKey = 'active-highlight-id-key';
 export const currentIncrementalRemTypeKey = 'current-incremental-rem-type-key';

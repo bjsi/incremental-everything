@@ -5,7 +5,8 @@ import {
   betaSchedulerEnabledId,
   betaFirstReviewIntervalId,
   betaMaxIntervalId,
-  // collapseQueueTopBar, // Disabled: feature not working
+  collapseQueueTopBar,
+  collapseTopBarCssId,
   defaultPriorityId,
   defaultCardPriorityId,
   displayPriorityShieldId,
@@ -103,14 +104,31 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     defaultValue: 30,
   });
 
-  // Disabled: collapseQueueTopBar feature not working
-  // plugin.settings.registerBooleanSetting({
-  //   id: collapseQueueTopBar,
-  //   title: 'Collapse Queue Top Bar',
-  //   description:
-  //     'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
-  //   defaultValue: true,
-  // });
+  plugin.settings.registerBooleanSetting({
+    id: collapseQueueTopBar,
+    title: 'Collapse Queue Top Bar (IncRem Only)',
+    description:
+      'Creates extra vertical space during Incremental Rem review by collapsing the queue top bar to a thin strip. Hover over it to reveal the full bar. Has no effect on regular flashcard turns.',
+    defaultValue: true,
+  });
+
+  const COLLAPSE_TOP_BAR_CSS = `
+    /* Collapse the top bar only during IncRem (Plugin) turns.
+       Gated on the queue iframe so regular flashcard turns are unaffected. */
+    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title:hover {
+      max-height: 999px;
+    }
+  `;
+
+  const shouldCollapseTopBar = await plugin.settings.getSetting<boolean>(collapseQueueTopBar);
+  if (shouldCollapseTopBar) {
+    await plugin.app.registerCSS(collapseTopBarCssId, COLLAPSE_TOP_BAR_CSS);
+  }
 
   // Priority settings
 
