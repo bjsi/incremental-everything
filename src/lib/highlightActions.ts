@@ -19,7 +19,7 @@ import {
   getLastSelectedDestination,
   saveLastSelectedDestination,
 } from './hierarchical_parent_selector/treeHelpers';
-import { isHtmlSource, getPdfInfoFromHighlight, addPageToHistory } from './pdfUtils';
+import { isHtmlSource, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from './pdfUtils';
 
 type CreateRemFromHighlightOptions = {
   makeIncremental: boolean;
@@ -230,13 +230,18 @@ export const createRemUnderParent = async (
   console.log('[ParentSelector:HighlightActions] About to save last destination...');
   await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
 
-  // NEW: Save reading position/bookmark automatically for the new incremental rem
+  // NEW: Save reading position/bookmark automatically for queue item 
   if (makeIncremental) {
     const { pdfRemId: actualPdf, pageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
     if (actualPdf && pageIndex !== null) {
         try {
-            await addPageToHistory(plugin, newRem._id, actualPdf, pageIndex, undefined, highlightRem._id);
-            console.log('[ParentSelector:HighlightActions] Automatically created bookmark for new incremental rem');
+            // Update progress for the currently reviewed Queue item (if active)
+            const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
+            if (queueCtx && queueCtx.pdfRemId === actualPdf && queueCtx.incrementalRemId) {
+                await addPageToHistory(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex, undefined, highlightRem._id);
+                await setIncrementalReadingPosition(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex);
+                console.log('[ParentSelector:HighlightActions] Updated Queue item reading history from highlight capture');
+            }
         } catch(e) {
             console.error('[ParentSelector:HighlightActions] Error creating bookmark:', e);
         }

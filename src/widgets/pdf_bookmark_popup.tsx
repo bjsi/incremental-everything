@@ -1,6 +1,6 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { getPdfInfoFromHighlight, getAllIncrementsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext } from '../lib/pdfUtils';
+import { getPdfInfoFromHighlight, getAllIncrementsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition } from '../lib/pdfUtils';
 
 export function PdfBookmarkPopup() {
   const plugin = usePlugin() as ReactRNPlugin;
@@ -10,7 +10,7 @@ export function PdfBookmarkPopup() {
   
   const [activeQueueContext, setActiveQueueContext] = useState<PageRangeContext | null>(null);
   const [associatedRems, setAssociatedRems] = useState<any[]>([]);
-  const [historicalBookmarks, setHistoricalBookmarks] = useState<{remId: string, history: PageHistoryEntry[]}[]>([]);
+  const [historicalBookmarks, setHistoricalBookmarks] = useState<{remId: string, name: string, history: PageHistoryEntry[]}[]>([]);
   
   const [loading, setLoading] = useState(true);
 
@@ -71,6 +71,7 @@ export function PdfBookmarkPopup() {
      if (!pdfRemId || pageIndex === null || !highlightRemId) return;
      try {
        await addPageToHistory(plugin, incrementalRemId, pdfRemId, pageIndex, undefined, highlightRemId);
+       await setIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId, pageIndex);
        await plugin.app.toast('✅ Bookmark saved successfully');
      } catch (e) {
        await plugin.app.toast('❌ Failed to save bookmark');
