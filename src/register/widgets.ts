@@ -235,6 +235,15 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Toggle Incremental Rem Toolbar Button
+  plugin.app.registerWidget('toggle_incremental_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
+    dimensions: {
+      width: 'auto',
+      height: 'auto',
+    },
+  });
+
+
   plugin.app.registerWidget('pdf_bookmark_popup', WidgetLocation.Popup, {
     dimensions: {
       width: '350px',
