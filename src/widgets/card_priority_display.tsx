@@ -403,7 +403,7 @@ export function CardPriorityDisplay() {
   };
 
   return (
-    <div style={{ paddingTop: '20px', paddingBottom: '10px' }}>
+    <div style={{ paddingTop: '30px', paddingBottom: '10px' }}>
       <div
         className="flex items-center justify-center gap-3 px-3 py-1.5"
         style={{

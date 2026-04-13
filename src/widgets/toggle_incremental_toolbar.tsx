@@ -1,11 +1,12 @@
 import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { powerupCode } from '../lib/consts';
+import { powerupCode, incrementalQueueActiveKey } from '../lib/consts';
 import { initIncrementalRem } from '../register/powerups';
 import {
   getPdfInfoFromHighlight,
   addPageToHistory,
   setIncrementalReadingPosition,
+  findPDFinRem
 } from '../lib/pdfUtils';
 
 export function ToggleIncrementalToolbar() {
@@ -43,20 +44,62 @@ export function ToggleIncrementalToolbar() {
     } else {
       await initIncrementalRem(plugin as any, rem);
       setIsIncremental(true);
-      await plugin.app.toast('✅ Tagged as Incremental Rem');
 
-      // Automatically set a bookmark for the currently reviewed Queue item (if active)
-      const { pdfRemId, pageIndex } = await getPdfInfoFromHighlight(plugin as any, rem);
-      if (pdfRemId && pageIndex !== null) {
-        try {
-          const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
-          if (queueCtx && queueCtx.pdfRemId === pdfRemId && queueCtx.incrementalRemId) {
-            await addPageToHistory(plugin as any, queueCtx.incrementalRemId, pdfRemId, pageIndex, undefined, rem._id);
-            await setIncrementalReadingPosition(plugin as any, queueCtx.incrementalRemId, pdfRemId, pageIndex);
+      // 1. Fetch PDF info from the newly tagged rem
+      const { pdfRemId: docId, pageIndex } = await getPdfInfoFromHighlight(plugin as any, rem);
+
+      let contextRemId: string | null = null;
+
+      // 2. Strict Queue Context Check
+      const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
+
+      if (isQueueActive) {
+        const currentQueueRemId = await plugin.storage.getSession<string>('current-inc-rem');
+        if (currentQueueRemId) {
+          const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
+          const foundPdf = currentQueueRem && docId ? await findPDFinRem(plugin as any, currentQueueRem, docId) : null;
+
+          if (foundPdf && foundPdf._id === docId) {
+            contextRemId = currentQueueRemId;
           }
+        }
+      }
+
+      // 3. Fallback to generic session context if not actively in queue
+      if (!contextRemId) {
+        const pageRangeContext = await plugin.storage.getSession<{
+          incrementalRemId: string | null;
+          pdfRemId: string | null;
+        }>('pageRangeContext');
+
+        const currentIncRemId = await plugin.storage.getSession<string>('current-inc-rem');
+
+        if (
+          pageRangeContext?.incrementalRemId &&
+          pageRangeContext?.pdfRemId &&
+          pageRangeContext.incrementalRemId !== pageRangeContext.pdfRemId
+        ) {
+          contextRemId = pageRangeContext.incrementalRemId;
+        } else if (currentIncRemId) {
+          const incRem = await plugin.rem.findOne(currentIncRemId);
+          if (incRem && (await incRem.hasPowerup(powerupCode))) {
+            contextRemId = currentIncRemId;
+          }
+        }
+      }
+
+      // 4. Save bookmark position safely to identified context
+      if (contextRemId && docId && pageIndex !== null) {
+        try {
+          await addPageToHistory(plugin as any, contextRemId, docId, pageIndex, undefined, rem._id);
+          await setIncrementalReadingPosition(plugin as any, contextRemId, docId, pageIndex);
+          await plugin.app.toast('✅ Tagged & bookmark updated');
         } catch (e) {
           console.error('Error creating bookmark for toggle_incremental_toolbar', e);
+          await plugin.app.toast('✅ Tagged as Incremental Rem'); // Fallback toast
         }
+      } else {
+        await plugin.app.toast('✅ Tagged as Incremental Rem');
       }
 
       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
@@ -82,7 +125,7 @@ export function ToggleIncrementalToolbar() {
         boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.22)' : '0 1px 3px rgba(0,0,0,0.10)',
         backgroundColor: isIncremental
           ? hovered ? 'rgba(59, 130, 246, 0.28)' : 'rgba(59, 130, 246, 0.15)'   // blue shades
-          : hovered ? 'rgba(239, 68, 68, 0.28)'  : 'rgba(239, 68, 68, 0.15)',   // red shades
+          : hovered ? 'rgba(239, 68, 68, 0.28)' : 'rgba(239, 68, 68, 0.15)',   // red shades
         transform: hovered ? 'translateY(-1px)' : 'none',
         border: isIncremental
           ? '1px solid rgba(59, 130, 246, 0.35)'
