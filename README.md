@@ -19,10 +19,11 @@ Incremental Everything allows you to interleave your flashcard reviews with note
 
 ### 🧠 Advanced Prioritization
 Manage information overload with a robust dual-priority system:
-- **Absolute & Relative Priorities**: Prioritize items from 0-100 and see exactly where they rank in your knowledge base.
+- **Absolute & Relative Priorities**: Prioritize items from 0-100 and see exactly where they rank.
 - **Priority Inheritance**: New extracts and flashcards automatically inherit the priority of their source material.
-- **Priority Shield**: A real-time diagnostic tool that shows your capacity to process high-priority material.
-- **Priority Review Documents**: Generate focused study sessions for your top N most important items (passive reading and flashcards) when you're overwhelmed.
+- **Priority Shield & Weighted Shield**: Diagnostic tools showing your capacity to process high-priority material and the fraction of your total priority-weighted queue processed.
+- **FSRS Analytics**: Real-time Difficulty (D), Stability (S), and Retrievability (R) statistics computed for flashcards.
+- **Priority Review Documents**: Generate focused study sessions for your top items when overwhelmed.
 
 ### 📱 Performance Modes
 - **Light Mode (Default for Mobile/Web)**: Fast, stable, and essential features only. Prevents crashes on phones and tablets.
@@ -62,9 +63,10 @@ This README covers the basics. For the comprehensive guides, please visit the **
 ![Make Incremental using the command](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/tag-inc-rem.gif)
 
 2. **Prioritize it**: Use `Alt+P` or `Alt+Shift+X` (Extract with Priority) to set its importance.
-3. **Create Flashcards**: Use `Alt+Z` to quickly create a **Cloze Deletion** from selected text.
-4. **Review it**: The plugin interleaves these items into your regular flashcard queue.
-5. **Disable it**: Remove the `Incremental` tag or press the **Dismiss** button in the queue if you are done reviewing it.
+3. **Copy/Paste Sources**: Efficiently link multiple chapters to one PDF using `Ctrl+Shift+F1` (Copy) and `Alt+Shift+V` (Paste).
+4. **Create Flashcards**: Use `Alt+Z` to quickly create a **Cloze Deletion** from selected text.
+5. **Review it**: The plugin interleaves these items into your regular flashcard queue.
+6. **Disable it**: Remove the `Incremental` tag or press the **Dismiss** button in the queue if you are done reviewing it.
 
 ### ⚡ Prioritization & Sorting
 - 0 is for your most important material and 100 is for the least important.
@@ -92,7 +94,12 @@ The plugin now features **Automatic Light Mode**.
 - If you want to turn a highlight into an incremental Rem, click on the highlight and click the puzzle piece icon.
 - 📄 **PDFs & Web**
   - **Visual Status**: Highlights turn **Green** when toggled as Incremental, and **Blue** when extracted.
-  - **Create Incremental Rem**: Select text in a PDF -> Highlight it -> Click the Puzzle Icon -> **"Create Incremental Rem"**. This extracts the text to a new Rem under a parent of your choice (using the smart parent selector).
+  - **PDF Control Panel**: Manage chapters, set page ranges, and view reading history for long documents.
+  - **Position Tracking**: The plugin automatically saves your last read page when using the PDF Chapter workflow or creating extracts.
+  - **Create Incremental Rem**: Select text in a PDF -> Highlight it -> Click the Funnel Icon -> **"Create Incremental Rem"**. This extracts the text to a new Rem under a parent of your choice (using the smart parent selector).
+
+![PDF Highlight Toolbar](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/pdfhighlight-toolbar.png)
+
 ![Highlight](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
 
 ### Incremental Writing
@@ -104,6 +111,8 @@ The plugin now features **Automatic Light Mode**.
 
 - You can tag YouTube videos with the `Incremental` tag to watch them incrementally.
 - It will work if you tag the link Rem itself, or a Rem with the YouTube link as a source.
+- **Video Extracts**: Create precise sub-clips with specific start/end timestamps, each with its own schedule and priority.
+- **Auto-Transcription**: Automatically fetch YouTube transcripts for extract ranges to make content searchable and ready for clozing.
 - The plugin will automatically save your progress and playback rate.
 - You can open the resizable notes section on the left to take notes while you watch.
 
@@ -138,12 +147,11 @@ There are lots of ways you can filter the table to create a subset of Rem to rev
 ## Known Issues
 
 ### Incremental PDF Reading Position
+Previously, reading positions for large PDFs were easily lost. 
 
-When reading a large PDF (like a book) as a regular incremental Rem, the plugin may not reliably return you to your last incremental reading spot.
-
-  * **The Problem**: If you open and scroll the same PDF in another window or tab, your incremental reading position will be lost. RemNote's native PDF viewer only remembers the single most recent position for a document, which overwrites the position from your incremental reading session. This also means you cannot have multiple incremental Rems for different chapters of the same PDF file, as they would all share the same scroll position.
-  * **The Cause**: This is due to a limitation in the current RemNote Plugin SDK. The plugin lacks the necessary tools to programmatically save and restore a specific scroll position for a PDF and must rely on RemNote's default behavior.
-  * **How You Can Help**: To fix this, we need the RemNote developers to expand the capabilities of their Plugin API. We have submitted a Feature Request asking for these tools. Please help us by upvoting the request on the RemNote feedback platform. More upvotes will increase its priority.
+  * **The Solution**: The plugin now supports a **Chapter-based workflow**. By splitting a PDF into multiple Incremental Rems (each with a defined page range) or using **PDF Highlights** as incremental items, the plugin **reliably saves and restores your reading position** for each specific item. 
+  * **The Remaining Challenge**: While we can now track positions per item, the RemNote Plugin SDK still lacks direct programmatic control over the native PDF viewer's internal scroll engine. This means that while we can take you to the correct page, we cannot yet control the exact vertical pixel scroll within that page.
+  * **How You Can Help**: We are still advocating for a more robust Plugin API. Please continue to upvote our request for better programmatic scroll control.
 
 ➡️ **[Upvote the Feature Request on the RemNote Feedback Site](https://feedback.remnote.com/p/feature-request-programmatic-control-over-pdf-scroll-position-for-plugins?b=Plugin-Requests)**
 
