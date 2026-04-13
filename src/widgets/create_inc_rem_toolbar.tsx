@@ -115,7 +115,7 @@ export function CreateIncRemToolbar() {
       title="Create a standalone Incremental Rem from this highlight"
     >
       <img
-        src="https://cdn-icons-png.flaticon.com/512/8365/8365483.png"
+        src="icon-extract.png"
         alt="Create Incremental Rem"
         style={{
           width: '16px',

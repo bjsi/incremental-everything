@@ -137,7 +137,7 @@ export function ToggleIncrementalToolbar() {
       title={tooltipText}
     >
       <img
-        src="https://cdn-icons-png.flaticon.com/512/1504/1504044.png"
+        src="icon-toggle-inc.png"
         alt="Toggle Incremental Rem"
         style={{
           width: '16px',
