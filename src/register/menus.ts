@@ -55,6 +55,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
     id: 'tag_rem_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
     name: 'Toggle Incremental Rem',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/12809/12809374.png',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) return;
@@ -77,6 +78,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
       }
     },
   });
+
 
   plugin.app.registerMenuItem({
     id: 'tag_highlight',
