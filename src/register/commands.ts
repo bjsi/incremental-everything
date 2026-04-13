@@ -50,12 +50,18 @@ import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
+
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async (): Promise<PluginRem | PluginRem[] | undefined> => {
     const selection = await plugin.editor.getSelection();
     if (!selection) {
+      // plugin.editor.getSelection() returns undefined when focus is inside the PDF
+      // iframe. plugin.reader.addHighlight() also returns null in that context —
+      // it requires a RemNote-internal pending highlight available only through the
+      // PDFHighlightToolbar widget flow. Keyboard shortcuts cannot create PDF highlights.
       return;
     }
+
     if (selection.type === SelectionType.Text && selection.range.start === selection.range.end) {
       // Fallback empty text selections to Rem selection behavior
       (selection as any).type = SelectionType.Rem;
@@ -189,6 +195,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
       return rems;
     } else {
+      // WebReader or other reader selection — fall back to addHighlight + initIncrementalRem.
+      // Note: PDF iframe selections are unreachable here because getSelection() returns
+      // undefined for them and we already returned early above.
       const highlight = await plugin.reader.addHighlight();
       if (!highlight) {
         return;
@@ -197,6 +206,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       return highlight;
     }
   };
+
 
 
 

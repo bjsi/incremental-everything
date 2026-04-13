@@ -145,29 +145,44 @@ export function usePdfPageControls(
 
         const checkForChanges = async () => {
             const range = await getIncrementalPageRange(plugin, incrementalRemId, pdfRemId);
+            const savedPage = await getIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId);
+            
             const newStart = range?.start || 1;
             const newEnd = range?.end || 0;
+
+            let updatedStartOrEnd = false;
+            let updatedPage = false;
 
             if (newStart !== pageRangeStart || newEnd !== pageRangeEnd) {
                 setPageRangeStart(newStart);
                 setPageRangeEnd(newEnd);
-
-                const minPage = Math.max(1, newStart);
-                const maxPage = newEnd > 0 ? Math.min(newEnd, totalPages || Infinity) : (totalPages || Infinity);
-
-                setCurrentPage(currentVal => {
-                    let correctedPage = currentVal;
-                    if (currentVal < minPage) { correctedPage = minPage; }
-                    else if (currentVal > maxPage) { correctedPage = maxPage; }
-
-                    if (correctedPage !== currentVal) {
-                        setPageInputValue(correctedPage.toString());
-                        saveCurrentPage(correctedPage);
-                        return correctedPage;
-                    }
-                    return currentVal;
-                });
+                updatedStartOrEnd = true;
             }
+
+            const minPage = Math.max(1, newStart);
+            const maxPage = newEnd > 0 ? Math.min(newEnd, totalPages || Infinity) : (totalPages || Infinity);
+
+            setCurrentPage(currentVal => {
+                let correctedPage = currentVal;
+                
+                // If the synced storage has a new saved position (e.g. from the popup explicitly updating it)
+                if (savedPage !== null && savedPage !== currentVal) {
+                    correctedPage = savedPage;
+                    updatedPage = true;
+                }
+
+                if (correctedPage < minPage) { correctedPage = minPage; updatedPage = true; }
+                else if (correctedPage > maxPage) { correctedPage = maxPage; updatedPage = true; }
+
+                if (updatedPage || updatedStartOrEnd) {
+                    setPageInputValue(correctedPage.toString());
+                    if (!updatedPage && updatedStartOrEnd) {
+                       saveCurrentPage(correctedPage); // Only explicitly save if range forced it to clamp
+                    }
+                    return correctedPage;
+                }
+                return currentVal;
+            });
         };
 
         const intervalId = setInterval(checkForChanges, 2000);

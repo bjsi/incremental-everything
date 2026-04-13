@@ -14,8 +14,6 @@ import { ExtractViewer } from '../components/ExtractViewer';
 import { IsolatedCardViewer } from '../components/IsolatedCardViewer';
 import { remToActionItemType } from '../lib/incremental_rem';
 import {
-  // collapseQueueTopBar, // Disabled: feature not working
-  // collapseTopBarKey, // Disabled: feature not working
   incrementalQueueActiveKey,
   shouldHideIncEverythingKey,
   currentIncrementalRemTypeKey,
@@ -83,12 +81,6 @@ export function QueueComponent() {
     }
   }, [ctx?.remId]);
 
-  // Disabled: collapseQueueTopBar feature not working
-  // const shouldCollapseTopBar = useTrackerPlugin(
-  //   (rp) => rp.settings.getSetting<boolean>(collapseQueueTopBar),
-  //   []
-  // );
-
   const showRemsAsIsolated = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(showRemsAsIsolatedInQueueId),
     []
@@ -97,11 +89,8 @@ export function QueueComponent() {
   // This hook signals the component's state.
   useEffect(() => {
     plugin.storage.setSession(incrementalQueueActiveKey, true);
-    // Disabled: collapseTopBarKey feature not working
-    // plugin.storage.setSession(collapseTopBarKey, shouldCollapseTopBar);
     return () => {
       plugin.storage.setSession(incrementalQueueActiveKey, false);
-      // plugin.storage.setSession(collapseTopBarKey, false);
     };
   }, [plugin]);
 
@@ -300,7 +289,7 @@ export function QueueComponent() {
           remAndType.type === 'html' ||
           remAndType.type === 'pdf-highlight' ||
           remAndType.type === 'html-highlight' ? (
-          <Reader actionItem={remAndType} />
+          <Reader actionItem={remAndType} queueIncRemId={ctx?.remId} />
         ) : remAndType.type === 'youtube' ? (
           <VideoViewer actionItem={remAndType} />
         ) : remAndType.type === 'youtube-highlight' ? (

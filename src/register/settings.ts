@@ -5,7 +5,8 @@ import {
   betaSchedulerEnabledId,
   betaFirstReviewIntervalId,
   betaMaxIntervalId,
-  // collapseQueueTopBar, // Disabled: feature not working
+  collapseQueueTopBar,
+  collapseTopBarCssId,
   defaultPriorityId,
   defaultCardPriorityId,
   displayPriorityShieldId,
@@ -103,14 +104,45 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     defaultValue: 30,
   });
 
-  // Disabled: collapseQueueTopBar feature not working
-  // plugin.settings.registerBooleanSetting({
-  //   id: collapseQueueTopBar,
-  //   title: 'Collapse Queue Top Bar',
-  //   description:
-  //     'Create extra space by collapsing the top bar in the queue. You can hover over the collapsed bar to open it.',
-  //   defaultValue: true,
-  // });
+  plugin.settings.registerBooleanSetting({
+    id: collapseQueueTopBar,
+    title: 'Collapse Queue Top Bar (IncRem Only)',
+    description:
+      'Creates extra vertical space during Incremental Rem review by collapsing the queue top bar to a thin strip. Hover over it to reveal the full bar. Has no effect on regular flashcard turns.',
+    defaultValue: false,
+  });
+
+  const COLLAPSE_TOP_BAR_CSS = `
+    /* Collapse the top bar only during IncRem (Plugin) turns.
+       Gated on the queue iframe so regular flashcard turns are unaffected.
+       Two fixes over the naive max-height:0 approach:
+       1. Use max-height: 3px instead of 0 — gives a thin visible strip as a hover target
+          (a 0-height element receives no hover events).
+       2. Hide .rn-queue__progress-bar — the progress bar sits immediately below and has
+          an invisible absolute overlay that steals hover events. It also shows flashcard
+          queue progress which is not meaningful during IncRem turns. */
+    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title {
+      max-height: 3px;
+      overflow: hidden;
+      /* collapse: wait 0.6s after mouse leaves, then animate over 0.4s */
+      transition: max-height 0.4s ease 0.6s;
+      cursor: pointer;
+    }
+    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title:hover {
+      max-height: 180px;
+      overflow: visible;
+      /* expand: start immediately, smooth over 0.25s */
+      transition: max-height 0.25s ease 0s;
+    }
+    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .rn-queue__progress-bar {
+      display: none !important;
+    }
+  `;
+
+  const shouldCollapseTopBar = await plugin.settings.getSetting<boolean>(collapseQueueTopBar);
+  if (shouldCollapseTopBar) {
+    await plugin.app.registerCSS(collapseTopBarCssId, COLLAPSE_TOP_BAR_CSS);
+  }
 
   // Priority settings
 

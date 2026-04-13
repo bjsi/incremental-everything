@@ -65,7 +65,7 @@ function computeShieldStatus(
       topMissedInKb.priority,
       predicate
     );
-    console.log(`[CardShield] KB Shield: priority ${topMissedInKb.priority}, percentile ${kbPercentile}%, triggered by remId: ${topMissedInKb.remId}`);
+    // console.log(`[CardShield] KB Shield: priority ${topMissedInKb.priority}, percentile ${kbPercentile}%, triggered by remId: ${topMissedInKb.remId}`);
   }
 
   let docPercentile: number | undefined;
@@ -78,7 +78,7 @@ function computeShieldStatus(
         topMissedInDoc.priority,
         predicate
       );
-      console.log(`[CardShield] Doc Shield: priority ${topMissedInDoc.priority}, percentile ${docPercentile}%, triggered by remId: ${topMissedInDoc.remId}`);
+      // console.log(`[CardShield] Doc Shield: priority ${topMissedInDoc.priority}, percentile ${docPercentile}%, triggered by remId: ${topMissedInDoc.remId}`);
     }
   }
 

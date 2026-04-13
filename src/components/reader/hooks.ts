@@ -39,7 +39,8 @@ export function useCriticalContext(
   pdfRemId: RemId,
   pdfParentId: RemId | null,
   actionType: 'pdf' | 'pdf-highlight' | 'html' | 'html-highlight' | 'rem' | 'youtube' | 'video',
-  highlightExtractId?: RemId
+  highlightExtractId?: RemId,
+  queueIncRemId?: string
 ) {
   const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
 
@@ -49,7 +50,15 @@ export function useCriticalContext(
     const loadCriticalData = async () => {
       const pdfRem = await plugin.rem.findOne(pdfRemId);
       if (!pdfRem || cancelled) return;
-      const incrementalRem = await findIncrementalRemForPDF(plugin, pdfRem, true);
+      // If the queue explicitly told us which IncRem is being reviewed, use it directly.
+      // This avoids the unreliable findIncrementalRemForPDF reverse-search which breaks
+      // when multiple IncRems share the same PDF source.
+      let incrementalRem = null;
+      if (queueIncRemId) {
+        incrementalRem = await plugin.rem.findOne(queueIncRemId);
+      } else {
+        incrementalRem = await findIncrementalRemForPDF(plugin, pdfRem, true);
+      }
 
       const rem = incrementalRem || pdfRem;
 
@@ -126,7 +135,8 @@ export function useCriticalContext(
       clearTimeout(timeoutId);
     };
     
-  }, [pdfRemId, pdfParentId, actionType, highlightExtractId, plugin]);
+  }, [pdfRemId, pdfParentId, actionType, highlightExtractId, queueIncRemId, plugin]);
+
 
   return criticalContext;
 }

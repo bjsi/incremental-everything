@@ -11,7 +11,7 @@ import {
   noIncRemTimerKey,
   pageRangeWidgetId,
 } from '../lib/consts';
-import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF } from '../lib/pdfUtils';
+import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
 import { createRemFromHighlight } from '../lib/highlightActions';
 
@@ -55,6 +55,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
     id: 'tag_rem_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
     name: 'Toggle Incremental Rem',
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/12809/12809374.png',
     action: async (args: { remId: string }) => {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) return;
@@ -75,82 +76,6 @@ export async function registerMenus(plugin: ReactRNPlugin) {
           remId: rem._id,
         });
       }
-    },
-  });
-
-  plugin.app.registerMenuItem({
-    id: 'tag_highlight',
-    location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
-    name: 'Toggle Incremental Rem',
-    action: async (args: { remId: string }) => {
-      const rem = await plugin.rem.findOne(args.remId);
-      if (!rem) return;
-
-      const isIncremental = await rem.hasPowerup(powerupCode);
-
-      if (isIncremental) {
-        await rem.removePowerup(powerupCode);
-        // Removed setHighlightColor -> CSS handles cleanup when tag is removed
-        await plugin.app.toast('❌ Removed Incremental tag');
-      } else {
-        await initIncrementalRem(plugin, rem);
-        // Removed setHighlightColor -> CSS handles styling via "incremental" tag
-        await plugin.app.toast('✅ Tagged as Incremental Rem');
-        // Clear stale session storage to prevent race condition with widget context
-        await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
-        await plugin.widget.openPopup('priority_interval', {
-          remId: rem._id,
-        });
-      }
-    },
-  });
-
-  plugin.app.registerMenuItem({
-    id: 'create_inc_rem_highlight',
-    location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
-    name: 'Create Incremental Rem',
-    iconUrl: "https://cdn-icons-png.flaticon.com/512/3626/3626838.png",
-    action: async (args: { remId: string }) => {
-      console.log('[ParentSelector:Menu] CREATE INCREMENTAL REM triggered for:', args.remId);
-
-      const highlight = await plugin.rem.findOne(args.remId);
-      if (!highlight) {
-        console.log('[ParentSelector:Menu] ERROR: Could not find highlight rem');
-        return;
-      }
-
-      // Get context for smart destination memory
-      const pageRangeContext = await plugin.storage.getSession<{
-        incrementalRemId: string | null;
-        pdfRemId: string | null;
-      }>('pageRangeContext');
-
-      const currentIncRemId = await plugin.storage.getSession<string>('current-inc-rem');
-
-      // Determine contextRemId
-      let contextRemId: string | null = null;
-
-      if (pageRangeContext?.incrementalRemId &&
-        pageRangeContext?.pdfRemId &&
-        pageRangeContext.incrementalRemId !== pageRangeContext.pdfRemId) {
-        contextRemId = pageRangeContext.incrementalRemId;
-      } else if (currentIncRemId) {
-        const incRem = await plugin.rem.findOne(currentIncRemId);
-        if (incRem && await incRem.hasPowerup(powerupCode)) {
-          contextRemId = currentIncRemId;
-        }
-      }
-
-      console.log('[ParentSelector:Menu] contextRemId:', contextRemId);
-
-      // Call createRemFromHighlight with the NEW option
-      await createRemFromHighlight(plugin, highlight, {
-        makeIncremental: true,
-        contextRemId,
-        // NEW: This tells the function to show the priority popup
-        // if the highlight is NOT already an incremental rem
-        showPriorityPopupIfNew: true,
-      });
     },
   });
 
