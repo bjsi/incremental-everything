@@ -110,13 +110,22 @@ export async function handleNextRepetitionClick(
   try {
     await plugin.storage.setSession('plugin_operation_active', true);
 
-    await updateReviewRemData(plugin, incRem);
+    // 1. Capture the exact new data calculated by the review
+    const reviewResult = await updateReviewRemData(plugin, incRem);
 
-    // Because we suppress the event listener, we manually refresh the cache
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(incRem.remId));
-    if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
+    if (reviewResult) {
+      // 2. Manually patch the object using the new data
+      const updatedIncRem: IncrementalRem = {
+        ...incRem,
+        nextRepDate: reviewResult.newNextRepDate,
+        history: reviewResult.newHistory,
+      };
 
-    // Keep the sleep to be safe, but it's less critical now
+      // 3. Update the cache with guaranteed fresh data
+      await updateIncrementalRemCache(plugin as any, updatedIncRem);
+    }
+
+    // Keep the sleep to be safe
     await sleep(150);
 
     await plugin.queue.removeCurrentCardFromQueue();
@@ -142,7 +151,6 @@ export async function handleNextRepetitionManualOffset(
   try {
     await plugin.storage.setSession('plugin_operation_active', true);
 
-    // Simple: set next rep date to today or tomorrow without multiplier math
     const targetDay = dayjs().startOf('day').add(Math.max(offsetDays, 0), 'day').valueOf();
 
     const newHistory = [
@@ -156,9 +164,14 @@ export async function handleNextRepetitionManualOffset(
 
     await updateSRSDataForRem(plugin, incRem.remId, targetDay, newHistory);
 
-    // Because we suppress the event listener, we manually refresh the cache
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(incRem.remId));
-    if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
+    // MANUALLY CONSTRUCT THE UPDATED OBJECT
+    const updatedIncRem: IncrementalRem = {
+      ...incRem,
+      nextRepDate: targetDay,
+      history: newHistory,
+    };
+
+    await updateIncrementalRemCache(plugin as any, updatedIncRem);
 
     await plugin.queue.removeCurrentCardFromQueue();
   } finally {
