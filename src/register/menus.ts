@@ -79,53 +79,6 @@ export async function registerMenus(plugin: ReactRNPlugin) {
     },
   });
 
-  // Transferred to toggle_incremental_toolbar.tsx
-
-  // plugin.app.registerMenuItem({
-  //   id: 'tag_highlight',
-  //   location: PluginCommandMenuLocation.PDFHighlightPopupLocation,
-  //   name: 'Toggle Incremental Rem',
-  //   action: async (args: { remId: string }) => {
-  //     const rem = await plugin.rem.findOne(args.remId);
-  //     if (!rem) return;
-
-  //     const isIncremental = await rem.hasPowerup(powerupCode);
-
-  //     if (isIncremental) {
-  //       await rem.removePowerup(powerupCode);
-  //       // Removed setHighlightColor -> CSS handles cleanup when tag is removed
-  //       await plugin.app.toast('❌ Removed Incremental tag');
-  //     } else {
-  //       await initIncrementalRem(plugin, rem);
-  //       // Removed setHighlightColor -> CSS handles styling via "incremental" tag
-  //       await plugin.app.toast('✅ Tagged as Incremental Rem');
-
-  //       // NEW: Automatically set bookmark
-  //       const { pdfRemId, pageIndex } = await getPdfInfoFromHighlight(plugin, rem);
-  //       if (pdfRemId && pageIndex !== null) {
-  //         try {
-  //           // Update progress for the currently reviewed Queue item (if active)
-  //           const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
-  //           if (queueCtx && queueCtx.pdfRemId === pdfRemId && queueCtx.incrementalRemId) {
-  //             await addPageToHistory(plugin, queueCtx.incrementalRemId, pdfRemId, pageIndex, undefined, rem._id);
-  //             await setIncrementalReadingPosition(plugin, queueCtx.incrementalRemId, pdfRemId, pageIndex);
-  //           }
-  //         } catch (e) {
-  //           console.error('Error creating bookmark for tag_highlight', e);
-  //         }
-  //       }
-
-  //       // Clear stale session storage to prevent race condition with widget context
-  //       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
-  //       await plugin.widget.openPopup('priority_interval', {
-  //         remId: rem._id,
-  //       });
-  //     }
-  //   },
-  // });
-
-
-
   plugin.app.registerMenuItem({
     id: 'batch_priority_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
