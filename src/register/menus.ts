@@ -10,6 +10,7 @@ import {
   noIncRemMenuItemId,
   noIncRemTimerKey,
   pageRangeWidgetId,
+  incRemDisabledDeviceKey,
 } from '../lib/consts';
 import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
@@ -144,6 +145,26 @@ export async function registerMenus(plugin: ReactRNPlugin) {
       await plugin.storage.setSynced(noIncRemTimerKey, endTime);
 
       await plugin.app.toast('Incremental rems disabled for 15 minutes. Only flashcards will be shown.');
+
+      await plugin.storage.setSynced('queue-refresh-trigger', Date.now());
+    },
+  });
+
+  plugin.app.registerMenuItem({
+    id: 'toggle-inc-rem-device',
+    name: 'Toggle Inc Rems in this device',
+    location: PluginCommandMenuLocation.QueueMenu,
+    action: async () => {
+      const isCurrentlyDisabled = await plugin.storage.getLocal<boolean>(incRemDisabledDeviceKey);
+      const newState = !isCurrentlyDisabled;
+      
+      await plugin.storage.setLocal(incRemDisabledDeviceKey, newState);
+      
+      if (newState) {
+        await plugin.app.toast('🚫 Incremental Rems disabled on this device.');
+      } else {
+        await plugin.app.toast('✅ Incremental Rems enabled on this device.');
+      }
 
       await plugin.storage.setSynced('queue-refresh-trigger', Date.now());
     },

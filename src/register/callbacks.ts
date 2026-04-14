@@ -16,6 +16,7 @@ import {
   noIncRemTimerKey,
   incremReviewStartTimeKey,
   incrementalQueueActiveKey,
+  incRemDisabledDeviceKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
@@ -101,23 +102,20 @@ export const resetSessionItemCounter = () => {
       console.log('queueInfo', queueInfo);
 
       const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
+      const isDeviceDisabled = await plugin.storage.getLocal<boolean>(incRemDisabledDeviceKey);
       const now = Date.now();
-      // console.log('⏰ TIMER CHECK:', {
-      //   noIncRemTimerEnd,
-      //   now,
-      //   isTimerActive: noIncRemTimerEnd && noIncRemTimerEnd > now,
-      //   timerWillExpireIn: noIncRemTimerEnd
-      //     ? Math.ceil((noIncRemTimerEnd - now) / 1000) + ' seconds'
-      //     : 'no timer set',
-      // });
 
       const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > now;
 
-      if (isTimerActive) {
-        const remainingSeconds = Math.ceil((noIncRemTimerEnd - now) / 1000);
-        // console.log('⚠️ TIMER IS ACTIVE - BLOCKING INCREM! Time remaining:', remainingSeconds, 'seconds');
+      if (isTimerActive || isDeviceDisabled) {
+        if (isTimerActive) {
+          const remainingSeconds = Math.ceil((noIncRemTimerEnd - now) / 1000);
+          // console.log('⚠️ TIMER IS ACTIVE - BLOCKING INCREM! Time remaining:', remainingSeconds, 'seconds');
+        } else {
+          // console.log('⚠️ DEVICE IS DISABLED - BLOCKING INCREM!');
+        }
 
-        // Timer is blocking IncRem — this turn will be a flashcard.
+        // Timer or Device is blocking IncRem — this turn will be a flashcard.
         plugin.app.registerCSS(queueCounterId, '');
         return null;
       } else if (noIncRemTimerEnd && noIncRemTimerEnd <= now) {
@@ -125,7 +123,7 @@ export const resetSessionItemCounter = () => {
         await plugin.storage.setSynced(noIncRemTimerKey, null);
         console.log('No Inc Rem timer expired and cleared');
       } else {
-        console.log('✅ No timer active - IncRem allowed');
+        console.log('✅ No timer active and device enabled - IncRem allowed');
       }
 
       const allIncrementalRem: IncrementalRem[] =
