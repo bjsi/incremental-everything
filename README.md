@@ -112,7 +112,7 @@ The plugin now features **Automatic Light Mode**.
 - You can tag YouTube videos with the `Incremental` tag to watch them incrementally.
 - It will work if you tag the link Rem itself, or a Rem with the YouTube link as a source.
 - **Video Extracts**: Create precise sub-clips with specific start/end timestamps, each with its own schedule and priority.
-- **Auto-Transcription**: Automatically fetch YouTube transcripts for extract ranges to make content searchable and ready for clozing.
+- **Auto-Transcription**: Automatically fetch YouTube transcripts for extract ranges to make content searchable and ready for clozing. [P.S.: Currently down after YouTube recent anti-bot measures]
 - The plugin will automatically save your progress and playback rate.
 - You can open the resizable notes section on the left to take notes while you watch.
 
