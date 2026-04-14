@@ -344,6 +344,10 @@ export function CardPriorityDisplay() {
     return await getCardPriority(rp, rem);
   }, [useLightMode, rem, refreshSignal, cardInfo]);
 
+  const isIncRem = useTrackerPlugin(async (rp) => {
+    if (!rem) return false;
+    return await rem.hasPowerup(powerupCode);
+  }, [rem]);
 
   // --- 🔌 COMBINE RESULTS ---
   // Prefer cache-based cardInfo; fall back to on-demand lightCardInfo (covers Light Mode + cache-not-ready)
@@ -407,14 +411,33 @@ export function CardPriorityDisplay() {
       <div
         className="flex items-center justify-center gap-3 px-3 py-1.5"
         style={{
+          position: 'relative',
           backgroundColor: 'var(--rn-clr-background-secondary)',
           border: '1px solid var(--rn-clr-border-primary)',
           borderLeft: `4px solid ${priorityColor}`,
           borderRadius: '8px',
           transition: 'background-color 0.15s',
           flexWrap: 'wrap',
+          minHeight: '36px',
+          paddingRight: isIncRem ? '44px' : undefined,
         }}
       >
+        {isIncRem && (
+          <img 
+            src="icon-toggle-inc.png" 
+            alt="Incremental Rem" 
+            style={{ 
+              position: 'absolute', 
+              right: '12px', 
+              top: '50%', 
+              transform: 'translateY(-50%)', 
+              width: '28px', 
+              height: '28px',
+              opacity: 0.8
+            }} 
+            title="This card is an Incremental Rem"
+          />
+        )}
         {/* Priority — clickable to open priority editor */}
         <div
           className="flex items-center gap-2"

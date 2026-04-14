@@ -53,7 +53,47 @@ import { handleReviewInEditorRem } from '../lib/review_actions';
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   const createExtract = async (): Promise<PluginRem | PluginRem[] | undefined> => {
-    const selection = await plugin.editor.getSelection();
+    let selection = await plugin.editor.getSelection();
+    const url = await plugin.window.getURL();
+
+    if (url.includes('/flashcards')) {
+      const currentQueueItem = await plugin.queue.getCurrentCard();
+      let isTargetingQueueContext = false;
+
+      if (!selection || !selection.type) {
+        isTargetingQueueContext = true;
+      } else if (currentQueueItem) {
+        if (selection.type === SelectionType.Rem && selection.remIds.includes(currentQueueItem.remId)) {
+          isTargetingQueueContext = true;
+        } else if (selection.type === SelectionType.Text && selection.remId === currentQueueItem.remId && selection.range.start === selection.range.end) {
+          isTargetingQueueContext = true;
+        }
+      } else {
+        const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+        if (currentIncRemId) {
+          if (selection.type === SelectionType.Rem && selection.remIds.includes(currentIncRemId)) {
+            isTargetingQueueContext = true;
+          } else if (selection.type === SelectionType.Text && selection.remId === currentIncRemId && selection.range.start === selection.range.end) {
+            isTargetingQueueContext = true;
+          }
+        }
+      }
+
+      if (isTargetingQueueContext) {
+        let targetRemId = currentQueueItem?.remId;
+        if (!targetRemId) {
+          targetRemId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
+        }
+
+        if (targetRemId) {
+          selection = {
+            type: SelectionType.Rem,
+            remIds: [targetRemId]
+          } as any;
+        }
+      }
+    }
+
     if (!selection) {
       // plugin.editor.getSelection() returns undefined when focus is inside the PDF
       // iframe. plugin.reader.addHighlight() also returns null in that context —

@@ -10,7 +10,7 @@ import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, incremReviewStartTimeKey } from '../lib/consts';
-import { IncrementalRep } from '../lib/incremental_rem';
+import { IncrementalRep, IncrementalRem } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
@@ -71,10 +71,17 @@ async function handleRescheduleAndPriorityUpdate(
 
     await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
 
-    const updatedIncRem = await getIncrementalRemFromRem(plugin, rem);
-    if (updatedIncRem) {
-      await updateIncrementalRemCache(plugin, updatedIncRem);
-    }
+    // Manually construct the patched object to bypass the SDK's local read-cache delay.
+    // Re-reading via getIncrementalRemFromRem() here may return stale data before the
+    // remote DB confirms the write, causing the queue injector to see the old nextRepDate.
+    // Priority must be included explicitly since setPowerupProperty() updated it above.
+    const updatedIncRem: IncrementalRem = {
+      ...incRem,
+      nextRepDate: newNextRepDate,
+      history: newHistory,
+      priority: newPriority,
+    };
+    await updateIncrementalRemCache(plugin, updatedIncRem);
 
     // Clear the start time (only relevant for queue context)
     if (context === 'queue') {

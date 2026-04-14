@@ -88,6 +88,7 @@ export const remnoteEnvironmentId = 'remnote-environment';
 export const noIncRemTimerKey = 'no-inc-rem-timer-end';
 export const noIncRemMenuItemId = 'no-inc-rem-15-min';
 export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
+export const incRemDisabledDeviceKey = 'inc-rem-disabled-device';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 // Pending priority save job: written by priority_light popup before closing,
