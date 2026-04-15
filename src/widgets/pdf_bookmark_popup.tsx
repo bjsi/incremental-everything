@@ -1,6 +1,6 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange } from '../lib/pdfUtils';
+import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
 import { incrementalQueueActiveKey } from '../lib/consts';
 
 export function PdfBookmarkPopup() {
@@ -46,12 +46,13 @@ export function PdfBookmarkPopup() {
           if (isQueueActive) {
             const currentQueueRemId = await plugin.storage.getSession<string>('current-inc-rem');
             if (currentQueueRemId) {
-              // We already know docId from the highlight itself — no need to re-validate
-              // via the expensive findPDFinRem. Trust the session's current-inc-rem directly.
+              // ⚡ FAST PATH: We already know the IncRem from the session.
+              // Skip findAllRemsForPDF entirely — it is not needed and is expensive.
               const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
+              let remName = '';
               if (currentQueueRem?.text) {
-                const textStr = await plugin.richText.toString(currentQueueRem.text);
-                setActiveQueueRemName(textStr);
+                remName = await safeRemTextToString(plugin, currentQueueRem.text);
+                setActiveQueueRemName(remName);
               }
               setActiveQueueContext({
                 incrementalRemId: currentQueueRemId as any,
@@ -59,68 +60,75 @@ export function PdfBookmarkPopup() {
                 totalPages: 0,
                 currentPage: 1
               });
+
+              // Only fetch reading history for this specific rem (1 call, not N)
+              const history = await getPageHistory(plugin, currentQueueRemId, docId);
+              const withHighlights = history.filter(h => h.highlightId);
+              if (withHighlights.length > 0) {
+                setHistoricalBookmarks([{ remId: currentQueueRemId, name: remName, history: withHighlights }]);
+              }
+              // associatedRems stays [] — not rendered in queue mode anyway
             }
-          }
+          } else {
+            // 🐌 FULL PATH (non-queue): find all IncRems that read this PDF
+            const associated = (await findAllRemsForPDF(plugin, docId)).filter(a => a.isIncremental);
 
+            // Fetch their page ranges to build hierarchy
+            const associatedWithRanges = await Promise.all(
+              associated.map(async (assoc) => {
+                const range = await getIncrementalPageRange(plugin, assoc.remId, docId);
+                return { ...assoc, range };
+              })
+            );
 
-          // Fetch all associated incremental reading rems globally, filter to active IncRems only
-          const associated = (await findAllRemsForPDF(plugin, docId)).filter(a => a.isIncremental);
+            // Build tree for hierarchical indentation based on bounding page ranges
+            const sorted = [...associatedWithRanges].sort((a, b) => {
+              if (a.range && b.range) return a.range.start - b.range.start;
+              if (a.range && !b.range) return -1;
+              if (!a.range && b.range) return 1;
+              return a.name.localeCompare(b.name);
+            });
 
-          // Fetch their page ranges to build hierarchy
-          const associatedWithRanges = await Promise.all(
-            associated.map(async (assoc) => {
-              const range = await getIncrementalPageRange(plugin, assoc.remId, docId);
-              return { ...assoc, range };
-            })
-          );
+            const contains = (outer: any, inner: any) =>
+              inner.start >= outer.start &&
+              (outer.end === null || inner.end === null || inner.end <= outer.end) &&
+              (inner.start > outer.start || (inner.end !== null && (outer.end === null || inner.end < outer.end)));
 
-          // Build tree for hierarchical identation based on bounding page ranges
-          const sorted = [...associatedWithRanges].sort((a, b) => {
-            if (a.range && b.range) return a.range.start - b.range.start;
-            if (a.range && !b.range) return -1;
-            if (!a.range && b.range) return 1;
-            return a.name.localeCompare(b.name);
-          });
+            const treeItems = sorted.map(item => ({ ...item, depth: 0, parentId: null as string | null }));
 
-          const contains = (outer: any, inner: any) =>
-            inner.start >= outer.start &&
-            (outer.end === null || inner.end === null || inner.end <= outer.end) &&
-            (inner.start > outer.start || (inner.end !== null && (outer.end === null || inner.end < outer.end)));
-
-          const treeItems = sorted.map(item => ({ ...item, depth: 0, parentId: null as string | null }));
-
-          for (let i = 0; i < treeItems.length; i++) {
-            if (!treeItems[i].range) continue;
-            let bestParentIdx = -1;
-            let bestParentSize = Infinity;
-            for (let j = 0; j < i; j++) {
-              if (!treeItems[j].range) continue;
-              if (contains(treeItems[j].range, treeItems[i].range)) {
-                const parentSize = (treeItems[j].range!.end ?? Infinity) - treeItems[j].range!.start;
-                if (parentSize < bestParentSize) {
-                  bestParentSize = parentSize;
-                  bestParentIdx = j;
+            for (let i = 0; i < treeItems.length; i++) {
+              if (!treeItems[i].range) continue;
+              let bestParentIdx = -1;
+              let bestParentSize = Infinity;
+              for (let j = 0; j < i; j++) {
+                if (!treeItems[j].range) continue;
+                if (contains(treeItems[j].range, treeItems[i].range)) {
+                  const parentSize = (treeItems[j].range!.end ?? Infinity) - treeItems[j].range!.start;
+                  if (parentSize < bestParentSize) {
+                    bestParentSize = parentSize;
+                    bestParentIdx = j;
+                  }
                 }
               }
+              if (bestParentIdx >= 0) {
+                treeItems[i].parentId = treeItems[bestParentIdx].remId;
+                treeItems[i].depth = treeItems[bestParentIdx].depth + 1;
+              }
             }
-            if (bestParentIdx >= 0) {
-              treeItems[i].parentId = treeItems[bestParentIdx].remId;
-              treeItems[i].depth = treeItems[bestParentIdx].depth + 1;
-            }
+
+            setAssociatedRems(treeItems);
+
+            // Fetch history for each to find scroll bookmarks
+            const histories = await Promise.all(
+              associated.map(async (assoc) => {
+                const history = await getPageHistory(plugin, assoc.remId, docId);
+                // Filter to only those with highlightId (actual bookmark scroll positions)
+                const withHighlights = history.filter(h => h.highlightId);
+                return { remId: assoc.remId, name: assoc.name, history: withHighlights };
+              })
+            );
+            setHistoricalBookmarks(histories.filter(h => h.history.length > 0));
           }
-
-          setAssociatedRems(treeItems);
-
-          // Fetch history for each to find scroll bookmarks
-          const histories = await Promise.all(
-            associated.map(async (assoc) => {
-              const history = await getPageHistory(plugin, assoc.remId, docId);
-              // Filter to only those with highlightId (actual bookmark scroll positions)
-              const withHighlights = history.filter(h => h.highlightId);
-              return { remId: assoc.remId, name: assoc.name, history: withHighlights };
-            })
-          );
-          setHistoricalBookmarks(histories.filter(h => h.history.length > 0));
         }
       } catch (err) {
         console.error("Error init bookmark popup", err);
