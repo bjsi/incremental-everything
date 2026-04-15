@@ -280,7 +280,7 @@ export const getIncrementalRemFromRem = async (
  * @param rem PluginRem to initialize.
  * @returns Promise that resolves after the Rem is initialized or skipped if already incremental.
  */
-export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean }) {
+export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean, explicitParentId?: string }) {
   const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
 
   if (!isAlreadyIncremental) {
@@ -300,7 +300,8 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
       const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
       const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
 
-      const initialPriority = await getInitialPriority(plugin, rem, defaultPriority);
+      // Pass explicitParentId to override stale SDK cache when creating a new Rem and moving it
+      const initialPriority = await getInitialPriority(plugin, rem, defaultPriority, options?.explicitParentId);
 
       await rem.addPowerup(powerupCode);
 

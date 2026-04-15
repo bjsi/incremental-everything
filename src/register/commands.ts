@@ -25,7 +25,7 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem } from '../lib/pdfUtils';
+import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem, getDescendantsToDepth } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
@@ -45,6 +45,7 @@ import { handleQuickPriorityChange } from '../lib/quick_priority';
 import {
   removeAllCardPriorityTags,
   updateAllCardPriorities,
+  setCardPriority,
 } from '../lib/card_priority';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { getPerformanceMode } from '../lib/utils';
@@ -137,8 +138,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       // Make Incremental
-      await initIncrementalRem(plugin, extractRem);
-
+      // Pass the explicit parent since the SDK cache may not yet reflect `extractRem.setParent(rem)`
+      await initIncrementalRem(plugin, extractRem, { explicitParentId: rem._id });
       // 4. Locate and Modify
       const r_start = Math.min(selection.range.start, selection.range.end);
       const r_end = Math.max(selection.range.start, selection.range.end);
@@ -294,7 +295,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         await plugin.app.toast('Please select some text to create a cloze deletion.');
         return;
       }
-      
+
       const rem = await plugin.rem.findOne(selection.remId);
       if (!rem) return;
 
@@ -312,7 +313,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
           const nodeStart = currIdx;
           const nodeEnd = currIdx + nodeLen;
-          
+
           if (nodeEnd <= r_start || nodeStart >= r_end) {
             newArray.push(item);
           } else {
@@ -320,7 +321,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
               const textStr = textNode.text || '';
               const relStart = Math.max(0, r_start - nodeStart);
               const relEnd = Math.min(nodeLen, r_end - nodeStart);
-              
+
               if (relStart > 0) {
                 newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
               }
