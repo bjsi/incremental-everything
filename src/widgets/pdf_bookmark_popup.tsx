@@ -1,6 +1,6 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, findPDFinRem, getIncrementalPageRange } from '../lib/pdfUtils';
+import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange } from '../lib/pdfUtils';
 import { incrementalQueueActiveKey } from '../lib/consts';
 
 export function PdfBookmarkPopup() {
@@ -46,21 +46,19 @@ export function PdfBookmarkPopup() {
           if (isQueueActive) {
             const currentQueueRemId = await plugin.storage.getSession<string>('current-inc-rem');
             if (currentQueueRemId) {
+              // We already know docId from the highlight itself — no need to re-validate
+              // via the expensive findPDFinRem. Trust the session's current-inc-rem directly.
               const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
-              const foundPdf = currentQueueRem ? await findPDFinRem(plugin, currentQueueRem, docId) : null;
-
-              if (foundPdf && foundPdf._id === docId) {
-                if (currentQueueRem?.text) {
-                  const textStr = await plugin.richText.toString(currentQueueRem.text);
-                  setActiveQueueRemName(textStr);
-                }
-                setActiveQueueContext({
-                  incrementalRemId: currentQueueRemId as any,
-                  pdfRemId: docId as any,
-                  totalPages: 0,
-                  currentPage: 1
-                });
+              if (currentQueueRem?.text) {
+                const textStr = await plugin.richText.toString(currentQueueRem.text);
+                setActiveQueueRemName(textStr);
               }
+              setActiveQueueContext({
+                incrementalRemId: currentQueueRemId as any,
+                pdfRemId: docId as any,
+                totalPages: 0,
+                currentPage: 1
+              });
             }
           }
 
@@ -182,7 +180,7 @@ export function PdfBookmarkPopup() {
               backgroundColor: 'var(--rn-clr-blue, #3b82f6)', color: 'white', cursor: 'pointer',
               fontWeight: 500, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px'
             }}
-            onClick={() => saveBookmark(activeQueueContext.incrementalRemId)}
+            onClick={async () => { await saveBookmark(activeQueueContext.incrementalRemId); plugin.widget.closePopup(); }}
           >
             Update Current Queue Reading
           </button>
