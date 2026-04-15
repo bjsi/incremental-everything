@@ -1,5 +1,6 @@
 import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
+import { currentIncRemKey, incrementalQueueActiveKey } from '../lib/consts';
 
 export function PdfBookmarkToolbar() {
   const plugin = usePlugin();
@@ -37,7 +38,14 @@ export function PdfBookmarkToolbar() {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={async () => {
-        await plugin.widget.openPopup('pdf_bookmark_popup', { remId });
+        // Resolve queue context here (at click time) where session storage is freshest.
+        // QueueComponent's mount/unmount cleanup can briefly flip incrementalQueueActiveKey
+        // to false, causing the popup's own async init to miss it.
+        const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
+        const queueIncRemId = isQueueActive
+          ? (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined
+          : undefined;
+        await plugin.widget.openPopup('pdf_bookmark_popup', { remId, queueIncRemId });
       }}
       title="Bookmark Position — save & jump to your reading position"
     >

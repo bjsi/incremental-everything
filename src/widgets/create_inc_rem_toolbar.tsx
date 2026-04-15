@@ -1,10 +1,9 @@
 import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
 import { createRemFromHighlight } from '../lib/highlightActions';
-import { powerupCode, incrementalQueueActiveKey } from '../lib/consts';
+import { powerupCode, incrementalQueueActiveKey, currentIncRemKey } from '../lib/consts';
 import {
   getPdfInfoFromHighlight,
-  findPDFinRem,
   addPageToHistory,
   setIncrementalReadingPosition
 } from '../lib/pdfUtils';
@@ -35,18 +34,14 @@ export function CreateIncRemToolbar() {
 
     let contextRemId: string | null = null;
 
-    // 2. Strict Queue Context Check (Syncs logic with pdf_bookmark_popup.tsx)
+    // 2. Queue Context Check: trust currentIncRemKey directly — the highlight's docId
+    // is already derived from the highlight itself, so no need to re-validate via findPDFinRem.
     const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
 
     if (isQueueActive) {
-      const currentQueueRemId = await plugin.storage.getSession<string>('current-inc-rem');
+      const currentQueueRemId = await plugin.storage.getSession<string>(currentIncRemKey);
       if (currentQueueRemId) {
-        const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
-        const foundPdf = currentQueueRem && docId ? await findPDFinRem(plugin as any, currentQueueRem, docId) : null;
-
-        if (foundPdf && foundPdf._id === docId) {
-          contextRemId = currentQueueRemId;
-        }
+        contextRemId = currentQueueRemId;
       }
     }
 
@@ -57,7 +52,7 @@ export function CreateIncRemToolbar() {
         pdfRemId: string | null;
       }>('pageRangeContext');
 
-      const currentIncRemId = await plugin.storage.getSession<string>('current-inc-rem');
+      const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
 
       if (
         pageRangeContext?.incrementalRemId &&

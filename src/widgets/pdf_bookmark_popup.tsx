@@ -1,7 +1,6 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
 import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
-import { incrementalQueueActiveKey } from '../lib/consts';
 
 export function PdfBookmarkPopup() {
   const plugin = usePlugin() as ReactRNPlugin;
@@ -39,36 +38,35 @@ export function PdfBookmarkPopup() {
         setPdfRemId(docId);
         setPageIndex(pIndex);
 
+        // queueIncRemId is resolved by the toolbar at click time (where session storage is
+        // most current) and passed directly via contextData — no session storage reads needed here.
+        const queueIncRemId = popupContext?.contextData?.queueIncRemId as string | undefined;
+
         if (docId) {
-          // Strict Queue Context Check: Ensure we truly are in the Active Queue
-          const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
-
-          if (isQueueActive) {
-            const currentQueueRemId = await plugin.storage.getSession<string>('current-inc-rem');
-            if (currentQueueRemId) {
-              // ⚡ FAST PATH: We already know the IncRem from the session.
-              // Skip findAllRemsForPDF entirely — it is not needed and is expensive.
-              const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
-              let remName = '';
-              if (currentQueueRem?.text) {
-                remName = await safeRemTextToString(plugin, currentQueueRem.text);
-                setActiveQueueRemName(remName);
-              }
-              setActiveQueueContext({
-                incrementalRemId: currentQueueRemId as any,
-                pdfRemId: docId as any,
-                totalPages: 0,
-                currentPage: 1
-              });
-
-              // Only fetch reading history for this specific rem (1 call, not N)
-              const history = await getPageHistory(plugin, currentQueueRemId, docId);
-              const withHighlights = history.filter(h => h.highlightId);
-              if (withHighlights.length > 0) {
-                setHistoricalBookmarks([{ remId: currentQueueRemId, name: remName, history: withHighlights }]);
-              }
-              // associatedRems stays [] — not rendered in queue mode anyway
+          if (queueIncRemId) {
+            // ⚡ FAST PATH: We already know the IncRem from the toolbar's click context.
+            // Skip findAllRemsForPDF entirely — it is not needed and is expensive.
+            const currentQueueRem = await plugin.rem.findOne(queueIncRemId);
+            let remName = '';
+            if (currentQueueRem?.text) {
+              remName = await safeRemTextToString(plugin, currentQueueRem.text);
+              setActiveQueueRemName(remName);
             }
+            setActiveQueueContext({
+              incrementalRemId: queueIncRemId as any,
+              pdfRemId: docId as any,
+              totalPages: 0,
+              currentPage: 1
+            });
+
+            // Only fetch reading history for this specific rem (1 call, not N)
+            const history = await getPageHistory(plugin, queueIncRemId, docId);
+            const withHighlights = history.filter(h => h.highlightId);
+            if (withHighlights.length > 0) {
+              setHistoricalBookmarks([{ remId: queueIncRemId, name: remName, history: withHighlights }]);
+            }
+            // associatedRems stays [] — not rendered in queue mode anyway
+
           } else {
             // 🐌 FULL PATH (non-queue): find all IncRems that read this PDF
             const associated = (await findAllRemsForPDF(plugin, docId)).filter(a => a.isIncremental);
