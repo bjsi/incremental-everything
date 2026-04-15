@@ -109,7 +109,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       (selection as any).remIds = [selection.remId];
     }
 
-    // TODO: extract within extract support
+    // Extract within extract
     if (selection.type === SelectionType.Text) {
       // 1. Fetch the Rem
       const rem = await plugin.rem.findOne(selection.remId);
@@ -119,10 +119,47 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const extractRem = await plugin.rem.createRem();
       if (!extractRem) return;
 
-      await extractRem.setText([
+      // Look for a reference pin to the original PDF Highlight in the parent
+      let pdfExtractPin: any = null;
+      if (rem.text) {
+        let pdfExtractTagRem: PluginRem | undefined;
+        try {
+          pdfExtractTagRem = await plugin.rem.findByName(['pdfextract'], null) || undefined;
+        } catch (e) {
+          // ignore
+        }
+
+        for (const item of rem.text) {
+          if (typeof item === 'object' && item !== null && item.i === 'q' && item._id) {
+            const referencedRem = await plugin.rem.findOne(item._id);
+            if (referencedRem) {
+              const isPdfHighlight = await referencedRem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
+              let hasTag = false;
+              if (pdfExtractTagRem) {
+                const tags = await referencedRem.getTagRems();
+                hasTag = tags.some(t => t._id === pdfExtractTagRem!._id);
+              }
+              
+              if (isPdfHighlight || hasTag) {
+                // Copy the exact pin
+                pdfExtractPin = { ...item, pin: true };
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      const newText: any[] = [
         ...selection.richText,
-        { i: 'q', _id: rem._id, pin: true },
-      ]);
+        { i: 'q', _id: rem._id, pin: true }
+      ];
+
+      if (pdfExtractPin) {
+        newText.push(' ', pdfExtractPin);
+      }
+
+      await extractRem.setText(newText);
       await extractRem.setParent(rem);
 
       // 3. Add "remove-from-queue" tag to the parent
