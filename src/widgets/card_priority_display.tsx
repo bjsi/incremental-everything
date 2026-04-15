@@ -391,10 +391,14 @@ export function CardPriorityDisplay() {
 
   const priorityColor = kbPercentile !== undefined ? percentileToHslColor(kbPercentile) : '#6b7280';
 
-  // --- NEW: Check if current card is directly impacting the shield ---
-  const isKbShieldActive = shieldStatus?.kb && finalCardInfo.priority === shieldStatus.kb.absolute;
-  const isDocShieldActive = shieldStatus?.doc && finalCardInfo.priority === shieldStatus.doc.absolute;
+  // --- Check if current card is directly impacting (or within) the shield boundary ---
+  // Pulse if the card's absolute priority is <= the shield value:
+  // this covers both the exact shield card and intra-day relearning/learning-step
+  // cards that reappear with a priority lower than (i.e. higher importance than) the shield.
+  const isKbShieldActive = shieldStatus?.kb != null && finalCardInfo.priority <= shieldStatus.kb.absolute;
+  const isDocShieldActive = shieldStatus?.doc != null && finalCardInfo.priority <= shieldStatus.doc.absolute;
   const isAnyShieldActive = isKbShieldActive || isDocShieldActive;
+
 
   const handleClick = async () => {
     if (!rem) return;
