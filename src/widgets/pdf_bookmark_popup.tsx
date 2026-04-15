@@ -15,6 +15,23 @@ export function PdfBookmarkPopup() {
   const [historicalBookmarks, setHistoricalBookmarks] = useState<{ remId: string, name: string, history: PageHistoryEntry[] }[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [highlightTexts, setHighlightTexts] = useState<Record<string, string>>({});
+
+  // Helper to batch-resolve highlight rem texts into a lookup map
+  const resolveHighlightTexts = async (entries: PageHistoryEntry[]): Promise<Record<string, string>> => {
+    const map: Record<string, string> = {};
+    await Promise.all(entries.map(async (entry) => {
+      if (!entry.highlightId) return;
+      try {
+        const hRem = await plugin.rem.findOne(entry.highlightId);
+        if (hRem?.text) {
+          const text = await safeRemTextToString(plugin as any, hRem.text);
+          if (text && text !== 'Untitled') map[entry.highlightId] = text;
+        }
+      } catch { /* ignore */ }
+    }));
+    return map;
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -66,9 +83,14 @@ export function PdfBookmarkPopup() {
 
             // Only fetch reading history for this specific rem (1 call, not N)
             const history = await getPageHistory(plugin, currentQueueRemId, docId);
-            const withHighlights = history.filter(h => h.highlightId);
+            // Most recent first
+            const withHighlights = history
+              .filter(h => h.highlightId)
+              .sort((a, b) => b.timestamp - a.timestamp);
             if (withHighlights.length > 0) {
               setHistoricalBookmarks([{ remId: currentQueueRemId, name: remName, history: withHighlights }]);
+              // Resolve highlight rem texts for display
+              resolveHighlightTexts(withHighlights).then(setHighlightTexts);
             }
             // associatedRems stays [] — not rendered in queue mode anyway
 
@@ -125,12 +147,18 @@ export function PdfBookmarkPopup() {
             const histories = await Promise.all(
               associated.map(async (assoc) => {
                 const history = await getPageHistory(plugin, assoc.remId, docId);
-                // Filter to only those with highlightId (actual bookmark scroll positions)
-                const withHighlights = history.filter(h => h.highlightId);
+                // Filter to those with highlightId, most recent first
+                const withHighlights = history
+                  .filter(h => h.highlightId)
+                  .sort((a, b) => b.timestamp - a.timestamp);
                 return { remId: assoc.remId, name: assoc.name, history: withHighlights };
               })
             );
-            setHistoricalBookmarks(histories.filter(h => h.history.length > 0));
+            const populated = histories.filter(h => h.history.length > 0);
+            setHistoricalBookmarks(populated);
+            // Resolve highlight rem texts for all entries
+            const allEntries = populated.flatMap(h => h.history);
+            resolveHighlightTexts(allEntries).then(setHighlightTexts);
           }
         }
       } catch (err) {
@@ -281,15 +309,30 @@ export function PdfBookmarkPopup() {
                               style={{
                                 textAlign: 'left', padding: '6px 10px', borderRadius: '6px',
                                 border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)',
-                                color: 'var(--rn-clr-blue, #3b82f6)', cursor: 'pointer', fontSize: '12px', display: 'flex', justifyContent: 'space-between',
-                                fontWeight: 500, transition: 'background-color 0.15s ease'
+                                color: 'var(--rn-clr-blue, #3b82f6)', cursor: 'pointer', fontSize: '12px',
+                                display: 'flex', flexDirection: 'column', gap: '2px',
+                                fontWeight: 500, transition: 'background-color 0.15s ease', width: '100%'
                               }}
                               onClick={() => jumpToBookmark(entry.highlightId!)}
                               onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-modifier-hover)'}
                               onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'}
                             >
-                              <span>📄 Page {entry.page}</span>
-                              <span style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px', fontWeight: 400 }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>📄 Page {entry.page}</span>
+                                <span style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px', fontWeight: 400 }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
+                              </div>
+                              {entry.highlightId && highlightTexts[entry.highlightId] && (
+                                <div style={{
+                                  fontSize: '10px', fontWeight: 400,
+                                  color: 'var(--rn-clr-content-secondary)',
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  maxWidth: '100%', fontStyle: 'italic'
+                                }}>
+                                  {highlightTexts[entry.highlightId].length > 90
+                                    ? highlightTexts[entry.highlightId].substring(0, 90) + '…'
+                                    : highlightTexts[entry.highlightId]}
+                                </div>
+                              )}
                             </button>
                           ))}
                         </div>
