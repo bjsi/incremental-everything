@@ -1,4 +1,4 @@
-import { RNPlugin, PluginRem, RichTextInterface } from '@remnote/plugin-sdk';
+import { RNPlugin, PluginRem, RichTextInterface, RemId } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem';
 import { getCardRandomness, getSortingRandomness, applySortingCriteria } from '../sorting';
 import { getDueCardsWithPriorities } from '../card_priority';
@@ -12,6 +12,52 @@ import { CardPriorityInfo } from '../card_priority';
 import { calculateAllPercentiles } from '../utils';
 import { buildComprehensiveScope } from '../scope_helpers';
 import * as _ from 'remeda'; // Ensure remeda is imported for uniqBy if available, or use custom
+
+// Possible powerup codes for the Card Cluster built-in powerup.
+// RemNote exposes it via the /cluster slash command but does not publish
+// the code in BuiltInPowerupCodes, so we try several plausible variants.
+const CARD_CLUSTER_POWERUP_CODES = ['cluster', 'cardCluster', 'card-cluster', 'card_cluster', 'cardcluster'];
+
+/**
+ * Returns true if `rem` carries the Card Cluster powerup.
+ * Tries each known code variant first, then falls back to inspecting
+ * the rem's tag-rems for text that contains "cluster" (case-insensitive).
+ */
+async function hasCardClusterPowerup(plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
+  // Try every plausible powerup code
+  for (const code of CARD_CLUSTER_POWERUP_CODES) {
+    try {
+      if (await rem.hasPowerup(code)) {
+        console.log(`[CardCluster] Detected via powerup code "${code}" on rem ${rem._id}`);
+        return true;
+      }
+    } catch (_) {
+      // ignore individual failures
+    }
+  }
+
+  // Fallback: inspect tag-rems for text containing "cluster"
+  try {
+    const tags = await rem.getTagRems();
+    if (tags?.length) {
+      for (const tag of tags) {
+        const tagText = Array.isArray(tag.text)
+          ? tag.text.join('')
+          : typeof tag.text === 'string'
+          ? tag.text
+          : '';
+        if (tagText.toLowerCase().includes('cluster')) {
+          console.log(`[CardCluster] Detected via tag text "${tagText}" on rem ${rem._id}`);
+          return true;
+        }
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+
+  return false;
+}
 
 // Helper function to find or create a tag
 async function findOrCreateTag(plugin: RNPlugin, tagName: string): Promise<PluginRem | undefined> {
@@ -233,8 +279,13 @@ export async function createPriorityReviewDocument(
   }
 
   const mixedItems: MixedItem[] = [];
+  // Track which rem IDs we have already added to avoid duplicates
+  const addedRemIds = new Set<RemId>();
   let incRemIndex = 0;
   let cardIndex = 0;
+
+  // Build a fast lookup: remId -> sorted card entry, for cluster sibling resolution
+  const dueCardByRemId = new Map(sortedCards.map(c => [c.rem._id, c]));
 
   const addIncRem = async (idx: number) => {
     if (idx >= sortedIncRems.length) return false;
@@ -256,13 +307,21 @@ export async function createPriorityReviewDocument(
     return false;
   };
 
-  const addCard = (idx: number) => {
+  /**
+   * Add the card at sortedCards[idx] to mixedItems, skipping if already added.
+   * If its direct parent carries the Card Cluster powerup, also enqueue all
+   * siblings (other children of that parent) that have due cards — so RemNote
+   * can present them as a native cluster in the review queue.
+   */
+  const addCard = async (idx: number): Promise<boolean> => {
     if (idx >= sortedCards.length) return false;
     const item = sortedCards[idx];
 
+    // Always advance past already-added rems so the caller can keep iterating
+    if (addedRemIds.has(item.rem._id)) return true;
+
     // Lookup percentile with debug log if missing
     let percentile = cardPercentiles[item.rem._id];
-
     if (percentile === undefined) {
       console.warn(`[PriorityGraph] Percentile missing for Card Rem: ${item.rem._id}. Fallback to 100.`);
       percentile = 100;
@@ -274,6 +333,46 @@ export async function createPriorityReviewDocument(
       priority: item.priority,
       percentile: percentile
     });
+    addedRemIds.add(item.rem._id);
+
+    // --- Card Cluster expansion ---
+    // Check if this rem's direct parent has the Card Cluster powerup.
+    // If so, add all sibling rems (same parent) that have due cards.
+    try {
+      const parentId = item.rem.parent as RemId | undefined;
+      if (parentId) {
+        const parentRem = await plugin.rem.findOne(parentId);
+        if (parentRem && await hasCardClusterPowerup(plugin, parentRem)) {
+          console.log(`[CardCluster] Expanding cluster for parent ${parentId}`);
+          // Fetch the parent's direct children
+          const siblings = await parentRem.getChildrenRem();
+          if (siblings?.length) {
+            for (const sibling of siblings) {
+              if (sibling._id === item.rem._id) continue; // skip self
+              if (addedRemIds.has(sibling._id)) continue;  // already queued
+              // Only add siblings that have due cards (present in dueCardByRemId)
+              const siblingEntry = dueCardByRemId.get(sibling._id);
+              if (siblingEntry) {
+                let siblingPercentile = cardPercentiles[sibling._id];
+                if (siblingPercentile === undefined) siblingPercentile = 100;
+                mixedItems.push({
+                  rem: sibling,
+                  type: 'flashcard',
+                  priority: siblingEntry.priority,
+                  percentile: siblingPercentile
+                });
+                addedRemIds.add(sibling._id);
+                console.log(`[CardCluster] Added cluster sibling ${sibling._id}`);
+              }
+            }
+          }
+        }
+      }
+    } catch (clusterErr) {
+      // Non-fatal: cluster expansion failure should not break the document creation
+      console.warn('[CardCluster] Error during cluster expansion:', clusterErr);
+    }
+
     return true;
   };
 
@@ -286,7 +385,7 @@ export async function createPriorityReviewDocument(
 
       for (let i = 0; i < cardRatio && mixedItems.length < itemCount; i++) {
         if (cardIndex < sortedCards.length) {
-          if (addCard(cardIndex)) { cardIndex++; addedThisCycle = true; }
+          if (await addCard(cardIndex)) { cardIndex++; addedThisCycle = true; }
         }
       }
 
@@ -299,7 +398,7 @@ export async function createPriorityReviewDocument(
     }
   } else {
     for (let i = 0; i < itemCount && i < sortedCards.length; i++) {
-      addCard(i);
+      await addCard(i);
     }
   }
 
