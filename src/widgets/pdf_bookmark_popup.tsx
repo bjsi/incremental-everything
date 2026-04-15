@@ -1,6 +1,7 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
 import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
+import { incrementalQueueActiveKey, currentIncRemKey } from '../lib/consts';
 
 export function PdfBookmarkPopup() {
   const plugin = usePlugin() as ReactRNPlugin;
@@ -38,32 +39,36 @@ export function PdfBookmarkPopup() {
         setPdfRemId(docId);
         setPageIndex(pIndex);
 
-        // queueIncRemId is resolved by the toolbar at click time (where session storage is
-        // most current) and passed directly via contextData — no session storage reads needed here.
-        const queueIncRemId = popupContext?.contextData?.queueIncRemId as string | undefined;
-
         if (docId) {
-          if (queueIncRemId) {
-            // ⚡ FAST PATH: We already know the IncRem from the toolbar's click context.
+          // Queue detection: read current-inc-rem directly as the primary signal.
+          // incrementalQueueActiveKey can get stuck false due to useEffect lifecycle
+          // timing, but current-inc-rem is reliably set by setCurrentIncrementalRem
+          // on every queue turn.
+          const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
+          const currentIncRem = await plugin.storage.getSession<string>(currentIncRemKey);
+          const currentQueueRemId = (isQueueActive || currentIncRem) ? currentIncRem : undefined;
+
+          if (currentQueueRemId) {
+            // ⚡ FAST PATH: We know the IncRem from the queue session.
             // Skip findAllRemsForPDF entirely — it is not needed and is expensive.
-            const currentQueueRem = await plugin.rem.findOne(queueIncRemId);
+            const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
             let remName = '';
             if (currentQueueRem?.text) {
               remName = await safeRemTextToString(plugin, currentQueueRem.text);
               setActiveQueueRemName(remName);
             }
             setActiveQueueContext({
-              incrementalRemId: queueIncRemId as any,
+              incrementalRemId: currentQueueRemId as any,
               pdfRemId: docId as any,
               totalPages: 0,
               currentPage: 1
             });
 
             // Only fetch reading history for this specific rem (1 call, not N)
-            const history = await getPageHistory(plugin, queueIncRemId, docId);
+            const history = await getPageHistory(plugin, currentQueueRemId, docId);
             const withHighlights = history.filter(h => h.highlightId);
             if (withHighlights.length > 0) {
-              setHistoricalBookmarks([{ remId: queueIncRemId, name: remName, history: withHighlights }]);
+              setHistoricalBookmarks([{ remId: currentQueueRemId, name: remName, history: withHighlights }]);
             }
             // associatedRems stays [] — not rendered in queue mode anyway
 
