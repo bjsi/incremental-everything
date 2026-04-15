@@ -42,11 +42,14 @@ import {
   saveDocumentShield,
   isIncRemDue,
   isCardDue,
+  isCardDueOverdue,
+  VerifyOptions,
 } from '../lib/shield_history';
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { shouldUseLightMode } from '../lib/mobileUtils';
+import dayjs from 'dayjs';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -174,8 +177,18 @@ export function registerQueueExitListener(
         console.warn('[QueueExit] Skipping KB IncRem shield save because cache was incomplete');
       }
 
+      // Card KB shield: use isCardDueOverdue + live verification with startOfToday threshold
+      const startOfToday = dayjs().startOf('day').valueOf();
+      const cardVerifyOptions: VerifyOptions<CardPriorityInfo> = {
+        getCards: async (info) => {
+          const rem = await plugin.rem.findOne(info.remId);
+          return rem ? await rem.getCards() : [];
+        },
+        dueThreshold: startOfToday,
+      };
+
       if (shouldSaveCard) {
-        await saveKBShield(plugin, allCardInfos, isCardDue, seenCardIds, cardPriorityShieldHistoryKey, 'Card', displayWeighted);
+        await saveKBShield(plugin, allCardInfos, isCardDueOverdue, seenCardIds, cardPriorityShieldHistoryKey, 'Card', displayWeighted, cardVerifyOptions);
       } else {
         console.warn('[QueueExit] Skipping KB Card shield save because cache was incomplete');
       }
@@ -203,12 +216,13 @@ export function registerQueueExitListener(
             plugin,
             allCardInfos,
             priorityCalcScopeRemIds,
-            isCardDue,
+            isCardDueOverdue,
             seenCardIds,
             documentCardPriorityShieldHistoryKey,
             historyKey,
             'Card',
-            displayWeighted
+            displayWeighted,
+            cardVerifyOptions
           );
         }
       } else {
@@ -309,6 +323,8 @@ export function registerQueueEnterListener(
     const dueIncRemsInKB = allIncRems?.filter(rem => Date.now() >= rem.nextRepDate) || [];
     let dueIncRemsInScope: IncrementalRem[] = [];
     let incRemDocPercentiles: Record<RemId, number> = {};
+    let overdueCardsInKB: CardPriorityInfo[] = [];
+    let overdueCardsInScope: CardPriorityInfo[] = [];
 
     if (scopeForItemSelection) {
       console.log('QUEUE ENTER: Setting up scopes...');
@@ -346,6 +362,8 @@ export function registerQueueEnterListener(
         if (!(await shouldUseLightMode(plugin))) {
           console.log('QUEUE ENTER: Full mode. Calculating session cache...');
 
+          const startOfToday = dayjs().startOf('day').valueOf();
+
           const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
           docPercentiles = calculateAllPercentiles(docCardInfos);
           dueCardsInScope = dueCardsInKB.filter(info => priorityCalcScope.has(info.remId));
@@ -354,9 +372,15 @@ export function registerQueueEnterListener(
           incRemDocPercentiles = calculateAllPercentiles(scopedIncRems as any);
           dueIncRemsInScope = dueIncRemsInKB.filter(rem => priorityCalcScope.has(rem.remId));
 
+          // Pre-filter overdue card lists for the shield (start-of-today criterion)
+          overdueCardsInKB = allCardInfos.filter(info => (info.dueCardsOverdue ?? 0) > 0);
+          overdueCardsInScope = overdueCardsInKB.filter(info => priorityCalcScope.has(info.remId));
+
           console.log(`QUEUE ENTER: Priority calculations complete:`);
           console.log(`  - Cards in priority scope: ${docCardInfos.length}`);
           console.log(`  - Due cards in priority scope: ${dueCardsInScope.length}`);
+          console.log(`  - Overdue cards in KB (start-of-today): ${overdueCardsInKB.length}`);
+          console.log(`  - Overdue cards in scope (start-of-today): ${overdueCardsInScope.length}`);
           console.log(`  - IncRems in priority scope: ${scopedIncRems.length}`);
           console.log(`  - Due IncRems in priority scope: ${dueIncRemsInScope.length}`);
 
@@ -371,6 +395,8 @@ export function registerQueueEnterListener(
       docPercentiles,
       dueCardsInScope,
       dueCardsInKB,
+      overdueCardsInKB,
+      overdueCardsInScope,
       dueIncRemsInScope,
       dueIncRemsInKB,
       incRemDocPercentiles,

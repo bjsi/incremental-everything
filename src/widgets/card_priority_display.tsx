@@ -53,10 +53,14 @@ function computeShieldStatus(
   const filterUnreviewed = (list: CardPriorityInfo[]) =>
     list.filter((info) => !seenRemIds.includes(info.remId) || info.remId === remId);
 
-  const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.dueCardsInKB), (info) => info.priority);
-  const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.dueCardsInScope), (info) => info.priority);
+  // Use the overdue lists (start-of-today criterion) for the shield.
+  // Falls back to [] when the session cache pre-dates this feature.
+  const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.overdueCardsInKB ?? []), (info) => info.priority);
+  const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.overdueCardsInScope ?? []), (info) => info.priority);
 
-  const predicate = (info: CardPriorityInfo) => info.dueCards > 0 && (!seenRemIds.includes(info.remId) || info.remId === remId);
+  // Predicate for percentile calculation also uses the start-of-today boundary.
+  const predicate = (info: CardPriorityInfo) =>
+    (info.dueCardsOverdue ?? 0) > 0 && (!seenRemIds.includes(info.remId) || info.remId === remId);
 
   let kbPercentile: number | undefined;
   if (topMissedInKb && allPrioritizedCardInfo) {
