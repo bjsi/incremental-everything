@@ -31,30 +31,51 @@ export function registerQueueCounter(plugin: ReactRNPlugin, count: number): void
   console.log(`QUEUE ENTER: Queue counter updated to show ${count} due IncRems`);
 }
 
-export async function registerQueueHidingCSS(plugin: ReactRNPlugin) {
+export async function registerPluginHidingCSS(plugin: ReactRNPlugin) {
 
   const css = `
-      /* Hide Priority and Priority Source Slots  */
-      [data-rem-property~="priority"],
-      [data-rem-container-property~="priority"],
-      [data-rem-property~="priority-source"],
-      [data-rem-container-property~="priority-source"],
-      /* Hide Last Updated Slot */
-      [data-rem-property~="last-updated"],
-      [data-rem-container-property~="last-updated"],
-      /* Hide Original Incremental Date Slot */
-      [data-rem-property~="original-inc-date"],
-      [data-rem-container-property~="original-inc-date"],
+      /* Hide cardPriority Slots - Priority, Priority Source and Last Updated   */
+      .rn-queue:has([data-rem-tags~="cardpriority" i]) [data-rem-property~="priority"],
+      .rn-queue:has([data-rem-tags~="cardpriority" i]) [data-rem-container-property~="priority"],
+      [data-rem-property~="priority"]:has(.rem-powerup-icon),
+      [data-rem-container-property~="priority"]:has(.rem-powerup-icon),
+
+      .rn-queue:has([data-rem-tags~="cardpriority" i]) [data-rem-property~="priority-source"],
+      .rn-queue:has([data-rem-tags~="cardpriority" i]) [data-rem-container-property~="priority-source"],
+      [data-rem-property~="priority-source"]:has(.rem-powerup-icon),
+      [data-rem-container-property~="priority-source"]:has(.rem-powerup-icon),
+
+      .rn-queue:has([data-rem-tags~="cardpriority" i]) [data-rem-property~="last-updated"],
+      .rn-queue:has([data-rem-tags~="cardpriority" i]) [data-rem-container-property~="last-updated"],
+      [data-rem-property~="last-updated"]:has(.rem-powerup-icon),
+      [data-rem-container-property~="last-updated"]:has(.rem-powerup-icon),
+
+      /* Hide Incremental Slots - Created and History */
+      .rn-queue:has([data-rem-tags~="incremental" i]) [data-rem-property~="created"],
+      .rn-queue:has([data-rem-tags~="incremental" i]) [data-rem-container-property~="created"],
+      [data-rem-property~="created"]:has(.rem-powerup-icon),
+      [data-rem-container-property~="created"]:has(.rem-powerup-icon),
+
+      .rn-queue:has([data-rem-tags~="incremental" i]) [data-rem-property~="history"],
+      .rn-queue:has([data-rem-tags~="incremental" i]) [data-rem-container-property~="history"],
+      [data-rem-property~="history"]:has(.rem-powerup-icon),
+      [data-rem-container-property~="history"]:has(.rem-powerup-icon),
+
       /* Hide Dismissed Slots */
-      [data-rem-property~="dismissed-history"],
-      [data-rem-container-property~="dismissed-history"],
-      [data-rem-property~="dismissed-date"],
-      [data-rem-container-property~="dismissed-date"] {
+      .rn-queue:has([data-rem-tags~="dismissed" i]) [data-rem-property~="dismissed-history"],
+      .rn-queue:has([data-rem-tags~="dismissed" i]) [data-rem-container-property~="dismissed-history"],
+      [data-rem-property~="dismissed-history"]:has(.rem-powerup-icon),
+      [data-rem-container-property~="dismissed-history"]:has(.rem-powerup-icon),
+
+      .rn-queue:has([data-rem-tags~="dismissed" i]) [data-rem-property~="dismissed-date"],
+      .rn-queue:has([data-rem-tags~="dismissed" i]) [data-rem-container-property~="dismissed-date"],
+      [data-rem-property~="dismissed-date"]:has(.rem-powerup-icon),
+      [data-rem-container-property~="dismissed-date"]:has(.rem-powerup-icon) {
         display: none !important; 
       }
   `;
 
-  await plugin.app.registerCSS('hide-priority-in-queue', css);
+  await plugin.app.registerCSS('hide-plugin-properties-globally', css);
 
 }
 
