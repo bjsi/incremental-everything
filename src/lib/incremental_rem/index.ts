@@ -24,6 +24,7 @@ import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 import { mergeHistoryFromDismissed } from '../dismissed';
+import { findPDFinRem, registerRemsAsPdfKnown } from '../pdfUtils';
 
 type ReviewOverrideOptions = {
   /**
@@ -347,6 +348,20 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
       }
 
       await updateIncrementalRemCache(plugin, newIncRem);
+
+      // Register in the known_pdf_rems_ synced index so the parent selector
+      // can discover this IncRem instantly (PART 2 of performFullPDFSearch),
+      // even when the session cache (allIncrementalRemKey) is not yet loaded
+      // (e.g., WebBrowser / Light Mode).
+      try {
+        const pdfSource = await findPDFinRem(plugin as any, rem);
+        if (pdfSource) {
+          await registerRemsAsPdfKnown(plugin as any, pdfSource._id, [rem._id]);
+        }
+      } catch (e) {
+        console.error('[initIncrementalRem] Error registering in known_pdf_rems_:', e);
+      }
+
       // Bump the reload trigger so the tracker picks up the new IncRem.
       // The tracker reads incRemCacheReloadKey reactively; writing a new timestamp
       // here causes it to re-run loadIncrementalRemCache (via non-reactive plugin ref).

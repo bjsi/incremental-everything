@@ -6,7 +6,7 @@ import {
   getPdfInfoFromHighlight,
   findPDFinRem,
   addPageToHistory,
-  setIncrementalReadingPosition
+  setIncrementalReadingPosition,
 } from '../lib/pdfUtils';
 
 export function CreateIncRemToolbar() {
