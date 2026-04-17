@@ -51,6 +51,7 @@ import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import type { RemHistoryData } from '../widgets/rem_history';
 import type { FlashcardHistoryData } from '../widgets/flashcard_history';
+import { registerQueueSessionTracking, saveCurrentSession, hasActiveSession } from '../lib/queue_session';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import dayjs from 'dayjs';
 
@@ -833,6 +834,11 @@ export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
     const currentRemId = message.remId as RemId;
     if (!currentRemId) return;
 
+    // If a practice session is active and the user navigated away, finalize it.
+    if (hasActiveSession()) {
+      await saveCurrentSession(plugin, 'GlobalOpenRem Navigation');
+    }
+
     const currentRemData =
       ((await plugin.storage.getSynced('remData')) as RemHistoryData[]) || [];
 
@@ -881,4 +887,5 @@ export function registerEventListeners(
   registerQueueCompleteCardListener(plugin);
   registerGlobalRemChangedListener(plugin);
   registerGlobalOpenRemListener(plugin);
+  registerQueueSessionTracking(plugin);
 }

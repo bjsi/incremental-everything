@@ -390,4 +390,14 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     ],
   });
 
+  plugin.settings.registerNumberSetting({
+    id: 'flashcard_response_time_limit',
+    title: 'Flashcard Response Time Limit (seconds)',
+    description:
+      "If you take longer to answer a flashcard than this (e.g. because you walked away), " +
+      "only this much time will be counted in Practiced Queues session statistics. " +
+      "Matches RemNote's native 'Flashcard Response Time Limit' setting. Default: 180s.",
+    defaultValue: 180,
+  });
+
 }

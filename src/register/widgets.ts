@@ -181,6 +181,15 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
 
 
+  plugin.app.registerWidget('practiced_queues', WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/6688/6688557.png",
+    widgetTabTitle: "Practiced Queues",
+  });
+
   plugin.app.registerWidget('incremental_history', WidgetLocation.RightSidebar, {
     dimensions: {
       width: '100%',
@@ -190,15 +199,6 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     widgetTabTitle: "Incremental History",
   });
 
-  plugin.app.registerWidget('rem_history', WidgetLocation.RightSidebar, {
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-    widgetTabIcon: "https://i.imgur.com/MLaBDJw.png",
-    widgetTabTitle: "Visited Rem History",
-  });
-
   plugin.app.registerWidget('flashcard_history', WidgetLocation.RightSidebar, {
     dimensions: {
       width: '100%',
@@ -206,6 +206,15 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
     widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/9145/9145670.png",
     widgetTabTitle: "Flashcard History",
+  });
+
+  plugin.app.registerWidget('rem_history', WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://i.imgur.com/MLaBDJw.png",
+    widgetTabTitle: "Visited Rem History",
   });
 
   // Repetition history popup for Answer Buttons
