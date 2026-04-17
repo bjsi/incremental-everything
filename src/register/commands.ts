@@ -781,7 +781,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'incremental-everything',
     keyboardShortcut: 'opt+x',
     name: 'Make Incremental (Extract)',
-    quickCode: 'extract',
+    quickCode: 'ext',
     action: async () => {
       createExtract();
     },
@@ -1008,7 +1008,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'open-inc-rem-main-view',
     name: 'Open Incremental Rems Main View',
     keyboardShortcut: 'opt+shift+i',
-    quickCode: 'increms',
+    quickCode: 'inc',
     action: async () => {
       await plugin.widget.openPopup('inc_rem_main_view');
     },
@@ -1146,7 +1146,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'open-repetition-history',
     name: 'Open Repetition History',
     keyboardShortcut: 'ctrl+shift+h',
-    quickCode: 'history',
+    quickCode: 'his',
     action: async () => {
       let remId: string | undefined;
       let cardId: string | undefined;
@@ -1276,7 +1276,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'open-priority-shield',
     name: 'Open Priority Shield Graph',
     description: 'Open the Priority Shield Graph history.',
-    quickCode: 'shield',
+    quickCode: 'shi',
     action: async () => {
       let subQueueId: string | null = null;
       const url = await plugin.window.getURL();
@@ -1303,7 +1303,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: dismissIncRemCommandId,
     name: 'Dismiss Incremental Rem',
     keyboardShortcut: 'ctrl+d',
-    quickCode: 'dismiss',
+    quickCode: 'dis',
     action: async () => {
       const url = await plugin.window.getURL();
       const isQueue = url && url.includes('/flashcards');
