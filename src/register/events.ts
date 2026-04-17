@@ -50,6 +50,7 @@ import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import type { RemHistoryData } from '../widgets/rem_history';
+import type { FlashcardHistoryData } from '../widgets/flashcard_history';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import dayjs from 'dayjs';
 
@@ -526,6 +527,47 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
             dueCardsInScope: sessionCache.dueCardsInScope.filter((c) => c.remId !== remId),
           };
           await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+        }
+
+        // Flashcard History: record the completed card for the sidebar widget
+        try {
+          const historyData =
+            ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
+
+          if (historyData[0]?.cardId !== data.cardId) {
+            const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+            const currentKbId = kbData._id;
+
+            let frontText = '';
+            let backText = '';
+            try {
+              const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
+              const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+              frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
+              backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
+            } catch (error) {
+              console.warn('Error parsing Rem text for flashcard history:', error);
+              frontText = '[Complex Media Rem]';
+            }
+
+            const text = `${frontText} ${backText}`.trim();
+
+            await plugin.storage.setSynced('flashcardHistoryData', [
+              {
+                key: Math.random(),
+                remId,
+                cardId: data.cardId,
+                open: false,
+                time: new Date().getTime(),
+                kbId: currentKbId,
+                text,
+                _v: 1,
+              },
+              ...historyData.slice(0, 999),
+            ]);
+          }
+        } catch (error) {
+          console.error('Failed to record flashcard history entry:', error);
         }
       } else {
         // console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);

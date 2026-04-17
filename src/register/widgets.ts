@@ -199,6 +199,15 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     widgetTabTitle: "Visited Rem History",
   });
 
+  plugin.app.registerWidget('flashcard_history', WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://i.imgur.com/MLaBDJw.png",
+    widgetTabTitle: "Flashcard History",
+  });
+
   // Repetition history popup for Answer Buttons
   plugin.app.registerWidget('repetition_history', WidgetLocation.Popup, {
     dimensions: {
