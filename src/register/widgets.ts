@@ -204,7 +204,7 @@ export function registerWidgets(plugin: ReactRNPlugin) {
       width: '100%',
       height: 'auto',
     },
-    widgetTabIcon: "https://i.imgur.com/MLaBDJw.png",
+    widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/9145/9145670.png",
     widgetTabTitle: "Flashcard History",
   });
 
