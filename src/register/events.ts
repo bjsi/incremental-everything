@@ -48,6 +48,8 @@ import {
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
+import { safeRemTextToString } from '../lib/pdfUtils';
+import type { RemHistoryData } from '../widgets/rem_history';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import dayjs from 'dayjs';
 
@@ -784,6 +786,49 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
   );
 }
 
+export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
+  plugin.event.addListener(AppEvents.GlobalOpenRem, undefined, async (message) => {
+    const currentRemId = message.remId as RemId;
+    if (!currentRemId) return;
+
+    const currentRemData =
+      ((await plugin.storage.getSynced('remData')) as RemHistoryData[]) || [];
+
+    if (currentRemData[0]?.remId === currentRemId) return;
+
+    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+    const currentKbId = kbData._id;
+
+    const rem = await plugin.rem.findOne(currentRemId);
+
+    let frontText = '';
+    let backText = '';
+    try {
+      const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
+      const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+      frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw : '';
+      backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw : '';
+    } catch (error) {
+      console.warn('Error parsing Rem text for visited history:', error);
+    }
+
+    const text = `${frontText} ${backText}`.trim();
+
+    await plugin.storage.setSynced('remData', [
+      {
+        key: Math.random(),
+        remId: currentRemId,
+        open: false,
+        time: new Date().getTime(),
+        kbId: currentKbId,
+        text,
+        _v: 1,
+      },
+      ...currentRemData.slice(0, 500),
+    ]);
+  });
+}
+
 export function registerEventListeners(
   plugin: ReactRNPlugin,
   resetSessionItemCounter: ResetSessionItemCounter
@@ -793,4 +838,5 @@ export function registerEventListeners(
   registerURLChangeListener(plugin);
   registerQueueCompleteCardListener(plugin);
   registerGlobalRemChangedListener(plugin);
+  registerGlobalOpenRemListener(plugin);
 }

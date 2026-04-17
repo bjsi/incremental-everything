@@ -190,6 +190,15 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     widgetTabTitle: "Incremental History",
   });
 
+  plugin.app.registerWidget('rem_history', WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://i.imgur.com/MLaBDJw.png",
+    widgetTabTitle: "Visited Rem History",
+  });
+
   // Repetition history popup for Answer Buttons
   plugin.app.registerWidget('repetition_history', WidgetLocation.Popup, {
     dimensions: {
