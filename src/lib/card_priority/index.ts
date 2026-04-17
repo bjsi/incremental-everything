@@ -1,6 +1,7 @@
 import { PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
 import { findClosestAncestorWithAnyPriority } from '../priority_inheritance';
+import dayjs from 'dayjs';
 import {
   allCardPriorityInfoKey,
   powerupCode,
@@ -47,7 +48,9 @@ export async function getCardPriority(
 ): Promise<CardPriorityInfo | null> {
   const cards = await rem.getCards();
   const now = Date.now();
+  const startOfToday = dayjs().startOf('day').valueOf();
   const dueCards = cards.filter((card) => (card.nextRepetitionTime ?? Infinity) <= now).length;
+  const dueCardsOverdue = cards.filter((card) => (card.nextRepetitionTime ?? Infinity) <= startOfToday).length;
 
   const priorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
 
@@ -65,6 +68,7 @@ export async function getCardPriority(
       lastUpdated: parseInt(lastUpdated) || now,
       cardCount: cards.length,
       dueCards,
+      dueCardsOverdue,
     };
   } else {
     const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
@@ -77,6 +81,7 @@ export async function getCardPriority(
         lastUpdated: 0,
         cardCount: cards.length,
         dueCards,
+        dueCardsOverdue,
       };
     }
 
@@ -88,6 +93,7 @@ export async function getCardPriority(
       lastUpdated: 0,
       cardCount: cards.length,
       dueCards,
+      dueCardsOverdue,
     };
   }
 }

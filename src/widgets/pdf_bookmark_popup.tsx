@@ -1,7 +1,7 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, findPDFinRem, getIncrementalPageRange } from '../lib/pdfUtils';
-import { incrementalQueueActiveKey } from '../lib/consts';
+import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
+import { incrementalQueueActiveKey, currentIncRemKey } from '../lib/consts';
 
 export function PdfBookmarkPopup() {
   const plugin = usePlugin() as ReactRNPlugin;
@@ -15,6 +15,23 @@ export function PdfBookmarkPopup() {
   const [historicalBookmarks, setHistoricalBookmarks] = useState<{ remId: string, name: string, history: PageHistoryEntry[] }[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [highlightTexts, setHighlightTexts] = useState<Record<string, string>>({});
+
+  // Helper to batch-resolve highlight rem texts into a lookup map
+  const resolveHighlightTexts = async (entries: PageHistoryEntry[]): Promise<Record<string, string>> => {
+    const map: Record<string, string> = {};
+    await Promise.all(entries.map(async (entry) => {
+      if (!entry.highlightId) return;
+      try {
+        const hRem = await plugin.rem.findOne(entry.highlightId);
+        if (hRem?.text) {
+          const text = await safeRemTextToString(plugin as any, hRem.text);
+          if (text && text !== 'Untitled') map[entry.highlightId] = text;
+        }
+      } catch { /* ignore */ }
+    }));
+    return map;
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -40,89 +57,109 @@ export function PdfBookmarkPopup() {
         setPageIndex(pIndex);
 
         if (docId) {
-          // Strict Queue Context Check: Ensure we truly are in the Active Queue
+          // Queue detection: read current-inc-rem directly as the primary signal.
+          // incrementalQueueActiveKey can get stuck false due to useEffect lifecycle
+          // timing, but current-inc-rem is reliably set by setCurrentIncrementalRem
+          // on every queue turn.
           const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
+          const currentIncRem = await plugin.storage.getSession<string>(currentIncRemKey);
+          const currentQueueRemId = (isQueueActive || currentIncRem) ? currentIncRem : undefined;
 
-          if (isQueueActive) {
-            const currentQueueRemId = await plugin.storage.getSession<string>('current-inc-rem');
-            if (currentQueueRemId) {
-              const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
-              const foundPdf = currentQueueRem ? await findPDFinRem(plugin, currentQueueRem, docId) : null;
+          if (currentQueueRemId) {
+            // ⚡ FAST PATH: We know the IncRem from the queue session.
+            // Skip findAllRemsForPDF entirely — it is not needed and is expensive.
+            const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
+            let remName = '';
+            if (currentQueueRem?.text) {
+              remName = await safeRemTextToString(plugin, currentQueueRem.text);
+              setActiveQueueRemName(remName);
+            }
+            setActiveQueueContext({
+              incrementalRemId: currentQueueRemId as any,
+              pdfRemId: docId as any,
+              totalPages: 0,
+              currentPage: 1
+            });
 
-              if (foundPdf && foundPdf._id === docId) {
-                if (currentQueueRem?.text) {
-                  const textStr = await plugin.richText.toString(currentQueueRem.text);
-                  setActiveQueueRemName(textStr);
+            // Only fetch reading history for this specific rem (1 call, not N)
+            const history = await getPageHistory(plugin, currentQueueRemId, docId);
+            // Most recent first
+            const withHighlights = history
+              .filter(h => h.highlightId)
+              .sort((a, b) => b.timestamp - a.timestamp);
+            if (withHighlights.length > 0) {
+              setHistoricalBookmarks([{ remId: currentQueueRemId, name: remName, history: withHighlights }]);
+              // Resolve highlight rem texts for display
+              resolveHighlightTexts(withHighlights).then(setHighlightTexts);
+            }
+            // associatedRems stays [] — not rendered in queue mode anyway
+
+          } else {
+            // 🐌 FULL PATH (non-queue): find all IncRems that read this PDF
+            const associated = (await findAllRemsForPDF(plugin, docId)).filter(a => a.isIncremental);
+
+            // Fetch their page ranges to build hierarchy
+            const associatedWithRanges = await Promise.all(
+              associated.map(async (assoc) => {
+                const range = await getIncrementalPageRange(plugin, assoc.remId, docId);
+                return { ...assoc, range };
+              })
+            );
+
+            // Build tree for hierarchical indentation based on bounding page ranges
+            const sorted = [...associatedWithRanges].sort((a, b) => {
+              if (a.range && b.range) return a.range.start - b.range.start;
+              if (a.range && !b.range) return -1;
+              if (!a.range && b.range) return 1;
+              return a.name.localeCompare(b.name);
+            });
+
+            const contains = (outer: any, inner: any) =>
+              inner.start >= outer.start &&
+              (outer.end === null || inner.end === null || inner.end <= outer.end) &&
+              (inner.start > outer.start || (inner.end !== null && (outer.end === null || inner.end < outer.end)));
+
+            const treeItems = sorted.map(item => ({ ...item, depth: 0, parentId: null as string | null }));
+
+            for (let i = 0; i < treeItems.length; i++) {
+              if (!treeItems[i].range) continue;
+              let bestParentIdx = -1;
+              let bestParentSize = Infinity;
+              for (let j = 0; j < i; j++) {
+                if (!treeItems[j].range) continue;
+                if (contains(treeItems[j].range, treeItems[i].range)) {
+                  const parentSize = (treeItems[j].range!.end ?? Infinity) - treeItems[j].range!.start;
+                  if (parentSize < bestParentSize) {
+                    bestParentSize = parentSize;
+                    bestParentIdx = j;
+                  }
                 }
-                setActiveQueueContext({
-                  incrementalRemId: currentQueueRemId as any,
-                  pdfRemId: docId as any,
-                  totalPages: 0,
-                  currentPage: 1
-                });
+              }
+              if (bestParentIdx >= 0) {
+                treeItems[i].parentId = treeItems[bestParentIdx].remId;
+                treeItems[i].depth = treeItems[bestParentIdx].depth + 1;
               }
             }
+
+            setAssociatedRems(treeItems);
+
+            // Fetch history for each to find scroll bookmarks
+            const histories = await Promise.all(
+              associated.map(async (assoc) => {
+                const history = await getPageHistory(plugin, assoc.remId, docId);
+                // Filter to those with highlightId, most recent first
+                const withHighlights = history
+                  .filter(h => h.highlightId)
+                  .sort((a, b) => b.timestamp - a.timestamp);
+                return { remId: assoc.remId, name: assoc.name, history: withHighlights };
+              })
+            );
+            const populated = histories.filter(h => h.history.length > 0);
+            setHistoricalBookmarks(populated);
+            // Resolve highlight rem texts for all entries
+            const allEntries = populated.flatMap(h => h.history);
+            resolveHighlightTexts(allEntries).then(setHighlightTexts);
           }
-
-
-          // Fetch all associated incremental reading rems globally, filter to active IncRems only
-          const associated = (await findAllRemsForPDF(plugin, docId)).filter(a => a.isIncremental);
-
-          // Fetch their page ranges to build hierarchy
-          const associatedWithRanges = await Promise.all(
-            associated.map(async (assoc) => {
-              const range = await getIncrementalPageRange(plugin, assoc.remId, docId);
-              return { ...assoc, range };
-            })
-          );
-
-          // Build tree for hierarchical identation based on bounding page ranges
-          const sorted = [...associatedWithRanges].sort((a, b) => {
-            if (a.range && b.range) return a.range.start - b.range.start;
-            if (a.range && !b.range) return -1;
-            if (!a.range && b.range) return 1;
-            return a.name.localeCompare(b.name);
-          });
-
-          const contains = (outer: any, inner: any) =>
-            inner.start >= outer.start &&
-            (outer.end === null || inner.end === null || inner.end <= outer.end) &&
-            (inner.start > outer.start || (inner.end !== null && (outer.end === null || inner.end < outer.end)));
-
-          const treeItems = sorted.map(item => ({ ...item, depth: 0, parentId: null as string | null }));
-
-          for (let i = 0; i < treeItems.length; i++) {
-            if (!treeItems[i].range) continue;
-            let bestParentIdx = -1;
-            let bestParentSize = Infinity;
-            for (let j = 0; j < i; j++) {
-              if (!treeItems[j].range) continue;
-              if (contains(treeItems[j].range, treeItems[i].range)) {
-                const parentSize = (treeItems[j].range!.end ?? Infinity) - treeItems[j].range!.start;
-                if (parentSize < bestParentSize) {
-                  bestParentSize = parentSize;
-                  bestParentIdx = j;
-                }
-              }
-            }
-            if (bestParentIdx >= 0) {
-              treeItems[i].parentId = treeItems[bestParentIdx].remId;
-              treeItems[i].depth = treeItems[bestParentIdx].depth + 1;
-            }
-          }
-
-          setAssociatedRems(treeItems);
-
-          // Fetch history for each to find scroll bookmarks
-          const histories = await Promise.all(
-            associated.map(async (assoc) => {
-              const history = await getPageHistory(plugin, assoc.remId, docId);
-              // Filter to only those with highlightId (actual bookmark scroll positions)
-              const withHighlights = history.filter(h => h.highlightId);
-              return { remId: assoc.remId, name: assoc.name, history: withHighlights };
-            })
-          );
-          setHistoricalBookmarks(histories.filter(h => h.history.length > 0));
         }
       } catch (err) {
         console.error("Error init bookmark popup", err);
@@ -182,7 +219,7 @@ export function PdfBookmarkPopup() {
               backgroundColor: 'var(--rn-clr-blue, #3b82f6)', color: 'white', cursor: 'pointer',
               fontWeight: 500, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px'
             }}
-            onClick={() => saveBookmark(activeQueueContext.incrementalRemId)}
+            onClick={async () => { await saveBookmark(activeQueueContext.incrementalRemId); plugin.widget.closePopup(); }}
           >
             Update Current Queue Reading
           </button>
@@ -272,15 +309,30 @@ export function PdfBookmarkPopup() {
                               style={{
                                 textAlign: 'left', padding: '6px 10px', borderRadius: '6px',
                                 border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)',
-                                color: 'var(--rn-clr-blue, #3b82f6)', cursor: 'pointer', fontSize: '12px', display: 'flex', justifyContent: 'space-between',
-                                fontWeight: 500, transition: 'background-color 0.15s ease'
+                                color: 'var(--rn-clr-blue, #3b82f6)', cursor: 'pointer', fontSize: '12px',
+                                display: 'flex', flexDirection: 'column', gap: '2px',
+                                fontWeight: 500, transition: 'background-color 0.15s ease', width: '100%'
                               }}
                               onClick={() => jumpToBookmark(entry.highlightId!)}
                               onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-modifier-hover)'}
                               onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'}
                             >
-                              <span>📄 Page {entry.page}</span>
-                              <span style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px', fontWeight: 400 }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>📄 Page {entry.page}</span>
+                                <span style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px', fontWeight: 400 }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
+                              </div>
+                              {entry.highlightId && highlightTexts[entry.highlightId] && (
+                                <div style={{
+                                  fontSize: '10px', fontWeight: 400,
+                                  color: 'var(--rn-clr-content-secondary)',
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                  maxWidth: '100%', fontStyle: 'italic'
+                                }}>
+                                  {highlightTexts[entry.highlightId].length > 90
+                                    ? highlightTexts[entry.highlightId].substring(0, 90) + '…'
+                                    : highlightTexts[entry.highlightId]}
+                                </div>
+                              )}
                             </button>
                           ))}
                         </div>

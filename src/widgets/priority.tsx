@@ -93,7 +93,7 @@ function Priority() {
       remId = await plugin.storage.getSession<string>('priorityPopupTargetRemId');
       if (remId) {
         // Clear it immediately so it doesn't persist for other uses
-        // await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+        await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
       }
     }
 
@@ -698,12 +698,12 @@ function Priority() {
     // while the tracker gracefully wraps the SDK writes in `plugin_operation_active`.
     if (incChanged || cardChanged) {
       plugin.storage.setSession(pendingPrioritySaveKey, {
-          remId: rem._id,
-          incPriority: incChanged ? incP : null,
-          cardPriority: cardChanged ? cardP : null,
-          cardSource: 'manual',
-          needsAddPowerup: cardChanged && !hasCardPriorityPowerup,
-          triggerCascade: incChanged || cardChanged,
+        remId: rem._id,
+        incPriority: incChanged ? incP : null,
+        cardPriority: cardChanged ? cardP : null,
+        cardSource: 'manual',
+        needsAddPowerup: cardChanged && !hasCardPriorityPowerup,
+        triggerCascade: incChanged || cardChanged,
       }).catch(console.error);
     }
 

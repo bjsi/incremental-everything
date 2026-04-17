@@ -2,8 +2,8 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  WidgetLocation,
   QueueInteractionScore,
+  AppEvents,
 } from '@remnote/plugin-sdk';
 import React, { useMemo, useCallback } from 'react';
 import {
@@ -53,10 +53,14 @@ function computeShieldStatus(
   const filterUnreviewed = (list: CardPriorityInfo[]) =>
     list.filter((info) => !seenRemIds.includes(info.remId) || info.remId === remId);
 
-  const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.dueCardsInKB), (info) => info.priority);
-  const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.dueCardsInScope), (info) => info.priority);
+  // Use the overdue lists (start-of-today criterion) for the shield.
+  // Falls back to [] when the session cache pre-dates this feature.
+  const topMissedInKb = _.minBy(filterUnreviewed(sessionCache.overdueCardsInKB ?? []), (info) => info.priority);
+  const topMissedInDoc = _.minBy(filterUnreviewed(sessionCache.overdueCardsInScope ?? []), (info) => info.priority);
 
-  const predicate = (info: CardPriorityInfo) => info.dueCards > 0 && (!seenRemIds.includes(info.remId) || info.remId === remId);
+  // Predicate for percentile calculation also uses the start-of-today boundary.
+  const predicate = (info: CardPriorityInfo) =>
+    (info.dueCardsOverdue ?? 0) > 0 && (!seenRemIds.includes(info.remId) || info.remId === remId);
 
   let kbPercentile: number | undefined;
   if (topMissedInKb && allPrioritizedCardInfo) {
@@ -135,18 +139,53 @@ export function CardPriorityDisplay() {
     [refreshSignal]
   ) ?? [];
 
+  // Inside a Card Cluster, RemNote keeps this FlashcardUnder widget mounted across all
+  // sibling cards and `getWidgetContext().remId` stays pinned to the cluster parent.
+  // Only `ctx.cardId` advances per sibling — and `plugin.queue.getCurrentCard()` is
+  // stuck on the cluster's anchor card. So we poll the widget context for cardId,
+  // then resolve the card to recover the sibling's real remId.
+  const [currentIds, setCurrentIds] = React.useState<{ remId?: string; cardId?: string }>({});
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const refresh = async () => {
+      try {
+        const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
+        if (!isMounted) return;
+
+        const ctxCardId: string | undefined = ctx?.cardId;
+        if (!ctxCardId) return;
+
+        const card = await plugin.card.findOne(ctxCardId);
+        if (!isMounted) return;
+        const resolvedRemId = card?.remId ?? ctx?.remId;
+
+        setCurrentIds((prev) => {
+          if (prev.cardId === ctxCardId && prev.remId === resolvedRemId) return prev;
+          return { remId: resolvedRemId, cardId: ctxCardId };
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    refresh();
+    const intervalId = setInterval(refresh, 500);
+    const listener = () => { refresh(); };
+    plugin.event.addListener(AppEvents.QueueLoadCard, undefined, listener);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      plugin.event.removeListener(AppEvents.QueueLoadCard, undefined, listener);
+    };
+  }, [plugin]);
+
   const rem = useTrackerPlugin(async (rp) => {
-    const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
-    if (!ctx?.remId) {
-      // console.log('[CardPriorityDisplay] rem tracker: ctx or remId is null', ctx);
-      return null;
-    }
-    const found = (await rp.rem.findOne(ctx.remId)) ?? null;
-    if (!found) {
-      // console.log('[CardPriorityDisplay] rem tracker: rem not found for id', ctx.remId);
-    }
-    return found;
-  }, []);
+    if (!currentIds.remId) return null;
+    return (await rp.rem.findOne(currentIds.remId)) ?? null;
+  }, [currentIds.remId]);
 
   const scopeRemIds = useTrackerPlugin(
     (rp) => rp.storage.getSession<string[] | null>(priorityCalcScopeRemIdsKey),
@@ -171,9 +210,8 @@ export function CardPriorityDisplay() {
 
   // --- Fetch card repetition history ---
   const cardRepData = useTrackerPlugin(async (rp) => {
-    const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardUnder>();
-    const cardId = ctx?.cardId;
-    const remId = ctx?.remId;
+    const cardId = currentIds.cardId;
+    const remId = currentIds.remId;
     if (!cardId && !remId) return null;
 
     let cards: any[] = [];
@@ -195,7 +233,7 @@ export function CardPriorityDisplay() {
       history: card.repetitionHistory || [],
       nextRepetitionTime: card.nextRepetitionTime,
     };
-  }, []);
+  }, [currentIds.cardId, currentIds.remId]);
 
   // --- Compute review stats from repetition history ---
   const historyStats = useMemo(() => {
@@ -387,10 +425,14 @@ export function CardPriorityDisplay() {
 
   const priorityColor = kbPercentile !== undefined ? percentileToHslColor(kbPercentile) : '#6b7280';
 
-  // --- NEW: Check if current card is directly impacting the shield ---
-  const isKbShieldActive = shieldStatus?.kb && finalCardInfo.priority === shieldStatus.kb.absolute;
-  const isDocShieldActive = shieldStatus?.doc && finalCardInfo.priority === shieldStatus.doc.absolute;
+  // --- Check if current card is directly impacting (or within) the shield boundary ---
+  // Pulse if the card's absolute priority is <= the shield value:
+  // this covers both the exact shield card and intra-day relearning/learning-step
+  // cards that reappear with a priority lower than (i.e. higher importance than) the shield.
+  const isKbShieldActive = shieldStatus?.kb != null && finalCardInfo.priority <= shieldStatus.kb.absolute;
+  const isDocShieldActive = shieldStatus?.doc != null && finalCardInfo.priority <= shieldStatus.doc.absolute;
   const isAnyShieldActive = isKbShieldActive || isDocShieldActive;
+
 
   const handleClick = async () => {
     if (!rem) return;

@@ -82,7 +82,7 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
           code: 'prioritySource',
           name: 'Priority Source',
           propertyType: PropertyType.TEXT,
-          propertyLocation: PropertyLocation.BELOW,
+          hidden: true,
         },
         {
           code: 'lastUpdated',

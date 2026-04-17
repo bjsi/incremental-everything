@@ -1,4 +1,4 @@
-import { ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
+import { ReactRNPlugin, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import dayjs from 'dayjs';
 import * as _ from 'remeda';
 import { calculateVolumeBasedPercentile, calculateWeightedShield } from './utils';
@@ -26,6 +26,83 @@ type PriorityItem = {
   priority: number;
 };
 
+/** Options for live verification of the top-missed rem at QueueExit. */
+export type VerifyOptions<T extends PriorityItem> = {
+  /** Called once per candidate rem; should return its current cards. */
+  getCards: (item: T) => Promise<{ nextRepetitionTime?: number }[]>;
+  /** Timestamp threshold — cards due at or before this count as overdue (e.g. startOfToday). */
+  dueThreshold: number;
+};
+
+/**
+ * Verify the top-priority missed rem from the candidate list using live API calls.
+ *
+ * Groups candidates by priority level and checks every rem in the top group.
+ * If all are stale, escalates to the next priority level.
+ * Caps total getCards() calls at MAX_SHIELD_VERIFY_CALLS (20).
+ *
+ * @param plugin Plugin instance (used only for rem.findOne ghost checks)
+ * @param candidates Pre-filtered, unreviewed due items sorted by ascending priority
+ * @param verifyOptions getCards callback and dueThreshold timestamp
+ * @param label Label for logging (e.g. 'KB' or 'Doc')
+ */
+async function verifyTopMissedByPriorityLevel<T extends PriorityItem>(
+  plugin: RNPlugin,
+  candidates: T[],
+  verifyOptions: VerifyOptions<T>,
+  label: string
+): Promise<T | undefined> {
+  const MAX_VERIFY_CALLS = 20;
+  const { getCards, dueThreshold } = verifyOptions;
+  const sorted = _.sortBy(candidates, (item) => item.priority);
+  let totalChecks = 0;
+  let idx = 0;
+
+  while (idx < sorted.length && totalChecks < MAX_VERIFY_CALLS) {
+    const currentPriority = sorted[idx].priority;
+
+    // Collect all candidates at this priority level
+    const group: T[] = [];
+    while (idx < sorted.length && sorted[idx].priority === currentPriority) {
+      group.push(sorted[idx]);
+      idx++;
+    }
+
+    let staleCount = 0;
+    for (const candidate of group) {
+      if (totalChecks >= MAX_VERIFY_CALLS) {
+        console.warn(`[ShieldVerify] ${label}: Hit verification cap (${MAX_VERIFY_CALLS}) at priority ${currentPriority}. Trusting remaining cache.`);
+        return candidate;
+      }
+
+      let cards: { nextRepetitionTime?: number }[];
+      try {
+        cards = await getCards(candidate);
+      } catch {
+        totalChecks++;
+        staleCount++;
+        continue;
+      }
+      totalChecks++;
+
+      const actualDue = cards.filter(c => (c.nextRepetitionTime ?? Infinity) <= dueThreshold).length;
+      if (actualDue > 0) {
+        if (staleCount > 0) {
+          console.log(`[ShieldVerify] ✅ ${label} verified at priority ${currentPriority} after skipping ${staleCount} stale entries.`);
+        }
+        return candidate;
+      } else {
+        console.warn(`[ShieldVerify] ⚠️ ${label} Stale: rem ${candidate.remId} (priority ${currentPriority}) has no overdue cards.`);
+        staleCount++;
+      }
+    }
+
+    console.log(`[ShieldVerify] ${label}: All ${group.length} entries at priority ${currentPriority} are stale. Escalating...`);
+  }
+
+  return undefined;
+}
+
 /**
  * Filters items to find those that are due and unreviewed.
  *
@@ -45,18 +122,25 @@ function filterUnreviewedDue<T extends PriorityItem>(
 /**
  * Calculates the final shield status for a set of items.
  *
+ * @param plugin Plugin instance (required when verifyOptions is provided, else null)
  * @param allItems All items in the universe
  * @param unreviewedDue Items that are due but unreviewed
- * @returns Shield history entry with absolute priority, percentile, and universe size
+ * @param isDue Predicate to determine if an item is still due
+ * @param seenIds IDs reviewed in this session
+ * @param dismissedCount Global dismissed count
+ * @param computeWeighted Whether to compute weighted shield
+ * @param verifyOptions When provided, the top-missed rem is confirmed via live API calls
  */
-function calculateShieldStatus<T extends PriorityItem>(
+async function calculateShieldStatus<T extends PriorityItem>(
+  plugin: RNPlugin | null,
   allItems: T[],
   unreviewedDue: T[],
   isDue: (item: T) => boolean,
   seenIds: string[],
   dismissedCount: number = 0,
-  computeWeighted: boolean = false
-): ShieldHistoryEntry {
+  computeWeighted: boolean = false,
+  verifyOptions?: VerifyOptions<T>
+): Promise<ShieldHistoryEntry> {
   const status: ShieldHistoryEntry = {
     absolute: null,
     percentile: 100,
@@ -65,7 +149,13 @@ function calculateShieldStatus<T extends PriorityItem>(
   };
 
   if (unreviewedDue.length > 0) {
-    const topMissed = _.minBy(unreviewedDue, item => item.priority);
+    let topMissed = _.minBy(unreviewedDue, item => item.priority);
+
+    // Optional live verification: confirm the cache-derived top candidate is truly overdue.
+    if (topMissed && verifyOptions && plugin) {
+      topMissed = await verifyTopMissedByPriorityLevel(plugin, unreviewedDue, verifyOptions, 'Shield') ?? topMissed;
+    }
+
     if (topMissed) {
       status.absolute = topMissed.priority;
       status.percentile = calculateVolumeBasedPercentile(
@@ -262,7 +352,8 @@ export async function saveKBShield<T extends PriorityItem>(
   seenIds: string[],
   storageKey: string,
   label: string,
-  computeWeighted: boolean = false
+  computeWeighted: boolean = false,
+  verifyOptions?: VerifyOptions<T>
 ): Promise<void> {
   if (allItems.length === 0) {
     console.log(`[QueueExit] No ${label} items found, skipping KB shield save`);
@@ -275,7 +366,7 @@ export async function saveKBShield<T extends PriorityItem>(
 
   const today = dayjs().format('YYYY-MM-DD');
   const unreviewedDue = filterUnreviewedDue(allItems, isDue, seenIds);
-  const status = calculateShieldStatus(allItems, unreviewedDue, isDue, seenIds, dismissedCount, computeWeighted);
+  const status = await calculateShieldStatus(plugin, allItems, unreviewedDue, isDue, seenIds, dismissedCount, computeWeighted, verifyOptions);
 
   await saveKBShieldHistory(plugin, storageKey, status, today);
   const kbTriggerItem = unreviewedDue.find(item => item.priority === status.absolute);
@@ -303,7 +394,8 @@ export async function saveDocumentShield<T extends PriorityItem>(
   storageKey: string,
   historyKey: string,
   label: string,
-  computeWeighted: boolean = false
+  computeWeighted: boolean = false,
+  verifyOptions?: VerifyOptions<T>
 ): Promise<void> {
   if (!scopeRemIds || scopeRemIds.length === 0) {
     console.log(`[QueueExit] No scope RemIds found, skipping ${label} document shield save`);
@@ -324,7 +416,7 @@ export async function saveDocumentShield<T extends PriorityItem>(
   const scopedDismissedCount = globalDismissedRems.filter(rem => scopeSet.has(rem._id)).length;
 
   const today = dayjs().format('YYYY-MM-DD');
-  const status = calculateShieldStatus(scopedItems, unreviewedDueInScope, isDue, seenIds, scopedDismissedCount, computeWeighted);
+  const status = await calculateShieldStatus(plugin, scopedItems, unreviewedDueInScope, isDue, seenIds, scopedDismissedCount, computeWeighted, verifyOptions);
 
   await saveScopedShieldHistory(plugin, storageKey, historyKey, status, today);
   const docTriggerItem = unreviewedDueInScope.find(item => item.priority === status.absolute);
@@ -341,3 +433,5 @@ export async function saveDocumentShield<T extends PriorityItem>(
  */
 export const isIncRemDue = (rem: IncrementalRem): boolean => Date.now() >= rem.nextRepDate;
 export const isCardDue = (card: CardPriorityInfo): boolean => card.dueCards > 0;
+/** Shield-specific: card was due before start of today (filters intraday re-scheduling noise). */
+export const isCardDueOverdue = (card: CardPriorityInfo): boolean => (card.dueCardsOverdue ?? 0) > 0;

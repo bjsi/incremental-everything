@@ -15,6 +15,9 @@ export interface CardPriorityInfo {
   lastUpdated: number;
   cardCount: number;
   dueCards: number;
+  /** Count of cards with nextRepetitionTime <= start of today (user's local timezone).
+   * Used exclusively by the priority shield to filter intraday scheduling noise. */
+  dueCardsOverdue?: number;
   kbPercentile?: number;
 }
 
@@ -37,6 +40,17 @@ export interface QueueSessionCache {
    * Used for the fast KB Shield calculation.
    */
   dueCardsInKB: CardPriorityInfo[];
+
+  /**
+   * A pre-filtered list of cards due before the start of today (user timezone).
+   * Used exclusively by the card priority shield to filter intraday scheduling noise.
+   */
+  overdueCardsInKB?: CardPriorityInfo[];
+
+  /**
+   * Same as overdueCardsInKB but scoped to the current document/folder.
+   */
+  overdueCardsInScope?: CardPriorityInfo[];
 
   /**
    * A pre-filtered list of all due Incremental Rems in the document scope.

@@ -105,7 +105,8 @@ function getOrdinalSuffix(num: number): string {
 export async function findClosestAncestorWithAnyPriority(
   plugin: RNPlugin,
   rem: PluginRem | undefined,
-  targetType: 'IncRem' | 'Card' = 'Card'
+  targetType: 'IncRem' | 'Card' = 'Card',
+  explicitParentId?: string
 ): Promise<{
   priority: number;
   ancestorName: string;
@@ -119,7 +120,10 @@ export async function findClosestAncestorWithAnyPriority(
   const PRIORITY_SLOT = 'priority';
   const SOURCE_SLOT = 'prioritySource';
 
-  let current = rem;
+  // We use explicitParentId as an override if provided. When creating a Rem and moving it,
+  // the RemNote SDK's local cache for `rem.parent` might be stale for a few milliseconds
+  // (especially on Web/Mobile). Passing explicitParentId bypasses this race condition.
+  let currentParentId = explicitParentId || rem.parent;
   let currentLevel = 0; // Track how many levels we've gone up
   let highestInheritedAncestor: {
     parent: PluginRem;
@@ -127,8 +131,8 @@ export async function findClosestAncestorWithAnyPriority(
     level: number;
   } | null = null;
 
-  while (current.parent) {
-    const parent = await plugin.rem.findOne(current.parent);
+  while (currentParentId) {
+    const parent = await plugin.rem.findOne(currentParentId);
     if (!parent) break;
 
     currentLevel++; // Increment level for each parent we check
@@ -208,7 +212,8 @@ export async function findClosestAncestorWithAnyPriority(
       }
     }
 
-    current = parent;
+    // For the next level up, we safely trust the SDK's object cache because higher ancestors haven't just been moved
+    currentParentId = parent.parent;
   }
 
   // No manual priority or IncRem found, but we have an orphaned inherited priority
@@ -242,7 +247,8 @@ export async function findClosestAncestorWithAnyPriority(
 export async function getInitialPriority(
   plugin: RNPlugin,
   rem: PluginRem,
-  defaultPriority: number
+  defaultPriority: number,
+  explicitParentId?: string
 ): Promise<number> {
   // 1. Check own cardPriority slot first — same guard used in getCardPriority() and
   //    handleCardPriorityInheritance(), so the precedence logic is unified across all paths.
@@ -260,7 +266,8 @@ export async function getInitialPriority(
   }
 
   // 2 & 3. Walk ancestors — prefers IncRem priority, falls back to explicit Card priority.
-  const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem, 'IncRem');
+  // We pass explicitParentId down to bypass initial SDK cache delays after rem structure changes
+  const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem, 'IncRem', explicitParentId);
   if (ancestorInfo) {
     console.log(`[getInitialPriority] Inheriting ${ancestorInfo.priority} from ${ancestorInfo.sourceType} ancestor: ${ancestorInfo.ancestorName}`);
     return ancestorInfo.priority;

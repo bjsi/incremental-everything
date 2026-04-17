@@ -1,32 +1,26 @@
 import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createRemFromHighlight } from '../lib/highlightActions';
-import { powerupCode, incrementalQueueActiveKey } from '../lib/consts';
+import { powerupCode, incrementalQueueActiveKey, currentIncRemKey } from '../lib/consts';
 import {
   getPdfInfoFromHighlight,
   findPDFinRem,
   addPageToHistory,
-  setIncrementalReadingPosition
+  setIncrementalReadingPosition,
 } from '../lib/pdfUtils';
 
 export function CreateIncRemToolbar() {
   const plugin = usePlugin();
-  const [remId, setRemId] = useState<string | null>(null);
   const [hovered, setHovered] = useState(false);
 
-  useEffect(() => {
-    const init = async () => {
-      const ctx = await plugin.widget.getWidgetContext<WidgetLocation.PDFHighlightToolbarLocation>();
-      if (ctx && ctx.remId) {
-        setRemId(ctx.remId);
-      }
-    };
-    init();
-  }, [plugin]);
-
-  if (!remId) return null;
-
   const handleClick = async () => {
+    // Always read the widget context fresh at click time.
+    // If the toolbar widget is reused across highlight selections (not remounted),
+    // a cached remId from a previous mount would cause extracts from the wrong highlight.
+    const ctx = await plugin.widget.getWidgetContext<WidgetLocation.PDFHighlightToolbarLocation>();
+    const remId = ctx?.remId;
+    if (!remId) return;
+
     const highlight = await plugin.rem.findOne(remId);
     if (!highlight) return;
 
@@ -35,15 +29,16 @@ export function CreateIncRemToolbar() {
 
     let contextRemId: string | null = null;
 
-    // 2. Strict Queue Context Check (Syncs logic with pdf_bookmark_popup.tsx)
+    // 2. Queue context check: confirm the current queue rem actually owns this
+    // highlight's PDF before trusting it as contextRemId. This prevents the
+    // wrong IncRem being used when multiple sections share the same PDF.
     const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
 
-    if (isQueueActive) {
-      const currentQueueRemId = await plugin.storage.getSession<string>('current-inc-rem');
+    if (isQueueActive && docId) {
+      const currentQueueRemId = await plugin.storage.getSession<string>(currentIncRemKey);
       if (currentQueueRemId) {
         const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
-        const foundPdf = currentQueueRem && docId ? await findPDFinRem(plugin as any, currentQueueRem, docId) : null;
-
+        const foundPdf = currentQueueRem ? await findPDFinRem(plugin as any, currentQueueRem, docId) : null;
         if (foundPdf && foundPdf._id === docId) {
           contextRemId = currentQueueRemId;
         }
@@ -57,7 +52,7 @@ export function CreateIncRemToolbar() {
         pdfRemId: string | null;
       }>('pageRangeContext');
 
-      const currentIncRemId = await plugin.storage.getSession<string>('current-inc-rem');
+      const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
 
       if (
         pageRangeContext?.incrementalRemId &&

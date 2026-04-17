@@ -199,6 +199,28 @@ async function performFullPDFSearch(
   const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
   // console.log('[ParentSelector:TreeHelpers] [FullSearch] Found', allIncrementalRems.length, 'incremental rems in cache');
 
+  // PART 0: Local ancestral check
+  // Ensures the direct parent containing the PDF is found even if cache is empty or incomplete
+  try {
+    const pdfRem = await plugin.rem.findOne(pdfRemId);
+    if (pdfRem && pdfRem.parent) {
+      const isPdfHighlight = await pdfRem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
+      if (!isPdfHighlight) {
+        const parent = await plugin.rem.findOne(pdfRem.parent);
+        if (parent) {
+          const foundPDF = await findPDFinRem(plugin, parent, pdfRemId);
+          if (foundPDF && foundPDF._id === pdfRemId) {
+            const node = await createTreeNode(plugin, parent, allIncrementalRems, 0, null);
+            result.push(node);
+            processedRemIds.add(parent._id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[ParentSelector:TreeHelpers] Error in ancestral check:', e);
+  }
+
   // PART 1: Search all incremental rems from cache
   for (const incRemInfo of allIncrementalRems) {
     if (processedRemIds.has(incRemInfo.remId)) continue;
@@ -352,6 +374,27 @@ async function performFullHTMLSearch(
 
   const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
   // console.log('[ParentSelector:TreeHelpers] [HTMLSearch] Found', allIncrementalRems.length, 'incremental rems in cache');
+
+  // PART 0: Local ancestral check
+  try {
+    const htmlRem = await plugin.rem.findOne(htmlRemId);
+    if (htmlRem && htmlRem.parent) {
+      const isHtmlHighlight = await htmlRem.hasPowerup(BuiltInPowerupCodes.HTMLHighlight);
+      if (!isHtmlHighlight) {
+        const parent = await plugin.rem.findOne(htmlRem.parent);
+        if (parent) {
+          const foundHTML = await findHTMLinRem(plugin, parent, htmlRemId);
+          if (foundHTML && foundHTML._id === htmlRemId) {
+            const node = await createTreeNode(plugin, parent, allIncrementalRems, 0, null);
+            result.push(node);
+            processedRemIds.add(parent._id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[ParentSelector:TreeHelpers] Error in ancestral check:', e);
+  }
 
   // PART 1: Search all incremental rems from cache
   for (const incRemInfo of allIncrementalRems) {

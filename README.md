@@ -57,7 +57,7 @@ This README covers the basics. For the comprehensive guides, please visit the **
 ## Usage
 
 ### Getting Started
-1. **Make Incremental**: Make any Rem, PDF, or Website `Incremental` using the `/Incremental Everything` command (Shortcut: `Alt+X`).
+1. **Make Incremental**: Make any Rem, PDF, or Website `Incremental` using the `/Make Incremental (Extract)` command (Shortcut: `Alt+X`).
    * **Extract Selection**: If you have text selected, `Alt+X` will extract that specific piece into a new child Rem and link it back.
 
 ![Make Incremental using the command](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/tag-inc-rem.gif)
@@ -112,7 +112,7 @@ The plugin now features **Automatic Light Mode**.
 - You can tag YouTube videos with the `Incremental` tag to watch them incrementally.
 - It will work if you tag the link Rem itself, or a Rem with the YouTube link as a source.
 - **Video Extracts**: Create precise sub-clips with specific start/end timestamps, each with its own schedule and priority.
-- **Auto-Transcription**: Automatically fetch YouTube transcripts for extract ranges to make content searchable and ready for clozing.
+- **Auto-Transcription**: Automatically fetch YouTube transcripts for extract ranges to make content searchable and ready for clozing. [P.S.: Currently down after YouTube recent anti-bot measures]
 - The plugin will automatically save your progress and playback rate.
 - You can open the resizable notes section on the left to take notes while you watch.
 
