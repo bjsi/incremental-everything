@@ -2,8 +2,8 @@ import {
   renderWidget,
   usePlugin,
   useTrackerPlugin,
-  WidgetLocation,
   QueueInteractionScore,
+  AppEvents,
 } from '@remnote/plugin-sdk';
 import React, { useMemo, useCallback } from 'react';
 import {
@@ -139,18 +139,53 @@ export function CardPriorityDisplay() {
     [refreshSignal]
   ) ?? [];
 
+  // Inside a Card Cluster, RemNote keeps this FlashcardUnder widget mounted across all
+  // sibling cards and `getWidgetContext().remId` stays pinned to the cluster parent.
+  // Only `ctx.cardId` advances per sibling — and `plugin.queue.getCurrentCard()` is
+  // stuck on the cluster's anchor card. So we poll the widget context for cardId,
+  // then resolve the card to recover the sibling's real remId.
+  const [currentIds, setCurrentIds] = React.useState<{ remId?: string; cardId?: string }>({});
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const refresh = async () => {
+      try {
+        const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
+        if (!isMounted) return;
+
+        const ctxCardId: string | undefined = ctx?.cardId;
+        if (!ctxCardId) return;
+
+        const card = await plugin.card.findOne(ctxCardId);
+        if (!isMounted) return;
+        const resolvedRemId = card?.remId ?? ctx?.remId;
+
+        setCurrentIds((prev) => {
+          if (prev.cardId === ctxCardId && prev.remId === resolvedRemId) return prev;
+          return { remId: resolvedRemId, cardId: ctxCardId };
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    refresh();
+    const intervalId = setInterval(refresh, 500);
+    const listener = () => { refresh(); };
+    plugin.event.addListener(AppEvents.QueueLoadCard, undefined, listener);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      plugin.event.removeListener(AppEvents.QueueLoadCard, undefined, listener);
+    };
+  }, [plugin]);
+
   const rem = useTrackerPlugin(async (rp) => {
-    const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardAnswerButtons>();
-    if (!ctx?.remId) {
-      // console.log('[CardPriorityDisplay] rem tracker: ctx or remId is null', ctx);
-      return null;
-    }
-    const found = (await rp.rem.findOne(ctx.remId)) ?? null;
-    if (!found) {
-      // console.log('[CardPriorityDisplay] rem tracker: rem not found for id', ctx.remId);
-    }
-    return found;
-  }, []);
+    if (!currentIds.remId) return null;
+    return (await rp.rem.findOne(currentIds.remId)) ?? null;
+  }, [currentIds.remId]);
 
   const scopeRemIds = useTrackerPlugin(
     (rp) => rp.storage.getSession<string[] | null>(priorityCalcScopeRemIdsKey),
@@ -175,9 +210,8 @@ export function CardPriorityDisplay() {
 
   // --- Fetch card repetition history ---
   const cardRepData = useTrackerPlugin(async (rp) => {
-    const ctx = await rp.widget.getWidgetContext<WidgetLocation.FlashcardUnder>();
-    const cardId = ctx?.cardId;
-    const remId = ctx?.remId;
+    const cardId = currentIds.cardId;
+    const remId = currentIds.remId;
     if (!cardId && !remId) return null;
 
     let cards: any[] = [];
@@ -199,7 +233,7 @@ export function CardPriorityDisplay() {
       history: card.repetitionHistory || [],
       nextRepetitionTime: card.nextRepetitionTime,
     };
-  }, []);
+  }, [currentIds.cardId, currentIds.remId]);
 
   // --- Compute review stats from repetition history ---
   const historyStats = useMemo(() => {
