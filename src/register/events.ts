@@ -588,7 +588,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
 export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
   // Per-remId debounce timers: prevents cross-rem timer stomping during
   // search/navigation bursts where many different remIds fire in rapid succession.
-  const remChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
+  const remChangeDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Store captured history per remId (captured before debounce to avoid race condition)
   // Key: remId, Value: cloned history array
