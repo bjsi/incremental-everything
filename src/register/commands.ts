@@ -50,6 +50,12 @@ import {
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
+import {
+  detectCase,
+  nextCase,
+  transformCase,
+  transformTitleCase,
+} from '../lib/text_case_converter_utils';
 
 
 export async function registerCommands(plugin: ReactRNPlugin) {
@@ -139,7 +145,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                 const tags = await referencedRem.getTagRems();
                 hasTag = tags.some(t => t._id === pdfExtractTagRem!._id);
               }
-              
+
               if (isPdfHighlight || hasTag) {
                 // Copy the exact pin
                 pdfExtractPin = { ...item, pin: true };
@@ -1635,6 +1641,41 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         const skippedNote = totalSkipped > 0 ? ` (${totalSkipped} already present, skipped)` : '';
         await plugin.app.toast(`✅ Added ${totalAdded} source(s) to ${remLabel}${skippedNote}.`);
       }
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'text-case-converter',
+    name: 'Text Case Converter',
+    keyboardShortcut: 'shift+F3',
+    action: async () => {
+      const selection = await plugin.editor.getSelectedText();
+      if (!selection?.richText?.length) {
+        await plugin.app.toast('No text selected.');
+        return;
+      }
+
+      const fullText = selection.richText
+        .map((e: any) => (typeof e === 'string' ? e : e?.text ?? ''))
+        .join('');
+
+      const current = detectCase(fullText);
+      const next = nextCase(current);
+
+      const transformed =
+        next === 'title'
+          ? transformTitleCase(selection.richText, fullText)
+          : transformCase(
+            selection.richText,
+            next === 'upper' ? (s) => s.toUpperCase() : (s) => s.toLowerCase()
+          );
+
+      await plugin.editor.delete();
+      await plugin.editor.insertRichText(transformed);
+      await plugin.editor.selectText({
+        start: selection.range.start,
+        end: selection.range.start + fullText.length,
+      });
     },
   });
 }
