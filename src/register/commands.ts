@@ -298,6 +298,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'extract-with-priority',
     name: 'Extract with Priority',
     keyboardShortcut: 'opt+shift+x',
+    quickCode: 'ep',
     action: async () => {
       const result = await createExtract();
       if (!result) {
@@ -410,6 +411,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'set-priority',
     name: 'Set Priority',
     keyboardShortcut: 'opt+p',
+    quickCode: 'pri',
     action: async () => {
       console.log('--- Set Priority Command Triggered ---');
       let remId: string | undefined;
@@ -491,6 +493,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Quick Set Priority',
     description: 'Instant popup to set Incremental and Card priorities',
     keyboardShortcut: 'ctrl+opt+p', // Shortcuts: Ctrl + Option + P
+    quickCode: 'qpri',
     action: async () => {
       const tCmd = performance.now();
       console.log('[set-priority-light] Command triggered');
@@ -564,6 +567,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'reschedule-incremental',
     name: 'Reschedule Incremental Rem',
     keyboardShortcut: 'ctrl+j', // Will be Ctrl+J on Mac also!
+    quickCode: 'res',
     action: async () => {
       console.log('--- Reschedule Incremental Rem Command Triggered ---');
       let remId: string | undefined;
@@ -728,6 +732,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   plugin.app.registerCommand({
     id: 'pdf-control-panel',
     name: 'PDF Control Panel',
+    quickCode: 'pdf',
     action: async () => {
       const rem = await plugin.focus.getFocusedRem();
       if (!rem) {
@@ -775,7 +780,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   plugin.app.registerCommand({
     id: 'incremental-everything',
     keyboardShortcut: 'opt+x',
-    name: 'Incremental Everything',
+    name: 'Make Incremental (Extract)',
+    quickCode: 'extract',
     action: async () => {
       createExtract();
     },
@@ -820,6 +826,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'create-priority-review',
     name: 'Create Priority Review Document',
     keyboardShortcut: 'opt+shift+r',
+    quickCode: 'prd',
     action: async () => {
       const focused = await plugin.focus.getFocusedRem();
 
@@ -854,6 +861,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'review-increm-in-editor',
     name: 'Review in Editor (Execute Repetition)',
     keyboardShortcut: 'ctrl+shift+j',
+    quickCode: 'er',
     action: async () => {
       console.log('--- Review Incremental Rem in Editor Command Triggered ---');
 
@@ -931,6 +939,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'update-card-priorities',
     name: 'Update all inherited Card Priorities',
     description: 'Update all inherited Card Priorities (and pre-compute and tag all card not yet prioritized)',
+    quickCode: 'ucp',
     action: async () => {
       await updateAllCardPriorities(plugin);
     },
@@ -999,6 +1008,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'open-inc-rem-main-view',
     name: 'Open Incremental Rems Main View',
     keyboardShortcut: 'opt+shift+i',
+    quickCode: 'increms',
     action: async () => {
       await plugin.widget.openPopup('inc_rem_main_view');
     },
@@ -1136,6 +1146,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'open-repetition-history',
     name: 'Open Repetition History',
     keyboardShortcut: 'ctrl+shift+h',
+    quickCode: 'history',
     action: async () => {
       let remId: string | undefined;
       let cardId: string | undefined;
@@ -1254,6 +1265,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'open-sorting-criteria',
     name: 'Open Sorting Criteria',
     description: 'Open the Sorting Criteria widget to adjust randomness and cards per rem.',
+    quickCode: 'sort',
     action: async () => {
       await plugin.widget.openPopup('sorting_criteria');
     },
@@ -1264,6 +1276,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'open-priority-shield',
     name: 'Open Priority Shield Graph',
     description: 'Open the Priority Shield Graph history.',
+    quickCode: 'shield',
     action: async () => {
       let subQueueId: string | null = null;
       const url = await plugin.window.getURL();
@@ -1290,6 +1303,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: dismissIncRemCommandId,
     name: 'Dismiss Incremental Rem',
     keyboardShortcut: 'ctrl+d',
+    quickCode: 'dismiss',
     action: async () => {
       const url = await plugin.window.getURL();
       const isQueue = url && url.includes('/flashcards');
@@ -1463,6 +1477,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: nextInQueueCommandId,
     name: 'Next Item in Queue',
     keyboardShortcut: 'cmd+right',
+    quickCode: 'next',
     action: async () => {
       const url = await plugin.window.getURL();
 
@@ -1537,6 +1552,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Copy Rem Sources',
     description: 'Copies the sources of the focused Rem to the clipboard (session storage) for pasting onto other Rems.',
     keyboardShortcut: 'ctrl+shift+F1',
+    quickCode: 'copy',
     action: async () => {
       const rem = await plugin.focus.getFocusedRem();
       if (!rem) {
@@ -1575,6 +1591,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Paste Rem Sources',
     description: 'Adds the previously copied sources to all selected Rems (or the focused Rem). Skips sources already present.',
     keyboardShortcut: 'opt+shift+v',
+    quickCode: 'paste',
     action: async () => {
       const copiedIds = await plugin.storage.getSession<string[]>(COPIED_SOURCES_KEY);
       if (!copiedIds || copiedIds.length === 0) {
@@ -1648,6 +1665,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'text-case-converter',
     name: 'Text Case Converter',
     keyboardShortcut: 'shift+F3',
+    quickCode: 'case',
     action: async () => {
       const selection = await plugin.editor.getSelectedText();
       if (!selection?.richText?.length) {
