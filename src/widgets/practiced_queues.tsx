@@ -6,6 +6,8 @@ import {
     useSyncedStorageState,
     useSessionStorageState,
 } from "@remnote/plugin-sdk";
+import '../style.css';
+import '../App.css';
 import { timeSince } from "../lib/utils";
 
 export interface PracticedQueueSession {

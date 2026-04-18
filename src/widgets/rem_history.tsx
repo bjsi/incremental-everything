@@ -7,6 +7,8 @@ import {
     usePlugin,
     useSyncedStorageState,
 } from "@remnote/plugin-sdk";
+import '../style.css';
+import '../App.css';
 import { timeSince } from "../lib/utils";
 import { safeRemTextToString } from "../lib/pdfUtils";
 

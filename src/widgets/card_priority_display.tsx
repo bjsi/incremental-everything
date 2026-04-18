@@ -23,8 +23,6 @@ import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/car
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
-import { safeRemTextToString } from '../lib/pdfUtils';
-import type { FlashcardHistoryData } from './flashcard_history';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
 import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
 import * as _ from 'remeda';
@@ -150,105 +148,85 @@ export function CardPriorityDisplay() {
 
   React.useEffect(() => {
     let isMounted = true;
+    // Track the last cardId we've already resolved so the interval skips redundant work.
+    let lastAppliedCardId: string | undefined;
 
-    const refresh = async () => {
-      try {
-        const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
-        if (!isMounted) return;
-
-        const ctxCardId: string | undefined = ctx?.cardId;
-        if (!ctxCardId) return;
-
-        const card = await plugin.card.findOne(ctxCardId);
-        if (!isMounted) return;
-        const resolvedRemId = card?.remId ?? ctx?.remId;
-
-        setCurrentIds((prev) => {
-          if (prev.cardId === ctxCardId && prev.remId === resolvedRemId) return prev;
-          return { remId: resolvedRemId, cardId: ctxCardId };
-        });
-      } catch {
-        // ignore
-      }
+    // Resolve a cardId → remId and push into state. Skips if cardId already applied.
+    const applyCardId = async (cardId: string) => {
+      if (!isMounted || cardId === lastAppliedCardId) return;
+      lastAppliedCardId = cardId;
+      const card = await plugin.card.findOne(cardId);
+      if (!isMounted) return;
+      const resolvedRemId = card?.remId;
+      setCurrentIds((prev) => {
+        if (prev.cardId === cardId && prev.remId === resolvedRemId) return prev;
+        return { remId: resolvedRemId, cardId };
+      });
     };
 
-    refresh();
-    const intervalId = setInterval(refresh, 500);
-    const listener = () => { refresh(); };
-    plugin.event.addListener(AppEvents.QueueLoadCard, undefined, listener);
+    // Initial mount: resolve the current card from the widget context.
+    // (Handles mounting mid-session when no QueueLoadCard fires retroactively.)
+    (async () => {
+      try {
+        const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
+        if (ctx?.cardId) await applyCardId(ctx.cardId);
+      } catch { /* ignore */ }
+    })();
+
+    // Normal card transitions: use data.cardId directly from the event payload.
+    // This avoids querying getWidgetContext(), which hasn't been updated yet when the
+    // event fires — the race condition that caused the ~500 ms display lag.
+    // Fire-and-forget (no async return) so the SDK can't await this listener and delay
+    // the queue's own event processing.
+    const queueLoadListener = (data: any) => {
+      if (data?.cardId) void applyCardId(data.cardId);
+    };
+    plugin.event.addListener(AppEvents.QueueLoadCard, undefined, queueLoadListener);
+
+    // Cluster sibling poll: inside a cluster, QueueLoadCard does NOT fire per sibling,
+    // so we poll getWidgetContext().cardId every 500 ms to detect sibling transitions.
+    // lastAppliedCardId prevents the poll from re-applying cards already handled above.
+    const pollForClusterSibling = async () => {
+      try {
+        const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
+        if (!isMounted || !ctx?.cardId) return;
+        await applyCardId(ctx.cardId);
+      } catch { /* ignore */ }
+    };
+    const intervalId = setInterval(pollForClusterSibling, 500);
 
     return () => {
       isMounted = false;
       clearInterval(intervalId);
-      plugin.event.removeListener(AppEvents.QueueLoadCard, undefined, listener);
+      plugin.event.removeListener(AppEvents.QueueLoadCard, undefined, queueLoadListener);
     };
   }, [plugin]);
 
-  // Cluster-aware signaling: broadcast the actually-visible cardId/remId to session storage
-  // (so events.ts QueueCompleteCard can use it for finalDrillIds), and record each seen
-  // sibling card to flashcardHistoryData. Needed because RemNote's QueueCompleteCard fires
-  // with the cluster anchor cardId — siblings are otherwise invisible to event listeners.
+  // Cluster-aware signaling: broadcast the actually-visible cardId/remId to session storage.
+  // These signals are consumed by:
+  //   - src/register/events.ts (QueueCompleteCard listener) — to attribute AGAIN/HARD and
+  //     flashcard-history entries to the sibling actually rated, not the cluster anchor.
+  //   - src/lib/queue_session.ts — to compute accurate per-sibling time-spent when
+  //     QueueCompleteCard fires with the cluster anchor cardId.
+  //
+  // We deliberately do NOT write to flashcardHistoryData here: events.ts already records
+  // it on QueueCompleteCard using `effectiveCardId` (which resolves from the signals below),
+  // and doing that write on every card transition caused ~several-hundred-ms of IPC lag on
+  // the hot path, competing with the trackers that render the widget's visible data.
   React.useEffect(() => {
     const cardId = currentIds.cardId;
     const remId = currentIds.remId;
     if (!cardId) return;
 
-    let cancelled = false;
     (async () => {
       try {
         await plugin.storage.setSession('clusterVisibleCardId', cardId);
-        // Broadcast the time at which this sibling became visible, so queue_session.ts
-        // can compute accurate time-spent when QueueCompleteCard fires with the cluster anchor.
         await plugin.storage.setSession('clusterVisibleCardLoadTime', Date.now());
         if (remId) await plugin.storage.setSession('clusterVisibleRemId', remId);
-
-        const historyData =
-          ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-        if (cancelled) return;
-        if (historyData[0]?.cardId === cardId) return;
-
-        const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-        const currentKbId = kbData?._id;
-        const rem = remId ? await plugin.rem.findOne(remId) : null;
-
-        let frontText = '';
-        let backText = '';
-        try {
-          const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
-          const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
-          frontText =
-            typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
-          backText =
-            typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
-        } catch {
-          frontText = '[Complex Media Rem]';
-        }
-        const text = `${frontText} ${backText}`.trim();
-
-        if (cancelled) return;
-        // Actively remove any existing entries with the same cardId before prepending.
-        const deduped = historyData.filter((entry) => entry.cardId !== cardId);
-        await plugin.storage.setSynced('flashcardHistoryData', [
-          {
-            key: Math.random(),
-            remId: remId ?? '',
-            cardId,
-            open: false,
-            time: Date.now(),
-            kbId: currentKbId,
-            text,
-            _v: 1,
-          },
-          ...deduped.slice(0, 999),
-        ]);
       } catch (error) {
-        console.error('Failed to record cluster-aware flashcard history:', error);
+        console.error('Failed to broadcast cluster-visible card signals:', error);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [plugin, currentIds.cardId, currentIds.remId]);
 
   const rem = useTrackerPlugin(async (rp) => {

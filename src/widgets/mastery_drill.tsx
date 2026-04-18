@@ -108,6 +108,10 @@ function FinalDrill() {
   const [editingRemId, setEditingRemId] = useState<string | null>(null);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
 
+  // null = hidden; 'current' = main drill; 'editing' = edit-previous view
+  const [editLaterContext, setEditLaterContext] = useState<'current' | 'editing' | null>(null);
+  const [editLaterMessage, setEditLaterMessage] = useState('');
+
   const startEditing = async (which: 'current' | 'previous') => {
     const key = which === 'current' ? "finalDrillCurrentCardId" : "finalDrillPreviousCardId";
     const cardId = await plugin.storage.getSession<string>(key);
@@ -122,6 +126,51 @@ function FinalDrill() {
     } else {
       await plugin.app.toast(`Could not find Rem for card ${cardId}`);
     }
+  };
+
+  const confirmEditLater = async () => {
+    const message = editLaterMessage.trim() || "Mastery Drill";
+    const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
+
+    if (editLaterContext === 'editing') {
+      if (!editingCardId) return;
+      const card = await plugin.card.findOne(editingCardId);
+      if (card && card.remId) {
+        const rem = await plugin.rem.findOne(card.remId);
+        if (rem) {
+          await rem.addPowerup(BuiltInPowerupCodes.EditLater);
+          await rem.setPowerupProperty(BuiltInPowerupCodes.EditLater, "Message", [message]);
+          const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== editingCardId);
+          await setFinalDrillIdsRaw(newIds);
+          await plugin.app.toast("Card marked for Edit Later and removed from drill.");
+          setEditingRemId(null);
+          setEditingCardId(null);
+        }
+      }
+    } else if (editLaterContext === 'current') {
+      const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
+      if (!cardId) { await plugin.app.toast("No current card found."); return; }
+      const card = await plugin.card.findOne(cardId);
+      if (card && card.remId) {
+        const rem = await plugin.rem.findOne(card.remId);
+        if (rem) {
+          await rem.addPowerup(BuiltInPowerupCodes.EditLater);
+          await rem.setPowerupProperty(BuiltInPowerupCodes.EditLater, "Message", [message]);
+          const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== cardId);
+          await setFinalDrillIdsRaw(newIds);
+          await plugin.queue.removeCurrentCardFromQueue(false);
+          await plugin.app.toast("Card marked for Edit Later and removed from drill.");
+        }
+      }
+    }
+
+    setEditLaterContext(null);
+    setEditLaterMessage('');
+  };
+
+  const cancelEditLater = () => {
+    setEditLaterContext(null);
+    setEditLaterMessage('');
   };
 
   const removeCurrentFromDrill = async () => {
@@ -174,22 +223,7 @@ function FinalDrill() {
           </div>
           <div className="flex gap-2" style={{ paddingRight: '60px' }}>
             <button
-              onClick={async () => {
-                if (!editingCardId) { await plugin.app.toast("No card found."); return; }
-                const card = await plugin.card.findOne(editingCardId);
-                if (card && card.remId) {
-                  const rem = await plugin.rem.findOne(card.remId);
-                  if (rem) {
-                    await rem.addPowerup(BuiltInPowerupCodes.EditLater);
-                    const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
-                    const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== editingCardId);
-                    await setFinalDrillIdsRaw(newIds);
-                    await plugin.app.toast("Card marked for Edit Later and removed from drill.");
-                    setEditingRemId(null);
-                    setEditingCardId(null);
-                  }
-                }
-              }}
+              onClick={() => { setEditLaterMessage(''); setEditLaterContext('editing'); }}
               className="px-3 py-1.5 rounded bg-orange-500 text-white hover:bg-orange-600 font-medium transition-colors shadow-md"
               title="Mark for Edit Later and remove from drill"
             >
@@ -221,6 +255,27 @@ function FinalDrill() {
             </button>
           </div>
         </div>
+
+        {editLaterContext === 'editing' && (
+          <div className="flex items-center gap-2 px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)' }}>
+            <span className="text-xs font-medium" style={{ color: 'var(--rn-clr-content-secondary)' }}>Edit Later note:</span>
+            <input
+              type="text"
+              value={editLaterMessage}
+              onChange={(e) => setEditLaterMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); confirmEditLater(); }
+                else if (e.key === 'Escape') { e.preventDefault(); cancelEditLater(); }
+              }}
+              placeholder="Mastery Drill"
+              className="flex-1 text-xs p-1 rounded"
+              style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)' }}
+              autoFocus
+            />
+            <button onClick={confirmEditLater} className="px-2 py-1 text-xs rounded bg-orange-500 text-white hover:bg-orange-600">Set</button>
+            <button onClick={cancelEditLater} className="px-2 py-1 text-xs rounded" style={{ border: '1px solid var(--rn-clr-border-primary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
+          </div>
+        )}
 
         <div className="flex-grow w-full overflow-hidden flex flex-col p-4 overflow-y-auto gap-6">
           <div className="flex-shrink-0">
@@ -396,25 +451,7 @@ function FinalDrill() {
             </button>
 
             <button
-              onClick={async () => {
-                const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
-                if (cardId) {
-                  const card = await plugin.card.findOne(cardId);
-                  if (card && card.remId) {
-                    const rem = await plugin.rem.findOne(card.remId);
-                    if (rem) {
-                      await rem.addPowerup(BuiltInPowerupCodes.EditLater);
-                      const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
-                      const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== cardId);
-                      await setFinalDrillIdsRaw(newIds);
-                      await plugin.queue.removeCurrentCardFromQueue(false);
-                      await plugin.app.toast("Card marked for Edit Later and removed from drill.");
-                    }
-                  }
-                } else {
-                  await plugin.app.toast("No current card found.");
-                }
-              }}
+              onClick={() => { setEditLaterMessage(''); setEditLaterContext('current'); }}
               className="px-3 py-1.5 text-sm rounded bg-orange-500 text-white hover:bg-orange-600 font-medium transition-colors shadow-md"
               title="Mark for Edit Later and remove from drill"
             >
@@ -470,6 +507,27 @@ function FinalDrill() {
             Flashcards you have rated <i>Again</i> or <i>Hard</i> will appear in the Mastery Drill and will remain here until you rate them <i>Good</i> or better.
           </span>
         </div>
+
+        {editLaterContext === 'current' && (
+          <div className="flex items-center gap-2 px-3 py-2 border-t flex-shrink-0" style={{ borderColor: 'var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)' }}>
+            <span className="text-xs font-medium" style={{ color: 'var(--rn-clr-content-secondary)' }}>Edit Later note:</span>
+            <input
+              type="text"
+              value={editLaterMessage}
+              onChange={(e) => setEditLaterMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); confirmEditLater(); }
+                else if (e.key === 'Escape') { e.preventDefault(); cancelEditLater(); }
+              }}
+              placeholder="Mastery Drill"
+              className="flex-1 text-xs p-1 rounded"
+              style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)' }}
+              autoFocus
+            />
+            <button onClick={confirmEditLater} className="px-2 py-1 text-xs rounded bg-orange-500 text-white hover:bg-orange-600">Set</button>
+            <button onClick={cancelEditLater} className="px-2 py-1 text-xs rounded" style={{ border: '1px solid var(--rn-clr-border-primary)', color: 'var(--rn-clr-content-secondary)' }}>Cancel</button>
+          </div>
+        )}
       </div>
 
       <div className="flex-grow relative">
