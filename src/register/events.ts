@@ -532,12 +532,21 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
           await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
         }
 
-        // Flashcard History: record the completed card for the sidebar widget
+        // Cluster-aware: prefer the sibling cardId signaled by card_priority_display widget.
+        // Falls back to data.cardId when the widget hasn't mounted or hasn't signaled yet.
+        const clusterVisibleCardId =
+          (await plugin.storage.getSession<string>('clusterVisibleCardId')) || undefined;
+        const effectiveCardId = clusterVisibleCardId || data.cardId;
+        // Clear so a stale value from this card can't leak into the next event if the widget fails to mount.
+        await plugin.storage.setSession('clusterVisibleCardId', undefined);
+
+        // Flashcard History: record the completed card for the sidebar widget.
+        // Acts as fallback when card_priority_display fails to mount.
         try {
           const historyData =
             ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
 
-          if (historyData[0]?.cardId !== data.cardId) {
+          if (historyData[0]?.cardId !== effectiveCardId) {
             const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
             const currentKbId = kbData._id;
 
@@ -555,18 +564,21 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
 
             const text = `${frontText} ${backText}`.trim();
 
+            // Actively remove any existing entries with the same cardId before prepending.
+            const deduped = historyData.filter((entry) => entry.cardId !== effectiveCardId);
+
             await plugin.storage.setSynced('flashcardHistoryData', [
               {
                 key: Math.random(),
                 remId,
-                cardId: data.cardId,
+                cardId: effectiveCardId,
                 open: false,
                 time: new Date().getTime(),
                 kbId: currentKbId,
                 text,
                 _v: 1,
               },
-              ...historyData.slice(0, 999),
+              ...deduped.slice(0, 999),
             ]);
           }
         } catch (error) {
@@ -585,15 +597,15 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
               typeof item === 'string' ? item : item.cardId;
 
             if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
-              if (!finalDrillIds.some((item) => getCardId(item) === data.cardId)) {
+              if (!finalDrillIds.some((item) => getCardId(item) === effectiveCardId)) {
                 finalDrillIds = [
                   ...finalDrillIds,
-                  { cardId: data.cardId, kbId: currentKbId, addedAt: Date.now() },
+                  { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
                 ];
                 await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
               }
             } else if (score >= QueueInteractionScore.GOOD) {
-              const filtered = finalDrillIds.filter((item) => getCardId(item) !== data.cardId);
+              const filtered = finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId);
               if (filtered.length !== finalDrillIds.length) {
                 await plugin.storage.setSynced('finalDrillIds', filtered);
               }

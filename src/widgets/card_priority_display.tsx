@@ -23,6 +23,8 @@ import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/car
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
+import { safeRemTextToString } from '../lib/pdfUtils';
+import type { FlashcardHistoryData } from './flashcard_history';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
 import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
 import * as _ from 'remeda';
@@ -181,6 +183,70 @@ export function CardPriorityDisplay() {
       plugin.event.removeListener(AppEvents.QueueLoadCard, undefined, listener);
     };
   }, [plugin]);
+
+  // Cluster-aware signaling: broadcast the actually-visible cardId/remId to session storage
+  // (so events.ts QueueCompleteCard can use it for finalDrillIds), and record each seen
+  // sibling card to flashcardHistoryData. Needed because RemNote's QueueCompleteCard fires
+  // with the cluster anchor cardId — siblings are otherwise invisible to event listeners.
+  React.useEffect(() => {
+    const cardId = currentIds.cardId;
+    const remId = currentIds.remId;
+    if (!cardId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await plugin.storage.setSession('clusterVisibleCardId', cardId);
+        if (remId) await plugin.storage.setSession('clusterVisibleRemId', remId);
+
+        const historyData =
+          ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
+        if (cancelled) return;
+        if (historyData[0]?.cardId === cardId) return;
+
+        const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+        const currentKbId = kbData?._id;
+        const rem = remId ? await plugin.rem.findOne(remId) : null;
+
+        let frontText = '';
+        let backText = '';
+        try {
+          const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
+          const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+          frontText =
+            typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
+          backText =
+            typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
+        } catch {
+          frontText = '[Complex Media Rem]';
+        }
+        const text = `${frontText} ${backText}`.trim();
+
+        if (cancelled) return;
+        // Actively remove any existing entries with the same cardId before prepending.
+        const deduped = historyData.filter((entry) => entry.cardId !== cardId);
+        await plugin.storage.setSynced('flashcardHistoryData', [
+          {
+            key: Math.random(),
+            remId: remId ?? '',
+            cardId,
+            open: false,
+            time: Date.now(),
+            kbId: currentKbId,
+            text,
+            _v: 1,
+          },
+          ...deduped.slice(0, 999),
+        ]);
+      } catch (error) {
+        console.error('Failed to record cluster-aware flashcard history:', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [plugin, currentIds.cardId, currentIds.remId]);
 
   const rem = useTrackerPlugin(async (rp) => {
     if (!currentIds.remId) return null;
