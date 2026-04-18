@@ -277,4 +277,20 @@ export function registerWidgets(plugin: ReactRNPlugin) {
       height: 'auto',
     },
   });
+
+  // Mastery Drill popup
+  plugin.app.registerWidget('mastery_drill', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1100,
+      height: 900,
+    },
+  });
+
+  // Mastery Drill notification banner
+  plugin.app.registerWidget('mastery_drill_notification', WidgetLocation.SidebarEnd, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
 }

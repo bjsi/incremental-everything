@@ -40,6 +40,7 @@ export async function saveCurrentSession(plugin: ReactRNPlugin, _reason: string)
   cardStartTimes.clear();
   currentIncRemStart = null;
   await plugin.storage.setSession(ACTIVE_SESSION_KEY, null);
+  await plugin.storage.setSession('finalDrillHeartbeat', 0);
 }
 
 export function hasActiveSession(): boolean {
@@ -47,6 +48,19 @@ export function hasActiveSession(): boolean {
 }
 
 export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
+  // Heartbeat monitor: auto-save Mastery Drill session if the popup is closed without QueueExit
+  setInterval(async () => {
+    if (currentSession && currentSession.scopeName === 'Mastery Drill') {
+      if (Date.now() - currentSession.startTime < 5000) return; // grace period
+      const lastHeartbeat = await plugin.storage.getSession<number>('finalDrillHeartbeat');
+      if (lastHeartbeat) {
+        if (Date.now() - lastHeartbeat > 5000) {
+          await saveCurrentSession(plugin, 'Heartbeat Stale');
+        }
+      }
+    }
+  }, 2500);
+
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async (data: any) => {
     try {
       if (currentSession) {
@@ -66,7 +80,11 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           scopeName = text && text !== 'Untitled' ? text : 'Untitled';
         }
       } else {
-        scopeName = 'Ad-hoc Session';
+        // Generated queueId could be "Practice All", "Mastery Drill", or "Embedded Queue"
+        const isFinalDrillActive = await plugin.storage.getSession<boolean>('finalDrillActive');
+        const lastHeartbeat = await plugin.storage.getSession<number>('finalDrillHeartbeat');
+        const isFresh = lastHeartbeat && Date.now() - lastHeartbeat < 4000;
+        scopeName = isFinalDrillActive || isFresh ? 'Mastery Drill' : 'Ad-hoc Session';
       }
 
       currentSession = {
@@ -113,11 +131,12 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       if (!currentSession) {
         try {
           const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+          const isFinalDrillActive = await plugin.storage.getSession<boolean>('finalDrillActive');
           currentSession = {
             id: Math.random().toString(36).substring(7),
             startTime: now,
             kbId: kbData._id,
-            scopeName: 'Restored Mobile Session',
+            scopeName: isFinalDrillActive ? 'Mastery Drill' : 'Restored Mobile Session',
             totalTime: 0,
             flashcardsCount: 0,
             flashcardsTime: 0,
@@ -180,6 +199,13 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       }
 
       if (data?.cardId) {
+        // Track current and previous card for Mastery Drill edit features
+        const lastCurrentId = await plugin.storage.getSession<string>('finalDrillCurrentCardId');
+        if (lastCurrentId && lastCurrentId !== data.cardId) {
+          await plugin.storage.setSession('finalDrillPreviousCardId', lastCurrentId);
+        }
+        await plugin.storage.setSession('finalDrillCurrentCardId', data.cardId);
+
         // Shift current → previous card stats
         if (currentSession) {
           currentSession.prevCardFirstRep = currentSession.currentCardFirstRep;
@@ -221,6 +247,22 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
         }
 
         cardStartTimes.set(data.cardId, now);
+
+        // Verify Mastery Drill scope: if we labeled this session as Mastery Drill but the
+        // card isn't in the drill list, it's an embedded/ad-hoc queue collision.
+        if (currentSession && currentSession.scopeName === 'Mastery Drill') {
+          type FinalDrillItem = string | { cardId: string; kbId?: string };
+          const finalDrillItems =
+            ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
+          const isOurCard =
+            finalDrillItems.length > 0 &&
+            finalDrillItems.some((item) =>
+              (typeof item === 'string' ? item : item.cardId) === data.cardId
+            );
+          if (!isOurCard) {
+            currentSession.scopeName = 'Ad-hoc Session';
+          }
+        }
       }
     } catch (error) {
       console.error('ERROR in QueueSession QueueLoadCard listener:', error);

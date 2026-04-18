@@ -1,4 +1,4 @@
-import { AppEvents, ReactRNPlugin, RemId, BuiltInPowerupCodes, RichTextElementRemInterface } from '@remnote/plugin-sdk';
+import { AppEvents, ReactRNPlugin, RemId, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
@@ -487,7 +487,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
   plugin.event.addListener(
     AppEvents.QueueCompleteCard,
     undefined,
-    async (data: { cardId: RemId }) => {
+    async (data: { cardId: RemId; score?: QueueInteractionScore }) => {
       if (await shouldUseLightMode(plugin)) {
         return;
       }
@@ -498,6 +498,8 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
         // console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
         return;
       }
+
+      const score = data.score;
 
       const card = await plugin.card.findOne(data.cardId);
       const remId = card?.remId;
@@ -569,6 +571,36 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
           }
         } catch (error) {
           console.error('Failed to record flashcard history entry:', error);
+        }
+
+        // Mastery Drill: add AGAIN/HARD cards, remove on GOOD+
+        if (score !== undefined) {
+          try {
+            const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+            const currentKbId = kbData?._id;
+            type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+            let finalDrillIds =
+              ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
+            const getCardId = (item: FinalDrillItem) =>
+              typeof item === 'string' ? item : item.cardId;
+
+            if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
+              if (!finalDrillIds.some((item) => getCardId(item) === data.cardId)) {
+                finalDrillIds = [
+                  ...finalDrillIds,
+                  { cardId: data.cardId, kbId: currentKbId, addedAt: Date.now() },
+                ];
+                await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
+              }
+            } else if (score >= QueueInteractionScore.GOOD) {
+              const filtered = finalDrillIds.filter((item) => getCardId(item) !== data.cardId);
+              if (filtered.length !== finalDrillIds.length) {
+                await plugin.storage.setSynced('finalDrillIds', filtered);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to update Mastery Drill list:', error);
+          }
         }
       } else {
         // console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);

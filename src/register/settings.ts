@@ -400,4 +400,18 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     defaultValue: 180,
   });
 
+  plugin.settings.registerNumberSetting({
+    id: 'old_item_threshold',
+    title: 'Old Items Threshold (Days) for Mastery Drill',
+    description: 'Items older than this number of days will trigger a warning in the Mastery Drill.',
+    defaultValue: 7,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: 'disable_final_drill_notification',
+    title: 'Disable Mastery Drill Notifications',
+    description: 'If enabled, the Mastery Drill sidebar notification will not appear.',
+    defaultValue: false,
+  });
+
 }

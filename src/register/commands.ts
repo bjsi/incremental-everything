@@ -1696,4 +1696,22 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       });
     },
   });
+
+  plugin.app.registerCommand({
+    id: 'open_mastery_drill',
+    name: 'Mastery Drill: deliberately practice poorly rated cards',
+    quickCode: 'md',
+    action: async () => {
+      await plugin.widget.openPopup('mastery_drill');
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'debug_clear_flashcard_history',
+    name: 'Debug: Clear Flashcard History (Fix Sync Error)',
+    action: async () => {
+      await plugin.storage.setSynced('flashcardHistoryData', []);
+      await plugin.app.toast('Flashcard History cleared!');
+    },
+  });
 }
