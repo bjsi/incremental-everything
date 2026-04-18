@@ -197,6 +197,9 @@ export function CardPriorityDisplay() {
     (async () => {
       try {
         await plugin.storage.setSession('clusterVisibleCardId', cardId);
+        // Broadcast the time at which this sibling became visible, so queue_session.ts
+        // can compute accurate time-spent when QueueCompleteCard fires with the cluster anchor.
+        await plugin.storage.setSession('clusterVisibleCardLoadTime', Date.now());
         if (remId) await plugin.storage.setSession('clusterVisibleRemId', remId);
 
         const historyData =

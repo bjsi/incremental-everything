@@ -534,11 +534,13 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
 
         // Cluster-aware: prefer the sibling cardId signaled by card_priority_display widget.
         // Falls back to data.cardId when the widget hasn't mounted or hasn't signaled yet.
+        // Note: do NOT clear clusterVisibleCardId here — queue_session.ts also reads it in
+        // its own QueueCompleteCard listener, and clear order across listeners is not
+        // guaranteed. Staleness is instead prevented by queue_session.ts clearing it at the
+        // start of each QueueLoadCard.
         const clusterVisibleCardId =
           (await plugin.storage.getSession<string>('clusterVisibleCardId')) || undefined;
         const effectiveCardId = clusterVisibleCardId || data.cardId;
-        // Clear so a stale value from this card can't leak into the next event if the widget fails to mount.
-        await plugin.storage.setSession('clusterVisibleCardId', undefined);
 
         // Flashcard History: record the completed card for the sidebar widget.
         // Acts as fallback when card_priority_display fails to mount.

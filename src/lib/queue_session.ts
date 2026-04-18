@@ -127,6 +127,13 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       const now = Date.now();
       const type = await plugin.queue.getCurrentQueueScreenType();
 
+      // Staleness defense: clear cluster signals at the start of each new card load so a
+      // value left over from the previous card can't leak in if the widget fails to mount.
+      // Inside a cluster, QueueLoadCard does not fire per sibling, so the widget's writes
+      // for subsequent siblings are preserved (only overwritten, not cleared, between them).
+      await plugin.storage.setSession('clusterVisibleCardId', undefined);
+      await plugin.storage.setSession('clusterVisibleCardLoadTime', undefined);
+
       // Lazy session init (mobile fix: QueueEnter sometimes doesn't fire on iOS)
       if (!currentSession) {
         try {
@@ -273,8 +280,22 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
     try {
       const { cardId, score } = message as { cardId: string; score: QueueInteractionScore };
 
+      // Cluster-aware: RemNote keeps the FlashcardUnder widget mounted across cluster
+      // siblings and only getWidgetContext().cardId advances; QueueLoadCard + the event's
+      // cardId both stick to the anchor. card_priority_display.tsx broadcasts the actually
+      // visible sibling id + load time so we can still record count and time per sibling.
+      const clusterCardId = cardId
+        ? await plugin.storage.getSession<string>('clusterVisibleCardId')
+        : undefined;
+      const clusterLoadTime = cardId
+        ? (await plugin.storage.getSession<number>('clusterVisibleCardLoadTime')) || undefined
+        : undefined;
+      const effectiveCardId = clusterCardId || cardId;
+
       if (currentSession && cardId) {
-        const startTime = cardStartTimes.get(cardId);
+        // Prefer the QueueLoadCard-recorded start time (more accurate for anchor / first card);
+        // fall back to the widget-recorded sibling load time for subsequent siblings.
+        const startTime = cardStartTimes.get(effectiveCardId) ?? clusterLoadTime;
         if (startTime) {
           const rawTimeSpent = Date.now() - startTime;
           const timeLimitSec =
@@ -290,13 +311,13 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           }
 
           if (score !== QueueInteractionScore.TOO_EARLY) {
-            if (currentSession.currentCardId === cardId) {
+            if (currentSession.currentCardId === effectiveCardId) {
               currentSession.currentCardTotalTime =
                 (currentSession.currentCardTotalTime || 0) + timeSpent;
               currentSession.currentCardRepCount =
                 (currentSession.currentCardRepCount || 0) + 1;
             }
-            if (currentSession.prevCardId === cardId) {
+            if (currentSession.prevCardId === effectiveCardId) {
               currentSession.prevCardTotalTime =
                 (currentSession.prevCardTotalTime || 0) + timeSpent;
               currentSession.prevCardRepCount =
@@ -304,7 +325,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
             }
           }
 
-          cardStartTimes.delete(cardId);
+          cardStartTimes.delete(effectiveCardId);
         }
       } else if (currentIncRemStart && currentSession) {
         // No cardId means IncRem completion (or generic) — close timing
@@ -317,10 +338,10 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       // Update prev-card interval/coverage now that scheduler has updated
       if (currentSession && cardId && score !== QueueInteractionScore.TOO_EARLY) {
         if (
-          currentSession.currentCardId === cardId ||
-          currentSession.prevCardId === cardId
+          currentSession.currentCardId === effectiveCardId ||
+          currentSession.prevCardId === effectiveCardId
         ) {
-          const card = await plugin.card.findOne(cardId);
+          const card = await plugin.card.findOne(effectiveCardId);
           if (card) {
             const dates = card.repetitionHistory?.map((h) => h.date) || [];
             const lastRepTime =
