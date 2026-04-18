@@ -47,6 +47,45 @@ export function hasActiveSession(): boolean {
   return currentSession !== null;
 }
 
+/**
+ * Populate the `currentCard*` lifetime stats on the given session from a card's
+ * repetitionHistory. Used by both QueueLoadCard and the cluster-sibling poll.
+ */
+async function loadCardStats(
+  plugin: ReactRNPlugin,
+  session: PracticedQueueSession,
+  cardId: string
+) {
+  const card = await plugin.card.findOne(cardId);
+  if (card?.repetitionHistory && card.repetitionHistory.length > 0) {
+    const dates = card.repetitionHistory.map((h) => h.date);
+    session.currentCardFirstRep = Math.min(...dates);
+
+    const lastRepTime =
+      card.lastRepetitionTime || (dates.length > 0 ? Math.max(...dates) : undefined);
+    session.currentCardInterval =
+      card.nextRepetitionTime && lastRepTime
+        ? card.nextRepetitionTime - lastRepTime
+        : undefined;
+
+    let totalCardTime = 0;
+    let totalCardReps = 0;
+    for (const rep of card.repetitionHistory) {
+      if (rep.score !== QueueInteractionScore.TOO_EARLY) {
+        totalCardReps++;
+        if (rep.responseTime) totalCardTime += rep.responseTime;
+      }
+    }
+    session.currentCardTotalTime = totalCardTime;
+    session.currentCardRepCount = totalCardReps;
+  } else {
+    session.currentCardFirstRep = undefined;
+    session.currentCardTotalTime = 0;
+    session.currentCardRepCount = 0;
+    session.currentCardInterval = undefined;
+  }
+}
+
 export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
   // Heartbeat monitor: auto-save Mastery Drill session if the popup is closed without QueueExit
   setInterval(async () => {
@@ -60,6 +99,30 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       }
     }
   }, 2500);
+
+  // Cluster sibling-transition poll: inside a cluster, QueueLoadCard does NOT fire per
+  // sibling — only card_priority_display.tsx sees each sibling via getWidgetContext().
+  // The widget broadcasts `clusterVisibleCardId`; we poll for changes and advance the
+  // per-card panel state (currentCardId/prevCardId + lifetime stats) so the UI tracks
+  // the sibling actually on screen rather than being stuck on the cluster anchor.
+  setInterval(async () => {
+    if (!currentSession) return;
+    try {
+      const vis = await plugin.storage.getSession<string>('clusterVisibleCardId');
+      if (!vis || vis === currentSession.currentCardId) return;
+
+      currentSession.prevCardFirstRep = currentSession.currentCardFirstRep;
+      currentSession.prevCardTotalTime = currentSession.currentCardTotalTime;
+      currentSession.prevCardRepCount = currentSession.currentCardRepCount;
+      currentSession.prevCardId = currentSession.currentCardId;
+      currentSession.currentCardId = vis;
+
+      await loadCardStats(plugin, currentSession, vis);
+      await syncLiveSession(plugin);
+    } catch (error) {
+      console.error('ERROR in cluster sibling-transition poll:', error);
+    }
+  }, 500);
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async (data: any) => {
     try {
@@ -221,34 +284,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           currentSession.prevCardId = currentSession.currentCardId;
           currentSession.currentCardId = data.cardId;
 
-          const card = await plugin.card.findOne(data.cardId);
-          if (card?.repetitionHistory && card.repetitionHistory.length > 0) {
-            const dates = card.repetitionHistory.map((h) => h.date);
-            currentSession.currentCardFirstRep = Math.min(...dates);
-
-            const lastRepTime =
-              card.lastRepetitionTime || (dates.length > 0 ? Math.max(...dates) : undefined);
-            currentSession.currentCardInterval =
-              card.nextRepetitionTime && lastRepTime
-                ? card.nextRepetitionTime - lastRepTime
-                : undefined;
-
-            let totalCardTime = 0;
-            let totalCardReps = 0;
-            for (const rep of card.repetitionHistory) {
-              if (rep.score !== QueueInteractionScore.TOO_EARLY) {
-                totalCardReps++;
-                if (rep.responseTime) totalCardTime += rep.responseTime;
-              }
-            }
-            currentSession.currentCardTotalTime = totalCardTime;
-            currentSession.currentCardRepCount = totalCardReps;
-          } else {
-            currentSession.currentCardFirstRep = undefined;
-            currentSession.currentCardTotalTime = 0;
-            currentSession.currentCardRepCount = 0;
-            currentSession.currentCardInterval = undefined;
-          }
+          await loadCardStats(plugin, currentSession, data.cardId);
 
           await syncLiveSession(plugin);
         }
