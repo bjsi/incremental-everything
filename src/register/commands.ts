@@ -1697,14 +1697,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerCommand({
-    id: 'open_mastery_drill',
-    name: 'Mastery Drill: deliberately practice poorly rated cards',
-    quickCode: 'drill',
-    action: async () => {
-      await plugin.widget.openPopup('mastery_drill');
-    },
-  });
+  const skipMasteryDrill = Boolean(
+    await plugin.settings.getSetting('skip_mastery_drill')
+  );
+  if (!skipMasteryDrill) {
+    plugin.app.registerCommand({
+      id: 'open_mastery_drill',
+      name: 'Mastery Drill: deliberately practice poorly rated cards',
+      quickCode: 'drill',
+      action: async () => {
+        await plugin.widget.openPopup('mastery_drill');
+      },
+    });
+  }
 
   plugin.app.registerCommand({
     id: 'debug_clear_flashcard_history',

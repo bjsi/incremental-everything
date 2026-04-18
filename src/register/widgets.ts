@@ -1,7 +1,10 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode } from '../lib/consts';
 
-export function registerWidgets(plugin: ReactRNPlugin) {
+export async function registerWidgets(plugin: ReactRNPlugin) {
+  const skipMasteryDrill = Boolean(
+    await plugin.settings.getSetting('skip_mastery_drill')
+  );
 
   // NEW: Light Priority Widget
   plugin.app.registerWidget('priority_light', WidgetLocation.Popup, {
@@ -278,19 +281,22 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // Mastery Drill popup
-  plugin.app.registerWidget('mastery_drill', WidgetLocation.Popup, {
-    dimensions: {
-      width: 1100,
-      height: 900,
-    },
-  });
+  // Mastery Drill widgets are gated behind the 'skip_mastery_drill' setting.
+  if (!skipMasteryDrill) {
+    // Mastery Drill popup
+    plugin.app.registerWidget('mastery_drill', WidgetLocation.Popup, {
+      dimensions: {
+        width: 1100,
+        height: 900,
+      },
+    });
 
-  // Mastery Drill notification banner
-  plugin.app.registerWidget('mastery_drill_notification', WidgetLocation.SidebarEnd, {
-    dimensions: {
-      width: '100%',
-      height: 'auto',
-    },
-  });
+    // Mastery Drill notification banner
+    plugin.app.registerWidget('mastery_drill_notification', WidgetLocation.SidebarEnd, {
+      dimensions: {
+        width: '100%',
+        height: 'auto',
+      },
+    });
+  }
 }

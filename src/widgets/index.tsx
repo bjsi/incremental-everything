@@ -37,7 +37,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerIncrementalRemTracker(plugin);
 
   registerCallbacks(plugin);
-  registerWidgets(plugin);
+  await registerWidgets(plugin);
 
   // Register CSS rules
   await registerPdfHighlightCSS(plugin);

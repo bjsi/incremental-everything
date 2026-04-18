@@ -587,33 +587,39 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
           console.error('Failed to record flashcard history entry:', error);
         }
 
-        // Mastery Drill: add AGAIN/HARD cards, remove on GOOD+
+        // Mastery Drill: add AGAIN/HARD cards, remove on GOOD+.
+        // Gated by the 'skip_mastery_drill' setting.
         if (score !== undefined) {
-          try {
-            const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-            const currentKbId = kbData?._id;
-            type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
-            let finalDrillIds =
-              ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
-            const getCardId = (item: FinalDrillItem) =>
-              typeof item === 'string' ? item : item.cardId;
+          const skipMasteryDrill = Boolean(
+            await plugin.settings.getSetting('skip_mastery_drill')
+          );
+          if (!skipMasteryDrill) {
+            try {
+              const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+              const currentKbId = kbData?._id;
+              type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+              let finalDrillIds =
+                ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
+              const getCardId = (item: FinalDrillItem) =>
+                typeof item === 'string' ? item : item.cardId;
 
-            if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
-              if (!finalDrillIds.some((item) => getCardId(item) === effectiveCardId)) {
-                finalDrillIds = [
-                  ...finalDrillIds,
-                  { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
-                ];
-                await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
+              if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
+                if (!finalDrillIds.some((item) => getCardId(item) === effectiveCardId)) {
+                  finalDrillIds = [
+                    ...finalDrillIds,
+                    { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
+                  ];
+                  await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
+                }
+              } else if (score >= QueueInteractionScore.GOOD) {
+                const filtered = finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId);
+                if (filtered.length !== finalDrillIds.length) {
+                  await plugin.storage.setSynced('finalDrillIds', filtered);
+                }
               }
-            } else if (score >= QueueInteractionScore.GOOD) {
-              const filtered = finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId);
-              if (filtered.length !== finalDrillIds.length) {
-                await plugin.storage.setSynced('finalDrillIds', filtered);
-              }
+            } catch (error) {
+              console.error('Failed to update Mastery Drill list:', error);
             }
-          } catch (error) {
-            console.error('Failed to update Mastery Drill list:', error);
           }
         }
       } else {

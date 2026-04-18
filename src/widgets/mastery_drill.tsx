@@ -106,6 +106,7 @@ function FinalDrill() {
   };
 
   const [editingRemId, setEditingRemId] = useState<string | null>(null);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
 
   const startEditing = async (which: 'current' | 'previous') => {
     const key = which === 'current' ? "finalDrillCurrentCardId" : "finalDrillPreviousCardId";
@@ -117,9 +118,23 @@ function FinalDrill() {
     const card = await plugin.card.findOne(cardId);
     if (card && card.remId) {
       setEditingRemId(card.remId);
+      setEditingCardId(cardId);
     } else {
       await plugin.app.toast(`Could not find Rem for card ${cardId}`);
     }
+  };
+
+  const removeCurrentFromDrill = async () => {
+    const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
+    if (!cardId) {
+      await plugin.app.toast("No current card found.");
+      return;
+    }
+    const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
+    const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== cardId);
+    await setFinalDrillIdsRaw(newIds);
+    await plugin.queue.removeCurrentCardFromQueue(false);
+    await plugin.app.toast("Card removed from Mastery Drill.");
   };
 
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -158,6 +173,28 @@ function FinalDrill() {
             <span className="text-xs px-2 font-mono" style={{ color: 'var(--rn-clr-content-tertiary)' }}>ID: {editingRemId}</span>
           </div>
           <div className="flex gap-2" style={{ paddingRight: '60px' }}>
+            <button
+              onClick={async () => {
+                if (!editingCardId) { await plugin.app.toast("No card found."); return; }
+                const card = await plugin.card.findOne(editingCardId);
+                if (card && card.remId) {
+                  const rem = await plugin.rem.findOne(card.remId);
+                  if (rem) {
+                    await rem.addPowerup(BuiltInPowerupCodes.EditLater);
+                    const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
+                    const newIds = finalDrillIdsRaw.filter(item => getCardId(item) !== editingCardId);
+                    await setFinalDrillIdsRaw(newIds);
+                    await plugin.app.toast("Card marked for Edit Later and removed from drill.");
+                    setEditingRemId(null);
+                    setEditingCardId(null);
+                  }
+                }
+              }}
+              className="px-3 py-1.5 rounded bg-orange-500 text-white hover:bg-orange-600 font-medium transition-colors shadow-md"
+              title="Mark for Edit Later and remove from drill"
+            >
+              Edit Later
+            </button>
             <button
               onClick={async () => {
                 const rem = await plugin.rem.findOne(editingRemId);
@@ -402,6 +439,13 @@ function FinalDrill() {
               title="Edit the currently visible card"
             >
               Edit Current
+            </button>
+            <button
+              onClick={removeCurrentFromDrill}
+              className="text-sm px-3 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 font-medium transition-colors"
+              title="Remove current card from the Mastery Drill"
+            >
+              Remove from Drill
             </button>
           </div>
 
