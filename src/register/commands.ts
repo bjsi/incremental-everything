@@ -1700,7 +1700,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   plugin.app.registerCommand({
     id: 'open_mastery_drill',
     name: 'Mastery Drill: deliberately practice poorly rated cards',
-    quickCode: 'md',
+    quickCode: 'drill',
     action: async () => {
       await plugin.widget.openPopup('mastery_drill');
     },
