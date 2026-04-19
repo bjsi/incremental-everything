@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   renderWidget,
   useSyncedStorageState,
@@ -23,11 +23,17 @@ function FinalDrill() {
 
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [filteredIds, setFilteredIds] = useState<string[]>([]);
+  const [delayedCount, setDelayedCount] = useState<number>(0);
   const [oldItemsCount, setOldItemsCount] = useState<number>(0);
+  const recheckTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const oldItemThreshold = useTrackerPlugin(async (reactivePlugin) => {
     return await reactivePlugin.settings.getSetting<number>("old_item_threshold");
   }, [plugin]) ?? 7;
+
+  const minDelayMinutes = useTrackerPlugin(async (reactivePlugin) => {
+    return await reactivePlugin.settings.getSetting<number>("mastery_drill_min_delay_minutes");
+  }, [plugin]) ?? 120;
 
   const [showClearOldConfirm, setShowClearOldConfirm] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
@@ -52,42 +58,59 @@ function FinalDrill() {
       const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
       const currentKbId = currentKb._id;
 
-      let relevantIds: string[] = [];
+      const activeIds: string[] = [];
+      let delayed = 0;
       let oldCount = 0;
+      let earliestUnblock: number | undefined;
       const now = Date.now();
       const msPerDay = 1000 * 60 * 60 * 24;
+      const minDelayMs = minDelayMinutes * 60 * 1000;
 
-      finalDrillIdsRaw.forEach(item => {
-        let isRelevant = false;
-        let addedAt: number | undefined;
+      for (const item of finalDrillIdsRaw) {
+        const isRelevant = typeof item === 'string' ? isPrimary : item.kbId === currentKbId;
+        if (!isRelevant) continue;
 
-        if (typeof item === 'string') {
-          if (isPrimary) isRelevant = true;
-        } else if (item.kbId === currentKbId) {
-          isRelevant = true;
-          addedAt = item.addedAt;
+        const cardId = typeof item === 'string' ? item : item.cardId;
+        const addedAt = typeof item === 'string' ? undefined : item.addedAt;
+
+        if (addedAt) {
+          const daysOld = (now - addedAt) / msPerDay;
+          if (daysOld > oldItemThreshold) oldCount++;
         }
 
-        if (isRelevant) {
-          const id = typeof item === 'string' ? item : item.cardId;
-          relevantIds.push(id);
-          if (addedAt) {
-            const daysOld = (now - addedAt) / msPerDay;
-            if (daysOld > oldItemThreshold) oldCount++;
-          }
+        if (addedAt && (now - addedAt) < minDelayMs) {
+          delayed++;
+          const unblockAt = addedAt + minDelayMs;
+          if (earliestUnblock === undefined || unblockAt < earliestUnblock) earliestUnblock = unblockAt;
+          console.log(`[MasteryDrill] Card ${cardId} cooling — addedAt=${new Date(addedAt).toISOString()}, remaining=${Math.round((unblockAt - now) / 60000)}min`);
+        } else {
+          activeIds.push(cardId);
         }
-      });
+      }
 
       if (!cancelled) {
-        setFilteredIds(relevantIds);
+        setFilteredIds(activeIds);
+        setDelayedCount(delayed);
         setOldItemsCount(oldCount);
         setIsLoaded(true);
+
+        // Schedule a recheck when the first delayed card becomes available
+        clearTimeout(recheckTimerRef.current);
+        if (delayed > 0 && earliestUnblock !== undefined) {
+          const msUntilUnblock = earliestUnblock - Date.now() + 500;
+          recheckTimerRef.current = setTimeout(() => {
+            if (!cancelled) updateDerivedState();
+          }, Math.max(msUntilUnblock, 1000));
+        }
       }
     }
 
     if (plugin) updateDerivedState();
-    return () => { cancelled = true; };
-  }, [finalDrillIdsRaw, plugin, oldItemThreshold]);
+    return () => {
+      cancelled = true;
+      clearTimeout(recheckTimerRef.current);
+    };
+  }, [finalDrillIdsRaw, plugin, oldItemThreshold, minDelayMinutes]);
 
   const clearOldItems = async () => {
     const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
@@ -391,6 +414,7 @@ function FinalDrill() {
   }
 
   if (filteredIds.length === 0) {
+    const isCoolingDown = delayedCount > 0;
     return (
       <div
         ref={containerRef}
@@ -401,16 +425,24 @@ function FinalDrill() {
           color: 'var(--rn-clr-content-primary)',
         }}
       >
-        <h3 className="text-lg font-bold mb-2">Mastery Drill Queue Empty</h3>
-        <p className="text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-          No cards are currently in the Mastery Drill queue for this Knowledge Base.
-        </p>
-        <button
-          onClick={() => setShowClearAllConfirm(true)}
-          className="mt-4 px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600"
-        >
-          Open Settings
-        </button>
+        {isCoolingDown ? (
+          <>
+            <h3 className="text-lg font-bold mb-2">All Cards Cooling Down</h3>
+            <p className="text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+              {delayedCount} card{delayedCount !== 1 ? 's are' : ' is'} waiting for the {minDelayMinutes}-minute minimum delay to pass before appearing here again.
+            </p>
+            <p className="text-xs mt-2" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              The drill will refresh automatically when the first card is ready.
+            </p>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-bold mb-2">Mastery Drill Queue Empty</h3>
+            <p className="text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+              No cards are currently in the Mastery Drill queue for this Knowledge Base.
+            </p>
+          </>
+        )}
       </div>
     );
   }
@@ -426,6 +458,22 @@ function FinalDrill() {
           <div className="flex gap-3 items-center">
             <span className="font-bold text-lg">Mastery Drill</span>
             <div className="flex gap-2 items-center">
+              <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-800">
+                {filteredIds.length} Remaining
+              </span>
+              {delayedCount > 0 && (
+                <span
+                  className="text-xs px-2 py-1 rounded"
+                  style={{
+                    backgroundColor: 'var(--rn-clr-background-secondary)',
+                    color: 'var(--rn-clr-content-secondary)',
+                    border: '1px solid var(--rn-clr-border-primary)',
+                  }}
+                  title={`${delayedCount} card${delayedCount !== 1 ? 's are' : ' is'} within the ${minDelayMinutes}-min minimum delay and will appear later`}
+                >
+                  {delayedCount} cooling
+                </span>
+              )}
               <button
                 onClick={() => setShowClearAllConfirm(true)}
                 className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
@@ -433,9 +481,6 @@ function FinalDrill() {
               >
                 Clear Queue
               </button>
-              <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-800">
-                {filteredIds.length} Remaining
-              </span>
               {currentCardData?.priority && (
                 <div
                   className="cursor-pointer"

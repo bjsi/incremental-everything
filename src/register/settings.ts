@@ -422,6 +422,14 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     defaultValue: 7,
   });
 
+  plugin.settings.registerNumberSetting({
+    id: 'mastery_drill_min_delay_minutes',
+    title: 'Mastery Drill Minimum Delay (Minutes)',
+    description:
+      'A card rated Again or Hard will not appear in the Mastery Drill until at least this many minutes have passed since it was last reviewed. Prevents reviewing the same card again too soon. Default: 120 minutes.',
+    defaultValue: 120,
+  });
+
   plugin.settings.registerBooleanSetting({
     id: 'disable_final_drill_notification',
     title: 'Disable Mastery Drill Notifications',

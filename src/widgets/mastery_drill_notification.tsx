@@ -76,23 +76,28 @@ export const FinalDrillNotification = () => {
     const settings = useTrackerPlugin(
         async (reactivePlugin) => {
             const disabled = await reactivePlugin.settings.getSetting("disable_final_drill_notification");
-            const ids = (await reactivePlugin.storage.getSynced("finalDrillIds")) as (string | { cardId: string; kbId?: string })[] || [];
+            const minDelayMinutes = (await reactivePlugin.settings.getSetting<number>("mastery_drill_min_delay_minutes")) ?? 120;
+            const ids = (await reactivePlugin.storage.getSynced("finalDrillIds")) as (string | { cardId: string; kbId?: string; addedAt?: number })[] || [];
 
             const currentKb = await reactivePlugin.kb.getCurrentKnowledgeBaseData();
             const isPrimary = await reactivePlugin.kb.isPrimaryKnowledgeBase();
             const currentKbId = currentKb?._id;
 
-            const count = ids.filter(item => {
-                if (typeof item === 'string') {
-                    return isPrimary;
-                } else {
-                    return item.kbId === currentKbId;
-                }
-            }).length;
+            const relevantItems = ids.filter(item =>
+                typeof item === 'string' ? isPrimary : item.kbId === currentKbId
+            );
+
+            const now = Date.now();
+            const minDelayMs = minDelayMinutes * 60 * 1000;
+            let readyCount = 0;
+            for (const item of relevantItems) {
+                const addedAt = typeof item === 'string' ? undefined : item.addedAt;
+                if (!addedAt || (now - addedAt) >= minDelayMs) readyCount++;
+            }
 
             const resumeTrigger = await reactivePlugin.storage.getSession<number>("finalDrillResumeTrigger");
 
-            return { disabled, count, resumeTrigger };
+            return { disabled, count: relevantItems.length, readyCount, resumeTrigger };
         },
         []
     );
@@ -130,7 +135,7 @@ export const FinalDrillNotification = () => {
 
     const MIN_QUEUE_SIZE_FOR_NOTIFICATION = 10;
 
-    if (!settings || settings.disabled || settings.count < MIN_QUEUE_SIZE_FOR_NOTIFICATION || dismissed) {
+    if (!settings || settings.disabled || settings.readyCount < MIN_QUEUE_SIZE_FOR_NOTIFICATION || dismissed) {
         return null;
     }
 
@@ -174,7 +179,7 @@ export const FinalDrillNotification = () => {
             </div>
 
             <div className="text-sm" style={textStyle}>
-                <span className="font-bold" style={{ color: "#ef4444" }}>{settings.count}</span> cards waiting.
+                <span className="font-bold" style={{ color: "#ef4444" }}>{settings.readyCount}</span> cards ready for drill.
             </div>
 
             <div style={phraseStyle}>
