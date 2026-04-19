@@ -593,135 +593,135 @@ function FinalDrill() {
       className="h-full w-full flex flex-col relative focus:outline-none"
     >
       <div className="border-b rn-clr-border-primary flex flex-col">
-        <div className="flex justify-between items-center p-2">
-          <div className="flex gap-3 items-center">
-            <span className="font-bold text-lg">Mastery Drill</span>
-            <div className="flex gap-2 items-center">
-              <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-800">
-                {filteredIds.length} Remaining
-              </span>
-              {delayedCount > 0 && (
-                <span
-                  className="text-xs px-2 py-1 rounded"
-                  style={{
-                    backgroundColor: 'var(--rn-clr-background-secondary)',
-                    color: 'var(--rn-clr-content-secondary)',
-                    border: '1px solid var(--rn-clr-border-primary)',
-                  }}
-                  title={`${delayedCount} card${delayedCount !== 1 ? 's are' : ' is'} within the ${minDelayMinutes}-min minimum delay and will appear later`}
-                >
-                  {delayedCount} cooling
-                </span>
-              )}
-              <button
-                onClick={() => setShowClearAllConfirm(true)}
-                className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                title="Clear all items from the Mastery Drill queue"
-              >
-                Clear Queue
-              </button>
-              <button
-                onClick={() => setShowClearLowPriorityView(true)}
-                className="text-xs px-2 py-1 rounded border border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-900/20"
-                title="Remove low priority cards from the Mastery Drill queue"
-              >
-                Clear Low Priority
-              </button>
-              {currentCardData?.priority && (
-                <div
-                  className="cursor-pointer"
-                  onClick={() => setEditingPriority(currentCardData.priority!.priority)}
-                  title="Click to change priority"
-                >
-                  <PriorityBadge
-                    priority={currentCardData.priority.priority}
-                    percentile={currentCardData.priority.kbPercentile ?? undefined}
-                    compact
-                    useAbsoluteColoring={currentCardData.priority.kbPercentile == null}
-                    source={currentCardData.priority.source}
-                    isCardPriority
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-2 items-center">
-            <button
-              onClick={async () => {
-                const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
-                if (cardId) {
-                  const card = await plugin.card.findOne(cardId);
-                  if (card && card.remId) {
-                    const rem = await plugin.rem.findOne(card.remId);
-                    if (rem) {
-                      await plugin.window.openRem(rem);
-                      await plugin.storage.setSession("finalDrillResumeTrigger", Date.now());
-                      await plugin.widget.closePopup();
-                    }
-                  }
-                }
-              }}
-              className="px-3 py-1.5 text-sm rounded transition-colors shadow-sm font-medium"
-              style={{
-                backgroundColor: 'var(--rn-clr-background-primary)',
-                color: 'var(--rn-clr-content-primary)',
-                border: '1px solid var(--rn-clr-border-primary)'
-              }}
-              title="Go to the current Rem (closes popup)"
-            >
-              Go to Rem
-            </button>
-
-            <button
-              onClick={() => { setEditLaterMessage(''); setEditLaterContext('current'); }}
-              className="px-3 py-1.5 text-sm rounded bg-orange-500 text-white hover:bg-orange-600 font-medium transition-colors shadow-md"
-              title="Mark for Edit Later and remove from drill"
-            >
-              Edit Later
-            </button>
-
-            <button
-              onClick={() => startEditing('previous')}
-              className="px-3 py-1.5 text-sm rounded font-medium transition-colors shadow-sm"
+        {/* Row 1: Queue management */}
+        <div className="flex items-center gap-2 px-2 pt-2 pb-1">
+          <span className="font-bold text-lg whitespace-nowrap flex-shrink-0">Mastery Drill</span>
+          <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-800 whitespace-nowrap">
+            {filteredIds.length} Remaining
+          </span>
+          {delayedCount > 0 && (
+            <span
+              className="text-xs px-2 py-1 rounded whitespace-nowrap"
               style={{
                 backgroundColor: 'var(--rn-clr-background-secondary)',
-                color: 'var(--rn-clr-content-primary)',
-                border: '1px solid var(--rn-clr-border-primary)'
+                color: 'var(--rn-clr-content-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
               }}
-              title="Edit the card you just rated"
+              title={`${delayedCount} card${delayedCount !== 1 ? 's are' : ' is'} within the ${minDelayMinutes}-min minimum delay and will appear later`}
             >
-              Edit Previous
-            </button>
-            <button
-              onClick={() => startEditing('current')}
-              className="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 font-medium transition-colors shadow-sm"
-              title="Edit the currently visible card"
-            >
-              Edit Current
-            </button>
-            <button
-              onClick={removeCurrentFromDrill}
-              className="text-sm px-3 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 font-medium transition-colors"
-              title="Remove current card from the Mastery Drill"
-            >
-              Remove from Drill
-            </button>
-          </div>
-
+              {delayedCount} cooling
+            </span>
+          )}
+          <button
+            onClick={() => setShowClearAllConfirm(true)}
+            className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 whitespace-nowrap"
+            title="Clear all items from the Mastery Drill queue"
+          >
+            Clear Queue
+          </button>
+          <button
+            onClick={() => setShowClearLowPriorityView(true)}
+            className="text-xs px-2 py-1 rounded border border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-900/20 whitespace-nowrap"
+            title="Remove low priority cards from the Mastery Drill queue"
+          >
+            Clear Low Priority
+          </button>
           {oldItemsCount > 0 && (
-            <div className="flex items-center gap-2 px-2 py-1 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-              <span className="text-xs text-yellow-800 dark:text-yellow-200">
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800"
+              title={`${oldItemsCount} card${oldItemsCount !== 1 ? 's have' : ' has'} been waiting in the drill queue for more than ${oldItemThreshold} days. The Mastery Drill is intended for cards you recently rated Hard or Again — after this much time, the spaced repetition algorithm will handle them at their scheduled date instead. You can remove them here if you prefer to trust the scheduler rather than drilling them now.`}
+            >
+              <span className="text-xs text-yellow-800 dark:text-yellow-200 whitespace-nowrap">
                 {oldItemsCount} &gt; {oldItemThreshold} days.
               </span>
               <button
                 onClick={() => setShowClearOldConfirm(true)}
-                className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 dark:border-yellow-600"
+                className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 dark:border-yellow-600 whitespace-nowrap"
               >
                 Clear Old
               </button>
             </div>
           )}
+        </div>
+
+        {/* Row 2: Current card actions */}
+        <div className="flex items-center gap-2 px-2 pb-2">
+          {currentCardData?.priority && (
+            <div
+              className="cursor-pointer"
+              onClick={() => setEditingPriority(currentCardData.priority!.priority)}
+              title="Click to change priority"
+            >
+              <PriorityBadge
+                priority={currentCardData.priority.priority}
+                percentile={currentCardData.priority.kbPercentile ?? undefined}
+                compact
+                useAbsoluteColoring={currentCardData.priority.kbPercentile == null}
+                source={currentCardData.priority.source}
+                isCardPriority
+              />
+            </div>
+          )}
+          <button
+            onClick={async () => {
+              const cardId = await plugin.storage.getSession<string>("finalDrillCurrentCardId");
+              if (cardId) {
+                const card = await plugin.card.findOne(cardId);
+                if (card && card.remId) {
+                  const rem = await plugin.rem.findOne(card.remId);
+                  if (rem) {
+                    await plugin.window.openRem(rem);
+                    await plugin.storage.setSession("finalDrillResumeTrigger", Date.now());
+                    await plugin.widget.closePopup();
+                  }
+                }
+              }
+            }}
+            className="px-3 py-1.5 text-sm rounded transition-colors shadow-sm font-medium whitespace-nowrap"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+              border: '1px solid var(--rn-clr-border-primary)'
+            }}
+            title="Go to the current Rem (closes popup)"
+          >
+            Go to Rem
+          </button>
+
+          <button
+            onClick={() => { setEditLaterMessage(''); setEditLaterContext('current'); }}
+            className="px-3 py-1.5 text-sm rounded bg-orange-500 text-white hover:bg-orange-600 font-medium transition-colors shadow-md whitespace-nowrap"
+            title="Mark for Edit Later and remove from drill"
+          >
+            Edit Later
+          </button>
+
+          <button
+            onClick={() => startEditing('previous')}
+            className="px-3 py-1.5 text-sm rounded font-medium transition-colors shadow-sm whitespace-nowrap"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              color: 'var(--rn-clr-content-primary)',
+              border: '1px solid var(--rn-clr-border-primary)'
+            }}
+            title="Edit the card you just rated"
+          >
+            Edit Previous
+          </button>
+          <button
+            onClick={() => startEditing('current')}
+            className="px-3 py-1.5 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 font-medium transition-colors shadow-sm whitespace-nowrap"
+            title="Edit the currently visible card"
+          >
+            Edit Current
+          </button>
+          <button
+            onClick={removeCurrentFromDrill}
+            className="text-sm px-3 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 font-medium transition-colors whitespace-nowrap"
+            title="Remove current card from the Mastery Drill"
+          >
+            Remove from Drill
+          </button>
         </div>
 
         {editingPriority !== null && currentCardData?.remId && (
@@ -739,10 +739,10 @@ function FinalDrill() {
           </div>
         )}
 
-        <div className="px-2 pb-2 flex flex-col gap-0.5">
-          <span className="text-sm px-2">Deliberately practice again your poorly rated flashcards.</span>
-          <span className="text-xs px-2 text-gray-500 dark:text-gray-400">
-            Flashcards you have rated <i>Again</i> or <i>Hard</i> will appear in the Mastery Drill and will remain here until you rate them <i>Good</i> or better.
+        <div className="px-4 pb-2 flex items-baseline gap-2 flex-nowrap overflow-hidden">
+          <span className="text-sm whitespace-nowrap flex-shrink-0">Deliberately practice again your poorly rated flashcards.</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            Flashcards you have rated <i>Again</i> or <i>Hard</i> will appear and remain in the Drill until you rate them <i>Good</i> or better.
           </span>
         </div>
 
