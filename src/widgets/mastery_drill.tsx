@@ -38,6 +38,45 @@ function FinalDrill() {
   const [showClearOldConfirm, setShowClearOldConfirm] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
 
+  const [showClearLowPriorityView, setShowClearLowPriorityView] = useState(false);
+  const [lowPriorityCardData, setLowPriorityCardData] = useState<{ cardId: string; priority: number }[] | null>(null);
+  const [lowPriorityThreshold, setLowPriorityThreshold] = useState(70);
+
+  useEffect(() => {
+    if (!showClearLowPriorityView) { setLowPriorityCardData(null); return; }
+    let cancelled = false;
+    (async () => {
+      const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
+      const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+      const currentKbId = currentKb._id;
+      const results: { cardId: string; priority: number }[] = [];
+      for (const item of finalDrillIdsRaw) {
+        if (cancelled) return;
+        const isRelevant = typeof item === 'string' ? isPrimary : item.kbId === currentKbId;
+        if (!isRelevant) continue;
+        const cardId = typeof item === 'string' ? item : item.cardId;
+        const card = await plugin.card.findOne(cardId);
+        if (!card?.remId || cancelled) continue;
+        const rem = await plugin.rem.findOne(card.remId);
+        if (!rem || cancelled) continue;
+        const priorityInfo = await getCardPriority(plugin, rem);
+        results.push({ cardId, priority: priorityInfo?.priority ?? 100 });
+      }
+      if (!cancelled) setLowPriorityCardData(results);
+    })();
+    return () => { cancelled = true; };
+  }, [showClearLowPriorityView]);
+
+  const doRemoveLowPriority = async () => {
+    if (!lowPriorityCardData) return;
+    const toRemoveIds = new Set(
+      lowPriorityCardData.filter(({ priority }) => priority > lowPriorityThreshold).map(({ cardId }) => cardId)
+    );
+    const getCardId = (item: FinalDrillItem) => typeof item === 'string' ? item : item.cardId;
+    await setFinalDrillIdsRaw(finalDrillIdsRaw.filter(item => !toRemoveIds.has(getCardId(item))));
+    setShowClearLowPriorityView(false);
+  };
+
   const [editingPriority, setEditingPriority] = useState<number | null>(null);
 
   const currentCardData = useTrackerPlugin(async (rp) => {
@@ -413,6 +452,106 @@ function FinalDrill() {
     );
   }
 
+  if (showClearLowPriorityView) {
+    const getBucket = (p: number) => Math.min(Math.floor(Math.max(p - 1, 0) / 5), 19);
+    const buckets = Array.from({ length: 20 }, (_, i) => ({
+      label: i === 0 ? '0-5' : `${i * 5 + 1}-${(i + 1) * 5}`,
+      minPriority: i === 0 ? 0 : i * 5 + 1,
+      maxPriority: (i + 1) * 5,
+      count: 0,
+    }));
+    lowPriorityCardData?.forEach(({ priority }) => { buckets[getBucket(priority)].count++; });
+    const maxCount = Math.max(...buckets.map(b => b.count), 1);
+    const toRemoveCount = lowPriorityCardData?.filter(({ priority }) => priority > lowPriorityThreshold).length ?? 0;
+
+    return (
+      <div className="h-full w-full flex flex-col" style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }}>
+        <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}>
+          <span className="font-semibold">Clear Low Priority Cards</span>
+          <button
+            onClick={() => setShowClearLowPriorityView(false)}
+            className="text-sm px-2 py-1 rounded transition-colors"
+            style={{ color: 'var(--rn-clr-content-secondary)', border: '1px solid var(--rn-clr-border-primary)' }}
+          >
+            ← Back
+          </button>
+        </div>
+
+        {lowPriorityCardData === null ? (
+          <div className="flex-grow flex items-center justify-center text-sm" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+            Loading priorities…
+          </div>
+        ) : (
+          <>
+            <div className="overflow-y-auto px-4 py-2" style={{ maxHeight: '65vh' }}>
+              {buckets.map((bucket, i) => {
+                const isAbove = bucket.minPriority > lowPriorityThreshold;
+                const isSplit = !isAbove && bucket.maxPriority > lowPriorityThreshold;
+                const barColor = isAbove ? '#ef4444' : isSplit ? '#f97316' : 'var(--rn-clr-blue)';
+                const barWidth = bucket.count > 0 ? Math.max((bucket.count / maxCount) * 100, 2) : 0;
+                return (
+                  <div key={i} className="flex items-center gap-2 py-0.5" style={{ opacity: bucket.count === 0 ? 0.3 : 1 }}>
+                    <span className="text-xs w-14 text-right flex-shrink-0 font-mono"
+                      style={{ color: isAbove ? '#ef4444' : isSplit ? '#f97316' : 'var(--rn-clr-content-secondary)', fontWeight: (isAbove || isSplit) ? 600 : undefined }}>
+                      {bucket.label}
+                    </span>
+                    <div className="flex-grow rounded overflow-hidden" style={{ height: 14, backgroundColor: 'var(--rn-clr-background-secondary)' }}>
+                      <div style={{ width: `${barWidth}%`, height: '100%', backgroundColor: barColor, transition: 'width 0.15s' }} />
+                    </div>
+                    <span className="text-xs w-5 text-right flex-shrink-0"
+                      style={{ color: isAbove ? '#ef4444' : 'var(--rn-clr-content-tertiary)' }}>
+                      {bucket.count}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex-shrink-0 px-4 py-2 border-t flex flex-col gap-2" style={{ borderColor: 'var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)' }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>Remove cards with priority above:</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={lowPriorityThreshold}
+                  onChange={(e) => setLowPriorityThreshold(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="w-14 text-xs p-1 rounded text-center"
+                  style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)' }}
+                />
+                <span className="text-xs ml-auto" style={{ color: toRemoveCount > 0 ? '#ef4444' : 'var(--rn-clr-content-tertiary)' }}>
+                  {toRemoveCount === 0 ? 'No cards to remove' : `${toRemoveCount} card${toRemoveCount !== 1 ? 's' : ''} will be removed`}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={doRemoveLowPriority}
+                  disabled={toRemoveCount === 0}
+                  className="flex-1 py-1.5 rounded text-sm font-medium transition-colors"
+                  style={{
+                    backgroundColor: toRemoveCount > 0 ? '#ef4444' : 'var(--rn-clr-background-primary)',
+                    color: toRemoveCount > 0 ? 'white' : 'var(--rn-clr-content-tertiary)',
+                    border: toRemoveCount === 0 ? '1px solid var(--rn-clr-border-primary)' : undefined,
+                    cursor: toRemoveCount === 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {toRemoveCount > 0 ? `Remove ${toRemoveCount} card${toRemoveCount !== 1 ? 's' : ''}` : 'No cards to remove'}
+                </button>
+                <button
+                  onClick={() => setShowClearLowPriorityView(false)}
+                  className="flex-1 py-1.5 rounded text-sm font-medium transition-colors"
+                  style={{ border: '1px solid var(--rn-clr-border-primary)', color: 'var(--rn-clr-content-secondary)', backgroundColor: 'var(--rn-clr-background-primary)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
   if (filteredIds.length === 0) {
     const isCoolingDown = delayedCount > 0;
     return (
@@ -480,6 +619,13 @@ function FinalDrill() {
                 title="Clear all items from the Mastery Drill queue"
               >
                 Clear Queue
+              </button>
+              <button
+                onClick={() => setShowClearLowPriorityView(true)}
+                className="text-xs px-2 py-1 rounded border border-orange-200 text-orange-600 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-900/20"
+                title="Remove low priority cards from the Mastery Drill queue"
+              >
+                Clear Low Priority
               </button>
               {currentCardData?.priority && (
                 <div
