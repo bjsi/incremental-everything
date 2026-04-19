@@ -11,6 +11,9 @@ import {
 } from "@remnote/plugin-sdk";
 import '../style.css';
 import '../App.css';
+import { PriorityBadge } from '../components';
+import { getCardPriority, setCardPriority } from '../lib/card_priority';
+import { InlinePriorityEditor } from '../components/InlineEditors';
 
 export type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
 
@@ -28,6 +31,19 @@ function FinalDrill() {
 
   const [showClearOldConfirm, setShowClearOldConfirm] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+
+  const [editingPriority, setEditingPriority] = useState<number | null>(null);
+
+  const currentCardData = useTrackerPlugin(async (rp) => {
+    const cardId = await rp.storage.getSession<string>("finalDrillCurrentCardId");
+    if (!cardId) return null;
+    const card = await rp.card.findOne(cardId);
+    if (!card?.remId) return null;
+    const rem = await rp.rem.findOne(card.remId);
+    if (!rem) return null;
+    const priority = await getCardPriority(rp, rem);
+    return { remId: card.remId, priority };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -420,6 +436,22 @@ function FinalDrill() {
               <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-800">
                 {filteredIds.length} Remaining
               </span>
+              {currentCardData?.priority && (
+                <div
+                  className="cursor-pointer"
+                  onClick={() => setEditingPriority(currentCardData.priority!.priority)}
+                  title="Click to change priority"
+                >
+                  <PriorityBadge
+                    priority={currentCardData.priority.priority}
+                    percentile={currentCardData.priority.kbPercentile ?? undefined}
+                    compact
+                    useAbsoluteColoring={currentCardData.priority.kbPercentile == null}
+                    source={currentCardData.priority.source}
+                    isCardPriority
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -500,6 +532,21 @@ function FinalDrill() {
             </div>
           )}
         </div>
+
+        {editingPriority !== null && currentCardData?.remId && (
+          <div className="px-2 pt-1">
+            <InlinePriorityEditor
+              value={editingPriority}
+              onChange={setEditingPriority}
+              onSave={async () => {
+                const rem = await plugin.rem.findOne(currentCardData.remId);
+                if (rem) await setCardPriority(plugin, rem, editingPriority, 'manual');
+                setEditingPriority(null);
+              }}
+              onCancel={() => setEditingPriority(null)}
+            />
+          </div>
+        )}
 
         <div className="px-2 pb-2 flex flex-col gap-0.5">
           <span className="text-sm px-2">Deliberately practice again your poorly rated flashcards.</span>
