@@ -8,6 +8,7 @@ import {
   RemHierarchyEditorTree,
   RemRichTextEditor,
   BuiltInPowerupCodes,
+  QueueInteractionScore,
 } from "@remnote/plugin-sdk";
 import '../style.css';
 import '../App.css';
@@ -265,6 +266,47 @@ function FinalDrill() {
   };
 
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const SCORE_MAP: Record<string, QueueInteractionScore> = {
+      '1': QueueInteractionScore.AGAIN,
+      '2': QueueInteractionScore.HARD,
+      '3': QueueInteractionScore.GOOD,
+      ' ': QueueInteractionScore.GOOD,
+      '4': QueueInteractionScore.EASY,
+    };
+
+    const handler = async (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        await plugin.queue.goBackToPreviousCard();
+        return;
+      }
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        await plugin.queue.removeCurrentCardFromQueue(true);
+        return;
+      }
+
+      const score = SCORE_MAP[e.key];
+      if (score === undefined) return;
+      e.preventDefault();
+
+      const revealed = await plugin.queue.hasRevealedAnswer();
+      if (!revealed) {
+        await plugin.queue.showAnswer();
+      } else {
+        await plugin.queue.rateCurrentCard(score);
+      }
+    };
+
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [plugin]);
 
   // Signal active state for queue_session.ts to set scopeName = "Mastery Drill"
   useEffect(() => {
