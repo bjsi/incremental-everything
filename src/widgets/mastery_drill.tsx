@@ -268,6 +268,10 @@ function FinalDrill() {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setTimeout(() => containerRef.current?.focus(), 100);
+  }, []);
+
+  useEffect(() => {
     const SCORE_MAP: Record<string, QueueInteractionScore> = {
       '1': QueueInteractionScore.AGAIN,
       '2': QueueInteractionScore.HARD,
@@ -810,7 +814,14 @@ function FinalDrill() {
         )}
       </div>
 
-      <div className="flex-grow relative">
+      <div
+        className="flex-grow relative"
+        onMouseDown={() => {
+          // After a click inside the Queue embed the iframe may steal focus.
+          // Re-focus our container so the window-level keydown listener keeps working.
+          setTimeout(() => containerRef.current?.focus(), 50);
+        }}
+      >
         {isLoaded ? (
           <Queue cardIds={filteredIds} width="100%" height="100%" />
         ) : (
