@@ -624,7 +624,7 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
                                     const cost = totalTimeMinutes / ageYears;
                                     return (
                                         <div className="mt-1 text-xs text-gray-500 dark:text-gray-400" title="Cost: Total time (min) / Age (years)">
-                                            Cost: {cost.toFixed(1)} min/year
+                                            💰 Cost: {cost.toFixed(1)} min/year
                                         </div>
                                     );
                                 }
@@ -658,7 +658,7 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
                                 {session.prevCardNextRepTime && (
                                     <>
                                         <div className="mt-1 text-xs text-gray-400 dark:text-gray-500" title="Total time coverage from card creation to next scheduled review">
-                                            Coverage: {formatCoverage(session.prevCardFirstRep, session.prevCardNextRepTime)}
+                                            📊 Coverage: {formatCoverage(session.prevCardFirstRep, session.prevCardNextRepTime)}
                                         </div>
                                         {session.prevCardTotalTime && session.prevCardFirstRep && (() => {
                                             const coverageMs = session.prevCardNextRepTime - session.prevCardFirstRep;
@@ -668,7 +668,7 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
                                                 const cost = totalTimeMinutes / coverageYears;
                                                 return (
                                                     <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                                                        Cost: {cost.toFixed(1)} min/year
+                                                        💰 Cost: {cost.toFixed(1)} min/year
                                                     </div>
                                                 );
                                             }

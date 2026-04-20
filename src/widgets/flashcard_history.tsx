@@ -211,7 +211,7 @@ function HistoryItem({
     };
 
     return (
-        <div className="px-1 py-4 border-b border-gray-100" key={data.key}>
+        <div className="px-1 py-4" style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }} key={data.key}>
             <div className="flex gap-2 mb-2">
                 <div
                     className="flex items-center justify-center flex-shrink-0 w-6 h-6 rounded-md cursor-pointer hover:bg-gray-200"

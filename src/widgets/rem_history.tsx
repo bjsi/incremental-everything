@@ -212,7 +212,7 @@ function RemHistoryItem({
     };
 
     return (
-        <div className="px-1 py-4 w-full border-b border-gray-100" key={remId}>
+        <div className="px-1 py-4 w-full" style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }} key={remId}>
             <div className="flex gap-2 mb-2">
                 <div
                     className="flex items-center justify-center flex-shrink-0 w-6 h-6 rounded-md cursor-pointer hover:bg-gray-200"
