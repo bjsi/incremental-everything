@@ -47,7 +47,10 @@ const config = {
       {
         test: /\.css$/i,
         use: [
-          isDevelopment ? "style-loader" : MiniCssExtractPlugin.loader,
+          // Always use style-loader (inject as <style> tags at runtime).
+          // MiniCssExtractPlugin would write separate .css files that RemNote never loads,
+          // causing Tailwind classes to have no effect in production builds.
+          "style-loader",
           { loader: 'css-loader', options: { url: false } },
           'postcss-loader',
         ],
@@ -55,10 +58,6 @@ const config = {
     ],
   },
   plugins: [
-    isDevelopment ? undefined : new MiniCssExtractPlugin({
-      filename: '[name].css',
-      chunkFilename: '[id].css',
-    }),
     new HtmlWebpackPlugin({
       templateContent: `
       <body></body>
