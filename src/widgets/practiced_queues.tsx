@@ -546,7 +546,7 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
                         ) : "Ad-hoc Queue")}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
                         <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
                             <div className="text-xs uppercase font-bold text-gray-500 mb-1">Time</div>
                             <div className="text-2xl font-mono font-semibold">{formatTime(session.totalTime)}</div>
