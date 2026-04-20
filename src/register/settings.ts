@@ -148,7 +148,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
 
   plugin.settings.registerNumberSetting({
     id: defaultPriorityId,
-    title: 'Default Priority',
+    title: 'Default IncRem Priority',
     description: 'Sets the default priority for new incremental rem (0-100, Lower = more important). Default: 10',
     defaultValue: 10,
     validators: [
@@ -193,8 +193,8 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
 
   plugin.settings.registerDropdownSetting({
     id: 'priorityEditorDisplayMode',
-    title: 'Priority Editor in Editor',
-    description: 'Controls when to show the priority widget in the right-hand margin of the editor.',
+    title: 'Priority Widget in Editor',
+    description: 'Controls when to show the priority widget in the right-hand margin of each Rem in the editor.',
     defaultValue: 'all',
     options: [
       {
@@ -216,15 +216,6 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   });
 
   // Queue Display Settings
-
-  plugin.settings.registerBooleanSetting({
-    id: showRemsAsIsolatedInQueueId,
-    title: 'Show regular Rems in isolated view (Queue)',
-    description:
-      'When enabled, incremental Rems that are plain Rems will use the isolated card view in the queue instead of the full document context. Switch back to context with the button in the queue.',
-    defaultValue: false,
-  });
-
 
   plugin.settings.registerBooleanSetting({
     id: displayPriorityShieldId,
@@ -250,6 +241,14 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     description:
       'If enabled, exhibits the PriorityBadge of the current flashcard or IncRem at the top right of the queue.',
     defaultValue: true,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: showRemsAsIsolatedInQueueId,
+    title: 'Show regular Rems in isolated view (Queue)',
+    description:
+      'When enabled, incremental Rems that are plain Rems will use the isolated card view in the queue instead of the full document context. Switch back to context with the button in the queue.',
+    defaultValue: false,
   });
 
 
@@ -388,6 +387,54 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
         value: 'www',
       },
     ],
+  });
+
+  // Practiced Queues Settings
+
+  plugin.settings.registerNumberSetting({
+    id: 'flashcard_response_time_limit',
+    title: 'Flashcard Response Time Limit (seconds)',
+    description:
+      "If you take longer to answer a flashcard than this (e.g. because you walked away), " +
+      "only this much time will be counted in Practiced Queues session statistics. " +
+      "Matches RemNote's native 'Flashcard Response Time Limit' setting. Default: 180s.",
+    defaultValue: 180,
+  });
+
+  // Mastery Drill Settings
+
+  plugin.settings.registerBooleanSetting({
+    id: 'skip_mastery_drill',
+    title: 'Skip Mastery Drill',
+    description:
+      'If enabled, all Mastery Drill features are turned off: the drill popup and sidebar ' +
+      'notification are hidden, the "Mastery Drill" command is not registered, and cards rated ' +
+      'Again or Hard are no longer tracked or added to the drill queue. Turn this on if you ' +
+      'do not want to use the Mastery Drill workflow at all.' +
+      'Requires reloading RemNote to take effect.',
+    defaultValue: false,
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: 'old_item_threshold',
+    title: 'Old Items Threshold (Days) for Mastery Drill',
+    description: 'Items older than this number of days will trigger a warning in the Mastery Drill.',
+    defaultValue: 7,
+  });
+
+  plugin.settings.registerNumberSetting({
+    id: 'mastery_drill_min_delay_minutes',
+    title: 'Mastery Drill Minimum Delay (Minutes)',
+    description:
+      'A card rated Again or Hard will not appear in the Mastery Drill until at least this many minutes have passed since it was last reviewed. Prevents reviewing the same card again too soon. Default: 120 minutes.',
+    defaultValue: 120,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: 'disable_final_drill_notification',
+    title: 'Disable Mastery Drill Notifications',
+    description: 'If enabled, the Mastery Drill sidebar notification will not appear.',
+    defaultValue: false,
   });
 
 }

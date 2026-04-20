@@ -1,7 +1,10 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode } from '../lib/consts';
 
-export function registerWidgets(plugin: ReactRNPlugin) {
+export async function registerWidgets(plugin: ReactRNPlugin) {
+  const skipMasteryDrill = Boolean(
+    await plugin.settings.getSetting('skip_mastery_drill')
+  );
 
   // NEW: Light Priority Widget
   plugin.app.registerWidget('priority_light', WidgetLocation.Popup, {
@@ -181,6 +184,15 @@ export function registerWidgets(plugin: ReactRNPlugin) {
 
 
 
+  plugin.app.registerWidget('practiced_queues', WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/6688/6688557.png",
+    widgetTabTitle: "Practiced Queues",
+  });
+
   plugin.app.registerWidget('incremental_history', WidgetLocation.RightSidebar, {
     dimensions: {
       width: '100%',
@@ -188,6 +200,24 @@ export function registerWidgets(plugin: ReactRNPlugin) {
     },
     widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/3626/3626838.png",
     widgetTabTitle: "Incremental History",
+  });
+
+  plugin.app.registerWidget('flashcard_history', WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/9145/9145670.png",
+    widgetTabTitle: "Flashcard History",
+  });
+
+  plugin.app.registerWidget('rem_history', WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://i.imgur.com/MLaBDJw.png",
+    widgetTabTitle: "Visited Rem History",
   });
 
   // Repetition history popup for Answer Buttons
@@ -250,4 +280,23 @@ export function registerWidgets(plugin: ReactRNPlugin) {
       height: 'auto',
     },
   });
+
+  // Mastery Drill widgets are gated behind the 'skip_mastery_drill' setting.
+  if (!skipMasteryDrill) {
+    // Mastery Drill popup
+    plugin.app.registerWidget('mastery_drill', WidgetLocation.Popup, {
+      dimensions: {
+        width: 1100,
+        height: 900,
+      },
+    });
+
+    // Mastery Drill notification banner
+    plugin.app.registerWidget('mastery_drill_notification', WidgetLocation.SidebarEnd, {
+      dimensions: {
+        width: '100%',
+        height: 'auto',
+      },
+    });
+  }
 }

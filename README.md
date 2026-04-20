@@ -25,6 +25,15 @@ Manage information overload with a robust dual-priority system:
 - **FSRS Analytics**: Real-time Difficulty (D), Stability (S), and Retrievability (R) statistics computed for flashcards.
 - **Priority Review Documents**: Generate focused study sessions for your top items when overwhelmed.
 
+### 📊 History, Dashboard & Mastery Drill *(new in v0.2.182)*
+A full suite of history and practice tools now built into the right sidebar:
+- **Visited Rem History**: jump back to any document you navigated to recently.
+- **Flashcard History**: find and open any flashcard you've reviewed, searchable by front and back text.
+- **Practiced Queues Dashboard**: real-time session metrics (speed, retention, card age) and a full history of every practice session, with Export/Import backup.
+- **Mastery Drill**: a focused re-practice queue for cards you rated *Forgot* or *Hard* — inspired by SuperMemo's Final Drill. Open with the `Mastery Drill` command or via the Left Sidebar notification.
+
+👉 [Full documentation on the wiki](https://github.com/bjsi/incremental-everything/wiki/History-Queue-Dashboard-and-Mastery-Drill)
+
 ### 📱 Performance Modes
 - **Light Mode (Default for Mobile/Web)**: Fast, stable, and essential features only. Prevents crashes on phones and tablets.
 - **Full Mode (Desktop Power User)**: Complete feature set with heavy statistical calculations for detailed analytics.

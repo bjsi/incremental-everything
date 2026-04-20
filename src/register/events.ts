@@ -1,4 +1,4 @@
-import { AppEvents, ReactRNPlugin, RemId, BuiltInPowerupCodes, RichTextElementRemInterface } from '@remnote/plugin-sdk';
+import { AppEvents, ReactRNPlugin, RemId, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
@@ -48,6 +48,10 @@ import {
 import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../lib/session_helpers';
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
+import { safeRemTextToString } from '../lib/pdfUtils';
+import type { RemHistoryData } from '../widgets/rem_history';
+import type { FlashcardHistoryData } from '../widgets/flashcard_history';
+import { registerQueueSessionTracking, saveCurrentSession, hasActiveSession } from '../lib/queue_session';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import dayjs from 'dayjs';
 
@@ -483,7 +487,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
   plugin.event.addListener(
     AppEvents.QueueCompleteCard,
     undefined,
-    async (data: { cardId: RemId }) => {
+    async (data: { cardId: RemId; score?: QueueInteractionScore }) => {
       if (await shouldUseLightMode(plugin)) {
         return;
       }
@@ -494,6 +498,8 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
         // console.error('LISTENER: Event fired but did not contain a cardId. Aborting.');
         return;
       }
+
+      const score = data.score;
 
       const card = await plugin.card.findOne(data.cardId);
       const remId = card?.remId;
@@ -525,6 +531,97 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
           };
           await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
         }
+
+        // Cluster-aware: prefer the sibling cardId signaled by card_priority_display widget.
+        // Falls back to data.cardId when the widget hasn't mounted or hasn't signaled yet.
+        // Note: do NOT clear clusterVisibleCardId here — queue_session.ts also reads it in
+        // its own QueueCompleteCard listener, and clear order across listeners is not
+        // guaranteed. Staleness is instead prevented by queue_session.ts clearing it at the
+        // start of each QueueLoadCard.
+        const clusterVisibleCardId =
+          (await plugin.storage.getSession<string>('clusterVisibleCardId')) || undefined;
+        const effectiveCardId = clusterVisibleCardId || data.cardId;
+
+        // Flashcard History: record the completed card for the sidebar widget.
+        // Acts as fallback when card_priority_display fails to mount.
+        try {
+          const historyData =
+            ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
+
+          if (historyData[0]?.cardId !== effectiveCardId) {
+            const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+            const currentKbId = kbData._id;
+
+            let frontText = '';
+            let backText = '';
+            try {
+              const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
+              const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+              frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
+              backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
+            } catch (error) {
+              console.warn('Error parsing Rem text for flashcard history:', error);
+              frontText = '[Complex Media Rem]';
+            }
+
+            const text = `${frontText} ${backText}`.trim();
+
+            // Actively remove any existing entries with the same cardId before prepending.
+            const deduped = historyData.filter((entry) => entry.cardId !== effectiveCardId);
+
+            await plugin.storage.setSynced('flashcardHistoryData', [
+              {
+                key: Math.random(),
+                remId,
+                cardId: effectiveCardId,
+                open: false,
+                time: new Date().getTime(),
+                kbId: currentKbId,
+                text,
+                _v: 1,
+              },
+              ...deduped.slice(0, 999),
+            ]);
+          }
+        } catch (error) {
+          console.error('Failed to record flashcard history entry:', error);
+        }
+
+        // Mastery Drill: add AGAIN/HARD cards, remove on GOOD+.
+        // Gated by the 'skip_mastery_drill' setting.
+        if (score !== undefined) {
+          const skipMasteryDrill = Boolean(
+            await plugin.settings.getSetting('skip_mastery_drill')
+          );
+          if (!skipMasteryDrill) {
+            try {
+              const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+              const currentKbId = kbData?._id;
+              type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+              let finalDrillIds =
+                ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
+              const getCardId = (item: FinalDrillItem) =>
+                typeof item === 'string' ? item : item.cardId;
+
+              if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
+                if (!finalDrillIds.some((item) => getCardId(item) === effectiveCardId)) {
+                  finalDrillIds = [
+                    ...finalDrillIds,
+                    { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
+                  ];
+                  await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
+                }
+              } else if (score >= QueueInteractionScore.GOOD) {
+                const filtered = finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId);
+                if (filtered.length !== finalDrillIds.length) {
+                  await plugin.storage.setSynced('finalDrillIds', filtered);
+                }
+              }
+            } catch (error) {
+              console.error('Failed to update Mastery Drill list:', error);
+            }
+          }
+        }
       } else {
         // console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
       }
@@ -544,7 +641,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
 export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
   // Per-remId debounce timers: prevents cross-rem timer stomping during
   // search/navigation bursts where many different remIds fire in rapid succession.
-  const remChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
+  const remChangeDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Store captured history per remId (captured before debounce to avoid race condition)
   // Key: remId, Value: cloned history array
@@ -784,6 +881,54 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
   );
 }
 
+export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
+  plugin.event.addListener(AppEvents.GlobalOpenRem, undefined, async (message) => {
+    const currentRemId = message.remId as RemId;
+    if (!currentRemId) return;
+
+    // If a practice session is active and the user navigated away, finalize it.
+    if (hasActiveSession()) {
+      await saveCurrentSession(plugin, 'GlobalOpenRem Navigation');
+    }
+
+    const currentRemData =
+      ((await plugin.storage.getSynced('remData')) as RemHistoryData[]) || [];
+
+    if (currentRemData[0]?.remId === currentRemId) return;
+
+    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+    const currentKbId = kbData._id;
+
+    const rem = await plugin.rem.findOne(currentRemId);
+
+    let frontText = '';
+    let backText = '';
+    try {
+      const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
+      const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+      frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw : '';
+      backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw : '';
+    } catch (error) {
+      console.warn('Error parsing Rem text for visited history:', error);
+    }
+
+    const text = `${frontText} ${backText}`.trim();
+
+    await plugin.storage.setSynced('remData', [
+      {
+        key: Math.random(),
+        remId: currentRemId,
+        open: false,
+        time: new Date().getTime(),
+        kbId: currentKbId,
+        text,
+        _v: 1,
+      },
+      ...currentRemData.slice(0, 500),
+    ]);
+  });
+}
+
 export function registerEventListeners(
   plugin: ReactRNPlugin,
   resetSessionItemCounter: ResetSessionItemCounter
@@ -793,4 +938,6 @@ export function registerEventListeners(
   registerURLChangeListener(plugin);
   registerQueueCompleteCardListener(plugin);
   registerGlobalRemChangedListener(plugin);
+  registerGlobalOpenRemListener(plugin);
+  registerQueueSessionTracking(plugin);
 }

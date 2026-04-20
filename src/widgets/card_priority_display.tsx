@@ -144,48 +144,106 @@ export function CardPriorityDisplay() {
   // Only `ctx.cardId` advances per sibling — and `plugin.queue.getCurrentCard()` is
   // stuck on the cluster's anchor card. So we poll the widget context for cardId,
   // then resolve the card to recover the sibling's real remId.
-  const [currentIds, setCurrentIds] = React.useState<{ remId?: string; cardId?: string }>({});
+  //
+  // We commit cardId + remId + the resolved Rem together in one state update so the
+  // widget's gating `if (!rem || ...)` doesn't flicker a hidden-frame between the
+  // cardId arriving and the rem arriving (that extra render was the perceived lag).
+  const [currentIds, setCurrentIds] = React.useState<{ remId?: string; cardId?: string; rem?: any }>({});
 
   React.useEffect(() => {
     let isMounted = true;
+    // Track the last cardId we've already resolved so the interval skips redundant work.
+    let lastAppliedCardId: string | undefined;
 
-    const refresh = async () => {
-      try {
-        const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
-        if (!isMounted) return;
-
-        const ctxCardId: string | undefined = ctx?.cardId;
-        if (!ctxCardId) return;
-
-        const card = await plugin.card.findOne(ctxCardId);
-        if (!isMounted) return;
-        const resolvedRemId = card?.remId ?? ctx?.remId;
-
-        setCurrentIds((prev) => {
-          if (prev.cardId === ctxCardId && prev.remId === resolvedRemId) return prev;
-          return { remId: resolvedRemId, cardId: ctxCardId };
-        });
-      } catch {
-        // ignore
-      }
+    // Resolve cardId → card → rem in one await chain and push into state atomically.
+    // Kicking off rem.findOne in parallel with the state commit would require splitting
+    // state updates; keeping them sequential here trades ~1 IPC of latency for guaranteed
+    // single-render mount (avoids the blank-frame flicker).
+    const applyCardId = async (cardId: string) => {
+      if (!isMounted || cardId === lastAppliedCardId) return;
+      lastAppliedCardId = cardId;
+      const card = await plugin.card.findOne(cardId);
+      if (!isMounted) return;
+      const resolvedRemId = card?.remId;
+      const resolvedRem = resolvedRemId ? await plugin.rem.findOne(resolvedRemId) : null;
+      if (!isMounted) return;
+      setCurrentIds((prev) => {
+        if (prev.cardId === cardId && prev.remId === resolvedRemId) return prev;
+        return { remId: resolvedRemId, cardId, rem: resolvedRem ?? null };
+      });
     };
 
-    refresh();
-    const intervalId = setInterval(refresh, 500);
-    const listener = () => { refresh(); };
-    plugin.event.addListener(AppEvents.QueueLoadCard, undefined, listener);
+    // Initial mount: resolve the current card from the widget context.
+    // (Handles mounting mid-session when no QueueLoadCard fires retroactively.)
+    (async () => {
+      try {
+        const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
+        if (ctx?.cardId) await applyCardId(ctx.cardId);
+      } catch { /* ignore */ }
+    })();
+
+    // Normal card transitions: use data.cardId directly from the event payload.
+    // This avoids querying getWidgetContext(), which hasn't been updated yet when the
+    // event fires — the race condition that caused an earlier display lag.
+    // Fire-and-forget (no async return) so the SDK can't await this listener and delay
+    // the queue's own event processing.
+    const queueLoadListener = (data: any) => {
+      if (data?.cardId) void applyCardId(data.cardId);
+    };
+    plugin.event.addListener(AppEvents.QueueLoadCard, undefined, queueLoadListener);
+
+    // Cluster sibling poll: inside a cluster, QueueLoadCard does NOT fire per sibling,
+    // so we poll getWidgetContext().cardId every 500 ms to detect sibling transitions.
+    // Not on the mount or transition hot path: `setInterval(fn, 500)` only fires its
+    // first tick at t+500ms, and `lastAppliedCardId` short-circuits any tick that
+    // re-sees a cardId already handled by the event listener above — so for
+    // non-clustered cards the interval never does any IPC.
+    const pollForClusterSibling = async () => {
+      try {
+        const ctx: any = await plugin.widget.getWidgetContext().catch(() => null);
+        if (!isMounted || !ctx?.cardId) return;
+        await applyCardId(ctx.cardId);
+      } catch { /* ignore */ }
+    };
+    const intervalId = setInterval(pollForClusterSibling, 500);
 
     return () => {
       isMounted = false;
       clearInterval(intervalId);
-      plugin.event.removeListener(AppEvents.QueueLoadCard, undefined, listener);
+      plugin.event.removeListener(AppEvents.QueueLoadCard, undefined, queueLoadListener);
     };
   }, [plugin]);
 
-  const rem = useTrackerPlugin(async (rp) => {
-    if (!currentIds.remId) return null;
-    return (await rp.rem.findOne(currentIds.remId)) ?? null;
-  }, [currentIds.remId]);
+  // Cluster-aware signaling: broadcast the actually-visible cardId/remId to session storage.
+  // These signals are consumed by:
+  //   - src/register/events.ts (QueueCompleteCard listener) — to attribute AGAIN/HARD and
+  //     flashcard-history entries to the sibling actually rated, not the cluster anchor.
+  //   - src/lib/queue_session.ts — to compute accurate per-sibling time-spent when
+  //     QueueCompleteCard fires with the cluster anchor cardId.
+  //
+  // We deliberately do NOT write to flashcardHistoryData here: events.ts already records
+  // it on QueueCompleteCard using `effectiveCardId` (which resolves from the signals below),
+  // and doing that write on every card transition caused ~several-hundred-ms of IPC lag on
+  // the hot path, competing with the trackers that render the widget's visible data.
+  React.useEffect(() => {
+    const cardId = currentIds.cardId;
+    const remId = currentIds.remId;
+    if (!cardId) return;
+
+    (async () => {
+      try {
+        await plugin.storage.setSession('clusterVisibleCardId', cardId);
+        await plugin.storage.setSession('clusterVisibleCardLoadTime', Date.now());
+        if (remId) await plugin.storage.setSession('clusterVisibleRemId', remId);
+      } catch (error) {
+        console.error('Failed to broadcast cluster-visible card signals:', error);
+      }
+    })();
+  }, [plugin, currentIds.cardId, currentIds.remId]);
+
+  // Use the Rem resolved alongside cardId in `applyCardId` — avoids the extra render
+  // cycle a separate tracker would introduce (gating returns null until rem resolves).
+  const rem = currentIds.rem ?? null;
 
   const scopeRemIds = useTrackerPlugin(
     (rp) => rp.storage.getSession<string[] | null>(priorityCalcScopeRemIdsKey),
