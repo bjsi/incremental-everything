@@ -332,28 +332,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Create Cloze Deletion',
     keyboardShortcut: 'opt+z',
     action: async () => {
-      console.log('[ClozeCmd] ── triggered ──────────────────────────');
       const selection = await plugin.editor.getSelection();
-      console.log('[ClozeCmd] selection:', JSON.stringify(selection));
-      if (!selection || selection.type !== SelectionType.Text) {
-        console.log('[ClozeCmd] abort: no text selection');
-        return;
-      }
+      if (!selection || selection.type !== SelectionType.Text) return;
       if (selection.range.start === selection.range.end) {
         await plugin.app.toast('Please select some text to create a cloze deletion.');
         return;
       }
 
       const rem = await plugin.rem.findOne(selection.remId);
-      if (!rem) { console.log('[ClozeCmd] abort: rem not found'); return; }
-
-      console.log('[ClozeCmd] rem._id:', rem._id);
-      console.log('[ClozeCmd] rem.text (raw):', JSON.stringify(rem.text));
-      console.log('[ClozeCmd] rem.backText (raw):', JSON.stringify(rem.backText));
+      if (!rem) return;
 
       const r_start = Math.min(selection.range.start, selection.range.end);
       const r_end = Math.max(selection.range.start, selection.range.end);
-      console.log('[ClozeCmd] r_start:', r_start, '  r_end:', r_end);
 
       const frontText = rem.text || [];
       const backText = rem.backText || [];
@@ -376,7 +366,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         rt.map((item: any) => typeof item === 'string' ? item : (item.i === 'm' ? (item.text || '') : '')).join('');
 
       const frontLen = rtCharLen(frontText);
-      console.log('[ClozeCmd] frontLen:', frontLen, '  hasBackText:', hasBackText);
 
       // Determine which section contains the selection.
       // r_start/r_end are global positions; the front section spans [0, frontLen).
@@ -392,24 +381,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // Since separatorLen is unknown, we locate the selection by string-matching.
         const selStr  = rtPlainStr(selection.richText as RichTextInterface);
         const backStr = rtPlainStr(backText);
-        console.log('[ClozeCmd] selStr:', JSON.stringify(selStr), '  backStr:', JSON.stringify(backStr));
         const posInBack = backStr.indexOf(selStr);
         if (posInBack >= 0) {
           sect_r_start = posInBack;
           sect_r_end   = posInBack + selStr.length;
         } else {
-          // Fallback: subtract frontLen (may be off by separatorLen, but better than nothing)
           sect_r_start = r_start - frontLen;
           sect_r_end   = r_end   - frontLen;
-          console.log('[ClozeCmd] WARN: selected text not found in backStr – using offset fallback');
         }
       }
       // When isBack=false, front text starts at global pos 0, so r_start IS the section-relative offset.
 
-      console.log('[ClozeCmd] isBack:', isBack, '  sect_r_start:', sect_r_start, '  sect_r_end:', sect_r_end);
-
       const clozeId = Math.random().toString(36).substring(2, 10);
-      console.log('[ClozeCmd] clozeId:', clozeId);
 
       // Determine arrow character from the rem's practice direction.
       const practiceDir = hasBackText ? await rem.getPracticeDirection() : 'none';
@@ -417,11 +400,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                       : practiceDir === 'backward' ? '⇐'
                       : practiceDir === 'both' ? '⇔'
                       : '⇔'; // fallback
-      console.log('[ClozeCmd] practiceDir:', practiceDir, '  arrowChar:', arrowChar);
-
-      // Detect rem type to apply matching front-text formatting in the child.
       const remType = rem.type;
-      console.log('[ClozeCmd] remType:', remType, '(CONCEPT=1, DESCRIPTOR=2, DEFAULT=0)');
 
       // Process one rich text section. localStart/localEnd are section-relative character positions.
       // - Delimiter nodes (i:'s') → replaced by arrowChar.
@@ -512,41 +491,32 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const buildChildText = (): RichTextInterface => {
         const rawFrontPart = processSection(frontText, !isBack, sect_r_start, sect_r_end);
         const frontPart = applyTypeFormatting(rawFrontPart);
-        console.log('[ClozeCmd] frontPart:', JSON.stringify(frontPart));
         const result: any[] = [...frontPart];
         if (hasBackText) {
-          // If the front text has an explicit i:'s' delimiter node, processSection already
-          // replaced it with arrowChar. Otherwise insert the arrow + spacing manually.
           const hasExplicitDelim = frontText.some((item: any) => typeof item !== 'string' && item?.i === 's');
           if (!hasExplicitDelim) {
             result.push({ i: 'm' as const, text: ' ' + arrowChar + ' ' });
           }
           const backPart = processSection(backText, isBack, sect_r_start, sect_r_end);
-          console.log('[ClozeCmd] backPart:', JSON.stringify(backPart));
           result.push(...backPart);
         }
         result.push({ i: 'q', _id: rem._id, pin: true });
-        console.log('[ClozeCmd] final childText:', JSON.stringify(result));
         return result;
       };
 
       // 1. Create child rem
       const clozeRem = await plugin.rem.createRem();
-      if (!clozeRem) { console.log('[ClozeCmd] abort: createRem failed'); return; }
-      console.log('[ClozeCmd] clozeRem._id:', clozeRem._id);
+      if (!clozeRem) return;
 
       await clozeRem.setText(buildChildText());
       await clozeRem.setParent(rem);
 
-      // Tag child rem so the CSS badge is visible in the queue
       let clozeExtractTag = await plugin.rem.findByName(['cloze-extract'], null);
       if (!clozeExtractTag) {
         clozeExtractTag = await plugin.rem.createRem();
         if (clozeExtractTag) await clozeExtractTag.setText(['cloze-extract']);
       }
       if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
-
-      console.log('[ClozeCmd] child rem created and parented');
 
       // 2. Add remove-from-queue tag to parent
       let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
@@ -594,15 +564,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       };
 
       if (isBack) {
-        const result = processParentSection(backText, sect_r_start, sect_r_end);
-        console.log('[ClozeCmd] parent backText result:', JSON.stringify(result));
-        await rem.setBackText(result);
+        await rem.setBackText(processParentSection(backText, sect_r_start, sect_r_end));
       } else {
-        const result = processParentSection(frontText, sect_r_start, sect_r_end);
-        console.log('[ClozeCmd] parent frontText result:', JSON.stringify(result));
-        await rem.setText(result);
+        await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
       }
-      console.log('[ClozeCmd] ── done ──────────────────────────────');
     },
   });
 
