@@ -368,54 +368,41 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem) return;
 
       const r_start = Math.min(selection.range.start, selection.range.end);
-      const r_end = Math.max(selection.range.start, selection.range.end);
 
       const frontText = rem.text || [];
       const backText = rem.backText || [];
       const hasBackText = backText.length > 0;
 
-      // Plain-text character length of a rich text array.
-      // NOTE: r_start/r_end use global character positions (front+delimiter+back).
-      // Non-text nodes (i≠'m', i≠'s') count as 1 char in the editor's position model.
-      const rtCharLen = (rt: RichTextInterface): number => {
-        let n = 0;
-        for (const item of rt) {
-          if (typeof item === 'string') n += (item as string).length;
-          else { const x = item as any; n += x.i === 'm' ? (x.text?.length || 0) : 1; }
-        }
-        return n;
-      };
-
       // Plain string from rich text (text nodes only, non-text nodes → '').
+      // Used for text-only position matching — immune to RemNote's i:'q' cursor-width (2 chars).
       const rtPlainStr = (rt: RichTextInterface): string =>
         rt.map((item: any) => typeof item === 'string' ? item : (item.i === 'm' ? (item.text || '') : '')).join('');
 
-      const frontLen = rtCharLen(frontText);
+      const selStr   = rtPlainStr(selection.richText as RichTextInterface);
+      const selLen   = selStr.length;
+      const frontStr = rtPlainStr(frontText);
+      const backStr  = rtPlainStr(backText);
 
-      // Determine which section contains the selection.
-      // r_start/r_end are global positions; the front section spans [0, frontLen).
-      // The delimiter + back section starts at frontLen in the global coord.
+      // Detect section via string-matching (text-only positions avoid RemNote cursor-model issues).
+      const posInFront = frontStr.indexOf(selStr);
+      const posInBack  = hasBackText ? backStr.indexOf(selStr) : -1;
+
       let isBack = false;
-      let sect_r_start = r_start;  // position relative to the containing section
-      let sect_r_end   = r_end;
+      let sect_r_start = 0;
 
-      if (hasBackText && r_start >= frontLen) {
+      if (posInFront >= 0 && (posInBack < 0 || r_start < frontStr.length)) {
+        isBack = false;
+        sect_r_start = posInFront;
+      } else if (posInBack >= 0) {
         isBack = true;
-        // Compute section-relative offset by finding the selected text within backText.
-        // global r_start = frontLen + separatorLen + posInBack
-        // Since separatorLen is unknown, we locate the selection by string-matching.
-        const selStr  = rtPlainStr(selection.richText as RichTextInterface);
-        const backStr = rtPlainStr(backText);
-        const posInBack = backStr.indexOf(selStr);
-        if (posInBack >= 0) {
-          sect_r_start = posInBack;
-          sect_r_end   = posInBack + selStr.length;
-        } else {
-          sect_r_start = r_start - frontLen;
-          sect_r_end   = r_end   - frontLen;
-        }
+        sect_r_start = posInBack;
+      } else {
+        // Fallback: use r_start directly (may be off if pins precede the selection)
+        isBack = false;
+        sect_r_start = r_start;
       }
-      // When isBack=false, front text starts at global pos 0, so r_start IS the section-relative offset.
+
+      const sect_r_end = sect_r_start + selLen;
 
       const clozeId = Math.random().toString(36).substring(2, 10);
 
@@ -442,10 +429,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         for (const item of richText) {
           const isStr  = typeof item === 'string';
           const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
-          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 1;
+          // Text-only positions: non-'m' nodes have length 0 (immune to RemNote's i:'q' cursor-width).
+          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 0;
           const nodeStart = currIdx;
           const nodeEnd   = currIdx + nodeLen;
-          const inSel = applySelection && nodeStart < localEnd && nodeEnd > localStart;
+          // For zero-length nodes use a point check; for text nodes use the range overlap check.
+          const inSel = applySelection && (
+            nodeLen > 0
+              ? (nodeStart < localEnd && nodeEnd > localStart)
+              : (currIdx > localStart && currIdx < localEnd)
+          );
 
           if (node.i === 's') {
             arr.push(inSel
@@ -563,27 +556,30 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         for (const item of richText) {
           const isStr  = typeof item === 'string';
           const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
-          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 1;
-          const nodeStart = currIdx;
-          const nodeEnd   = currIdx + nodeLen;
+          // Text-only positions: non-'m' nodes pass through unchanged.
+          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 0;
 
-          if (nodeEnd <= localStart || nodeStart >= localEnd) {
+          if (nodeLen === 0) {
             arr.push(item);
-          } else if (node.i === 'm') {
-            const textStr  = node.text || '';
-            const relStart = Math.max(0, localStart - nodeStart);
-            const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
-            if (relStart > 0) {
-              arr.push(isStr ? textStr.substring(0, relStart) : { ...node, text: textStr.substring(0, relStart) });
-            }
-            arr.push({ ...node, text: textStr.substring(relStart, relEnd), [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
-            if (relEnd < nodeLen) {
-              arr.push(isStr ? textStr.substring(relEnd) : { ...node, text: textStr.substring(relEnd) });
-            }
           } else {
-            arr.push({ ...node, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+            const nodeStart = currIdx;
+            const nodeEnd   = currIdx + nodeLen;
+            if (nodeEnd <= localStart || nodeStart >= localEnd) {
+              arr.push(item);
+            } else {
+              const textStr  = node.text || '';
+              const relStart = Math.max(0, localStart - nodeStart);
+              const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
+              if (relStart > 0) {
+                arr.push(isStr ? textStr.substring(0, relStart) : { ...node, text: textStr.substring(0, relStart) });
+              }
+              arr.push({ ...node, text: textStr.substring(relStart, relEnd), [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+              if (relEnd < nodeLen) {
+                arr.push(isStr ? textStr.substring(relEnd) : { ...node, text: textStr.substring(relEnd) });
+              }
+            }
+            currIdx += nodeLen;
           }
-          currIdx += nodeLen;
         }
         return arr;
       };
