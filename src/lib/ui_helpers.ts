@@ -98,6 +98,46 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
   await plugin.app.registerCSS('pdf-inc-highlight-styling', css);
 }
 
+export async function registerClozeExtractCSS(plugin: ReactRNPlugin) {
+  const css = `
+    /* Badge: violet ↑ pill before the bullet */
+    [data-queue-rem-tags~="clozeextract"].rn-queue-rem:not(.rem-bullet__document) .rn-bullet-container,
+    [data-queue-rem-tags~="cloze-extract"].rn-queue-rem:not(.rem-bullet__document) .rn-bullet-container {
+      position: relative;
+    }
+    [data-queue-rem-tags~="clozeextract"].rn-queue-rem:not(.rem-bullet__document) .rn-bullet-container::before,
+    [data-queue-rem-tags~="cloze-extract"].rn-queue-rem:not(.rem-bullet__document) .rn-bullet-container::before {
+      content: '↑';
+      background: #7c3aed;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.4;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-right: 4px;
+    }
+    /* Tooltip shown when hovering the bullet container */
+    [data-queue-rem-tags~="clozeextract"].rn-queue-rem:not(.rem-bullet__document) .rn-bullet-container:hover::after,
+    [data-queue-rem-tags~="cloze-extract"].rn-queue-rem:not(.rem-bullet__document) .rn-bullet-container:hover::after {
+      content: 'Cloze child — created from a parent rem via Create Cloze Deletion';
+      position: absolute;
+      top: -30px;
+      left: 0;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 400;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+    }
+  `;
+  await plugin.app.registerCSS('cloze-extract-badge', css);
+}
+
 /**
  * Clears all queue-specific UI elements (menu items and CSS).
  * Called when the user navigates away from the flashcards view.

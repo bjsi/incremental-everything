@@ -537,6 +537,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       await clozeRem.setText(buildChildText());
       await clozeRem.setParent(rem);
+
+      // Tag child rem so the CSS badge is visible in the queue
+      let clozeExtractTag = await plugin.rem.findByName(['cloze-extract'], null);
+      if (!clozeExtractTag) {
+        clozeExtractTag = await plugin.rem.createRem();
+        if (clozeExtractTag) await clozeExtractTag.setText(['cloze-extract']);
+      }
+      if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
+
       console.log('[ClozeCmd] child rem created and parented');
 
       // 2. Add remove-from-queue tag to parent

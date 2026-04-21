@@ -15,7 +15,7 @@ import { registerCommands } from '../register/commands';
 import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerJumpToRemHelper } from '../register/window';
-import { registerPluginHidingCSS, registerPdfHighlightCSS } from '../lib/ui_helpers';
+import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS } from '../lib/ui_helpers';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -42,6 +42,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Register CSS rules
   await registerPdfHighlightCSS(plugin);
   await registerPluginHidingCSS(plugin);
+  await registerClozeExtractCSS(plugin);
 
   await registerCommands(plugin);
   await registerMenus(plugin);
