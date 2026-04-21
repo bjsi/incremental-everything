@@ -24,7 +24,7 @@ import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 import { mergeHistoryFromDismissed } from '../dismissed';
-import { findPDFinRem, registerRemsAsPdfKnown } from '../pdfUtils';
+import { registerRemsAsPdfKnown } from '../pdfUtils';
 
 type ReviewOverrideOptions = {
   /**
@@ -354,9 +354,20 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
       // even when the session cache (allIncrementalRemKey) is not yet loaded
       // (e.g., WebBrowser / Light Mode).
       try {
-        const pdfSource = await findPDFinRem(plugin as any, rem);
-        if (pdfSource) {
-          await registerRemsAsPdfKnown(plugin as any, pdfSource._id, [rem._id]);
+        const sources = await rem.getSources();
+        const allSources = [rem, ...sources];
+        for (const candidate of allSources) {
+          const isPdf = await candidate.hasPowerup(BuiltInPowerupCodes.UploadedFile);
+          if (isPdf) {
+            try {
+              const url = await candidate.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
+              if (typeof url === 'string' && url.toLowerCase().endsWith('.pdf')) {
+                await registerRemsAsPdfKnown(plugin as any, candidate._id, [rem._id]);
+              }
+            } catch {
+              // Skip candidates where URL can't be read
+            }
+          }
         }
       } catch (e) {
         console.error('[initIncrementalRem] Error registering in known_pdf_rems_:', e);
