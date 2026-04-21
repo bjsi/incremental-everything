@@ -6,6 +6,7 @@ import {
   BuiltInPowerupCodes,
   RICH_TEXT_FORMATTING,
   RichTextInterface,
+  RemType,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -331,8 +332,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Create Cloze Deletion',
     keyboardShortcut: 'opt+z',
     action: async () => {
+      console.log('[ClozeCmd] ── triggered ──────────────────────────');
       const selection = await plugin.editor.getSelection();
+      console.log('[ClozeCmd] selection:', JSON.stringify(selection));
       if (!selection || selection.type !== SelectionType.Text) {
+        console.log('[ClozeCmd] abort: no text selection');
         return;
       }
       if (selection.range.start === selection.range.end) {
@@ -341,69 +345,255 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       const rem = await plugin.rem.findOne(selection.remId);
-      if (!rem) return;
+      if (!rem) { console.log('[ClozeCmd] abort: rem not found'); return; }
+
+      console.log('[ClozeCmd] rem._id:', rem._id);
+      console.log('[ClozeCmd] rem.text (raw):', JSON.stringify(rem.text));
+      console.log('[ClozeCmd] rem.backText (raw):', JSON.stringify(rem.backText));
 
       const r_start = Math.min(selection.range.start, selection.range.end);
       const r_end = Math.max(selection.range.start, selection.range.end);
+      console.log('[ClozeCmd] r_start:', r_start, '  r_end:', r_end);
+
+      const frontText = rem.text || [];
+      const backText = rem.backText || [];
+      const hasBackText = backText.length > 0;
+
+      // Plain-text character length of a rich text array.
+      // NOTE: r_start/r_end use global character positions (front+delimiter+back).
+      // Non-text nodes (i≠'m', i≠'s') count as 1 char in the editor's position model.
+      const rtCharLen = (rt: RichTextInterface): number => {
+        let n = 0;
+        for (const item of rt) {
+          if (typeof item === 'string') n += (item as string).length;
+          else { const x = item as any; n += x.i === 'm' ? (x.text?.length || 0) : 1; }
+        }
+        return n;
+      };
+
+      // Plain string from rich text (text nodes only, non-text nodes → '').
+      const rtPlainStr = (rt: RichTextInterface): string =>
+        rt.map((item: any) => typeof item === 'string' ? item : (item.i === 'm' ? (item.text || '') : '')).join('');
+
+      const frontLen = rtCharLen(frontText);
+      console.log('[ClozeCmd] frontLen:', frontLen, '  hasBackText:', hasBackText);
+
+      // Determine which section contains the selection.
+      // r_start/r_end are global positions; the front section spans [0, frontLen).
+      // The delimiter + back section starts at frontLen in the global coord.
+      let isBack = false;
+      let sect_r_start = r_start;  // position relative to the containing section
+      let sect_r_end   = r_end;
+
+      if (hasBackText && r_start >= frontLen) {
+        isBack = true;
+        // Compute section-relative offset by finding the selected text within backText.
+        // global r_start = frontLen + separatorLen + posInBack
+        // Since separatorLen is unknown, we locate the selection by string-matching.
+        const selStr  = rtPlainStr(selection.richText as RichTextInterface);
+        const backStr = rtPlainStr(backText);
+        console.log('[ClozeCmd] selStr:', JSON.stringify(selStr), '  backStr:', JSON.stringify(backStr));
+        const posInBack = backStr.indexOf(selStr);
+        if (posInBack >= 0) {
+          sect_r_start = posInBack;
+          sect_r_end   = posInBack + selStr.length;
+        } else {
+          // Fallback: subtract frontLen (may be off by separatorLen, but better than nothing)
+          sect_r_start = r_start - frontLen;
+          sect_r_end   = r_end   - frontLen;
+          console.log('[ClozeCmd] WARN: selected text not found in backStr – using offset fallback');
+        }
+      }
+      // When isBack=false, front text starts at global pos 0, so r_start IS the section-relative offset.
+
+      console.log('[ClozeCmd] isBack:', isBack, '  sect_r_start:', sect_r_start, '  sect_r_end:', sect_r_end);
 
       const clozeId = Math.random().toString(36).substring(2, 10);
+      console.log('[ClozeCmd] clozeId:', clozeId);
 
-      const processRichText = (richText: RichTextInterface): RichTextInterface => {
-        const newArray: any[] = [];
+      // Determine arrow character from the rem's practice direction.
+      const practiceDir = hasBackText ? await rem.getPracticeDirection() : 'none';
+      const arrowChar = practiceDir === 'forward' ? '⇒'
+                      : practiceDir === 'backward' ? '⇐'
+                      : practiceDir === 'both' ? '⇔'
+                      : '⇔'; // fallback
+      console.log('[ClozeCmd] practiceDir:', practiceDir, '  arrowChar:', arrowChar);
+
+      // Detect rem type to apply matching front-text formatting in the child.
+      const remType = rem.type;
+      console.log('[ClozeCmd] remType:', remType, '(CONCEPT=1, DESCRIPTOR=2, DEFAULT=0)');
+
+      // Process one rich text section. localStart/localEnd are section-relative character positions.
+      // - Delimiter nodes (i:'s') → replaced by arrowChar.
+      // - Existing cloze marks outside the selection → stripped, yellow highlight + red font applied.
+      // - Text inside [localStart, localEnd) → new clozeId applied.
+      const processSection = (
+        richText: RichTextInterface,
+        applySelection: boolean,
+        localStart: number,
+        localEnd: number
+      ): any[] => {
+        const arr: any[] = [];
         let currIdx = 0;
         for (const item of richText) {
-          const isString = typeof item === 'string';
-          const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
-          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
+          const isStr  = typeof item === 'string';
+          const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
+          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 1;
           const nodeStart = currIdx;
-          const nodeEnd = currIdx + nodeLen;
+          const nodeEnd   = currIdx + nodeLen;
+          const inSel = applySelection && nodeStart < localEnd && nodeEnd > localStart;
 
-          if (nodeEnd <= r_start || nodeStart >= r_end) {
-            newArray.push(item);
-          } else {
-            if (textNode.i === 'm') {
-              const textStr = textNode.text || '';
-              const relStart = Math.max(0, r_start - nodeStart);
-              const relEnd = Math.min(nodeLen, r_end - nodeStart);
+          if (node.i === 's') {
+            arr.push(inSel
+              ? { i: 'm' as const, text: arrowChar, [RICH_TEXT_FORMATTING.CLOZE]: clozeId }
+              : { i: 'm' as const, text: arrowChar }
+            );
+          } else if (node.i === 'm') {
+            const textStr  = node.text || '';
+            const baseNode: any = { ...node };
+            const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
+            delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
 
-              if (relStart > 0) {
-                newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
-              }
-              newArray.push({
-                ...textNode,
-                text: textStr.substring(relStart, relEnd),
-                [RICH_TEXT_FORMATTING.CLOZE]: clozeId,
-              });
-              if (relEnd < nodeLen) {
-                newArray.push({ ...textNode, text: textStr.substring(relEnd) });
+            if (!inSel) {
+              if (hadCloze) {
+                arr.push(isStr
+                  ? { i: 'm' as const, text: textStr, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 }
+                  : { ...baseNode, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+              } else {
+                arr.push(isStr ? textStr : baseNode);
               }
             } else {
-              newArray.push({
-                ...textNode,
-                [RICH_TEXT_FORMATTING.CLOZE]: clozeId,
-              });
+              const relStart = Math.max(0, localStart - nodeStart);
+              const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
+              if (relStart > 0) {
+                const pre = textStr.substring(0, relStart);
+                arr.push(hadCloze
+                  ? { ...baseNode, text: pre, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 }
+                  : (isStr ? pre : { ...baseNode, text: pre }));
+              }
+              arr.push({ ...baseNode, text: textStr.substring(relStart, relEnd), [RICH_TEXT_FORMATTING.CLOZE]: clozeId });
+              if (relEnd < nodeLen) {
+                const post = textStr.substring(relEnd);
+                arr.push(hadCloze
+                  ? { ...baseNode, text: post, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 }
+                  : (isStr ? post : { ...baseNode, text: post }));
+              }
+            }
+          } else {
+            const baseNode: any = { ...node };
+            const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
+            delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
+            if (inSel) {
+              arr.push({ ...baseNode, [RICH_TEXT_FORMATTING.CLOZE]: clozeId });
+            } else if (hadCloze) {
+              arr.push({ ...baseNode, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+            } else {
+              arr.push(baseNode);
             }
           }
           currIdx += nodeLen;
         }
-        return newArray;
+        return arr;
       };
 
-      let isBack = false;
-      const remText = rem.text || [];
-      const frontMiddle = await plugin.richText.substring(remText, r_start, r_end);
-      if (!(await plugin.richText.equals(selection.richText, frontMiddle))) {
-        const backMiddle = await plugin.richText.substring(rem.backText || [], r_start, r_end);
-        if (await plugin.richText.equals(selection.richText, backMiddle)) {
-          isBack = true;
+      // Apply bold (concept) or italic (descriptor) to all text nodes in a node array,
+      // matching how RemNote renders the front of concept/descriptor rems.
+      const applyTypeFormatting = (nodes: any[]): any[] => {
+        if (remType !== RemType.CONCEPT && remType !== RemType.DESCRIPTOR) return nodes;
+        const prop = remType === RemType.CONCEPT ? RICH_TEXT_FORMATTING.BOLD : RICH_TEXT_FORMATTING.ITALIC;
+        return nodes.map((node: any) => {
+          if (typeof node === 'string') return { i: 'm' as const, text: node, [prop]: true };
+          if (node.i === 'm') return { ...node, [prop]: true };
+          return node;
+        });
+      };
+
+      // Build child text: processed front + (arrow separator if needed) + processed back + parent pin.
+      const buildChildText = (): RichTextInterface => {
+        const rawFrontPart = processSection(frontText, !isBack, sect_r_start, sect_r_end);
+        const frontPart = applyTypeFormatting(rawFrontPart);
+        console.log('[ClozeCmd] frontPart:', JSON.stringify(frontPart));
+        const result: any[] = [...frontPart];
+        if (hasBackText) {
+          // If the front text has an explicit i:'s' delimiter node, processSection already
+          // replaced it with arrowChar. Otherwise insert the arrow + spacing manually.
+          const hasExplicitDelim = frontText.some((item: any) => typeof item !== 'string' && item?.i === 's');
+          if (!hasExplicitDelim) {
+            result.push({ i: 'm' as const, text: ' ' + arrowChar + ' ' });
+          }
+          const backPart = processSection(backText, isBack, sect_r_start, sect_r_end);
+          console.log('[ClozeCmd] backPart:', JSON.stringify(backPart));
+          result.push(...backPart);
+        }
+        result.push({ i: 'q', _id: rem._id, pin: true });
+        console.log('[ClozeCmd] final childText:', JSON.stringify(result));
+        return result;
+      };
+
+      // 1. Create child rem
+      const clozeRem = await plugin.rem.createRem();
+      if (!clozeRem) { console.log('[ClozeCmd] abort: createRem failed'); return; }
+      console.log('[ClozeCmd] clozeRem._id:', clozeRem._id);
+
+      await clozeRem.setText(buildChildText());
+      await clozeRem.setParent(rem);
+      console.log('[ClozeCmd] child rem created and parented');
+
+      // 2. Add remove-from-queue tag to parent
+      let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
+      if (!removeFromQueueTag) {
+        removeFromQueueTag = await plugin.rem.createRem();
+        if (removeFromQueueTag) {
+          await removeFromQueueTag.setText(['remove-from-queue']);
         }
       }
+      if (removeFromQueueTag) {
+        await rem.addTag(removeFromQueueTag._id);
+      }
+
+      // 3. Mark selected text in parent with yellow highlight + red font.
+      // Uses the same section-relative positions (sect_r_start/sect_r_end).
+      const processParentSection = (richText: RichTextInterface, localStart: number, localEnd: number): RichTextInterface => {
+        const arr: any[] = [];
+        let currIdx = 0;
+        for (const item of richText) {
+          const isStr  = typeof item === 'string';
+          const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
+          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 1;
+          const nodeStart = currIdx;
+          const nodeEnd   = currIdx + nodeLen;
+
+          if (nodeEnd <= localStart || nodeStart >= localEnd) {
+            arr.push(item);
+          } else if (node.i === 'm') {
+            const textStr  = node.text || '';
+            const relStart = Math.max(0, localStart - nodeStart);
+            const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
+            if (relStart > 0) {
+              arr.push(isStr ? textStr.substring(0, relStart) : { ...node, text: textStr.substring(0, relStart) });
+            }
+            arr.push({ ...node, text: textStr.substring(relStart, relEnd), [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+            if (relEnd < nodeLen) {
+              arr.push(isStr ? textStr.substring(relEnd) : { ...node, text: textStr.substring(relEnd) });
+            }
+          } else {
+            arr.push({ ...node, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+          }
+          currIdx += nodeLen;
+        }
+        return arr;
+      };
 
       if (isBack) {
-        await rem.setBackText(processRichText(rem.backText || []));
+        const result = processParentSection(backText, sect_r_start, sect_r_end);
+        console.log('[ClozeCmd] parent backText result:', JSON.stringify(result));
+        await rem.setBackText(result);
       } else {
-        await rem.setText(processRichText(rem.text || []));
+        const result = processParentSection(frontText, sect_r_start, sect_r_end);
+        console.log('[ClozeCmd] parent frontText result:', JSON.stringify(result));
+        await rem.setText(result);
       }
+      console.log('[ClozeCmd] ── done ──────────────────────────────');
     },
   });
 
