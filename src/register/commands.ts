@@ -186,25 +186,72 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await initIncrementalRem(plugin, extractRem, { explicitParentId: rem._id });
       // 4. Locate and Modify
       const r_start = Math.min(selection.range.start, selection.range.end);
-      const r_end = Math.max(selection.range.start, selection.range.end);
 
-      const processRichText = (richText: RichTextInterface): RichTextInterface => {
+      const frontText = rem.text || [];
+      const backText  = rem.backText || [];
+
+      // Plain text extractor — non-text nodes (i:'q' pins etc.) contribute empty string.
+      // This gives us text-only positions that are immune to RemNote's reference node
+      // cursor-width (which counts i:'q' as 2 chars, not 1).
+      const rtPlainStr = (rt: RichTextInterface): string =>
+        rt.map((item: any) => typeof item === 'string' ? item : (item.i === 'm' ? (item.text || '') : '')).join('');
+
+      const frontStr = rtPlainStr(frontText);
+      const backStr  = rtPlainStr(backText);
+      const selStr   = rtPlainStr(selection.richText as RichTextInterface);
+      const selLen   = selStr.length;
+      const hasBackText = backText.length > 0;
+
+      // Detect which section contains the selection via string-matching (text-only positions).
+      // Prefer front; fall back to back; fall back to r_start heuristic.
+      let isBack = false;
+      let sect_r_start = 0;
+
+      const posInFront = frontStr.indexOf(selStr);
+      const posInBack  = hasBackText ? backStr.indexOf(selStr) : -1;
+
+      if (posInFront >= 0 && (posInBack < 0 || r_start < frontStr.length)) {
+        isBack = false;
+        sect_r_start = posInFront;
+      } else if (posInBack >= 0) {
+        isBack = true;
+        sect_r_start = posInBack;
+      } else {
+        // Last resort: use r_start directly (may still be slightly off for rems with pins)
+        isBack = false;
+        sect_r_start = r_start;
+      }
+
+      const sect_r_end = sect_r_start + selLen;
+
+      // Process rich text using text-only positions (non-text nodes have length 0 and pass
+      // through unchanged). This avoids any mismatch with RemNote's cursor model for pins.
+      const processRichText = (richText: RichTextInterface, localStart: number, localEnd: number): RichTextInterface => {
         const newArray: any[] = [];
         let currIdx = 0;
+        let pinInserted = false;
         for (const item of richText) {
           const isString = typeof item === 'string';
           const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
-          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
-          const nodeStart = currIdx;
-          const nodeEnd = currIdx + nodeLen;
+          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 0;
 
-          if (nodeEnd <= r_start || nodeStart >= r_end) {
+          if (nodeLen === 0) {
+            // Non-text node: insert the new pin here if the selection ends exactly at this point
+            if (!pinInserted && currIdx >= localEnd && localEnd > localStart) {
+              newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+              pinInserted = true;
+            }
             newArray.push(item);
           } else {
-            if (textNode.i === 'm') {
-              const textStr = textNode.text || '';
-              const relStart = Math.max(0, r_start - nodeStart);
-              const relEnd = Math.min(nodeLen, r_end - nodeStart);
+            const nodeStart = currIdx;
+            const nodeEnd   = currIdx + nodeLen;
+
+            if (nodeEnd <= localStart || nodeStart >= localEnd) {
+              newArray.push(item);
+            } else {
+              const textStr  = textNode.text || '';
+              const relStart = Math.max(0, localStart - nodeStart);
+              const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
 
               if (relStart > 0) {
                 newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
@@ -214,50 +261,28 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                 text: textStr.substring(relStart, relEnd),
                 [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6, // RemColor.Blue = 6
               });
-
-              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) {
+              if (nodeEnd >= localEnd) {
                 newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+                pinInserted = true;
               }
-
               if (relEnd < nodeLen) {
                 newArray.push({ ...textNode, text: textStr.substring(relEnd) });
               }
-            } else {
-              newArray.push({
-                ...textNode,
-                [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6,
-              });
-
-              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) {
-                newArray.push({ i: 'q', _id: extractRem._id, pin: true });
-              }
             }
+            currIdx += nodeLen;
           }
-
-          currIdx += nodeLen;
         }
-        if (r_end > currIdx && r_start < currIdx) {
+        if (!pinInserted && localEnd <= currIdx && localStart < currIdx) {
           newArray.push({ i: 'q', _id: extractRem._id, pin: true });
         }
         return newArray;
       };
 
-      // Detect if selection is in front or back
-      let isBack = false;
-      const remText = rem.text || [];
-      const frontMiddle = await plugin.richText.substring(remText, r_start, r_end);
-      if (!(await plugin.richText.equals(selection.richText, frontMiddle))) {
-        const backMiddle = await plugin.richText.substring(rem.backText || [], r_start, r_end);
-        if (await plugin.richText.equals(selection.richText, backMiddle)) {
-          isBack = true;
-        }
-      }
-
       // 6. Save the Changes
       if (isBack) {
-        await rem.setBackText(processRichText(rem.backText || []));
+        await rem.setBackText(processRichText(backText, sect_r_start, sect_r_end));
       } else {
-        await rem.setText(processRichText(rem.text || []));
+        await rem.setText(processRichText(frontText, sect_r_start, sect_r_end));
       }
 
       return extractRem;
