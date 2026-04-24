@@ -1895,6 +1895,176 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         await plugin.widget.openPopup('mastery_drill');
       },
     });
+
+    plugin.app.registerCommand({
+      id: 'debug_audit_mastery_drill',
+      name: 'Debug: Audit Mastery Drill Inconsistencies',
+      action: async () => {
+        type DrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+        const allDrillIds = ((await plugin.storage.getSynced('finalDrillIds')) as DrillItem[]) || [];
+
+        const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
+        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+        const currentKbId = currentKb?._id;
+
+        const finalDrillIds = allDrillIds.filter(item =>
+          typeof item === 'string' ? isPrimary : item.kbId === currentKbId
+        );
+        const skippedOtherKb = allDrillIds.length - finalDrillIds.length;
+
+        if (finalDrillIds.length === 0) {
+          await plugin.app.toast(
+            skippedOtherKb > 0
+              ? `No drill items for this KB (${skippedOtherKb} belong to other KBs).`
+              : 'Mastery Drill queue is empty.'
+          );
+          return;
+        }
+
+        const scoreName = (score: number): string => {
+          const map: Record<number, string> = {
+            0: 'AGAIN',
+            0.01: 'TOO_EARLY',
+            0.5: 'HARD',
+            1: 'GOOD',
+            1.5: 'EASY',
+            2: 'VIEWED_AS_LEECH',
+            3: 'RESET',
+            4: 'MANUAL_DATE',
+            5: 'MANUAL_EASE',
+          };
+          return map[score] ?? `UNKNOWN(${score})`;
+        };
+
+        const inconsistencies: string[] = [];
+        let inconsistencyCount = 0;
+
+        for (const item of finalDrillIds) {
+          const cardId = typeof item === 'string' ? item : item.cardId;
+          const addedAt = typeof item === 'object' && item.addedAt
+            ? new Date(item.addedAt).toISOString()
+            : 'unknown';
+
+          const card = await plugin.card.findOne(cardId);
+          if (!card) {
+            inconsistencies.push(`[MISSING_CARD] cardId=${cardId} addedAt=${addedAt}`);
+            inconsistencyCount++;
+            continue;
+          }
+
+          const history = card.repetitionHistory ?? [];
+          const meaningful = history.filter(r => r.score !== QueueInteractionScore.TOO_EARLY);
+
+          if (meaningful.length === 0) {
+            inconsistencies.push(
+              `[NO_HISTORY] cardId=${cardId} remId=${card.remId} — ${history.length === 0 ? 'no reps at all' : 'only TOO_EARLY reps'} (addedAt=${addedAt})`
+            );
+            inconsistencyCount++;
+            continue;
+          }
+
+          const last = meaningful[meaningful.length - 1];
+          const isExpected =
+            last.score === QueueInteractionScore.AGAIN ||
+            last.score === QueueInteractionScore.HARD;
+
+          if (!isExpected) {
+            const cramFlag = last.isCram ? ' [CRAM]' : '';
+            const everHard = meaningful.some(r => r.score === QueueInteractionScore.HARD);
+            const everAgain = meaningful.some(r => r.score === QueueInteractionScore.AGAIN);
+            const poorRatings = [everAgain ? 'AGAIN' : null, everHard ? 'HARD' : null].filter(Boolean).join('/');
+            const everPoorFlag = poorRatings ? ` everPoor=${poorRatings}` : ' everPoor=NEVER';
+            inconsistencies.push(
+              `[UNEXPECTED_SCORE] cardId=${cardId} remId=${card.remId} — last=${scoreName(last.score)}${cramFlag} ratedAt=${new Date(last.date).toISOString()} addedAt=${addedAt}${everPoorFlag}`
+            );
+            inconsistencyCount++;
+            history.forEach((rep, i) => {
+              const cram = rep.isCram ? ' [CRAM]' : '';
+              const scheduled = rep.scheduled ? ` scheduled=${new Date(rep.scheduled).toISOString()}` : '';
+              inconsistencies.push(
+                `      [${i + 1}/${history.length}] ${new Date(rep.date).toISOString()} ${scoreName(rep.score)}${cram}${scheduled}`
+              );
+            });
+          }
+        }
+
+        const scopeLabel = `KB=${isPrimary ? 'primary' : currentKbId} (${skippedOtherKb} items skipped from other KBs)`;
+        if (inconsistencyCount === 0) {
+          console.log(`[MasteryDrillAudit] ${scopeLabel} — all ${finalDrillIds.length} cards OK (last rating is AGAIN or HARD).`);
+          await plugin.app.toast(`All ${finalDrillIds.length} drill cards OK.`);
+        } else {
+          console.log(`[MasteryDrillAudit] ${scopeLabel} — ${inconsistencyCount} inconsistencies out of ${finalDrillIds.length} cards:`);
+          for (const msg of inconsistencies) {
+            console.log('  ' + msg);
+          }
+          await plugin.app.toast(`Found ${inconsistencyCount} inconsistent drill cards — check console.`);
+        }
+      },
+    });
+
+    plugin.app.registerCommand({
+      id: 'cleanup_mastery_drill',
+      name: 'Mastery Drill: Remove cards whose last rating was Good or Easy',
+      action: async () => {
+        type DrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+        const allDrillIds = ((await plugin.storage.getSynced('finalDrillIds')) as DrillItem[]) || [];
+
+        const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
+        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+        const currentKbId = currentKb?._id;
+        const getCardId = (item: DrillItem) => typeof item === 'string' ? item : item.cardId;
+        const isInCurrentKb = (item: DrillItem) =>
+          typeof item === 'string' ? isPrimary : item.kbId === currentKbId;
+
+        const toRemoveIds = new Set<string>();
+        let missingCount = 0;
+        let noHistoryCount = 0;
+
+        for (const item of allDrillIds) {
+          if (!isInCurrentKb(item)) continue;
+          const cardId = getCardId(item);
+          const card = await plugin.card.findOne(cardId);
+          if (!card) {
+            toRemoveIds.add(cardId);
+            missingCount++;
+            continue;
+          }
+          const history = card.repetitionHistory ?? [];
+          const meaningful = history.filter(r => r.score !== QueueInteractionScore.TOO_EARLY);
+          if (meaningful.length === 0) {
+            toRemoveIds.add(cardId);
+            noHistoryCount++;
+            continue;
+          }
+          const last = meaningful[meaningful.length - 1];
+          const isExpected =
+            last.score === QueueInteractionScore.AGAIN ||
+            last.score === QueueInteractionScore.HARD;
+          if (!isExpected) {
+            toRemoveIds.add(cardId);
+          }
+        }
+
+        if (toRemoveIds.size === 0) {
+          await plugin.app.toast('No cards to remove — the drill is already clean for this KB.');
+          return;
+        }
+
+        const kept = allDrillIds.filter(item => {
+          if (!isInCurrentKb(item)) return true;
+          return !toRemoveIds.has(getCardId(item));
+        });
+        await plugin.storage.setSynced('finalDrillIds', kept);
+
+        const unexpectedCount = toRemoveIds.size - missingCount - noHistoryCount;
+        console.log(
+          `[MasteryDrillCleanup] Removed ${toRemoveIds.size} cards from current KB ` +
+          `(missing=${missingCount}, noHistory=${noHistoryCount}, lastRatingWasGoodOrEasy=${unexpectedCount}). ` +
+          `${kept.length} items remain in finalDrillIds (across all KBs).`
+        );
+        await plugin.app.toast(`Removed ${toRemoveIds.size} cards from drill.`);
+      },
+    });
   }
 
   plugin.app.registerCommand({
@@ -1906,173 +2076,4 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerCommand({
-    id: 'debug_audit_mastery_drill',
-    name: 'Debug: Audit Mastery Drill Inconsistencies',
-    action: async () => {
-      type DrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
-      const allDrillIds = ((await plugin.storage.getSynced('finalDrillIds')) as DrillItem[]) || [];
-
-      const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
-      const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-      const currentKbId = currentKb?._id;
-
-      const finalDrillIds = allDrillIds.filter(item =>
-        typeof item === 'string' ? isPrimary : item.kbId === currentKbId
-      );
-      const skippedOtherKb = allDrillIds.length - finalDrillIds.length;
-
-      if (finalDrillIds.length === 0) {
-        await plugin.app.toast(
-          skippedOtherKb > 0
-            ? `No drill items for this KB (${skippedOtherKb} belong to other KBs).`
-            : 'Mastery Drill queue is empty.'
-        );
-        return;
-      }
-
-      const scoreName = (score: number): string => {
-        const map: Record<number, string> = {
-          0: 'AGAIN',
-          0.01: 'TOO_EARLY',
-          0.5: 'HARD',
-          1: 'GOOD',
-          1.5: 'EASY',
-          2: 'VIEWED_AS_LEECH',
-          3: 'RESET',
-          4: 'MANUAL_DATE',
-          5: 'MANUAL_EASE',
-        };
-        return map[score] ?? `UNKNOWN(${score})`;
-      };
-
-      const inconsistencies: string[] = [];
-      let inconsistencyCount = 0;
-
-      for (const item of finalDrillIds) {
-        const cardId = typeof item === 'string' ? item : item.cardId;
-        const addedAt = typeof item === 'object' && item.addedAt
-          ? new Date(item.addedAt).toISOString()
-          : 'unknown';
-
-        const card = await plugin.card.findOne(cardId);
-        if (!card) {
-          inconsistencies.push(`[MISSING_CARD] cardId=${cardId} addedAt=${addedAt}`);
-          inconsistencyCount++;
-          continue;
-        }
-
-        const history = card.repetitionHistory ?? [];
-        const meaningful = history.filter(r => r.score !== QueueInteractionScore.TOO_EARLY);
-
-        if (meaningful.length === 0) {
-          inconsistencies.push(
-            `[NO_HISTORY] cardId=${cardId} remId=${card.remId} — ${history.length === 0 ? 'no reps at all' : 'only TOO_EARLY reps'} (addedAt=${addedAt})`
-          );
-          inconsistencyCount++;
-          continue;
-        }
-
-        const last = meaningful[meaningful.length - 1];
-        const isExpected =
-          last.score === QueueInteractionScore.AGAIN ||
-          last.score === QueueInteractionScore.HARD;
-
-        if (!isExpected) {
-          const cramFlag = last.isCram ? ' [CRAM]' : '';
-          const everHard = meaningful.some(r => r.score === QueueInteractionScore.HARD);
-          const everAgain = meaningful.some(r => r.score === QueueInteractionScore.AGAIN);
-          const poorRatings = [everAgain ? 'AGAIN' : null, everHard ? 'HARD' : null].filter(Boolean).join('/');
-          const everPoorFlag = poorRatings ? ` everPoor=${poorRatings}` : ' everPoor=NEVER';
-          inconsistencies.push(
-            `[UNEXPECTED_SCORE] cardId=${cardId} remId=${card.remId} — last=${scoreName(last.score)}${cramFlag} ratedAt=${new Date(last.date).toISOString()} addedAt=${addedAt}${everPoorFlag}`
-          );
-          inconsistencyCount++;
-          history.forEach((rep, i) => {
-            const cram = rep.isCram ? ' [CRAM]' : '';
-            const scheduled = rep.scheduled ? ` scheduled=${new Date(rep.scheduled).toISOString()}` : '';
-            inconsistencies.push(
-              `      [${i + 1}/${history.length}] ${new Date(rep.date).toISOString()} ${scoreName(rep.score)}${cram}${scheduled}`
-            );
-          });
-        }
-      }
-
-      const scopeLabel = `KB=${isPrimary ? 'primary' : currentKbId} (${skippedOtherKb} items skipped from other KBs)`;
-      if (inconsistencyCount === 0) {
-        console.log(`[MasteryDrillAudit] ${scopeLabel} — all ${finalDrillIds.length} cards OK (last rating is AGAIN or HARD).`);
-        await plugin.app.toast(`All ${finalDrillIds.length} drill cards OK.`);
-      } else {
-        console.log(`[MasteryDrillAudit] ${scopeLabel} — ${inconsistencyCount} inconsistencies out of ${finalDrillIds.length} cards:`);
-        for (const msg of inconsistencies) {
-          console.log('  ' + msg);
-        }
-        await plugin.app.toast(`Found ${inconsistencyCount} inconsistent drill cards — check console.`);
-      }
-    },
-  });
-
-  plugin.app.registerCommand({
-    id: 'cleanup_mastery_drill',
-    name: 'Mastery Drill: Remove cards whose last rating was Good or Easy',
-    action: async () => {
-      type DrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
-      const allDrillIds = ((await plugin.storage.getSynced('finalDrillIds')) as DrillItem[]) || [];
-
-      const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
-      const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-      const currentKbId = currentKb?._id;
-      const getCardId = (item: DrillItem) => typeof item === 'string' ? item : item.cardId;
-      const isInCurrentKb = (item: DrillItem) =>
-        typeof item === 'string' ? isPrimary : item.kbId === currentKbId;
-
-      const toRemoveIds = new Set<string>();
-      let missingCount = 0;
-      let noHistoryCount = 0;
-
-      for (const item of allDrillIds) {
-        if (!isInCurrentKb(item)) continue;
-        const cardId = getCardId(item);
-        const card = await plugin.card.findOne(cardId);
-        if (!card) {
-          toRemoveIds.add(cardId);
-          missingCount++;
-          continue;
-        }
-        const history = card.repetitionHistory ?? [];
-        const meaningful = history.filter(r => r.score !== QueueInteractionScore.TOO_EARLY);
-        if (meaningful.length === 0) {
-          toRemoveIds.add(cardId);
-          noHistoryCount++;
-          continue;
-        }
-        const last = meaningful[meaningful.length - 1];
-        const isExpected =
-          last.score === QueueInteractionScore.AGAIN ||
-          last.score === QueueInteractionScore.HARD;
-        if (!isExpected) {
-          toRemoveIds.add(cardId);
-        }
-      }
-
-      if (toRemoveIds.size === 0) {
-        await plugin.app.toast('No cards to remove — the drill is already clean for this KB.');
-        return;
-      }
-
-      const kept = allDrillIds.filter(item => {
-        if (!isInCurrentKb(item)) return true;
-        return !toRemoveIds.has(getCardId(item));
-      });
-      await plugin.storage.setSynced('finalDrillIds', kept);
-
-      const unexpectedCount = toRemoveIds.size - missingCount - noHistoryCount;
-      console.log(
-        `[MasteryDrillCleanup] Removed ${toRemoveIds.size} cards from current KB ` +
-        `(missing=${missingCount}, noHistory=${noHistoryCount}, lastRatingWasGoodOrEasy=${unexpectedCount}). ` +
-        `${kept.length} items remain in finalDrillIds (across all KBs).`
-      );
-      await plugin.app.toast(`Removed ${toRemoveIds.size} cards from drill.`);
-    },
-  });
 }
