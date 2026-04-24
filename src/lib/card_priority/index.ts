@@ -175,8 +175,10 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
   const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
 
   if (ancestorPriority) {
-    // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop)
-    if (existingPriority && existingPriority.source === 'inherited' && existingPriority.priority === ancestorPriority.priority) {
+    // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop).
+    // lastUpdated > 0 means the powerup tag exists; untagged rems must always be written
+    // even when their computed priority matches, so they receive the actual tag.
+    if (existingPriority && existingPriority.lastUpdated > 0 && existingPriority.source === 'inherited' && existingPriority.priority === ancestorPriority.priority) {
       return ancestorPriority.priority;
     }
     await setCardPriority(plugin, rem, ancestorPriority.priority, 'inherited');
@@ -188,8 +190,9 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
   }
 
   const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
-  // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop)
-  if (existingPriority && existingPriority.source === 'default' && existingPriority.priority === defaultPriority) {
+  // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop).
+  // lastUpdated === 0 means the powerup tag does not exist yet; always write so the rem gets tagged.
+  if (existingPriority && existingPriority.lastUpdated > 0 && existingPriority.source === 'default' && existingPriority.priority === defaultPriority) {
     return defaultPriority;
   }
   await setCardPriority(plugin, rem, defaultPriority, 'default');
