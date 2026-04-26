@@ -176,9 +176,12 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
 
   if (ancestorPriority) {
     // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop).
-    // lastUpdated > 0 means the powerup tag exists; untagged rems must always be written
-    // even when their computed priority matches, so they receive the actual tag.
-    if (existingPriority && existingPriority.lastUpdated > 0 && existingPriority.source === 'inherited' && existingPriority.priority === ancestorPriority.priority) {
+    // Untagged rems with matching inherited priority intentionally stay untagged: the
+    // widget already falls back to getCardPriority() (which returns the inherited value
+    // with lastUpdated: 0) when there's no cache entry, and the deferred batch still
+    // pushes them into the cache by remId regardless of tag status. Force-tagging on
+    // every ambient edit causes a write storm in the GlobalRemChanged listener.
+    if (existingPriority && existingPriority.source === 'inherited' && existingPriority.priority === ancestorPriority.priority) {
       return ancestorPriority.priority;
     }
     await setCardPriority(plugin, rem, ancestorPriority.priority, 'inherited');
@@ -191,8 +194,10 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
 
   const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
   // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop).
-  // lastUpdated === 0 means the powerup tag does not exist yet; always write so the rem gets tagged.
-  if (existingPriority && existingPriority.lastUpdated > 0 && existingPriority.source === 'default' && existingPriority.priority === defaultPriority) {
+  // Untagged rems with matching default priority intentionally stay untagged: the widget
+  // falls back to getCardPriority() and the deferred batch still pushes them into the
+  // cache by remId regardless of tag status.
+  if (existingPriority && existingPriority.source === 'default' && existingPriority.priority === defaultPriority) {
     return defaultPriority;
   }
   await setCardPriority(plugin, rem, defaultPriority, 'default');

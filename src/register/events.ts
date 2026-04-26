@@ -683,7 +683,11 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       // and adds the rem's ID to recentlyProcessedCards. GlobalRemChanged then fires for that same
       // remId, hits the recentlyProcessedCards guard, and skips. For cluster cards, QueueCompleteCard
       // never fires, so the parent remId is never in recentlyProcessedCards — we proceed.
-      {
+      // Short-circuit: clusterVisibleCardId is only set during cluster card review.
+      // Reading it first lets every other GlobalRemChanged (the common case) skip the
+      // settings read and the recentlyProcessedCards bookkeeping below.
+      const clusterCardId = await plugin.storage.getSession<string>('clusterVisibleCardId');
+      if (clusterCardId) {
         const skipMasteryDrill = Boolean(await plugin.settings.getSetting('skip_mastery_drill'));
         if (!skipMasteryDrill && !recentlyProcessedCards.has(data.remId)) {
           // Claim this remId synchronously before the first await so concurrent GlobalRemChanged
@@ -693,80 +697,76 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
           // sibling's GlobalRemChanged will always find the set clear.
           recentlyProcessedCards.add(data.remId);
           try {
-            const clusterCardId = await plugin.storage.getSession<string>('clusterVisibleCardId');
+            const card = await plugin.card.findOne(clusterCardId);
+            const history = card?.repetitionHistory;
+            const now = Date.now();
+            const FRESH_RATING_WINDOW_MS = 10_000;
+            const lastEntry = history && history.length > 0 ? history[history.length - 1] : undefined;
 
-            if (clusterCardId) {
-              const card = await plugin.card.findOne(clusterCardId);
-              const history = card?.repetitionHistory;
-              const now = Date.now();
-              const FRESH_RATING_WINDOW_MS = 10_000;
-              const lastEntry = history && history.length > 0 ? history[history.length - 1] : undefined;
+            if (
+              lastEntry?.date &&
+              now - lastEntry.date <= FRESH_RATING_WINDOW_MS &&
+              lastEntry.score !== QueueInteractionScore.TOO_EARLY
+            ) {
+              const score = lastEntry.score;
+              const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+              const currentKbId = kbData?._id;
 
-              if (
-                lastEntry?.date &&
-                now - lastEntry.date <= FRESH_RATING_WINDOW_MS &&
-                lastEntry.score !== QueueInteractionScore.TOO_EARLY
-              ) {
-                const score = lastEntry.score;
-                const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-                const currentKbId = kbData?._id;
+              type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+              let finalDrillIds =
+                ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
+              const getCardId = (item: FinalDrillItem) =>
+                typeof item === 'string' ? item : item.cardId;
 
-                type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
-                let finalDrillIds =
-                  ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
-                const getCardId = (item: FinalDrillItem) =>
-                  typeof item === 'string' ? item : item.cardId;
-
-                if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
-                  if (!finalDrillIds.some((item) => getCardId(item) === clusterCardId)) {
-                    finalDrillIds = [
-                      ...finalDrillIds,
-                      { cardId: clusterCardId, kbId: currentKbId, addedAt: Date.now() },
-                    ];
-                    await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
-                  }
-                } else if (score >= QueueInteractionScore.GOOD) {
-                  const filtered = finalDrillIds.filter((item) => getCardId(item) !== clusterCardId);
-                  if (filtered.length !== finalDrillIds.length) {
-                    await plugin.storage.setSynced('finalDrillIds', filtered);
-                  }
+              if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
+                if (!finalDrillIds.some((item) => getCardId(item) === clusterCardId)) {
+                  finalDrillIds = [
+                    ...finalDrillIds,
+                    { cardId: clusterCardId, kbId: currentKbId, addedAt: Date.now() },
+                  ];
+                  await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
                 }
-
-                // Flashcard History: record cluster card rating (QueueCompleteCard doesn't fire for clusters)
-                try {
-                  const historyData =
-                    ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-                  if (historyData[0]?.cardId !== clusterCardId) {
-                    const clusterRem = card?.remId ? await plugin.rem.findOne(card.remId) : undefined;
-                    let frontText = '';
-                    let backText = '';
-                    try {
-                      const frontRaw = clusterRem?.text ? await safeRemTextToString(plugin, clusterRem.text) : '';
-                      const backRaw = clusterRem?.backText ? await safeRemTextToString(plugin, clusterRem.backText) : '';
-                      frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
-                      backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
-                    } catch (_e) {
-                      frontText = '[Complex Media Rem]';
-                    }
-                    const text = `${frontText} ${backText}`.trim();
-                    const deduped = historyData.filter((entry) => entry.cardId !== clusterCardId);
-                    await plugin.storage.setSynced('flashcardHistoryData', [
-                      {
-                        key: Math.random(),
-                        remId: card?.remId,
-                        cardId: clusterCardId,
-                        open: false,
-                        time: new Date().getTime(),
-                        kbId: currentKbId,
-                        text,
-                        _v: 1,
-                      },
-                      ...deduped.slice(0, 999),
-                    ]);
-                  }
-                } catch (error) {
-                  console.error('Failed to record flashcard history for cluster card:', error);
+              } else if (score >= QueueInteractionScore.GOOD) {
+                const filtered = finalDrillIds.filter((item) => getCardId(item) !== clusterCardId);
+                if (filtered.length !== finalDrillIds.length) {
+                  await plugin.storage.setSynced('finalDrillIds', filtered);
                 }
+              }
+
+              // Flashcard History: record cluster card rating (QueueCompleteCard doesn't fire for clusters)
+              try {
+                const historyData =
+                  ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
+                if (historyData[0]?.cardId !== clusterCardId) {
+                  const clusterRem = card?.remId ? await plugin.rem.findOne(card.remId) : undefined;
+                  let frontText = '';
+                  let backText = '';
+                  try {
+                    const frontRaw = clusterRem?.text ? await safeRemTextToString(plugin, clusterRem.text) : '';
+                    const backRaw = clusterRem?.backText ? await safeRemTextToString(plugin, clusterRem.backText) : '';
+                    frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
+                    backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
+                  } catch (_e) {
+                    frontText = '[Complex Media Rem]';
+                  }
+                  const text = `${frontText} ${backText}`.trim();
+                  const deduped = historyData.filter((entry) => entry.cardId !== clusterCardId);
+                  await plugin.storage.setSynced('flashcardHistoryData', [
+                    {
+                      key: Math.random(),
+                      remId: card?.remId,
+                      cardId: clusterCardId,
+                      open: false,
+                      time: new Date().getTime(),
+                      kbId: currentKbId,
+                      text,
+                      _v: 1,
+                    },
+                    ...deduped.slice(0, 999),
+                  ]);
+                }
+              } catch (error) {
+                console.error('Failed to record flashcard history for cluster card:', error);
               }
             }
           } catch (error) {
