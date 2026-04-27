@@ -24,6 +24,7 @@ import {
   safeRemTextToString,
   PageHistoryEntry,
 } from '../lib/pdfUtils';
+import { openRemInNewPane } from '../lib/remHelpers';
 
 // Move styles outside component to avoid recreation on every render
 const adjustButtonStyle: React.CSSProperties = {
@@ -613,14 +614,12 @@ export function PriorityEditor() {
                       if (!bookmarkRem) return;
 
                       // scrollToReaderHighlight is a no-op unless a PDF reader is
-                      // already mounted. Open the PDF rem first so the reader exists,
-                      // then scroll once it has had a moment to mount.
+                      // already mounted. Open the PDF rem in a NEW pane (to the
+                      // right) so the reader exists without closing the IncRem
+                      // view the user was looking at. Then scroll once mounted.
                       if (remData.pdfRemId) {
-                        const pdfRem = await plugin.rem.findOne(remData.pdfRemId);
-                        if (pdfRem) {
-                          await pdfRem.openRemAsPage();
-                          console.log('[PriorityEditor] Opened PDF rem as page:', remData.pdfRemId);
-                        }
+                        await openRemInNewPane(plugin, remData.pdfRemId);
+                        console.log('[PriorityEditor] Opened PDF rem in new pane:', remData.pdfRemId);
                       }
 
                       setTimeout(() => {

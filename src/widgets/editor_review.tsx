@@ -16,6 +16,7 @@ import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { safeRemTextToString, findPDFinRem, getIncrementalReadingPosition, addPageToHistory, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { determineIncRemType } from '../lib/incRemHelpers';
+import { openRemInNewPane } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 
@@ -223,9 +224,10 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
       console.log('[EditorReview.handleStartTimer] rem:', remId, 'pdfRem:', pdfRem?._id ?? null, 'incRemType:', incRemType);
 
       if (pdfRem) {
-        // Mount the PDF reader by opening the PDF rem as a page.
-        await pdfRem.openRemAsPage();
-        console.log('[EditorReview.handleStartTimer] Opened PDF rem as page:', pdfRem._id);
+        // Mount the PDF reader in a NEW pane (right of the current layout) so
+        // the IncRem the user was viewing in the editor stays visible.
+        await openRemInNewPane(plugin, pdfRem._id);
+        console.log('[EditorReview.handleStartTimer] Opened PDF rem in new pane:', pdfRem._id);
       } else if (incRemType === 'pdf-note') {
         await rem.openRemAsPage();
       } else {
