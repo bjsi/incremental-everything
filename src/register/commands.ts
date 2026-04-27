@@ -6,6 +6,8 @@ import {
   BuiltInPowerupCodes,
   RICH_TEXT_FORMATTING,
   RichTextInterface,
+  RemType,
+  QueueInteractionScore,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -185,25 +187,72 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await initIncrementalRem(plugin, extractRem, { explicitParentId: rem._id });
       // 4. Locate and Modify
       const r_start = Math.min(selection.range.start, selection.range.end);
-      const r_end = Math.max(selection.range.start, selection.range.end);
 
-      const processRichText = (richText: RichTextInterface): RichTextInterface => {
+      const frontText = rem.text || [];
+      const backText  = rem.backText || [];
+
+      // Plain text extractor — non-text nodes (i:'q' pins etc.) contribute empty string.
+      // This gives us text-only positions that are immune to RemNote's reference node
+      // cursor-width (which counts i:'q' as 2 chars, not 1).
+      const rtPlainStr = (rt: RichTextInterface): string =>
+        rt.map((item: any) => typeof item === 'string' ? item : (item.i === 'm' ? (item.text || '') : '')).join('');
+
+      const frontStr = rtPlainStr(frontText);
+      const backStr  = rtPlainStr(backText);
+      const selStr   = rtPlainStr(selection.richText as RichTextInterface);
+      const selLen   = selStr.length;
+      const hasBackText = backText.length > 0;
+
+      // Detect which section contains the selection via string-matching (text-only positions).
+      // Prefer front; fall back to back; fall back to r_start heuristic.
+      let isBack = false;
+      let sect_r_start = 0;
+
+      const posInFront = frontStr.indexOf(selStr);
+      const posInBack  = hasBackText ? backStr.indexOf(selStr) : -1;
+
+      if (posInFront >= 0 && (posInBack < 0 || r_start < frontStr.length)) {
+        isBack = false;
+        sect_r_start = posInFront;
+      } else if (posInBack >= 0) {
+        isBack = true;
+        sect_r_start = posInBack;
+      } else {
+        // Last resort: use r_start directly (may still be slightly off for rems with pins)
+        isBack = false;
+        sect_r_start = r_start;
+      }
+
+      const sect_r_end = sect_r_start + selLen;
+
+      // Process rich text using text-only positions (non-text nodes have length 0 and pass
+      // through unchanged). This avoids any mismatch with RemNote's cursor model for pins.
+      const processRichText = (richText: RichTextInterface, localStart: number, localEnd: number): RichTextInterface => {
         const newArray: any[] = [];
         let currIdx = 0;
+        let pinInserted = false;
         for (const item of richText) {
           const isString = typeof item === 'string';
           const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
-          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
-          const nodeStart = currIdx;
-          const nodeEnd = currIdx + nodeLen;
+          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 0;
 
-          if (nodeEnd <= r_start || nodeStart >= r_end) {
+          if (nodeLen === 0) {
+            // Non-text node: insert the new pin here if the selection ends exactly at this point
+            if (!pinInserted && currIdx >= localEnd && localEnd > localStart) {
+              newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+              pinInserted = true;
+            }
             newArray.push(item);
           } else {
-            if (textNode.i === 'm') {
-              const textStr = textNode.text || '';
-              const relStart = Math.max(0, r_start - nodeStart);
-              const relEnd = Math.min(nodeLen, r_end - nodeStart);
+            const nodeStart = currIdx;
+            const nodeEnd   = currIdx + nodeLen;
+
+            if (nodeEnd <= localStart || nodeStart >= localEnd) {
+              newArray.push(item);
+            } else {
+              const textStr  = textNode.text || '';
+              const relStart = Math.max(0, localStart - nodeStart);
+              const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
 
               if (relStart > 0) {
                 newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
@@ -213,50 +262,28 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                 text: textStr.substring(relStart, relEnd),
                 [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6, // RemColor.Blue = 6
               });
-
-              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) {
+              if (nodeEnd >= localEnd) {
                 newArray.push({ i: 'q', _id: extractRem._id, pin: true });
+                pinInserted = true;
               }
-
               if (relEnd < nodeLen) {
                 newArray.push({ ...textNode, text: textStr.substring(relEnd) });
               }
-            } else {
-              newArray.push({
-                ...textNode,
-                [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6,
-              });
-
-              if (r_start < r_end && nodeStart < r_end && nodeEnd >= r_end) {
-                newArray.push({ i: 'q', _id: extractRem._id, pin: true });
-              }
             }
+            currIdx += nodeLen;
           }
-
-          currIdx += nodeLen;
         }
-        if (r_end > currIdx && r_start < currIdx) {
+        if (!pinInserted && localEnd <= currIdx && localStart < currIdx) {
           newArray.push({ i: 'q', _id: extractRem._id, pin: true });
         }
         return newArray;
       };
 
-      // Detect if selection is in front or back
-      let isBack = false;
-      const remText = rem.text || [];
-      const frontMiddle = await plugin.richText.substring(remText, r_start, r_end);
-      if (!(await plugin.richText.equals(selection.richText, frontMiddle))) {
-        const backMiddle = await plugin.richText.substring(rem.backText || [], r_start, r_end);
-        if (await plugin.richText.equals(selection.richText, backMiddle)) {
-          isBack = true;
-        }
-      }
-
       // 6. Save the Changes
       if (isBack) {
-        await rem.setBackText(processRichText(rem.backText || []));
+        await rem.setBackText(processRichText(backText, sect_r_start, sect_r_end));
       } else {
-        await rem.setText(processRichText(rem.text || []));
+        await rem.setText(processRichText(frontText, sect_r_start, sect_r_end));
       }
 
       return extractRem;
@@ -332,9 +359,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'opt+z',
     action: async () => {
       const selection = await plugin.editor.getSelection();
-      if (!selection || selection.type !== SelectionType.Text) {
-        return;
-      }
+      if (!selection || selection.type !== SelectionType.Text) return;
       if (selection.range.start === selection.range.end) {
         await plugin.app.toast('Please select some text to create a cloze deletion.');
         return;
@@ -344,65 +369,226 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem) return;
 
       const r_start = Math.min(selection.range.start, selection.range.end);
-      const r_end = Math.max(selection.range.start, selection.range.end);
+
+      const frontText = rem.text || [];
+      const backText = rem.backText || [];
+      const hasBackText = backText.length > 0;
+
+      // Plain string from rich text (text nodes only, non-text nodes → '').
+      // Used for text-only position matching — immune to RemNote's i:'q' cursor-width (2 chars).
+      const rtPlainStr = (rt: RichTextInterface): string =>
+        rt.map((item: any) => typeof item === 'string' ? item : (item.i === 'm' ? (item.text || '') : '')).join('');
+
+      const selStr   = rtPlainStr(selection.richText as RichTextInterface);
+      const selLen   = selStr.length;
+      const frontStr = rtPlainStr(frontText);
+      const backStr  = rtPlainStr(backText);
+
+      // Detect section via string-matching (text-only positions avoid RemNote cursor-model issues).
+      const posInFront = frontStr.indexOf(selStr);
+      const posInBack  = hasBackText ? backStr.indexOf(selStr) : -1;
+
+      let isBack = false;
+      let sect_r_start = 0;
+
+      if (posInFront >= 0 && (posInBack < 0 || r_start < frontStr.length)) {
+        isBack = false;
+        sect_r_start = posInFront;
+      } else if (posInBack >= 0) {
+        isBack = true;
+        sect_r_start = posInBack;
+      } else {
+        // Fallback: use r_start directly (may be off if pins precede the selection)
+        isBack = false;
+        sect_r_start = r_start;
+      }
+
+      const sect_r_end = sect_r_start + selLen;
 
       const clozeId = Math.random().toString(36).substring(2, 10);
 
-      const processRichText = (richText: RichTextInterface): RichTextInterface => {
-        const newArray: any[] = [];
+      // Determine arrow character from the rem's practice direction.
+      const practiceDir = hasBackText ? await rem.getPracticeDirection() : 'none';
+      const arrowChar = practiceDir === 'forward' ? '⇒'
+                      : practiceDir === 'backward' ? '⇐'
+                      : practiceDir === 'both' ? '⇔'
+                      : '⇔'; // fallback
+      const remType = rem.type;
+
+      // Process one rich text section. localStart/localEnd are section-relative character positions.
+      // - Delimiter nodes (i:'s') → replaced by arrowChar.
+      // - Existing cloze marks outside the selection → stripped, yellow highlight + red font applied.
+      // - Text inside [localStart, localEnd) → new clozeId applied.
+      const processSection = (
+        richText: RichTextInterface,
+        applySelection: boolean,
+        localStart: number,
+        localEnd: number
+      ): any[] => {
+        const arr: any[] = [];
         let currIdx = 0;
         for (const item of richText) {
-          const isString = typeof item === 'string';
-          const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
-          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 1;
+          const isStr  = typeof item === 'string';
+          const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
+          // Text-only positions: non-'m' nodes have length 0 (immune to RemNote's i:'q' cursor-width).
+          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 0;
           const nodeStart = currIdx;
-          const nodeEnd = currIdx + nodeLen;
+          const nodeEnd   = currIdx + nodeLen;
+          // For zero-length nodes use a point check; for text nodes use the range overlap check.
+          const inSel = applySelection && (
+            nodeLen > 0
+              ? (nodeStart < localEnd && nodeEnd > localStart)
+              : (currIdx > localStart && currIdx < localEnd)
+          );
 
-          if (nodeEnd <= r_start || nodeStart >= r_end) {
-            newArray.push(item);
-          } else {
-            if (textNode.i === 'm') {
-              const textStr = textNode.text || '';
-              const relStart = Math.max(0, r_start - nodeStart);
-              const relEnd = Math.min(nodeLen, r_end - nodeStart);
+          if (node.i === 's') {
+            arr.push(inSel
+              ? { i: 'm' as const, text: arrowChar, [RICH_TEXT_FORMATTING.CLOZE]: clozeId }
+              : { i: 'm' as const, text: arrowChar }
+            );
+          } else if (node.i === 'm') {
+            const textStr  = node.text || '';
+            const baseNode: any = { ...node };
+            const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
+            delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
 
-              if (relStart > 0) {
-                newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
-              }
-              newArray.push({
-                ...textNode,
-                text: textStr.substring(relStart, relEnd),
-                [RICH_TEXT_FORMATTING.CLOZE]: clozeId,
-              });
-              if (relEnd < nodeLen) {
-                newArray.push({ ...textNode, text: textStr.substring(relEnd) });
+            if (!inSel) {
+              if (hadCloze) {
+                arr.push(isStr
+                  ? { i: 'm' as const, text: textStr, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 }
+                  : { ...baseNode, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+              } else {
+                arr.push(isStr ? textStr : baseNode);
               }
             } else {
-              newArray.push({
-                ...textNode,
-                [RICH_TEXT_FORMATTING.CLOZE]: clozeId,
-              });
+              const relStart = Math.max(0, localStart - nodeStart);
+              const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
+              if (relStart > 0) {
+                const pre = textStr.substring(0, relStart);
+                arr.push(hadCloze
+                  ? { ...baseNode, text: pre, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 }
+                  : (isStr ? pre : { ...baseNode, text: pre }));
+              }
+              arr.push({ ...baseNode, text: textStr.substring(relStart, relEnd), [RICH_TEXT_FORMATTING.CLOZE]: clozeId });
+              if (relEnd < nodeLen) {
+                const post = textStr.substring(relEnd);
+                arr.push(hadCloze
+                  ? { ...baseNode, text: post, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 }
+                  : (isStr ? post : { ...baseNode, text: post }));
+              }
+            }
+          } else {
+            const baseNode: any = { ...node };
+            const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
+            delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
+            if (inSel) {
+              arr.push({ ...baseNode, [RICH_TEXT_FORMATTING.CLOZE]: clozeId });
+            } else if (hadCloze) {
+              arr.push({ ...baseNode, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+            } else {
+              arr.push(baseNode);
             }
           }
           currIdx += nodeLen;
         }
-        return newArray;
+        return arr;
       };
 
-      let isBack = false;
-      const remText = rem.text || [];
-      const frontMiddle = await plugin.richText.substring(remText, r_start, r_end);
-      if (!(await plugin.richText.equals(selection.richText, frontMiddle))) {
-        const backMiddle = await plugin.richText.substring(rem.backText || [], r_start, r_end);
-        if (await plugin.richText.equals(selection.richText, backMiddle)) {
-          isBack = true;
+      // Apply bold (concept) or italic (descriptor) to all text nodes in a node array,
+      // matching how RemNote renders the front of concept/descriptor rems.
+      const applyTypeFormatting = (nodes: any[]): any[] => {
+        if (remType !== RemType.CONCEPT && remType !== RemType.DESCRIPTOR) return nodes;
+        const prop = remType === RemType.CONCEPT ? RICH_TEXT_FORMATTING.BOLD : RICH_TEXT_FORMATTING.ITALIC;
+        return nodes.map((node: any) => {
+          if (typeof node === 'string') return { i: 'm' as const, text: node, [prop]: true };
+          if (node.i === 'm') return { ...node, [prop]: true };
+          return node;
+        });
+      };
+
+      // Build child text: processed front + (arrow separator if needed) + processed back + parent pin.
+      const buildChildText = (): RichTextInterface => {
+        const rawFrontPart = processSection(frontText, !isBack, sect_r_start, sect_r_end);
+        const frontPart = applyTypeFormatting(rawFrontPart);
+        const result: any[] = [...frontPart];
+        if (hasBackText) {
+          const hasExplicitDelim = frontText.some((item: any) => typeof item !== 'string' && item?.i === 's');
+          if (!hasExplicitDelim) {
+            result.push({ i: 'm' as const, text: ' ' + arrowChar + ' ' });
+          }
+          const backPart = processSection(backText, isBack, sect_r_start, sect_r_end);
+          result.push(...backPart);
+        }
+        result.push({ i: 'q', _id: rem._id, pin: true });
+        return result;
+      };
+
+      // 1. Create child rem
+      const clozeRem = await plugin.rem.createRem();
+      if (!clozeRem) return;
+
+      await clozeRem.setText(buildChildText());
+      await clozeRem.setParent(rem);
+
+      let clozeExtractTag = await plugin.rem.findByName(['cloze-extract'], null);
+      if (!clozeExtractTag) {
+        clozeExtractTag = await plugin.rem.createRem();
+        if (clozeExtractTag) await clozeExtractTag.setText(['cloze-extract']);
+      }
+      if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
+
+      // 2. Add remove-from-queue tag to parent
+      let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
+      if (!removeFromQueueTag) {
+        removeFromQueueTag = await plugin.rem.createRem();
+        if (removeFromQueueTag) {
+          await removeFromQueueTag.setText(['remove-from-queue']);
         }
       }
+      if (removeFromQueueTag) {
+        await rem.addTag(removeFromQueueTag._id);
+      }
+
+      // 3. Mark selected text in parent with yellow highlight + red font.
+      // Uses the same section-relative positions (sect_r_start/sect_r_end).
+      const processParentSection = (richText: RichTextInterface, localStart: number, localEnd: number): RichTextInterface => {
+        const arr: any[] = [];
+        let currIdx = 0;
+        for (const item of richText) {
+          const isStr  = typeof item === 'string';
+          const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
+          // Text-only positions: non-'m' nodes pass through unchanged.
+          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 0;
+
+          if (nodeLen === 0) {
+            arr.push(item);
+          } else {
+            const nodeStart = currIdx;
+            const nodeEnd   = currIdx + nodeLen;
+            if (nodeEnd <= localStart || nodeStart >= localEnd) {
+              arr.push(item);
+            } else {
+              const textStr  = node.text || '';
+              const relStart = Math.max(0, localStart - nodeStart);
+              const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
+              if (relStart > 0) {
+                arr.push(isStr ? textStr.substring(0, relStart) : { ...node, text: textStr.substring(0, relStart) });
+              }
+              arr.push({ ...node, text: textStr.substring(relStart, relEnd), [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+              if (relEnd < nodeLen) {
+                arr.push(isStr ? textStr.substring(relEnd) : { ...node, text: textStr.substring(relEnd) });
+              }
+            }
+            currIdx += nodeLen;
+          }
+        }
+        return arr;
+      };
 
       if (isBack) {
-        await rem.setBackText(processRichText(rem.backText || []));
+        await rem.setBackText(processParentSection(backText, sect_r_start, sect_r_end));
       } else {
-        await rem.setText(processRichText(rem.text || []));
+        await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
       }
     },
   });
@@ -1709,6 +1895,176 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         await plugin.widget.openPopup('mastery_drill');
       },
     });
+
+    plugin.app.registerCommand({
+      id: 'debug_audit_mastery_drill',
+      name: 'Debug: Audit Mastery Drill Inconsistencies',
+      action: async () => {
+        type DrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+        const allDrillIds = ((await plugin.storage.getSynced('finalDrillIds')) as DrillItem[]) || [];
+
+        const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
+        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+        const currentKbId = currentKb?._id;
+
+        const finalDrillIds = allDrillIds.filter(item =>
+          typeof item === 'string' ? isPrimary : item.kbId === currentKbId
+        );
+        const skippedOtherKb = allDrillIds.length - finalDrillIds.length;
+
+        if (finalDrillIds.length === 0) {
+          await plugin.app.toast(
+            skippedOtherKb > 0
+              ? `No drill items for this KB (${skippedOtherKb} belong to other KBs).`
+              : 'Mastery Drill queue is empty.'
+          );
+          return;
+        }
+
+        const scoreName = (score: number): string => {
+          const map: Record<number, string> = {
+            0: 'AGAIN',
+            0.01: 'TOO_EARLY',
+            0.5: 'HARD',
+            1: 'GOOD',
+            1.5: 'EASY',
+            2: 'VIEWED_AS_LEECH',
+            3: 'RESET',
+            4: 'MANUAL_DATE',
+            5: 'MANUAL_EASE',
+          };
+          return map[score] ?? `UNKNOWN(${score})`;
+        };
+
+        const inconsistencies: string[] = [];
+        let inconsistencyCount = 0;
+
+        for (const item of finalDrillIds) {
+          const cardId = typeof item === 'string' ? item : item.cardId;
+          const addedAt = typeof item === 'object' && item.addedAt
+            ? new Date(item.addedAt).toISOString()
+            : 'unknown';
+
+          const card = await plugin.card.findOne(cardId);
+          if (!card) {
+            inconsistencies.push(`[MISSING_CARD] cardId=${cardId} addedAt=${addedAt}`);
+            inconsistencyCount++;
+            continue;
+          }
+
+          const history = card.repetitionHistory ?? [];
+          const meaningful = history.filter(r => r.score !== QueueInteractionScore.TOO_EARLY);
+
+          if (meaningful.length === 0) {
+            inconsistencies.push(
+              `[NO_HISTORY] cardId=${cardId} remId=${card.remId} — ${history.length === 0 ? 'no reps at all' : 'only TOO_EARLY reps'} (addedAt=${addedAt})`
+            );
+            inconsistencyCount++;
+            continue;
+          }
+
+          const last = meaningful[meaningful.length - 1];
+          const isExpected =
+            last.score === QueueInteractionScore.AGAIN ||
+            last.score === QueueInteractionScore.HARD;
+
+          if (!isExpected) {
+            const cramFlag = last.isCram ? ' [CRAM]' : '';
+            const everHard = meaningful.some(r => r.score === QueueInteractionScore.HARD);
+            const everAgain = meaningful.some(r => r.score === QueueInteractionScore.AGAIN);
+            const poorRatings = [everAgain ? 'AGAIN' : null, everHard ? 'HARD' : null].filter(Boolean).join('/');
+            const everPoorFlag = poorRatings ? ` everPoor=${poorRatings}` : ' everPoor=NEVER';
+            inconsistencies.push(
+              `[UNEXPECTED_SCORE] cardId=${cardId} remId=${card.remId} — last=${scoreName(last.score)}${cramFlag} ratedAt=${new Date(last.date).toISOString()} addedAt=${addedAt}${everPoorFlag}`
+            );
+            inconsistencyCount++;
+            history.forEach((rep, i) => {
+              const cram = rep.isCram ? ' [CRAM]' : '';
+              const scheduled = rep.scheduled ? ` scheduled=${new Date(rep.scheduled).toISOString()}` : '';
+              inconsistencies.push(
+                `      [${i + 1}/${history.length}] ${new Date(rep.date).toISOString()} ${scoreName(rep.score)}${cram}${scheduled}`
+              );
+            });
+          }
+        }
+
+        const scopeLabel = `KB=${isPrimary ? 'primary' : currentKbId} (${skippedOtherKb} items skipped from other KBs)`;
+        if (inconsistencyCount === 0) {
+          console.log(`[MasteryDrillAudit] ${scopeLabel} — all ${finalDrillIds.length} cards OK (last rating is AGAIN or HARD).`);
+          await plugin.app.toast(`All ${finalDrillIds.length} drill cards OK.`);
+        } else {
+          console.log(`[MasteryDrillAudit] ${scopeLabel} — ${inconsistencyCount} inconsistencies out of ${finalDrillIds.length} cards:`);
+          for (const msg of inconsistencies) {
+            console.log('  ' + msg);
+          }
+          await plugin.app.toast(`Found ${inconsistencyCount} inconsistent drill cards — check console.`);
+        }
+      },
+    });
+
+    plugin.app.registerCommand({
+      id: 'cleanup_mastery_drill',
+      name: 'Mastery Drill: Remove cards whose last rating was Good or Easy',
+      action: async () => {
+        type DrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+        const allDrillIds = ((await plugin.storage.getSynced('finalDrillIds')) as DrillItem[]) || [];
+
+        const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
+        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+        const currentKbId = currentKb?._id;
+        const getCardId = (item: DrillItem) => typeof item === 'string' ? item : item.cardId;
+        const isInCurrentKb = (item: DrillItem) =>
+          typeof item === 'string' ? isPrimary : item.kbId === currentKbId;
+
+        const toRemoveIds = new Set<string>();
+        let missingCount = 0;
+        let noHistoryCount = 0;
+
+        for (const item of allDrillIds) {
+          if (!isInCurrentKb(item)) continue;
+          const cardId = getCardId(item);
+          const card = await plugin.card.findOne(cardId);
+          if (!card) {
+            toRemoveIds.add(cardId);
+            missingCount++;
+            continue;
+          }
+          const history = card.repetitionHistory ?? [];
+          const meaningful = history.filter(r => r.score !== QueueInteractionScore.TOO_EARLY);
+          if (meaningful.length === 0) {
+            toRemoveIds.add(cardId);
+            noHistoryCount++;
+            continue;
+          }
+          const last = meaningful[meaningful.length - 1];
+          const isExpected =
+            last.score === QueueInteractionScore.AGAIN ||
+            last.score === QueueInteractionScore.HARD;
+          if (!isExpected) {
+            toRemoveIds.add(cardId);
+          }
+        }
+
+        if (toRemoveIds.size === 0) {
+          await plugin.app.toast('No cards to remove — the drill is already clean for this KB.');
+          return;
+        }
+
+        const kept = allDrillIds.filter(item => {
+          if (!isInCurrentKb(item)) return true;
+          return !toRemoveIds.has(getCardId(item));
+        });
+        await plugin.storage.setSynced('finalDrillIds', kept);
+
+        const unexpectedCount = toRemoveIds.size - missingCount - noHistoryCount;
+        console.log(
+          `[MasteryDrillCleanup] Removed ${toRemoveIds.size} cards from current KB ` +
+          `(missing=${missingCount}, noHistory=${noHistoryCount}, lastRatingWasGoodOrEasy=${unexpectedCount}). ` +
+          `${kept.length} items remain in finalDrillIds (across all KBs).`
+        );
+        await plugin.app.toast(`Removed ${toRemoveIds.size} cards from drill.`);
+      },
+    });
   }
 
   plugin.app.registerCommand({
@@ -1719,4 +2075,5 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await plugin.app.toast('Flashcard History cleared!');
     },
   });
+
 }

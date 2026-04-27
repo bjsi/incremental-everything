@@ -175,7 +175,12 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
   const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
 
   if (ancestorPriority) {
-    // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop)
+    // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop).
+    // Untagged rems with matching inherited priority intentionally stay untagged: the
+    // widget already falls back to getCardPriority() (which returns the inherited value
+    // with lastUpdated: 0) when there's no cache entry, and the deferred batch still
+    // pushes them into the cache by remId regardless of tag status. Force-tagging on
+    // every ambient edit causes a write storm in the GlobalRemChanged listener.
     if (existingPriority && existingPriority.source === 'inherited' && existingPriority.priority === ancestorPriority.priority) {
       return ancestorPriority.priority;
     }
@@ -188,7 +193,10 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
   }
 
   const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
-  // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop)
+  // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop).
+  // Untagged rems with matching default priority intentionally stay untagged: the widget
+  // falls back to getCardPriority() and the deferred batch still pushes them into the
+  // cache by remId regardless of tag status.
   if (existingPriority && existingPriority.source === 'default' && existingPriority.priority === defaultPriority) {
     return defaultPriority;
   }

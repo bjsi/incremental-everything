@@ -4,7 +4,7 @@ import { CardPriorityInfo, PrioritySource } from './types';
 import { getCardPriority, autoAssignCardPriority } from './index';
 import * as _ from 'remeda';
 
-let cacheUpdateTimer: NodeJS.Timeout | null = null;
+let cacheUpdateTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingUpdates = new Map<RemId, { info: CardPriorityInfo | null; isLight: boolean }>();
 const lightModeOptimisticOverrides = new Map<RemId, { info: CardPriorityInfo; expiresAt: number }>();
 
@@ -422,6 +422,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
         });
 
         await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
+        await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
       }
 
       if (

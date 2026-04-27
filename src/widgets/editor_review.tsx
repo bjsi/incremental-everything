@@ -13,8 +13,10 @@ import { powerupCode, prioritySlotCode, pageRangeWidgetId } from '../lib/consts'
 import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
-import { safeRemTextToString, findPDFinRem, getIncrementalReadingPosition, addPageToHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
+import { safeRemTextToString, findPDFinRem, getIncrementalReadingPosition, addPageToHistory, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
 import { addToIncrementalHistory } from '../lib/history_utils';
+import { determineIncRemType } from '../lib/incRemHelpers';
+import { openRemInNewPane } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 
@@ -207,6 +209,55 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
     await plugin.storage.setSession('editor-review-timer-rem-name', remName);
 
     await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
+
+    // Open the PDF (if any) and resume at the last bookmarked highlight.
+    // Mirrors the priority_editor Scroll-to-Position behavior: scrollToReaderHighlight
+    // is a no-op unless a PDF reader is mounted, so we explicitly open the PDF rem
+    // first. For non-PDF rems, fall back to the original opening logic.
+    //
+    // IMPORTANT: closePopup() must come AFTER all SDK calls. Closing the popup
+    // tears down the widget sandbox, so any plugin.* call after that will time out.
+    try {
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) {
+        await plugin.widget.closePopup();
+        return;
+      }
+
+      const pdfRem = await findPDFinRem(plugin, rem);
+      const incRemType = await determineIncRemType(plugin, rem);
+
+      if (pdfRem) {
+        // Mount the PDF reader in a NEW pane (right of the current layout) so
+        // the IncRem the user was viewing in the editor stays visible.
+        await openRemInNewPane(plugin, pdfRem._id);
+      } else if (incRemType === 'pdf-note') {
+        await rem.openRemAsPage();
+      } else {
+        await plugin.window.openRem(rem);
+      }
+
+      if (pdfRem) {
+        const history = await getPageHistory(plugin, remId, pdfRem._id);
+        const lastEntry = history[history.length - 1];
+        const bookmarkHighlightId = lastEntry?.highlightId;
+        if (bookmarkHighlightId) {
+          const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+          if (bookmarkRem && typeof bookmarkRem.scrollToReaderHighlight === 'function') {
+            // Delay so the reader has time to mount before we ask it to scroll.
+            setTimeout(() => {
+              bookmarkRem.scrollToReaderHighlight();
+            }, 400);
+          } else {
+
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[EditorReview.handleStartTimer] Failed to open & scroll', e);
+    }
+
+    // Close the popup LAST — after all SDK work is done.
     await plugin.widget.closePopup();
   };
 

@@ -1,4 +1,60 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
+import type { PaneRemWindowTree, RemIdWindowTree } from '@remnote/plugin-sdk/dist/interfaces';
+
+/**
+ * Open a rem in a separate pane to the right of the current layout, or focus
+ * the existing pane if one already shows that rem. Preserves whatever the user
+ * has in the current pane (e.g. the IncRem they were viewing in the editor).
+ *
+ * Uses the SDK's window-tree API: getCurrentWindowTree → strip paneIds → wrap
+ * as {direction:'row', first: existing, second: new remId} → setRemWindowTree.
+ */
+export const openRemInNewPane = async (
+  plugin: RNPlugin,
+  remId: string
+): Promise<void> => {
+  // If the rem is already open in some pane, just focus that pane.
+  try {
+    const openRemIds = await plugin.window.getOpenPaneRemIds();
+    if (openRemIds.includes(remId)) {
+      const paneIds = await plugin.window.getOpenPaneIds();
+      for (const paneId of paneIds) {
+        const paneRemId = await plugin.window.getOpenPaneRemId(paneId);
+        if (paneRemId === remId) {
+          await plugin.window.setFocusedPaneId(paneId);
+          return;
+        }
+      }
+    }
+  } catch (e) {
+    // Fall through to split-pane creation if querying fails.
+    console.warn('[openRemInNewPane] Pre-check failed, will split:', e);
+  }
+
+  const currentTree = await plugin.window.getCurrentWindowTree();
+
+  const stripPaneIds = (node: PaneRemWindowTree): RemIdWindowTree => {
+    if ('remId' in node && 'paneId' in node) {
+      return (node as any).remId;
+    }
+    const parent = node as any;
+    return {
+      direction: parent.direction,
+      first: stripPaneIds(parent.first),
+      second: stripPaneIds(parent.second),
+      splitPercentage: parent.splitPercentage,
+    };
+  };
+
+  const existing = stripPaneIds(currentTree);
+  const newTree: RemIdWindowTree = {
+    direction: 'row',
+    first: existing,
+    second: remId,
+    splitPercentage: 50,
+  };
+  await plugin.window.setRemWindowTree(newTree);
+};
 
 /**
  * Jumps to a specific Rem by its ID, opening it in RemNote.

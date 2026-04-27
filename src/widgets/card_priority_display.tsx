@@ -144,32 +144,23 @@ export function CardPriorityDisplay() {
   // Only `ctx.cardId` advances per sibling — and `plugin.queue.getCurrentCard()` is
   // stuck on the cluster's anchor card. So we poll the widget context for cardId,
   // then resolve the card to recover the sibling's real remId.
-  //
-  // We commit cardId + remId + the resolved Rem together in one state update so the
-  // widget's gating `if (!rem || ...)` doesn't flicker a hidden-frame between the
-  // cardId arriving and the rem arriving (that extra render was the perceived lag).
-  const [currentIds, setCurrentIds] = React.useState<{ remId?: string; cardId?: string; rem?: any }>({});
+  const [currentIds, setCurrentIds] = React.useState<{ remId?: string; cardId?: string }>({});
 
   React.useEffect(() => {
     let isMounted = true;
     // Track the last cardId we've already resolved so the interval skips redundant work.
     let lastAppliedCardId: string | undefined;
 
-    // Resolve cardId → card → rem in one await chain and push into state atomically.
-    // Kicking off rem.findOne in parallel with the state commit would require splitting
-    // state updates; keeping them sequential here trades ~1 IPC of latency for guaranteed
-    // single-render mount (avoids the blank-frame flicker).
+    // Resolve cardId → remId and push into state. One IPC (card.findOne) per transition.
     const applyCardId = async (cardId: string) => {
       if (!isMounted || cardId === lastAppliedCardId) return;
       lastAppliedCardId = cardId;
       const card = await plugin.card.findOne(cardId);
       if (!isMounted) return;
       const resolvedRemId = card?.remId;
-      const resolvedRem = resolvedRemId ? await plugin.rem.findOne(resolvedRemId) : null;
-      if (!isMounted) return;
       setCurrentIds((prev) => {
         if (prev.cardId === cardId && prev.remId === resolvedRemId) return prev;
-        return { remId: resolvedRemId, cardId, rem: resolvedRem ?? null };
+        return { remId: resolvedRemId, cardId };
       });
     };
 
@@ -241,9 +232,10 @@ export function CardPriorityDisplay() {
     })();
   }, [plugin, currentIds.cardId, currentIds.remId]);
 
-  // Use the Rem resolved alongside cardId in `applyCardId` — avoids the extra render
-  // cycle a separate tracker would introduce (gating returns null until rem resolves).
-  const rem = currentIds.rem ?? null;
+  const rem = useTrackerPlugin(async (rp) => {
+    if (!currentIds.remId) return null;
+    return (await rp.rem.findOne(currentIds.remId)) ?? null;
+  }, [currentIds.remId]);
 
   const scopeRemIds = useTrackerPlugin(
     (rp) => rp.storage.getSession<string[] | null>(priorityCalcScopeRemIdsKey),
@@ -440,7 +432,7 @@ export function CardPriorityDisplay() {
     return await getCardPriority(rp, rem);
   }, [useLightMode, rem, refreshSignal, cardInfo]);
 
-  const isIncRem = useTrackerPlugin(async (rp) => {
+  const isIncRem = useTrackerPlugin(async (_rp) => {
     if (!rem) return false;
     return await rem.hasPowerup(powerupCode);
   }, [rem]);

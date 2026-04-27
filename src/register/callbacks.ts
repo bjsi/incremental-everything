@@ -75,11 +75,14 @@ const QUEUE_HIDE_ELEMENTS_CSS = `
 
 const REMOVE_FROM_QUEUE_CSS = `
   /* Remove from Queue Styles */
+  .rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem) > .rn-queue-rem,
   .rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem) > .rn-queue-rem {
     display: none;
   }
 
+  .rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem),
   .rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem),
+  .rn-breadcrumb-item[data-rem-tags~="removefromqueue"],
   .rn-breadcrumb-item[data-rem-tags~="remove-from-queue"] {
     margin-left: 0px !important; /* makes it look like its not indented to the removed parent */
   }

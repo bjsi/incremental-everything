@@ -24,6 +24,7 @@ import {
   safeRemTextToString,
   PageHistoryEntry,
 } from '../lib/pdfUtils';
+import { openRemInNewPane } from '../lib/remHelpers';
 
 // Move styles outside component to avoid recreation on every render
 const adjustButtonStyle: React.CSSProperties = {
@@ -97,6 +98,8 @@ export function PriorityEditor() {
         pdfRange = range;
         pdfHistory = history;
         pdfStats = stats;
+        console.log('[PriorityEditor] Fetched pdfHistory',
+          { incRemId: rem._id, pdfRemId: pdfRem._id, historyLength: history.length, lastEntry: history[history.length - 1] });
       }
 
       // Calculate relative priorities inline
@@ -591,6 +594,45 @@ export function PriorityEditor() {
                   )}
                 </div>
               )}
+
+              {/* Scroll to Bookmark — only when the LAST history entry carries a highlightId.
+                  A manual position recorded after a highlight bookmark would otherwise
+                  jump to a stale highlight, so we suppress the button in that case. */}
+              {(() => {
+                const history = remData.pdfHistory ?? [];
+                const lastEntry = history[history.length - 1];
+                const bookmarkHighlightId = lastEntry?.highlightId;
+                if (!bookmarkHighlightId) return null;
+                return (
+                  <button
+                    onClick={async () => {
+                      const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+                      if (!bookmarkRem) return;
+
+                      // scrollToReaderHighlight is a no-op unless a PDF reader is
+                      // already mounted. Open the PDF rem in a NEW pane (to the
+                      // right) so the reader exists without closing the IncRem
+                      // view the user was looking at. Then scroll once mounted.
+                      if (remData.pdfRemId) {
+                        await openRemInNewPane(plugin, remData.pdfRemId);
+                      }
+
+                      setTimeout(() => {
+                        bookmarkRem.scrollToReaderHighlight();
+                      }, 400);
+                    }}
+                    className="w-full mt-2 py-1 rounded text-[11px] font-semibold transition-colors"
+                    style={{
+                      backgroundColor: 'var(--rn-clr-background-secondary)',
+                      color: 'var(--rn-clr-blue, #3b82f6)',
+                      border: '2px solid var(--rn-clr-blue, #3b82f6)',
+                    }}
+                    title="Scroll to Bookmark: Open the PDF and jump to your last saved reading position"
+                  >
+                    🔖 Scroll to Position
+                  </button>
+                );
+              })()}
 
               {/* Full panel link */}
               <button

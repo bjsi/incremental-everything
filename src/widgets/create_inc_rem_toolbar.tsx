@@ -1,7 +1,7 @@
 import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState } from 'react';
 import { createRemFromHighlight } from '../lib/highlightActions';
-import { powerupCode, incrementalQueueActiveKey, currentIncRemKey } from '../lib/consts';
+import { powerupCode, incrementalQueueActiveKey, currentIncRemKey, editorReviewTimerRemIdKey } from '../lib/consts';
 import {
   getPdfInfoFromHighlight,
   findPDFinRem,
@@ -41,6 +41,21 @@ export function CreateIncRemToolbar() {
         const foundPdf = currentQueueRem ? await findPDFinRem(plugin as any, currentQueueRem, docId) : null;
         if (foundPdf && foundPdf._id === docId) {
           contextRemId = currentQueueRemId;
+        }
+      }
+    }
+
+    // 2b. Editor Review Timer context: when the user is reviewing an IncRem in
+    // the editor, the URLChange listener has already cleared currentIncRemKey
+    // and incrementalQueueActiveKey, so the queue check above misses it.
+    // Confirm the timer's IncRem owns this PDF, same safety check as the queue.
+    if (!contextRemId && docId) {
+      const editorTimerRemId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
+      if (editorTimerRemId) {
+        const editorTimerRem = await plugin.rem.findOne(editorTimerRemId);
+        const foundPdf = editorTimerRem ? await findPDFinRem(plugin as any, editorTimerRem, docId) : null;
+        if (foundPdf && foundPdf._id === docId) {
+          contextRemId = editorTimerRemId;
         }
       }
     }
