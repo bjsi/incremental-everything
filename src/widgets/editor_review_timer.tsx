@@ -13,7 +13,8 @@ import { handleCardPriorityInheritance } from '../lib/card_priority/card_priorit
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
-import { findPDFinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, safeRemTextToString } from '../lib/pdfUtils';
+import { findPDFinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
+import { openRemInNewPane } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import dayjs from 'dayjs';
@@ -26,6 +27,7 @@ function EditorReviewTimer() {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [pdfRemId, setPdfRemId] = useState<string | null>(null);
   const [isPdfNote, setIsPdfNote] = useState(false);
+  const [bookmarkHighlightId, setBookmarkHighlightId] = useState<string | null>(null);
 
   const timerData = useTrackerPlugin(
     async (rp) => {
@@ -81,8 +83,14 @@ function EditorReviewTimer() {
       if (pdfRem) {
         setIsPdfNote(true);
         setPdfRemId(pdfRem._id);
+
+        // Check for a bookmark highlight in the last history entry
+        const history = await getPageHistory(plugin, timerData.remId, pdfRem._id);
+        const lastEntry = history[history.length - 1];
+        setBookmarkHighlightId(lastEntry?.highlightId ?? null);
       } else {
         setIsPdfNote(false);
+        setBookmarkHighlightId(null);
       }
     };
     loadPdfData();
@@ -517,12 +525,49 @@ function EditorReviewTimer() {
       </div>
 
       {isPdfNote && pdfRemId && (
-        <div style={{ marginRight: '8px', paddingRight: '12px', borderRight: '1px solid #93c5fd' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px', paddingRight: '12px', borderRight: '1px solid #93c5fd' }}>
           <PageControls
             incrementalRemId={timerData.remId as any}
             {...pdfControls}
             totalPages={0}
           />
+          {bookmarkHighlightId && (
+            <button
+              onClick={async () => {
+                // Open the PDF in a new pane (or focus existing) and scroll to bookmark
+                await openRemInNewPane(plugin, pdfRemId);
+                const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+                if (bookmarkRem && typeof bookmarkRem.scrollToReaderHighlight === 'function') {
+                  setTimeout(() => {
+                    bookmarkRem.scrollToReaderHighlight();
+                    console.log('[EditorReviewTimer] scrollToReaderHighlight called for', bookmarkHighlightId);
+                  }, 400);
+                }
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                backgroundColor: 'transparent',
+                color: '#3b82f6',
+                border: '2px solid #3b82f6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#3b82f6';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#3b82f6';
+              }}
+              title="Open PDF and scroll to your last bookmark position"
+            >
+              🔖 Scroll
+            </button>
+          )}
         </div>
       )}
 
