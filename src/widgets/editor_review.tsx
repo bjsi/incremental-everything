@@ -209,15 +209,20 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
     await plugin.storage.setSession('editor-review-timer-rem-name', remName);
 
     await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
-    await plugin.widget.closePopup();
 
     // Open the PDF (if any) and resume at the last bookmarked highlight.
     // Mirrors the priority_editor Scroll-to-Position behavior: scrollToReaderHighlight
     // is a no-op unless a PDF reader is mounted, so we explicitly open the PDF rem
     // first. For non-PDF rems, fall back to the original opening logic.
+    //
+    // IMPORTANT: closePopup() must come AFTER all SDK calls. Closing the popup
+    // tears down the widget sandbox, so any plugin.* call after that will time out.
     try {
       const rem = await plugin.rem.findOne(remId);
-      if (!rem) return;
+      if (!rem) {
+        await plugin.widget.closePopup();
+        return;
+      }
 
       const pdfRem = await findPDFinRem(plugin, rem);
       const incRemType = await determineIncRemType(plugin, rem);
@@ -255,6 +260,9 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
     } catch (e) {
       console.error('[EditorReview.handleStartTimer] Failed to open & scroll', e);
     }
+
+    // Close the popup LAST — after all SDK work is done.
+    await plugin.widget.closePopup();
   };
 
   return (
