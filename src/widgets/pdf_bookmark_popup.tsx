@@ -1,7 +1,7 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { getPdfInfoFromHighlight, findAllRemsForPDF, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
-import { incrementalQueueActiveKey, currentIncRemKey } from '../lib/consts';
+import { getPdfInfoFromHighlight, findAllRemsForPDF, findPDFinRem, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
+import { incrementalQueueActiveKey, currentIncRemKey, editorReviewTimerRemIdKey } from '../lib/consts';
 
 export function PdfBookmarkPopup() {
   const plugin = usePlugin() as ReactRNPlugin;
@@ -11,6 +11,9 @@ export function PdfBookmarkPopup() {
 
   const [activeQueueContext, setActiveQueueContext] = useState<PageRangeContext | null>(null);
   const [activeQueueRemName, setActiveQueueRemName] = useState<string>('');
+  // Whether the active context came from the queue or the editor-review timer.
+  // The fast-path UI is identical; only the labels change.
+  const [activeContextSource, setActiveContextSource] = useState<'queue' | 'editor-timer'>('queue');
   const [associatedRems, setAssociatedRems] = useState<any[]>([]);
   const [historicalBookmarks, setHistoricalBookmarks] = useState<{ remId: string, name: string, history: PageHistoryEntry[] }[]>([]);
 
@@ -63,36 +66,57 @@ export function PdfBookmarkPopup() {
           // on every queue turn.
           const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
           const currentIncRem = await plugin.storage.getSession<string>(currentIncRemKey);
-          const currentQueueRemId = (isQueueActive || currentIncRem) ? currentIncRem : undefined;
+          let activeRemId: string | undefined = (isQueueActive || currentIncRem) ? currentIncRem : undefined;
+          let activeSource: 'queue' | 'editor-timer' = 'queue';
 
-          if (currentQueueRemId) {
-            // ⚡ FAST PATH: We know the IncRem from the queue session.
-            // Skip findAllRemsForPDF entirely — it is not needed and is expensive.
-            const currentQueueRem = await plugin.rem.findOne(currentQueueRemId);
+          // Editor-Review-Timer fallback: when reviewing in the editor, the
+          // URLChange listener clears currentIncRemKey/incrementalQueueActiveKey,
+          // so the queue check above misses it. Confirm the timer's rem owns
+          // this PDF before trusting it (same safety check as create_inc_rem_toolbar).
+          if (!activeRemId) {
+            const editorTimerRemId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
+            if (editorTimerRemId) {
+              const editorTimerRem = await plugin.rem.findOne(editorTimerRemId);
+              const foundPdf = editorTimerRem ? await findPDFinRem(plugin, editorTimerRem, docId) : null;
+              if (foundPdf && foundPdf._id === docId) {
+                activeRemId = editorTimerRemId;
+                activeSource = 'editor-timer';
+              }
+            }
+          }
+
+          console.log('[PdfBookmarkPopup] context detection',
+            { docId, isQueueActive, currentIncRem, activeRemId, activeSource });
+
+          if (activeRemId) {
+            // ⚡ FAST PATH: We know the IncRem from the active session (queue
+            // or editor-review timer). Skip findAllRemsForPDF entirely.
+            const activeRem = await plugin.rem.findOne(activeRemId);
             let remName = '';
-            if (currentQueueRem?.text) {
-              remName = await safeRemTextToString(plugin, currentQueueRem.text);
+            if (activeRem?.text) {
+              remName = await safeRemTextToString(plugin, activeRem.text);
               setActiveQueueRemName(remName);
             }
+            setActiveContextSource(activeSource);
             setActiveQueueContext({
-              incrementalRemId: currentQueueRemId as any,
+              incrementalRemId: activeRemId as any,
               pdfRemId: docId as any,
               totalPages: 0,
               currentPage: 1
             });
 
             // Only fetch reading history for this specific rem (1 call, not N)
-            const history = await getPageHistory(plugin, currentQueueRemId, docId);
+            const history = await getPageHistory(plugin, activeRemId, docId);
             // Most recent first
             const withHighlights = history
               .filter(h => h.highlightId)
               .sort((a, b) => b.timestamp - a.timestamp);
             if (withHighlights.length > 0) {
-              setHistoricalBookmarks([{ remId: currentQueueRemId, name: remName, history: withHighlights }]);
+              setHistoricalBookmarks([{ remId: activeRemId, name: remName, history: withHighlights }]);
               // Resolve highlight rem texts for display
               resolveHighlightTexts(withHighlights).then(setHighlightTexts);
             }
-            // associatedRems stays [] — not rendered in queue mode anyway
+            // associatedRems stays [] — not rendered in fast-path mode anyway
 
           } else {
             // 🐌 FULL PATH (non-queue): find all IncRems that read this PDF
@@ -172,6 +196,8 @@ export function PdfBookmarkPopup() {
 
   const saveBookmark = async (incrementalRemId: string) => {
     if (!pdfRemId || pageIndex === null || !highlightRemId) return;
+    console.log('[PdfBookmarkPopup] saveBookmark',
+      { incrementalRemId, pdfRemId, pageIndex, highlightRemId });
     try {
       await addPageToHistory(plugin, incrementalRemId, pdfRemId, pageIndex, undefined, highlightRemId);
       await setIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId, pageIndex);
@@ -221,7 +247,9 @@ export function PdfBookmarkPopup() {
             }}
             onClick={async () => { await saveBookmark(activeQueueContext.incrementalRemId); plugin.widget.closePopup(); }}
           >
-            Update Current Queue Reading
+            {activeContextSource === 'editor-timer'
+              ? 'Update Current Editor Review Reading'
+              : 'Update Current Queue Reading'}
           </button>
           {activeQueueRemName && (
              <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginTop: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -297,7 +325,9 @@ export function PdfBookmarkPopup() {
                 {activeHistoryItems.length > 0 && (
                   <div style={{ marginBottom: otherHistoryItems.length > 0 ? '16px' : '0' }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--rn-clr-content-primary)', marginBottom: '8px' }}>
-                      {activeId ? "Queue Reading Bookmarks:" : "Your Saved Bookmarks:"}
+                      {activeId
+                        ? (activeContextSource === 'editor-timer' ? 'Editor Review Bookmarks:' : 'Queue Reading Bookmarks:')
+                        : 'Your Saved Bookmarks:'}
                     </div>
                     {activeHistoryItems.map(h => (
                       <div key={h.remId} style={{ marginBottom: '8px' }}>

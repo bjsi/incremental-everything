@@ -97,6 +97,8 @@ export function PriorityEditor() {
         pdfRange = range;
         pdfHistory = history;
         pdfStats = stats;
+        console.log('[PriorityEditor] Fetched pdfHistory',
+          { incRemId: rem._id, pdfRemId: pdfRem._id, historyLength: history.length, lastEntry: history[history.length - 1] });
       }
 
       // Calculate relative priorities inline
@@ -591,6 +593,53 @@ export function PriorityEditor() {
                   )}
                 </div>
               )}
+
+              {/* Scroll to Bookmark — only when the LAST history entry carries a highlightId.
+                  A manual position recorded after a highlight bookmark would otherwise
+                  jump to a stale highlight, so we suppress the button in that case. */}
+              {(() => {
+                const history = remData.pdfHistory ?? [];
+                const lastEntry = history[history.length - 1];
+                const bookmarkHighlightId = lastEntry?.highlightId;
+                console.log('[PriorityEditor] pdfHistory check',
+                  { remId, pdfRemId: remData.pdfRemId, historyLength: history.length, lastEntry, bookmarkHighlightId });
+                if (!bookmarkHighlightId) return null;
+                return (
+                  <button
+                    onClick={async () => {
+                      const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+                      console.log('[PriorityEditor] Scroll click → bookmarkRem:', bookmarkRem?._id,
+                        'has scrollToReaderHighlight:', typeof bookmarkRem?.scrollToReaderHighlight === 'function');
+                      if (!bookmarkRem) return;
+
+                      // scrollToReaderHighlight is a no-op unless a PDF reader is
+                      // already mounted. Open the PDF rem first so the reader exists,
+                      // then scroll once it has had a moment to mount.
+                      if (remData.pdfRemId) {
+                        const pdfRem = await plugin.rem.findOne(remData.pdfRemId);
+                        if (pdfRem) {
+                          await pdfRem.openRemAsPage();
+                          console.log('[PriorityEditor] Opened PDF rem as page:', remData.pdfRemId);
+                        }
+                      }
+
+                      setTimeout(() => {
+                        bookmarkRem.scrollToReaderHighlight();
+                        console.log('[PriorityEditor] scrollToReaderHighlight called for', bookmarkHighlightId);
+                      }, 400);
+                    }}
+                    className="w-full mt-2 py-1 rounded text-[11px] font-semibold transition-colors"
+                    style={{
+                      backgroundColor: 'var(--rn-clr-background-secondary)',
+                      color: 'var(--rn-clr-blue, #3b82f6)',
+                      border: '2px solid var(--rn-clr-blue, #3b82f6)',
+                    }}
+                    title="Scroll to Bookmark: Open the PDF and jump to your last saved reading position"
+                  >
+                    🔖 Scroll to Position
+                  </button>
+                );
+              })()}
 
               {/* Full panel link */}
               <button

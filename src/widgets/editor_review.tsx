@@ -13,8 +13,9 @@ import { powerupCode, prioritySlotCode, pageRangeWidgetId } from '../lib/consts'
 import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
-import { safeRemTextToString, findPDFinRem, getIncrementalReadingPosition, addPageToHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
+import { safeRemTextToString, findPDFinRem, getIncrementalReadingPosition, addPageToHistory, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
 import { addToIncrementalHistory } from '../lib/history_utils';
+import { determineIncRemType } from '../lib/incRemHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 
@@ -208,6 +209,50 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
 
     await plugin.app.toast(`⏱️ Timer started for: ${remName}`);
     await plugin.widget.closePopup();
+
+    // Open the PDF (if any) and resume at the last bookmarked highlight.
+    // Mirrors the priority_editor Scroll-to-Position behavior: scrollToReaderHighlight
+    // is a no-op unless a PDF reader is mounted, so we explicitly open the PDF rem
+    // first. For non-PDF rems, fall back to the original opening logic.
+    try {
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) return;
+
+      const pdfRem = await findPDFinRem(plugin, rem);
+      const incRemType = await determineIncRemType(plugin, rem);
+      console.log('[EditorReview.handleStartTimer] rem:', remId, 'pdfRem:', pdfRem?._id ?? null, 'incRemType:', incRemType);
+
+      if (pdfRem) {
+        // Mount the PDF reader by opening the PDF rem as a page.
+        await pdfRem.openRemAsPage();
+        console.log('[EditorReview.handleStartTimer] Opened PDF rem as page:', pdfRem._id);
+      } else if (incRemType === 'pdf-note') {
+        await rem.openRemAsPage();
+      } else {
+        await plugin.window.openRem(rem);
+      }
+
+      if (pdfRem) {
+        const history = await getPageHistory(plugin, remId, pdfRem._id);
+        const lastEntry = history[history.length - 1];
+        const bookmarkHighlightId = lastEntry?.highlightId;
+        console.log('[EditorReview.handleStartTimer] history length:', history.length, 'last highlightId:', bookmarkHighlightId ?? null);
+        if (bookmarkHighlightId) {
+          const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+          if (bookmarkRem && typeof bookmarkRem.scrollToReaderHighlight === 'function') {
+            // Delay so the reader has time to mount before we ask it to scroll.
+            setTimeout(() => {
+              bookmarkRem.scrollToReaderHighlight();
+              console.log('[EditorReview.handleStartTimer] scrollToReaderHighlight called for', bookmarkHighlightId);
+            }, 400);
+          } else {
+            console.warn('[EditorReview.handleStartTimer] bookmark rem missing or has no scrollToReaderHighlight', bookmarkHighlightId);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[EditorReview.handleStartTimer] Failed to open & scroll', e);
+    }
   };
 
   return (

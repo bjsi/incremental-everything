@@ -279,11 +279,30 @@ export const addPageToHistory = async (
 
   const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
 
+  // Bookmark preservation: when no highlightId is supplied (e.g. queue "Next",
+  // session-end timers, manual page save) but the most-recent same-page entry
+  // carries one, inherit it. Otherwise, that anonymous entry would shadow a
+  // just-saved highlight bookmark under the "last entry only" detection used
+  // by the Scroll-to-Position buttons. Same physical page, same bookmark intent.
+  let effectiveHighlightId = highlightId;
+  if (!effectiveHighlightId) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const prev = history[i];
+      if (prev.highlightId && prev.page === page) {
+        effectiveHighlightId = prev.highlightId;
+        console.log(`[addPageToHistory] Preserving bookmark highlightId from prior same-page entry: ${effectiveHighlightId}`);
+        break;
+      }
+      // Stop scanning past a different-page entry — the bookmark intent ended there.
+      if (prev.page !== page) break;
+    }
+  }
+
   const entry: PageHistoryEntry = {
     page,
     timestamp: Date.now(),
     sessionDuration,
-    highlightId
+    highlightId: effectiveHighlightId
   };
 
   history.push(entry);
