@@ -226,13 +226,11 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
 
       const pdfRem = await findPDFinRem(plugin, rem);
       const incRemType = await determineIncRemType(plugin, rem);
-      console.log('[EditorReview.handleStartTimer] rem:', remId, 'pdfRem:', pdfRem?._id ?? null, 'incRemType:', incRemType);
 
       if (pdfRem) {
         // Mount the PDF reader in a NEW pane (right of the current layout) so
         // the IncRem the user was viewing in the editor stays visible.
         await openRemInNewPane(plugin, pdfRem._id);
-        console.log('[EditorReview.handleStartTimer] Opened PDF rem in new pane:', pdfRem._id);
       } else if (incRemType === 'pdf-note') {
         await rem.openRemAsPage();
       } else {
@@ -243,17 +241,15 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
         const history = await getPageHistory(plugin, remId, pdfRem._id);
         const lastEntry = history[history.length - 1];
         const bookmarkHighlightId = lastEntry?.highlightId;
-        console.log('[EditorReview.handleStartTimer] history length:', history.length, 'last highlightId:', bookmarkHighlightId ?? null);
         if (bookmarkHighlightId) {
           const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
           if (bookmarkRem && typeof bookmarkRem.scrollToReaderHighlight === 'function') {
             // Delay so the reader has time to mount before we ask it to scroll.
             setTimeout(() => {
               bookmarkRem.scrollToReaderHighlight();
-              console.log('[EditorReview.handleStartTimer] scrollToReaderHighlight called for', bookmarkHighlightId);
             }, 400);
           } else {
-            console.warn('[EditorReview.handleStartTimer] bookmark rem missing or has no scrollToReaderHighlight', bookmarkHighlightId);
+
           }
         }
       }

@@ -540,7 +540,6 @@ function EditorReviewTimer() {
                 if (bookmarkRem && typeof bookmarkRem.scrollToReaderHighlight === 'function') {
                   setTimeout(() => {
                     bookmarkRem.scrollToReaderHighlight();
-                    console.log('[EditorReviewTimer] scrollToReaderHighlight called for', bookmarkHighlightId);
                   }, 400);
                 }
               }}

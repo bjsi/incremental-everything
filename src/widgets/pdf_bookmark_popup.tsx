@@ -85,8 +85,6 @@ export function PdfBookmarkPopup() {
             }
           }
 
-          console.log('[PdfBookmarkPopup] context detection',
-            { docId, isQueueActive, currentIncRem, activeRemId, activeSource });
 
           if (activeRemId) {
             // ⚡ FAST PATH: We know the IncRem from the active session (queue
@@ -196,8 +194,6 @@ export function PdfBookmarkPopup() {
 
   const saveBookmark = async (incrementalRemId: string) => {
     if (!pdfRemId || pageIndex === null || !highlightRemId) return;
-    console.log('[PdfBookmarkPopup] saveBookmark',
-      { incrementalRemId, pdfRemId, pageIndex, highlightRemId });
     try {
       await addPageToHistory(plugin, incrementalRemId, pdfRemId, pageIndex, undefined, highlightRemId);
       await setIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId, pageIndex);

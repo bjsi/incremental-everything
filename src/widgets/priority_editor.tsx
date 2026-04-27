@@ -602,15 +602,11 @@ export function PriorityEditor() {
                 const history = remData.pdfHistory ?? [];
                 const lastEntry = history[history.length - 1];
                 const bookmarkHighlightId = lastEntry?.highlightId;
-                console.log('[PriorityEditor] pdfHistory check',
-                  { remId, pdfRemId: remData.pdfRemId, historyLength: history.length, lastEntry, bookmarkHighlightId });
                 if (!bookmarkHighlightId) return null;
                 return (
                   <button
                     onClick={async () => {
                       const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
-                      console.log('[PriorityEditor] Scroll click → bookmarkRem:', bookmarkRem?._id,
-                        'has scrollToReaderHighlight:', typeof bookmarkRem?.scrollToReaderHighlight === 'function');
                       if (!bookmarkRem) return;
 
                       // scrollToReaderHighlight is a no-op unless a PDF reader is
@@ -619,12 +615,10 @@ export function PriorityEditor() {
                       // view the user was looking at. Then scroll once mounted.
                       if (remData.pdfRemId) {
                         await openRemInNewPane(plugin, remData.pdfRemId);
-                        console.log('[PriorityEditor] Opened PDF rem in new pane:', remData.pdfRemId);
                       }
 
                       setTimeout(() => {
                         bookmarkRem.scrollToReaderHighlight();
-                        console.log('[PriorityEditor] scrollToReaderHighlight called for', bookmarkHighlightId);
                       }, 400);
                     }}
                     className="w-full mt-2 py-1 rounded text-[11px] font-semibold transition-colors"
