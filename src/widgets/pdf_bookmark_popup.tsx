@@ -193,10 +193,14 @@ export function PdfBookmarkPopup() {
   }, [plugin]);
 
   const saveBookmark = async (incrementalRemId: string) => {
-    if (!pdfRemId || pageIndex === null || !highlightRemId) return;
+    // Host doc and highlight are required; page is optional (null for HTML/Text Reader).
+    if (!pdfRemId || !highlightRemId) return;
     try {
       await addPageToHistory(plugin, incrementalRemId, pdfRemId, pageIndex, undefined, highlightRemId);
-      await setIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId, pageIndex);
+      // Reading-position pointer only makes sense for paginated sources.
+      if (pageIndex !== null) {
+        await setIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId, pageIndex);
+      }
       await plugin.app.toast('✅ Bookmark saved successfully');
     } catch (e) {
       await plugin.app.toast('❌ Failed to save bookmark');
@@ -216,8 +220,8 @@ export function PdfBookmarkPopup() {
     return <div style={{ padding: '8px', fontSize: '13px' }}>Loading...</div>;
   }
 
-  if (!pdfRemId || pageIndex === null) {
-    return <div style={{ padding: '8px', fontSize: '13px', color: 'var(--rn-clr-content-secondary)' }}>No page context found.</div>;
+  if (!pdfRemId) {
+    return <div style={{ padding: '8px', fontSize: '13px', color: 'var(--rn-clr-content-secondary)' }}>No reader context found.</div>;
   }
 
   return (
@@ -230,7 +234,9 @@ export function PdfBookmarkPopup() {
     }}>
       <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--rn-clr-border-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span>🔖 Bookmark Position</span>
-        <span style={{ fontSize: '12px', color: 'var(--rn-clr-content-secondary)' }}>Page {pageIndex}</span>
+        {pageIndex !== null && (
+          <span style={{ fontSize: '12px', color: 'var(--rn-clr-content-secondary)' }}>Page {pageIndex}</span>
+        )}
       </div>
 
       {activeQueueContext && (
@@ -344,7 +350,7 @@ export function PdfBookmarkPopup() {
                               onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>📄 Page {entry.page}</span>
+                                <span>{typeof entry.page === 'number' ? `📄 Page ${entry.page}` : '🔖 Bookmark'}</span>
                                 <span style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px', fontWeight: 400 }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
                               </div>
                               {entry.highlightId && highlightTexts[entry.highlightId] && (
@@ -389,7 +395,7 @@ export function PdfBookmarkPopup() {
                               onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-modifier-hover)'}
                               onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                             >
-                              <span>Page {entry.page}</span>
+                              <span>{typeof entry.page === 'number' ? `Page ${entry.page}` : 'Bookmark'}</span>
                               <span style={{ fontSize: '9px', color: 'var(--rn-clr-content-tertiary)' }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
                             </button>
                           ))}

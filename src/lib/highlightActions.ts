@@ -233,16 +233,20 @@ export const createRemUnderParent = async (
   console.log('[ParentSelector:HighlightActions] About to save last destination...');
   await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
 
-  // NEW: Save reading position/bookmark automatically for queue item 
+  // NEW: Save reading position/bookmark automatically for queue item.
+  // pageIndex is null for HTML / PDF Text Reader highlights — we still record
+  // the bookmark by highlight rem id so jumps work in those modes too.
   if (makeIncremental) {
     const { pdfRemId: actualPdf, pageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
-    if (actualPdf && pageIndex !== null) {
+    if (actualPdf) {
         try {
             // Update progress for the currently reviewed Queue item (if active)
             const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
             if (queueCtx && queueCtx.pdfRemId === actualPdf && queueCtx.incrementalRemId) {
                 await addPageToHistory(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex, undefined, highlightRem._id);
-                await setIncrementalReadingPosition(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex);
+                if (pageIndex !== null) {
+                    await setIncrementalReadingPosition(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex);
+                }
                 console.log('[ParentSelector:HighlightActions] Updated Queue item reading history from highlight capture');
             }
         } catch(e) {

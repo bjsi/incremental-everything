@@ -290,11 +290,19 @@ export function PriorityEditor() {
               📄{remData.pdfRange ? (
                 <>
                   {` p.${remData.pdfRange.start}–${remData.pdfRange.end || '∞'}`}
-                  {remData.pdfHistory && remData.pdfHistory.length > 0 && (
-                    <span style={{ color: '#10b981', marginLeft: '2px' }}>
-                      ({remData.pdfHistory[remData.pdfHistory.length - 1].page})
-                    </span>
-                  )}
+                  {(() => {
+                    const last = remData.pdfHistory?.[remData.pdfHistory.length - 1];
+                    if (!last) return null;
+                    const hasPage = typeof last.page === 'number';
+                    if (!hasPage && !last.highlightId) return null;
+                    return (
+                      <span style={{ color: '#10b981', marginLeft: '2px' }}>
+                        {hasPage && `(${last.page})`}
+                        {hasPage && last.highlightId && ' '}
+                        {last.highlightId && '🔖'}
+                      </span>
+                    );
+                  })()}
                 </>
               ) : ' —'}
             </span>
@@ -468,11 +476,19 @@ export function PriorityEditor() {
                   <span className="text-[10px] px-1.5 py-0.5 rounded font-medium"
                     style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-secondary)', whiteSpace: 'nowrap' }}>
                     p.{remData.pdfRange.start}–{remData.pdfRange.end || '∞'}
-                    {remData.pdfHistory && remData.pdfHistory.length > 0 && (
-                      <span style={{ color: '#10b981', marginLeft: '2px' }}>
-                        ({remData.pdfHistory[remData.pdfHistory.length - 1].page})
-                      </span>
-                    )}
+                    {(() => {
+                      const last = remData.pdfHistory?.[remData.pdfHistory.length - 1];
+                      if (!last) return null;
+                      const hasPage = typeof last.page === 'number';
+                      if (!hasPage && !last.highlightId) return null;
+                      return (
+                        <span style={{ color: '#10b981', marginLeft: '2px' }}>
+                          {hasPage && `(${last.page})`}
+                          {hasPage && last.highlightId && ' '}
+                          {last.highlightId && '🔖'}
+                        </span>
+                      );
+                    })()}
                   </span>
                 ) : (
                   <span className="text-[10px]" style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.6 }}>No range</span>
@@ -586,12 +602,20 @@ export function PriorityEditor() {
                     <span className="text-[10px]" style={{ color: '#10b981' }}
                       title="Total reading time">⏱️{formatDuration(remData.pdfStats.totalTimeSeconds)}</span>
                   )}
-                  {remData.pdfHistory?.length > 0 && (
-                    <span className="text-[10px]" style={{ color: 'var(--rn-clr-content-tertiary)' }}
-                      title={`Last: page ${remData.pdfHistory[remData.pdfHistory.length - 1].page}`}>
-                      Last p.{remData.pdfHistory[remData.pdfHistory.length - 1].page}
-                    </span>
-                  )}
+                  {remData.pdfHistory?.length > 0 && (() => {
+                    const last = remData.pdfHistory[remData.pdfHistory.length - 1];
+                    const hasPage = typeof last.page === 'number';
+                    if (!hasPage && !last.highlightId) return null;
+                    const tooltip = hasPage
+                      ? `Last: page ${last.page}${last.highlightId ? ' (auto-scrollable bookmark)' : ''}`
+                      : 'Last: bookmark with no page info';
+                    return (
+                      <span className="text-[10px]" style={{ color: 'var(--rn-clr-content-tertiary)' }}
+                        title={tooltip}>
+                        Last {hasPage ? `p.${last.page}` : ''}{hasPage && last.highlightId ? ' ' : ''}{last.highlightId ? '🔖' : ''}
+                      </span>
+                    );
+                  })()}
                 </div>
               )}
 

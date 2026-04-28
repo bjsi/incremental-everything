@@ -14,7 +14,8 @@ export interface PageRangeContext {
  * Enhanced structure for page history entries with duration tracking
  */
 export interface PageHistoryEntry {
-  page: number;
+  // Optional: HTML articles and PDF Text Reader highlights have no page number.
+  page?: number;
   timestamp: number;
   sessionDuration?: number;   // Duration in seconds for this reading session
   highlightId?: string;       // Rem ID of the specific highlight mapped to this bookmark
@@ -192,10 +193,11 @@ export const getPageHistory = async (
       if (typeof entry === 'number') {
         // Old format: just page number, no timestamp
         return { page: entry, timestamp: 0 };
-      } else if (entry && typeof entry.page === 'number') {
-        // New format with timestamp and possibly duration
+      } else if (entry && (typeof entry.page === 'number' || entry.highlightId)) {
+        // Accept entries with a real page number (PDF Reader) OR with a
+        // highlightId but no page (HTML / PDF Text Reader bookmarks).
         return {
-          page: entry.page,
+          page: typeof entry.page === 'number' ? entry.page : undefined,
           timestamp: entry.timestamp || 0,
           sessionDuration: entry.sessionDuration,
           highlightId: entry.highlightId
@@ -223,7 +225,9 @@ export const addPageToHistory = async (
   plugin: RNPlugin,
   incrementalRemId: string,
   pdfRemId: string,
-  pageToRecord?: number,
+  // Pass `null` for non-paginated sources (HTML / PDF Text Reader). Pass
+  // `undefined` to derive the page from the saved reading position.
+  pageToRecord?: number | null,
   sessionDurationOverride?: number,
   highlightId?: string
 ): Promise<void> => {
@@ -231,9 +235,11 @@ export const addPageToHistory = async (
 
   const historyKey = getPageHistoryKey(incrementalRemId, pdfRemId);
 
-  // Get the page to record - either provided or from current reading position
-  let page: number;
-  if (pageToRecord !== undefined) {
+  // Get the page to record. `null` = explicit "no page" (HTML/text reader).
+  let page: number | undefined;
+  if (pageToRecord === null) {
+    page = undefined;
+  } else if (pageToRecord !== undefined) {
     page = pageToRecord;
   } else {
     // Get the actual current reading position instead of defaulting to 1
@@ -366,7 +372,7 @@ export const getReadingStatistics = async (
     averageSessionSeconds: Math.round(averageSessionSeconds),
     lastSessionDate: lastEntry?.timestamp,
     lastSessionDuration: lastEntry?.sessionDuration,
-    pagesRead: new Set(history.map(e => e.page)),
+    pagesRead: new Set(history.map(e => e.page).filter((p): p is number => typeof p === 'number')),
     sessionsWithTime: sessionsWithDuration.length
   };
 };
@@ -1086,17 +1092,27 @@ export async function getRemCardContent(
 }
 
 /**
- * Extracts the associated PDF Document ID and native Page index from a PDF Highlight's Data slot.
+ * Extracts the host-document Rem ID and native Page index from a Reader highlight.
+ *
+ * Handles three highlight kinds with one signature:
+ *   - PDF Reader highlight  → host has UploadedFile powerup, page from Data slot
+ *   - PDF Text Reader highlight → host has UploadedFile powerup, no page
+ *   - HTML article highlight (Reader Mode) → host has Link powerup, no page
+ *
+ * The returned `pdfRemId` is the host doc rem id regardless of source type
+ * (name kept for backwards compatibility). `pageIndex` is null when the
+ * source is non-paginated.
  */
 export const getPdfInfoFromHighlight = async (
   plugin: RNPlugin,
   highlightRem: PluginRem
 ): Promise<{ pdfRemId: string | null; pageIndex: number | null }> => {
-  let pdfRemId: string | null = null;
+  let hostRemId: string | null = null;
   let pageIndex: number | null = null;
 
   try {
-    // 1. Resolve page index via Data slot JSON
+    // 1. Resolve page index via Data slot JSON. Only PDF Reader highlights
+    //    populate this slot — Text Reader and HTML highlights leave it undefined.
     const dataString = await highlightRem.getPowerupProperty(BuiltInPowerupCodes.PDFHighlight, 'Data');
     if (dataString) {
       const dataObj = JSON.parse(dataString);
@@ -1107,23 +1123,26 @@ export const getPdfInfoFromHighlight = async (
       }
     }
 
-    // 2. Resolve PDF Document ID by walking up to UploadedFile
-    let docRem: PluginRem | undefined = highlightRem;
-    while (docRem) {
-      const isPdf = await docRem.hasPowerup(BuiltInPowerupCodes.UploadedFile);
-      if (isPdf) {
-        pdfRemId = docRem._id;
+    // 2. Resolve host doc by walking up the parent chain. The host is whichever
+    //    ancestor first identifies as a Reader source: UploadedFile (PDFs) or
+    //    a non-YouTube Link (HTML articles).
+    let cursor: PluginRem | undefined = highlightRem;
+    while (cursor) {
+      if (await cursor.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
+        hostRemId = cursor._id;
         break;
       }
-      const parent = await docRem.getParentRem();
+      if (await isHtmlSource(cursor)) {
+        hostRemId = cursor._id;
+        break;
+      }
+      const parent: PluginRem | undefined = await cursor.getParentRem();
       if (!parent) break;
-      docRem = parent;
+      cursor = parent;
     }
-    
-    // (No further fallback — .document property does not exist on PluginRem)
   } catch (e) {
     console.error('[getPdfInfoFromHighlight] Error:', e);
   }
 
-  return { pdfRemId, pageIndex };
+  return { pdfRemId: hostRemId, pageIndex };
 };
