@@ -24,7 +24,7 @@ import {
   safeRemTextToString,
   PageHistoryEntry,
 } from '../lib/pdfUtils';
-import { openRemInNewPane } from '../lib/remHelpers';
+import { openAndScrollToHighlight } from '../lib/remHelpers';
 
 // Move styles outside component to avoid recreation on every render
 const adjustButtonStyle: React.CSSProperties = {
@@ -630,20 +630,16 @@ export function PriorityEditor() {
                 return (
                   <button
                     onClick={async () => {
-                      const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
-                      if (!bookmarkRem) return;
-
-                      // scrollToReaderHighlight is a no-op unless a PDF reader is
-                      // already mounted. Open the PDF rem in a NEW pane (to the
-                      // right) so the reader exists without closing the IncRem
-                      // view the user was looking at. Then scroll once mounted.
+                      // openAndScrollToHighlight handles cold-open vs warm-open:
+                      // polls for the pane to mount, then retries the scroll
+                      // through PDF.js's boot window so a single click works
+                      // even when the PDF was previously closed.
                       if (remData.pdfRemId) {
-                        await openRemInNewPane(plugin, remData.pdfRemId);
+                        await openAndScrollToHighlight(plugin, remData.pdfRemId, bookmarkHighlightId);
+                      } else {
+                        const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+                        bookmarkRem?.scrollToReaderHighlight();
                       }
-
-                      setTimeout(() => {
-                        bookmarkRem.scrollToReaderHighlight();
-                      }, 400);
                     }}
                     className="w-full mt-2 py-1 rounded text-[11px] font-semibold transition-colors"
                     style={{

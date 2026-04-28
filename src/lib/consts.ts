@@ -131,6 +131,11 @@ export const pdfHighlightColorId = 'pdf-highlight-color'; // Incremental PDF hig
 export const currentDocumentIdKey = 'current-document-id';
 export const popupDocumentIdKey = 'popup-document-id';
 
+// Pending scroll-to-highlight request, picked up by the main-process listener
+// in callbacks.ts after a widget triggers `openRemInNewPane`. The widget's
+// iframe dies during the layout reorg, so the scroll must run in main-process.
+export const pendingScrollRequestKey = 'pending-scroll-request';
+
 // Priority Review Graph
 export const priorityGraphPowerupCode = 'priority_review_graph';
 export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';
