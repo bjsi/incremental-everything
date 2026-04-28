@@ -291,39 +291,45 @@ export function PriorityEditor() {
           {showCardEditor && (
             <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact source={cardInfo?.source} isCardPriority={true} />
           )}
-          {remData?.hostKind === 'pdf' && remData?.pdfRemId && (
-            <span
-              title={remData.pdfRange ? `PDF: p.${remData.pdfRange.start}–${remData.pdfRange.end || '∞'}` : 'PDF source — no range set'}
-              style={{
-                fontSize: '10px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 2,
-                color: remData.pdfRange ? 'var(--rn-clr-content-secondary)' : 'var(--rn-clr-content-tertiary)',
-                opacity: remData.pdfRange ? 1 : 0.55,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              📄{remData.pdfRange ? (
-                <>
-                  {` p.${remData.pdfRange.start}–${remData.pdfRange.end || '∞'}`}
-                  {(() => {
-                    const last = remData.pdfHistory?.[remData.pdfHistory.length - 1];
-                    if (!last) return null;
-                    const hasPage = typeof last.page === 'number';
-                    if (!hasPage && !last.highlightId) return null;
-                    return (
-                      <span style={{ color: '#10b981', marginLeft: '2px' }}>
-                        {hasPage && `(${last.page})`}
-                        {hasPage && last.highlightId && ' '}
-                        {last.highlightId && '🔖'}
-                      </span>
-                    );
-                  })()}
-                </>
-              ) : ' —'}
-            </span>
-          )}
+          {remData?.hostKind === 'pdf' && remData?.pdfRemId && (() => {
+            const last = remData.pdfHistory?.[remData.pdfHistory.length - 1];
+            const hasPage = typeof last?.page === 'number';
+            const hasBookmark = !!last?.highlightId;
+            const hasRange = !!remData.pdfRange;
+            const hasAnyState = hasRange || hasPage || hasBookmark;
+            const titleParts = [
+              hasRange ? `p.${remData.pdfRange!.start}–${remData.pdfRange!.end || '∞'}` : null,
+              hasBookmark ? 'saved bookmark' : null,
+            ].filter(Boolean);
+            const title = titleParts.length > 0
+              ? `PDF: ${titleParts.join(' · ')}`
+              : 'PDF source — no range set';
+            return (
+              <span
+                title={title}
+                style={{
+                  fontSize: '10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  color: hasAnyState ? 'var(--rn-clr-content-secondary)' : 'var(--rn-clr-content-tertiary)',
+                  opacity: hasAnyState ? 1 : 0.55,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                📄
+                {hasRange && ` p.${remData.pdfRange!.start}–${remData.pdfRange!.end || '∞'}`}
+                {(hasPage || hasBookmark) && (
+                  <span style={{ color: '#10b981', marginLeft: '2px' }}>
+                    {hasPage && `(${last!.page})`}
+                    {hasPage && hasBookmark && ' '}
+                    {hasBookmark && '🔖'}
+                  </span>
+                )}
+                {!hasAnyState && ' —'}
+              </span>
+            );
+          })()}
           {remData?.hostKind === 'html' && remData?.pdfRemId && (() => {
             const last = remData.pdfHistory?.[remData.pdfHistory.length - 1];
             const hasBookmark = !!last?.highlightId;
