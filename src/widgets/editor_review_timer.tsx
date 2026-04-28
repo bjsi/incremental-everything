@@ -13,8 +13,8 @@ import { handleCardPriorityInheritance } from '../lib/card_priority/card_priorit
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
-import { findPDFinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
-import { openRemInNewPane } from '../lib/remHelpers';
+import { findPDFinRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
+import { openAndScrollToHighlight } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import dayjs from 'dayjs';
@@ -27,6 +27,12 @@ function EditorReviewTimer() {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [pdfRemId, setPdfRemId] = useState<string | null>(null);
   const [isPdfNote, setIsPdfNote] = useState(false);
+  // hostRemId is the host doc rem id when the IncRem reads from a PDF or HTML
+  // article. pdfRemId remains PDF-only (gates PageControls and page-keyed
+  // history saves). hostKind disambiguates the two for the bookmark Scroll
+  // button and addPageToHistory's page argument.
+  const [hostRemId, setHostRemId] = useState<string | null>(null);
+  const [hostKind, setHostKind] = useState<'pdf' | 'html' | null>(null);
   const [bookmarkHighlightId, setBookmarkHighlightId] = useState<string | null>(null);
 
   const timerData = useTrackerPlugin(
@@ -71,29 +77,48 @@ function EditorReviewTimer() {
 
   const pdfControls = usePdfPageControls(plugin, timerData?.remId, pdfRemId, 0);
 
-  // Load PDF info if the rem is a pdf or has a pdf source
+  // Load host (PDF or HTML article) info if the rem reads from one. PDFs
+  // additionally enable PageControls; HTML hosts only get the bookmark Scroll
+  // button.
   useEffect(() => {
     if (!timerData?.remId) return;
 
-    const loadPdfData = async () => {
+    const loadHostData = async () => {
       const rem = await plugin.rem.findOne(timerData.remId);
-      if (!rem) return;
+      if (!rem) {
+        setIsPdfNote(false);
+        setPdfRemId(null);
+        setHostRemId(null);
+        setHostKind(null);
+        setBookmarkHighlightId(null);
+        return;
+      }
 
       const pdfRem = await findPDFinRem(plugin, rem);
+      const htmlRem = pdfRem ? null : await findHTMLinRem(plugin, rem);
+      const host = pdfRem ?? htmlRem;
+
       if (pdfRem) {
         setIsPdfNote(true);
         setPdfRemId(pdfRem._id);
+      } else {
+        setIsPdfNote(false);
+        setPdfRemId(null);
+      }
 
-        // Check for a bookmark highlight in the last history entry
-        const history = await getPageHistory(plugin, timerData.remId, pdfRem._id);
+      if (host) {
+        setHostRemId(host._id);
+        setHostKind(pdfRem ? 'pdf' : 'html');
+        const history = await getPageHistory(plugin, timerData.remId, host._id);
         const lastEntry = history[history.length - 1];
         setBookmarkHighlightId(lastEntry?.highlightId ?? null);
       } else {
-        setIsPdfNote(false);
+        setHostRemId(null);
+        setHostKind(null);
         setBookmarkHighlightId(null);
       }
     };
-    loadPdfData();
+    loadHostData();
   }, [timerData?.remId, plugin]);
 
   const isPaused = !!(timerData?.pausedAt);
@@ -157,8 +182,11 @@ function EditorReviewTimer() {
       const reviewTimeSeconds = Math.round(elapsedMs / 1000);
 
       // Synchronize time spent reading directly to the PDF reading history tracker
-      if (isPdfNote && pdfRemId) {
-        await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
+      // Record reading time against the host (PDF or HTML). Pages only apply
+      // to PDFs — pass null for HTML so the entry is page-less.
+      if (hostRemId) {
+        const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
       }
 
       if (timerData.origin === 'queue') {
@@ -275,8 +303,11 @@ function EditorReviewTimer() {
 
       // Calculate review time and sync PDF page
       const reviewTimeSeconds = Math.round(elapsedMs / 1000);
-      if (isPdfNote && pdfRemId) {
-        await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
+      // Record reading time against the host (PDF or HTML). Pages only apply
+      // to PDFs — pass null for HTML so the entry is page-less.
+      if (hostRemId) {
+        const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
       }
 
       // Always create a new repetition, just like Mode 2
@@ -379,8 +410,11 @@ function EditorReviewTimer() {
       const reviewTimeSeconds = Math.round(elapsedMs / 1000);
 
       // Sync PDF page history if applicable
-      if (isPdfNote && pdfRemId) {
-        await addPageToHistory(plugin, timerData.remId, pdfRemId, pdfControls.currentPage, reviewTimeSeconds);
+      // Record reading time against the host (PDF or HTML). Pages only apply
+      // to PDFs — pass null for HTML so the entry is page-less.
+      if (hostRemId) {
+        const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
       }
 
       const finalRep: IncrementalRep = {
@@ -524,24 +558,23 @@ function EditorReviewTimer() {
         </div>
       </div>
 
-      {isPdfNote && pdfRemId && (
+      {(isPdfNote || (hostRemId && bookmarkHighlightId)) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px', paddingRight: '12px', borderRight: '1px solid #93c5fd' }}>
-          <PageControls
-            incrementalRemId={timerData.remId as any}
-            {...pdfControls}
-            totalPages={0}
-          />
-          {bookmarkHighlightId && (
+          {/* Page controls only apply to PDF hosts. */}
+          {isPdfNote && pdfRemId && (
+            <PageControls
+              incrementalRemId={timerData.remId as any}
+              {...pdfControls}
+              totalPages={0}
+            />
+          )}
+          {hostRemId && bookmarkHighlightId && (
             <button
               onClick={async () => {
-                // Open the PDF in a new pane (or focus existing) and scroll to bookmark
-                await openRemInNewPane(plugin, pdfRemId);
-                const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
-                if (bookmarkRem && typeof bookmarkRem.scrollToReaderHighlight === 'function') {
-                  setTimeout(() => {
-                    bookmarkRem.scrollToReaderHighlight();
-                  }, 400);
-                }
+                // openAndScrollToHighlight handles cold/warm open and survives
+                // the layout reorganization that destroys this widget's iframe
+                // on cold opens.
+                await openAndScrollToHighlight(plugin, hostRemId, bookmarkHighlightId);
               }}
               style={{
                 padding: '4px 10px',
@@ -562,7 +595,9 @@ function EditorReviewTimer() {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.color = '#3b82f6';
               }}
-              title="Open PDF and scroll to your last bookmark position"
+              title={hostKind === 'html'
+                ? 'Open the article and scroll to your last bookmark position'
+                : 'Open PDF and scroll to your last bookmark position'}
             >
               🔖 Scroll
             </button>
