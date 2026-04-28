@@ -177,7 +177,9 @@ export function Reader(props: ReaderProps) {
         highlightExtract?.scrollToReaderHighlight();
         hasScrolled.current = true;
       }, 100);
-    } else if (actionType === 'pdf' && !hasScrolled.current && isReaderReady && criticalContext?.incrementalRemId) {
+    } else if ((actionType === 'pdf' || actionType === 'html') && !hasScrolled.current && isReaderReady && criticalContext?.incrementalRemId) {
+      // Auto-scroll to last saved bookmark for both PDF docs and HTML articles
+      // (Reader Mode). Highlight reps already auto-scroll above.
       const checkAndScrollBookmark = async () => {
         try {
           const history = await getPageHistory(plugin as ReactRNPlugin, criticalContext.incrementalRemId!, pdfRemId);

@@ -90,11 +90,15 @@ export function CreateIncRemToolbar() {
       showPriorityPopupIfNew: true,
     });
 
-    // 5. Save the bookmark position dynamically to the identified contextRem
-    if (contextRemId && docId && pageIndex !== null) {
+    // 5. Save the bookmark position dynamically to the identified contextRem.
+    //    pageIndex is null for HTML / PDF Text Reader highlights — we still
+    //    record the bookmark by highlight rem id so jumps work.
+    if (contextRemId && docId) {
       try {
         await addPageToHistory(plugin as any, contextRemId, docId, pageIndex, undefined, highlight._id);
-        await setIncrementalReadingPosition(plugin as any, contextRemId, docId, pageIndex);
+        if (pageIndex !== null) {
+          await setIncrementalReadingPosition(plugin as any, contextRemId, docId, pageIndex);
+        }
 
         // Optional: show a combined toast to indicate both tasks succeeded
         await plugin.app.toast('✅ Extract created & bookmark updated');

@@ -1,4 +1,5 @@
 import {
+  AppEvents,
   QueueItemType,
   ReactRNPlugin,
   RemId,
@@ -20,6 +21,7 @@ import {
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
+import { consumePendingScrollRequest } from '../lib/remHelpers';
 
 
 // Registered once globally — safe because all selectors are highly specific to the
@@ -296,4 +298,23 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       }
     }
   );
+
+  // Pending-scroll listener. Runs in the main-process context, so the
+  // polling and setTimeouts inside `consumePendingScrollRequest` survive
+  // the widget iframe death caused by `setRemWindowTree` reorganizing the
+  // panes. Triggered widgets stash their request in session storage and
+  // call openRemInNewPane; this listener picks it up after the layout
+  // settles.
+  let scrollInflight = false;
+  plugin.event.addListener(AppEvents.CurrentWindowTreeChange, undefined, async () => {
+    if (scrollInflight) return;
+    scrollInflight = true;
+    try {
+      await consumePendingScrollRequest(plugin);
+    } catch (e) {
+      console.error('[pending-scroll listener] consume threw:', e);
+    } finally {
+      scrollInflight = false;
+    }
+  });
 }

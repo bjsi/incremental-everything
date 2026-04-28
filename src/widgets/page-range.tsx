@@ -239,10 +239,16 @@ function PageRangeWidget() {
     if (currentPage && currentPage > 0) {
       page = currentPage;
     } else {
-      // Check if we have history for this rem
+      // Check if we have history for this rem (skip page-less HTML/text reader bookmarks)
       const history = remHistories[remId];
       if (history && history.length > 0) {
-        page = history[history.length - 1].page;
+        for (let i = history.length - 1; i >= 0; i--) {
+          const p = history[i].page;
+          if (typeof p === 'number') {
+            page = p;
+            break;
+          }
+        }
       }
     }
     setEditingState({ type: 'history', remId, page });
@@ -773,7 +779,7 @@ function PageRangeWidget() {
                   coverageInfo={item.childCoverage}
                   priorityInfo={remPriorities[item.remId]}
                   statistics={remStatistics[item.remId]}
-                  history={remHistories[item.remId]}
+                  history={remHistories[item.remId]?.filter((e): e is { page: number; timestamp: number; sessionDuration?: number; highlightId?: string } => typeof e.page === 'number')}
                   editingState={editingState}
                   onToggleExpanded={toggleExpanded}
                   onInitIncremental={handleInitIncrementalRem}

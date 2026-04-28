@@ -24,7 +24,7 @@ import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 import { mergeHistoryFromDismissed } from '../dismissed';
-import { registerRemsAsPdfKnown } from '../pdfUtils';
+import { registerRemsAsPdfKnown, registerRemsAsHtmlKnown, isHtmlSource } from '../pdfUtils';
 
 type ReviewOverrideOptions = {
   /**
@@ -349,10 +349,10 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
 
       await updateIncrementalRemCache(plugin, newIncRem);
 
-      // Register in the known_pdf_rems_ synced index so the parent selector
-      // can discover this IncRem instantly (PART 2 of performFullPDFSearch),
-      // even when the session cache (allIncrementalRemKey) is not yet loaded
-      // (e.g., WebBrowser / Light Mode).
+      // Register in the known_pdf_rems_ / known_html_rems_ synced indexes so
+      // the parent selector and bookmark popup can discover this IncRem
+      // instantly (PART 2 of findAllRemsFor*), even when the session cache
+      // (allIncrementalRemKey) is not yet loaded (e.g., WebBrowser / Light Mode).
       try {
         const sources = await rem.getSources();
         const allSources = [rem, ...sources];
@@ -367,10 +367,18 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
             } catch {
               // Skip candidates where URL can't be read
             }
+            continue;
+          }
+          if (await isHtmlSource(candidate)) {
+            try {
+              await registerRemsAsHtmlKnown(plugin as any, candidate._id, [rem._id]);
+            } catch {
+              // Skip candidates that fail registration
+            }
           }
         }
       } catch (e) {
-        console.error('[initIncrementalRem] Error registering in known_pdf_rems_:', e);
+        console.error('[initIncrementalRem] Error registering in known host indexes:', e);
       }
 
       // Bump the reload trigger so the tracker picks up the new IncRem.

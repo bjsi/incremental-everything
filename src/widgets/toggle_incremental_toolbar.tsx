@@ -88,11 +88,15 @@ export function ToggleIncrementalToolbar() {
         }
       }
 
-      // 4. Save bookmark position safely to identified context
-      if (contextRemId && docId && pageIndex !== null) {
+      // 4. Save bookmark position safely to identified context.
+      //    pageIndex is null for HTML / PDF Text Reader highlights — we still
+      //    want to record the bookmark by highlight rem id so jumps work.
+      if (contextRemId && docId) {
         try {
           await addPageToHistory(plugin as any, contextRemId, docId, pageIndex, undefined, rem._id);
-          await setIncrementalReadingPosition(plugin as any, contextRemId, docId, pageIndex);
+          if (pageIndex !== null) {
+            await setIncrementalReadingPosition(plugin as any, contextRemId, docId, pageIndex);
+          }
           await plugin.app.toast('✅ Tagged & bookmark updated');
         } catch (e) {
           console.error('Error creating bookmark for toggle_incremental_toolbar', e);
