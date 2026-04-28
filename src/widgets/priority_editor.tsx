@@ -15,6 +15,7 @@ import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { PriorityBadge } from '../components';
 import {
   findPreferredPDFInRem,
+  findHTMLinRem,
   getIncrementalPageRange,
   getPageHistory,
   getReadingStatistics,
@@ -81,25 +82,40 @@ export function PriorityEditor() {
         findPreferredPDFInRem(plugin as any, rem, false),
       ]);
 
-      // Fetch PDF range / history / stats if a PDF source was found
+      // Fetch host (PDF or HTML) range / history / stats. PDFs get a page-range
+      // panel; HTML hosts only get a bookmark/history panel since pages don't
+      // apply. The state name `pdfRemId` is kept for backwards compat — it now
+      // stores either a PDF or an HTML host id.
       let pdfRemId: string | null = null;
       let pdfRemName: string | null = null;
       let pdfRange: { start: number; end: number | null } | null = null;
       let pdfHistory: PageHistoryEntry[] = [];
       let pdfStats: any = null;
-      if (pdfRem) {
-        pdfRemId = pdfRem._id;
-        pdfRemName = pdfRem.text ? await safeRemTextToString(plugin as any, pdfRem.text) : null;
+      let hostKind: 'pdf' | 'html' | null = null;
+
+      let hostRem: typeof pdfRem = pdfRem;
+      if (!hostRem) {
+        // Fall back to HTML host (Reader Mode source) for non-PDF IncRems.
+        hostRem = await findHTMLinRem(plugin as any, rem);
+      }
+
+      if (hostRem) {
+        hostKind = pdfRem ? 'pdf' : 'html';
+        pdfRemId = hostRem._id;
+        pdfRemName = hostRem.text ? await safeRemTextToString(plugin as any, hostRem.text) : null;
         const [range, history, stats] = await Promise.all([
-          getIncrementalPageRange(plugin as any, rem._id, pdfRem._id),
-          getPageHistory(plugin as any, rem._id, pdfRem._id),
-          getReadingStatistics(plugin as any, rem._id, pdfRem._id),
+          // Range only applies to PDFs.
+          hostKind === 'pdf'
+            ? getIncrementalPageRange(plugin as any, rem._id, hostRem._id)
+            : Promise.resolve(null),
+          getPageHistory(plugin as any, rem._id, hostRem._id),
+          getReadingStatistics(plugin as any, rem._id, hostRem._id),
         ]);
         pdfRange = range;
         pdfHistory = history;
         pdfStats = stats;
-        console.log('[PriorityEditor] Fetched pdfHistory',
-          { incRemId: rem._id, pdfRemId: pdfRem._id, historyLength: history.length, lastEntry: history[history.length - 1] });
+        console.log('[PriorityEditor] Fetched host history',
+          { incRemId: rem._id, hostRemId: hostRem._id, hostKind, historyLength: history.length, lastEntry: history[history.length - 1] });
       }
 
       // Calculate relative priorities inline
@@ -126,6 +142,7 @@ export function PriorityEditor() {
         pdfRange,
         pdfHistory,
         pdfStats,
+        hostKind,
       };
     },
     [remId, refreshSignal]
@@ -274,7 +291,7 @@ export function PriorityEditor() {
           {showCardEditor && (
             <PriorityBadge priority={cardInfo?.priority ?? 50} percentile={cardRelativePriority ?? undefined} compact source={cardInfo?.source} isCardPriority={true} />
           )}
-          {remData?.pdfRemId && (
+          {remData?.hostKind === 'pdf' && remData?.pdfRemId && (
             <span
               title={remData.pdfRange ? `PDF: p.${remData.pdfRange.start}–${remData.pdfRange.end || '∞'}` : 'PDF source — no range set'}
               style={{
@@ -307,6 +324,25 @@ export function PriorityEditor() {
               ) : ' —'}
             </span>
           )}
+          {remData?.hostKind === 'html' && remData?.pdfRemId && (() => {
+            const last = remData.pdfHistory?.[remData.pdfHistory.length - 1];
+            const hasBookmark = !!last?.highlightId;
+            return (
+              <span
+                title={hasBookmark ? 'Web source — saved bookmark' : 'Web source'}
+                style={{
+                  fontSize: '10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  color: 'var(--rn-clr-content-secondary)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                🌐{hasBookmark && <span style={{ color: '#10b981', marginLeft: '2px' }}>🔖</span>}
+              </span>
+            );
+          })()}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -454,7 +490,7 @@ export function PriorityEditor() {
           )}
 
           {/* PDF Range Section */}
-          {remData?.pdfRemId && (
+          {remData?.hostKind === 'pdf' && remData?.pdfRemId && (
             <div
               className="p-3 rounded-lg"
               style={{
@@ -664,6 +700,80 @@ export function PriorityEditor() {
               >
                 PDF Control Panel ↗
               </button>
+            </div>
+          )}
+
+          {/* Web Source Section (HTML hosts) — minimal panel: name + bookmark
+              info + Scroll to Position. No range / page editing because HTML
+              articles aren't paginated. */}
+          {remData?.hostKind === 'html' && remData?.pdfRemId && (
+            <div
+              className="p-3 rounded-lg"
+              style={{
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                border: '1px solid var(--rn-clr-border-primary)',
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">🌐</span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>Web Source</span>
+                  {remData.pdfRemName && (
+                    <span className="text-[10px] truncate max-w-[140px]" style={{ color: 'var(--rn-clr-content-tertiary)' }}
+                      title={remData.pdfRemName}>{remData.pdfRemName}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Stats + last bookmark */}
+              {(remData.pdfStats?.totalTimeSeconds > 0 || remData.pdfHistory?.length > 0) && (
+                <div className="mt-1 flex items-center gap-3 flex-wrap">
+                  {remData.pdfStats?.totalTimeSeconds > 0 && (
+                    <span className="text-[10px]" style={{ color: '#10b981' }}
+                      title="Total reading time">⏱️{formatDuration(remData.pdfStats.totalTimeSeconds)}</span>
+                  )}
+                  {remData.pdfHistory?.length > 0 && (() => {
+                    const last = remData.pdfHistory[remData.pdfHistory.length - 1];
+                    if (!last.highlightId) return null;
+                    return (
+                      <span className="text-[10px]" style={{ color: 'var(--rn-clr-content-tertiary)' }}
+                        title="Last: bookmark with no page info">
+                        Last 🔖
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Scroll to Bookmark — same logic as the PDF panel: only when the
+                  LAST history entry carries a highlightId. */}
+              {(() => {
+                const history = remData.pdfHistory ?? [];
+                const lastEntry = history[history.length - 1];
+                const bookmarkHighlightId = lastEntry?.highlightId;
+                if (!bookmarkHighlightId) return null;
+                return (
+                  <button
+                    onClick={async () => {
+                      if (remData.pdfRemId) {
+                        await openAndScrollToHighlight(plugin, remData.pdfRemId, bookmarkHighlightId);
+                      } else {
+                        const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
+                        bookmarkRem?.scrollToReaderHighlight();
+                      }
+                    }}
+                    className="w-full mt-2 py-1 rounded text-[11px] font-semibold transition-colors"
+                    style={{
+                      backgroundColor: 'var(--rn-clr-background-secondary)',
+                      color: 'var(--rn-clr-blue, #3b82f6)',
+                      border: '2px solid var(--rn-clr-blue, #3b82f6)',
+                    }}
+                    title="Scroll to Bookmark: Open the article and jump to your last saved reading position"
+                  >
+                    🔖 Scroll to Position
+                  </button>
+                );
+              })()}
             </div>
           )}
 

@@ -1,6 +1,6 @@
 import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { getPdfInfoFromHighlight, findAllRemsForPDF, findPDFinRem, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
+import { getPdfInfoFromHighlight, findAllRemsForPDF, findAllRemsForHTML, findPDFinRem, findHTMLinRem, isHtmlSource, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
 import { incrementalQueueActiveKey, currentIncRemKey, editorReviewTimerRemIdKey } from '../lib/consts';
 
 export function PdfBookmarkPopup() {
@@ -60,6 +60,12 @@ export function PdfBookmarkPopup() {
         setPageIndex(pIndex);
 
         if (docId) {
+          // Host kind: PDF (UploadedFile) or HTML (Link, non-YouTube). Used to
+          // dispatch between findPDFinRem / findHTMLinRem and findAllRemsForPDF
+          // / findAllRemsForHTML so that HTML IncRems are discoverable too.
+          const hostRem = await plugin.rem.findOne(docId);
+          const isHtmlHost = hostRem ? await isHtmlSource(hostRem) : false;
+
           // Queue detection: read current-inc-rem directly as the primary signal.
           // incrementalQueueActiveKey can get stuck false due to useEffect lifecycle
           // timing, but current-inc-rem is reliably set by setCurrentIncrementalRem
@@ -77,8 +83,12 @@ export function PdfBookmarkPopup() {
             const editorTimerRemId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
             if (editorTimerRemId) {
               const editorTimerRem = await plugin.rem.findOne(editorTimerRemId);
-              const foundPdf = editorTimerRem ? await findPDFinRem(plugin, editorTimerRem, docId) : null;
-              if (foundPdf && foundPdf._id === docId) {
+              const foundHost = editorTimerRem
+                ? (isHtmlHost
+                    ? await findHTMLinRem(plugin, editorTimerRem, docId)
+                    : await findPDFinRem(plugin, editorTimerRem, docId))
+                : null;
+              if (foundHost && foundHost._id === docId) {
                 activeRemId = editorTimerRemId;
                 activeSource = 'editor-timer';
               }
@@ -117,8 +127,12 @@ export function PdfBookmarkPopup() {
             // associatedRems stays [] — not rendered in fast-path mode anyway
 
           } else {
-            // 🐌 FULL PATH (non-queue): find all IncRems that read this PDF
-            const associated = (await findAllRemsForPDF(plugin, docId)).filter(a => a.isIncremental);
+            // 🐌 FULL PATH (non-queue): find all IncRems that read this host doc.
+            // For PDFs we get page-range hierarchy; for HTML the range concept
+            // doesn't apply and the list ends up flat (range stays null).
+            const associated = (await (isHtmlHost
+              ? findAllRemsForHTML(plugin, docId)
+              : findAllRemsForPDF(plugin, docId))).filter(a => a.isIncremental);
 
             // Fetch their page ranges to build hierarchy
             const associatedWithRanges = await Promise.all(

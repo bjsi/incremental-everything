@@ -609,6 +609,32 @@ export const findPreferredPDFInRem = async (
 export const getKnownPdfRemsKey = (pdfRemId: string) => `known_pdf_rems_${pdfRemId}`;
 
 /**
+ * Register one or more rem IDs as known users of a specific HTML article.
+ * Mirror of registerRemsAsPdfKnown for HTML hosts. Idempotent.
+ * (The key generator getKnownHtmlRemsKey is defined further below alongside
+ * the other HTML-related helpers.)
+ */
+export const registerRemsAsHtmlKnown = async (
+  plugin: RNPlugin,
+  htmlRemId: string,
+  remIds: string[]
+): Promise<void> => {
+  const key = getKnownHtmlRemsKey(htmlRemId);
+  const existing = (await plugin.storage.getSynced<string[]>(key)) || [];
+  const existingSet = new Set(existing);
+  let changed = false;
+  for (const id of remIds) {
+    if (!existingSet.has(id)) {
+      existingSet.add(id);
+      changed = true;
+    }
+  }
+  if (changed) {
+    await plugin.storage.setSynced(key, Array.from(existingSet));
+  }
+};
+
+/**
  * Register one or more rem IDs as known users of a specific PDF in synced storage.
  * This is the index that getAllIncrementsForPDF and findAllRemsForPDF rely on to
  * discover rems that were not found via the local parent/sibling search.
@@ -957,6 +983,93 @@ export const findAllRemsForPDF = async (
     return result;
   } catch (error) {
     console.error('Error finding rems for PDF:', error);
+    return [];
+  }
+};
+
+/**
+ * Find all rems (incremental and non-incremental) that use a specific HTML
+ * article (Reader Mode source). Mirror of findAllRemsForPDF.
+ */
+export const findAllRemsForHTML = async (
+  plugin: RNPlugin,
+  htmlRemId: string
+): Promise<Array<{
+  remId: string;
+  name: string;
+  isIncremental: boolean;
+}>> => {
+  try {
+    const result: Array<{
+      remId: string;
+      name: string;
+      isIncremental: boolean;
+    }> = [];
+
+    const processedRemIds = new Set<string>();
+
+    // PART 1: Search all incremental rems from cache
+    const allIncrementalRems = await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey) || [];
+
+    for (const incRemInfo of allIncrementalRems) {
+      if (processedRemIds.has(incRemInfo.remId)) continue;
+
+      const rem = await plugin.rem.findOne(incRemInfo.remId);
+      if (!rem) continue;
+
+      // Skip highlight rems — we want host-doc-level IncRems only
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
+      if (isPdfHighlight) continue;
+
+      const foundHtml = await findHTMLinRem(plugin, rem, htmlRemId);
+      if (foundHtml && foundHtml._id === htmlRemId) {
+        const remText = await safeRemTextToString(plugin, rem.text);
+        result.push({
+          remId: rem._id,
+          name: remText,
+          isIncremental: true
+        });
+        processedRemIds.add(rem._id);
+      }
+    }
+
+    // PART 2: Check known rems from storage (non-incremental + cache-cold cases)
+    const knownRemsKey = getKnownHtmlRemsKey(htmlRemId);
+    const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
+
+    for (const remId of knownRemIds) {
+      if (processedRemIds.has(remId)) continue;
+
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) continue;
+
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
+      if (isPdfHighlight) continue;
+
+      const isIncremental = await rem.hasPowerup(powerupCode);
+      const remText = await safeRemTextToString(plugin, rem.text);
+
+      const foundHtml = await findHTMLinRem(plugin, rem, htmlRemId);
+      if (foundHtml && foundHtml._id === htmlRemId) {
+        result.push({
+          remId: rem._id,
+          name: remText,
+          isIncremental
+        });
+        processedRemIds.add(rem._id);
+      }
+    }
+
+    result.sort((a, b) => {
+      if (a.isIncremental !== b.isIncremental) {
+        return a.isIncremental ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error finding rems for HTML:', error);
     return [];
   }
 };
