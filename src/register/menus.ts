@@ -81,6 +81,25 @@ export async function registerMenus(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerMenuItem({
+    id: 'set_priority_document_menuitem',
+    location: PluginCommandMenuLocation.DocumentMenu,
+    name: 'Set Priority',
+    action: async (args: { remId: string }) => {
+      const rem = await plugin.rem.findOne(args.remId);
+      if (!rem) {
+        await plugin.app.toast('Could not find a Rem to set priority for.');
+        return;
+      }
+
+      await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+
+      await plugin.widget.openPopup('priority', {
+        remId: rem._id,
+      });
+    },
+  });
+
+  plugin.app.registerMenuItem({
     id: 'batch_priority_menuitem',
     location: PluginCommandMenuLocation.DocumentMenu,
     name: 'Batch Priority Change',
