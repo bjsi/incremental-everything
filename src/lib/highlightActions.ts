@@ -53,15 +53,6 @@ const buildContextForSelector = (
   highlightWasAlreadyIncremental: boolean,
   highlightPageIndex: number | null
 ): ExtendedParentSelectorContext => {
-  console.log('[ParentSelector:HighlightActions] Building context for selector:');
-  console.log('[ParentSelector:HighlightActions]   pdfRemId:', pdfRemId);
-  console.log('[ParentSelector:HighlightActions]   contextRemId:', contextRemId);
-  console.log('[ParentSelector:HighlightActions]   lastSelectedDestination:', lastSelectedDestination);
-  console.log('[ParentSelector:HighlightActions]   rootCandidates count:', rootCandidates.length);
-  console.log('[ParentSelector:HighlightActions]   showPriorityPopupAfterCreate:', showPriorityPopupAfterCreate);
-  console.log('[ParentSelector:HighlightActions]   highlightWasAlreadyIncremental:', highlightWasAlreadyIncremental);
-  console.log('[ParentSelector:HighlightActions]   highlightPageIndex:', highlightPageIndex);
-
   return {
     pdfRemId,
     extractRemId: extractRem._id,
@@ -133,9 +124,6 @@ export const showPriorityPopupForRem = async (
   plugin: ReactRNPlugin,
   remId: RemId
 ): Promise<void> => {
-  console.log('[ParentSelector:HighlightActions] Showing priority popup for rem:', remId);
-
-  // Store the rem ID for the priority popup to use
   await plugin.storage.setSession('priorityPopupTargetRemId', remId);
   await plugin.widget.openPopup('priority_interval');
 };
@@ -146,21 +134,12 @@ export const showPriorityPopupForRem = async (
  */
 const ensurePdfExtractTag = async (plugin: ReactRNPlugin): Promise<PluginRem | undefined> => {
   const tagName = 'pdfextract';
-  console.log(`[ParentSelector:HighlightActions] ensurePdfExtractTag: Searching for "${tagName}"...`);
-  // Attempt to find existing tag by name
   const existingTag = await plugin.rem.findByName([tagName], null);
-  if (existingTag) {
-    console.log('[ParentSelector:HighlightActions] ensurePdfExtractTag: Found existing tag:', existingTag._id);
-    return existingTag;
-  }
-  // Create if missing
-  console.log('[ParentSelector:HighlightActions] ensurePdfExtractTag: Creating new tag...');
+  if (existingTag) return existingTag;
+
   const newTag = await plugin.rem.createRem();
   if (newTag) {
     await newTag.setText([tagName]);
-    console.log('[ParentSelector:HighlightActions] ensurePdfExtractTag: Created new tag:', newTag._id);
-    // Optional: could set it as a stub or move it to a system folder, 
-    // but just creating it is sufficient for tagging.
   } else {
     console.error('[ParentSelector:HighlightActions] ensurePdfExtractTag: Failed to create new tag');
   }
@@ -181,12 +160,6 @@ export const createRemUnderParent = async (
   parentName?: string,
   showPriorityPopup: boolean = false
 ): Promise<RemId | null> => {
-  console.log('[ParentSelector:HighlightActions] createRemUnderParent called:');
-  console.log('[ParentSelector:HighlightActions]   parentId:', parentId);
-  console.log('[ParentSelector:HighlightActions]   pdfRemId:', pdfRemId);
-  console.log('[ParentSelector:HighlightActions]   contextRemId:', contextRemId);
-  console.log('[ParentSelector:HighlightActions]   showPriorityPopup:', showPriorityPopup);
-
   const newRem = await plugin.rem.createRem();
   if (!newRem) {
     await plugin.app.toast('Failed to create rem');
@@ -200,54 +173,40 @@ export const createRemUnderParent = async (
   await newRem.setParent(parentId);
 
   if (makeIncremental) {
-    // DEBUG: Check parentage for priority inheritance
-    console.log('[ParentSelector:HighlightActions] Initializing Incremental Rem...');
-    console.log('[ParentSelector:HighlightActions] newRem.parent (local):', newRem.parent);
-
-    // Attempt to reload rem to ensure parent is strict?
-    // This is a suspicion for why priority inheritance might fail (defaulting to 25 if parent is unknown)
+    // Reload to ensure parent is set in the SDK cache before initIncrementalRem
+    // walks ancestors for priority inheritance. Without this, the new rem can
+    // appear parentless and inherit the default priority instead.
     const reloadedRem = await plugin.rem.findOne(newRem._id);
-    console.log('[ParentSelector:HighlightActions] reloadedRem.parent:', reloadedRem?.parent);
 
-    // Pass the reloaded rem if available, otherwise original
-    await initIncrementalRem(plugin, reloadedRem || newRem);
+    // When the priority popup will follow, skip the cascade — the popup's
+    // intervalBatchSave will fire one with the user's actual priority.
+    await initIncrementalRem(plugin, reloadedRem || newRem, { skipInitialCascade: showPriorityPopup });
 
-    // NEW: Tag the highlight as "pdfextract"
-    // This allows CSS to target [data-rem-tags~="pdfextract"]
-    console.log('[ParentSelector:HighlightActions] Attempting to tag highlight with "pdfextract"...');
     try {
       const pdfExtractTag = await ensurePdfExtractTag(plugin);
       if (pdfExtractTag) {
-        console.log('[ParentSelector:HighlightActions] Found/Created tag rem:', pdfExtractTag._id);
         await highlightRem.addTag(pdfExtractTag._id);
-        console.log('[ParentSelector:HighlightActions] Successfully added tag to highlight');
-      } else {
-        console.log('[ParentSelector:HighlightActions] Failed to ensure pdfextract tag exists');
       }
     } catch (err) {
       console.error('[ParentSelector:HighlightActions] Error adding pdfextract tag:', err);
     }
   }
 
-  // Save this destination for future use
-  console.log('[ParentSelector:HighlightActions] About to save last destination...');
   await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
 
-  // NEW: Save reading position/bookmark automatically for queue item.
+  // Save reading position/bookmark for the queue item.
   // pageIndex is null for HTML / PDF Text Reader highlights — we still record
   // the bookmark by highlight rem id so jumps work in those modes too.
   if (makeIncremental) {
     const { pdfRemId: actualPdf, pageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
     if (actualPdf) {
         try {
-            // Update progress for the currently reviewed Queue item (if active)
             const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
             if (queueCtx && queueCtx.pdfRemId === actualPdf && queueCtx.incrementalRemId) {
                 await addPageToHistory(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex, undefined, highlightRem._id);
                 if (pageIndex !== null) {
                     await setIncrementalReadingPosition(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex);
                 }
-                console.log('[ParentSelector:HighlightActions] Updated Queue item reading history from highlight capture');
             }
         } catch(e) {
             console.error('[ParentSelector:HighlightActions] Error creating bookmark:', e);
@@ -291,51 +250,26 @@ export const createRemFromHighlight = async (
   highlightRem: PluginRem,
   options: CreateRemFromHighlightOptions
 ) => {
-  console.log('[ParentSelector:HighlightActions] ============================================');
-  console.log('[ParentSelector:HighlightActions] createRemFromHighlight CALLED');
-  console.log('[ParentSelector:HighlightActions] options:', JSON.stringify(options, null, 2));
-  console.log('[ParentSelector:HighlightActions] ============================================');
-
   const { makeIncremental, sourceDocumentId, contextRemId, showPriorityPopupIfNew } = options;
-
-  // Normalize contextRemId: undefined becomes null
   const normalizedContextRemId = contextRemId ?? null;
 
-  console.log('[ParentSelector:HighlightActions] Normalized contextRemId:', normalizedContextRemId);
-
-  // Check if the highlight is already an incremental rem
   const highlightIsAlreadyIncremental = await highlightRem.hasPowerup(powerupCode);
-  console.log('[ParentSelector:HighlightActions] Highlight is already incremental:', highlightIsAlreadyIncremental);
-
-  // Determine if we should show priority popup after creating the rem
   const shouldShowPriorityPopup =
     showPriorityPopupIfNew === true &&
     !highlightIsAlreadyIncremental &&
     makeIncremental;
 
-  console.log('[ParentSelector:HighlightActions] Should show priority popup:', shouldShowPriorityPopup);
-
-  // Step 1: Resolve the source document (PDF or HTML)
   const sourceDocument = await resolveSourceDocument(plugin, highlightRem, sourceDocumentId);
   if (!sourceDocument) {
-    console.log('[ParentSelector:HighlightActions] ERROR: Could not find source document');
     await plugin.app.toast('Could not find the source document for this highlight');
     return;
   }
 
-  console.log('[ParentSelector:HighlightActions] Source document resolved:', sourceDocument._id);
-
-  // Check source type: PDF or HTML
   const isPdfSource = await sourceDocument.hasPowerup(BuiltInPowerupCodes.UploadedFile);
   const isHtmlSourceDoc = await isHtmlSource(sourceDocument);
 
-  console.log('[ParentSelector:HighlightActions] Is PDF source:', isPdfSource);
-  console.log('[ParentSelector:HighlightActions] Is HTML source:', isHtmlSourceDoc);
-
-  // Step 2: If not a PDF or HTML, create directly under source
-  // This handles YouTube videos, regular rems, etc.
+  // For non-PDF/HTML sources (YouTube, regular rems, etc.), create directly under source.
   if (!isPdfSource && !isHtmlSourceDoc) {
-    console.log('[ParentSelector:HighlightActions] Not a PDF or HTML, creating directly under source');
     await createRemUnderParent(
       plugin,
       highlightRem,
@@ -349,22 +283,16 @@ export const createRemFromHighlight = async (
     return;
   }
 
-  // Step 3: Find all rems for this source as a tree structure
-  // Use appropriate function based on source type
   let rootCandidates: ParentTreeNode[];
-
   if (isPdfSource) {
-    console.log('[ParentSelector:HighlightActions] Finding all rems for PDF as tree...');
     rootCandidates = await findAllRemsForPDFAsTree(plugin, sourceDocument._id);
   } else {
-    console.log('[ParentSelector:HighlightActions] Finding all rems for HTML as tree...');
     rootCandidates = await findAllRemsForHTMLAsTree(plugin, sourceDocument._id);
   }
 
-  // FIX: If no candidates found, add the source document itself as the root
-  // so the user can select it or create a child under it
+  // If no candidates found, add the source document itself so the user can select
+  // it or create a child under it.
   if (rootCandidates.length === 0) {
-    console.log('[ParentSelector:HighlightActions] No candidates found, adding source document as root candidate');
     const sourceText = await plugin.richText.toString(sourceDocument.text || []) || (isPdfSource ? 'PDF Document' : 'HTML Document');
     rootCandidates.push({
       remId: sourceDocument._id,
@@ -381,27 +309,16 @@ export const createRemFromHighlight = async (
     });
   }
 
-  console.log('[ParentSelector:HighlightActions] Root candidates found (or added):', rootCandidates.length);
-
-  // Step 4: Get last selected destination for this context
-  console.log('[ParentSelector:HighlightActions] Getting last selected destination...');
   const lastSelectedDestination = await getLastSelectedDestination(
     plugin,
     sourceDocument._id,
     normalizedContextRemId
   );
-  console.log('[ParentSelector:HighlightActions] Last selected destination:', lastSelectedDestination);
 
-  // Step 5: Decision logic - Always show popup for PDF and HTML sources
-  // This allows users to choose where to place the new rem
-
-  console.log('[ParentSelector:HighlightActions] DECISION: Showing hierarchical popup');
-
-  // Extract page index from the highlight for suggestion purposes
   const { pageIndex: highlightPageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
 
   const context = buildContextForSelector(
-    sourceDocument._id,  // This is used as "pdfRemId" but works for HTML too
+    sourceDocument._id,
     highlightRem,
     rootCandidates,
     makeIncremental,
@@ -412,16 +329,6 @@ export const createRemFromHighlight = async (
     highlightPageIndex
   );
 
-  console.log('[ParentSelector:HighlightActions] Storing context in session...');
   await plugin.storage.setSession('parentSelectorContext', context);
-
-  // Verify context was stored
-  const storedContext = await plugin.storage.getSession<ExtendedParentSelectorContext>('parentSelectorContext');
-  console.log('[ParentSelector:HighlightActions] Verified stored context:');
-  console.log('[ParentSelector:HighlightActions]   contextRemId:', storedContext?.contextRemId);
-  console.log('[ParentSelector:HighlightActions]   lastSelectedDestination:', storedContext?.lastSelectedDestination);
-  console.log('[ParentSelector:HighlightActions]   showPriorityPopupAfterCreate:', storedContext?.showPriorityPopupAfterCreate);
-
-  console.log('[ParentSelector:HighlightActions] Opening popup...');
   await plugin.widget.openPopup(parentSelectorWidgetId);
 };
