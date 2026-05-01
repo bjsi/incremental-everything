@@ -1,10 +1,11 @@
 import {
   AppEvents,
   QueueInteractionScore,
-  QueueItemType,
   ReactRNPlugin,
+  RNPlugin,
 } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from './pdfUtils';
+import { autoFocusQueueDashboardId } from './consts';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
 
 const PRACTICED_QUEUES_HISTORY_KEY = 'practicedQueuesHistory';
@@ -12,21 +13,211 @@ const ACTIVE_SESSION_KEY = 'activeQueueSession';
 const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
 const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
 
+// Editor-only IncRem sessions auto-close after this much idle time so a row
+// is recorded for the burst of activity. Cleared/rescheduled on every
+// engagement and rep tick. See startIncRemEngagement / recordIncRemRep.
+const EDITOR_SESSION_IDLE_MS = 60 * 60 * 1000;
+const EDITOR_REVIEW_SCOPE = 'Editor Review';
+
 let currentSession: PracticedQueueSession | null = null;
 const cardStartTimes = new Map<string, number>();
-let currentIncRemStart: number | null = null;
 
-async function syncLiveSession(plugin: ReactRNPlugin) {
+// Open IncRem engagement timer. Replaces the old currentIncRemStart variable
+// and is now driven by explicit start/end calls from the IncRem rendering
+// surfaces (queue widget, editor timer) rather than inferred from QueueLoadCard.
+let incRemEngagementStart: number | null = null;
+let incRemEngagementRemId: string | null = null;
+
+// Set by markIncRemTransition() right before a queue→editor handoff. Tells the
+// next startIncRemEngagement(remId) to skip the count++ so a single IncRem
+// reviewed across queue + editor counts as one rep with combined time.
+let incRemTransitionFlag: string | null = null;
+
+let editorIncRemIdleTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function syncLiveSession(plugin: RNPlugin) {
   await plugin.storage.setSession(ACTIVE_SESSION_KEY, currentSession);
 }
 
-export async function saveCurrentSession(plugin: ReactRNPlugin, _reason: string) {
+function clearEditorIdleSave() {
+  if (editorIncRemIdleTimer) {
+    clearTimeout(editorIncRemIdleTimer);
+    editorIncRemIdleTimer = null;
+  }
+}
+
+function scheduleEditorIdleSave(plugin: RNPlugin) {
+  if (!currentSession || currentSession.scopeName !== EDITOR_REVIEW_SCOPE) return;
+  clearEditorIdleSave();
+  editorIncRemIdleTimer = setTimeout(() => {
+    if (currentSession?.scopeName === EDITOR_REVIEW_SCOPE) {
+      saveCurrentSession(plugin, 'Editor Review Idle Timeout').catch((err) =>
+        console.error('Failed to auto-save editor IncRem session:', err)
+      );
+    }
+  }, EDITOR_SESSION_IDLE_MS);
+}
+
+async function ensureSessionForIncRem(plugin: RNPlugin) {
+  if (currentSession) return;
+  try {
+    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+    currentSession = {
+      id: Math.random().toString(36).substring(7),
+      startTime: Date.now(),
+      kbId: kbData._id,
+      scopeName: EDITOR_REVIEW_SCOPE,
+      totalTime: 0,
+      flashcardsCount: 0,
+      flashcardsTime: 0,
+      incRemsCount: 0,
+      incRemsTime: 0,
+      againCount: 0,
+      currentCardFirstRep: undefined,
+    };
+    await syncLiveSession(plugin);
+  } catch (err) {
+    console.error('Failed to lazily create Editor Review session:', err);
+  }
+}
+
+async function maybeAdoptScopeFromRem(plugin: RNPlugin, remId: string) {
+  if (!currentSession) return;
+  const generic =
+    !currentSession.scopeName ||
+    currentSession.scopeName === 'Untitled' ||
+    currentSession.scopeName === 'Ad-hoc Queue' ||
+    currentSession.scopeName === 'Ad-hoc Session' ||
+    currentSession.scopeName === EDITOR_REVIEW_SCOPE;
+  if (!generic) return;
+  const rem = await plugin.rem.findOne(remId);
+  if (rem?.text) {
+    const text = await safeRemTextToString(plugin, rem.text);
+    if (text && text !== 'Untitled') currentSession.scopeName = text;
+  }
+}
+
+// ─── Widget→main IncRem signaling ──────────────────────────────────────────────
+// Widgets run in sandboxed iframes, so they cannot mutate this module's
+// `currentSession` directly — their import of this file gets a separate
+// in-iframe copy. To bridge that, the public helpers (start/end engagement,
+// record rep, mark transition) push events to a session-storage log, and
+// registerQueueSessionTracking (which runs in the main process) polls and
+// drains that log into the real `currentSession`.
+//
+// Pattern mirrors the existing card_priority_display → cluster-sibling poll.
+
+const INC_REM_EVENT_LOG_KEY = 'ieIncRemEventLog';
+
+type IncRemEvent =
+  | { type: 'start'; remId: string; ts: number }
+  | { type: 'end'; ts: number }
+  | { type: 'rep'; remId: string; durationMs: number; ts: number }
+  | { type: 'transition'; remId: string; ts: number };
+
+async function pushIncRemEvent(plugin: RNPlugin, event: IncRemEvent) {
+  const log = ((await plugin.storage.getSession<IncRemEvent[]>(INC_REM_EVENT_LOG_KEY)) || []).slice();
+  log.push(event);
+  await plugin.storage.setSession(INC_REM_EVENT_LOG_KEY, log);
+}
+
+export function markIncRemTransition(plugin: RNPlugin, remId: string) {
+  // Fire-and-forget: handleReviewInEditorRem callers don't await this
+  // historically, and the next polled drain will pick it up anyway.
+  pushIncRemEvent(plugin, { type: 'transition', remId, ts: Date.now() }).catch((err) =>
+    console.error('Failed to push IncRem transition event:', err)
+  );
+}
+
+export async function startIncRemEngagement(plugin: RNPlugin, remId: string) {
+  await pushIncRemEvent(plugin, { type: 'start', remId, ts: Date.now() });
+}
+
+export async function endIncRemEngagement(plugin: RNPlugin) {
+  await pushIncRemEvent(plugin, { type: 'end', ts: Date.now() });
+}
+
+export async function recordIncRemRep(plugin: RNPlugin, remId: string, durationMs: number) {
+  await pushIncRemEvent(plugin, { type: 'rep', remId, durationMs, ts: Date.now() });
+}
+
+// ─── Main-process apply functions (only called by the poll) ────────────────────
+
+async function applyIncRemEngagementStart(
+  plugin: RNPlugin,
+  remId: string,
+  startTs: number
+) {
+  await ensureSessionForIncRem(plugin);
+  if (!currentSession) return;
+
+  // Already engaged with this rem (e.g., widget re-render): keep timer.
+  if (incRemEngagementRemId === remId && incRemEngagementStart !== null) {
+    return;
+  }
+
+  // Engaged with a different rem: close that engagement first (time only).
+  if (incRemEngagementStart !== null) {
+    const duration = Math.max(0, startTs - incRemEngagementStart);
+    currentSession.incRemsTime += duration;
+    currentSession.totalTime += duration;
+    incRemEngagementStart = null;
+    incRemEngagementRemId = null;
+  }
+
+  const isTransition = incRemTransitionFlag === remId;
+  incRemTransitionFlag = null;
+
+  if (!isTransition) {
+    currentSession.incRemsCount++;
+    await maybeAdoptScopeFromRem(plugin, remId);
+  }
+
+  incRemEngagementStart = startTs;
+  incRemEngagementRemId = remId;
+
+  scheduleEditorIdleSave(plugin);
+  await syncLiveSession(plugin);
+}
+
+async function applyIncRemEngagementEnd(plugin: RNPlugin, endTs: number) {
+  if (!currentSession || incRemEngagementStart === null) return;
+  const duration = Math.max(0, endTs - incRemEngagementStart);
+  currentSession.incRemsTime += duration;
+  currentSession.totalTime += duration;
+  incRemEngagementStart = null;
+  incRemEngagementRemId = null;
+
+  scheduleEditorIdleSave(plugin);
+  await syncLiveSession(plugin);
+}
+
+async function applyIncRemRep(
+  plugin: RNPlugin,
+  remId: string,
+  durationMs: number
+) {
+  await ensureSessionForIncRem(plugin);
+  if (!currentSession) return;
+
+  currentSession.incRemsCount++;
+  if (durationMs > 0) {
+    currentSession.incRemsTime += durationMs;
+    currentSession.totalTime += durationMs;
+  }
+  await maybeAdoptScopeFromRem(plugin, remId);
+
+  scheduleEditorIdleSave(plugin);
+  await syncLiveSession(plugin);
+}
+
+export async function saveCurrentSession(plugin: RNPlugin, _reason: string) {
   if (!currentSession) return;
 
   currentSession.endTime = Date.now();
 
-  if (currentIncRemStart) {
-    currentSession.incRemsTime += Date.now() - currentIncRemStart;
+  if (incRemEngagementStart !== null) {
+    currentSession.incRemsTime += Date.now() - incRemEngagementStart;
   }
   currentSession.totalTime = currentSession.flashcardsTime + currentSession.incRemsTime;
 
@@ -38,7 +229,10 @@ export async function saveCurrentSession(plugin: ReactRNPlugin, _reason: string)
 
   currentSession = null;
   cardStartTimes.clear();
-  currentIncRemStart = null;
+  incRemEngagementStart = null;
+  incRemEngagementRemId = null;
+  incRemTransitionFlag = null;
+  clearEditorIdleSave();
   await plugin.storage.setSession(ACTIVE_SESSION_KEY, null);
   await plugin.storage.setSession('finalDrillHeartbeat', 0);
 }
@@ -52,7 +246,7 @@ export function hasActiveSession(): boolean {
  * repetitionHistory. Used by both QueueLoadCard and the cluster-sibling poll.
  */
 async function loadCardStats(
-  plugin: ReactRNPlugin,
+  plugin: RNPlugin,
   session: PracticedQueueSession,
   cardId: string
 ) {
@@ -124,6 +318,31 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
     }
   }, 500);
 
+  // IncRem event-log drain: widgets push start/end/rep/transition events to
+  // session storage (see pushIncRemEvent above). Poll, drain, apply in order.
+  // Read-clear-process: a widget appending between read and write loses that
+  // event, but the race window is sub-millisecond — acceptable.
+  setInterval(async () => {
+    try {
+      const log = await plugin.storage.getSession<IncRemEvent[]>(INC_REM_EVENT_LOG_KEY);
+      if (!log || log.length === 0) return;
+      await plugin.storage.setSession(INC_REM_EVENT_LOG_KEY, []);
+      for (const event of log) {
+        if (event.type === 'start') {
+          await applyIncRemEngagementStart(plugin, event.remId, event.ts);
+        } else if (event.type === 'end') {
+          await applyIncRemEngagementEnd(plugin, event.ts);
+        } else if (event.type === 'rep') {
+          await applyIncRemRep(plugin, event.remId, event.durationMs);
+        } else if (event.type === 'transition') {
+          incRemTransitionFlag = event.remId;
+        }
+      }
+    } catch (error) {
+      console.error('ERROR in IncRem event-log drain poll:', error);
+    }
+  }, 250);
+
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async (data: any) => {
     try {
       if (currentSession) {
@@ -167,7 +386,21 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
       await syncLiveSession(plugin);
       cardStartTimes.clear();
-      currentIncRemStart = null;
+      incRemEngagementStart = null;
+      incRemEngagementRemId = null;
+      incRemTransitionFlag = null;
+      clearEditorIdleSave();
+
+      // Auto-focus the Practiced Queues dashboard in the right sidebar so the
+      // user always has a live session view while reviewing. Opt-in via setting.
+      const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
+      if (autoFocus) {
+        try {
+          await plugin.window.openWidgetInRightSidebar('practiced_queues');
+        } catch (err) {
+          console.error('Failed to auto-focus Practiced Queues dashboard:', err);
+        }
+      }
     } catch (error) {
       console.error('ERROR in QueueSession QueueEnter listener:', error);
     }
@@ -188,7 +421,6 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
   plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async (data: any) => {
     try {
       const now = Date.now();
-      const type = await plugin.queue.getCurrentQueueScreenType();
 
       // Staleness defense: clear cluster signals at the start of each new card load so a
       // value left over from the previous card can't leak in if the widget fails to mount.
@@ -217,56 +449,19 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           };
           await syncLiveSession(plugin);
           cardStartTimes.clear();
-          currentIncRemStart = null;
+          incRemEngagementStart = null;
+          incRemEngagementRemId = null;
+          incRemTransitionFlag = null;
         } catch (err) {
           console.error('ERROR: Failed to lazily initialize practice session', err);
         }
       }
 
-      const isLikelyIncRem =
-        type === QueueItemType.Plugin || ((type === undefined || type === null) && !data?.cardId);
-
-      if (isLikelyIncRem) {
-        if (currentIncRemStart && currentSession) {
-          const duration = now - currentIncRemStart;
-          currentSession.incRemsTime += duration;
-          currentSession.totalTime += duration;
-        }
-
-        if (currentSession) {
-          currentSession.incRemsCount++;
-        }
-
-        currentIncRemStart = now;
-
-        if (currentSession) {
-          await syncLiveSession(plugin);
-        }
-
-        // Capture scope from first IncRem text if scope is generic
-        if (
-          currentSession &&
-          (currentSession.scopeName === 'Untitled' ||
-            currentSession.scopeName === 'Ad-hoc Queue' ||
-            currentSession.scopeName === 'Ad-hoc Session' ||
-            !currentSession.scopeName) &&
-          data?.remId
-        ) {
-          const rem = await plugin.rem.findOne(data.remId);
-          if (rem?.text) {
-            const text = await safeRemTextToString(plugin, rem.text);
-            if (text && text !== 'Untitled') currentSession.scopeName = text;
-          }
-        }
-      } else {
-        // Switched to a flashcard — close any open IncRem timing
-        if (currentIncRemStart && currentSession) {
-          const duration = now - currentIncRemStart;
-          currentSession.incRemsTime += duration;
-          currentSession.totalTime += duration;
-        }
-        currentIncRemStart = null;
-      }
+      // IncRem engagement (count + time) is now tracked explicitly by the
+      // IncRem rendering surfaces (queue.tsx and editor_review_timer.tsx) via
+      // startIncRemEngagement / endIncRemEngagement, plus by editor_review.tsx's
+      // manual-minutes confirm via recordIncRemRep. This event no longer
+      // infers IncRem activity from QueueItemType.Plugin.
 
       if (data?.cardId) {
         // Track current and previous card for Mastery Drill edit features
@@ -363,12 +558,11 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
           cardStartTimes.delete(effectiveCardId);
         }
-      } else if (currentIncRemStart && currentSession) {
-        // No cardId means IncRem completion (or generic) — close timing
-        const duration = Date.now() - currentIncRemStart;
-        currentSession.incRemsTime += duration;
-        currentSession.totalTime += duration;
-        currentIncRemStart = null;
+      } else if (incRemEngagementStart !== null && currentSession) {
+        // No cardId — IncRem rep completion. Close any open engagement so
+        // its accumulated time is captured even if the widget cleanup hasn't
+        // fired yet (the rendering surfaces also call endIncRemEngagement).
+        await endIncRemEngagement(plugin);
       }
 
       // Update prev-card interval/coverage now that scheduler has updated

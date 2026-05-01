@@ -17,6 +17,7 @@ import { findPDFinRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext,
 import { openAndScrollToHighlight } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
+import { startIncRemEngagement, endIncRemEngagement } from '../lib/queue_session';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
@@ -74,6 +75,20 @@ function EditorReviewTimer() {
 
     return () => clearInterval(intervalId);
   }, []);
+
+  // Track IncRem engagement for PracticedQueues (count + time). When the
+  // timer is started for a rem, engagement starts; when remId changes (Next)
+  // or clears (End Review / Cancel), engagement ends and accumulated time is
+  // added. For queue→editor handoffs, markIncRemTransition() in
+  // handleReviewInEditorRem suppresses the count++ here so the IncRem is
+  // counted only once across the combined queue + editor time.
+  useEffect(() => {
+    if (!timerData?.remId) return;
+    startIncRemEngagement(plugin, timerData.remId);
+    return () => {
+      endIncRemEngagement(plugin);
+    };
+  }, [timerData?.remId, plugin]);
 
   const pdfControls = usePdfPageControls(plugin, timerData?.remId, pdfRemId, 0);
 
