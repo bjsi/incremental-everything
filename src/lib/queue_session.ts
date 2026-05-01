@@ -319,6 +319,26 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
     }
   }, 500);
 
+  // Periodic IncRem engagement flush: while an engagement is open, roll its
+  // elapsed time into incRemsTime/totalTime so the live dashboard reflects
+  // reading time without waiting for engagement end. The end/save paths still
+  // flush remaining elapsed correctly because they compute from the (just
+  // advanced) incRemEngagementStart.
+  setInterval(async () => {
+    if (!currentSession || incRemEngagementStart === null) return;
+    try {
+      const now = Date.now();
+      const elapsed = Math.max(0, now - incRemEngagementStart);
+      if (elapsed === 0) return;
+      currentSession.incRemsTime += elapsed;
+      currentSession.totalTime += elapsed;
+      incRemEngagementStart = now;
+      await syncLiveSession(plugin);
+    } catch (error) {
+      console.error('ERROR in IncRem engagement live flush:', error);
+    }
+  }, 2000);
+
   // IncRem event-log drain: widgets push start/end/rep/transition events to
   // session storage (see pushIncRemEvent above). Poll, drain, apply in order.
   // Read-clear-process: a widget appending between read and write loses that
@@ -431,6 +451,16 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
   plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async (data: any) => {
     try {
       const now = Date.now();
+
+      // Defensive: when a flashcard loads (data.cardId is set; IncRems load
+      // without a cardId), close any open IncRem engagement synchronously so
+      // the periodic flush does not keep adding reading time to incRemsTime
+      // while a flashcard is on screen. The IncRem widget's unmount cleanup
+      // also calls endIncRemEngagement, but that routes through the 250 ms
+      // event-log drain and may lag behind QueueLoadCard.
+      if (data?.cardId && incRemEngagementStart !== null && currentSession) {
+        await applyIncRemEngagementEnd(plugin, now);
+      }
 
       // Staleness defense: clear cluster signals at the start of each new card load so a
       // value left over from the previous card can't leak in if the widget fails to mount.
