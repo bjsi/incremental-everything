@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId } from '../lib/consts';
 
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const skipMasteryDrill = Boolean(
@@ -218,6 +218,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
     widgetTabIcon: "https://i.imgur.com/MLaBDJw.png",
     widgetTabTitle: "Visited Rem History",
+  });
+
+  // IncRem Notes Sidebar: shows the DocumentViewer for the IncRem being reviewed
+  // Opened programmatically by the Reader 📝 button via openWidgetInRightSidebar.
+  plugin.app.registerWidget(incremNotesSidebarWidgetId, WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/1828/1828911.png",
+    widgetTabTitle: "Document Notes",
   });
 
   // Repetition history popup for Answer Buttons

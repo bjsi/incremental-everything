@@ -149,3 +149,8 @@ export const videoExtractPowerupCode = 'videoExtract';
 export const videoExtractUrlSlotCode = 'videoUrl';
 export const videoExtractStartSlotCode = 'startTime';
 export const videoExtractEndSlotCode = 'endTime';
+
+// IncRem Notes Sidebar (right sidebar widget)
+// Opened programmatically by the Reader 📝 button; reads currentIncRemKey directly.
+export const incremNotesSidebarWidgetId = 'increm_notes_sidebar';
+
