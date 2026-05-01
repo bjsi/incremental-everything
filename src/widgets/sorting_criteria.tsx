@@ -75,6 +75,11 @@ export function SortingCriteria() {
     []
   );
 
+  const currentKbName = useTrackerPlugin(
+    async (rp) => (await rp.kb.getCurrentKnowledgeBaseData())?.name,
+    []
+  );
+
   const [sliderValue, setSliderValue] = useState<number | undefined>(undefined);
 
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -155,6 +160,11 @@ export function SortingCriteria() {
       )}
 
       <div className="text-2xl font-bold">Sorting Criteria</div>
+      {currentKbName && (
+        <div className="rn-clr-content-secondary text-sm italic mt-[-8px]">
+          Knowledge Base: {currentKbName}
+        </div>
+      )}
 
       {/* Randomness slider is unchanged */}
       <div className="flex flex-col gap-2 ">

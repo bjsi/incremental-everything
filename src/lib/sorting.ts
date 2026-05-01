@@ -6,18 +6,27 @@ export const DEFAULT_CARDS_PER_REM = 6;
 
 export const setSortingRandomness = async (plugin: RNPlugin, randomness: number) => {
   randomness = Math.min(1, Math.max(0, randomness));
-  await plugin.storage.setSynced('randomness', randomness);
+  const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+  await plugin.storage.setSynced(`randomness_${kbId}`, randomness);
 };
 
 export const getSortingRandomness = async (plugin: RNPlugin) => {
-  const val = (await plugin.storage.getSynced('randomness')) as number;
+  const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+  let val = (await plugin.storage.getSynced(`randomness_${kbId}`)) as number;
+  if (val == null) {
+    val = (await plugin.storage.getSynced('randomness')) as number;
+  }
   return val == null ? DEFAULT_RANDOMNESS : val;
 };
 
 export type CardsPerRem = 'no-rem' | 'no-cards' | number;
 
 export const getCardsPerRem = async (plugin: RNPlugin): Promise<CardsPerRem> => {
-	const val = await plugin.storage.getSynced('cardsPerRem');
+	const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+	let val = await plugin.storage.getSynced(`cardsPerRem_${kbId}`);
+	if (val == null) {
+		val = await plugin.storage.getSynced('cardsPerRem');
+	}
 	if (val === 'no-rem' || val === 'no-cards' || typeof val === 'number') {
 		return val;
 	}
@@ -25,20 +34,25 @@ export const getCardsPerRem = async (plugin: RNPlugin): Promise<CardsPerRem> => 
 }
 
 export const setCardsPerRem = async (plugin: RNPlugin, value: CardsPerRem) => {
-	await plugin.storage.setSynced('cardsPerRem', value);
+	const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+	await plugin.storage.setSynced(`cardsPerRem_${kbId}`, value);
 }
-
 
 // Add new functions for flashcard randomness
 export const DEFAULT_CARD_RANDOMNESS = 0.1;
 
 export const setCardRandomness = async (plugin: RNPlugin, randomness: number) => {
   randomness = Math.min(1, Math.max(0, randomness));
-  await plugin.storage.setSynced('cardRandomness', randomness);
+  const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+  await plugin.storage.setSynced(`cardRandomness_${kbId}`, randomness);
 };
 
 export const getCardRandomness = async (plugin: RNPlugin) => {
-  const val = (await plugin.storage.getSynced('cardRandomness')) as number;
+  const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+  let val = (await plugin.storage.getSynced(`cardRandomness_${kbId}`)) as number;
+  if (val == null) {
+    val = (await plugin.storage.getSynced('cardRandomness')) as number;
+  }
   return val == null ? DEFAULT_CARD_RANDOMNESS : val;
 };
 
