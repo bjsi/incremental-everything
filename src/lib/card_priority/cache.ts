@@ -1,7 +1,7 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../consts';
 import { CardPriorityInfo, PrioritySource } from './types';
-import { getCardPriority, autoAssignCardPriority } from './index';
+import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
 
 let cacheUpdateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -395,7 +395,8 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
               return;
             }
 
-            await autoAssignCardPriority(plugin, rem);
+            const calculated = await calculateNewPriority(plugin, rem);
+            await setCardPriority(plugin, rem, calculated.priority, calculated.source);
 
             const cardInfo = await getCardPriority(plugin, rem);
             if (cardInfo) {
