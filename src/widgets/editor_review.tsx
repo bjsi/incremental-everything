@@ -19,6 +19,7 @@ import { determineIncRemType } from '../lib/incRemHelpers';
 import { openRemInNewPane, openAndScrollToHighlight } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
+import { recordIncRemRep } from '../lib/queue_session';
 
 async function handleEditorReview(
   plugin: RNPlugin,
@@ -193,6 +194,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
     if (!isNaN(numDays)) {
       const result = await handleEditorReview(plugin, remId, numDays, priority, numMinutes);
       if (result) {
+        await recordIncRemRep(plugin, remId, Math.round(numMinutes * 60 * 1000));
         const dateStr = dayjs(result.newNextRepDate).format('MMMM D, YYYY');
         await plugin.app.toast(`✓ ${remName}: Repetition stored, next review: ${dateStr}`);
         await plugin.widget.closePopup();

@@ -23,6 +23,7 @@ import {
 } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { startIncRemEngagement, endIncRemEngagement } from '../lib/queue_session';
 
 console.log('QUEUE.TSX FILE LOADED');
 
@@ -93,6 +94,18 @@ export function QueueComponent() {
       plugin.storage.setSession(incrementalQueueActiveKey, false);
     };
   }, [plugin]);
+
+  // Drive PracticedQueues IncRem count + time from explicit mount/unmount of
+  // this widget rather than the QueueLoadCard heuristic. Mount = engagement
+  // starts (count++ unless this is a queue→editor handoff). Unmount or remId
+  // change = engagement ends (accumulated time is added to the session).
+  useEffect(() => {
+    if (!ctx?.remId) return;
+    startIncRemEngagement(plugin, ctx.remId);
+    return () => {
+      endIncRemEngagement(plugin);
+    };
+  }, [ctx?.remId, plugin]);
 
   useEffect(() => {
     // The true identity of the incremental item in the queue is ALWAYS ctx.remId.

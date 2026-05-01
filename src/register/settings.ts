@@ -18,6 +18,7 @@ import {
   fsrsWeightsId,
   displayQueueToolbarPriorityId,
   displayWeightedShieldId,
+  autoFocusQueueDashboardId,
 } from '../lib/consts';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
@@ -248,6 +249,14 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Show regular Rems in isolated view (Queue)',
     description:
       'When enabled, incremental Rems that are plain Rems will use the isolated card view in the queue instead of the full document context. Switch back to context with the button in the queue.',
+    defaultValue: false,
+  });
+
+  plugin.settings.registerBooleanSetting({
+    id: autoFocusQueueDashboardId,
+    title: 'Auto focus Queue Dashboard',
+    description:
+      'When enabled, opens the Practiced Queues dashboard in the Right Sidebar automatically on Queue Enter so you always have a live view of the current session. Note: PDF IncRems may temporarily steal focus to PDF-related tabs; the dashboard tab stays available for re-selection.',
     defaultValue: false,
   });
 
