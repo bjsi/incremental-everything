@@ -1,32 +1,37 @@
 // widgets/increm_notes_sidebar.tsx
 // Right-sidebar widget that shows a DocumentViewer for the current IncRem being reviewed.
-// Reads two existing session keys:
-//   - currentIncRemKey: the IncRem ID (set by QueueComponent on mount, stale during flashcard turns)
-//   - incrementalQueueActiveKey: true only while QueueComponent is mounted (IncRem turn)
-// Only renders when BOTH signals are present, which correctly hides during flashcard turns.
+// Uses three existing session keys as signals:
+//   - currentIncRemKey: the IncRem ID (stale during flashcard turns)
+//   - incrementalQueueActiveKey: true only while QueueComponent is mounted
+//   - currentIncrementalRemTypeKey: the action item type (pdf, html, rem, youtube, etc.)
+// Only renders for PDF/HTML types where a side-by-side document view is useful.
 
 import React from 'react';
 import { DocumentViewer, RemId, renderWidget, usePlugin, useSessionStorageState } from '@remnote/plugin-sdk';
-import { currentIncRemKey, incrementalQueueActiveKey } from '../lib/consts';
+import { currentIncRemKey, incrementalQueueActiveKey, currentIncrementalRemTypeKey } from '../lib/consts';
+
+// Types where showing the document notes sidebar makes sense
+const DOCUMENT_TYPES = new Set(['pdf', 'html', 'pdf-highlight', 'html-highlight']);
 
 function IncremNotesSidebar() {
   const plugin = usePlugin();
 
-  // currentIncRemKey holds the IncRem ID but is NOT cleared during flashcard turns
-  // (QueueComponent simply doesn't mount for regular flashcards).
   const [currentIncRemId] = useSessionStorageState<string | null>(currentIncRemKey, null);
-
-  // incrementalQueueActiveKey is true only while QueueComponent is mounted (IncRem turn),
-  // and false when it unmounts (flashcard turn) or the queue exits.
   const [isQueueActive] = useSessionStorageState<boolean>(incrementalQueueActiveKey, false);
+  const [remType] = useSessionStorageState<string | null>(currentIncrementalRemTypeKey, null);
 
-  // Debug: log both values to understand why the widget doesn't update during flashcard turns
+  // Debug: remove after confirming behavior
   React.useEffect(() => {
-    console.log('[IncremNotesSidebar] currentIncRemId:', currentIncRemId, '| isQueueActive:', isQueueActive);
-  }, [currentIncRemId, isQueueActive]);
+    console.log('[IncremNotesSidebar] currentIncRemId:', currentIncRemId,
+      '| isQueueActive:', isQueueActive, '| remType:', remType);
+  }, [currentIncRemId, isQueueActive, remType]);
 
-  // Only show the DocumentViewer when an IncRem is actively being reviewed.
-  const remId = isQueueActive && currentIncRemId ? currentIncRemId : null;
+  // Only show DocumentViewer when:
+  // 1. QueueComponent is mounted (IncRem turn, not flashcard)
+  // 2. We have an IncRem ID
+  // 3. The current item is a PDF/HTML type (not an extract rem, video, etc.)
+  const isDocumentType = remType != null && DOCUMENT_TYPES.has(remType);
+  const remId = isQueueActive && currentIncRemId && isDocumentType ? currentIncRemId : null;
 
   if (!remId) {
     return (
@@ -45,7 +50,7 @@ function IncremNotesSidebar() {
         }}
       >
         <span style={{ fontSize: '24px' }}>📝</span>
-        <span>No IncRem being reviewed.<br />Click 📝 while reviewing an IncRem to open its notes here.</span>
+        <span>No document being reviewed.<br />Click 📝 while reviewing a PDF to open its notes here.</span>
       </div>
     );
   }
