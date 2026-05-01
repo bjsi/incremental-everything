@@ -50,7 +50,7 @@ function IncremNotesSidebar() {
         }}
       >
         <span style={{ fontSize: '24px' }}>📝</span>
-        <span>No document being reviewed.<br />Click 📝 while reviewing a PDF to open its notes here.</span>
+        <span>No document being reviewed.<br />Click 📝 while reviewing a PDF/HTML to open its notes here.</span>
       </div>
     );
   }
