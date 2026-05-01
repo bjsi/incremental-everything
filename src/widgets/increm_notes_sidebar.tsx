@@ -20,12 +20,6 @@ function IncremNotesSidebar() {
   const [isQueueActive] = useSessionStorageState<boolean>(incrementalQueueActiveKey, false);
   const [remType] = useSessionStorageState<string | null>(currentIncrementalRemTypeKey, null);
 
-  // Debug: remove after confirming behavior
-  React.useEffect(() => {
-    console.log('[IncremNotesSidebar] currentIncRemId:', currentIncRemId,
-      '| isQueueActive:', isQueueActive, '| remType:', remType);
-  }, [currentIncRemId, isQueueActive, remType]);
-
   // Only show DocumentViewer when:
   // 1. QueueComponent is mounted (IncRem turn, not flashcard)
   // 2. We have an IncRem ID
