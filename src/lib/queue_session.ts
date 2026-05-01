@@ -6,6 +6,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from './pdfUtils';
 import { autoFocusQueueDashboardId } from './consts';
+import { isMobileDevice } from './mobileUtils';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
 
 const PRACTICED_QUEUES_HISTORY_KEY = 'practicedQueuesHistory';
@@ -394,12 +395,21 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       // Auto-focus the Practiced Queues dashboard in the right sidebar so the
       // user always has a live session view while reviewing. Opt-in via setting.
       const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
-      if (autoFocus) {
-        try {
-          await plugin.window.openWidgetInRightSidebar('practiced_queues');
-        } catch (err) {
-          console.error('Failed to auto-focus Practiced Queues dashboard:', err);
-        }
+      const isMobile = await isMobileDevice(plugin);
+      if (autoFocus && !isMobile) {
+        const focusDashboard = async () => {
+          try {
+            await plugin.window.openWidgetInRightSidebar('practiced_queues');
+          } catch (err) {
+            console.error('Failed to auto-focus Practiced Queues dashboard:', err);
+          }
+        };
+        // Immediate call: works when the sidebar is already open (just switches tab).
+        // When the sidebar is closed, this opens it — but RemNote also auto-focuses
+        // the AI Tutor tab on QueueEnter when it spawns the sidebar, racing us.
+        // Re-issue after a delay so our focus wins over RemNote's auto-focus.
+        await focusDashboard();
+        setTimeout(focusDashboard, 600);
       }
     } catch (error) {
       console.error('ERROR in QueueSession QueueEnter listener:', error);

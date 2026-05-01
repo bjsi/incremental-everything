@@ -256,7 +256,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: autoFocusQueueDashboardId,
     title: 'Auto focus Queue Dashboard',
     description:
-      'When enabled, opens the Practiced Queues dashboard in the Right Sidebar automatically on Queue Enter so you always have a live view of the current session. Note: PDF IncRems may temporarily steal focus to PDF-related tabs; the dashboard tab stays available for re-selection.',
+      'When enabled, opens the Practiced Queues dashboard in the Right Sidebar automatically on Queue Enter so you always have a live view of the current session. Note: PDF IncRems may temporarily steal focus to PDF-related tabs; the dashboard tab stays available for re-selection. (Does not apply to mobile)',
     defaultValue: false,
   });
 
