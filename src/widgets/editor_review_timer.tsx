@@ -17,7 +17,7 @@ import { findPDFinRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext,
 import { openAndScrollToHighlight } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
-import { startIncRemEngagement, endIncRemEngagement } from '../lib/queue_session';
+import { startIncRemEngagement, endIncRemEngagement, forceSaveSession } from '../lib/queue_session';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
@@ -264,6 +264,9 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-origin', undefined);
     await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
     await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
+
+    // Explicitly end the active session when Ending Review
+    await forceSaveSession(plugin);
 
     // Perform navigation at the very end — only if requested
     if (navigateBack) {

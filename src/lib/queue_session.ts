@@ -29,6 +29,10 @@ const cardStartTimes = new Map<string, number>();
 let incRemEngagementStart: number | null = null;
 let incRemEngagementRemId: string | null = null;
 
+// Track the last closed engagement to prevent unmount/remount races (e.g. extracts) from double-counting
+let lastIncRemEndTs: number | null = null;
+let lastIncRemEndRemId: string | null = null;
+
 // Set by markIncRemTransition() right before a queue→editor handoff. Tells the
 // next startIncRemEngagement(remId) to skip the count++ so a single IncRem
 // reviewed across queue + editor counts as one rep with combined time.
@@ -114,7 +118,8 @@ type IncRemEvent =
   | { type: 'start'; remId: string; ts: number }
   | { type: 'end'; ts: number }
   | { type: 'rep'; remId: string; durationMs: number; ts: number }
-  | { type: 'transition'; remId: string; ts: number };
+  | { type: 'transition'; remId: string; ts: number }
+  | { type: 'force_save'; ts: number };
 
 async function pushIncRemEvent(plugin: RNPlugin, event: IncRemEvent) {
   const log = ((await plugin.storage.getSession<IncRemEvent[]>(INC_REM_EVENT_LOG_KEY)) || []).slice();
@@ -136,6 +141,10 @@ export async function startIncRemEngagement(plugin: RNPlugin, remId: string) {
 
 export async function endIncRemEngagement(plugin: RNPlugin) {
   await pushIncRemEvent(plugin, { type: 'end', ts: Date.now() });
+}
+
+export async function forceSaveSession(plugin: RNPlugin) {
+  await pushIncRemEvent(plugin, { type: 'force_save', ts: Date.now() });
 }
 
 export async function recordIncRemRep(plugin: RNPlugin, remId: string, durationMs: number) {
@@ -169,7 +178,12 @@ async function applyIncRemEngagementStart(
   const isTransition = incRemTransitionFlag === remId;
   incRemTransitionFlag = null;
 
-  if (!isTransition) {
+  const isResumption = 
+    lastIncRemEndRemId === remId && 
+    lastIncRemEndTs !== null && 
+    (startTs - lastIncRemEndTs) < 2000;
+
+  if (!isTransition && !isResumption) {
     currentSession.incRemsCount++;
     await maybeAdoptScopeFromRem(plugin, remId);
   }
@@ -186,6 +200,10 @@ async function applyIncRemEngagementEnd(plugin: RNPlugin, endTs: number) {
   const duration = Math.max(0, endTs - incRemEngagementStart);
   currentSession.incRemsTime += duration;
   currentSession.totalTime += duration;
+
+  lastIncRemEndTs = endTs;
+  lastIncRemEndRemId = incRemEngagementRemId;
+
   incRemEngagementStart = null;
   incRemEngagementRemId = null;
 
@@ -232,6 +250,8 @@ export async function saveCurrentSession(plugin: RNPlugin, _reason: string) {
   cardStartTimes.clear();
   incRemEngagementStart = null;
   incRemEngagementRemId = null;
+  lastIncRemEndTs = null;
+  lastIncRemEndRemId = null;
   incRemTransitionFlag = null;
   clearEditorIdleSave();
   await plugin.storage.setSession(ACTIVE_SESSION_KEY, null);
@@ -357,6 +377,8 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           await applyIncRemRep(plugin, event.remId, event.durationMs);
         } else if (event.type === 'transition') {
           incRemTransitionFlag = event.remId;
+        } else if (event.type === 'force_save') {
+          await saveCurrentSession(plugin, 'Explicit End Review');
         }
       }
     } catch (error) {
@@ -409,6 +431,8 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       cardStartTimes.clear();
       incRemEngagementStart = null;
       incRemEngagementRemId = null;
+      lastIncRemEndTs = null;
+      lastIncRemEndRemId = null;
       incRemTransitionFlag = null;
       clearEditorIdleSave();
 
@@ -491,6 +515,8 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           cardStartTimes.clear();
           incRemEngagementStart = null;
           incRemEngagementRemId = null;
+          lastIncRemEndTs = null;
+          lastIncRemEndRemId = null;
           incRemTransitionFlag = null;
         } catch (err) {
           console.error('ERROR: Failed to lazily initialize practice session', err);
