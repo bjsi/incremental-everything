@@ -260,24 +260,10 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // PDF Bookmark Flow
-  plugin.app.registerWidget('pdf_bookmark_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
-    dimensions: {
-      width: 'auto',
-      height: 'auto',
-    },
-  });
-
-  // Create Incremental Rem Toolbar Button
-  plugin.app.registerWidget('create_inc_rem_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
-    dimensions: {
-      width: 'auto',
-      height: 'auto',
-    },
-  });
-
-  // Toggle Incremental Rem Toolbar Button
-  plugin.app.registerWidget('toggle_incremental_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
+  // Consolidated PDF highlight toolbar: bookmark, create extract, and toggle
+  // incremental — one widget hosts all three icons, so RemNote only spins up a
+  // single plugin iframe per toolbar render instead of three.
+  plugin.app.registerWidget('highlight_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
     dimensions: {
       width: 'auto',
       height: 'auto',
