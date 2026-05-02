@@ -498,11 +498,12 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
         try {
           const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
           const isFinalDrillActive = await plugin.storage.getSession<boolean>('finalDrillActive');
+          const isMobile = await isMobileDevice(plugin);
           currentSession = {
             id: Math.random().toString(36).substring(7),
             startTime: now,
             kbId: kbData._id,
-            scopeName: isFinalDrillActive ? 'Mastery Drill' : 'Restored Mobile Session',
+            scopeName: isFinalDrillActive ? 'Mastery Drill' : (isMobile ? 'Restored Mobile Session' : 'Ad-hoc Session'),
             totalTime: 0,
             flashcardsCount: 0,
             flashcardsTime: 0,
