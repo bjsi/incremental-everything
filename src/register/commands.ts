@@ -353,11 +353,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerCommand({
-    id: 'create-cloze-deletion',
-    name: 'Create Cloze Deletion',
-    keyboardShortcut: 'opt+z',
-    action: async () => {
+  const createClozeDeletion = async (): Promise<PluginRem | undefined> => {
       const selection = await plugin.editor.getSelection();
       if (!selection || selection.type !== SelectionType.Text) return;
       if (selection.range.start === selection.range.end) {
@@ -590,6 +586,25 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       } else {
         await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
       }
+      return clozeRem;
+  };
+
+  plugin.app.registerCommand({
+    id: 'create-cloze-deletion',
+    name: 'Create Cloze Deletion',
+    keyboardShortcut: 'opt+z',
+    action: async () => { await createClozeDeletion(); },
+  });
+
+  plugin.app.registerCommand({
+    id: 'create-cloze-deletion-with-priority',
+    name: 'Create Cloze Deletion with Priority',
+    keyboardShortcut: 'opt+shift+z',
+    action: async () => {
+      const clozeRem = await createClozeDeletion();
+      if (!clozeRem) return;
+      await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+      await plugin.widget.openPopup('priority_light', { remId: clozeRem._id });
     },
   });
 
