@@ -27,6 +27,17 @@ import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { initIncrementalRem } from '../lib/incremental_rem';
 
 
+interface ParentExtractContext {
+    parentRemId: string;
+    parentText: string;
+    parentPriority: number;
+    parentPrioritySource: 'incremental' | 'card-or-inherited';
+    clozeChildCount: number;
+    decrementsApplied: number;
+    stepSize: number;
+    suggestedPriority: number;
+}
+
 function PriorityLight() {
     const plugin = usePlugin();
 
@@ -40,6 +51,9 @@ function PriorityLight() {
         // Use 'any' to bypass strict WidgetLocation constraint for custom popup context
         return await plugin.widget.getWidgetContext<any>();
     }, []);
+
+    const parentExtractContext: ParentExtractContext | undefined =
+        context?.contextData?.parentExtractContext;
 
     // 2. Ultra-Fast Data Fetching (O(1))
     // We only fetch the primitive values needed to render the sliders.
@@ -307,6 +321,45 @@ function PriorityLight() {
                     </span>
                 </div>
             </div>
+
+            {/* Parent extract context — only shown for the "Create Cloze with Priority" flow */}
+            {parentExtractContext && (
+                <div
+                    className="rounded p-2 mb-1 text-xs"
+                    style={{
+                        backgroundColor: 'var(--rn-clr-background-secondary)',
+                        border: '1px solid var(--rn-clr-border-primary)',
+                    }}
+                >
+                    <div className="font-semibold opacity-70 mb-1">From extract</div>
+                    <div
+                        className="opacity-90 mb-1.5 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={parentExtractContext.parentText}
+                    >
+                        {parentExtractContext.parentText || <span className="italic opacity-60">(empty)</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 opacity-80">
+                        <span>
+                            Priority: <strong>{parentExtractContext.parentPriority}</strong>
+                            <span className="opacity-60 ml-0.5">
+                                ({parentExtractContext.parentPrioritySource === 'incremental' ? 'IncRem' : 'card/inherited'})
+                            </span>
+                        </span>
+                        <span>
+                            Existing clozes: <strong>{parentExtractContext.clozeChildCount}</strong>
+                        </span>
+                        <span>
+                            Suggested: <strong>{parentExtractContext.suggestedPriority}</strong>
+                            <span className="opacity-60 ml-0.5">
+                                ({parentExtractContext.parentPriority}
+                                {parentExtractContext.decrementsApplied > 0
+                                    ? ` + ${parentExtractContext.decrementsApplied}×${parentExtractContext.stepSize}`
+                                    : ''})
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            )}
 
             {/* Incremental Rem Section - HIDDEN if not an Incremental Rem */}
             {data.hasIncPowerup && (

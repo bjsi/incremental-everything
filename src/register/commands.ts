@@ -27,7 +27,7 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem, getDescendantsToDepth } from '../lib/pdfUtils';
+import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem, getDescendantsToDepth, getRemCardContent } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
@@ -49,7 +49,8 @@ import {
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
-import { loadCardPriorityCache } from '../lib/card_priority/cache';
+import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
+import { computeClozeAutoPriority, ClozeAutoPriorityInfo } from '../lib/cloze_priority';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 import {
@@ -353,7 +354,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  const createClozeDeletion = async (): Promise<PluginRem | undefined> => {
+  const createClozeDeletion = async (): Promise<{
+    clozeRem: PluginRem;
+    parentRem: PluginRem;
+    autoPriority: ClozeAutoPriorityInfo;
+  } | undefined> => {
       const selection = await plugin.editor.getSelection();
       if (!selection || selection.type !== SelectionType.Text) return;
       if (selection.range.start === selection.range.end) {
@@ -363,6 +368,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       const rem = await plugin.rem.findOne(selection.remId);
       if (!rem) return;
+
+      // Compute auto-priority BEFORE creating the new cloze rem, so the count of existing
+      // cloze-extract children reflects only prior clozes (not the one we're about to create).
+      const autoPriority = await computeClozeAutoPriority(plugin, rem);
 
       const r_start = Math.min(selection.range.start, selection.range.end);
 
@@ -586,7 +595,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       } else {
         await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
       }
-      return clozeRem;
+
+      // Apply the auto-priority computed at the top (before the new cloze existed,
+      // so the existing-cloze count was correct).
+      await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual');
+      await updateCardPriorityCache(plugin, clozeRem._id, true, {
+        remId: clozeRem._id,
+        priority: autoPriority.priority,
+        source: 'manual',
+        cardCount: 1,
+        dueCards: 1,
+      } as any);
+
+      return { clozeRem, parentRem: rem, autoPriority };
   };
 
   plugin.app.registerCommand({
@@ -601,10 +622,28 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Create Cloze Deletion with Priority',
     keyboardShortcut: 'opt+shift+z',
     action: async () => {
-      const clozeRem = await createClozeDeletion();
-      if (!clozeRem) return;
+      const result = await createClozeDeletion();
+      if (!result) return;
+      const { clozeRem, parentRem, autoPriority } = result;
+
+      const parentContent = await getRemCardContent(plugin, parentRem);
+      const parentText = parentContent.front
+        + (parentContent.back ? ` → ${parentContent.back}` : '');
+
       await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
-      await plugin.widget.openPopup('priority_light', { remId: clozeRem._id });
+      await plugin.widget.openPopup('priority_light', {
+        remId: clozeRem._id,
+        parentExtractContext: {
+          parentRemId: parentRem._id,
+          parentText,
+          parentPriority: autoPriority.parentPriority,
+          parentPrioritySource: autoPriority.parentPrioritySource,
+          clozeChildCount: autoPriority.clozeChildCount,
+          decrementsApplied: autoPriority.decrementsApplied,
+          stepSize: autoPriority.stepSize,
+          suggestedPriority: autoPriority.priority,
+        },
+      });
     },
   });
 
