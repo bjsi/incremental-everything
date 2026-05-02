@@ -7,7 +7,7 @@
 // Only renders for PDF/HTML types where a side-by-side document view is useful.
 
 import React from 'react';
-import { DocumentViewer, RemId, renderWidget, usePlugin, useSessionStorageState } from '@remnote/plugin-sdk';
+import { DocumentViewer, RemId, renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import { currentIncRemKey, incrementalQueueActiveKey, currentIncrementalRemTypeKey } from '../lib/consts';
 
 // Types where showing the document notes sidebar makes sense
@@ -16,9 +16,20 @@ const DOCUMENT_TYPES = new Set(['pdf', 'html', 'pdf-highlight', 'html-highlight'
 function IncremNotesSidebar() {
   const plugin = usePlugin();
 
-  const [currentIncRemId] = useSessionStorageState<string | null>(currentIncRemKey, null);
-  const [isQueueActive] = useSessionStorageState<boolean>(incrementalQueueActiveKey, false);
-  const [remType] = useSessionStorageState<string | null>(currentIncrementalRemTypeKey, null);
+  const currentIncRemId = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string>(currentIncRemKey),
+    []
+  );
+  
+  const isQueueActive = useTrackerPlugin(
+    (rp) => rp.storage.getSession<boolean>(incrementalQueueActiveKey),
+    []
+  );
+
+  const remType = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string>(currentIncrementalRemTypeKey),
+    []
+  );
 
   // Only show DocumentViewer when:
   // 1. QueueComponent is mounted (IncRem turn, not flashcard)
@@ -26,6 +37,14 @@ function IncremNotesSidebar() {
   // 3. The current item is a PDF/HTML type (not an extract rem, video, etc.)
   const isDocumentType = remType != null && DOCUMENT_TYPES.has(remType);
   const remId = isQueueActive && currentIncRemId && isDocumentType ? currentIncRemId : null;
+
+  console.log("IncremNotesSidebar state:", { 
+    currentIncRemId, 
+    isQueueActive, 
+    remType, 
+    isDocumentType, 
+    remId 
+  });
 
   if (!remId) {
     return (
