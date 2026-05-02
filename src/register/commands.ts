@@ -639,6 +639,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           parentPriority: autoPriority.parentPriority,
           parentPrioritySource: autoPriority.parentPrioritySource,
           clozeChildCount: autoPriority.clozeChildCount,
+          parentOwnCardCount: autoPriority.parentOwnCardCount,
+          totalExistingCount: autoPriority.totalExistingCount,
           decrementsApplied: autoPriority.decrementsApplied,
           stepSize: autoPriority.stepSize,
           suggestedPriority: autoPriority.priority,

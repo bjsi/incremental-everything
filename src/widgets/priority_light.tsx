@@ -33,6 +33,8 @@ interface ParentExtractContext {
     parentPriority: number;
     parentPrioritySource: 'incremental' | 'card-or-inherited';
     clozeChildCount: number;
+    parentOwnCardCount: number;
+    totalExistingCount: number;
     decrementsApplied: number;
     stepSize: number;
     suggestedPriority: number;
@@ -346,7 +348,12 @@ function PriorityLight() {
                             </span>
                         </span>
                         <span>
-                            Existing clozes: <strong>{parentExtractContext.clozeChildCount}</strong>
+                            Existing clozes/cards: <strong>{parentExtractContext.totalExistingCount}</strong>
+                            {parentExtractContext.parentOwnCardCount > 0 && (
+                                <span className="opacity-60 ml-0.5">
+                                    ({parentExtractContext.clozeChildCount} child + {parentExtractContext.parentOwnCardCount} in extract)
+                                </span>
+                            )}
                         </span>
                         <span>
                             Suggested: <strong>{parentExtractContext.suggestedPriority}</strong>
