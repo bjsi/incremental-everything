@@ -134,6 +134,24 @@ export async function registerClozeExtractCSS(plugin: ReactRNPlugin) {
       z-index: 100;
       pointer-events: none;
     }
+
+    /* Editor: Make cloze-extract rems less conspicuous */
+    .rn-editor [data-rem-tags~="clozeextract"] .rem-text,
+    .rn-editor [data-rem-tags~="cloze-extract"] .rem-text {
+      opacity: 0.5;
+      filter: grayscale(40%);
+      zoom: 0.8;
+      transition: all 0.2s ease-in-out;
+    }
+
+    /* Reveal full opacity when focused/hovered for readability */
+    .rn-editor [data-rem-tags~="clozeextract"]:focus-within .rem-text,
+    .rn-editor [data-rem-tags~="cloze-extract"]:focus-within .rem-text,
+    .rn-editor [data-rem-tags~="clozeextract"]:hover .rem-text,
+    .rn-editor [data-rem-tags~="cloze-extract"]:hover .rem-text {
+      opacity: 1;
+      filter: grayscale(0%);
+    }
   `;
   await plugin.app.registerCSS('cloze-extract-badge', css);
 }
