@@ -388,7 +388,9 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async (data: any) => {
     try {
+      console.warn(`[QueueEnter DEBUG] fired at ${Date.now()}, subQueueId=${data?.subQueueId}, hasCurrentSession=${!!currentSession}`);
       if (currentSession) {
+        console.warn(`[QueueEnter DEBUG] saving previous session (scope=${currentSession.scopeName}, fc=${currentSession.flashcardsCount}, ir=${currentSession.incRemsCount})`);
         await saveCurrentSession(plugin, 'QueueEnter Overwrite');
       }
 
@@ -427,6 +429,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
         currentCardFirstRep: undefined,
       };
 
+      console.warn(`[QueueEnter DEBUG] new session created, scopeName=${scopeName}`);
       await syncLiveSession(plugin);
       cardStartTimes.clear();
       incRemEngagementStart = null;
@@ -438,9 +441,13 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
       // Auto-focus the Practiced Queues dashboard in the right sidebar so the
       // user always has a live session view while reviewing. Opt-in via setting.
+      // Skip when triggered from the Mastery Drill: opening the right sidebar
+      // resizes the popup which re-mounts the embedded Queue, fires QueueEnter
+      // again, and creates a resize loop.
       const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
       const isMobile = await isMobileDevice(plugin);
-      if (autoFocus && !isMobile) {
+      const isMasteryDrill = scopeName === 'Mastery Drill';
+      if (autoFocus && !isMobile && !isMasteryDrill) {
         const focusDashboard = async () => {
           try {
             await plugin.window.openWidgetInRightSidebar('practiced_queues');
