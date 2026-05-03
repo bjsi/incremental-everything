@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+    QueueInteractionScore,
     RemHierarchyEditorTree,
     RemId,
     RemViewer,
@@ -23,6 +24,7 @@ export interface FlashcardHistoryData {
     kbId?: string;
     text?: string;
     _v?: number;
+    score?: QueueInteractionScore;
 }
 
 function FlashcardHistory() {
@@ -34,6 +36,7 @@ function FlashcardHistory() {
 
     const [filteredData, setFilteredData] = useState<FlashcardHistoryData[]>([]);
     const [searchText, setSearchText] = useState("");
+    const [filterScore, setFilterScore] = useState<QueueInteractionScore | "ALL">("ALL");
 
     // Backfill text for legacy entries lacking it
     useEffect(() => {
@@ -93,6 +96,10 @@ function FlashcardHistory() {
                 return item.kbId === currentKbId;
             });
 
+            if (filterScore !== "ALL") {
+                filtered = filtered.filter(item => item.score === filterScore);
+            }
+
             if (searchText.trim().length > 0) {
                 const lowerSearch = searchText.toLowerCase();
                 const tokens = lowerSearch.split(/\s+/).filter(t => t.length > 0);
@@ -119,7 +126,7 @@ function FlashcardHistory() {
             setFilteredData(filtered);
         }
         filterData();
-    }, [historyDataRaw, plugin, searchText]);
+    }, [historyDataRaw, plugin, searchText, filterScore]);
 
     const closeIndex = (itemKey: number) => {
         const originalIndex = historyDataRaw.findIndex(x => x.key === itemKey);
@@ -163,6 +170,23 @@ function FlashcardHistory() {
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
                 />
+                <div className="flex flex-wrap gap-4 mt-2 text-sm rn-clr-content-primary">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterScore === "ALL"} onChange={() => setFilterScore("ALL")} /> All
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterScore === QueueInteractionScore.AGAIN} onChange={() => setFilterScore(QueueInteractionScore.AGAIN)} /> Again
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterScore === QueueInteractionScore.HARD} onChange={() => setFilterScore(QueueInteractionScore.HARD)} /> Hard
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterScore === QueueInteractionScore.GOOD} onChange={() => setFilterScore(QueueInteractionScore.GOOD)} /> Good
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterScore === QueueInteractionScore.EASY} onChange={() => setFilterScore(QueueInteractionScore.EASY)} /> Easy
+                    </label>
+                </div>
             </div>
             {filteredData.length === 0 && (
                 <div className="p-2 rn-clr-content-primary">
@@ -187,6 +211,57 @@ function FlashcardHistory() {
                 </div>
             )}
         </div>
+    );
+}
+
+function RatingBadge({ score }: { score?: QueueInteractionScore }) {
+    if (score === undefined) return null;
+    
+    let label = 'Unknown';
+    let bgColor = 'rgba(156,163,175,0.15)';
+    let color = '#9ca3af';
+
+    switch (score) {
+        case QueueInteractionScore.AGAIN:
+            label = 'Again';
+            bgColor = 'rgba(239,68,68,0.15)'; // red
+            color = '#ef4444';
+            break;
+        case QueueInteractionScore.HARD:
+            label = 'Hard';
+            bgColor = 'rgba(249,115,22,0.15)'; // orange
+            color = '#f97316';
+            break;
+        case QueueInteractionScore.GOOD:
+            label = 'Good';
+            bgColor = 'rgba(16,185,129,0.15)'; // green
+            color = '#10b981';
+            break;
+        case QueueInteractionScore.EASY:
+            label = 'Easy';
+            bgColor = 'rgba(59,130,246,0.15)'; // blue
+            color = '#3b82f6';
+            break;
+    }
+
+    return (
+        <span
+            style={{
+                display: 'inline-block',
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                padding: '1px 5px',
+                borderRadius: 3,
+                backgroundColor: bgColor,
+                color: color,
+                flexShrink: 0,
+                alignSelf: 'center',
+            }}
+        >
+            {label}
+        </span>
     );
 }
 
@@ -228,6 +303,11 @@ function HistoryItem({
                     />
                 </div>
                 <div className="flex-grow min-w-0" onClick={() => openRem(remId)}>
+                    {data.score !== undefined && (
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                            <RatingBadge score={data.score} />
+                        </div>
+                    )}
                     <RemViewer
                         remId={remId}
                         width="100%"

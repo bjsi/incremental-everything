@@ -586,6 +586,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
                 kbId: currentKbId,
                 text,
                 _v: 1,
+                score,
               },
               ...deduped.slice(0, 999),
             ]);
@@ -761,6 +762,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                       kbId: currentKbId,
                       text,
                       _v: 1,
+                      score,
                     },
                     ...deduped.slice(0, 999),
                   ]);
