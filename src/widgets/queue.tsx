@@ -20,6 +20,7 @@ import {
   activeHighlightIdKey,
   showRemsAsIsolatedInQueueId,
   powerupCode,
+  currentHostDocumentIdKey,
 } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -89,9 +90,21 @@ export function QueueComponent() {
       : null;
     plugin.storage.setSession(activeHighlightIdKey, activeHighlight);
 
+    // Publish the host document ID (PDF/HTML source Rem) so the notes sidebar
+    // can discover related IncRems for highlight types.
+    const hostDocId = (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight'
+      || remAndType?.type === 'pdf' || remAndType?.type === 'html')
+      ? remAndType.rem._id
+      : null;
+    plugin.storage.setSession(currentHostDocumentIdKey, hostDocId);
+
     if (remAndType === null) {
       plugin.queue.removeCurrentCardFromQueue(false);
     }
+
+    return () => {
+      plugin.storage.setSession(currentHostDocumentIdKey, null);
+    };
   }, [ctx?.remId, remAndType, plugin]);
 
   const shouldRenderEditorForRemType = useRunAsync(async () => {
