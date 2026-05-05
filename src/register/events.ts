@@ -17,6 +17,7 @@ import {
   dismissedPowerupCode,
   repHistorySlotCode,
   incrementalQueueActiveKey,
+  currentIncrementalRemTypeKey,
   displayWeightedShieldId,
 } from '../lib/consts';
 import {
@@ -146,6 +147,7 @@ export function registerQueueExitListener(
     // Safety net: always clear the incremental queue flag on exit.
     // The QueueComponent's useEffect cleanup may not fire if its iframe is destroyed abruptly.
     await plugin.storage.setSession(incrementalQueueActiveKey, false);
+    await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
 
     await flushCacheUpdatesNow(plugin);
     console.log('QueueExit triggered, subQueueId:', subQueueId);
@@ -286,6 +288,7 @@ export function registerQueueEnterListener(
     // Safety net: clear stale incremental queue flag from a previous session
     // whose iframe cleanup may not have fired.
     await plugin.storage.setSession(incrementalQueueActiveKey, false);
+    await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
 
     resetSessionItemCounter();
     await clearSeenItems(plugin);

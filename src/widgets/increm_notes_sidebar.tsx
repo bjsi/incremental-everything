@@ -62,14 +62,21 @@ function IncremNotesSidebar() {
   const isDocumentType = remType != null && DOCUMENT_TYPES.has(remType);
   const isHighlightType = remType != null && HIGHLIGHT_TYPES.has(remType);
 
+  // Whether we have a valid document review happening.
+  // NOTE: we intentionally do NOT gate on isQueueActive here.
+  // incrementalQueueActiveKey is unreliable — callbacks.ts sets it false on flashcard
+  // turns and the write races with QueueComponent's mount effect. Instead, the presence
+  // of currentIncRemId + a document remType is sufficient evidence.
+  const hasActiveDocument = !!currentIncRemId && isDocumentType;
+
   // For non-highlight types, use currentIncRemId directly
-  const directRemId = isQueueActive && currentIncRemId && isDocumentType && !isHighlightType
+  const directRemId = hasActiveDocument && !isHighlightType
     ? currentIncRemId
     : null;
 
   // For highlights, discover IncRems associated with the host document
   useEffect(() => {
-    if (!isQueueActive || !isHighlightType || !hostDocId) {
+    if (!hasActiveDocument || !isHighlightType || !hostDocId) {
       setDiscoveredRems([]);
       setSelectedRemId(null);
       return;
@@ -108,7 +115,7 @@ function IncremNotesSidebar() {
     discover();
 
     return () => { cancelled = true; };
-  }, [isQueueActive, isHighlightType, hostDocId, plugin]);
+  }, [hasActiveDocument, isHighlightType, hostDocId, plugin]);
 
   // Reset selection when the host doc changes
   useEffect(() => {
@@ -126,21 +133,37 @@ function IncremNotesSidebar() {
   // Determine which remId to show in the DocumentViewer
   const viewerRemId = directRemId || selectedRemId;
 
-  console.log("IncremNotesSidebar state:", {
+  // Debug: log every render with all signal values
+  console.log("[IncremNotesSidebar] render:", {
     currentIncRemId,
     isQueueActive,
     remType,
     hostDocId,
     isDocumentType,
     isHighlightType,
+    hasActiveDocument,
     directRemId,
     selectedRemId,
     discoveredRems: discoveredRems.length,
     viewerRemId,
   });
 
+  // Debug: track individual signal changes to detect stuck/stale values
+  useEffect(() => {
+    console.log("[IncremNotesSidebar] ⚡ currentIncRemId changed:", currentIncRemId);
+  }, [currentIncRemId]);
+  useEffect(() => {
+    console.log("[IncremNotesSidebar] ⚡ isQueueActive changed:", isQueueActive);
+  }, [isQueueActive]);
+  useEffect(() => {
+    console.log("[IncremNotesSidebar] ⚡ remType changed:", remType);
+  }, [remType]);
+  useEffect(() => {
+    console.log("[IncremNotesSidebar] ⚡ hostDocId changed:", hostDocId);
+  }, [hostDocId]);
+
   // --- Empty state: no document being reviewed ---
-  if (!isQueueActive || !isDocumentType) {
+  if (!hasActiveDocument) {
     return (
       <div style={emptyStateStyle}>
         <span style={{ fontSize: '24px' }}>📝</span>

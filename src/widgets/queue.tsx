@@ -45,8 +45,18 @@ export function QueueComponent() {
     async (rp) => {
       if (!ctx?.remId) return undefined;
       const rem = await rp.rem.findOne(ctx.remId);
-      if (!rem) return null;
-      return await remToActionItemType(rp, rem);
+      if (!rem) {
+        console.log('[QueueComponent] remAndType: rem not found for', ctx.remId);
+        return null;
+      }
+      const result = await remToActionItemType(rp, rem);
+      console.log('[QueueComponent] remAndType resolved:', {
+        ctxRemId: ctx.remId,
+        type: result?.type,
+        remId: result?.rem?._id,
+        hasExtract: !!(result as any)?.extract,
+      });
+      return result;
     },
     [ctx?.remId]
   );
@@ -82,28 +92,40 @@ export function QueueComponent() {
     const incrementalRemId = ctx?.remId;
     setCurrentIncrementalRem(plugin, incrementalRemId);
 
-    plugin.storage.setSession(currentIncrementalRemTypeKey, remAndType?.type);
+    const resolvedType = remAndType?.type;
+    plugin.storage.setSession(currentIncrementalRemTypeKey, resolvedType);
 
     // For highlights, we still need to identify the specific extract.
-    const activeHighlight = (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight')
+    const activeHighlight = (resolvedType === 'pdf-highlight' || resolvedType === 'html-highlight')
       ? (remAndType as any).extract?._id
       : null;
     plugin.storage.setSession(activeHighlightIdKey, activeHighlight);
 
     // Publish the host document ID (PDF/HTML source Rem) so the notes sidebar
     // can discover related IncRems for highlight types.
-    const hostDocId = (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight'
-      || remAndType?.type === 'pdf' || remAndType?.type === 'html')
-      ? remAndType.rem._id
+    const hostDocId = (resolvedType === 'pdf-highlight' || resolvedType === 'html-highlight'
+      || resolvedType === 'pdf' || resolvedType === 'html')
+      ? remAndType!.rem._id
       : null;
     plugin.storage.setSession(currentHostDocumentIdKey, hostDocId);
+
+    console.log('[QueueComponent] useEffect publishing session signals:', {
+      incrementalRemId,
+      resolvedType,
+      activeHighlight,
+      hostDocId,
+      remAndTypeIsNull: remAndType === null,
+      remAndTypeIsUndefined: remAndType === undefined,
+    });
 
     if (remAndType === null) {
       plugin.queue.removeCurrentCardFromQueue(false);
     }
 
     return () => {
+      console.log('[QueueComponent] useEffect CLEANUP - clearing hostDocId + remType');
       plugin.storage.setSession(currentHostDocumentIdKey, null);
+      plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
     };
   }, [ctx?.remId, remAndType, plugin]);
 
