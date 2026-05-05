@@ -8,8 +8,8 @@ import { safeRemTextToString } from './pdfUtils';
 import { autoFocusQueueDashboardId } from './consts';
 import { isMobileDevice } from './mobileUtils';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
+import { PRACTICED_QUEUES_HISTORY_KEY, rollOverOldSessions } from './queue_aggregates';
 
-const PRACTICED_QUEUES_HISTORY_KEY = 'practicedQueuesHistory';
 const ACTIVE_SESSION_KEY = 'activeQueueSession';
 const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
 const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
@@ -39,6 +39,28 @@ let lastIncRemEndRemId: string | null = null;
 let incRemTransitionFlag: string | null = null;
 
 let editorIncRemIdleTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Single-flight guard: rollover walks synced storage and rewrites two keys.
+// Concurrent runs would race on the read/write cycle and could double-bucket
+// the same sessions. Skip if one is already in-flight; the next save (or the
+// next register pass) will pick up anything missed.
+let isRollingOver = false;
+async function maybeRollOver(plugin: RNPlugin) {
+  if (isRollingOver) return;
+  isRollingOver = true;
+  try {
+    const result = await rollOverOldSessions(plugin);
+    if (result.rolled > 0 || result.removedNulls > 0) {
+      console.log(
+        `[QueueSession] Rolled over ${result.rolled} old sessions; pruned ${result.removedNulls} null entries.`
+      );
+    }
+  } catch (err) {
+    console.error('[QueueSession] Rollover failed:', err);
+  } finally {
+    isRollingOver = false;
+  }
+}
 
 async function syncLiveSession(plugin: RNPlugin) {
   await plugin.storage.setSession(ACTIVE_SESSION_KEY, currentSession);
@@ -243,7 +265,11 @@ export async function saveCurrentSession(plugin: RNPlugin, _reason: string) {
   if (currentSession.flashcardsCount > 0 || currentSession.incRemsCount > 0) {
     const history =
       ((await plugin.storage.getSynced(PRACTICED_QUEUES_HISTORY_KEY)) as PracticedQueueSession[]) || [];
-    await plugin.storage.setSynced(PRACTICED_QUEUES_HISTORY_KEY, [currentSession, ...history]);
+    const validHistory = history.filter((s): s is PracticedQueueSession => !!s);
+    await plugin.storage.setSynced(PRACTICED_QUEUES_HISTORY_KEY, [currentSession, ...validHistory]);
+    // Fire-and-forget: keeps the raw window bounded by rolling older sessions
+    // into daily aggregates. Single-flight guard inside.
+    maybeRollOver(plugin);
   }
 
   currentSession = null;
@@ -302,6 +328,11 @@ async function loadCardStats(
 }
 
 export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
+  // One-shot startup migration / rollover: covers users who installed this
+  // build but haven't reviewed yet. Fire-and-forget; widget reads will pick
+  // up the new state via useSyncedStorageState reactivity.
+  maybeRollOver(plugin);
+
   // Heartbeat monitor: auto-save Mastery Drill session if the popup is closed without QueueExit
   setInterval(async () => {
     if (currentSession && currentSession.scopeName === 'Mastery Drill') {

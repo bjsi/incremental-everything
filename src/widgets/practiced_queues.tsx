@@ -9,6 +9,18 @@ import {
 import '../style.css';
 import '../App.css';
 import { timeSince } from "../lib/utils";
+import {
+    DAILY_AGGREGATES_KEY,
+    DailyAggregate,
+    PeriodStats,
+    aggregatePeriodStats,
+    bucketSession,
+    filterAggregatesForKb,
+    getAggregatedIdsSet,
+    getLocalDateKey,
+    rawCutoffDateKey,
+    totalAggregatedSessionCount,
+} from "../lib/queue_aggregates";
 
 export interface PracticedQueueSession {
     id: string;
@@ -41,7 +53,6 @@ export interface PracticedQueueSession {
 
 interface AggregatedStats {
     label: string;
-    sessions: PracticedQueueSession[];
     totalTime: number;
     cardsCount: number;
     cardsTime: number;
@@ -92,43 +103,37 @@ function getStartOfYear(date: Date) {
     return newDate.getTime();
 }
 
-function calculateStats(sessions: PracticedQueueSession[], label: string): AggregatedStats {
-    let totalTime = 0;
-    let cardsCount = 0;
-    let cardsTime = 0;
-    let incRemsCount = 0;
-    let incRemsTime = 0;
-    let totalForgot = 0;
-
-    sessions.forEach(s => {
-        totalTime += s.totalTime || 0;
-        cardsCount += s.flashcardsCount || 0;
-        cardsTime += s.flashcardsTime || 0;
-        incRemsCount += s.incRemsCount || 0;
-        incRemsTime += s.incRemsTime || 0;
-        totalForgot += s.againCount || 0;
-    });
-
-    const totalRemembered = Math.max(0, cardsCount - totalForgot);
-    const retentionRate = cardsCount > 0 ? (totalRemembered / cardsCount) * 100 : 0;
-
-    const cardsTimeMin = cardsTime / 1000 / 60;
-    const avgSpeed = cardsTimeMin > 0 ? cardsCount / cardsTimeMin : 0;
-
+function buildRow(
+    label: string,
+    rawSessions: PracticedQueueSession[],
+    aggregates: DailyAggregate[],
+    startMs: number,
+    endMs?: number
+): AggregatedStats {
+    const s: PeriodStats = aggregatePeriodStats(rawSessions, aggregates, startMs, endMs);
+    const remembered = Math.max(0, s.cardsCount - s.forgotCount);
+    const retentionRate = s.cardsCount > 0 ? (remembered / s.cardsCount) * 100 : 0;
+    const cardsTimeMin = s.cardsTime / 1000 / 60;
+    const avgSpeed = cardsTimeMin > 0 ? s.cardsCount / cardsTimeMin : 0;
     return {
         label,
-        sessions,
-        totalTime,
-        cardsCount,
-        cardsTime,
-        incRemsCount,
-        incRemsTime,
+        totalTime: s.totalTime,
+        cardsCount: s.cardsCount,
+        cardsTime: s.cardsTime,
+        incRemsCount: s.incRemsCount,
+        incRemsTime: s.incRemsTime,
         retentionRate,
-        avgSpeed
+        avgSpeed,
     };
 }
 
-function SummaryTable({ allSessions }: { allSessions: PracticedQueueSession[] }) {
+function SummaryTable({
+    allSessions,
+    allAggregates,
+}: {
+    allSessions: PracticedQueueSession[];
+    allAggregates: DailyAggregate[];
+}) {
     const stats = useMemo(() => {
         const now = new Date();
         const startOfToday = getStartOfDay(now);
@@ -146,27 +151,18 @@ function SummaryTable({ allSessions }: { allSessions: PracticedQueueSession[] })
         lastYearDate.setFullYear(lastYearDate.getFullYear() - 1);
         const startOfLastYear = getStartOfYear(lastYearDate);
 
-        const today = allSessions.filter(s => s.startTime >= startOfToday);
-        const yesterday = allSessions.filter(s => s.startTime >= startOfYesterday && s.startTime < startOfToday);
-        const thisWeek = allSessions.filter(s => s.startTime >= startOfWeek);
-        const lastWeek = allSessions.filter(s => s.startTime >= startOfLastWeek && s.startTime < startOfWeek);
-        const thisMonth = allSessions.filter(s => s.startTime >= startOfMonth);
-        const lastMonth = allSessions.filter(s => s.startTime >= startOfLastMonth && s.startTime < startOfMonth);
-        const thisYear = allSessions.filter(s => s.startTime >= startOfYear);
-        const lastYear = allSessions.filter(s => s.startTime >= startOfLastYear && s.startTime < startOfYear);
-
         return [
-            calculateStats(today, "Today"),
-            calculateStats(yesterday, "Yesterday"),
-            calculateStats(thisWeek, "This Week"),
-            calculateStats(lastWeek, "Last Week"),
-            calculateStats(thisMonth, "This Month"),
-            calculateStats(lastMonth, "Last Month"),
-            calculateStats(thisYear, "This Year"),
-            calculateStats(lastYear, "Last Year"),
-            calculateStats(allSessions, "Ever"),
+            buildRow("Today", allSessions, allAggregates, startOfToday),
+            buildRow("Yesterday", allSessions, allAggregates, startOfYesterday, startOfToday),
+            buildRow("This Week", allSessions, allAggregates, startOfWeek),
+            buildRow("Last Week", allSessions, allAggregates, startOfLastWeek, startOfWeek),
+            buildRow("This Month", allSessions, allAggregates, startOfMonth),
+            buildRow("Last Month", allSessions, allAggregates, startOfLastMonth, startOfMonth),
+            buildRow("This Year", allSessions, allAggregates, startOfYear),
+            buildRow("Last Year", allSessions, allAggregates, startOfLastYear, startOfYear),
+            buildRow("Ever", allSessions, allAggregates, 0),
         ];
-    }, [allSessions]);
+    }, [allSessions, allAggregates]);
 
     return (
         <div className="mb-6 overflow-x-auto">
@@ -233,24 +229,46 @@ function PracticedQueues() {
         "practicedQueuesHistory",
         []
     );
+    const [aggregatesRaw, setAggregates] = useSyncedStorageState<DailyAggregate[]>(
+        DAILY_AGGREGATES_KEY,
+        []
+    );
     const [activeSession] = useSessionStorageState<PracticedQueueSession | null>("activeQueueSession", null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const [filteredData, setFilteredData] = useState<PracticedQueueSession[]>([]);
+    const [currentKbId, setCurrentKbId] = useState<string | null>(null);
 
     useEffect(() => {
-        async function filterData() {
-            const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
-            const currentKbId = currentKb._id;
+        let cancelled = false;
+        plugin.kb.getCurrentKnowledgeBaseData().then((kb) => {
+            if (!cancelled) setCurrentKbId(kb._id);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [plugin]);
 
-            const filtered = historyRaw.filter((item) => {
-                if (!item.kbId) return true;
-                return item.kbId === currentKbId;
-            });
-            setFilteredData(filtered);
-        }
-        filterData();
-    }, [historyRaw, plugin]);
+    // Defensive: skip null entries (synced storage can leave nulls when a
+    // partial write hits the storage quota — see queue_aggregates rollover).
+    const filteredData = useMemo(() => {
+        if (!currentKbId) return [];
+        return historyRaw.filter((item) => {
+            if (!item) return false;
+            if (!item.kbId) return true;
+            return item.kbId === currentKbId;
+        });
+    }, [historyRaw, currentKbId]);
+
+    const filteredAggregates = useMemo(() => {
+        if (!currentKbId) return [];
+        return filterAggregatesForKb(aggregatesRaw, currentKbId);
+    }, [aggregatesRaw, currentKbId]);
+
+    const totalAllKbsCount = useMemo(() => {
+        const rawCount = (historyRaw || []).filter(Boolean).length;
+        const bucketCount = totalAggregatedSessionCount(aggregatesRaw);
+        return rawCount + bucketCount;
+    }, [historyRaw, aggregatesRaw]);
 
     const [numLoaded, setNumLoaded] = React.useState(1);
 
@@ -264,19 +282,20 @@ function PracticedQueues() {
     );
 
     const deleteItem = (id: string) => {
-        const idx = historyRaw.findIndex(x => x.id === id);
-        if (idx !== -1) {
-            historyRaw.splice(idx, 1);
-            setHistory([...historyRaw]);
+        const next = historyRaw.filter((x) => x && x.id !== id);
+        if (next.length !== historyRaw.length) {
+            setHistory(next);
         }
     };
 
     const handleExport = useCallback(() => {
         const envelope = {
-            version: 1,
+            version: 2,
             exportedAt: new Date().toISOString(),
-            count: historyRaw.length,
-            sessions: historyRaw,
+            sessionCount: (historyRaw || []).filter(Boolean).length,
+            aggregatedCount: totalAggregatedSessionCount(aggregatesRaw),
+            sessions: (historyRaw || []).filter(Boolean),
+            dailyAggregates: aggregatesRaw || [],
         };
         const json = JSON.stringify(envelope, null, 2);
         const blob = new Blob([json], { type: "application/json" });
@@ -289,8 +308,9 @@ function PracticedQueues() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        plugin.app.toast(`Exported ${historyRaw.length} sessions`);
-    }, [historyRaw, plugin]);
+        const total = envelope.sessionCount + envelope.aggregatedCount;
+        plugin.app.toast(`Exported ${total} sessions (${envelope.sessionCount} raw, ${envelope.aggregatedCount} aggregated)`);
+    }, [historyRaw, aggregatesRaw, plugin]);
 
     const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -317,23 +337,108 @@ function PracticedQueues() {
                     return;
                 }
 
-                const existingIds = new Set(historyRaw.map(s => s.id));
-                const newSessions = valid.filter(s => !existingIds.has(s.id));
+                const localAggregates = aggregatesRaw || [];
+                const localAggregatedIds = getAggregatedIdsSet(localAggregates);
+                const localRawIds = new Set(
+                    (historyRaw || []).filter(Boolean).map((s) => s.id)
+                );
+
+                const newSessions = valid.filter(
+                    (s) => !localRawIds.has(s.id) && !localAggregatedIds.has(s.id)
+                );
                 const duplicateCount = valid.length - newSessions.length;
 
-                if (newSessions.length === 0) {
-                    plugin.app.toast(`All ${duplicateCount} sessions already exist. Nothing imported.`);
+                // Split incoming into recent (raw window) vs old (bucket).
+                const cutoffKey = rawCutoffDateKey();
+                const recentNew: PracticedQueueSession[] = [];
+                const oldNew: PracticedQueueSession[] = [];
+                for (const s of newSessions) {
+                    if (getLocalDateKey(s.startTime) >= cutoffKey) recentNew.push(s);
+                    else oldNew.push(s);
+                }
+
+                // Optionally seed local aggregates from a v2 backup, but only
+                // when the local aggregate set is empty — merging two
+                // independent aggregate snapshots without per-bucket id lists
+                // would risk double-counting. v2 backups carry ids in each
+                // bucket so a fresh restore is fully accurate.
+                let aggregatesAfterImport = localAggregates;
+                let seededFromFile = 0;
+                if (
+                    data.version === 2 &&
+                    Array.isArray(data.dailyAggregates) &&
+                    localAggregates.length === 0
+                ) {
+                    aggregatesAfterImport = (data.dailyAggregates as DailyAggregate[]).filter(
+                        (b): b is DailyAggregate => !!b && Array.isArray(b.ids)
+                    );
+                    seededFromFile = totalAggregatedSessionCount(aggregatesAfterImport);
+                }
+
+                // Now bucket the import's old sessions (those not already covered
+                // by the seeded buckets). We deep-clone to avoid mutating the
+                // hook-returned reference.
+                let bucketedFromImport = 0;
+                if (oldNew.length > 0) {
+                    aggregatesAfterImport = aggregatesAfterImport.map((a) => ({
+                        ...a,
+                        ids: [...(a.ids || [])],
+                    }));
+                    const idsSet = getAggregatedIdsSet(aggregatesAfterImport);
+                    for (const s of oldNew) {
+                        if (bucketSession(aggregatesAfterImport, s, idsSet)) bucketedFromImport++;
+                    }
+                }
+
+                if (
+                    recentNew.length === 0 &&
+                    bucketedFromImport === 0 &&
+                    seededFromFile === 0
+                ) {
+                    plugin.app.toast(
+                        `All ${duplicateCount} sessions already exist. Nothing imported.`
+                    );
                     return;
                 }
 
-                const merged = [...historyRaw, ...newSessions].sort(
-                    (a, b) => b.startTime - a.startTime
-                );
-                setHistory(merged);
-                plugin.app.toast(
-                    `Imported ${newSessions.length} new sessions` +
-                    (duplicateCount > 0 ? ` (${duplicateCount} duplicates skipped)` : "")
-                );
+                if (
+                    aggregatesAfterImport !== localAggregates ||
+                    bucketedFromImport > 0 ||
+                    seededFromFile > 0
+                ) {
+                    setAggregates(aggregatesAfterImport);
+                }
+
+                if (recentNew.length > 0) {
+                    const mergedHistory = [
+                        ...((historyRaw || []).filter(Boolean) as PracticedQueueSession[]),
+                        ...recentNew,
+                    ].sort((a, b) => b.startTime - a.startTime);
+                    setHistory(mergedHistory);
+                }
+
+                const importedTotal =
+                    recentNew.length + bucketedFromImport + seededFromFile;
+                let msg = `Imported ${importedTotal} session${importedTotal === 1 ? "" : "s"}`;
+                const parts: string[] = [];
+                if (recentNew.length > 0) parts.push(`${recentNew.length} recent`);
+                if (bucketedFromImport > 0)
+                    parts.push(`${bucketedFromImport} aggregated`);
+                if (seededFromFile > 0)
+                    parts.push(`${seededFromFile} from backup aggregates`);
+                if (parts.length > 0) msg += ` (${parts.join(", ")})`;
+                if (duplicateCount > 0)
+                    msg += ` — ${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"} skipped`;
+                if (
+                    data.version === 2 &&
+                    Array.isArray(data.dailyAggregates) &&
+                    localAggregates.length > 0 &&
+                    seededFromFile === 0
+                ) {
+                    msg +=
+                        ". Backup's historical aggregates were skipped — local aggregates already exist.";
+                }
+                plugin.app.toast(msg);
             } catch (err) {
                 plugin.app.toast("Failed to parse backup file. Is it valid JSON?");
                 console.error("Import error:", err);
@@ -342,7 +447,7 @@ function PracticedQueues() {
         reader.readAsText(file);
 
         e.target.value = "";
-    }, [historyRaw, setHistory, plugin]);
+    }, [historyRaw, aggregatesRaw, setHistory, setAggregates, plugin]);
 
     useEffect(() => {
         plugin.event.addListener(
@@ -380,7 +485,7 @@ function PracticedQueues() {
                     </div>
                 )}
 
-                <SummaryTable allSessions={filteredData} />
+                <SummaryTable allSessions={filteredData} allAggregates={filteredAggregates} />
 
                 <div className="flex items-center gap-2 mb-4">
                     <button
@@ -411,7 +516,7 @@ function PracticedQueues() {
                         className="hidden"
                     />
                     <span className="text-[10px] rn-clr-content-tertiary ml-1">
-                        {historyRaw.length} sessions total (all KBs)
+                        {totalAllKbsCount} sessions total (all KBs)
                     </span>
                 </div>
 
