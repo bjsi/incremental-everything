@@ -630,8 +630,17 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
       if (currentSession && cardId) {
         // Prefer the QueueLoadCard-recorded start time (more accurate for anchor / first card);
-        // fall back to the widget-recorded sibling load time for subsequent siblings.
-        const startTime = cardStartTimes.get(effectiveCardId) ?? clusterLoadTime;
+        // fall back to the widget-recorded sibling load time only for cluster siblings, where
+        // QueueLoadCard does NOT fire per sibling and effectiveCardId differs from data.cardId.
+        // For non-cluster cards (effectiveCardId === cardId) where cardStartTimes was already
+        // consumed, the fallback is wrong: clusterLoadTime is stale (the original load time)
+        // and using it would inflate the session counters when RemNote fires QueueCompleteCard
+        // repeatedly for a stuck card. Drop the fallback in that case so the duplicate
+        // completion is silently ignored.
+        const isClusterSibling = effectiveCardId !== cardId;
+        const startTime =
+          cardStartTimes.get(effectiveCardId) ??
+          (isClusterSibling ? clusterLoadTime : undefined);
         if (startTime) {
           const rawTimeSpent = Date.now() - startTime;
           const timeLimitSec =
