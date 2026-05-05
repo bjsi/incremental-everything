@@ -109,8 +109,10 @@ export const VideoViewer: React.FC<VideoViewerProps> = (props) => {
       await newRem.setPowerupProperty(videoExtractPowerupCode, videoExtractStartSlotCode, [startTime.toString()]);
       await newRem.setPowerupProperty(videoExtractPowerupCode, videoExtractEndSlotCode, [endTime.toString()]);
 
-      // Make it incremental
-      await initIncrementalRem(plugin as any, newRem);
+      // Make it incremental — pass explicitParentId so priority inheritance
+      // can walk ancestors correctly (the local `newRem` object's .parent is
+      // stale after setParent, same pattern as highlightActions.ts reload).
+      await initIncrementalRem(plugin as any, newRem, { explicitParentId: props.actionItem.rem._id });
 
       await plugin.app.toast(`✅ Created video extract [${formatTime(startTime)} – ${formatTime(endTime)}]`);
 

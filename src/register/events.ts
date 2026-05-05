@@ -488,150 +488,155 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
     AppEvents.QueueCompleteCard,
     undefined,
     async (data: { cardId: RemId; score?: QueueInteractionScore }) => {
-      if (await shouldUseLightMode(plugin)) {
-        return;
-      }
-
       if (!data || !data.cardId) {
         return;
       }
 
-      const score = data.score;
-
       const card = await plugin.card.findOne(data.cardId);
       const remId = card?.remId;
       const rem = remId ? await plugin.rem.findOne(remId) : null;
-      const isIncRem = rem ? await rem.hasPowerup(powerupCode) : false;
 
-      // console.log(`🎴 Card from ${isIncRem ? 'INCREMENTAL REM' : 'regular card'}, remId: ${remId}`);
-
-      if (remId) {
-        recentlyProcessedCards.add(remId);
-        setTimeout(() => recentlyProcessedCards.delete(remId), CARD_PROCESSING_DEBOUNCE_MS);
-
-        // console.log('LISTENER: Calling LIGHT updateCardPriorityCache...');
-        await updateCardPriorityCache(plugin, remId, true);
-
-        // Mark card as seen for this session (used by Shield)
-        const seenCards = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
-        if (!seenCards.includes(remId)) {
-          await plugin.storage.setSession(seenCardInSessionKey, [...seenCards, remId]);
+      // Resolve score: data.score is optional in the RemNote API and is not always
+      // populated. When missing, fall back to the card's latest repetition history
+      // entry — the same reliable approach used by the cluster and drill paths.
+      let score = data.score;
+      if (score === undefined && card?.repetitionHistory && card.repetitionHistory.length > 0) {
+        const lastEntry = card.repetitionHistory[card.repetitionHistory.length - 1];
+        if (lastEntry?.score !== undefined && lastEntry.score !== QueueInteractionScore.TOO_EARLY) {
+          score = lastEntry.score;
         }
+      }
 
-        // Keep session cache in sync so Shield updates immediately
-        const sessionCache = await plugin.storage.getSession<QueueSessionCache>(queueSessionCacheKey);
-        if (sessionCache) {
-          const updatedCache: QueueSessionCache = {
-            ...sessionCache,
-            dueCardsInKB: sessionCache.dueCardsInKB.filter((c) => c.remId !== remId),
-            dueCardsInScope: sessionCache.dueCardsInScope.filter((c) => c.remId !== remId),
-          };
-          await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
+      // Cluster-aware: prefer the sibling cardId signaled by card_priority_display widget.
+      // Falls back to data.cardId when the widget hasn't mounted or hasn't signaled yet.
+      // Note: do NOT clear clusterVisibleCardId here — queue_session.ts also reads it in
+      // its own QueueCompleteCard listener, and clear order across listeners is not
+      // guaranteed. Staleness is instead prevented by queue_session.ts clearing it at the
+      // start of each QueueLoadCard.
+      //
+      // Guard: clusterVisibleCardId may be stale from a previously-rendered sibling when
+      // events fire across card transitions. Only trust it if it belongs to the same rem
+      // as data.cardId. Otherwise it's contamination from an unrelated card.
+      const rawClusterVisibleCardId =
+        (await plugin.storage.getSession<string>('clusterVisibleCardId')) || undefined;
+      let effectiveCardId = data.cardId;
+      if (rawClusterVisibleCardId && rawClusterVisibleCardId !== data.cardId && remId) {
+        const clusterCard = await plugin.card.findOne(rawClusterVisibleCardId);
+        if (clusterCard?.remId === remId) {
+          effectiveCardId = rawClusterVisibleCardId;
         }
+      }
 
-        // Cluster-aware: prefer the sibling cardId signaled by card_priority_display widget.
-        // Falls back to data.cardId when the widget hasn't mounted or hasn't signaled yet.
-        // Note: do NOT clear clusterVisibleCardId here — queue_session.ts also reads it in
-        // its own QueueCompleteCard listener, and clear order across listeners is not
-        // guaranteed. Staleness is instead prevented by queue_session.ts clearing it at the
-        // start of each QueueLoadCard.
-        //
-        // Guard: clusterVisibleCardId may be stale from a previously-rendered sibling when
-        // events fire across card transitions. Only trust it if it belongs to the same rem
-        // as data.cardId. Otherwise it's contamination from an unrelated card.
-        const rawClusterVisibleCardId =
-          (await plugin.storage.getSession<string>('clusterVisibleCardId')) || undefined;
-        let effectiveCardId = data.cardId;
-        if (rawClusterVisibleCardId && rawClusterVisibleCardId !== data.cardId) {
-          const clusterCard = await plugin.card.findOne(rawClusterVisibleCardId);
-          if (clusterCard?.remId === remId) {
-            effectiveCardId = rawClusterVisibleCardId;
+      // Flashcard History: record the completed card for the sidebar widget.
+      // This block runs unconditionally (regardless of Light Mode) so the history
+      // sidebar always receives entries with a score badge.
+      try {
+        const historyData =
+          ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
+
+        if (historyData[0]?.cardId !== effectiveCardId) {
+          const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+          const currentKbId = kbData._id;
+
+          let frontText = '';
+          let backText = '';
+          try {
+            const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
+            const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+            frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
+            backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
+          } catch (error) {
+            console.warn('Error parsing Rem text for flashcard history:', error);
+            frontText = '[Complex Media Rem]';
+          }
+
+          const text = `${frontText} ${backText}`.trim();
+
+          // Actively remove any existing entries with the same cardId before prepending.
+          const deduped = historyData.filter((entry) => entry.cardId !== effectiveCardId);
+
+          await plugin.storage.setSynced('flashcardHistoryData', [
+            {
+              key: Math.random(),
+              remId,
+              cardId: effectiveCardId,
+              open: false,
+              time: new Date().getTime(),
+              kbId: currentKbId,
+              text,
+              _v: 1,
+              score,
+            },
+            ...deduped.slice(0, 999),
+          ]);
+        }
+      } catch (error) {
+        console.error('Failed to record flashcard history entry:', error);
+      }
+
+      // --- Light Mode gate: priority cache and shield updates only ---
+      if (!(await shouldUseLightMode(plugin))) {
+        if (remId) {
+          recentlyProcessedCards.add(remId);
+          setTimeout(() => recentlyProcessedCards.delete(remId), CARD_PROCESSING_DEBOUNCE_MS);
+
+          // console.log('LISTENER: Calling LIGHT updateCardPriorityCache...');
+          await updateCardPriorityCache(plugin, remId, true);
+
+          // Mark card as seen for this session (used by Shield)
+          const seenCards = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
+          if (!seenCards.includes(remId)) {
+            await plugin.storage.setSession(seenCardInSessionKey, [...seenCards, remId]);
+          }
+
+          // Keep session cache in sync so Shield updates immediately
+          const sessionCache = await plugin.storage.getSession<QueueSessionCache>(queueSessionCacheKey);
+          if (sessionCache) {
+            const updatedCache: QueueSessionCache = {
+              ...sessionCache,
+              dueCardsInKB: sessionCache.dueCardsInKB.filter((c) => c.remId !== remId),
+              dueCardsInScope: sessionCache.dueCardsInScope.filter((c) => c.remId !== remId),
+            };
+            await plugin.storage.setSession(queueSessionCacheKey, updatedCache);
           }
         }
+      }
 
-        // Flashcard History: record the completed card for the sidebar widget.
-        // Acts as fallback when card_priority_display fails to mount.
-        try {
-          const historyData =
-            ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-
-          if (historyData[0]?.cardId !== effectiveCardId) {
+      // Mastery Drill: add AGAIN/HARD cards, remove on GOOD+.
+      // Runs unconditionally (not gated by Light Mode).
+      // Gated by the 'skip_mastery_drill' setting.
+      if (score !== undefined && remId) {
+        const skipMasteryDrill = Boolean(
+          await plugin.settings.getSetting('skip_mastery_drill')
+        );
+        if (!skipMasteryDrill) {
+          try {
             const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-            const currentKbId = kbData._id;
+            const currentKbId = kbData?._id;
+            type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
+            let finalDrillIds =
+              ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
+            const getCardId = (item: FinalDrillItem) =>
+              typeof item === 'string' ? item : item.cardId;
 
-            let frontText = '';
-            let backText = '';
-            try {
-              const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
-              const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
-              frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
-              backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
-            } catch (error) {
-              console.warn('Error parsing Rem text for flashcard history:', error);
-              frontText = '[Complex Media Rem]';
-            }
-
-            const text = `${frontText} ${backText}`.trim();
-
-            // Actively remove any existing entries with the same cardId before prepending.
-            const deduped = historyData.filter((entry) => entry.cardId !== effectiveCardId);
-
-            await plugin.storage.setSynced('flashcardHistoryData', [
-              {
-                key: Math.random(),
-                remId,
-                cardId: effectiveCardId,
-                open: false,
-                time: new Date().getTime(),
-                kbId: currentKbId,
-                text,
-                _v: 1,
-                score,
-              },
-              ...deduped.slice(0, 999),
-            ]);
-          }
-        } catch (error) {
-          console.error('Failed to record flashcard history entry:', error);
-        }
-
-        // Mastery Drill: add AGAIN/HARD cards, remove on GOOD+.
-        // Gated by the 'skip_mastery_drill' setting.
-        if (score !== undefined) {
-          const skipMasteryDrill = Boolean(
-            await plugin.settings.getSetting('skip_mastery_drill')
-          );
-          if (!skipMasteryDrill) {
-            try {
-              const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-              const currentKbId = kbData?._id;
-              type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
-              let finalDrillIds =
-                ((await plugin.storage.getSynced('finalDrillIds')) as FinalDrillItem[]) || [];
-              const getCardId = (item: FinalDrillItem) =>
-                typeof item === 'string' ? item : item.cardId;
-
-              if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
-                if (!finalDrillIds.some((item) => getCardId(item) === effectiveCardId)) {
-                  finalDrillIds = [
-                    ...finalDrillIds,
-                    { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
-                  ];
-                  await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
-                }
-              } else if (score >= QueueInteractionScore.GOOD) {
-                const filtered = finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId);
-                if (filtered.length !== finalDrillIds.length) {
-                  await plugin.storage.setSynced('finalDrillIds', filtered);
-                }
+            if (score === QueueInteractionScore.AGAIN || score === QueueInteractionScore.HARD) {
+              if (!finalDrillIds.some((item) => getCardId(item) === effectiveCardId)) {
+                finalDrillIds = [
+                  ...finalDrillIds,
+                  { cardId: effectiveCardId, kbId: currentKbId, addedAt: Date.now() },
+                ];
+                await plugin.storage.setSynced('finalDrillIds', finalDrillIds);
               }
-            } catch (error) {
-              console.error('Failed to update Mastery Drill list:', error);
+            } else if (score >= QueueInteractionScore.GOOD) {
+              const filtered = finalDrillIds.filter((item) => getCardId(item) !== effectiveCardId);
+              if (filtered.length !== finalDrillIds.length) {
+                await plugin.storage.setSynced('finalDrillIds', filtered);
+              }
             }
+          } catch (error) {
+            console.error('Failed to update Mastery Drill list:', error);
           }
         }
-      } else {
-        // console.error(`LISTENER: Could not find a parent Rem for the completed cardId ${data.cardId}`);
       }
     }
   );
@@ -1130,6 +1135,7 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
             kbId: currentKbId,
             text,
             _v: 1,
+            score,
           },
           ...deduped.slice(0, 999),
         ]);
