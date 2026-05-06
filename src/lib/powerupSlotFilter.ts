@@ -3,7 +3,7 @@
 // These slots (Priority, Next Rep Date, Sources, PDF Metadata, View Modes, etc.) add clutter.
 
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode } from './consts';
+import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode } from './consts';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, LAST_UPDATED_SLOT } from './card_priority/types';
 
 /**
@@ -15,8 +15,12 @@ const PLUGIN_POWERUP_SLOT_CONFIGS = [
     slotCodes: [prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode]
   },
   {
-    powerupCode: CARD_PRIORITY_CODE, // 'cardPriority'  
+    powerupCode: CARD_PRIORITY_CODE, // 'cardPriority'
     slotCodes: [PRIORITY_SLOT, SOURCE_SLOT, LAST_UPDATED_SLOT]
+  },
+  {
+    powerupCode: dismissedPowerupCode, // 'dismissed'
+    slotCodes: [dismissedHistorySlotCode, dismissedDateSlotCode]
   }
 ];
 
@@ -196,6 +200,8 @@ export async function isPowerupPropertyChildByName(plugin: RNPlugin, rem: Plugin
     'Priority', 'Next Rep Date', 'History',
     // CardPriority powerup slots
     'Priority Source', 'Last Updated',
+    // Dismissed powerup slots
+    'Dismissed Date',
     // Built-in RemNote slots (Sources, Aliases, etc)
     'Sources', 'Source', 'Aliases', 'Status',
     // PDF / File Metadata
@@ -243,7 +249,8 @@ export async function isPowerupPropertyChildByName(plugin: RNPlugin, rem: Plugin
           // 1. Check for plugin powerups
           const hasIncremental = await parent.hasPowerup(powerupCode);
           const hasCardPriority = await parent.hasPowerup(CARD_PRIORITY_CODE);
-          if (hasIncremental || hasCardPriority) return true;
+          const hasDismissed = await parent.hasPowerup(dismissedPowerupCode);
+          if (hasIncremental || hasCardPriority || hasDismissed) return true;
 
           // 2. Check for Built-in Powerups that generate these slots
           const builtInPowerupsToCheck = [
