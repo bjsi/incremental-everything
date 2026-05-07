@@ -21,6 +21,15 @@ import {
     rawCutoffDateKey,
     totalAggregatedSessionCount,
 } from "../lib/queue_aggregates";
+import {
+    AUTHORITATIVE_AGGREGATES_KEY,
+    AUTHORITATIVE_LAST_COMPUTED_KEY,
+    aggregatePeriodStatsCombined,
+    computeAuthoritativeAggregatesForCurrentKb,
+    filterAuthoritativeForKb,
+    saveAuthoritativeAggregates,
+    type ProgressUpdate,
+} from "../lib/authoritative_aggregates";
 
 export interface PracticedQueueSession {
     id: string;
@@ -105,12 +114,21 @@ function getStartOfYear(date: Date) {
 
 function buildRow(
     label: string,
+    authoritative: DailyAggregate[],
     rawSessions: PracticedQueueSession[],
-    aggregates: DailyAggregate[],
+    listenerAggregates: DailyAggregate[],
+    lastComputed: number,
     startMs: number,
     endMs?: number
 ): AggregatedStats {
-    const s: PeriodStats = aggregatePeriodStats(rawSessions, aggregates, startMs, endMs);
+    const s: PeriodStats = aggregatePeriodStatsCombined(
+        authoritative,
+        rawSessions,
+        listenerAggregates,
+        lastComputed,
+        startMs,
+        endMs
+    );
     const remembered = Math.max(0, s.cardsCount - s.forgotCount);
     const retentionRate = s.cardsCount > 0 ? (remembered / s.cardsCount) * 100 : 0;
     const cardsTimeMin = s.cardsTime / 1000 / 60;
@@ -128,11 +146,15 @@ function buildRow(
 }
 
 function SummaryTable({
+    authoritative,
     allSessions,
     allAggregates,
+    lastComputed,
 }: {
+    authoritative: DailyAggregate[];
     allSessions: PracticedQueueSession[];
     allAggregates: DailyAggregate[];
+    lastComputed: number;
 }) {
     const stats = useMemo(() => {
         const now = new Date();
@@ -151,22 +173,24 @@ function SummaryTable({
         lastYearDate.setFullYear(lastYearDate.getFullYear() - 1);
         const startOfLastYear = getStartOfYear(lastYearDate);
 
+        const row = (label: string, startMs: number, endMs?: number) =>
+            buildRow(label, authoritative, allSessions, allAggregates, lastComputed, startMs, endMs);
+
         return [
-            buildRow("Today", allSessions, allAggregates, startOfToday),
-            buildRow("Yesterday", allSessions, allAggregates, startOfYesterday, startOfToday),
-            buildRow("This Week", allSessions, allAggregates, startOfWeek),
-            buildRow("Last Week", allSessions, allAggregates, startOfLastWeek, startOfWeek),
-            buildRow("This Month", allSessions, allAggregates, startOfMonth),
-            buildRow("Last Month", allSessions, allAggregates, startOfLastMonth, startOfMonth),
-            buildRow("This Year", allSessions, allAggregates, startOfYear),
-            buildRow("Last Year", allSessions, allAggregates, startOfLastYear, startOfYear),
-            buildRow("Ever", allSessions, allAggregates, 0),
+            row("Today", startOfToday),
+            row("Yesterday", startOfYesterday, startOfToday),
+            row("This Week", startOfWeek),
+            row("Last Week", startOfLastWeek, startOfWeek),
+            row("This Month", startOfMonth),
+            row("Last Month", startOfLastMonth, startOfMonth),
+            row("This Year", startOfYear),
+            row("Last Year", startOfLastYear, startOfYear),
+            row("Ever", 0),
         ];
-    }, [allSessions, allAggregates]);
+    }, [authoritative, allSessions, allAggregates, lastComputed]);
 
     return (
         <div className="mb-6 overflow-x-auto">
-            <h2 className="text-sm font-bold uppercase rn-clr-content-tertiary mb-2 tracking-wider">Summary</h2>
             <div className="border rounded-lg overflow-hidden text-xs rn-clr-border-opaque">
                 <table className="w-full text-left rn-clr-background-primary">
                     <thead className="rn-clr-background-secondary border-b rn-clr-border-opaque">
@@ -233,10 +257,25 @@ function PracticedQueues() {
         DAILY_AGGREGATES_KEY,
         []
     );
+    const [authoritativeRaw] = useSyncedStorageState<DailyAggregate[]>(
+        AUTHORITATIVE_AGGREGATES_KEY,
+        []
+    );
+    const [authoritativeLastComputed] = useSyncedStorageState<number>(
+        AUTHORITATIVE_LAST_COMPUTED_KEY,
+        0
+    );
     const [activeSession] = useSessionStorageState<PracticedQueueSession | null>("activeQueueSession", null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [currentKbId, setCurrentKbId] = useState<string | null>(null);
+
+    const [recomputeJob, setRecomputeJob] = useState<{
+        running: boolean;
+        percent: number;
+        label: string;
+        controller: AbortController | null;
+    }>({ running: false, percent: 0, label: "", controller: null });
 
     useEffect(() => {
         let cancelled = false;
@@ -263,6 +302,11 @@ function PracticedQueues() {
         if (!currentKbId) return [];
         return filterAggregatesForKb(aggregatesRaw, currentKbId);
     }, [aggregatesRaw, currentKbId]);
+
+    const filteredAuthoritative = useMemo(() => {
+        if (!currentKbId) return [];
+        return filterAuthoritativeForKb(authoritativeRaw, currentKbId);
+    }, [authoritativeRaw, currentKbId]);
 
     const totalAllKbsCount = useMemo(() => {
         const rawCount = (historyRaw || []).filter(Boolean).length;
@@ -462,6 +506,51 @@ function PracticedQueues() {
         );
     }, [handleExport, plugin]);
 
+    const handleRecompute = useCallback(async () => {
+        if (recomputeJob.running) return;
+        const controller = new AbortController();
+        setRecomputeJob({ running: true, percent: 0, label: "Starting…", controller });
+        try {
+            const buckets = await computeAuthoritativeAggregatesForCurrentKb(plugin, {
+                signal: controller.signal,
+                onProgress: (u: ProgressUpdate) =>
+                    setRecomputeJob((j) =>
+                        j.controller === controller
+                            ? { ...j, percent: u.percent, label: u.label }
+                            : j
+                    ),
+            });
+            await saveAuthoritativeAggregates(plugin, buckets);
+            setRecomputeJob({ running: false, percent: 1, label: "", controller: null });
+            plugin.app.toast(`Statistics refreshed (${buckets.length} day buckets)`);
+        } catch (err: any) {
+            setRecomputeJob({ running: false, percent: 0, label: "", controller: null });
+            if (err?.message === "Aborted") {
+                plugin.app.toast("Recompute cancelled");
+            } else {
+                console.error("Authoritative recompute failed:", err);
+                plugin.app.toast("Recompute failed — see console");
+            }
+        }
+    }, [plugin, recomputeJob.running]);
+
+    const handleCancelRecompute = useCallback(() => {
+        recomputeJob.controller?.abort();
+    }, [recomputeJob.controller]);
+
+    const formatLastComputed = (ts: number): string => {
+        if (!ts) return "Never";
+        const diffMs = Date.now() - ts;
+        const minutes = Math.floor(diffMs / 60000);
+        if (minutes < 1) return "Just now";
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        if (days < 7) return `${days}d ago`;
+        return new Date(ts).toLocaleString();
+    };
+
     return (
         <div className="h-full w-full overflow-y-auto rn-clr-background-primary">
             <div className="p-4">
@@ -485,7 +574,55 @@ function PracticedQueues() {
                     </div>
                 )}
 
-                <SummaryTable allSessions={filteredData} allAggregates={filteredAggregates} />
+                <div className="flex items-center justify-between gap-2 mb-2">
+                    <h2 className="text-sm font-bold uppercase rn-clr-content-tertiary tracking-wider">
+                        Summary
+                    </h2>
+                    {recomputeJob.running ? (
+                        <div className="flex items-center gap-2 flex-1 max-w-md">
+                            <div className="flex-1 h-2 rn-clr-background-secondary rounded overflow-hidden">
+                                <div
+                                    className="h-full bg-blue-500 transition-all"
+                                    style={{ width: `${Math.round(recomputeJob.percent * 100)}%` }}
+                                />
+                            </div>
+                            <span className="text-[10px] rn-clr-content-tertiary whitespace-nowrap min-w-[120px] text-right">
+                                {recomputeJob.label}
+                            </span>
+                            <button
+                                onClick={handleCancelRecompute}
+                                className="px-2 py-1 text-xs font-medium rounded-md border rn-clr-border-opaque rn-clr-content-secondary hover:rn-clr-background-secondary transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] rn-clr-content-tertiary">
+                                {authoritativeLastComputed > 0
+                                    ? `Updated ${formatLastComputed(authoritativeLastComputed)}`
+                                    : "Not yet computed"}
+                            </span>
+                            <button
+                                onClick={handleRecompute}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border rn-clr-border-opaque rn-clr-content-secondary hover:rn-clr-background-secondary transition-colors"
+                                title="Recompute summary statistics from card and IncRem history (authoritative)"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5 9a8 8 0 0114-3M19 15a8 8 0 01-14 3" />
+                                </svg>
+                                Refresh Statistics
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <SummaryTable
+                    authoritative={filteredAuthoritative}
+                    allSessions={filteredData}
+                    allAggregates={filteredAggregates}
+                    lastComputed={authoritativeLastComputed}
+                />
 
                 <div className="flex items-center gap-2 mb-4">
                     <button
