@@ -149,7 +149,12 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
   options?: ComputeOptions
 ): Promise<DailyAggregate[]> {
   const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
-  const responseTimeCapMs =
+  // Flashcard-only cap (matches the live tracker in queue_session.ts). IncRem
+  // reviewTimeSeconds is intentionally NOT capped — an IncRem rep can legitimately
+  // take many minutes (PDF reading, long passages), so capping would systematically
+  // undercount IncRem time. Only flashcard responseTimes get clipped, since those
+  // are quick-recall reviews where >180s usually indicates the user walked away.
+  const flashcardResponseTimeCapMs =
     ((await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING)) ||
       DEFAULT_RESPONSE_TIME_LIMIT_SEC) * 1000;
 
@@ -173,7 +178,7 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
       if (!rep || typeof rep.date !== 'number') continue;
       if (!isRealCardScore(rep.score)) continue;
       const b = findOrCreateBucket(buckets, getLocalDateKey(rep.date), kbId);
-      const t = Math.min(Math.max(0, rep.responseTime || 0), responseTimeCapMs);
+      const t = Math.min(Math.max(0, rep.responseTime || 0), flashcardResponseTimeCapMs);
       b.cardsCount += 1;
       b.cardsTime += t;
       b.totalTime += t;
