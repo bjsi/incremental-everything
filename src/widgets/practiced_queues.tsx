@@ -27,6 +27,7 @@ import {
     aggregatePeriodStatsCombined,
     computeAuthoritativeAggregatesForCurrentKb,
     filterAuthoritativeForKb,
+    logAuthoritativeDiff,
     saveAuthoritativeAggregates,
     type ProgressUpdate,
 } from "../lib/authoritative_aggregates";
@@ -520,6 +521,27 @@ function PracticedQueues() {
                             : j
                     ),
             });
+            const kbId = currentKbId ?? (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+            const kbBuckets = buckets.filter((b) => b.kbId === kbId);
+            // Read listener storage fresh: useSyncedStorageState starts as []
+            // and loads asynchronously, so the closure-captured filteredData /
+            // filteredAggregates may be empty at first mount. Reading directly
+            // covers BOTH the raw window (practicedQueuesHistory) and the
+            // rolled-over older buckets (practicedQueuesDailyAggregates).
+            const freshHistory =
+                ((await plugin.storage.getSynced("practicedQueuesHistory")) as PracticedQueueSession[]) || [];
+            const freshAggs =
+                ((await plugin.storage.getSynced(DAILY_AGGREGATES_KEY)) as DailyAggregate[]) || [];
+            const freshSessionsForKb = freshHistory.filter((s) => {
+                if (!s) return false;
+                if (!s.kbId) return true;
+                return s.kbId === kbId;
+            });
+            const freshAggsForKb = filterAggregatesForKb(freshAggs, kbId);
+            console.log(
+                `[Authoritative Diff] Listener sources: ${freshSessionsForKb.length} raw sessions, ${freshAggsForKb.length} rolled-over day-buckets (KB ${kbId})`
+            );
+            logAuthoritativeDiff(kbBuckets, freshSessionsForKb, freshAggsForKb, kbId);
             await saveAuthoritativeAggregates(plugin, buckets);
             setRecomputeJob({ running: false, percent: 1, label: "", controller: null });
             plugin.app.toast(`Statistics refreshed (${buckets.length} day buckets)`);
