@@ -333,6 +333,30 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
   // up the new state via useSyncedStorageState reactivity.
   maybeRollOver(plugin);
 
+  // Startup recovery: if the plugin restarted (page refresh, crash) while a
+  // session was in progress, ACTIVE_SESSION_KEY holds the last synced snapshot
+  // but currentSession is null. Rescue it into synced history so the work is
+  // not silently lost.
+  (async () => {
+    try {
+      const orphaned = await plugin.storage.getSession<PracticedQueueSession>(ACTIVE_SESSION_KEY);
+      if (orphaned && (orphaned.flashcardsCount > 0 || orphaned.incRemsCount > 0)) {
+        if (!orphaned.endTime) orphaned.endTime = Date.now();
+        const history =
+          ((await plugin.storage.getSynced(PRACTICED_QUEUES_HISTORY_KEY)) as PracticedQueueSession[]) || [];
+        const deduped = history.filter((s): s is PracticedQueueSession => !!s && s.id !== orphaned.id);
+        await plugin.storage.setSynced(PRACTICED_QUEUES_HISTORY_KEY, [orphaned, ...deduped]);
+        await plugin.storage.setSession(ACTIVE_SESSION_KEY, null);
+        console.log(
+          `[QueueSession] Recovered orphaned session: id=${orphaned.id} scope="${orphaned.scopeName}" fc=${orphaned.flashcardsCount} ir=${orphaned.incRemsCount}`
+        );
+        maybeRollOver(plugin);
+      }
+    } catch (err) {
+      console.error('[QueueSession] Orphaned session recovery failed:', err);
+    }
+  })();
+
   // Heartbeat monitor: auto-save Mastery Drill session if the popup is closed without QueueExit
   setInterval(async () => {
     if (currentSession && currentSession.scopeName === 'Mastery Drill') {
