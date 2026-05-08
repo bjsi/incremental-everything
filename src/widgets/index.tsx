@@ -13,6 +13,15 @@ import { registerWidgets } from '../register/widgets';
 import { registerMenus } from '../register/menus';
 import { registerCommands } from '../register/commands';
 import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
+import {
+  registerCoreQueueDisplayPowerups,
+  registerHideInQueueLegacyPowerups,
+} from '../register/queue_display_powerups';
+import {
+  registerCoreQueueDisplayCommands,
+  registerHideInQueueLegacyCommands,
+} from '../register/queue_display_commands';
+import { enableHideInQueueIntegrationId } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { registerJumpToRemHelper } from '../register/window';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS } from '../lib/ui_helpers';
@@ -30,7 +39,23 @@ async function onActivate(plugin: ReactRNPlugin) {
 
 
   await registerPluginPowerups(plugin);
+  // Core queue display powerups (Remove Parent / Remove Grandparent) are
+  // always registered — the Cloze and Extract creators apply Remove Parent to
+  // newly-created rems. These powerup codes don't exist in the standalone
+  // Hide in Queue plugin, so they cannot collide with it.
+  await registerCoreQueueDisplayPowerups(plugin);
   await registerPluginSettings(plugin);
+
+  // Hide-in-Queue legacy powerups (Hide in Queue, Remove from Queue, etc.) and
+  // their commands are gated by a setting. They share powerup codes with the
+  // standalone Hide in Queue plugin — registering both at once causes RemNote
+  // to throw "Duplicated powerup" and aborts plugin loading. The user must
+  // uninstall the standalone plugin first, then enable this setting.
+  const enableHideInQueueIntegration =
+    (await plugin.settings.getSetting<boolean>(enableHideInQueueIntegrationId)) ?? false;
+  if (enableHideInQueueIntegration) {
+    await registerHideInQueueLegacyPowerups(plugin);
+  }
 
   registerEventListeners(plugin, resetSessionItemCounter);
 
@@ -45,6 +70,18 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerClozeExtractCSS(plugin);
 
   await registerCommands(plugin);
+
+  // Remove Parent / Remove Grandparent commands are always available — they
+  // wrap powerups that are always registered and don't conflict with anything.
+  await registerCoreQueueDisplayCommands(plugin);
+
+  // Hide-in-Queue legacy commands gated on the same setting as the legacy
+  // powerups above (must be in lockstep — registering commands without their
+  // backing powerups would surface no-op commands to the user).
+  if (enableHideInQueueIntegration) {
+    await registerHideInQueueLegacyCommands(plugin);
+  }
+
   await registerMenus(plugin);
 
   // Mobile and Web Browser Light Mode Features

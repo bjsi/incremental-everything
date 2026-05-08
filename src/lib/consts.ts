@@ -21,6 +21,7 @@ export const defaultPriorityId = 'default-priority';
 export const defaultCardPriorityId = 'defaultCardPriority';
 export const showRemsAsIsolatedInQueueId = 'show-rems-as-isolated-in-queue';
 export const priorityStepSizeId = 'priority-step-size';
+export const enableHideInQueueIntegrationId = 'enable-hide-in-queue-integration';
 
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';

@@ -51,6 +51,7 @@ import {
 } from '../lib/card_priority';
 import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
 import { computeClozeAutoPriority, ClozeAutoPriorityInfo } from '../lib/cloze_priority';
+import { REMOVE_PARENT_POWERUP_CODE } from './queue_display_powerups';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 import {
@@ -171,17 +172,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await extractRem.setText(newText);
       await extractRem.setParent(rem);
 
-      // 3. Add "remove-from-queue" tag to the parent
-      let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
-      if (!removeFromQueueTag) {
-        removeFromQueueTag = await plugin.rem.createRem();
-        if (removeFromQueueTag) {
-          await removeFromQueueTag.setText(['remove-from-queue']);
-        }
-      }
-      if (removeFromQueueTag) {
-        await rem.addTag(removeFromQueueTag._id);
-      }
+      // 3. Apply Remove Parent powerup to the extract itself so the parent rem is
+      // hidden from queue display only when this specific extract is the current item.
+      // Tagging the parent with Remove from Queue (the previous behavior) would also
+      // hide it for sibling/descendant flashcards (e.g. descriptor children),
+      // breaking their context. Scoping the effect to the extract avoids that.
+      await extractRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
 
       // Make Incremental
       // Pass the explicit parent since the SDK cache may not yet reflect `extractRem.setParent(rem)`
@@ -542,21 +538,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
       if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
 
-      // 2. Tag the cloze rem with `remove-parent` so the parent rem is hidden from
-      // the queue when this cloze is the current card — but only for this cloze.
-      // Tagging the parent with `remove-from-queue` (the previous behavior) would
+      // 2. Apply the Remove Parent powerup to the cloze rem so its parent is hidden
+      // from queue display only when this specific cloze is the current card.
+      // Tagging the parent with Remove from Queue (the previous behavior) would
       // also hide it for sibling/descendant flashcards (e.g. descriptor children),
-      // breaking their context. Tagging the cloze itself scopes the effect correctly.
-      let removeParentTag = await plugin.rem.findByName(['remove-parent'], null);
-      if (!removeParentTag) {
-        removeParentTag = await plugin.rem.createRem();
-        if (removeParentTag) {
-          await removeParentTag.setText(['remove-parent']);
-        }
-      }
-      if (removeParentTag) {
-        await clozeRem.addTag(removeParentTag._id);
-      }
+      // breaking their context. Scoping the effect to the cloze itself avoids that.
+      await clozeRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
 
       // 3. Mark selected text in parent with yellow highlight + red font.
       // Uses the same section-relative positions (sect_r_start/sect_r_end).

@@ -19,6 +19,7 @@ import {
   displayQueueToolbarPriorityId,
   displayWeightedShieldId,
   autoFocusQueueDashboardId,
+  enableHideInQueueIntegrationId,
 } from '../lib/consts';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
@@ -318,6 +319,21 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   }
 
 
+
+  // Hide-in-Queue integration (powerups + commands ported from the standalone
+  // "Hide in Queue" plugin). Excludes "Remove Parent" and "Remove Grandparent",
+  // which are always registered (the Cloze and Extract creators depend on them).
+
+  plugin.settings.registerBooleanSetting({
+    id: enableHideInQueueIntegrationId,
+    title: 'Enable Hide-in-Queue powerups and commands',
+    description:
+      'If enabled, registers the "Hide in Queue", "Remove from Queue", "No Hierarchy", "Hide Parent", and "Hide Grandparent" powerups and their commands directly inside Incremental Everything.\n\n' +
+      'WARNING: only enable this if you do NOT have the standalone "Hide in Queue" plugin installed — duplicate powerup registration throws a fatal error that breaks this plugin. If you currently have the standalone plugin, uninstall it first, then reload RemNote.\n\n' +
+      'The "Remove Parent" and "Remove Grandparent" powerups/commands (used internally by the Cloze and Extract creators) are always registered regardless of this setting.\n\n' +
+      'After changing this setting, reload RemNote.',
+    defaultValue: false,
+  });
 
   // Performance Mode
 
