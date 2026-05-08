@@ -27,7 +27,7 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem, getDescendantsToDepth } from '../lib/pdfUtils';
+import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem, getDescendantsToDepth, getRemCardContent } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
@@ -49,7 +49,12 @@ import {
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
-import { loadCardPriorityCache } from '../lib/card_priority/cache';
+import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
+import { computeClozeAutoPriority, ClozeAutoPriorityInfo } from '../lib/cloze_priority';
+import {
+  REMOVE_PARENT_POWERUP_CODE,
+  REMOVE_FROM_QUEUE_POWERUP_CODE,
+} from './queue_display_powerups';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 import {
@@ -170,16 +175,27 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await extractRem.setText(newText);
       await extractRem.setParent(rem);
 
-      // 3. Add "remove-from-queue" tag to the parent
-      let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
-      if (!removeFromQueueTag) {
-        removeFromQueueTag = await plugin.rem.createRem();
-        if (removeFromQueueTag) {
-          await removeFromQueueTag.setText(['remove-from-queue']);
-        }
-      }
-      if (removeFromQueueTag) {
-        await rem.addTag(removeFromQueueTag._id);
+      // 3. Hide the source rem from queue display when this extract is reviewed.
+      //
+      // Preferred path: tag the PARENT (source rem) with Remove from Queue. This
+      // survives extract relocation cleanly — if the user later deletes the parent
+      // and lets extracts stand on their own, the powerup goes with the parent
+      // and the standalone extracts behave normally.
+      //
+      // Fallback path: if Remove from Queue isn't registered (neither our
+      // Hide-in-Queue integration nor the standalone plugin is active), tag the
+      // EXTRACT itself with Remove Parent (always registered). This works but
+      // has a relocation caveat: if the extract is later moved under a new
+      // parent, that new parent will be hidden too — the user must remove the
+      // powerup manually in that case.
+      //
+      // Detecting via getPowerupByCode (rather than our integration setting alone)
+      // ensures users with only the standalone plugin still hit the preferred path.
+      const rfqPowerup = await plugin.powerup.getPowerupByCode(REMOVE_FROM_QUEUE_POWERUP_CODE);
+      if (rfqPowerup) {
+        await rem.addPowerup(REMOVE_FROM_QUEUE_POWERUP_CODE);
+      } else {
+        await extractRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
       }
 
       // Make Incremental
@@ -353,11 +369,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerCommand({
-    id: 'create-cloze-deletion',
-    name: 'Create Cloze Deletion',
-    keyboardShortcut: 'opt+z',
-    action: async () => {
+  const createClozeDeletion = async (): Promise<{
+    clozeRem: PluginRem;
+    parentRem: PluginRem;
+    autoPriority: ClozeAutoPriorityInfo;
+  } | undefined> => {
       const selection = await plugin.editor.getSelection();
       if (!selection || selection.type !== SelectionType.Text) return;
       if (selection.range.start === selection.range.end) {
@@ -367,6 +383,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       const rem = await plugin.rem.findOne(selection.remId);
       if (!rem) return;
+
+      // Compute auto-priority BEFORE creating the new cloze rem, so the count of existing
+      // cloze-extract children reflects only prior clozes (not the one we're about to create).
+      const autoPriority = await computeClozeAutoPriority(plugin, rem);
 
       const r_start = Math.min(selection.range.start, selection.range.end);
 
@@ -537,17 +557,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
       if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
 
-      // 2. Add remove-from-queue tag to parent
-      let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
-      if (!removeFromQueueTag) {
-        removeFromQueueTag = await plugin.rem.createRem();
-        if (removeFromQueueTag) {
-          await removeFromQueueTag.setText(['remove-from-queue']);
-        }
-      }
-      if (removeFromQueueTag) {
-        await rem.addTag(removeFromQueueTag._id);
-      }
+      // 2. Apply the Remove Parent powerup to the cloze rem so its parent is hidden
+      // from queue display only when this specific cloze is the current card.
+      // Tagging the parent with Remove from Queue (the previous behavior) would
+      // also hide it for sibling/descendant flashcards (e.g. descriptor children),
+      // breaking their context. Scoping the effect to the cloze itself avoids that.
+      await clozeRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
 
       // 3. Mark selected text in parent with yellow highlight + red font.
       // Uses the same section-relative positions (sect_r_start/sect_r_end).
@@ -590,6 +605,57 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       } else {
         await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
       }
+
+      // Apply the auto-priority computed at the top (before the new cloze existed,
+      // so the existing-cloze count was correct).
+      await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual');
+      await updateCardPriorityCache(plugin, clozeRem._id, true, {
+        remId: clozeRem._id,
+        priority: autoPriority.priority,
+        source: 'manual',
+        cardCount: 1,
+        dueCards: 1,
+      } as any);
+
+      return { clozeRem, parentRem: rem, autoPriority };
+  };
+
+  plugin.app.registerCommand({
+    id: 'create-cloze-deletion',
+    name: 'Create Cloze Deletion',
+    keyboardShortcut: 'opt+z',
+    action: async () => { await createClozeDeletion(); },
+  });
+
+  plugin.app.registerCommand({
+    id: 'create-cloze-deletion-with-priority',
+    name: 'Create Cloze Deletion with Priority',
+    keyboardShortcut: 'opt+shift+z',
+    action: async () => {
+      const result = await createClozeDeletion();
+      if (!result) return;
+      const { clozeRem, parentRem, autoPriority } = result;
+
+      const parentContent = await getRemCardContent(plugin, parentRem);
+      const parentText = parentContent.front
+        + (parentContent.back ? ` → ${parentContent.back}` : '');
+
+      await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+      await plugin.widget.openPopup('priority_light', {
+        remId: clozeRem._id,
+        parentExtractContext: {
+          parentRemId: parentRem._id,
+          parentText,
+          parentPriority: autoPriority.parentPriority,
+          parentPrioritySource: autoPriority.parentPrioritySource,
+          clozeChildCount: autoPriority.clozeChildCount,
+          parentOwnCardCount: autoPriority.parentOwnCardCount,
+          totalExistingCount: autoPriority.totalExistingCount,
+          decrementsApplied: autoPriority.decrementsApplied,
+          stepSize: autoPriority.stepSize,
+          suggestedPriority: autoPriority.priority,
+        },
+      });
     },
   });
 

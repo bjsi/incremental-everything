@@ -8,6 +8,172 @@ interface WeightedShieldPopupContext {
   itemLabel: string;
 }
 
+const WEIGHT_K = 2.3026;
+
+function SubsetStatsPanel({
+  sortedItems,
+  totalWeight,
+}: {
+  sortedItems: { priority: number; isDue: boolean }[];
+  totalWeight: number;
+}) {
+  const N = sortedItems.length;
+  const minPriority = N > 0 ? sortedItems[0].priority : 0;
+  const maxPriority = N > 0 ? sortedItems[N - 1].priority : 100;
+
+  // Slider range. If all items share a priority, widen by 1 so the slider isn't degenerate.
+  const sliderMin = Math.floor(minPriority);
+  const sliderMax = Math.max(Math.ceil(maxPriority), sliderMin + 1);
+
+  const [threshold, setThreshold] = React.useState<number>(Math.round(maxPriority));
+
+  // Prefix sums of weight and due count, indexed [0..N]: cum[i] = sum over items 0..i-1.
+  const prefix = React.useMemo(() => {
+    const cumWeight = new Float64Array(N + 1);
+    const cumDue = new Int32Array(N + 1);
+    for (let i = 0; i < N; i++) {
+      const percentile = ((i + 1) / N) * 100;
+      const w = Math.exp((-WEIGHT_K * percentile) / 100);
+      cumWeight[i + 1] = cumWeight[i] + w;
+      cumDue[i + 1] = cumDue[i] + (sortedItems[i].isDue ? 1 : 0);
+    }
+    return { cumWeight, cumDue };
+  }, [sortedItems, N]);
+
+  const stats = React.useMemo(() => {
+    if (N === 0) return null;
+    // Largest index hi such that sortedItems[i].priority <= threshold for all i < hi.
+    let lo = 0;
+    let hi = N;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (sortedItems[mid].priority <= threshold) lo = mid + 1;
+      else hi = mid;
+    }
+    const count = lo;
+    if (count === 0) {
+      return {
+        count: 0,
+        due: 0,
+        processedPct: 0,
+        meanWeight: 0,
+        weightShare: 0,
+        relPercentile: 0,
+      };
+    }
+    const due = prefix.cumDue[count];
+    const weightSum = prefix.cumWeight[count];
+    const processedPct = ((count - due) / count) * 100;
+    const meanWeight = weightSum / count;
+    const weightShare = totalWeight > 0 ? (weightSum / totalWeight) * 100 : 0;
+    const relPercentile = (count / N) * 100;
+    return { count, due, processedPct, meanWeight, weightShare, relPercentile };
+  }, [threshold, sortedItems, N, prefix, totalWeight]);
+
+  if (N === 0) return null;
+
+  const cellStyle: React.CSSProperties = {
+    padding: '4px 6px',
+    borderRight: '1px solid var(--rn-clr-background-tertiary)',
+    fontSize: '11px',
+    lineHeight: '1.3',
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: '10px',
+    color: 'var(--rn-clr-content-tertiary)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    fontWeight: 600,
+  };
+  const valueStyle: React.CSSProperties = {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: 'var(--rn-clr-content-primary)',
+  };
+
+  return (
+    <div style={{
+      marginTop: '10px',
+      padding: '8px 10px',
+      borderRadius: '6px',
+      background: 'var(--rn-clr-background-secondary)',
+      border: '1px solid var(--rn-clr-background-tertiary)',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginBottom: '6px',
+      }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--rn-clr-content-secondary)' }}>
+          Threshold (Absolute Priority ≤)
+        </span>
+        <input
+          type="range"
+          min={sliderMin}
+          max={sliderMax}
+          step={1}
+          value={threshold}
+          onChange={(e) => setThreshold(parseInt(e.target.value, 10))}
+          style={{ flex: 1 }}
+        />
+        <span style={{
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          fontWeight: 700,
+          minWidth: '52px',
+          textAlign: 'right',
+          color: 'var(--rn-clr-content-primary)',
+        }}>
+          {threshold}
+        </span>
+      </div>
+
+      {stats && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(6, 1fr)',
+          border: '1px solid var(--rn-clr-background-tertiary)',
+          borderRadius: '4px',
+          background: 'var(--rn-clr-background-primary)',
+          overflow: 'hidden',
+        }}>
+          <div style={cellStyle}>
+            <div style={labelStyle}>Rel %ile</div>
+            <div style={valueStyle}>{stats.relPercentile.toFixed(1)}%</div>
+          </div>
+          <div style={cellStyle}>
+            <div style={labelStyle}>Items</div>
+            <div style={valueStyle}>{stats.count.toLocaleString()}</div>
+          </div>
+          <div style={cellStyle}>
+            <div style={labelStyle}>Due</div>
+            <div style={{ ...valueStyle, color: stats.due > 0 ? '#ef4444' : 'inherit' }}>
+              {stats.due.toLocaleString()}
+            </div>
+          </div>
+          <div style={cellStyle}>
+            <div style={labelStyle}>% Done</div>
+            <div style={{ ...valueStyle, color: stats.processedPct >= 50 ? '#22c55e' : 'inherit' }}>
+              {stats.processedPct.toFixed(1)}%
+            </div>
+          </div>
+          <div style={cellStyle}>
+            <div style={labelStyle}>Avg W</div>
+            <div style={{ ...valueStyle, fontFamily: 'monospace' }}>
+              {stats.meanWeight.toFixed(3)}
+            </div>
+          </div>
+          <div style={{ ...cellStyle, borderRight: 'none' }}>
+            <div style={labelStyle}>W Share</div>
+            <div style={valueStyle}>{stats.weightShare.toFixed(1)}%</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MiniBar({ processedPct }: { processedPct: number }) {
   return (
     <div style={{
@@ -165,6 +331,13 @@ function BreakdownSection({
           ))}
         </tbody>
       </table>
+
+      {breakdown.sortedItems && breakdown.sortedItems.length > 0 && (
+        <SubsetStatsPanel
+          sortedItems={breakdown.sortedItems}
+          totalWeight={breakdown.totalWeight}
+        />
+      )}
     </div>
   );
 }

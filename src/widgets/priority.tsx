@@ -504,18 +504,38 @@ function Priority() {
   // --- MODIFIED: Initialize scope with original scope for Priority Review Documents ---
   useEffect(() => {
     const initializeScope = async () => {
-      if (inQueue && queueSubQueueId && performanceMode === PERFORMANCE_MODE_FULL) { // 🔌 Skip in light mode
-        // Use originalScopeId if available (Priority Review Document case)
-        const effectiveScopeId = originalScopeId || queueSubQueueId;
-        const scopeRem = await plugin.rem.findOne(effectiveScopeId);
+      if (!inQueue || !queueSubQueueId || performanceMode !== PERFORMANCE_MODE_FULL) return;
 
-        if (scopeRem) {
-          setScope({
-            remId: scopeRem._id,
-            name: await safeRemTextToString(plugin, scopeRem.text)
-          });
-          setScopeMode('document');
-        }
+      // Full-KB priority review doc: originalScopeId === null is the explicit
+      // "Full Knowledge Base" signal from extractOriginalScopeFromPriorityReview.
+      // Strict === null avoids matching `undefined` (tracker still loading).
+      if (isPriorityReviewDoc && originalScopeId === null) {
+        setScope({ remId: null, name: 'All KB' });
+        setScopeMode('all');
+        return;
+      }
+
+      // Priority Review Queue tag rem: when the user enters the queue from the
+      // tag itself (an aggregator across many priority review docs), the rem
+      // text is literally "Priority Review Queue". Treat this as full KB too,
+      // since the per-doc scope cache is meaningless across heterogeneous docs.
+      const tagRem = await plugin.rem.findByName(['Priority Review Queue'], null);
+      if (tagRem && queueSubQueueId === tagRem._id) {
+        setScope({ remId: null, name: 'All KB' });
+        setScopeMode('all');
+        return;
+      }
+
+      // Use originalScopeId if available (Priority Review Document case)
+      const effectiveScopeId = originalScopeId || queueSubQueueId;
+      const scopeRem = await plugin.rem.findOne(effectiveScopeId);
+
+      if (scopeRem) {
+        setScope({
+          remId: scopeRem._id,
+          name: await safeRemTextToString(plugin, scopeRem.text)
+        });
+        setScopeMode('document');
       }
     };
     initializeScope();

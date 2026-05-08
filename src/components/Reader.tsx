@@ -1,7 +1,7 @@
 // components/Reader.tsx
 import { usePlugin, RemId, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
-import { activeHighlightIdKey, pageRangeWidgetId } from '../lib/consts';
+import { activeHighlightIdKey, pageRangeWidgetId, incremNotesSidebarWidgetId } from '../lib/consts';
 import { HTMLActionItem, HTMLHighlightActionItem, PDFActionItem, PDFHighlightActionItem, RemActionItem } from '../lib/incremental_rem';
 import { getIncrementalReadingPosition, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext, getPageHistory } from '../lib/pdfUtils';
 import { Breadcrumb, BreadcrumbItem } from './Breadcrumb';
@@ -167,7 +167,6 @@ export function Reader(props: ReaderProps) {
   // and by handleReviewInEditorRem. We do NOT save on unmount to avoid duplicate entries.
 
 
-
   // Handle highlights
   React.useEffect(() => {
     const isHighlight = actionType === 'pdf-highlight' || actionType === 'html-highlight';
@@ -247,15 +246,22 @@ export function Reader(props: ReaderProps) {
     pdfHighlightCount = '...',
   } = metadata || {};
 
+  // Only show the notes button when there is a separate IncRem document.
+  // If incrementalRemId === pdfRemId the IncRem IS the PDF source, so there is
+  // no distinct note document to show.
+  const canShowNotesPanel = !!incrementalRemId && incrementalRemId !== pdfRemId;
 
   return (
     <div className="pdf-reader-viewer" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Breadcrumb Section */}
+      {/* Breadcrumb Section – 📝 button inline on the left when a distinct IncRem exists */}
       <div
         className="breadcrumb-section"
         style={{
-          padding: '8px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '4px 12px',
           borderBottom: '1px solid var(--rn-clr-border-primary)',
           backgroundColor: 'var(--rn-clr-background-secondary)',
           flexShrink: 0,
@@ -263,12 +269,25 @@ export function Reader(props: ReaderProps) {
           minHeight: '28px',
         }}
       >
-        <Breadcrumb
-          items={ancestors as BreadcrumbItem[]}
-          isLoading={isContextLoading}
-          loadingText="Loading breadcrumbs..."
-          onClick={handleBreadcrumbClick}
-        />
+        {canShowNotesPanel && (
+          <button
+            title="Open document notes in sidebar"
+            style={{ flexShrink: 0, lineHeight: 1, padding: '0 2px', fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer' }}
+            onClick={() => {
+              plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId);
+            }}
+          >
+            📝
+          </button>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Breadcrumb
+            items={ancestors as BreadcrumbItem[]}
+            isLoading={isContextLoading}
+            loadingText="Loading breadcrumbs..."
+            onClick={handleBreadcrumbClick}
+          />
+        </div>
       </div>
 
       {/* PDF Reader Section (Renders INSTANTLY) */}
@@ -278,7 +297,7 @@ export function Reader(props: ReaderProps) {
             ref={pdfReaderRef}
             remId={pdfRemId}
             height={isIOS ? '100vh' : '100%'}
-            key={pdfRemId} // Ensure key is the PDF rem ID
+            key={pdfRemId}
           />
         ) : (
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading PDF for iOS...</div>

@@ -1,5 +1,5 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId } from '../lib/consts';
 
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const skipMasteryDrill = Boolean(
@@ -220,6 +220,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     widgetTabTitle: "Visited Rem History",
   });
 
+  // IncRem Notes Sidebar: shows the DocumentViewer for the IncRem being reviewed
+  // Opened programmatically by the Reader 📝 button via openWidgetInRightSidebar.
+  plugin.app.registerWidget(incremNotesSidebarWidgetId, WidgetLocation.RightSidebar, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+    widgetTabIcon: "https://cdn-icons-png.flaticon.com/512/1828/1828911.png",
+    widgetTabTitle: "Document Notes",
+  });
+
   // Repetition history popup for Answer Buttons
   plugin.app.registerWidget('repetition_history', WidgetLocation.Popup, {
     dimensions: {
@@ -249,24 +260,10 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // PDF Bookmark Flow
-  plugin.app.registerWidget('pdf_bookmark_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
-    dimensions: {
-      width: 'auto',
-      height: 'auto',
-    },
-  });
-
-  // Create Incremental Rem Toolbar Button
-  plugin.app.registerWidget('create_inc_rem_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
-    dimensions: {
-      width: 'auto',
-      height: 'auto',
-    },
-  });
-
-  // Toggle Incremental Rem Toolbar Button
-  plugin.app.registerWidget('toggle_incremental_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
+  // Consolidated PDF highlight toolbar: bookmark, create extract, and toggle
+  // incremental — one widget hosts all three icons, so RemNote only spins up a
+  // single plugin iframe per toolbar render instead of three.
+  plugin.app.registerWidget('highlight_toolbar', WidgetLocation.PDFHighlightToolbarLocation, {
     dimensions: {
       width: 'auto',
       height: 'auto',

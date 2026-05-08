@@ -7,6 +7,7 @@ import {
   currentSubQueueIdKey,
   queueSessionCacheKey,
   incrementalQueueActiveKey,
+  currentIncrementalRemTypeKey,
 } from './consts';
 import { IncrementalRem } from './incremental_rem';
 import { QueueSessionCache } from './card_priority';
@@ -28,6 +29,7 @@ export async function resetQueueSession(plugin: ReactRNPlugin): Promise<void> {
   await plugin.storage.setSession('skipCardHistorySave', null);
   await plugin.storage.setSession('skipIncRemHistorySave', null);
   await plugin.storage.setSession(incrementalQueueActiveKey, false);
+  await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
 }
 
 /**

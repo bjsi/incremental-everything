@@ -116,9 +116,11 @@ export const remToActionItemType = async (
         rem,
       };
     }
-  } else {
+   } else {
     const sources = await rem.getSources();
     let selectedSource: PluginRem | null = null;
+
+    console.log('[action_items] Source resolution for rem', rem._id, '- found', sources.length, 'sources');
 
     if (sources.length === 1) {
       selectedSource = sources[0];
@@ -160,6 +162,13 @@ export const remToActionItemType = async (
         }
       } catch (e) {}
 
+      console.log('[action_items] Source resolution:', {
+        sourceRemId: selectedSource._id,
+        isLink,
+        url: url?.substring(0, 60),
+        originalRemId: rem._id,
+      });
+
       if (isLink && url && url.includes('youtube')) {
         const data = await remToActionItemType(plugin, selectedSource);
         if (data) {
@@ -170,6 +179,12 @@ export const remToActionItemType = async (
         }
       } else {
         const data = await remToActionItemType(plugin, selectedSource);
+        console.log('[action_items] ⚠️ Non-YouTube source resolved to:', {
+          type: data?.type,
+          returnedRemId: data?.rem?._id,
+          originalRemId: rem._id,
+          NOTE: 'If type is html, rem._id here is the SOURCE, not the incremental rem!',
+        });
         if (data) {
           return data;
         }

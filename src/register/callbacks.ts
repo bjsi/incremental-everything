@@ -18,6 +18,7 @@ import {
   incremReviewStartTimeKey,
   incrementalQueueActiveKey,
   incRemDisabledDeviceKey,
+  currentIncrementalRemTypeKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
@@ -75,20 +76,6 @@ const QUEUE_HIDE_ELEMENTS_CSS = `
   }
 `;
 
-const REMOVE_FROM_QUEUE_CSS = `
-  /* Remove from Queue Styles */
-  .rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem) > .rn-queue-rem,
-  .rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem) > .rn-queue-rem {
-    display: none;
-  }
-
-  .rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem),
-  .rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem),
-  .rn-breadcrumb-item[data-rem-tags~="removefromqueue"],
-  .rn-breadcrumb-item[data-rem-tags~="remove-from-queue"] {
-    margin-left: 0px !important; /* makes it look like its not indented to the removed parent */
-  }
-`;
 
 let sessionItemCounter = 0;
 
@@ -99,12 +86,20 @@ export const resetSessionItemCounter = () => {
 export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
   plugin.app.registerCSS(queueHideElementsId, QUEUE_HIDE_ELEMENTS_CSS);
-  plugin.app.registerCSS('remove-from-queue-css', REMOVE_FROM_QUEUE_CSS);
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
     async (queueInfo) => {
       console.log('queueInfo', queueInfo);
+
+      // Helper: clear stale sidebar signals when returning null (flashcard turn).
+      // The QueueComponent's useEffect cleanup is unreliable — RemNote can
+      // destroy its iframe before React cleanup fires. This main-process
+      // helper guarantees the signals are cleared.
+      const clearStaleIncRemSignals = () => {
+        plugin.storage.setSession(incrementalQueueActiveKey, false);
+        plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
+      };
 
       const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
       const isDeviceDisabled = await plugin.storage.getLocal<boolean>(incRemDisabledDeviceKey);
@@ -122,6 +117,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
 
         // Timer or Device is blocking IncRem — this turn will be a flashcard.
         plugin.app.registerCSS(queueCounterId, '');
+        clearStaleIncRemSignals();
         return null;
       } else if (noIncRemTimerEnd && noIncRemTimerEnd <= now) {
         // console.log('🧹 Timer expired, cleaning up...');
@@ -214,12 +210,12 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         queueInfo.numCardsRemaining === 0 ||
         intervalBetweenIncRem === 'no-cards';
 
-      console.log('🎯 GetNextCard Decision:', {
-        shouldShowIncRem,
+      console.log('🎯 GetNextCard → deciding NEXT item:', {
+        willShowIncRem: shouldShowIncRem,
         sessionItemCounter,
         counterCheck: typeof intervalBetweenIncRem === 'number' ? `(${sessionItemCounter}+1) % ${intervalBetweenIncRem} = ${(sessionItemCounter + 1) % intervalBetweenIncRem}` : intervalBetweenIncRem,
         numCardsRemaining: queueInfo.numCardsRemaining,
-        filteredLength: filtered.length,
+        filteredIncRems: filtered.length,
       });
 
       if (shouldShowIncRem) {
@@ -238,6 +234,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           // console.log('⚠️ FILTERED LENGTH IS 0 - Returning null, will show a flashcard.');
           plugin.app.registerCSS(queueCounterId, '');
           sessionItemCounter++;
+          clearStaleIncRemSignals();
           return null;
         }
 
@@ -257,6 +254,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           if (filtered.length === 0) {
             console.log('❌ All filtered items were invalid after verification - Returning null');
             plugin.app.registerCSS(queueCounterId, '');
+            clearStaleIncRemSignals();
             return null;
           }
           first = filtered[0];
@@ -293,7 +291,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         sessionItemCounter++;
         // Flashcard turn — the hide CSS is globally registered and self-deactivates via :has()
         // when the Plugin iframe is absent; no manual clearing needed.
-        await plugin.storage.setSession(incrementalQueueActiveKey, false);
+        clearStaleIncRemSignals();
         return null;
       }
     }

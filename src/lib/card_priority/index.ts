@@ -1,4 +1,4 @@
-import { PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
+import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
 import { findClosestAncestorWithAnyPriority } from '../priority_inheritance';
 import dayjs from 'dayjs';
@@ -41,23 +41,36 @@ async function findClosestAncestorWithPriority(
 /**
  * Get card priority info for a rem.
  * If no priority is set, it checks for inherited priority before returning a default state.
+ *
+ * Performance: when called from the cache builder for many rems, the caller can
+ * pre-fetch all cards once via plugin.card.getAll() and pass the per-rem subset
+ * via options.preloadedCards. This skips the per-rem rem.getCards() round-trip
+ * (the most expensive call inside this function for large KBs).
+ *
+ * The slot reads are parallelized in a single Promise.all batch; reading
+ * source/lastUpdated even when priorityValue ends up null is essentially free
+ * (parallel cost is governed by the slowest call) and simplifies the flow.
  */
 export async function getCardPriority(
   plugin: RNPlugin,
-  rem: PluginRem
+  rem: PluginRem,
+  options?: { preloadedCards?: Card[] }
 ): Promise<CardPriorityInfo | null> {
-  const cards = await rem.getCards();
+  const [cards, priorityValue, source, lastUpdated] = await Promise.all([
+    options?.preloadedCards !== undefined
+      ? Promise.resolve(options.preloadedCards)
+      : rem.getCards(),
+    rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT),
+    rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT),
+    rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT),
+  ]);
+
   const now = Date.now();
   const startOfToday = dayjs().startOf('day').valueOf();
   const dueCards = cards.filter((card) => (card.nextRepetitionTime ?? Infinity) <= now).length;
   const dueCardsOverdue = cards.filter((card) => (card.nextRepetitionTime ?? Infinity) <= startOfToday).length;
 
-  const priorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
-
   if (priorityValue) {
-    const source = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-    const lastUpdated = await rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT);
-
     const parsedPriority = parseInt(priorityValue);
     const finalPriority = !isNaN(parsedPriority) ? parsedPriority : 50;
 

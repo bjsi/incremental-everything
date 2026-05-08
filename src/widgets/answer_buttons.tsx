@@ -7,7 +7,7 @@ import {
   PluginRem,
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import { IncrementalRep } from '../lib/incremental_rem/types';
@@ -254,6 +254,28 @@ export function AnswerButtons() {
     return { reps, totalMinutes };
   }, [coreData?.incRemInfo?.history]);
 
+  // Detect whether the stats separator `|` has flex-wrapped to a new line.
+  // CSS cannot observe line-breaks in a flex-wrap container, so we compare the
+  // vertical position of the separator span against the stats div with a layout effect.
+  // The `|` stays in the DOM (opacity: 0 when hidden) so it's always measurable.
+  const statsSepRef = useRef<HTMLSpanElement>(null);
+  const statsContainerRef = useRef<HTMLDivElement>(null);
+  const [statsSepVisible, setStatsSepVisible] = useState(true);
+
+  useLayoutEffect(() => {
+    const sep = statsSepRef.current;
+    const stats = statsContainerRef.current;
+    if (!sep || !stats) return;
+    // Compare vertical midpoints rather than top edges: in a centered flex row,
+    // elements of different heights have different tops even when on the same row.
+    const sepRect = sep.getBoundingClientRect();
+    const statsRect = stats.getBoundingClientRect();
+    const sepMid = sepRect.top + sepRect.height / 2;
+    const statsMid = statsRect.top + statsRect.height / 2;
+    const sameRow = Math.abs(sepMid - statsMid) < 4;
+    setStatsSepVisible(sameRow);
+  }); // No deps — runs after every render so it catches the first render where refs are populated
+
   // ✅ NOW we can do early returns AFTER all hooks are called
   if (!coreData) {
     return (
@@ -343,6 +365,7 @@ export function AnswerButtons() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: '16px',
     padding: '8px 16px',
     backgroundColor: 'var(--rn-clr-background-secondary)',
@@ -808,12 +831,24 @@ export function AnswerButtons() {
                 `}</style>
               </>
             )}
+          </div>
 
+          {/* Separator before Weighted/Reps — hidden when it has wrapped to a new line */}
+          <span
+            ref={statsSepRef}
+            style={{
+              color: 'var(--rn-clr-content-tertiary)',
+              opacity: statsSepVisible ? 1 : 0,
+              pointerEvents: 'none',
+            }}
+          >|</span>
+
+          {/* Right side: Weighted Shield + Reps — wraps together as a unit */}
+          <div ref={statsContainerRef} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* Weighted Shield Display */}
             {!useLightMode && shouldDisplayWeightedShield && shieldStatusAsync &&
               shieldStatusAsync.weightedKB !== null && shieldStatusAsync.weightedKB !== undefined && (
                 <>
-                  <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
                   <WeightedShieldTooltip
                     kbValue={shieldStatusAsync.weightedKB}
                     docValue={shieldStatusAsync.weightedDoc}
@@ -822,12 +857,10 @@ export function AnswerButtons() {
                     docItems={shieldStatusAsync.docIncRems}
                     itemLabel="IncRem"
                   />
+                  <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
                 </>
               )
             }
-
-            {/* Separator before History */}
-            <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>|</span>
 
             {/* Repetition History Stats and Icon */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -21,6 +21,7 @@ export const defaultPriorityId = 'default-priority';
 export const defaultCardPriorityId = 'defaultCardPriority';
 export const showRemsAsIsolatedInQueueId = 'show-rems-as-isolated-in-queue';
 export const priorityStepSizeId = 'priority-step-size';
+export const enableHideInQueueIntegrationId = 'enable-hide-in-queue-integration';
 
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';
@@ -149,3 +150,12 @@ export const videoExtractPowerupCode = 'videoExtract';
 export const videoExtractUrlSlotCode = 'videoUrl';
 export const videoExtractStartSlotCode = 'startTime';
 export const videoExtractEndSlotCode = 'endTime';
+
+// IncRem Notes Sidebar (right sidebar widget)
+// Opened programmatically by the Reader 📝 button; reads currentIncRemKey directly.
+export const incremNotesSidebarWidgetId = 'increm_notes_sidebar';
+// Host document ID for highlight IncRems (PDF/HTML source Rem).
+// Set by queue.tsx so the sidebar can discover related IncRems without
+// re-resolving the action item type.
+export const currentHostDocumentIdKey = 'current-host-document-id';
+

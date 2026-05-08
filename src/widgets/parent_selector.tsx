@@ -452,13 +452,7 @@ function ParentSelectorWidget() {
   const contextData = useTrackerPlugin(
     async (rp) => {
       const data = await rp.storage.getSession<ParentSelectorContext>('parentSelectorContext');
-      console.log('[ParentSelector:Widget] Context data loaded:', JSON.stringify({
-        pdfRemId: data?.pdfRemId,
-        contextRemId: data?.contextRemId,
-        lastSelectedDestination: data?.lastSelectedDestination,
-        rootCandidatesCount: data?.rootCandidates?.length,
-      }, null, 2));
-      return data;
+      return data ?? null;
     },
     []
   );
@@ -466,8 +460,9 @@ function ParentSelectorWidget() {
   const allIncrementalRems = useTrackerPlugin(
     async (rp) => {
       const data = await rp.storage.getSession<IncrementalRem[]>(allIncrementalRemKey);
-      console.log('[ParentSelector:Widget] allIncrementalRems loaded:', data?.length ?? 'null/undefined');
-      return data;
+      // Normalize: null = resolved-empty, undefined = still loading.
+      // The init effect uses this distinction to wait for the cache exactly once.
+      return data ?? null;
     },
     []
   );
@@ -487,13 +482,6 @@ function ParentSelectorWidget() {
     const tryScroll = () => {
       const selectedEl = itemRefs.current[selectedIndex];
       const container = listContainerRef.current;
-
-      console.log(`[ParentSelector:Scroll] attempt ${attempts} at index ${selectedIndex}`, {
-        hasScrolled: hasInitiallyScrolled.current,
-        elFound: !!selectedEl,
-        containerFound: !!container,
-        clientHeight: selectedEl?.clientHeight,
-      });
 
       if (selectedEl && container) {
         // If layout hasn't populated, wait for next paint
@@ -515,16 +503,9 @@ function ParentSelectorWidget() {
           }
         } else {
           // Manual center block logic for initial load
-          // We use offsetTop because getBoundingClientRect gives incorrect warped 
+          // We use offsetTop because getBoundingClientRect gives incorrect warped
           // coordinates while the popup is scaling/animating into view natively.
           const scrollOffset = selectedEl.offsetTop - container.clientHeight / 2 + selectedEl.clientHeight / 2;
-
-          console.log(`[ParentSelector:Scroll] Initial load centering:`, {
-            offsetTop: selectedEl.offsetTop,
-            containerHeight: container.clientHeight,
-            calcScrollOffset: scrollOffset
-          });
-
           container.scrollTop = scrollOffset;
           hasInitiallyScrolled.current = true;
         }
@@ -545,33 +526,22 @@ function ParentSelectorWidget() {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
+    // Gate: enter init only when BOTH async reads have resolved, and we
+    // haven't already initialized. `useTrackerPlugin` returns `undefined`
+    // while still loading; the loaders normalize empty results to `null`,
+    // so `=== undefined` cleanly distinguishes "loading" from "resolved-empty".
+    // Without this gate the effect ran 3–4× per popup as each dep resolved
+    // separately, redoing the full tree expansion each time.
+    if (contextData === undefined || allIncrementalRems === undefined) return;
+    if (!contextData?.rootCandidates || isInitialized) return;
+
     const initializeTree = async () => {
-      console.log('[ParentSelector:Widget] ========== INITIALIZATION ==========');
-      console.log('[ParentSelector:Widget] contextData:', !!contextData);
-      console.log('[ParentSelector:Widget] contextData?.rootCandidates:', contextData?.rootCandidates?.length);
-      console.log('[ParentSelector:Widget] allIncrementalRems:', allIncrementalRems?.length ?? 'null/undefined');
-      console.log('[ParentSelector:Widget] isInitialized:', isInitialized);
-
-      if (!contextData?.rootCandidates || isInitialized) {
-        console.log('[ParentSelector:Widget] Skipping init - no data or already initialized');
-        return;
-      }
-
       setIsLoading(true);
 
       let initialTree = [...contextData.rootCandidates];
-      console.log('[ParentSelector:Widget] Initial tree has', initialTree.length, 'root nodes');
-
-      // If there's a last selected destination, try to expand to it
-      // FIX: Use empty array as fallback if allIncrementalRems is null/undefined
       const incrementalRemsToUse = allIncrementalRems || [];
 
-      console.log('[ParentSelector:Widget] lastSelectedDestination:', contextData.lastSelectedDestination);
-      console.log('[ParentSelector:Widget] incrementalRemsToUse length:', incrementalRemsToUse.length);
-
       if (contextData.lastSelectedDestination) {
-        console.log('[ParentSelector:Widget] Attempting to expand to last destination...');
-
         try {
           const { tree: expandedTree, foundIndex } = await expandToLastDestination(
             plugin,
@@ -581,20 +551,13 @@ function ParentSelectorWidget() {
           );
 
           initialTree = expandedTree;
-          console.log('[ParentSelector:Widget] Expand result - foundIndex:', foundIndex);
-
           if (foundIndex >= 0) {
             setSelectedIndex(foundIndex);
-            console.log('[ParentSelector:Widget] Set selected index to:', foundIndex);
-          } else {
-            console.log('[ParentSelector:Widget] Destination not found in tree, keeping default selection');
           }
         } catch (error) {
           console.error('[ParentSelector:Widget] Error expanding to last destination:', error);
         }
       } else {
-        console.log('[ParentSelector:Widget] No last destination to expand to');
-
         // No prior memory: suggest the tightest-range IncRem containing the highlight page
         const pageIndex = (contextData as any).highlightPageIndex as number | null | undefined;
         if (pageIndex != null && contextData.pdfRemId) {
@@ -619,10 +582,8 @@ function ParentSelectorWidget() {
 
             if (bestRemId) {
               setSuggestedRemId(bestRemId);
-              // Also pre-select it so keyboard Enter works immediately
               const suggestedIdx = flatAll.findIndex(n => n.remId === bestRemId);
               if (suggestedIdx >= 0) setSelectedIndex(suggestedIdx);
-              console.log('[ParentSelector:Widget] Suggested IncRem:', bestRemId);
             }
           } catch (e) {
             console.error('[ParentSelector:Widget] Error computing suggestion:', e);
@@ -633,7 +594,6 @@ function ParentSelectorWidget() {
       setTree(initialTree);
       setIsLoading(false);
       setIsInitialized(true);
-      console.log('[ParentSelector:Widget] ========== INITIALIZATION COMPLETE ==========');
     };
 
     initializeTree();
@@ -816,12 +776,6 @@ function ParentSelectorWidget() {
   const handleSelect = useCallback(
     async (node: ParentTreeNode) => {
       if (!contextData || isCreating || creatingChildForNodeId) return;
-
-      console.log('[ParentSelector:Widget] ======== HANDLE SELECT ==========');
-      console.log('[ParentSelector:Widget] Selected node:', node.name, node.remId);
-      console.log('[ParentSelector:Widget] Context pdfRemId:', contextData.pdfRemId);
-      console.log('[ParentSelector:Widget] Context contextRemId:', contextData.contextRemId);
-      console.log('[ParentSelector:Widget] showPriorityPopupAfterCreate:', (contextData as any).showPriorityPopupAfterCreate);
 
       setIsCreating(true);
 

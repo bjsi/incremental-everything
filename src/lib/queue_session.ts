@@ -6,9 +6,10 @@ import {
 } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from './pdfUtils';
 import { autoFocusQueueDashboardId } from './consts';
+import { isMobileDevice } from './mobileUtils';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
+import { PRACTICED_QUEUES_HISTORY_KEY, rollOverOldSessions } from './queue_aggregates';
 
-const PRACTICED_QUEUES_HISTORY_KEY = 'practicedQueuesHistory';
 const ACTIVE_SESSION_KEY = 'activeQueueSession';
 const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
 const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
@@ -28,12 +29,38 @@ const cardStartTimes = new Map<string, number>();
 let incRemEngagementStart: number | null = null;
 let incRemEngagementRemId: string | null = null;
 
+// Track the last closed engagement to prevent unmount/remount races (e.g. extracts) from double-counting
+let lastIncRemEndTs: number | null = null;
+let lastIncRemEndRemId: string | null = null;
+
 // Set by markIncRemTransition() right before a queue→editor handoff. Tells the
 // next startIncRemEngagement(remId) to skip the count++ so a single IncRem
 // reviewed across queue + editor counts as one rep with combined time.
 let incRemTransitionFlag: string | null = null;
 
 let editorIncRemIdleTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Single-flight guard: rollover walks synced storage and rewrites two keys.
+// Concurrent runs would race on the read/write cycle and could double-bucket
+// the same sessions. Skip if one is already in-flight; the next save (or the
+// next register pass) will pick up anything missed.
+let isRollingOver = false;
+async function maybeRollOver(plugin: RNPlugin) {
+  if (isRollingOver) return;
+  isRollingOver = true;
+  try {
+    const result = await rollOverOldSessions(plugin);
+    if (result.rolled > 0 || result.removedNulls > 0) {
+      console.log(
+        `[QueueSession] Rolled over ${result.rolled} old sessions; pruned ${result.removedNulls} null entries.`
+      );
+    }
+  } catch (err) {
+    console.error('[QueueSession] Rollover failed:', err);
+  } finally {
+    isRollingOver = false;
+  }
+}
 
 async function syncLiveSession(plugin: RNPlugin) {
   await plugin.storage.setSession(ACTIVE_SESSION_KEY, currentSession);
@@ -113,7 +140,8 @@ type IncRemEvent =
   | { type: 'start'; remId: string; ts: number }
   | { type: 'end'; ts: number }
   | { type: 'rep'; remId: string; durationMs: number; ts: number }
-  | { type: 'transition'; remId: string; ts: number };
+  | { type: 'transition'; remId: string; ts: number }
+  | { type: 'force_save'; ts: number };
 
 async function pushIncRemEvent(plugin: RNPlugin, event: IncRemEvent) {
   const log = ((await plugin.storage.getSession<IncRemEvent[]>(INC_REM_EVENT_LOG_KEY)) || []).slice();
@@ -135,6 +163,10 @@ export async function startIncRemEngagement(plugin: RNPlugin, remId: string) {
 
 export async function endIncRemEngagement(plugin: RNPlugin) {
   await pushIncRemEvent(plugin, { type: 'end', ts: Date.now() });
+}
+
+export async function forceSaveSession(plugin: RNPlugin) {
+  await pushIncRemEvent(plugin, { type: 'force_save', ts: Date.now() });
 }
 
 export async function recordIncRemRep(plugin: RNPlugin, remId: string, durationMs: number) {
@@ -168,7 +200,12 @@ async function applyIncRemEngagementStart(
   const isTransition = incRemTransitionFlag === remId;
   incRemTransitionFlag = null;
 
-  if (!isTransition) {
+  const isResumption = 
+    lastIncRemEndRemId === remId && 
+    lastIncRemEndTs !== null && 
+    (startTs - lastIncRemEndTs) < 2000;
+
+  if (!isTransition && !isResumption) {
     currentSession.incRemsCount++;
     await maybeAdoptScopeFromRem(plugin, remId);
   }
@@ -185,6 +222,10 @@ async function applyIncRemEngagementEnd(plugin: RNPlugin, endTs: number) {
   const duration = Math.max(0, endTs - incRemEngagementStart);
   currentSession.incRemsTime += duration;
   currentSession.totalTime += duration;
+
+  lastIncRemEndTs = endTs;
+  lastIncRemEndRemId = incRemEngagementRemId;
+
   incRemEngagementStart = null;
   incRemEngagementRemId = null;
 
@@ -224,13 +265,19 @@ export async function saveCurrentSession(plugin: RNPlugin, _reason: string) {
   if (currentSession.flashcardsCount > 0 || currentSession.incRemsCount > 0) {
     const history =
       ((await plugin.storage.getSynced(PRACTICED_QUEUES_HISTORY_KEY)) as PracticedQueueSession[]) || [];
-    await plugin.storage.setSynced(PRACTICED_QUEUES_HISTORY_KEY, [currentSession, ...history]);
+    const validHistory = history.filter((s): s is PracticedQueueSession => !!s);
+    await plugin.storage.setSynced(PRACTICED_QUEUES_HISTORY_KEY, [currentSession, ...validHistory]);
+    // Fire-and-forget: keeps the raw window bounded by rolling older sessions
+    // into daily aggregates. Single-flight guard inside.
+    maybeRollOver(plugin);
   }
 
   currentSession = null;
   cardStartTimes.clear();
   incRemEngagementStart = null;
   incRemEngagementRemId = null;
+  lastIncRemEndTs = null;
+  lastIncRemEndRemId = null;
   incRemTransitionFlag = null;
   clearEditorIdleSave();
   await plugin.storage.setSession(ACTIVE_SESSION_KEY, null);
@@ -281,6 +328,35 @@ async function loadCardStats(
 }
 
 export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
+  // One-shot startup migration / rollover: covers users who installed this
+  // build but haven't reviewed yet. Fire-and-forget; widget reads will pick
+  // up the new state via useSyncedStorageState reactivity.
+  maybeRollOver(plugin);
+
+  // Startup recovery: if the plugin restarted (page refresh, crash) while a
+  // session was in progress, ACTIVE_SESSION_KEY holds the last synced snapshot
+  // but currentSession is null. Rescue it into synced history so the work is
+  // not silently lost.
+  (async () => {
+    try {
+      const orphaned = await plugin.storage.getSession<PracticedQueueSession>(ACTIVE_SESSION_KEY);
+      if (orphaned && (orphaned.flashcardsCount > 0 || orphaned.incRemsCount > 0)) {
+        if (!orphaned.endTime) orphaned.endTime = Date.now();
+        const history =
+          ((await plugin.storage.getSynced(PRACTICED_QUEUES_HISTORY_KEY)) as PracticedQueueSession[]) || [];
+        const deduped = history.filter((s): s is PracticedQueueSession => !!s && s.id !== orphaned.id);
+        await plugin.storage.setSynced(PRACTICED_QUEUES_HISTORY_KEY, [orphaned, ...deduped]);
+        await plugin.storage.setSession(ACTIVE_SESSION_KEY, null);
+        console.log(
+          `[QueueSession] Recovered orphaned session: id=${orphaned.id} scope="${orphaned.scopeName}" fc=${orphaned.flashcardsCount} ir=${orphaned.incRemsCount}`
+        );
+        maybeRollOver(plugin);
+      }
+    } catch (err) {
+      console.error('[QueueSession] Orphaned session recovery failed:', err);
+    }
+  })();
+
   // Heartbeat monitor: auto-save Mastery Drill session if the popup is closed without QueueExit
   setInterval(async () => {
     if (currentSession && currentSession.scopeName === 'Mastery Drill') {
@@ -318,6 +394,26 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
     }
   }, 500);
 
+  // Periodic IncRem engagement flush: while an engagement is open, roll its
+  // elapsed time into incRemsTime/totalTime so the live dashboard reflects
+  // reading time without waiting for engagement end. The end/save paths still
+  // flush remaining elapsed correctly because they compute from the (just
+  // advanced) incRemEngagementStart.
+  setInterval(async () => {
+    if (!currentSession || incRemEngagementStart === null) return;
+    try {
+      const now = Date.now();
+      const elapsed = Math.max(0, now - incRemEngagementStart);
+      if (elapsed === 0) return;
+      currentSession.incRemsTime += elapsed;
+      currentSession.totalTime += elapsed;
+      incRemEngagementStart = now;
+      await syncLiveSession(plugin);
+    } catch (error) {
+      console.error('ERROR in IncRem engagement live flush:', error);
+    }
+  }, 2000);
+
   // IncRem event-log drain: widgets push start/end/rep/transition events to
   // session storage (see pushIncRemEvent above). Poll, drain, apply in order.
   // Read-clear-process: a widget appending between read and write loses that
@@ -336,6 +432,8 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           await applyIncRemRep(plugin, event.remId, event.durationMs);
         } else if (event.type === 'transition') {
           incRemTransitionFlag = event.remId;
+        } else if (event.type === 'force_save') {
+          await saveCurrentSession(plugin, 'Explicit End Review');
         }
       }
     } catch (error) {
@@ -345,7 +443,9 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
   plugin.event.addListener(AppEvents.QueueEnter, undefined, async (data: any) => {
     try {
+      console.warn(`[QueueEnter DEBUG] fired at ${Date.now()}, subQueueId=${data?.subQueueId}, hasCurrentSession=${!!currentSession}`);
       if (currentSession) {
+        console.warn(`[QueueEnter DEBUG] saving previous session (scope=${currentSession.scopeName}, fc=${currentSession.flashcardsCount}, ir=${currentSession.incRemsCount})`);
         await saveCurrentSession(plugin, 'QueueEnter Overwrite');
       }
 
@@ -384,22 +484,38 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
         currentCardFirstRep: undefined,
       };
 
+      console.warn(`[QueueEnter DEBUG] new session created, scopeName=${scopeName}`);
       await syncLiveSession(plugin);
       cardStartTimes.clear();
       incRemEngagementStart = null;
       incRemEngagementRemId = null;
+      lastIncRemEndTs = null;
+      lastIncRemEndRemId = null;
       incRemTransitionFlag = null;
       clearEditorIdleSave();
 
       // Auto-focus the Practiced Queues dashboard in the right sidebar so the
       // user always has a live session view while reviewing. Opt-in via setting.
+      // Skip when triggered from the Mastery Drill: opening the right sidebar
+      // resizes the popup which re-mounts the embedded Queue, fires QueueEnter
+      // again, and creates a resize loop.
       const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
-      if (autoFocus) {
-        try {
-          await plugin.window.openWidgetInRightSidebar('practiced_queues');
-        } catch (err) {
-          console.error('Failed to auto-focus Practiced Queues dashboard:', err);
-        }
+      const isMobile = await isMobileDevice(plugin);
+      const isMasteryDrill = scopeName === 'Mastery Drill';
+      if (autoFocus && !isMobile && !isMasteryDrill) {
+        const focusDashboard = async () => {
+          try {
+            await plugin.window.openWidgetInRightSidebar('practiced_queues');
+          } catch (err) {
+            console.error('Failed to auto-focus Practiced Queues dashboard:', err);
+          }
+        };
+        // Immediate call: works when the sidebar is already open (just switches tab).
+        // When the sidebar is closed, this opens it — but RemNote also auto-focuses
+        // the AI Tutor tab on QueueEnter when it spawns the sidebar, racing us.
+        // Re-issue after a delay so our focus wins over RemNote's auto-focus.
+        await focusDashboard();
+        setTimeout(focusDashboard, 600);
       }
     } catch (error) {
       console.error('ERROR in QueueSession QueueEnter listener:', error);
@@ -422,6 +538,16 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
     try {
       const now = Date.now();
 
+      // Defensive: when a flashcard loads (data.cardId is set; IncRems load
+      // without a cardId), close any open IncRem engagement synchronously so
+      // the periodic flush does not keep adding reading time to incRemsTime
+      // while a flashcard is on screen. The IncRem widget's unmount cleanup
+      // also calls endIncRemEngagement, but that routes through the 250 ms
+      // event-log drain and may lag behind QueueLoadCard.
+      if (data?.cardId && incRemEngagementStart !== null && currentSession) {
+        await applyIncRemEngagementEnd(plugin, now);
+      }
+
       // Staleness defense: clear cluster signals at the start of each new card load so a
       // value left over from the previous card can't leak in if the widget fails to mount.
       // Inside a cluster, QueueLoadCard does not fire per sibling, so the widget's writes
@@ -434,11 +560,12 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
         try {
           const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
           const isFinalDrillActive = await plugin.storage.getSession<boolean>('finalDrillActive');
+          const isMobile = await isMobileDevice(plugin);
           currentSession = {
             id: Math.random().toString(36).substring(7),
             startTime: now,
             kbId: kbData._id,
-            scopeName: isFinalDrillActive ? 'Mastery Drill' : 'Restored Mobile Session',
+            scopeName: isFinalDrillActive ? 'Mastery Drill' : (isMobile ? 'Restored Mobile Session' : 'Ad-hoc Session'),
             totalTime: 0,
             flashcardsCount: 0,
             flashcardsTime: 0,
@@ -451,6 +578,8 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           cardStartTimes.clear();
           incRemEngagementStart = null;
           incRemEngagementRemId = null;
+          lastIncRemEndTs = null;
+          lastIncRemEndRemId = null;
           incRemTransitionFlag = null;
         } catch (err) {
           console.error('ERROR: Failed to lazily initialize practice session', err);
@@ -525,8 +654,17 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
       if (currentSession && cardId) {
         // Prefer the QueueLoadCard-recorded start time (more accurate for anchor / first card);
-        // fall back to the widget-recorded sibling load time for subsequent siblings.
-        const startTime = cardStartTimes.get(effectiveCardId) ?? clusterLoadTime;
+        // fall back to the widget-recorded sibling load time only for cluster siblings, where
+        // QueueLoadCard does NOT fire per sibling and effectiveCardId differs from data.cardId.
+        // For non-cluster cards (effectiveCardId === cardId) where cardStartTimes was already
+        // consumed, the fallback is wrong: clusterLoadTime is stale (the original load time)
+        // and using it would inflate the session counters when RemNote fires QueueCompleteCard
+        // repeatedly for a stuck card. Drop the fallback in that case so the duplicate
+        // completion is silently ignored.
+        const isClusterSibling = effectiveCardId !== cardId;
+        const startTime =
+          cardStartTimes.get(effectiveCardId) ??
+          (isClusterSibling ? clusterLoadTime : undefined);
         if (startTime) {
           const rawTimeSpent = Date.now() - startTime;
           const timeLimitSec =

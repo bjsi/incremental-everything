@@ -16,7 +16,6 @@ import {
   defaultPriorityId,
   currentIncRemKey,
   incremReviewStartTimeKey,
-  incRemCacheReloadKey,
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
@@ -281,7 +280,7 @@ export const getIncrementalRemFromRem = async (
  * @param rem PluginRem to initialize.
  * @returns Promise that resolves after the Rem is initialized or skipped if already incremental.
  */
-export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean, explicitParentId?: string }) {
+export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean, explicitParentId?: string, skipInitialCascade?: boolean }) {
   const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
 
   if (!isAlreadyIncremental) {
@@ -381,12 +380,12 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         console.error('[initIncrementalRem] Error registering in known host indexes:', e);
       }
 
-      // Bump the reload trigger so the tracker picks up the new IncRem.
-      // The tracker reads incRemCacheReloadKey reactively; writing a new timestamp
-      // here causes it to re-run loadIncrementalRemCache (via non-reactive plugin ref).
-      await plugin.storage.setSession(incRemCacheReloadKey, Date.now());
-      plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
-      triggeredCascade = true;
+      // The targeted updateIncrementalRemCache call above already inserts the new
+      // IncRem into the in-session cache, so no global reload trigger is needed.
+      if (!options?.skipInitialCascade) {
+        plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
+        triggeredCascade = true;
+      }
     } finally {
       // Only clear the flag if no cascade was triggered.
       // If cascade IS pending, leave the flag up — the cascade tracker will clear it.

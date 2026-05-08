@@ -5,7 +5,7 @@ import {
   useTrackerPlugin,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Reader } from '../components/Reader';
 import { VideoViewer } from '../components/Video';
 import { VideoExtractViewer } from '../components/VideoExtractViewer';
@@ -20,12 +20,11 @@ import {
   activeHighlightIdKey,
   showRemsAsIsolatedInQueueId,
   powerupCode,
+  currentHostDocumentIdKey,
 } from '../lib/consts';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { startIncRemEngagement, endIncRemEngagement } from '../lib/queue_session';
-
-console.log('QUEUE.TSX FILE LOADED');
 
 type ViewMode = 'isolated' | 'context';
 
@@ -35,52 +34,32 @@ export function QueueComponent() {
   const [sourceDocName, setSourceDocName] = useState<string | undefined>();
   const [showSpark, setShowSpark] = useState(false);
 
-  console.log('🎬 QueueComponent RENDER START');
-
   const ctx = useRunAsync(
-    async () => {
-      console.log('🎬 ctx: Getting widget context...');
-      const context = await plugin.widget.getWidgetContext<WidgetLocation.Flashcard>();
-      console.log('🎬 ctx: Got context:', context);
-      return context;
-    },
+    async () => plugin.widget.getWidgetContext<WidgetLocation.Flashcard>(),
     []
   );
 
-  console.log('🎬 QueueComponent ctx value:', ctx);
-
-  // MOVE ALL HOOKS HERE - BEFORE ANY RETURNS
+  // All hooks must run before any early return — keep this block above the
+  // `if (!ctx?.remId) return null` guard further down.
   const remAndType = useTrackerPlugin(
     async (rp) => {
-      // Add guard INSIDE the hook
-      if (!ctx?.remId) {
-        console.log('⛔ useTrackerPlugin: No ctx.remId yet');
-        return undefined;
-      }
-
-      console.log('🔄 useTrackerPlugin RUNNING for remId:', ctx.remId);
+      if (!ctx?.remId) return undefined;
       const rem = await rp.rem.findOne(ctx.remId);
       if (!rem) {
-        console.log('⛔ useTrackerPlugin: Rem not found');
+        console.log('[QueueComponent] remAndType: rem not found for', ctx.remId);
         return null;
       }
-
-      console.log('🔄 useTrackerPlugin: Calling remToActionItemType');
       const result = await remToActionItemType(rp, rem);
-      console.log('✅ useTrackerPlugin result:', result?.type);
+      console.log('[QueueComponent] remAndType resolved:', {
+        ctxRemId: ctx.remId,
+        type: result?.type,
+        remId: result?.rem?._id,
+        hasExtract: !!(result as any)?.extract,
+      });
       return result;
     },
     [ctx?.remId]
   );
-
-  const lastProcessedRemId = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (ctx?.remId && ctx.remId !== lastProcessedRemId.current) {
-      lastProcessedRemId.current = ctx.remId;
-      console.log('🔄 Processing new rem in queue:', ctx.remId);
-    }
-  }, [ctx?.remId]);
 
   const showRemsAsIsolated = useTrackerPlugin(
     (rp) => rp.settings.getSetting<boolean>(showRemsAsIsolatedInQueueId),
@@ -113,17 +92,41 @@ export function QueueComponent() {
     const incrementalRemId = ctx?.remId;
     setCurrentIncrementalRem(plugin, incrementalRemId);
 
-    plugin.storage.setSession(currentIncrementalRemTypeKey, remAndType?.type);
+    const resolvedType = remAndType?.type;
+    plugin.storage.setSession(currentIncrementalRemTypeKey, resolvedType);
 
     // For highlights, we still need to identify the specific extract.
-    const activeHighlight = (remAndType?.type === 'pdf-highlight' || remAndType?.type === 'html-highlight')
+    const activeHighlight = (resolvedType === 'pdf-highlight' || resolvedType === 'html-highlight')
       ? (remAndType as any).extract?._id
       : null;
     plugin.storage.setSession(activeHighlightIdKey, activeHighlight);
 
+    // Publish the host document ID (PDF/HTML source Rem) so the notes sidebar
+    // can discover related IncRems for highlight types.
+    const hostDocId = (resolvedType === 'pdf-highlight' || resolvedType === 'html-highlight'
+      || resolvedType === 'pdf' || resolvedType === 'html')
+      ? remAndType!.rem._id
+      : null;
+    plugin.storage.setSession(currentHostDocumentIdKey, hostDocId);
+
+    console.log('[QueueComponent] useEffect publishing session signals:', {
+      incrementalRemId,
+      resolvedType,
+      activeHighlight,
+      hostDocId,
+      remAndTypeIsNull: remAndType === null,
+      remAndTypeIsUndefined: remAndType === undefined,
+    });
+
     if (remAndType === null) {
       plugin.queue.removeCurrentCardFromQueue(false);
     }
+
+    return () => {
+      console.log('[QueueComponent] useEffect CLEANUP - clearing hostDocId + remType');
+      plugin.storage.setSession(currentHostDocumentIdKey, null);
+      plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
+    };
   }, [ctx?.remId, remAndType, plugin]);
 
   const shouldRenderEditorForRemType = useRunAsync(async () => {
@@ -156,7 +159,6 @@ export function QueueComponent() {
   // If the powerup goes missing while we're mounted, immediately advance the queue.
   useEffect(() => {
     if (hasIncrementalPowerup === false) {
-      console.log('🎬 QueueComponent: Rem lost powerup, advancing queue proactively');
       plugin.queue.removeCurrentCardFromQueue(true);
     }
   }, [hasIncrementalPowerup, plugin]);
@@ -199,28 +201,12 @@ export function QueueComponent() {
   }, [viewMode, isHighlightType, isRemType, showRemsAsIsolated]);
 
   // AFTER ALL HOOKS, NOW you can return early
-  if (!ctx?.remId) {
-    console.log('⛔ QueueComponent: No ctx.remId, returning null');
-    return null;
-  }
+  if (!ctx?.remId) return null;
 
   // If the powerup is gone, this widget should NOT be rendering anything that covers the flashcard.
-  if (hasIncrementalPowerup === false) {
-    return null;
-  }
+  if (hasIncrementalPowerup === false) return null;
 
-  console.log('🎬 QueueComponent: ctx.remId exists:', ctx.remId);
-
-  if (remAndType?.type === 'rem' && !shouldRenderEditorForRemType) {
-    return null;
-  }
-
-  console.log('🎬 QueueComponent FINAL RENDER:', {
-    remId: ctx?.remId,
-    type: remAndType?.type,
-    viewMode,
-    willRender: remAndType ? 'YES' : 'NO'
-  });
+  if (remAndType?.type === 'rem' && !shouldRenderEditorForRemType) return null;
 
   // Get the rem to display in isolated view (highlights and optionally rems)
   const getIsolatedRem = () => {

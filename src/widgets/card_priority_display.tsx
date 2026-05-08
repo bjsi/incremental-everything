@@ -515,18 +515,18 @@ export function CardPriorityDisplay() {
         }}
       >
         {isIncRem && (
-          <img 
-            src="icon-toggle-inc.png" 
-            alt="Incremental Rem" 
-            style={{ 
-              position: 'absolute', 
-              right: '12px', 
-              top: '50%', 
-              transform: 'translateY(-50%)', 
-              width: '28px', 
+          <img
+            src="icon-toggle-inc.png"
+            alt="Incremental Rem"
+            style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: '28px',
               height: '28px',
               opacity: 0.8
-            }} 
+            }}
             title="This card is an Incremental Rem"
           />
         )}
