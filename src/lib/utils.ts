@@ -243,6 +243,11 @@ export interface WeightedShieldBreakdown {
   processedWeightPct: number;
   /** 10 buckets of percentile ranges */
   buckets: WeightedShieldBucket[];
+  /**
+   * Items sorted by priority asc, with their due state. Lets the popup compute
+   * stats for arbitrary "priority ≤ threshold" subsets without re-fetching data.
+   */
+  sortedItems?: { priority: number; isDue: boolean }[];
 }
 
 /**
@@ -277,11 +282,15 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
   let dueWeight = 0;
   let dueCount = 0;
 
+  // Cache per-item due state so we only call the predicate once per item.
+  const dueByRemId = new Map<string, boolean>();
+
   for (const item of validItems) {
     const p = percentileMap.get(item.remId) ?? 50;
     const weight = Math.exp(-k * p / 100);
     const bucketIdx = Math.min(Math.floor(p / 10), 9); // 0-9
     const isDue = isDuePredicate(item);
+    dueByRemId.set(item.remId, isDue);
 
     totalWeight += weight;
     bucketData[bucketIdx].total++;
@@ -297,6 +306,12 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
       bucketData[bucketIdx].processed++;
     }
   }
+
+  // Slim, ordered snapshot for the interactive subset-stats slider in the popup.
+  const sortedItems = sorted.map((item) => ({
+    priority: item.priority,
+    isDue: dueByRemId.get(item.remId) ?? false,
+  }));
 
   const shieldValue = totalWeight > 0
     ? Math.round(((totalWeight - dueWeight) / totalWeight) * 1000) / 10
@@ -322,6 +337,7 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
     dueWeight: Math.round(dueWeight * 100) / 100,
     processedWeightPct: shieldValue,
     buckets,
+    sortedItems,
   };
 }
 
