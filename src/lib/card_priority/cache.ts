@@ -349,13 +349,16 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   const inheritanceRemIdSet = new Set<RemId>(taggedForInheritanceRems.map((r) => r._id));
   console.log(`[Card Priority Cache] Found ${inheritanceRemIdSet.size} rems tagged with cardPriority powerup`);
 
-  // Untagged rems = rems with cards that are NOT tagged. taggedRem() already
-  // tells us which rems carry the powerup, so we can split without per-rem
-  // hasPowerup checks.
+  // Untagged-with-cards = rems with cards that are NOT tagged. taggedRem()
+  // already tells us which rems carry the powerup, so we can split without
+  // per-rem hasPowerup checks.
   const untaggedRemIds: string[] = cardRemIds.filter((id) => !inheritanceRemIdSet.has(id));
-  const totalUnique = inheritanceRemIdSet.size + untaggedRemIds.length;
+  // Inheritance-only = rems tagged with cardPriority that have no cards of
+  // their own (they exist purely so descendants can inherit the priority).
+  const inheritanceOnlyCount = inheritanceRemIdSet.size - (cardRemIds.length - untaggedRemIds.length);
+  const totalUnique = cardRemIds.length + inheritanceOnlyCount;
   console.log(
-    `[Card Priority Cache] Total ${totalUnique} rems to process (${taggedForInheritanceRems.length} tagged + ${untaggedRemIds.length} untagged-with-cards)`
+    `[Card Priority Cache] Total ${totalUnique} rems to process (${cardRemIds.length} with cards + ${inheritanceOnlyCount} inheritance-only)`
   );
 
   if (totalUnique === 0) {
@@ -365,7 +368,7 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   }
 
   const phase1Start = Date.now();
-  console.log(`[Card Priority Cache] Phase 1 - Loading ${taggedForInheritanceRems.length} pre-tagged cards...`);
+  console.log(`[Card Priority Cache] Phase 1 - Loading ${taggedForInheritanceRems.length} pre-tagged rems...`);
   const taggedPriorities: CardPriorityInfo[] = [];
 
   const checkBatchSize = 100;
@@ -408,9 +411,9 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   const phase1Time = Math.round((Date.now() - phase1Start) / 1000);
   const totalTime = Math.round((Date.now() - startTime) / 1000);
   console.log(
-    `[Card Priority Cache] Phase 1 complete. Loaded and enriched ${enrichedTaggedPriorities.length} tagged cards in ${phase1Time}s (total ${totalTime}s including setup)`
+    `[Card Priority Cache] Phase 1 complete. Loaded and enriched ${enrichedTaggedPriorities.length} tagged rems in ${phase1Time}s (total ${totalTime}s including setup)`
   );
-  console.log(`[Card Priority Cache] Found ${untaggedRemIds.length} untagged cards for deferred processing`);
+  console.log(`[Card Priority Cache] Found ${untaggedRemIds.length} untagged rems with cards for deferred processing`);
 
   if (enrichedTaggedPriorities.length > 0) {
     await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} pre-tagged card priorities in ${phase1Time}s`);
@@ -420,7 +423,7 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
     const untaggedPercentage = Math.round((untaggedRemIds.length / totalUnique) * 100);
     if (untaggedPercentage > 20) {
       await plugin.app.toast(
-        `⏳ Processing ${untaggedRemIds.length} untagged cards in background... `
+        `⏳ Processing ${untaggedRemIds.length} untagged rems in background... `
       );
     }
 
@@ -428,7 +431,7 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
       await processDeferredCardPriorityCache(plugin, untaggedRemIds);
     }, 3000);
   } else {
-    console.log('[Card Priority Cache] All cards are pre-tagged! No deferred processing needed.');
+    console.log('[Card Priority Cache] All rems with cards are pre-tagged! No deferred processing needed.');
     await plugin.app.toast('✅ All card priorities loaded!');
     await plugin.storage.setSession('card_priority_cache_fully_loaded', true);
   }

@@ -3,7 +3,7 @@ import {
   usePlugin,
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPriorityReviewDocument } from '../lib/priority_review_document';
 import { getCardsPerRem } from '../lib/sorting';
 
@@ -31,6 +31,22 @@ function ReviewDocumentCreator() {
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
+
+  const scopeFirstRadioRef = useRef<HTMLInputElement>(null);
+  const scopeSecondRadioRef = useRef<HTMLInputElement>(null);
+  const numberInputRef = useRef<HTMLInputElement>(null);
+  const hasFocused = useRef(false);
+
+  useEffect(() => {
+    if (context && flashcardRatio !== undefined && !hasFocused.current) {
+      hasFocused.current = true;
+      if (context.scopeRemId && scopeFirstRadioRef.current) {
+        scopeFirstRadioRef.current.focus();
+      } else {
+        scopeSecondRadioRef.current?.focus();
+      }
+    }
+  }, [context, flashcardRatio]);
 
   const ratioToLabel = (ratio: number | 'no-cards' | 'no-rem'): string => {
     if (ratio === 'no-cards') return 'Only Incremental Rems';
@@ -84,6 +100,47 @@ function ReviewDocumentCreator() {
     }
   };
 
+  const focusCurrentScopeRadio = () => {
+    if (!useFullKB && context?.scopeRemId && scopeFirstRadioRef.current) {
+      scopeFirstRadioRef.current.focus();
+    } else {
+      scopeSecondRadioRef.current?.focus();
+    }
+  };
+
+  const handleWrapperKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isCreating) {
+      e.preventDefault();
+      handleCreate();
+    }
+  };
+
+  const handleScopeKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (context?.scopeRemId && !isCreating) {
+        setUseFullKB(false);
+        scopeFirstRadioRef.current?.focus();
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isCreating) {
+        setUseFullKB(true);
+        scopeSecondRadioRef.current?.focus();
+      }
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      numberInputRef.current?.focus();
+    }
+  };
+
+  const handleNumberInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      focusCurrentScopeRadio();
+    }
+  };
+
   const handleOpenSortingSettings = async () => {
     try {
       // Open sorting criteria as a popup
@@ -103,7 +160,7 @@ function ReviewDocumentCreator() {
   }
 
   return (
-    <div className="p-5 flex flex-col gap-4" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '800px', margin: '0 auto' }}>
+    <div className="p-5 flex flex-col gap-4" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '800px', margin: '0 auto' }} onKeyDown={handleWrapperKeyDown}>
 
       {/* Header */}
       <div>
@@ -114,12 +171,13 @@ function ReviewDocumentCreator() {
       </div>
 
       {/* Scope Selection */}
-      <div className="rn-clr-background-secondary rounded-lg border border-gray-300 p-4" style={{ borderColor: 'var(--rn-clr-border, #e5e7eb)' }}>
+      <div className="rn-clr-background-secondary rounded-lg border border-gray-300 p-4" style={{ borderColor: 'var(--rn-clr-border, #e5e7eb)' }} onKeyDown={handleScopeKeyDown}>
         <div className="flex items-start gap-6">
           <div className="font-semibold whitespace-nowrap" style={{ width: '80px' }}>Scope</div>
           <div className="flex flex-col gap-2">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
+                ref={scopeFirstRadioRef}
                 type="radio"
                 checked={!useFullKB}
                 onChange={() => setUseFullKB(false)}
@@ -129,6 +187,7 @@ function ReviewDocumentCreator() {
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
+                ref={scopeSecondRadioRef}
                 type="radio"
                 checked={useFullKB}
                 onChange={() => setUseFullKB(true)}
@@ -146,11 +205,13 @@ function ReviewDocumentCreator() {
           <div className="font-semibold" style={{ width: '80px', lineHeight: '1.1', paddingTop: '4px' }}>Number of Items</div>
           <div className="flex items-center gap-3">
             <input
+              ref={numberInputRef}
               type="number"
               min={1}
               max={500}
               value={itemCount}
               onChange={(e) => setItemCount(Math.max(1, Math.min(500, parseInt(e.target.value) || 1)))}
+              onKeyDown={handleNumberInputKeyDown}
               className="rn-clr-background rounded"
               style={{
                 padding: '8px 12px',
