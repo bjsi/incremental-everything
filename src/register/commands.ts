@@ -542,16 +542,20 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
       if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
 
-      // 2. Add remove-from-queue tag to parent
-      let removeFromQueueTag = await plugin.rem.findByName(['remove-from-queue'], null);
-      if (!removeFromQueueTag) {
-        removeFromQueueTag = await plugin.rem.createRem();
-        if (removeFromQueueTag) {
-          await removeFromQueueTag.setText(['remove-from-queue']);
+      // 2. Tag the cloze rem with `remove-parent` so the parent rem is hidden from
+      // the queue when this cloze is the current card — but only for this cloze.
+      // Tagging the parent with `remove-from-queue` (the previous behavior) would
+      // also hide it for sibling/descendant flashcards (e.g. descriptor children),
+      // breaking their context. Tagging the cloze itself scopes the effect correctly.
+      let removeParentTag = await plugin.rem.findByName(['remove-parent'], null);
+      if (!removeParentTag) {
+        removeParentTag = await plugin.rem.createRem();
+        if (removeParentTag) {
+          await removeParentTag.setText(['remove-parent']);
         }
       }
-      if (removeFromQueueTag) {
-        await rem.addTag(removeFromQueueTag._id);
+      if (removeParentTag) {
+        await clozeRem.addTag(removeParentTag._id);
       }
 
       // 3. Mark selected text in parent with yellow highlight + red font.

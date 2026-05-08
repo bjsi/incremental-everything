@@ -91,6 +91,29 @@ const REMOVE_FROM_QUEUE_CSS = `
   }
 `;
 
+/* Remove-Parent: when applied to the current question rem, completely removes the
+   parent rem from the queue display on BOTH front and back of the card (no
+   "Hidden in queue" placeholder, unlike hide-parent). Mirrors hide-parent's
+   :has() selector but drops the --answer-hidden modifier and hides .rn-queue-rem
+   outright. */
+const REMOVE_PARENT_CSS = `
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="removeparent"]) > .RichTextViewer,
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="remove-parent"]) > .RichTextViewer,
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="removeparent"]) > .rn-flashcard-delimiter,
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="remove-parent"]) > .rn-flashcard-delimiter,
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="removeparent"]) > .rn-queue-rem,
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="remove-parent"]) > .rn-queue-rem,
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="removeparent"]) > .rem-bullet__document,
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="remove-parent"]) > .rem-bullet__document {
+    display: none !important;
+  }
+
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="removeparent"]),
+  .rn-queue__content .indented-rem:has(> .rn-question-rem[data-queue-rem-container-tags~="remove-parent"]) {
+    margin-left: 0px !important;
+  }
+`;
+
 let sessionItemCounter = 0;
 
 export const resetSessionItemCounter = () => {
@@ -101,6 +124,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
   plugin.app.registerCSS(queueHideElementsId, QUEUE_HIDE_ELEMENTS_CSS);
   plugin.app.registerCSS('remove-from-queue-css', REMOVE_FROM_QUEUE_CSS);
+  plugin.app.registerCSS('remove-parent-css', REMOVE_PARENT_CSS);
 
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
