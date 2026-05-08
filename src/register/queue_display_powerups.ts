@@ -21,12 +21,36 @@ export const NO_HIERARCHY_POWERUP_CODE = 'noHierarchy';
 export const HIDE_PARENT_POWERUP_CODE = 'hideParent';
 export const HIDE_GRANDPARENT_POWERUP_CODE = 'hideGrandparent';
 
-/* CORE CSS — covers Remove Parent + Remove Grandparent.
+/* CORE CSS — covers Remove Parent, Remove Grandparent, and Remove from Queue.
+
+   Why Remove from Queue is here (not in LEGACY_CSS):
+   - The createExtract flow falls back on Remove Parent only when Remove from
+     Queue is unavailable. When it IS available, it tags the PARENT, and we
+     need that to render whether or not our integration is on (the standalone
+     Hide in Queue plugin also registers an equivalent rule, so duplication
+     when both exist is harmless).
+   - Existing extracts created before the powerup migration carry a legacy
+     tag-rem named "remove-from-queue" on their parent. Keeping the CSS
+     always-on preserves the rendering for that legacy data even for users
+     who have neither our integration enabled nor the standalone plugin.
 
    Both selector forms (`~="remove-parent"` and `~="removeparent"`) are
    included defensively to cover any RemNote-side slugification differences
    between powerup-applied tags and legacy tag-rem-applied tags. */
 const CORE_CSS = `
+/* ===== Remove from Queue ===== */
+.rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem) > .rn-queue-rem,
+.rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem) > .rn-queue-rem {
+  display: none;
+}
+
+.rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem),
+.rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem),
+.rn-breadcrumb-item[data-rem-tags~="remove-from-queue"],
+.rn-breadcrumb-item[data-rem-tags~="removefromqueue"] {
+  margin-left: 0px !important;
+}
+
 /* ===== Remove Parent =====
    Like hide-parent but: (a) applies on BOTH front and back (no --answer-hidden gate)
    and (b) hides .rn-queue-rem outright instead of leaving a "Hidden in queue" stub. */
@@ -65,8 +89,8 @@ const CORE_CSS = `
 }
 `;
 
-/* LEGACY CSS — Hide in Queue, Remove from Queue, No Hierarchy, Hide Parent,
-   Hide Grandparent. Identical in effect to the standalone plugin's CSS. */
+/* LEGACY CSS — Hide in Queue, No Hierarchy, Hide Parent, Hide Grandparent.
+   Remove from Queue's CSS lives in CORE_CSS (always-on) — see comment there. */
 const LEGACY_CSS = `
 /* ===== Hide in Queue ===== */
 .rn-queue__content--answer-hidden [data-queue-rem-container-tags~="hide-in-queue"]:not(.rn-question-rem) > .RichTextViewer,
@@ -97,19 +121,6 @@ const LEGACY_CSS = `
   position: absolute;
   left: 25px;
   top: 0;
-}
-
-/* ===== Remove from Queue ===== */
-.rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem) > .rn-queue-rem,
-.rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem) > .rn-queue-rem {
-  display: none;
-}
-
-.rn-queue__content [data-queue-rem-container-tags~="remove-from-queue"]:not(.rn-question-rem),
-.rn-queue__content [data-queue-rem-container-tags~="removefromqueue"]:not(.rn-question-rem),
-.rn-breadcrumb-item[data-rem-tags~="remove-from-queue"],
-.rn-breadcrumb-item[data-rem-tags~="removefromqueue"] {
-  margin-left: 0px !important;
 }
 
 /* ===== No Hierarchy ===== */

@@ -51,7 +51,10 @@ import {
 } from '../lib/card_priority';
 import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
 import { computeClozeAutoPriority, ClozeAutoPriorityInfo } from '../lib/cloze_priority';
-import { REMOVE_PARENT_POWERUP_CODE } from './queue_display_powerups';
+import {
+  REMOVE_PARENT_POWERUP_CODE,
+  REMOVE_FROM_QUEUE_POWERUP_CODE,
+} from './queue_display_powerups';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 import {
@@ -172,12 +175,28 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await extractRem.setText(newText);
       await extractRem.setParent(rem);
 
-      // 3. Apply Remove Parent powerup to the extract itself so the parent rem is
-      // hidden from queue display only when this specific extract is the current item.
-      // Tagging the parent with Remove from Queue (the previous behavior) would also
-      // hide it for sibling/descendant flashcards (e.g. descriptor children),
-      // breaking their context. Scoping the effect to the extract avoids that.
-      await extractRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
+      // 3. Hide the source rem from queue display when this extract is reviewed.
+      //
+      // Preferred path: tag the PARENT (source rem) with Remove from Queue. This
+      // survives extract relocation cleanly — if the user later deletes the parent
+      // and lets extracts stand on their own, the powerup goes with the parent
+      // and the standalone extracts behave normally.
+      //
+      // Fallback path: if Remove from Queue isn't registered (neither our
+      // Hide-in-Queue integration nor the standalone plugin is active), tag the
+      // EXTRACT itself with Remove Parent (always registered). This works but
+      // has a relocation caveat: if the extract is later moved under a new
+      // parent, that new parent will be hidden too — the user must remove the
+      // powerup manually in that case.
+      //
+      // Detecting via getPowerupByCode (rather than our integration setting alone)
+      // ensures users with only the standalone plugin still hit the preferred path.
+      const rfqPowerup = await plugin.powerup.getPowerupByCode(REMOVE_FROM_QUEUE_POWERUP_CODE);
+      if (rfqPowerup) {
+        await rem.addPowerup(REMOVE_FROM_QUEUE_POWERUP_CODE);
+      } else {
+        await extractRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
+      }
 
       // Make Incremental
       // Pass the explicit parent since the SDK cache may not yet reflect `extractRem.setParent(rem)`
