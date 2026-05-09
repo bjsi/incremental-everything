@@ -4,11 +4,110 @@ import {
   ReactRNPlugin,
   RemId,
   RichTextElementRemInterface,
+  RichTextInterface,
+  RichTextElementInterface,
 } from '@remnote/plugin-sdk';
 import { parentSelectorWidgetId, powerupCode, allIncrementalRemKey } from './consts';
 import { initIncrementalRem } from './incremental_rem';
 import { IncrementalRem } from './incremental_rem';
 import { removeIncrementalRemCache } from './incremental_rem/cache';
+
+/**
+ * Sanitize a RichTextInterface array so that every element conforms strictly to
+ * the shapes accepted by `rem.setText()`.
+ *
+ * When reading `highlightRem.text` from a PDF highlight that contains images,
+ * the internal representation may carry extra/internal properties that RemNote's
+ * cross-sandbox `setText` validator rejects with "Invalid input". This function
+ * strips each element down to only the keys defined in the plugin SDK types.
+ */
+const sanitizeRichTextForSetText = (richText: RichTextInterface): RichTextInterface => {
+  return richText.map((element): RichTextElementInterface => {
+    // Plain strings pass through as-is
+    if (typeof element === 'string') return element;
+
+    const el = element as any;
+    switch (el.i) {
+      case 'm': {
+        // RichTextElementTextInterface
+        const clean: any = { i: 'm', text: el.text ?? '' };
+        // Copy known optional formatting properties (only if present)
+        const textKeys = [
+          'workInProgressTag', 'workInProgressRem', 'workInProgressPortal',
+          'block', 'title',
+          // RICH_TEXT_FORMATTING enum values (string keys)
+          'cloze', 'u', 'b', 'l', 'code', 'rc', 'hc',
+          'h', 'tc', 'dl', 'cl', 'q', 'il',
+        ];
+        for (const k of textKeys) {
+          if (k in el) clean[k] = el[k];
+        }
+        return clean;
+      }
+
+      case 'q': {
+        // RichTextElementRemInterface
+        const clean: any = { i: 'q', _id: el._id };
+        if (el.aliasId !== undefined) clean.aliasId = el.aliasId;
+        if (el.pin !== undefined) clean.pin = el.pin;
+        if (el.content !== undefined) clean.content = el.content;
+        if (el.textOfDeletedRem !== undefined) {
+          clean.textOfDeletedRem = sanitizeRichTextForSetText(el.textOfDeletedRem);
+        }
+        if ('cloze' in el) clean.cloze = el.cloze;
+        return clean;
+      }
+
+      case 'i': {
+        // RichTextImageInterface — this is the key culprit for PDF highlights with images
+        const clean: any = { i: 'i', url: el.url };
+        // Copy simple optional keys (skip 'percent' — handled separately below)
+        const imageKeys = [
+          'blocks', 'clozeOrder',
+          'loading', 'title', 'transparent', 'imgId',
+          'practiceInOrder', 'openOcclusionPopup',
+        ];
+        for (const k of imageKeys) {
+          if (k in el) clean[k] = el[k];
+        }
+        // width/height: round to integers to avoid potential validator issues with floats
+        if (el.width !== undefined) clean.width = Math.round(el.width);
+        if (el.height !== undefined) clean.height = Math.round(el.height);
+        // percent: SDK only allows 5 | 25 | 50 | 100. The PDF engine sometimes stores
+        // the highlight's area percentage (e.g. 68.08…) which the validator rejects.
+        const VALID_PERCENTS = new Set([5, 25, 50, 100]);
+        if (el.percent !== undefined && VALID_PERCENTS.has(el.percent)) {
+          clean.percent = el.percent;
+        }
+        if (el.label !== undefined) clean.label = sanitizeRichTextForSetText(el.label);
+        if (el.frontLabel !== undefined) clean.frontLabel = sanitizeRichTextForSetText(el.frontLabel);
+        return clean;
+      }
+
+      case 'a': {
+        // RichTextAudioInterface
+        const clean: any = { i: 'a', url: el.url };
+        if (el.onlyAudio !== undefined) clean.onlyAudio = el.onlyAudio;
+        if (el.width !== undefined) clean.width = el.width;
+        if (el.height !== undefined) clean.height = el.height;
+        if (el.percent !== undefined) clean.percent = el.percent;
+        return clean;
+      }
+
+      case 'p': {
+        // RichTextPluginInterface
+        const clean: any = { i: 'p', url: el.url };
+        if (el.pluginName !== undefined) clean.pluginName = el.pluginName;
+        return clean;
+      }
+
+      default:
+        // For any other element types (latex 'x', card delimiter 's', annotations, etc.)
+        // pass through as-is — they rarely appear in PDF highlights.
+        return el;
+    }
+  });
+};
 import {
   ParentTreeNode,
   ParentSelectorContext,
@@ -167,7 +266,8 @@ export const createRemUnderParent = async (
   }
 
   const sourceLink = { i: 'q' as const, _id: highlightRem._id, pin: true };
-  const contentWithReference = [...(highlightRem.text || []), ' ', sourceLink];
+  const sanitizedHighlightText = sanitizeRichTextForSetText(highlightRem.text || []);
+  const contentWithReference = [...sanitizedHighlightText, ' ', sourceLink];
 
   await newRem.setText(contentWithReference);
   await newRem.setParent(parentId);
