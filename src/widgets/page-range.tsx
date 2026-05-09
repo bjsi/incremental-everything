@@ -10,7 +10,8 @@ import {
   getPageRangeKey,
   getPageHistory,
   getAllIncrementsForPDF,
-  getFastRemsForPDF,
+  getInstantRemsForPDF,
+  getCacheRemsForPDF,
   getLocalRemsForPDF,
   findIncrementalRemForPDFFast,
   getIncrementalPageRange,
@@ -161,64 +162,30 @@ function PageRangeWidget() {
 
   const reloadRelatedRems = async () => {
     if (!contextData?.pdfRemId) return;
+    const pdfRemId = contextData.pdfRemId;
+    const t0 = performance.now();
 
-    // ── FAST PHASE: cache + known-rems index (renders immediately) ──────────
-    const { results: fastResults, processedIds } = await getFastRemsForPDF(plugin, contextData.pdfRemId);
-
-    // Sort fast results for an immediately-useful render
-    const sortedFast = [...fastResults].sort((a, b) => {
-      if (a.isIncremental !== b.isIncremental) return a.isIncremental ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
-    setRelatedRems(sortedFast);
-    await calculatePriorities(sortedFast);
-
-    // Fetch histories and stats for fast results
-    const histories: Record<string, PageHistoryEntry[]> = {};
-    const statistics: Record<string, any> = {};
-    let totalTime = 0;
-    for (const item of sortedFast) {
-      const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
-      if (history.length > 0) histories[item.remId] = history;
-      const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
-      statistics[item.remId] = stats;
-      totalTime += stats.totalTimeSeconds;
-    }
-    setRemHistories(histories);
-    setRemStatistics(statistics);
-    setTotalPdfReadingTime(totalTime);
-
-    // ── SLOW PHASE: local tree walk — runs in background ───────────────────
-    setIsBackgroundRefreshing(true);
-    // Fire-and-forget; captures editingState via closure at call-time
-    getLocalRemsForPDF(plugin, contextData.pdfRemId, processedIds).then(async (slowResults) => {
-      setIsBackgroundRefreshing(false);
-      if (slowResults.length === 0) return; // Nothing new found, skip re-render
-
-      // Only patch state when the user is not actively editing
+    // Helper: merges newly discovered entries into state and fetches their histories/stats
+    const patchNewEntries = async (newEntries: typeof sortedInstant) => {
+      if (newEntries.length === 0) return;
       setEditingState(current => {
-        if (current.type !== 'none') return current; // user is editing — defer
-
-        // Merge new entries into the existing list
+        if (current.type !== 'none') return current; // user editing — defer
         setRelatedRems(prev => {
           const existingIds = new Set(prev.map(r => r.remId));
-          const newEntries = slowResults.filter(r => !existingIds.has(r.remId));
-          if (newEntries.length === 0) return prev;
-
-          const merged = [...prev, ...newEntries].sort((a, b) => {
+          const fresh = newEntries.filter(r => !existingIds.has(r.remId));
+          if (fresh.length === 0) return prev;
+          const merged = [...prev, ...fresh].sort((a, b) => {
             if (a.isIncremental !== b.isIncremental) return a.isIncremental ? -1 : 1;
             return a.name.localeCompare(b.name);
           });
-
-          // Patch histories and stats for new entries (fire-and-forget)
           (async () => {
             const newHistories: Record<string, PageHistoryEntry[]> = {};
             const newStats: Record<string, any> = {};
             let addedTime = 0;
-            for (const item of newEntries) {
-              const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId!);
+            for (const item of fresh) {
+              const history = await getPageHistory(plugin, item.remId, pdfRemId);
               if (history.length > 0) newHistories[item.remId] = history;
-              const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId!);
+              const stats = await getReadingStatistics(plugin, item.remId, pdfRemId);
               newStats[item.remId] = stats;
               addedTime += stats.totalTimeSeconds;
             }
@@ -227,14 +194,51 @@ function PageRangeWidget() {
             setTotalPdfReadingTime(t => t + addedTime);
             await calculatePriorities(merged);
           })();
-
           return merged;
         });
-
-        return current; // don't change editingState itself
+        return current;
       });
+    };
+
+    // ── PHASE 1 ─ INSTANT: known-rems index only (O(12) ≈ <100ms) ──────────
+    const { results: instantResults, processedIds: afterInstant } =
+      await getInstantRemsForPDF(plugin, pdfRemId);
+
+    const sortedInstant = [...instantResults].sort((a, b) => {
+      if (a.isIncremental !== b.isIncremental) return a.isIncremental ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    setRelatedRems(sortedInstant);
+    await calculatePriorities(sortedInstant);
+
+    // Fetch histories/stats for instant results
+    const histories: Record<string, PageHistoryEntry[]> = {};
+    const statistics: Record<string, any> = {};
+    let totalTime = 0;
+    for (const item of sortedInstant) {
+      const history = await getPageHistory(plugin, item.remId, pdfRemId);
+      if (history.length > 0) histories[item.remId] = history;
+      const stats = await getReadingStatistics(plugin, item.remId, pdfRemId);
+      statistics[item.remId] = stats;
+      totalTime += stats.totalTimeSeconds;
+    }
+    setRemHistories(histories);
+    setRemStatistics(statistics);
+    setTotalPdfReadingTime(totalTime);
+    console.log(`⏱ [page-range] INSTANT phase + render prep: ${(performance.now() - t0).toFixed(0)}ms`);
+
+    // ── PHASES 2 & 3 ─ CACHE SCAN + LOCAL WALK: both in background ────────
+    setIsBackgroundRefreshing(true);
+    Promise.all([
+      getCacheRemsForPDF(plugin, pdfRemId, afterInstant),
+      getLocalRemsForPDF(plugin, pdfRemId, afterInstant),
+    ]).then(async ([{ results: cacheResults }, slowResults]) => {
+      setIsBackgroundRefreshing(false);
+      console.log(`⏱ [page-range] Background phases done: ${(performance.now() - t0).toFixed(0)}ms total`);
+      const combined = [...cacheResults, ...slowResults];
+      await patchNewEntries(combined);
     }).catch(err => {
-      console.error('[page-range] Background slow phase failed:', err);
+      console.error('[page-range] Background phases failed:', err);
       setIsBackgroundRefreshing(false);
     });
   };

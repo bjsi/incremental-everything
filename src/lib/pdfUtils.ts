@@ -744,26 +744,73 @@ const sortPdfRemEntries = (entries: PdfRemEntry[]) =>
   });
 
 /**
- * FAST phase: reads only from session cache (allIncrementalRems) and the
- * known-rems synced index. No local tree walk — returns in milliseconds.
- *
- * @param alreadyFound  Optional set of remIds to skip.
+ * INSTANT phase: reads only from the known-rems synced index for this specific PDF.
+ * Typically O(12) lookups — renders in well under 100ms.
+ * Does NOT scan the global session cache.
  */
-export const getFastRemsForPDF = async (
+export const getInstantRemsForPDF = async (
   plugin: RNPlugin,
   pdfRemId: string,
   alreadyFound: Set<string> = new Set()
 ): Promise<{ results: PdfRemEntry[]; processedIds: Set<string> }> => {
+  const t0 = performance.now();
   const results: PdfRemEntry[] = [];
   const processedIds = new Set<string>(alreadyFound);
 
   try {
-    console.log('\n===== FAST: Searching all incremental rems from cache =====');
+    console.log('\n===== INSTANT: Checking known-rems index =====');
+    const knownRemsKey = getKnownPdfRemsKey(pdfRemId);
+    const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
+    console.log(`Known-rems index has ${knownRemIds.length} entries for this PDF`);
 
-    // Phase A: incremental-rem session cache
+    for (const remId of knownRemIds) {
+      if (processedIds.has(remId)) continue;
+
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) continue;
+
+      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
+      if (isPdfHighlight) continue;
+
+      // Verify the PDF association is still valid
+      const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
+      if (foundPDF && foundPDF._id === pdfRemId) {
+        const isIncremental = await rem.hasPowerup(powerupCode);
+        const remText = await safeRemTextToString(plugin, rem.text);
+        const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
+        const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
+        results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental });
+        processedIds.add(rem._id);
+        console.log(`✓ INSTANT ADDED: "${remText}" (Incremental: ${isIncremental})`);
+      }
+    }
+  } catch (error) {
+    console.error('[getInstantRemsForPDF] Error:', error);
+  }
+
+  console.log(`⏱ INSTANT phase: ${(performance.now() - t0).toFixed(0)}ms, found ${results.length} rems`);
+  return { results, processedIds };
+};
+
+/**
+ * CACHE phase: scans all incremental rems in the session cache to find ones
+ * associated with this PDF that aren't already in the known-rems index.
+ * O(allIncrementalRems) — can be ~seconds for large KBs, run in background.
+ */
+export const getCacheRemsForPDF = async (
+  plugin: RNPlugin,
+  pdfRemId: string,
+  alreadyFound: Set<string> = new Set()
+): Promise<{ results: PdfRemEntry[]; processedIds: Set<string> }> => {
+  const t0 = performance.now();
+  const results: PdfRemEntry[] = [];
+  const processedIds = new Set<string>(alreadyFound);
+
+  try {
+    console.log('\n===== CACHE: Scanning session cache for new rems =====');
     const allIncrementalRems =
       (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
-    console.log(`Found ${allIncrementalRems.length} incremental rems in cache`);
+    console.log(`Scanning ${allIncrementalRems.length} incremental rems in cache`);
 
     for (const incRemInfo of allIncrementalRems) {
       if (processedIds.has(incRemInfo.remId)) continue;
@@ -781,40 +828,38 @@ export const getFastRemsForPDF = async (
         const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
         results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental: true });
         processedIds.add(rem._id);
-        console.log(`✓ FAST ADDED: "${remText}" (Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
-      }
-    }
-
-    // Phase B: known-rems synced index (includes non-incremental rems)
-    const knownRemsKey = getKnownPdfRemsKey(pdfRemId);
-    const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
-
-    for (const remId of knownRemIds) {
-      if (processedIds.has(remId)) continue;
-
-      const rem = await plugin.rem.findOne(remId);
-      if (!rem) continue;
-
-      const isPdfHighlight = await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
-      if (isPdfHighlight) continue;
-
-      const isIncremental = await rem.hasPowerup(powerupCode);
-      const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
-      if (foundPDF && foundPDF._id === pdfRemId) {
-        const remText = await safeRemTextToString(plugin, rem.text);
-        const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
-        const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
-        results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental });
-        processedIds.add(rem._id);
-        console.log(`✓ FAST ADDED (known): "${remText}" (Incremental: ${isIncremental})`);
+        console.log(`✓ CACHE ADDED: "${remText}" (Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
       }
     }
   } catch (error) {
-    console.error('[getFastRemsForPDF] Error:', error);
+    console.error('[getCacheRemsForPDF] Error:', error);
   }
 
+  console.log(`⏱ CACHE phase: ${(performance.now() - t0).toFixed(0)}ms, found ${results.length} new rems`);
   return { results, processedIds };
 };
+
+/**
+ * FAST phase: INSTANT (known-rems index) + CACHE (session scan) combined.
+ * Kept for backward compatibility with getAllIncrementsForPDF.
+ */
+export const getFastRemsForPDF = async (
+  plugin: RNPlugin,
+  pdfRemId: string,
+  alreadyFound: Set<string> = new Set()
+): Promise<{ results: PdfRemEntry[]; processedIds: Set<string> }> => {
+  const { results: instantResults, processedIds: afterInstant } =
+    await getInstantRemsForPDF(plugin, pdfRemId, alreadyFound);
+
+  const { results: cacheResults, processedIds: afterCache } =
+    await getCacheRemsForPDF(plugin, pdfRemId, afterInstant);
+
+  return {
+    results: [...instantResults, ...cacheResults],
+    processedIds: afterCache,
+  };
+};
+
 
 /**
  * SLOW phase: walks the local parent/sibling/descendant tree to discover
@@ -826,6 +871,7 @@ export const getLocalRemsForPDF = async (
   pdfRemId: string,
   alreadyFound: Set<string> = new Set()
 ): Promise<PdfRemEntry[]> => {
+  const t0 = performance.now();
   const results: PdfRemEntry[] = [];
 
   try {
@@ -891,7 +937,7 @@ export const getLocalRemsForPDF = async (
     const merged = new Set([...existing, ...Array.from(processedRemIds)]);
     await plugin.storage.setSynced(knownRemsKey, Array.from(merged));
 
-    console.log(`SLOW phase found ${results.length} additional rems`);
+    console.log(`⏱ SLOW phase: ${(performance.now() - t0).toFixed(0)}ms, found ${results.length} additional rems`);
   } catch (error) {
     console.error('[getLocalRemsForPDF] Error:', error);
   }
