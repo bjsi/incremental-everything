@@ -784,6 +784,10 @@ export const getInstantRemsForPDF = async (
         console.log(`✓ INSTANT ADDED: "${remText}" (Incremental: ${isIncremental})`);
       }
     }
+    // Self-heal: trim the stored index to only the IDs that still have this PDF.
+    // This undoes the historical pollution caused by the old slow-phase logic.
+    const verifiedIds = results.map(r => r.remId);
+    await plugin.storage.setSynced(knownRemsKey, verifiedIds);
   } catch (error) {
     console.error('[getInstantRemsForPDF] Error:', error);
   }
@@ -931,10 +935,13 @@ export const getLocalRemsForPDF = async (
       }
     }
 
-    // Persist all discovered IDs back to the known-rems index
+    // Persist only the IDs of rems that actually have this PDF.
+    // We intentionally do NOT persist non-matching processedRemIds here —
+    // that was the original bug that inflated the index to 3000+ entries.
     const knownRemsKey = getKnownPdfRemsKey(pdfRemId);
     const existing = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
-    const merged = new Set([...existing, ...Array.from(processedRemIds)]);
+    const newMatchingIds = results.map(r => r.remId);
+    const merged = new Set([...existing, ...newMatchingIds]);
     await plugin.storage.setSynced(knownRemsKey, Array.from(merged));
 
     console.log(`⏱ SLOW phase: ${(performance.now() - t0).toFixed(0)}ms, found ${results.length} additional rems`);
