@@ -589,10 +589,23 @@ function EditorReviewTimer() {
           {hostRemId && bookmarkHighlightId && (
             <button
               onClick={async () => {
+                // Re-read the latest highlightId from page history at click
+                // time so we never scroll to a stale position. During a review
+                // session the user may create new extracts (via the highlight
+                // toolbar) which append newer bookmark entries, but the
+                // bookmarkHighlightId state was captured once at session start.
+                let freshHighlightId = bookmarkHighlightId;
+                if (timerData?.remId) {
+                  const history = await getPageHistory(plugin, timerData.remId, hostRemId);
+                  const lastEntry = history[history.length - 1];
+                  if (lastEntry?.highlightId) {
+                    freshHighlightId = lastEntry.highlightId;
+                  }
+                }
                 // openAndScrollToHighlight handles cold/warm open and survives
                 // the layout reorganization that destroys this widget's iframe
                 // on cold opens.
-                await openAndScrollToHighlight(plugin, hostRemId, bookmarkHighlightId);
+                await openAndScrollToHighlight(plugin, hostRemId, freshHighlightId);
               }}
               style={{
                 padding: '4px 10px',
