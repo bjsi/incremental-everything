@@ -404,23 +404,99 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const frontStr = rtPlainStr(frontText);
       const backStr  = rtPlainStr(backText);
 
-      // Detect section via string-matching (text-only positions avoid RemNote cursor-model issues).
-      const posInFront = frontStr.indexOf(selStr);
-      const posInBack  = hasBackText ? backStr.indexOf(selStr) : -1;
+      // Find all offsets at which `needle` occurs in `haystack`.
+      const findAllOccurrences = (haystack: string, needle: string): number[] => {
+        const offsets: number[] = [];
+        if (!needle) return offsets;
+        let idx = 0;
+        while (true) {
+          const found = haystack.indexOf(needle, idx);
+          if (found === -1) break;
+          offsets.push(found);
+          idx = found + 1;
+        }
+        return offsets;
+      };
+
+      // Correct r_start from RemNote's cursor model into plain-string space.
+      //
+      // RemNote's editor counts each non-text node (i:'q' reference/pin) as 2 chars,
+      // while rtPlainStr gives them 0 chars. Each such node before the cursor therefore
+      // inflates r_start by 2 relative to our plain-string offset (net: -1 per node,
+      // because it contributes 2 to the editor cursor but 0 to plain-string length,
+      // and the node itself occupied 1 slot in the old nodeLen=1 model but 0 in ours).
+      //
+      // Correction: walk the combined rich text (front + back), accumulate editor-model
+      // position alongside plain-string position, stop when editor-model pos reaches r_start,
+      // and read the plain-string pos at that point.
+      const toCorrectedPlainStart = (richText: RichTextInterface, editorOffset: number): number => {
+        let editorPos = 0;
+        let plainPos  = 0;
+        for (const item of richText) {
+          if (editorPos >= editorOffset) break;
+          const node = typeof item === 'string' ? { i: 'm' as const, text: item as string } : (item as any);
+          if (node.i === 'm') {
+            const len = node.text?.length || 0;
+            const step = Math.min(len, editorOffset - editorPos);
+            editorPos += step;
+            plainPos  += step;
+          } else {
+            // Non-text nodes: count as 2 in editor model, 0 in plain-string model.
+            editorPos += 2;
+            // plainPos unchanged — these nodes contribute nothing to the plain string.
+          }
+        }
+        return plainPos;
+      };
+
+      // Build the combined (front + back) rich text as RemNote sees it in its cursor model
+      // so we can convert r_start → plain-string offset correctly.
+      const combinedRichText = [...frontText, ...backText];
+      const plainStart = toCorrectedPlainStart(combinedRichText, r_start);
+
+      // Among all occurrences of the selected text, pick the one whose plain-string
+      // start position is closest to the corrected plain-string offset.
+      // This correctly handles duplicate phrases — indexOf always returned the first one,
+      // and raw r_start was unreliable due to pin node cursor-width inflation.
+      const pickBestOccurrence = (offsets: number[], baseOffset: number = 0): number => {
+        if (offsets.length === 0) return -1;
+        return offsets.reduce((best, off) =>
+          Math.abs((off + baseOffset) - plainStart) < Math.abs((best + baseOffset) - plainStart) ? off : best
+        , offsets[0]);
+      };
+
+      const allFrontOffsets = findAllOccurrences(frontStr, selStr);
+      const allBackOffsets  = hasBackText ? findAllOccurrences(backStr, selStr) : [];
 
       let isBack = false;
       let sect_r_start = 0;
 
-      if (posInFront >= 0 && (posInBack < 0 || r_start < frontStr.length)) {
+      // Pick the best occurrence in each section. For back text, plain positions are
+      // offset by frontStr.length in the combined plain-string space.
+      const bestFront = pickBestOccurrence(allFrontOffsets, 0);
+      const bestBack  = pickBestOccurrence(allBackOffsets, frontStr.length);
+
+      if (bestFront >= 0 && bestBack < 0) {
         isBack = false;
-        sect_r_start = posInFront;
-      } else if (posInBack >= 0) {
+        sect_r_start = bestFront;
+      } else if (bestBack >= 0 && bestFront < 0) {
         isBack = true;
-        sect_r_start = posInBack;
+        sect_r_start = bestBack;
+      } else if (bestFront >= 0 && bestBack >= 0) {
+        // Both sections have a candidate — pick whichever is closest to the corrected plain offset.
+        const frontDist = Math.abs(bestFront - plainStart);
+        const backDist  = Math.abs((bestBack + frontStr.length) - plainStart);
+        if (frontDist <= backDist) {
+          isBack = false;
+          sect_r_start = bestFront;
+        } else {
+          isBack = true;
+          sect_r_start = bestBack;
+        }
       } else {
-        // Fallback: use r_start directly (may be off if pins precede the selection)
+        // Fallback: use corrected plainStart directly
         isBack = false;
-        sect_r_start = r_start;
+        sect_r_start = plainStart;
       }
 
       const sect_r_end = sect_r_start + selLen;
