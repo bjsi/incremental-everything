@@ -5,6 +5,7 @@
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, originalIncrementalDateSlotCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, videoExtractPowerupCode, videoExtractUrlSlotCode, videoExtractStartSlotCode, videoExtractEndSlotCode } from './consts';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, LAST_UPDATED_SLOT } from './card_priority/types';
+import { safeRemTextToString } from './pdfUtils';
 
 /**
  * Configuration for plugin powerups and their slots to filter
@@ -236,8 +237,7 @@ export async function isPowerupPropertyChildByName(plugin: RNPlugin, rem: Plugin
   ]);
   
   try {
-    const remText = await plugin.richText.toString(rem.text);
-    const text = remText ? remText.trim() : '';
+    const text = (await safeRemTextToString(plugin, rem.text)).trim();
     
     // Check 1: Empty text, "Untitled", Exact Match, or "Starts With Query"
     const isNameMatch = text === '' ||
