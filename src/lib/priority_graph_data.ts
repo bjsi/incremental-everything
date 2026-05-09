@@ -51,8 +51,10 @@ export function computePriorityGraphData(
     allKbCardInfos: CardPriorityInfo[],
 ): PriorityGraphData {
     // Calculate percentiles against the ENTIRE KB
+    // Filter out inheritance-only rems (cardCount === 0) before percentile calculation
+    const validKbCardInfos = allKbCardInfos.filter(c => c.cardCount === undefined || c.cardCount > 0);
     const kbIncRemPercentiles = calculateAllPercentiles(allKbIncRems);
-    const kbCardPercentiles = calculateAllPercentiles(allKbCardInfos);
+    const kbCardPercentiles = calculateAllPercentiles(validKbCardInfos);
 
     const binsAbsolute = createBins();
     const binsKbRelative = createBins();
@@ -70,7 +72,10 @@ export function computePriorityGraphData(
     }
 
     // Fill bins from document-scoped Cards
+    // Filter out inheritance-only rems (cardCount === 0) that hold the powerup
+    // only for child inheritance but have no actual cards themselves.
     for (const item of docCardInfos) {
+        if (item.cardCount !== undefined && item.cardCount <= 0) continue;
         const pAbs = Math.max(0, Math.min(100, item.priority));
         const absIndex = Math.min(Math.floor(pAbs / 5), 19);
         binsAbsolute[absIndex].card++;

@@ -213,33 +213,26 @@ export async function registerMenus(plugin: ReactRNPlugin) {
     location: PluginCommandMenuLocation.DocumentMenu,
     name: 'PDF Control Panel',
     action: async (args: { remId: string }) => {
+      console.log('[PDF Control Panel] Menu item clicked, resolving PDF rem...');
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) return;
 
       const pdfRem = await findPDFinRem(plugin, rem);
-
       if (!pdfRem) {
         await plugin.app.toast('No PDF found in this rem or its sources');
         return;
       }
 
-      const incrementalRem = await findIncrementalRemForPDF(plugin, pdfRem, false);
-
-      if (!incrementalRem) {
-        await plugin.app.toast('No incremental rem found for this PDF');
-        return;
-      }
-
-      const context = {
-        incrementalRemId: incrementalRem._id,
+      // Open the popup immediately with a partial context (no incrementalRemId yet).
+      // The widget will resolve incrementalRemId itself using a fast cache-first path.
+      console.log('[PDF Control Panel] Opening popup immediately with pdfRemId:', pdfRem._id);
+      await plugin.storage.setSession('pageRangeContext', {
         pdfRemId: pdfRem._id,
+        incrementalRemId: null,   // widget will fill this in
         totalPages: 0,
-        currentPage: 1
-      };
-
-      await plugin.storage.setSession('pageRangeContext', context);
+        currentPage: 1,
+      });
       await plugin.storage.setSession('pageRangePopupOpen', true);
-
       await plugin.widget.openPopup(pageRangeWidgetId);
     },
   });

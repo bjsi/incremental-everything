@@ -3,8 +3,9 @@
 // These slots (Priority, Next Rep Date, Sources, PDF Metadata, View Modes, etc.) add clutter.
 
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode } from './consts';
+import { powerupCode, prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, originalIncrementalDateSlotCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, videoExtractPowerupCode, videoExtractUrlSlotCode, videoExtractStartSlotCode, videoExtractEndSlotCode } from './consts';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, LAST_UPDATED_SLOT } from './card_priority/types';
+import { safeRemTextToString } from './pdfUtils';
 
 /**
  * Configuration for plugin powerups and their slots to filter
@@ -12,7 +13,7 @@ import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, LAST_UPDATED_SLOT } fro
 const PLUGIN_POWERUP_SLOT_CONFIGS = [
   {
     powerupCode: powerupCode, // 'incremental'
-    slotCodes: [prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode]
+    slotCodes: [prioritySlotCode, nextRepDateSlotCode, repHistorySlotCode, originalIncrementalDateSlotCode]
   },
   {
     powerupCode: CARD_PRIORITY_CODE, // 'cardPriority'
@@ -21,6 +22,10 @@ const PLUGIN_POWERUP_SLOT_CONFIGS = [
   {
     powerupCode: dismissedPowerupCode, // 'dismissed'
     slotCodes: [dismissedHistorySlotCode, dismissedDateSlotCode]
+  },
+  {
+    powerupCode: videoExtractPowerupCode, // 'videoExtract'
+    slotCodes: [videoExtractUrlSlotCode, videoExtractStartSlotCode, videoExtractEndSlotCode]
   }
 ];
 
@@ -197,11 +202,13 @@ export async function isPowerupPropertyChildByName(plugin: RNPlugin, rem: Plugin
   // Known slot names from both plugin powerups and built-in powerups
   const knownSlotNames = new Set([
     // Incremental powerup slots
-    'Priority', 'Next Rep Date', 'History',
+    'Priority', 'Next Rep Date', 'History', 'Created',
     // CardPriority powerup slots
     'Priority Source', 'Last Updated',
     // Dismissed powerup slots
     'Dismissed Date',
+    // VideoExtract powerup slots
+    'Video URL', 'Start Time', 'End Time',
     // Built-in RemNote slots (Sources, Aliases, etc)
     'Sources', 'Source', 'Aliases', 'Status',
     // PDF / File Metadata
@@ -230,8 +237,7 @@ export async function isPowerupPropertyChildByName(plugin: RNPlugin, rem: Plugin
   ]);
   
   try {
-    const remText = await plugin.richText.toString(rem.text);
-    const text = remText ? remText.trim() : '';
+    const text = (await safeRemTextToString(plugin, rem.text)).trim();
     
     // Check 1: Empty text, "Untitled", Exact Match, or "Starts With Query"
     const isNameMatch = text === '' ||
@@ -250,7 +256,8 @@ export async function isPowerupPropertyChildByName(plugin: RNPlugin, rem: Plugin
           const hasIncremental = await parent.hasPowerup(powerupCode);
           const hasCardPriority = await parent.hasPowerup(CARD_PRIORITY_CODE);
           const hasDismissed = await parent.hasPowerup(dismissedPowerupCode);
-          if (hasIncremental || hasCardPriority || hasDismissed) return true;
+          const hasVideoExtract = await parent.hasPowerup(videoExtractPowerupCode);
+          if (hasIncremental || hasCardPriority || hasDismissed || hasVideoExtract) return true;
 
           // 2. Check for Built-in Powerups that generate these slots
           const builtInPowerupsToCheck = [

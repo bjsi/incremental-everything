@@ -48,7 +48,10 @@ function computeKbGraphBins(
     bins[idx].incRem++;
   }
 
+  // Filter out inheritance-only rems (cardCount === 0) that hold the powerup
+  // only for child inheritance but have no actual cards themselves.
   for (const item of allCardInfos) {
+    if (item.cardCount !== undefined && item.cardCount <= 0) continue;
     const p = Math.max(0, Math.min(100, item.priority));
     const idx = Math.min(Math.floor(p / 5), 19);
     bins[idx].card++;
@@ -374,7 +377,7 @@ export function IncRemMainView() {
             <h4 className="text-sm font-semibold text-gray-700 mb-3">
               KB Priority Distribution
               <span className="text-xs font-normal text-gray-400 ml-2">
-                ({allIncRems?.length || 0} IncRems, {allCardInfos?.length || 0} Rems with Cards)
+                ({allIncRems?.length || 0} IncRems, {allCardInfos?.filter(c => c.cardCount === undefined || c.cardCount > 0).length || 0} Rems with Cards)
               </span>
             </h4>
 
