@@ -128,11 +128,12 @@ function PageRangeWidget() {
   };
 
   // Calculate priority info for each incremental rem
-  const calculatePriorities = async (rems: any[]) => {
+  // Accepts an explicit remsForCalculation list to avoid stale closure captures.
+  const calculatePriorities = async (rems: any[], remsForCalculation?: IncrementalRem[]) => {
     const priorities: Record<string, { absolute: number, percentile: number | null }> = {};
 
-    // Use allIncrementalRems from tracker
-    const remsForCalculation = allIncrementalRems || [];
+    // Prefer the explicitly-passed list; fall back to tracker value.
+    const calcRems = remsForCalculation ?? allIncrementalRems ?? [];
 
     for (const rem of rems) {
       if (rem.isIncremental) {
@@ -140,8 +141,8 @@ function PageRangeWidget() {
         if (remObj) {
           const incRemInfo = await getIncrementalRemFromRem(plugin, remObj);
           if (incRemInfo) {
-            const percentile = remsForCalculation.length > 0 ?
-              calculateRelativePercentile(remsForCalculation, rem.remId) : null;
+            const percentile = calcRems.length > 0 ?
+              calculateRelativePercentile(calcRems, rem.remId) : null;
             priorities[rem.remId] = {
               absolute: incRemInfo.priority,
               percentile
@@ -341,7 +342,8 @@ function PageRangeWidget() {
   // Recalculate priorities when allIncrementalRems tracker updates
   useEffect(() => {
     if (relatedRems.length > 0 && allIncrementalRems && allIncrementalRems.length > 0) {
-      calculatePriorities(relatedRems);
+      // Pass the fresh tracker value explicitly to avoid stale closure
+      calculatePriorities(relatedRems, allIncrementalRems);
     }
   }, [allIncrementalRems]);
 

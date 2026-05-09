@@ -99,7 +99,12 @@ export function PdfRemItem({
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: '#d1fae5', color: '#065f46' }}>Current</span>
         )}
         {item.isIncremental && priorityInfo && (
-          <PriorityBadge priority={priorityInfo.absolute} percentile={priorityInfo.percentile ?? undefined} compact />
+          <PriorityBadge
+            priority={priorityInfo.absolute}
+            percentile={priorityInfo.percentile ?? undefined}
+            useAbsoluteColoring={priorityInfo.percentile === null}
+            compact
+          />
         )}
         {item.range && (
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-secondary)' }} title="Page range">
