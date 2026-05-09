@@ -10,6 +10,9 @@ import {
   getPageRangeKey,
   getPageHistory,
   getAllIncrementsForPDF,
+  getFastRemsForPDF,
+  getLocalRemsForPDF,
+  findIncrementalRemForPDFFast,
   getIncrementalPageRange,
   setIncrementalReadingPosition,
   addPageToHistory,
@@ -52,6 +55,7 @@ function PageRangeWidget() {
 
   const [editingState, setEditingState] = useState<EditingState>({ type: 'none' });
   const [totalPdfReadingTime, setTotalPdfReadingTime] = useState<number>(0);
+  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
 
   const handleInitIncrementalRem = async (remId: string) => {
     try {
@@ -158,33 +162,81 @@ function PageRangeWidget() {
   const reloadRelatedRems = async () => {
     if (!contextData?.pdfRemId) return;
 
-    const related = await getAllIncrementsForPDF(plugin, contextData.pdfRemId);
-    setRelatedRems(related);
+    // ── FAST PHASE: cache + known-rems index (renders immediately) ──────────
+    const { results: fastResults, processedIds } = await getFastRemsForPDF(plugin, contextData.pdfRemId);
 
-    // Calculate priorities using tracker data
-    await calculatePriorities(related);
+    // Sort fast results for an immediately-useful render
+    const sortedFast = [...fastResults].sort((a, b) => {
+      if (a.isIncremental !== b.isIncremental) return a.isIncremental ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    setRelatedRems(sortedFast);
+    await calculatePriorities(sortedFast);
 
-    // Fetch reading histories and statistics for each related rem
+    // Fetch histories and stats for fast results
     const histories: Record<string, PageHistoryEntry[]> = {};
     const statistics: Record<string, any> = {};
     let totalTime = 0;
-
-    for (const item of related) {
-      // Always fetch stats if it's a related rem
+    for (const item of sortedFast) {
       const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId);
-      if (history.length > 0) {
-        histories[item.remId] = history;
-      }
-
+      if (history.length > 0) histories[item.remId] = history;
       const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId);
       statistics[item.remId] = stats;
       totalTime += stats.totalTimeSeconds;
-
     }
-
     setRemHistories(histories);
     setRemStatistics(statistics);
     setTotalPdfReadingTime(totalTime);
+
+    // ── SLOW PHASE: local tree walk — runs in background ───────────────────
+    setIsBackgroundRefreshing(true);
+    // Fire-and-forget; captures editingState via closure at call-time
+    getLocalRemsForPDF(plugin, contextData.pdfRemId, processedIds).then(async (slowResults) => {
+      setIsBackgroundRefreshing(false);
+      if (slowResults.length === 0) return; // Nothing new found, skip re-render
+
+      // Only patch state when the user is not actively editing
+      setEditingState(current => {
+        if (current.type !== 'none') return current; // user is editing — defer
+
+        // Merge new entries into the existing list
+        setRelatedRems(prev => {
+          const existingIds = new Set(prev.map(r => r.remId));
+          const newEntries = slowResults.filter(r => !existingIds.has(r.remId));
+          if (newEntries.length === 0) return prev;
+
+          const merged = [...prev, ...newEntries].sort((a, b) => {
+            if (a.isIncremental !== b.isIncremental) return a.isIncremental ? -1 : 1;
+            return a.name.localeCompare(b.name);
+          });
+
+          // Patch histories and stats for new entries (fire-and-forget)
+          (async () => {
+            const newHistories: Record<string, PageHistoryEntry[]> = {};
+            const newStats: Record<string, any> = {};
+            let addedTime = 0;
+            for (const item of newEntries) {
+              const history = await getPageHistory(plugin, item.remId, contextData.pdfRemId!);
+              if (history.length > 0) newHistories[item.remId] = history;
+              const stats = await getReadingStatistics(plugin, item.remId, contextData.pdfRemId!);
+              newStats[item.remId] = stats;
+              addedTime += stats.totalTimeSeconds;
+            }
+            setRemHistories(h => ({ ...h, ...newHistories }));
+            setRemStatistics(s => ({ ...s, ...newStats }));
+            setTotalPdfReadingTime(t => t + addedTime);
+            await calculatePriorities(merged);
+          })();
+
+          return merged;
+        });
+
+        return current; // don't change editingState itself
+      });
+    }).catch(err => {
+      console.error('[page-range] Background slow phase failed:', err);
+      setIsBackgroundRefreshing(false);
+    });
   };
 
   // Toggle expanded state for a rem
@@ -297,14 +349,41 @@ function PageRangeWidget() {
   // Load data effect
   useEffect(() => {
     const loadData = async () => {
-      if (!contextData?.incrementalRemId || !contextData?.pdfRemId) {
+      if (!contextData?.pdfRemId) {
         setIsLoading(false);
         return;
       }
 
       try {
         setIsLoading(true);
-        const { incrementalRemId, pdfRemId } = contextData;
+        const pdfRemId = contextData.pdfRemId;
+        let incrementalRemId = contextData.incrementalRemId;
+
+        // If the menu opened the popup without resolving incrementalRemId,
+        // resolve it now using the fast cache-first path.
+        if (!incrementalRemId) {
+          console.log('[page-range] incrementalRemId missing — resolving fast...');
+          const pdfRem = await plugin.rem.findOne(pdfRemId);
+          if (pdfRem) {
+            const incRem = await findIncrementalRemForPDFFast(plugin, pdfRem);
+            if (incRem) {
+              incrementalRemId = incRem._id;
+              // Write it back to session so other parts of the widget (and getLocalRemsForPDF) can use it
+              await plugin.storage.setSession('pageRangeContext', {
+                ...contextData,
+                incrementalRemId,
+              });
+              console.log('[page-range] Resolved incrementalRemId:', incrementalRemId);
+            } else {
+              await plugin.app.toast('No incremental rem found for this PDF');
+              setIsLoading(false);
+              return;
+            }
+          } else {
+            setIsLoading(false);
+            return;
+          }
+        }
 
         // Fetch current rem details
         const currentRem = await plugin.rem.findOne(incrementalRemId);
@@ -337,7 +416,7 @@ function PageRangeWidget() {
     };
 
     loadData();
-  }, [contextData?.incrementalRemId, contextData?.pdfRemId, plugin]);
+  }, [contextData?.pdfRemId, plugin]);
 
   // Recalculate priorities when allIncrementalRems tracker updates
   useEffect(() => {
@@ -649,6 +728,11 @@ function PageRangeWidget() {
           {totalPdfReadingTime > 0 && (
             <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               · ⏱️ {formatDuration(totalPdfReadingTime)}
+            </span>
+          )}
+          {isBackgroundRefreshing && (
+            <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.6 }} title="Searching for additional rems…">
+              · 🔍…
             </span>
           )}
         </div>
