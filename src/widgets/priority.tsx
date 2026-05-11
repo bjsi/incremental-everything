@@ -692,6 +692,29 @@ function Priority() {
 
   }, [rem, plugin, sessionCache, originalScopeId, performanceMode, cardInfo, hasCardPriorityPowerup]); // 🔌 Add performanceMode
 
+  // Convert an inherited card priority to manual without changing its numeric value.
+  // saveCardPriority alone only patches the session cache; the SOURCE_SLOT in the DB
+  // is only written by the background tracker watching pendingPrioritySaveKey. Without
+  // this dual write, the optimistic 'manual' flip is immediately overwritten the next
+  // time getCardPriority reads SOURCE_SLOT from the DB.
+  const convertToManual = useCallback(() => {
+    if (!rem || !cardInfo) return;
+
+    // 1. Optimistic cache update + descendant cascade trigger.
+    saveCardPriority(cardInfo.priority).catch(console.error);
+
+    // 2. Persist source='manual' to the DB via the background tracker.
+    //    triggerCascade=false because saveCardPriority already scheduled one.
+    plugin.storage.setSession(pendingPrioritySaveKey, {
+      remId: rem._id,
+      incPriority: null,
+      cardPriority: cardInfo.priority,
+      cardSource: 'manual',
+      needsAddPowerup: !hasCardPriorityPowerup,
+      triggerCascade: false,
+    }).catch(console.error);
+  }, [rem, cardInfo, hasCardPriorityPowerup, saveCardPriority, plugin]);
+
   const showInheritanceSection =
     (!showIncSection && !showCardSection) ||
     (showIncSection && !hasCards && cardInfo?.source === 'manual') ||
@@ -1217,7 +1240,7 @@ function Priority() {
                   <span>Source: <strong>{cardInfo?.source}</strong> • Due: {cardInfo?.dueCards}/{cardInfo?.cardCount}</span>
                   {cardInfo?.source === 'inherited' && (
                     <button
-                      onClick={() => saveCardPriority(cardInfo.priority)}
+                      onClick={convertToManual}
                       className="text-xs hover:underline"
                       style={{ color: '#3b82f6' }}
                     >
