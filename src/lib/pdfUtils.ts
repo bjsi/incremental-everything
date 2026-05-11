@@ -8,6 +8,13 @@ export interface PageRangeContext {
   pdfRemId: RemId;
   totalPages: number;
   currentPage: number;
+  /**
+   * All PDF rem IDs available for the IncRem, when known at popup-open time.
+   * Used by the panel's PDF selector for instant render. Undefined when the
+   * popup enters from a path that hasn't resolved the IncRem yet (the widget
+   * computes the list itself once the IncRem is resolved).
+   */
+  allPdfRemIds?: RemId[];
 }
 
 /**

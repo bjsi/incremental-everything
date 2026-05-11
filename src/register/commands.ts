@@ -1093,11 +1093,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // 4. Prepare the context for the popup widget, similar to how the Reader does it.
       //    This context tells the popup which incremental Rem and which PDF to work with.
+      //    We also include the full list of PDFs on this IncRem so the panel can
+      //    render its PDF selector immediately (no re-derivation flash).
+      const allPdfs = await getAllPDFsInRem(plugin, rem);
       const context = {
         incrementalRemId: rem._id,
         pdfRemId: pdfRem._id,
         totalPages: undefined, // Not available in the editor context
         currentPage: undefined, // Not available in the editor context
+        allPdfRemIds: allPdfs.map((p) => p.rem._id),
       };
 
       // 5. Store the context in session storage so the popup can access it.

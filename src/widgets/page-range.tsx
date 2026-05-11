@@ -18,6 +18,9 @@ import {
   setIncrementalReadingPosition,
   addPageToHistory,
   getReadingStatistics,
+  getAllPDFsInRem,
+  setActivePdfForIncRem,
+  safeRemTextToString,
   PageHistoryEntry,
   PageRangeContext,
 } from '../lib/pdfUtils';
@@ -57,6 +60,11 @@ function PageRangeWidget() {
   const [editingState, setEditingState] = useState<EditingState>({ type: 'none' });
   const [totalPdfReadingTime, setTotalPdfReadingTime] = useState<number>(0);
   const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
+
+  // PDFs available on the IncRem context (computed after IncRem resolves).
+  // When length > 1 the header renders a selector that switches the panel's
+  // PDF view and pins the chosen PDF as active for this IncRem.
+  const [pdfOptions, setPdfOptions] = useState<Array<{ remId: string; name: string; isPreferred: boolean }>>([]);
 
   const handleInitIncrementalRem = async (remId: string) => {
     try {
@@ -396,6 +404,24 @@ function PageRangeWidget() {
           const isIncremental = await currentRem.hasPowerup(powerupCode);
           setCurrentRemName(remText);
           setIsCurrentRemIncremental(isIncremental);
+
+          // Build the PDF selector options for this IncRem. Hidden in the UI
+          // when length <= 1; otherwise lets the user switch the panel's view
+          // and pin the chosen PDF as active.
+          try {
+            const pdfs = await getAllPDFsInRem(plugin, currentRem);
+            const options = await Promise.all(
+              pdfs.map(async (p) => ({
+                remId: p.rem._id,
+                name: await safeRemTextToString(plugin, p.rem.text),
+                isPreferred: p.isPreferred,
+              }))
+            );
+            setPdfOptions(options);
+          } catch (e) {
+            console.error('[page-range] Failed to load PDF options:', e);
+            setPdfOptions([]);
+          }
         }
 
         // Load page range for current rem
@@ -496,6 +522,20 @@ function PageRangeWidget() {
   };
 
   const handleClose = () => plugin.widget.closePopup();
+
+  // Switch which PDF the panel is viewing for the current IncRem.
+  // Pins the chosen PDF as active so future opens of this IncRem (queue,
+  // Reader, Priority Editor) follow the same choice.
+  const handlePdfChange = async (newPdfId: string) => {
+    if (!contextData || newPdfId === contextData.pdfRemId) return;
+    if (contextData.incrementalRemId) {
+      await setActivePdfForIncRem(plugin, contextData.incrementalRemId, newPdfId);
+    }
+    await plugin.storage.setSession('pageRangeContext', {
+      ...contextData,
+      pdfRemId: newPdfId,
+    });
+  };
 
 
 
@@ -751,6 +791,41 @@ function PageRangeWidget() {
           ✕
         </button>
       </div>
+
+      {/* PDF Selector — only shown when the IncRem has >1 PDF source.
+          Selecting an option pins it as active and reloads the panel for that PDF. */}
+      {pdfOptions.length > 1 && (
+        <div
+          className="flex items-center gap-2 px-4 py-1.5 shrink-0"
+          style={{
+            borderBottom: '1px solid var(--rn-clr-border-primary)',
+            backgroundColor: 'var(--rn-clr-background-secondary)',
+          }}
+        >
+          <span className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>📄 PDF:</span>
+          <select
+            value={contextData?.pdfRemId ?? ''}
+            onChange={(e) => handlePdfChange(e.target.value)}
+            className="text-xs px-2 py-1 rounded"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+              border: '1px solid var(--rn-clr-border-primary)',
+              maxWidth: '360px',
+            }}
+            title="Switch which PDF the panel is managing — pins it as active for this Rem"
+          >
+            {pdfOptions.map((opt) => (
+              <option key={opt.remId} value={opt.remId}>
+                {opt.name}{opt.isPreferred ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            ★ = #preferthispdf · selecting pins this PDF as active
+          </span>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
 
