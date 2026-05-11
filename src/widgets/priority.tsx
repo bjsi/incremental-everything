@@ -72,6 +72,11 @@ function Priority() {
   // RelPriority moved to useMemo below derivedData to ensure synchronous updates (fixing flicker)
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showInheritanceForIncRem, setShowInheritanceForIncRem] = useState(false);
+  // Optimistic flag: flipped instantly when the user clicks "Convert to Manual"
+  // so the UI reflects the new source before the background tracker's DB write
+  // propagates back through useTrackerPlugin. Auto-cleared below once the raw
+  // cardInfo.source resolves to 'manual'.
+  const [convertedToManual, setConvertedToManual] = useState(false);
   const incSliderRef = useRef<PrioritySliderRef>(null);
   const cardSliderRef = useRef<PrioritySliderRef>(null);
   const isSaving = useRef(false);
@@ -264,7 +269,17 @@ function Priority() {
 
   // Then use:
   const hasCards = cardData?.hasCards ?? undefined;
-  const cardInfo = cardData?.cardInfo ?? undefined;
+  // Apply the optimistic 'Convert to Manual' override on top of the raw fetched
+  // cardInfo so every downstream consumer (badge, label, button visibility,
+  // confirmation dialog gating) sees the new source immediately.
+  const cardInfo = useMemo(() => {
+    const raw = cardData?.cardInfo;
+    if (!raw) return undefined;
+    if (convertedToManual && raw.source === 'inherited') {
+      return { ...raw, source: 'manual' as CardPriorityInfo['source'] };
+    }
+    return raw;
+  }, [cardData?.cardInfo, convertedToManual]);
   const hasCardPriorityPowerup = cardData?.hasCardPriorityPowerup ?? false;
 
   // This tracker is fast (direct Rem lookup) so it can run in both modes,
@@ -424,10 +439,21 @@ function Priority() {
   useEffect(() => {
     incIsDirty.current = false;
     cardIsDirty.current = false;
+    setConvertedToManual(false);
     // We don't necessarily want to set priorities to null here because other hooks
     // might be about to set them, and setting null might cause a flash.
     // However, for cleanliness on ID swap, we should relying on the data hooks to fire again.
   }, [rem?._id]);
+
+  // Auto-clear the 'Convert to Manual' override once useTrackerPlugin re-fetches
+  // cardInfo with source='manual' from the DB. We key off the RAW source from
+  // cardData (not the derived cardInfo.source, which is always 'manual' while
+  // the override is on) to avoid a flip-flop.
+  useEffect(() => {
+    if (convertedToManual && cardData?.cardInfo?.source === 'manual') {
+      setConvertedToManual(false);
+    }
+  }, [cardData?.cardInfo?.source, convertedToManual]);
 
   useEffect(() => {
     if (isSaving.current) return;
@@ -700,10 +726,14 @@ function Priority() {
   const convertToManual = useCallback(() => {
     if (!rem || !cardInfo) return;
 
-    // 1. Optimistic cache update + descendant cascade trigger.
+    // 1. Flip the UI to 'manual' immediately. The override self-clears once the
+    //    DB write propagates back via useTrackerPlugin (see the auto-clear effect).
+    setConvertedToManual(true);
+
+    // 2. Optimistic cache update + descendant cascade trigger.
     saveCardPriority(cardInfo.priority).catch(console.error);
 
-    // 2. Persist source='manual' to the DB via the background tracker.
+    // 3. Persist source='manual' to the DB via the background tracker.
     //    triggerCascade=false because saveCardPriority already scheduled one.
     plugin.storage.setSession(pendingPrioritySaveKey, {
       remId: rem._id,
