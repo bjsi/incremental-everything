@@ -5,7 +5,7 @@ import {
   RichTextElementRemInterface,
 } from '@remnote/plugin-sdk';
 import { RemAndType } from './types';
-import { safeRemTextToString, getActivePdfKey } from '../pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem } from '../pdfUtils';
 import {
   videoExtractPowerupCode,
   videoExtractUrlSlotCode,
@@ -125,17 +125,18 @@ export const remToActionItemType = async (
     if (sources.length === 1) {
       selectedSource = sources[0];
     } else if (sources.length > 1) {
-      // An explicit per-IncRem PDF pin trumps the #preferthispdf tag scan.
-      // (No pin → existing tag-based behavior is preserved verbatim.)
-      const pinnedPdfId = await plugin.storage.getSynced<string>(getActivePdfKey(rem._id));
-      if (pinnedPdfId) {
-        const pinned = sources.find((s) => s._id === pinnedPdfId);
-        if (pinned) {
-          selectedSource = pinned;
-        }
-      }
-
-      if (!selectedSource) {
+      // Multi-source resolution for PDFs: pin → #preferthispdf → first PDF.
+      // Whenever the IncRem has any PDF source we open it in the Reader
+      // (the Reader's PDF switcher lets the user pick a different one).
+      // The legacy ExtractViewer fallback is reserved for the
+      // #extractviewer-tagged case handled at the top of this function.
+      const resolvedPdf = await getActivePdfForIncRem(plugin, rem);
+      if (resolvedPdf) {
+        selectedSource = resolvedPdf;
+      } else {
+        // No PDFs on this rem — fall back to the legacy #preferthispdf scan,
+        // which can also disambiguate among non-PDF sources (HTML, video, etc.)
+        // when the user has explicitly tagged one.
         const preferredSources: PluginRem[] = [];
         for (const source of sources) {
           try {
@@ -157,7 +158,7 @@ export const remToActionItemType = async (
         if (preferredSources.length === 1) {
           selectedSource = preferredSources[0];
         } else if (preferredSources.length > 1) {
-          await plugin.app.toast('Multiple PDFs have the #preferthispdf tag. Opening in standard Rem view instead of Reader.');
+          await plugin.app.toast('Multiple sources have the #preferthispdf tag. Opening in standard Rem view.');
         }
       }
     }
