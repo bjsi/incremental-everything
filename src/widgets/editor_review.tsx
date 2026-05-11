@@ -13,7 +13,7 @@ import { powerupCode, prioritySlotCode, pageRangeWidgetId } from '../lib/consts'
 import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
-import { safeRemTextToString, findPDFinRem, findHTMLinRem, getIncrementalReadingPosition, addPageToHistory, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, getIncrementalReadingPosition, addPageToHistory, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { determineIncRemType } from '../lib/incRemHelpers';
 import { openRemInNewPane, openAndScrollToHighlight } from '../lib/remHelpers';
@@ -49,7 +49,7 @@ async function handleEditorReview(
   const reviewTimeSeconds = Math.round(reviewTimeMinutes * 60);
 
   // Synchronize time spent reading directly to the PDF reading history tracker
-  const pdfRem = await findPDFinRem(plugin, rem);
+  const pdfRem = await getActivePdfForIncRem(plugin, rem);
   if (pdfRem && reviewTimeSeconds > 0) {
     const activePage = await getIncrementalReadingPosition(plugin, remId, pdfRem._id);
     await addPageToHistory(plugin, remId, pdfRem._id, activePage || 1, reviewTimeSeconds);
@@ -149,7 +149,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
         const name = await safeRemTextToString(plugin, rem.text);
         setRemName(name);
 
-        const pdfRem = await findPDFinRem(plugin, rem);
+        const pdfRem = await getActivePdfForIncRem(plugin, rem);
         if (pdfRem) {
           setIsPdfNote(true);
           setPdfRemId(pdfRem._id);
@@ -230,7 +230,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
       }
 
       // Host resolution: PDF first, then HTML article (Reader Mode source).
-      const pdfRem = await findPDFinRem(plugin, rem);
+      const pdfRem = await getActivePdfForIncRem(plugin, rem);
       const hostRem = pdfRem ?? (await findHTMLinRem(plugin, rem));
       const incRemType = await determineIncRemType(plugin, rem);
 

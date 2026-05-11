@@ -32,7 +32,7 @@ import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetiti
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, calculateWeightedShield, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
-import { safeRemTextToString, findPDFinRem, findHTMLinRem, addPageToHistory, getPageHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, addPageToHistory, getPageHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
@@ -210,7 +210,7 @@ export function AnswerButtons() {
     if (type !== 'pdf' && type !== 'html') return null;
 
     const hostRem = type === 'pdf'
-      ? await findPDFinRem(rp, baseData.rem)
+      ? await getActivePdfForIncRem(rp, baseData.rem)
       : await findHTMLinRem(rp, baseData.rem);
     if (!hostRem) return null;
 
@@ -296,7 +296,7 @@ export function AnswerButtons() {
 
   const handleNextClick = async () => {
     if (remType === 'pdf') {
-      const pdfRem = await findPDFinRem(plugin, rem);
+      const pdfRem = await getActivePdfForIncRem(plugin, rem);
       if (pdfRem) {
         const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
         const currentPage = await plugin.storage.getSynced<number>(pageKey);

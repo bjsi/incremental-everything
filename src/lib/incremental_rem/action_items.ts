@@ -5,7 +5,7 @@ import {
   RichTextElementRemInterface,
 } from '@remnote/plugin-sdk';
 import { RemAndType } from './types';
-import { safeRemTextToString } from '../pdfUtils';
+import { safeRemTextToString, getActivePdfKey } from '../pdfUtils';
 import {
   videoExtractPowerupCode,
   videoExtractUrlSlotCode,
@@ -125,28 +125,40 @@ export const remToActionItemType = async (
     if (sources.length === 1) {
       selectedSource = sources[0];
     } else if (sources.length > 1) {
-      const preferredSources: PluginRem[] = [];
-      for (const source of sources) {
-        try {
-          const tags = await source.getTagRems();
-          for (const tagRem of tags) {
-            if (!tagRem.text) continue;
-            const tagText = await safeRemTextToString(plugin, tagRem.text);
-            const tagLower = tagText.toLowerCase().replace(/\s+/g, '');
-            if (tagLower === 'preferthispdf') {
-              preferredSources.push(source);
-              break;
-            }
-          }
-        } catch (e) {
-          // Ignore errors reading tags
+      // An explicit per-IncRem PDF pin trumps the #preferthispdf tag scan.
+      // (No pin → existing tag-based behavior is preserved verbatim.)
+      const pinnedPdfId = await plugin.storage.getSynced<string>(getActivePdfKey(rem._id));
+      if (pinnedPdfId) {
+        const pinned = sources.find((s) => s._id === pinnedPdfId);
+        if (pinned) {
+          selectedSource = pinned;
         }
       }
 
-      if (preferredSources.length === 1) {
-        selectedSource = preferredSources[0];
-      } else if (preferredSources.length > 1) {
-        await plugin.app.toast('Multiple PDFs have the #preferthispdf tag. Opening in standard Rem view instead of Reader.');
+      if (!selectedSource) {
+        const preferredSources: PluginRem[] = [];
+        for (const source of sources) {
+          try {
+            const tags = await source.getTagRems();
+            for (const tagRem of tags) {
+              if (!tagRem.text) continue;
+              const tagText = await safeRemTextToString(plugin, tagRem.text);
+              const tagLower = tagText.toLowerCase().replace(/\s+/g, '');
+              if (tagLower === 'preferthispdf') {
+                preferredSources.push(source);
+                break;
+              }
+            }
+          } catch (e) {
+            // Ignore errors reading tags
+          }
+        }
+
+        if (preferredSources.length === 1) {
+          selectedSource = preferredSources[0];
+        } else if (preferredSources.length > 1) {
+          await plugin.app.toast('Multiple PDFs have the #preferthispdf tag. Opening in standard Rem view instead of Reader.');
+        }
       }
     }
 

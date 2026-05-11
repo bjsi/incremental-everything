@@ -13,7 +13,7 @@ import { handleCardPriorityInheritance } from '../lib/card_priority/card_priorit
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
-import { findPDFinRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
+import { getActivePdfForIncRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
 import { openAndScrollToHighlight } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
@@ -109,7 +109,7 @@ function EditorReviewTimer() {
         return;
       }
 
-      const pdfRem = await findPDFinRem(plugin, rem);
+      const pdfRem = await getActivePdfForIncRem(plugin, rem);
       const htmlRem = pdfRem ? null : await findHTMLinRem(plugin, rem);
       const host = pdfRem ?? htmlRem;
 

@@ -12,7 +12,7 @@ import {
   pageRangeWidgetId,
   incRemDisabledDeviceKey,
 } from '../lib/consts';
-import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
 import { createRemFromHighlight } from '../lib/highlightActions';
 
@@ -217,7 +217,7 @@ export async function registerMenus(plugin: ReactRNPlugin) {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) return;
 
-      const pdfRem = await findPDFinRem(plugin, rem);
+      const pdfRem = await getActivePdfForIncRem(plugin, rem);
       if (!pdfRem) {
         await plugin.app.toast('No PDF found in this rem or its sources');
         return;

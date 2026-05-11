@@ -14,7 +14,7 @@ import { calculateRelativePercentile, formatDuration } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { PriorityBadge } from '../components';
 import {
-  findPreferredPDFInRem,
+  getActivePdfForIncRem,
   findHTMLinRem,
   getIncrementalPageRange,
   getPageHistory,
@@ -69,7 +69,7 @@ export function PriorityEditor() {
     if (!remId) return null;
     const rem = await plugin.rem.findOne(remId);
     if (!rem) return null;
-    const pdfRem = await findPreferredPDFInRem(plugin as any, rem, false);
+    const pdfRem = await getActivePdfForIncRem(plugin as any, rem);
     const hostRem = pdfRem ?? await findHTMLinRem(plugin as any, rem);
     if (!hostRem) {
       return { pdfRemId: null, pdfRemName: null, hostKind: null as 'pdf' | 'html' | null };
