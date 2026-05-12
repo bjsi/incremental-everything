@@ -435,15 +435,20 @@ Created: ${timestamp}`;
 
   // 7. Generate Graph Data and Insert Graph Widget
 
-  // Initialize bins (0-5, 5-10, ... 95-100)
-  const createBins = () => Array(20).fill(0).map((_, i) => ({
-    range: `${i * 5}-${(i + 1) * 5}`,
+  // Initialize bins. Two label styles:
+  //   'integer' for discrete absolute-priority values → `0-4, 5-9, ..., 95-100`
+  //   'range'   for continuous percentile space      → `0-5, 5-10, ..., 95-100`
+  // Last bucket is inclusive of 100 in both styles (priority/percentile is clamped).
+  const createBins = (style: 'integer' | 'range') => Array(20).fill(0).map((_, i) => ({
+    range: style === 'integer'
+      ? (i === 19 ? '95-100' : `${i * 5}-${i * 5 + 4}`)
+      : `${i * 5}-${(i + 1) * 5}`,
     incRem: 0,
     card: 0,
   }));
 
-  const binsAbsolute = createBins();
-  const binsRelative = createBins();
+  const binsAbsolute = createBins('integer');
+  const binsRelative = createBins('range');
 
   for (const item of mixedItems) {
     // Fill Absolute Bins
