@@ -84,11 +84,14 @@ El complemento ahora cuenta con **Modo Ligero Automático**.
 ### Lectura Incremental
 
 - Puedes etiquetar PDFs, sitios web y resaltados con la etiqueta `Incremental` para hacer lectura incremental clásica estilo SuperMemo.
-- Funcionará si etiquetas el PDF o sitio web en sí, o un Rem con un solo PDF o sitio web como fuente.
+- Funciona si etiquetas el PDF/sitio en sí, un Rem con una única fuente, o un Rem con **múltiples PDFs como fuente** — el complemento te permite alternar entre ellos al vuelo y fijar uno como el PDF *activo* para ese Inc Rem.
 - El complemento renderizará la vista de lectura del PDF o sitio web dentro de la cola.
 - Si quieres convertir un resaltado en un Rem incremental, haz clic en el resaltado y haz clic en el icono de la pieza de rompecabezas.
 - ** 📄 PDFs y Web**
   - **Estado Visual**: Los resaltados se vuelven **Verdes** cuando se activan como Incrementales, y **Azules** cuando se extraen.
+  - **Panel de Control de PDF**: Gestiona capítulos, define rangos de páginas y consulta el historial de lectura para documentos largos.
+  - **Selector multi-PDF** *(nuevo)*: Cuando un Inc Rem tiene múltiples PDFs como fuente, aparece un desplegable en el Reader (junto al ícono 📝 de Notas del Documento), en el Cronómetro de Revisión del Editor, en el popup de Ejecutar Repetición, en el Panel de Control de PDF y en el Priority Editor — permitiéndote cambiar el PDF que se muestra y fijar uno como activo para ese Inc Rem. El orden de resolución es **fijación explícita → `#preferthispdf` → primer PDF**, aplicado de forma uniforme en todas las superficies.
+  - **Seguimiento de Posición**: El complemento guarda automáticamente tu última página leída al usar el flujo de Capítulos de PDF o al crear extractos.
   - **Crear Rem Incremental**: Selecciona texto en un PDF -> Resáltalo -> Haz clic en el Icono de Rompecabezas -> **"Create Incremental Rem"**. Esto extrae el texto a un nuevo Rem bajo un padre de tu elección (usando el selector inteligente de padres).
 ![Resaltar](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
 

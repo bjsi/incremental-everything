@@ -98,12 +98,13 @@ The plugin now features **Automatic Light Mode**.
 ### Incremental Reading
 
 - You can tag PDFs, websites and highlights with the `Incremental` tag to do classic SuperMemo-style incremental reading.
-- It will work if you tag the PDF or website itself, a Rem with a single PDF or website as a source, or a Rem with multiple sources where exactly one PDF has the `#preferthispdf` tag.
+- It works whether you tag the PDF/website itself, a Rem with a single source, or a Rem with **multiple PDF sources** — the plugin lets you switch between them on the fly and pin one as the *active* PDF for that Inc Rem.
 - The plugin will render the PDF or website reader view inside the queue.
 - If you want to turn a highlight into an incremental Rem, click on the highlight and click the puzzle piece icon.
 - 📄 **PDFs & Web**
   - **Visual Status**: Highlights turn **Green** when toggled as Incremental, and **Blue** when extracted.
   - **PDF Control Panel**: Manage chapters, set page ranges, and view reading history for long documents.
+  - **Multi-PDF Switcher** *(new)*: When an Inc Rem has multiple PDF sources, a dropdown appears in the Reader (next to the 📝 Document Notes icon), in the Editor Review Timer, in the Execute Repetition popup, in the PDF Control Panel, and in the Editor Toolbar — letting you switch the PDF in view and pin a chosen one as active for that Inc Rem. Resolution order is **explicit pin → `#preferthispdf` → first PDF**, applied uniformly across every surface.
   - **Position Tracking**: The plugin automatically saves your last read page when using the PDF Chapter workflow or creating extracts.
   - **Create Incremental Rem**: Select text in a PDF -> Highlight it -> Click the Funnel Icon -> **"Create Incremental Rem"**. This extracts the text to a new Rem under a parent of your choice (using the smart parent selector).
 
