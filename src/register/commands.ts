@@ -46,7 +46,7 @@ import {
 import { handleQuickPriorityChange } from '../lib/quick_priority';
 import {
   removeAllCardPriorityTags,
-  cleanUpDuplicateCardPrioritySlots,
+  sanitizeAllRogueCardPriorityTags,
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
@@ -1294,14 +1294,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  // Cleanup duplicates command
+  // Sanitize rogue tags command
   await plugin.app.registerCommand({
-    id: 'cleanup-duplicate-card-priority-slots',
-    name: 'Clean Up Duplicate CardPriority Slots',
+    id: 'sanitize-rogue-card-priority-tags',
+    name: 'Sanitize Rogue CardPriority Tags',
     description:
-      'Detect and remove the cardPriority powerup and all its slots from any Rem that has duplicate slots',
+      'Detects and removes the CardPriority powerup from properties and non-flashcards across your KB',
     action: async () => {
-      await cleanUpDuplicateCardPrioritySlots(plugin);
+      await sanitizeAllRogueCardPriorityTags(plugin);
     },
   });
 

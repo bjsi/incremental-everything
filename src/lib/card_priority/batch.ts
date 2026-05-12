@@ -1,4 +1,4 @@
-import { RNPlugin } from '@remnote/plugin-sdk';
+import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import {
   allCardPriorityInfoKey,
   cardPriorityShieldHistoryKey,
@@ -8,7 +8,7 @@ import {
 import { CardPriorityInfo } from './types';
 import { calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
-import { PluginRem } from '@remnote/plugin-sdk';
+import { safeRemTextToString } from '../pdfUtils';
 
 export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   const confirmed = confirm(
@@ -561,22 +561,77 @@ export async function removeCardPriorityFromRem(plugin: RNPlugin, rem: PluginRem
   }
 }
 
+export interface RogueTagResult {
+  id: string;
+  name: string;
+  parentId?: string;
+  parentName?: string;
+}
+
 /**
  * Scans a Rem's children to find Rems that have the CardPriority powerup but no flashcards natively.
  */
 export async function getSpuriousCardPriorityTags(plugin: RNPlugin, rem: PluginRem, recursive: boolean = false) {
-  const rogueRems: { id: string; name: string }[] = [];
+  const guaranteedRogue: RogueTagResult[] = [];
+  const suspicious: RogueTagResult[] = [];
+
+  // Fetch slot DEFINITION Rems (templates, not instances) — this is read-only and safe.
+  // Each slot definition has an _id that RemNote uses to tag the actual slot instances on rems.
+  const slotDefs = [
+    { powerup: 'incremental', slot: 'repHist' },
+    { powerup: 'incremental', slot: 'originalIncDate' },
+    { powerup: 'incremental', slot: 'nextRepDate' },
+    { powerup: 'incremental', slot: 'priority' },
+    { powerup: 'cardPriority', slot: 'priority' },
+    { powerup: 'cardPriority', slot: 'prioritySource' },
+    { powerup: 'cardPriority', slot: 'lastUpdated' },
+    { powerup: 'videoExtract', slot: 'videoUrl' },
+    { powerup: 'videoExtract', slot: 'startTime' },
+    { powerup: 'videoExtract', slot: 'endTime' },
+    { powerup: 'dismissed', slot: 'dismissedHistory' },
+    { powerup: 'dismissed', slot: 'dismissedDate' },
+  ];
+
+  const ownSlotDefinitionIds = new Set<string>();
+  for (const { powerup, slot } of slotDefs) {
+    const defRem = await plugin.powerup.getPowerupSlotByCode(powerup, slot);
+    if (defRem) {
+      ownSlotDefinitionIds.add(defRem._id);
+    }
+  }
 
   async function scanRem(target: PluginRem) {
     const children = await target.getChildrenRem();
+    const targetName = await safeRemTextToString(plugin, target.text);
+
     for (const child of children) {
       const hasPowerup = await child.hasPowerup('cardPriority');
       if (hasPowerup) {
-        const cards = await child.getCards();
-        if (!cards || cards.length === 0) {
-          const textRaw = await child.text;
-          const textString = textRaw ? await plugin.richText.toString(textRaw) : 'Untitled';
-          rogueRems.push({ id: child._id, name: textString || 'Untitled' });
+        const isProp = await child.isProperty();
+        const isPowerupProp = await child.isPowerupProperty();
+        
+        // ONLY target property nodes. Structural rems (folders/documents) used for inheritance MUST be preserved.
+        if (isProp || isPowerupProp) {
+          const cards = await child.getCards();
+          if (!cards || cards.length === 0) {
+            const textRaw = await child.text;
+            const textString = await safeRemTextToString(plugin, textRaw);
+            
+            // Check if this child's text references one of our own slot definitions.
+            // RemNote links slot instances to their definitions via a reference in the
+            // rich text content: text[0]._id points to the slot definition Rem.
+            const isOwnSlot = textRaw 
+              && textRaw.length > 0 
+              && typeof textRaw[0] === 'object' 
+              && (textRaw[0] as any)?._id 
+              && ownSlotDefinitionIds.has((textRaw[0] as any)._id);
+            
+            if (isOwnSlot) {
+              guaranteedRogue.push({ id: child._id, name: textString, parentId: target._id, parentName: targetName });
+            } else {
+              suspicious.push({ id: child._id, name: textString, parentId: target._id, parentName: targetName });
+            }
+          }
         }
       }
       if (recursive) {
@@ -586,7 +641,7 @@ export async function getSpuriousCardPriorityTags(plugin: RNPlugin, rem: PluginR
   }
 
   await scanRem(rem);
-  return rogueRems;
+  return { guaranteedRogue, suspicious };
 }
 
 /**
@@ -612,7 +667,7 @@ export async function removeCardPriorityFromSpecificRems(plugin: RNPlugin, remId
     return { success: true, cleanedCount };
   } catch (error) {
     console.error(`[Sanitize] Error:`, error);
-    return { success: false, error };
+    return { success: false, error, cleanedCount: 0 };
   } finally {
     setTimeout(async () => {
       await plugin.storage.setSession('plugin_operation_active', false);
@@ -620,71 +675,72 @@ export async function removeCardPriorityFromSpecificRems(plugin: RNPlugin, remId
   }
 }
 
-export async function cleanUpDuplicateCardPrioritySlots(plugin: RNPlugin) {
-  const confirmed = confirm(
-    '⚠️ Clean Up Duplicate CardPriority Slots\n\n' +
-    'This will detect and remove the cardPriority powerup and all its slots from any Rem that has duplicate slots.\n\n' +
-    'You can then run "Update all inherited Card Priorities" to recalculate them.\n\n' +
-    'Continue?'
-  );
+export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
+  await plugin.app.toast('Scanning knowledge base for rogue CardPriority tags...');
+  
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+  
+  let allGuaranteed: RogueTagResult[] = [];
+  let allSuspicious: RogueTagResult[] = [];
+  
+  for (const rem of taggedRems) {
+    const { guaranteedRogue, suspicious } = await getSpuriousCardPriorityTags(plugin, rem, false);
+    allGuaranteed.push(...guaranteedRogue);
+    allSuspicious.push(...suspicious);
+  }
 
-  if (!confirmed) return;
+  if (allGuaranteed.length === 0 && allSuspicious.length === 0) {
+    await plugin.app.toast('No rogue tags found. Your database is clean!');
+    return;
+  }
 
-  await plugin.app.toast('Scanning for duplicate slots...');
-  await plugin.storage.setSession('plugin_operation_active', true);
+  let totalCleaned = 0;
+  const CHUNK_SIZE = 20;
 
-  try {
-    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
-    const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
-
-    const prioritySlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'priority');
-    const sourceSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'prioritySource');
-    const updatedSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'lastUpdated');
-
-    const slotIds = new Set(
-      [prioritySlot?._id, sourceSlot?._id, updatedSlot?._id].filter(Boolean)
-    );
-
-    let remsWithDuplicates = 0;
-    const cpPowerupId = cardPriorityPowerup?._id;
-
-    for (const rem of taggedRems) {
-      const children = await rem.getChildrenRem();
-      const slotCounts = new Map<string, number>();
-
-      for (const child of children) {
-        const isProp = await child.isProperty();
-        const isPowerupProp = await child.isPowerupProperty();
+  if (allGuaranteed.length > 0) {
+    for (let i = 0; i < allGuaranteed.length; i += CHUNK_SIZE) {
+      const chunk = allGuaranteed.slice(i, i + CHUNK_SIZE);
+      const listString = chunk.map(r => `- ${r.name} (${r.id})`).join('\n');
+      
+      const chunkMsg = allGuaranteed.length > CHUNK_SIZE 
+        ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(allGuaranteed.length/CHUNK_SIZE)})` 
+        : '';
         
-        if (isProp || isPowerupProp) {
-          const tags = await child.getTagRems();
-          const tagIds = tags.map(t => t._id);
-          for (const tagId of tagIds) {
-            if (slotIds.has(tagId) || tagId === cpPowerupId) {
-              const countKey = slotIds.has(tagId) ? tagId : 'general_powerup_tag';
-              slotCounts.set(countKey, (slotCounts.get(countKey) || 0) + 1);
-            }
+      const confirmed = confirm(`Found ${allGuaranteed.length} GUARANTEED rogue properties. This will safely remove CardPriority from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
+      
+      if (!confirmed) {
+        if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
+        return;
+      }
+      
+      await plugin.app.toast(`Sanitizing ${chunk.length} guaranteed rogue properties...`);
+      const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map(r => r.id));
+      if (result.success) {
+        totalCleaned += result.cleanedCount;
+      } else {
+        await plugin.app.toast('Sanitize failed during batch. Check console.');
+        return;
+      }
+    }
+  }
+
+  if (allSuspicious.length > 0) {
+    const proceed = confirm(`We successfully processed the guaranteed tags.\n\nHowever, we also found ${allSuspicious.length} SUSPICIOUS properties.\nThese are property nodes from other plugins that have CardPriority but 0 flashcards. They might be bugs, or they might be intentional.\n\nDo you want to review them one by one?`);
+    
+    if (proceed) {
+      for (const rem of allSuspicious) {
+        const confirmDelete = confirm(`⚠️ Suspicious Property Found\n\nProperty Text: "${rem.name}"\nParent Rem: "${rem.parentName}"\n\nThis property has no flashcards. Do you want to remove CardPriority from it?`);
+        
+        if (confirmDelete) {
+          const result = await removeCardPriorityFromSpecificRems(plugin, [rem.id]);
+          if (result.success) {
+            totalCleaned += result.cleanedCount;
           }
         }
       }
-
-      const hasDuplicates = Array.from(slotCounts.values()).some((count) => count > 1);
-
-      if (hasDuplicates) {
-        await removeCardPriorityFromRem(plugin, rem);
-        remsWithDuplicates++;
-      }
     }
-
-    if (remsWithDuplicates > 0) {
-      await plugin.app.toast(`✅ Cleaned up ${remsWithDuplicates} rems with duplicate slots.`);
-    } else {
-      await plugin.app.toast('No duplicate slots found. Your database is clean!');
-    }
-  } catch (error) {
-    console.error('Error during duplicate slots cleanup:', error);
-    await plugin.app.toast('❌ Error during cleanup. Check console for details.');
-  } finally {
-    await plugin.storage.setSession('plugin_operation_active', false);
   }
+
+  await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tags across your KB.`);
 }

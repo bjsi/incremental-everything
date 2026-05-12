@@ -57,8 +57,8 @@ function Debug() {
          currentParent = await currentParent.getParentRem();
       }
 
-      const spuriousRems = await getSpuriousCardPriorityTags(rp, rem, false);
-      const hasSpuriousTags = spuriousRems.length > 0;
+      const { guaranteedRogue, suspicious } = await getSpuriousCardPriorityTags(rp, rem, false);
+      const hasSpuriousTags = guaranteedRogue.length > 0 || suspicious.length > 0;
 
       return {
         incrementalRem,
@@ -67,7 +67,8 @@ function Debug() {
         isCardDisabledLocally,
         isCardDisabledInAncestors,
         hasSpuriousTags,
-        spuriousRems,
+        guaranteedRogue,
+        suspicious,
         rem
       };
     },
@@ -76,7 +77,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, spuriousRems, rem } = debugData;
+  const { incrementalRem, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, rem } = debugData;
 
   const handleDeepLog = async () => {
     console.log(`\n=================== DEEP LOG REM: ${rem._id} ===================`);
@@ -117,33 +118,52 @@ function Debug() {
   };
 
   const handleSanitize = async () => {
-    if (!spuriousRems || spuriousRems.length === 0) return;
+    if (!hasSpuriousTags) return;
     
     let totalCleaned = 0;
     const CHUNK_SIZE = 20;
     
-    for (let i = 0; i < spuriousRems.length; i += CHUNK_SIZE) {
-      const chunk = spuriousRems.slice(i, i + CHUNK_SIZE);
-      const listString = chunk.map((r: any) => `- ${r.name} (${r.id})`).join('\n');
-      
-      const chunkMsg = spuriousRems.length > CHUNK_SIZE 
-        ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(spuriousRems.length/CHUNK_SIZE)})` 
-        : '';
+    if (guaranteedRogue.length > 0) {
+      for (let i = 0; i < guaranteedRogue.length; i += CHUNK_SIZE) {
+        const chunk = guaranteedRogue.slice(i, i + CHUNK_SIZE);
+        const listString = chunk.map((r: any) => `- ${r.name}`).join('\n');
         
-      const confirmed = confirm(`This will remove CardPriority from ${chunk.length} non-flashcard rem(s) ${chunkMsg}:\n\n${listString}\n\nContinue?`);
-      
-      if (!confirmed) {
-        if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
-        return;
+        const chunkMsg = guaranteedRogue.length > CHUNK_SIZE 
+          ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(guaranteedRogue.length/CHUNK_SIZE)})` 
+          : '';
+          
+        const confirmed = confirm(`Found ${guaranteedRogue.length} GUARANTEED rogue properties. This will safely remove CardPriority from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
+        
+        if (!confirmed) {
+          if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
+          return;
+        }
+        
+        await plugin.app.toast(`Sanitizing ${chunk.length} guaranteed rogue properties...`);
+        const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map((r: any) => r.id));
+        if (result.success) {
+          totalCleaned += result.cleanedCount;
+        } else {
+          await plugin.app.toast('Sanitize failed during batch. Check console.');
+          return;
+        }
       }
+    }
+
+    if (suspicious.length > 0) {
+      const proceed = confirm(`We found ${suspicious.length} SUSPICIOUS properties.\nThese are property nodes from other plugins that have CardPriority but 0 flashcards. They might be bugs, or they might be intentional.\n\nDo you want to review them one by one?`);
       
-      await plugin.app.toast(`Sanitizing ${chunk.length} rogue properties...`);
-      const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map((r: any) => r.id));
-      if (result.success) {
-        totalCleaned += result.cleanedCount;
-      } else {
-        await plugin.app.toast('Sanitize failed during batch. Check console.');
-        return;
+      if (proceed) {
+        for (const r of suspicious) {
+          const confirmDelete = confirm(`⚠️ Suspicious Property Found\n\nProperty Text: "${r.name}"\nParent Rem: "${r.parentName}"\n\nThis property has no flashcards. Do you want to remove CardPriority from it?`);
+          
+          if (confirmDelete) {
+            const result = await removeCardPriorityFromSpecificRems(plugin, [r.id]);
+            if (result.success) {
+              totalCleaned += result.cleanedCount;
+            }
+          }
+        }
       }
     }
     
