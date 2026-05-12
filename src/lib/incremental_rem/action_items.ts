@@ -5,7 +5,7 @@ import {
   RichTextElementRemInterface,
 } from '@remnote/plugin-sdk';
 import { RemAndType } from './types';
-import { safeRemTextToString } from '../pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem } from '../pdfUtils';
 import {
   videoExtractPowerupCode,
   videoExtractUrlSlotCode,
@@ -125,28 +125,41 @@ export const remToActionItemType = async (
     if (sources.length === 1) {
       selectedSource = sources[0];
     } else if (sources.length > 1) {
-      const preferredSources: PluginRem[] = [];
-      for (const source of sources) {
-        try {
-          const tags = await source.getTagRems();
-          for (const tagRem of tags) {
-            if (!tagRem.text) continue;
-            const tagText = await safeRemTextToString(plugin, tagRem.text);
-            const tagLower = tagText.toLowerCase().replace(/\s+/g, '');
-            if (tagLower === 'preferthispdf') {
-              preferredSources.push(source);
-              break;
+      // Multi-source resolution for PDFs: pin → #preferthispdf → first PDF.
+      // Whenever the IncRem has any PDF source we open it in the Reader
+      // (the Reader's PDF switcher lets the user pick a different one).
+      // The legacy ExtractViewer fallback is reserved for the
+      // #extractviewer-tagged case handled at the top of this function.
+      const resolvedPdf = await getActivePdfForIncRem(plugin, rem);
+      if (resolvedPdf) {
+        selectedSource = resolvedPdf;
+      } else {
+        // No PDFs on this rem — fall back to the legacy #preferthispdf scan,
+        // which can also disambiguate among non-PDF sources (HTML, video, etc.)
+        // when the user has explicitly tagged one.
+        const preferredSources: PluginRem[] = [];
+        for (const source of sources) {
+          try {
+            const tags = await source.getTagRems();
+            for (const tagRem of tags) {
+              if (!tagRem.text) continue;
+              const tagText = await safeRemTextToString(plugin, tagRem.text);
+              const tagLower = tagText.toLowerCase().replace(/\s+/g, '');
+              if (tagLower === 'preferthispdf') {
+                preferredSources.push(source);
+                break;
+              }
             }
+          } catch (e) {
+            // Ignore errors reading tags
           }
-        } catch (e) {
-          // Ignore errors reading tags
         }
-      }
 
-      if (preferredSources.length === 1) {
-        selectedSource = preferredSources[0];
-      } else if (preferredSources.length > 1) {
-        await plugin.app.toast('Multiple PDFs have the #preferthispdf tag. Opening in standard Rem view instead of Reader.');
+        if (preferredSources.length === 1) {
+          selectedSource = preferredSources[0];
+        } else if (preferredSources.length > 1) {
+          await plugin.app.toast('Multiple sources have the #preferthispdf tag. Opening in standard Rem view.');
+        }
       }
     }
 

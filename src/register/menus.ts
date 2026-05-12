@@ -12,7 +12,7 @@ import {
   pageRangeWidgetId,
   incRemDisabledDeviceKey,
 } from '../lib/consts';
-import { safeRemTextToString, findPDFinRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem, getAllPDFsInRem, findIncrementalRemForPDF, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from '../lib/pdfUtils';
 import { initIncrementalRem } from './powerups';
 import { createRemFromHighlight } from '../lib/highlightActions';
 
@@ -217,20 +217,36 @@ export async function registerMenus(plugin: ReactRNPlugin) {
       const rem = await plugin.rem.findOne(args.remId);
       if (!rem) return;
 
-      const pdfRem = await findPDFinRem(plugin, rem);
+      const pdfRem = await getActivePdfForIncRem(plugin, rem);
       if (!pdfRem) {
         await plugin.app.toast('No PDF found in this rem or its sources');
         return;
       }
 
-      // Open the popup immediately with a partial context (no incrementalRemId yet).
-      // The widget will resolve incrementalRemId itself using a fast cache-first path.
-      console.log('[PDF Control Panel] Opening popup immediately with pdfRemId:', pdfRem._id);
+      // If the menu was triggered from an IncRem document (rather than from
+      // the PDF document itself), pass the IncRem id directly. Without this,
+      // the widget falls back to findIncrementalRemForPDFFast, which walks
+      // the known-rems index and returns the *first* match — silently
+      // landing on the wrong IncRem when many share the same PDF (e.g. a
+      // book's chapters all sourcing the same textbook PDF). Pre-populating
+      // allPdfRemIds lets the PDF selector render immediately too.
+      const isIncRem = await rem.hasPowerup(powerupCode);
+      const incrementalRemId = isIncRem ? rem._id : null;
+      const allPdfRemIds = isIncRem
+        ? (await getAllPDFsInRem(plugin, rem)).map((p) => p.rem._id)
+        : undefined;
+
+      console.log('[PDF Control Panel] Opening popup with', {
+        pdfRemId: pdfRem._id,
+        incrementalRemId,
+        allPdfCount: allPdfRemIds?.length ?? 'unknown',
+      });
       await plugin.storage.setSession('pageRangeContext', {
         pdfRemId: pdfRem._id,
-        incrementalRemId: null,   // widget will fill this in
+        incrementalRemId,   // null only when triggered from a non-IncRem doc
         totalPages: 0,
         currentPage: 1,
+        allPdfRemIds,
       });
       await plugin.storage.setSession('pageRangePopupOpen', true);
       await plugin.widget.openPopup(pageRangeWidgetId);

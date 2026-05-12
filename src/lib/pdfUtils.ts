@@ -8,6 +8,13 @@ export interface PageRangeContext {
   pdfRemId: RemId;
   totalPages: number;
   currentPage: number;
+  /**
+   * All PDF rem IDs available for the IncRem, when known at popup-open time.
+   * Used by the panel's PDF selector for instant render. Undefined when the
+   * popup enters from a path that hasn't resolved the IncRem yet (the widget
+   * computes the list itself once the IncRem is resolved).
+   */
+  allPdfRemIds?: RemId[];
 }
 
 /**
@@ -569,6 +576,121 @@ export const findPDFinRem = async (
 };
 
 /**
+ * Enumerate every PDF source attached to a rem, flagging which carry the
+ * `#preferthispdf` tag. The rem itself is included if it is an uploaded PDF.
+ *
+ * This is the building block for `findPreferredPDFInRem` (legacy strict
+ * resolver) and `getActivePdfForIncRem` (active-PDF-aware resolver).
+ */
+export const getAllPDFsInRem = async (
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<Array<{ rem: PluginRem; isPreferred: boolean }>> => {
+  const isUploadedPdf = async (r: PluginRem): Promise<boolean> => {
+    if (!(await r.hasPowerup(BuiltInPowerupCodes.UploadedFile))) return false;
+    try {
+      const url = await r.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
+      return typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
+    } catch {
+      return false;
+    }
+  };
+
+  const hasPreferTag = async (r: PluginRem): Promise<boolean> => {
+    try {
+      const tags = await r.getTagRems();
+      for (const tagRem of tags) {
+        if (!tagRem.text) continue;
+        const tagText = (await safeRemTextToString(plugin, tagRem.text))
+          .toLowerCase()
+          .replace(/\s+/g, '');
+        if (tagText === 'preferthispdf') return true;
+      }
+    } catch {
+      // Ignore tag-read errors for individual PDFs
+    }
+    return false;
+  };
+
+  const result: Array<{ rem: PluginRem; isPreferred: boolean }> = [];
+
+  if (await isUploadedPdf(rem)) {
+    result.push({ rem, isPreferred: await hasPreferTag(rem) });
+  }
+
+  const sources = await rem.getSources();
+  for (const source of sources) {
+    if (await isUploadedPdf(source)) {
+      result.push({ rem: source, isPreferred: await hasPreferTag(source) });
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Storage key for the user's explicitly chosen "active PDF" on an IncRem.
+ * Lets the user pin a non-preferred PDF as the focus of their work without
+ * editing tags.
+ */
+export const getActivePdfKey = (incRemId: string) => `active_pdf_for_${incRemId}`;
+
+/**
+ * Pin a PDF as the active one for an IncRem. Pass `null` to clear the pin.
+ */
+export const setActivePdfForIncRem = async (
+  plugin: RNPlugin,
+  incRemId: string,
+  pdfRemId: string | null
+): Promise<void> => {
+  await plugin.storage.setSynced(getActivePdfKey(incRemId), pdfRemId);
+};
+
+/**
+ * Resolve the PDF the user is currently focused on for an IncRem.
+ *
+ * Resolution order:
+ *   1. Explicit active PDF (`active_pdf_for_${remId}`) if still a source —
+ *      stale stored IDs are auto-cleared.
+ *   2. PDF tagged `#preferthispdf`. With multiple such PDFs:
+ *        - strict mode → null (caller communicates the conflict).
+ *        - default mode → first preferred PDF (graceful fallback).
+ *   3. First PDF source found.
+ *
+ * Returns null only if the rem has no PDFs, or if strict mode hit a
+ * multi-preferred conflict.
+ */
+export const getActivePdfForIncRem = async (
+  plugin: RNPlugin,
+  rem: PluginRem,
+  opts: { strict?: boolean } = {}
+): Promise<PluginRem | null> => {
+  const allPdfs = await getAllPDFsInRem(plugin, rem);
+  if (allPdfs.length === 0) return null;
+  if (allPdfs.length === 1) return allPdfs[0].rem;
+
+  // 1. Explicit active PDF
+  const activeId = await plugin.storage.getSynced<string>(getActivePdfKey(rem._id));
+  if (activeId) {
+    const match = allPdfs.find(p => p.rem._id === activeId);
+    if (match) return match.rem;
+    // Stored PDF is no longer a source — clear the stale pin.
+    await plugin.storage.setSynced(getActivePdfKey(rem._id), null);
+  }
+
+  // 2. Preferred PDF (#preferthispdf)
+  const preferred = allPdfs.filter(p => p.isPreferred);
+  if (preferred.length === 1) return preferred[0].rem;
+  if (preferred.length > 1) {
+    if (opts.strict) return null;
+    return preferred[0].rem;
+  }
+
+  // 3. First PDF source
+  return allPdfs[0].rem;
+};
+
+/**
  * Finds the best PDF for a given rem, respecting the `#preferthispdf` tag.
  *
  * Resolution order:
@@ -579,8 +701,9 @@ export const findPDFinRem = async (
  *     (caller should fall back to the standard ExtractViewer path).
  *  5. If no source has the tag → return the first PDF found (legacy behaviour).
  *
- * This mirrors the logic in `action_items.ts` but is exposed here so any
- * command or widget can call it without duplicating the tag-check loop.
+ * Strict resolver — does NOT consult the per-IncRem "active PDF" pin. Prefer
+ * `getActivePdfForIncRem` for new code; this remains for call sites that
+ * specifically want the multi-preferred conflict toast (e.g. legacy paths).
  */
 export const findPreferredPDFInRem = async (
   plugin: RNPlugin,
@@ -588,55 +711,12 @@ export const findPreferredPDFInRem = async (
   /** If true, show a toast when multiple #preferthispdf tags are found */
   showWarningToast: boolean = true
 ): Promise<PluginRem | null> => {
-  // Collect all PDF sources on this rem
-  const allPdfs: PluginRem[] = [];
-
-  // Rem itself may be a PDF
-  const isUploadedPdf = async (r: PluginRem) => {
-    if (!(await r.hasPowerup(BuiltInPowerupCodes.UploadedFile))) return false;
-    try {
-      const url = await r.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
-      return typeof url === 'string' && url.toLowerCase().endsWith('.pdf');
-    } catch {
-      return false;
-    }
-  };
-
-  if (await isUploadedPdf(rem)) {
-    allPdfs.push(rem);
-  }
-
-  const sources = await rem.getSources();
-  for (const source of sources) {
-    if (await isUploadedPdf(source)) {
-      allPdfs.push(source);
-    }
-  }
-
+  const allPdfs = await getAllPDFsInRem(plugin, rem);
   if (allPdfs.length === 0) return null;
-  if (allPdfs.length === 1) return allPdfs[0];
+  if (allPdfs.length === 1) return allPdfs[0].rem;
 
-  // Multiple PDFs — look for #preferthispdf tag
-  const preferred: PluginRem[] = [];
-  for (const pdf of allPdfs) {
-    try {
-      const tags = await pdf.getTagRems();
-      for (const tagRem of tags) {
-        if (!tagRem.text) continue;
-        const tagText = (await safeRemTextToString(plugin, tagRem.text))
-          .toLowerCase()
-          .replace(/\s+/g, '');
-        if (tagText === 'preferthispdf') {
-          preferred.push(pdf);
-          break;
-        }
-      }
-    } catch {
-      // Ignore tag-read errors for individual PDFs
-    }
-  }
-
-  if (preferred.length === 1) return preferred[0];
+  const preferred = allPdfs.filter(p => p.isPreferred);
+  if (preferred.length === 1) return preferred[0].rem;
 
   if (preferred.length > 1 && showWarningToast) {
     await plugin.app.toast(
@@ -646,7 +726,7 @@ export const findPreferredPDFInRem = async (
   }
 
   // No tag found — fall back to first PDF (legacy behaviour)
-  return allPdfs[0];
+  return allPdfs[0].rem;
 };
 
 /**

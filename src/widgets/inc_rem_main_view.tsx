@@ -25,27 +25,40 @@ import {
 
 interface GraphDataPoint {
   range: string;
-  incRem: number;
-  card: number;
+  incRemDue: number;
+  incRemNotDue: number;
+  cardDue: number;
+  cardNotDue: number;
 }
+
+const INC_REM_DUE_COLOR = '#3b82f6';
+const INC_REM_NOT_DUE_COLOR = '#bfdbfe';
+const CARD_DUE_COLOR = '#ef4444';
+const CARD_NOT_DUE_COLOR = '#fecaca';
 
 /**
  * Computes absolute priority bins from all KB IncRems and card infos.
+ * Each bin splits items into "due" (nextRepDate <= now for IncRems; dueCards > 0
+ * for rems with cards) and "not due" (already processed, scheduled forward).
  */
 function computeKbGraphBins(
   allIncRems: IncrementalRem[],
   allCardInfos: CardPriorityInfo[],
 ): GraphDataPoint[] {
+  const now = Date.now();
   const bins: GraphDataPoint[] = Array(20).fill(0).map((_, i) => ({
     range: `${i * 5}-${(i + 1) * 5}`,
-    incRem: 0,
-    card: 0,
+    incRemDue: 0,
+    incRemNotDue: 0,
+    cardDue: 0,
+    cardNotDue: 0,
   }));
 
   for (const item of allIncRems) {
     const p = Math.max(0, Math.min(100, item.priority));
     const idx = Math.min(Math.floor(p / 5), 19);
-    bins[idx].incRem++;
+    if (item.nextRepDate <= now) bins[idx].incRemDue++;
+    else bins[idx].incRemNotDue++;
   }
 
   // Filter out inheritance-only rems (cardCount === 0) that hold the powerup
@@ -54,10 +67,51 @@ function computeKbGraphBins(
     if (item.cardCount !== undefined && item.cardCount <= 0) continue;
     const p = Math.max(0, Math.min(100, item.priority));
     const idx = Math.min(Math.floor(p / 5), 19);
-    bins[idx].card++;
+    if ((item.dueCards ?? 0) > 0) bins[idx].cardDue++;
+    else bins[idx].cardNotDue++;
   }
 
   return bins;
+}
+
+function PriorityBinTooltip({ active, payload, label }: any) {
+  if (!active || !payload || payload.length === 0) return null;
+  const data = payload[0]?.payload as GraphDataPoint | undefined;
+  if (!data) return null;
+
+  const incTotal = data.incRemDue + data.incRemNotDue;
+  const cardTotal = data.cardDue + data.cardNotDue;
+  const incPct = incTotal > 0 ? Math.round((data.incRemNotDue / incTotal) * 100) : 0;
+  const cardPct = cardTotal > 0 ? Math.round((data.cardNotDue / cardTotal) * 100) : 0;
+
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        border: 'none',
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+        background: 'white',
+        padding: '8px 10px',
+        fontSize: 12,
+        color: '#374151',
+        lineHeight: 1.4,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ color: INC_REM_DUE_COLOR, fontWeight: 600 }}>
+        Incremental Rems: {incTotal}
+      </div>
+      <div style={{ marginLeft: 8 }}>
+        Due: {data.incRemDue} · Processed: {data.incRemNotDue} ({incPct}%)
+      </div>
+      <div style={{ color: CARD_DUE_COLOR, fontWeight: 600, marginTop: 4 }}>
+        Rems with Cards: {cardTotal}
+      </div>
+      <div style={{ marginLeft: 8 }}>
+        Due: {data.cardDue} · Processed: {data.cardNotDue} ({cardPct}%)
+      </div>
+    </div>
+  );
 }
 
 const INC_REM_MAIN_VIEW_STATE_KEY = 'inc-rem-main-view-state';
@@ -381,8 +435,8 @@ export function IncRemMainView() {
               </span>
             </h4>
 
-            <div style={{ width: '100%', height: 250 }}>
-              <ResponsiveContainer width="100%" height="100%" minHeight={250} minWidth={100}>
+            <div style={{ width: '100%', height: 350 }}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={350} minWidth={100}>
                 <BarChart
                   data={graphBins}
                   margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
@@ -412,12 +466,12 @@ export function IncRemMainView() {
                     tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v)}
                     label={{ value: 'Rems with Cards', angle: 90, position: 'insideRight', fill: '#ef4444', fontSize: 10 }}
                   />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                  />
+                  <Tooltip content={<PriorityBinTooltip />} />
                   <Legend verticalAlign="top" height={36} />
-                  <Bar yAxisId="left" dataKey="incRem" name="Incremental Rems" fill="#3b82f6" />
-                  <Bar yAxisId="right" dataKey="card" name="Rems with Cards" fill="#ef4444" />
+                  <Bar yAxisId="left" stackId="incRem" dataKey="incRemNotDue" name="IncRems · Processed" fill={INC_REM_NOT_DUE_COLOR} />
+                  <Bar yAxisId="left" stackId="incRem" dataKey="incRemDue" name="IncRems · Due" fill={INC_REM_DUE_COLOR} />
+                  <Bar yAxisId="right" stackId="card" dataKey="cardNotDue" name="Cards · Processed" fill={CARD_NOT_DUE_COLOR} />
+                  <Bar yAxisId="right" stackId="card" dataKey="cardDue" name="Cards · Due" fill={CARD_DUE_COLOR} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

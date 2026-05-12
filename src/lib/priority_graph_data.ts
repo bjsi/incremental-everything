@@ -11,8 +11,14 @@ import { buildDocumentScope } from './scope_helpers';
 
 export interface GraphDataPoint {
     range: string;
-    incRem: number;
-    card: number;
+    /** IncRems with nextRepDate <= now */
+    incRemDue: number;
+    /** IncRems scheduled forward (already processed for now) */
+    incRemNotDue: number;
+    /** Rems with cards where dueCards > 0 */
+    cardDue: number;
+    /** Rems with cards where dueCards === 0 (all cards scheduled forward) */
+    cardNotDue: number;
 }
 
 export interface PriorityGraphData {
@@ -27,8 +33,10 @@ export interface PriorityGraphData {
 function createBins(): GraphDataPoint[] {
     return Array(20).fill(0).map((_, i) => ({
         range: `${i * 5}-${(i + 1) * 5}`,
-        incRem: 0,
-        card: 0,
+        incRemDue: 0,
+        incRemNotDue: 0,
+        cardDue: 0,
+        cardNotDue: 0,
     }));
 }
 
@@ -58,17 +66,21 @@ export function computePriorityGraphData(
 
     const binsAbsolute = createBins();
     const binsKbRelative = createBins();
+    const now = Date.now();
 
     // Fill bins from document-scoped IncRems
     for (const item of docIncRems) {
+        const isDue = item.nextRepDate <= now;
         const pAbs = Math.max(0, Math.min(100, item.priority));
         const absIndex = Math.min(Math.floor(pAbs / 5), 19);
-        binsAbsolute[absIndex].incRem++;
+        if (isDue) binsAbsolute[absIndex].incRemDue++;
+        else binsAbsolute[absIndex].incRemNotDue++;
 
         // KB-wide percentile for this item
         const pKb = Math.max(0, Math.min(100, kbIncRemPercentiles[item.remId] ?? 100));
         const kbIndex = Math.min(Math.floor(pKb / 5), 19);
-        binsKbRelative[kbIndex].incRem++;
+        if (isDue) binsKbRelative[kbIndex].incRemDue++;
+        else binsKbRelative[kbIndex].incRemNotDue++;
     }
 
     // Fill bins from document-scoped Cards
@@ -76,13 +88,16 @@ export function computePriorityGraphData(
     // only for child inheritance but have no actual cards themselves.
     for (const item of docCardInfos) {
         if (item.cardCount !== undefined && item.cardCount <= 0) continue;
+        const isDue = (item.dueCards ?? 0) > 0;
         const pAbs = Math.max(0, Math.min(100, item.priority));
         const absIndex = Math.min(Math.floor(pAbs / 5), 19);
-        binsAbsolute[absIndex].card++;
+        if (isDue) binsAbsolute[absIndex].cardDue++;
+        else binsAbsolute[absIndex].cardNotDue++;
 
         const pKb = Math.max(0, Math.min(100, kbCardPercentiles[item.remId] ?? 100));
         const kbIndex = Math.min(Math.floor(pKb / 5), 19);
-        binsKbRelative[kbIndex].card++;
+        if (isDue) binsKbRelative[kbIndex].cardDue++;
+        else binsKbRelative[kbIndex].cardNotDue++;
     }
 
     return {

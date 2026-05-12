@@ -84,11 +84,14 @@ O plugin agora possui **Modo Leve Automático**.
 ### Leitura Incremental
 
 - Você pode marcar PDFs, sites e destaques com a etiqueta `Incremental` para fazer leitura incremental clássica estilo SuperMemo.
-- Funcionará se você marcar o PDF ou site em si, ou um Rem com um único PDF ou site como fonte.
+- Funciona se você marcar o PDF/site em si, um Rem com uma única fonte, ou um Rem com **múltiplos PDFs como fonte** — o plugin permite alternar entre eles e fixar um como o PDF *ativo* para aquele Inc Rem.
 - O plugin renderizará a visualização de leitura do PDF ou site dentro da fila.
 - Se você quiser transformar um destaque em um Rem incremental, clique no destaque e clique no ícone da peça de quebra-cabeça.
 - ** 📄 PDFs e Web**
   - **Estado Visual**: Os destaques ficam **Verdes** quando alternados como Incrementais e **Azuis** quando extraídos.
+  - **Painel de Controle de PDF**: Gerencie capítulos, defina intervalos de páginas e veja o histórico de leitura para documentos longos.
+  - **Seletor multi-PDF** *(novo)*: Quando um Inc Rem tem múltiplos PDFs como fonte, um dropdown aparece no Reader (ao lado do ícone 📝 de Notas do Documento), no Cronômetro de Revisão no Editor, no popup de Executar Repetição, no Painel de Controle de PDF e no Priority Editor — permitindo alternar o PDF em exibição e fixar um como ativo para aquele Inc Rem. A ordem de resolução é **fixação explícita → `#preferthispdf` → primeiro PDF**, aplicada uniformemente em todas as superfícies.
+  - **Rastreamento de Posição**: O plugin salva automaticamente sua última página lida ao usar o fluxo de Capítulos de PDF ou ao criar extrações.
   - **Criar Rem Incremental**: Selecione o texto em um PDF -> Destaque-o -> Clique no ícone de quebra-cabeça -> **"Create Incremental Rem"**. Isso extrai o texto para um novo Rem sob um pai de sua escolha (usando o seletor inteligente de pais).
 ![Destacar](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
 

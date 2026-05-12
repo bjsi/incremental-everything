@@ -13,7 +13,7 @@ import { powerupCode, prioritySlotCode, pageRangeWidgetId } from '../lib/consts'
 import { IncrementalRep } from '../lib/incremental_rem';
 import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
-import { safeRemTextToString, findPDFinRem, findHTMLinRem, getIncrementalReadingPosition, addPageToHistory, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, getIncrementalReadingPosition, addPageToHistory, getPageHistory, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext } from '../lib/pdfUtils';
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { determineIncRemType } from '../lib/incRemHelpers';
 import { openRemInNewPane, openAndScrollToHighlight } from '../lib/remHelpers';
@@ -49,7 +49,7 @@ async function handleEditorReview(
   const reviewTimeSeconds = Math.round(reviewTimeMinutes * 60);
 
   // Synchronize time spent reading directly to the PDF reading history tracker
-  const pdfRem = await findPDFinRem(plugin, rem);
+  const pdfRem = await getActivePdfForIncRem(plugin, rem);
   if (pdfRem && reviewTimeSeconds > 0) {
     const activePage = await getIncrementalReadingPosition(plugin, remId, pdfRem._id);
     await addPageToHistory(plugin, remId, pdfRem._id, activePage || 1, reviewTimeSeconds);
@@ -133,6 +133,9 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
   // PDF States
   const [pdfRemId, setPdfRemId] = useState<string | null>(null);
   const [isPdfNote, setIsPdfNote] = useState(false);
+  // PDFs on this IncRem (>1 enables the inline switcher). Switching pins the
+  // chosen PDF so handleStartTimer opens it and follows its bookmark.
+  const [pdfOptions, setPdfOptions] = useState<Array<{ remId: string; name: string; isPreferred: boolean }>>([]);
 
   const pdfControls = usePdfPageControls(plugin, remId, pdfRemId, 0);
 
@@ -149,12 +152,27 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
         const name = await safeRemTextToString(plugin, rem.text);
         setRemName(name);
 
-        const pdfRem = await findPDFinRem(plugin, rem);
+        const pdfRem = await getActivePdfForIncRem(plugin, rem);
         if (pdfRem) {
           setIsPdfNote(true);
           setPdfRemId(pdfRem._id);
         } else {
           setIsPdfNote(false);
+        }
+
+        try {
+          const pdfs = await getAllPDFsInRem(plugin, rem);
+          const options = await Promise.all(
+            pdfs.map(async (p) => ({
+              remId: p.rem._id,
+              name: await safeRemTextToString(plugin, p.rem.text),
+              isPreferred: p.isPreferred,
+            }))
+          );
+          setPdfOptions(options);
+        } catch (e) {
+          console.error('[editor_review] Failed to load PDF options:', e);
+          setPdfOptions([]);
         }
       }
 
@@ -202,6 +220,13 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
     }
   };
 
+  const handlePdfSwitch = async (newPdfId: string) => {
+    if (newPdfId === pdfRemId) return;
+    await setActivePdfForIncRem(plugin, remId, newPdfId);
+    setPdfRemId(newPdfId);
+    setIsPdfNote(true);
+  };
+
   const handleStartTimer = async () => {
     // Store timer info in session
     await plugin.storage.setSession('editor-review-timer-rem-id', remId);
@@ -230,7 +255,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
       }
 
       // Host resolution: PDF first, then HTML article (Reader Mode source).
-      const pdfRem = await findPDFinRem(plugin, rem);
+      const pdfRem = await getActivePdfForIncRem(plugin, rem);
       const hostRem = pdfRem ?? (await findHTMLinRem(plugin, rem));
       const incRemType = await determineIncRemType(plugin, rem);
 
@@ -315,6 +340,34 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
           <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
             {ancestorInfo.ancestorName}
           </div>
+        </div>
+      )}
+
+      {pdfOptions.length > 1 && pdfRemId && (
+        <div className="flex items-center gap-2 my-2 p-2 border rounded shadow-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+          <label className="text-xs font-semibold" htmlFor="pdf-switch">📄 PDF:</label>
+          <select
+            id="pdf-switch"
+            value={pdfRemId}
+            onChange={(e) => handlePdfSwitch(e.target.value)}
+            className="text-xs px-2 py-1 rounded flex-1"
+            style={{
+              border: '1px solid var(--rn-clr-border-primary)',
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+              maxWidth: '320px',
+            }}
+            title="Switch active PDF for this IncRem"
+          >
+            {pdfOptions.map((opt) => (
+              <option key={opt.remId} value={opt.remId}>
+                {opt.name}{opt.isPreferred ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            ★ = #preferthispdf
+          </span>
         </div>
       )}
 

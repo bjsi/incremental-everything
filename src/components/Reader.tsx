@@ -3,7 +3,7 @@ import { usePlugin, RemId, ReactRNPlugin } from '@remnote/plugin-sdk';
 import React, { useMemo } from 'react';
 import { activeHighlightIdKey, pageRangeWidgetId, incremNotesSidebarWidgetId } from '../lib/consts';
 import { HTMLActionItem, HTMLHighlightActionItem, PDFActionItem, PDFHighlightActionItem, RemActionItem } from '../lib/incremental_rem';
-import { getIncrementalReadingPosition, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext, getPageHistory } from '../lib/pdfUtils';
+import { getIncrementalReadingPosition, getIncrementalPageRange, clearIncrementalPDFData, PageRangeContext, getPageHistory, getAllPDFsInRem, setActivePdfForIncRem, safeRemTextToString } from '../lib/pdfUtils';
 import { Breadcrumb, BreadcrumbItem } from './Breadcrumb';
 import { useCriticalContext, useMetadataStats } from './reader/hooks';
 import { MemoizedPdfReader, PageControls, StatsGroup } from './reader/ui';
@@ -35,6 +35,10 @@ export function Reader(props: ReaderProps) {
   const [canRenderPdf, setCanRenderPdf] = React.useState(
     !(isIOS && (actionType === 'pdf' || actionType === 'pdf-highlight'))
   );
+  // PDFs available on the IncRem (>1 enables the switcher next to the 📝
+  // notes button). Only meaningful for actionType === 'pdf'; highlights are
+  // tied to a specific PDF and switching would invalidate the queue card.
+  const [pdfOptions, setPdfOptions] = React.useState<Array<{ remId: string; name: string; isPreferred: boolean }>>([]);
 
   // useState (Deferred States)
   const criticalContext = useCriticalContext(plugin as ReactRNPlugin, pdfRemId, pdfParentId, actionType, highlightExtractId || undefined, props.queueIncRemId);
@@ -224,6 +228,47 @@ export function Reader(props: ReaderProps) {
     hasScrolled.current = false;
   }, [pdfRemId]);
 
+  // Load PDF selector options when the IncRem is known. Keyed on IncRem id
+  // (not pdfRemId) so switching between this IncRem's PDFs doesn't re-fetch
+  // the list — the option set is the same.
+  const incRemIdForOptions = criticalContext?.incrementalRemId ?? null;
+  React.useEffect(() => {
+    if (!incRemIdForOptions || actionType !== 'pdf') {
+      setPdfOptions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const incRem = await plugin.rem.findOne(incRemIdForOptions);
+        if (!incRem || cancelled) return;
+        const pdfs = await getAllPDFsInRem(plugin as ReactRNPlugin, incRem);
+        if (cancelled) return;
+        const options = await Promise.all(
+          pdfs.map(async (p) => ({
+            remId: p.rem._id,
+            name: await safeRemTextToString(plugin as ReactRNPlugin, p.rem.text),
+            isPreferred: p.isPreferred,
+          }))
+        );
+        if (!cancelled) setPdfOptions(options);
+      } catch (e) {
+        console.error('[Reader] Failed to load PDF options:', e);
+        if (!cancelled) setPdfOptions([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [incRemIdForOptions, actionType, plugin]);
+
+  // Switch the active PDF for the IncRem. Writes the pin to synced storage,
+  // which fires queue.tsx's `remToActionItemType` tracker (it reads the pin
+  // key); the queue then hands Reader a new actionItem with the new PDF,
+  // and React reconciliation re-renders everything against the new pdfRemId.
+  const handlePdfSwitch = React.useCallback(async (newPdfId: string) => {
+    if (!incRemIdForOptions || newPdfId === pdfRemId) return;
+    await setActivePdfForIncRem(plugin as ReactRNPlugin, incRemIdForOptions, newPdfId);
+  }, [plugin, incRemIdForOptions, pdfRemId]);
+
   // --- 5. RENDER START ---
 
   // Use state variables for rendering
@@ -279,6 +324,30 @@ export function Reader(props: ReaderProps) {
           >
             📝
           </button>
+        )}
+        {actionType === 'pdf' && pdfOptions.length > 1 && (
+          <select
+            value={pdfRemId}
+            onChange={(e) => handlePdfSwitch(e.target.value)}
+            title="Switch active PDF for this IncRem"
+            style={{
+              flexShrink: 0,
+              fontSize: '11px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              border: '1px solid var(--rn-clr-border-primary)',
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+              maxWidth: '220px',
+              cursor: 'pointer',
+            }}
+          >
+            {pdfOptions.map((opt) => (
+              <option key={opt.remId} value={opt.remId}>
+                📄 {opt.name}{opt.isPreferred ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <Breadcrumb

@@ -13,7 +13,7 @@ import { handleCardPriorityInheritance } from '../lib/card_priority/card_priorit
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
-import { findPDFinRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
+import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
 import { openAndScrollToHighlight } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
@@ -35,6 +35,9 @@ function EditorReviewTimer() {
   const [hostRemId, setHostRemId] = useState<string | null>(null);
   const [hostKind, setHostKind] = useState<'pdf' | 'html' | null>(null);
   const [bookmarkHighlightId, setBookmarkHighlightId] = useState<string | null>(null);
+  // PDFs available on the timer's IncRem. When length > 1 a small switcher
+  // appears next to the page controls.
+  const [pdfOptions, setPdfOptions] = useState<Array<{ remId: string; name: string; isPreferred: boolean }>>([]);
 
   const timerData = useTrackerPlugin(
     async (rp) => {
@@ -106,10 +109,11 @@ function EditorReviewTimer() {
         setHostRemId(null);
         setHostKind(null);
         setBookmarkHighlightId(null);
+        setPdfOptions([]);
         return;
       }
 
-      const pdfRem = await findPDFinRem(plugin, rem);
+      const pdfRem = await getActivePdfForIncRem(plugin, rem);
       const htmlRem = pdfRem ? null : await findHTMLinRem(plugin, rem);
       const host = pdfRem ?? htmlRem;
 
@@ -132,9 +136,43 @@ function EditorReviewTimer() {
         setHostKind(null);
         setBookmarkHighlightId(null);
       }
+
+      // Populate PDF selector options (shown only when >1 PDF)
+      try {
+        const pdfs = await getAllPDFsInRem(plugin, rem);
+        const options = await Promise.all(
+          pdfs.map(async (p) => ({
+            remId: p.rem._id,
+            name: await safeRemTextToString(plugin, p.rem.text),
+            isPreferred: p.isPreferred,
+          }))
+        );
+        setPdfOptions(options);
+      } catch (e) {
+        console.error('[editor_review_timer] Failed to load PDF options:', e);
+        setPdfOptions([]);
+      }
     };
     loadHostData();
   }, [timerData?.remId, plugin]);
+
+  // Switch the active PDF for the timer's IncRem. Pins the choice, then
+  // updates the in-widget host state so PageControls, the Scroll bookmark,
+  // and any subsequent reading-time records target the new PDF.
+  const handlePdfSwitch = useCallback(async (newPdfId: string) => {
+    if (!timerData?.remId || newPdfId === pdfRemId) return;
+
+    await setActivePdfForIncRem(plugin, timerData.remId, newPdfId);
+
+    setPdfRemId(newPdfId);
+    setHostRemId(newPdfId);
+    setHostKind('pdf');
+    setIsPdfNote(true);
+
+    const history = await getPageHistory(plugin, timerData.remId, newPdfId);
+    const lastEntry = history[history.length - 1];
+    setBookmarkHighlightId(lastEntry?.highlightId ?? null);
+  }, [plugin, timerData?.remId, pdfRemId]);
 
   const isPaused = !!(timerData?.pausedAt);
 
@@ -578,6 +616,30 @@ function EditorReviewTimer() {
 
       {(isPdfNote || (hostRemId && bookmarkHighlightId)) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px', paddingRight: '12px', borderRight: '1px solid #93c5fd' }}>
+          {/* PDF switcher — only when the IncRem has >1 PDF source. */}
+          {pdfOptions.length > 1 && pdfRemId && (
+            <select
+              value={pdfRemId}
+              onChange={(e) => handlePdfSwitch(e.target.value)}
+              title="Switch active PDF for this IncRem"
+              style={{
+                fontSize: '12px',
+                padding: '3px 6px',
+                borderRadius: '4px',
+                border: '1px solid #3b82f6',
+                backgroundColor: 'white',
+                color: '#1e40af',
+                maxWidth: '180px',
+                fontWeight: 600,
+              }}
+            >
+              {pdfOptions.map((opt) => (
+                <option key={opt.remId} value={opt.remId}>
+                  {opt.name}{opt.isPreferred ? ' ★' : ''}
+                </option>
+              ))}
+            </select>
+          )}
           {/* Page controls only apply to PDF hosts. */}
           {isPdfNote && pdfRemId && (
             <PageControls

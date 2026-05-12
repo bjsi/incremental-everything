@@ -27,7 +27,7 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { findPDFinRem, safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, findPreferredPDFInRem, getDescendantsToDepth, getRemCardContent } from '../lib/pdfUtils';
+import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
@@ -1067,16 +1067,21 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      // 1. Find the associated PDF Rem, honouring #preferthispdf when multiple sources exist
-      const pdfRem = await findPreferredPDFInRem(plugin, rem);
+      // 1. Resolve the active PDF for this rem.
+      //    Strict mode surfaces the multi-#preferthispdf conflict so the user
+      //    is alerted; an explicit active-PDF pin (when present) bypasses the
+      //    conflict by definition.
+      const pdfRem = await getActivePdfForIncRem(plugin, rem, { strict: true });
 
-      // 2. If no PDF is found (or multiple #preferthispdf tags conflict), inform the user and stop.
+      // 2. If nothing resolved, distinguish "no PDFs at all" from "ambiguous preference".
       if (!pdfRem) {
-        // findPreferredPDFInRem already showed a toast for the multi-tag conflict case;
-        // only show the generic message when truly no PDF was found.
-        const hasSomePdf = await findPDFinRem(plugin, rem);
-        if (!hasSomePdf) {
+        const pdfs = await getAllPDFsInRem(plugin, rem);
+        if (pdfs.length === 0) {
           await plugin.app.toast('No PDF found in the focused Rem or its sources.');
+        } else {
+          await plugin.app.toast(
+            'Multiple PDFs have the #preferthispdf tag — cannot determine which to open. Add the tag to exactly one PDF source.'
+          );
         }
         return;
       }
@@ -1088,11 +1093,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // 4. Prepare the context for the popup widget, similar to how the Reader does it.
       //    This context tells the popup which incremental Rem and which PDF to work with.
+      //    We also include the full list of PDFs on this IncRem so the panel can
+      //    render its PDF selector immediately (no re-derivation flash).
+      const allPdfs = await getAllPDFsInRem(plugin, rem);
       const context = {
         incrementalRemId: rem._id,
         pdfRemId: pdfRem._id,
         totalPages: undefined, // Not available in the editor context
         currentPage: undefined, // Not available in the editor context
+        allPdfRemIds: allPdfs.map((p) => p.rem._id),
       };
 
       // 5. Store the context in session storage so the popup can access it.
@@ -1848,7 +1857,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       // Handle PDF page history (same as handleNextClick in answer_buttons.tsx)
       const remType = await plugin.storage.getSession<string | null>(currentIncrementalRemTypeKey);
       if (remType === 'pdf') {
-        const pdfRem = await findPDFinRem(plugin, rem);
+        const pdfRem = await getActivePdfForIncRem(plugin, rem);
         if (pdfRem) {
           const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
           const currentPage = await plugin.storage.getSynced<number>(pageKey);
