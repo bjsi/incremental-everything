@@ -11,6 +11,7 @@ import {
 import { CardPriorityInfo } from '../card_priority';
 import { calculateAllPercentiles } from '../utils';
 import { buildComprehensiveScope } from '../scope_helpers';
+import { registerReviewGraphKey } from './cleanup';
 import * as _ from 'remeda'; // Ensure remeda is imported for uniqBy if available, or use custom
 
 // Possible powerup codes for the Card Cluster built-in powerup.
@@ -490,6 +491,9 @@ Created: ${timestamp}`;
     };
 
     await plugin.storage.setSynced(GRAPH_DATA_KEY_PREFIX + graphRem._id, graphData);
+    // Track this graph Rem so the startup sweep can clear its data later
+    // if the user deletes the Priority Review Document.
+    await registerReviewGraphKey(plugin, graphRem._id);
   }
 
 

@@ -23,6 +23,7 @@ import {
 } from '../register/queue_display_commands';
 import { enableHideInQueueIntegrationId } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
+import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { registerJumpToRemHelper } from '../register/window';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS } from '../lib/ui_helpers';
 
@@ -60,6 +61,11 @@ async function onActivate(plugin: ReactRNPlugin) {
   registerEventListeners(plugin, resetSessionItemCounter);
 
   registerIncrementalRemTracker(plugin);
+
+  // Fire-and-forget: clear synced graph-data entries whose Priority Review
+  // Document graph Rem was deleted. Errors are logged inside the helper and
+  // must not block activation.
+  void cleanupOrphanedReviewGraphs(plugin);
 
   registerCallbacks(plugin);
   await registerWidgets(plugin);
