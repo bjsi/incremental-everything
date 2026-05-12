@@ -46,6 +46,7 @@ import {
 import { handleQuickPriorityChange } from '../lib/quick_priority';
 import {
   removeAllCardPriorityTags,
+  cleanUpDuplicateCardPrioritySlots,
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
@@ -1290,6 +1291,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       'Completely remove all CardPriority powerup tags and data from your knowledge base',
     action: async () => {
       await removeAllCardPriorityTags(plugin);
+    },
+  });
+
+  // Cleanup duplicates command
+  await plugin.app.registerCommand({
+    id: 'cleanup-duplicate-card-priority-slots',
+    name: 'Clean Up Duplicate CardPriority Slots',
+    description:
+      'Detect and remove the cardPriority powerup and all its slots from any Rem that has duplicate slots',
+    action: async () => {
+      await cleanUpDuplicateCardPrioritySlots(plugin);
     },
   });
 

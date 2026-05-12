@@ -8,6 +8,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
+import { sanitizeCardPriorityFromDescendants } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -56,12 +57,26 @@ function Debug() {
          currentParent = await currentParent.getParentRem();
       }
 
+      let hasSpuriousTags = false;
+      const children = await rem.getChildrenRem();
+      for (const child of children) {
+        if (await child.hasPowerup('cardPriority')) {
+          const cards = await child.getCards();
+          if (!cards || cards.length === 0) {
+            hasSpuriousTags = true;
+            break;
+          }
+        }
+      }
+
       return {
         incrementalRem,
         cardPriority,
         dismissed,
         isCardDisabledLocally,
-        isCardDisabledInAncestors
+        isCardDisabledInAncestors,
+        hasSpuriousTags,
+        rem
       };
     },
     [remId]
@@ -69,13 +84,80 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors } = debugData;
+  const { incrementalRem, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, rem } = debugData;
+
+  const handleDeepLog = async () => {
+    console.log(`\n=================== DEEP LOG REM: ${rem._id} ===================`);
+    const tags = await rem.getTagRems();
+    const mainTagsMapped = await Promise.all(tags.map(async t => ({ 
+      id: t._id, 
+      name: t.text ? await plugin.richText.toString(t.text) : '' 
+    })));
+    const mainTagsStr = mainTagsMapped.length > 0
+      ? mainTagsMapped.map(t => t.name || t.id).join(', ')
+      : 'None';
+    console.log(`Tags: [${mainTagsStr}]`);
+    
+    const children = await rem.getChildrenRem();
+    console.log(`Found ${children.length} total children.`);
+    
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      const isProp = await child.isProperty();
+      const isPowerupProp = await child.isPowerupProperty();
+      const childTags = await child.getTagRems();
+      const textRaw = await child.text;
+      const textString = textRaw ? await plugin.richText.toString(textRaw) : '';
+      
+      const childTagsMapped = await Promise.all(childTags.map(async t => ({ 
+        id: t._id, 
+        name: t.text ? await plugin.richText.toString(t.text) : '' 
+      })));
+      
+      const tagsStr = childTagsMapped.length > 0 
+        ? childTagsMapped.map(t => t.name || t.id).join(', ') 
+        : 'None';
+        
+      console.log(`Child ${i + 1} (${child._id}): text="${textString}", isProp=${isProp}, isPowerupProp=${isPowerupProp}, tags=[${tagsStr}]`);
+    }
+    console.log(`=================================================================\n`);
+    await plugin.app.toast('Deep log printed to console! Please check Developer Tools.');
+  };
+
+  const handleSanitize = async () => {
+    const confirmed = confirm('Are you sure you want to sanitize this rem? This will safely remove the CardPriority powerup from its property slots and any non-flashcard descendants, while preserving legitimate flashcards.');
+    if (!confirmed) return;
+    
+    await plugin.app.toast('Sanitizing rogue properties...');
+    const result = await sanitizeCardPriorityFromDescendants(plugin, rem, false);
+    if (result.success) {
+       await plugin.app.toast(`Sanitized! Cleaned ${result.cleanedCount} rogue tags. Preserved ${result.preservedCount} flashcards.`);
+    } else {
+       await plugin.app.toast('Sanitize failed. Check console.');
+    }
+  };
 
   const preStyle = { backgroundColor: 'var(--rn-clr-background-secondary)', padding: '8px', borderRadius: '4px', marginTop: '4px', fontSize: '11px', overflowX: 'auto' as 'auto' };
 
   return (
-    <div className="incremental-everything-debug p-4 w-[100%] max-h-[80vh] overflow-y-auto" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', color: 'var(--rn-clr-content-primary)' }}>
-      <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>General Data</h2>
+    <div className="incremental-everything-debug p-4 max-h-[80vh] overflow-y-auto" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box' }}>
+      <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+         General Data
+         <button
+           onClick={handleDeepLog}
+           style={{
+             fontSize: '11px',
+             padding: '2px 8px',
+             backgroundColor: 'var(--rn-clr-background-secondary)',
+             color: 'var(--rn-clr-content-primary)',
+             border: '1px solid var(--rn-clr-border)',
+             borderRadius: '4px',
+             cursor: 'pointer'
+           }}
+         >
+           Deep Log Structure
+         </button>
+      </h2>
       <Info className="rem-id" label="Rem ID" data={<code>{remId}</code>} />
       <div className="flex gap-4">
         <Info className="card-disabled" label="Cards Disabled (Locally)" data={isCardDisabledLocally ? <span style={{color: '#ef4444', fontWeight: 600}}>YES</span> : 'No'} />
@@ -116,7 +198,28 @@ function Debug() {
 
       {cardPriority && (
         <div style={{ marginTop: '16px' }}>
-           <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>Card Priority Powerup</h2>
+           <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             Card Priority Powerup
+             <button
+               onClick={handleSanitize}
+               style={{
+                 fontSize: '11px',
+                 padding: '2px 8px',
+                 backgroundColor: 'var(--rn-clr-background-warning)',
+                 color: 'var(--rn-clr-content-warning)',
+                 border: '1px solid var(--rn-clr-border-warning)',
+                 borderRadius: '4px',
+                 cursor: 'pointer'
+               }}
+             >
+               Sanitize Rogue Tags
+             </button>
+           </h2>
+           {hasSpuriousTags && (
+             <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--rn-clr-border-warning)' }}>
+               ⚠️ <strong>Spurious Tags Detected:</strong> Rogue CardPriority tags were found on non-flashcard children. Please click "Sanitize Rogue Tags" to cure this rem.
+             </div>
+           )}
            <div className="flex gap-4 mb-2">
              <Info className="cp-priority" label="Priority" data={cardPriority.priority} />
              <Info className="cp-source" label="Source" data={<span style={{ textTransform: 'capitalize' }}>{cardPriority.source}</span>} />

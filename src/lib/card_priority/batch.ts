@@ -8,6 +8,7 @@ import {
 import { CardPriorityInfo } from './types';
 import { calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
+import { PluginRem } from '@remnote/plugin-sdk';
 
 export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   const confirmed = confirm(
@@ -464,3 +465,219 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   alert(resultMessage);
 }
 
+export async function removeCardPriorityFromRem(plugin: RNPlugin, rem: PluginRem) {
+  console.log(`\n======================================================`);
+  console.log(`[CardPriority Cleanup] Starting cleanup for rem: ${rem._id}`);
+  
+  // Set flag to block GlobalRemChanged overriding us
+  await plugin.storage.setSession('plugin_operation_active', true);
+  try {
+    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+    const cpPowerupId = cardPriorityPowerup?._id;
+
+    const prioritySlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'priority');
+    const sourceSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'prioritySource');
+    const updatedSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'lastUpdated');
+
+    const slotIds = new Set(
+      [prioritySlot?._id, sourceSlot?._id, updatedSlot?._id].filter(Boolean)
+    );
+    console.log(`[CardPriority Cleanup] Extracted slot IDs:`, Array.from(slotIds), `Powerup ID:`, cpPowerupId);
+
+    const children = await rem.getChildrenRem();
+    console.log(`[CardPriority Cleanup] Found ${children.length} total children on rem ${rem._id}`);
+
+    let removedSlotsCount = 0;
+    const removedChildIds: string[] = [];
+
+    // First pass: identify and delete all explicit CardPriority properties
+    for (const child of children) {
+      const isProp = await child.isProperty();
+      const isPowerupProp = await child.isPowerupProperty();
+      
+      // CRITICAL: Do not touch regular children (e.g. descendant flashcards)
+      if (!isPowerupProp && !isProp) {
+        continue;
+      }
+
+      const tags = await child.getTagRems();
+      const tagIds = tags.map(t => t._id);
+      
+      const textRaw = await child.text;
+      const textString = textRaw ? await plugin.richText.toString(textRaw) : '';
+      const tagsMapped = await Promise.all(tags.map(async t => t.text ? await plugin.richText.toString(t.text) : t._id));
+      
+      const hasSlotTag = tagIds.some(id => slotIds.has(id));
+      const hasPowerupTag = cpPowerupId ? tagIds.includes(cpPowerupId) : false;
+      
+      console.log(`[CardPriority Cleanup] Child ${child._id}: text="${textString}", isProp=${isProp}, isPowerupProp=${isPowerupProp}, tags=[${tagsMapped.join(', ')}], hasSlotTag=${hasSlotTag}`);
+      
+      if (hasSlotTag || hasPowerupTag) {
+        console.log(`[CardPriority Cleanup] Deleting known CardPriority property child: ${child._id} (text: "${textString}")`);
+        await child.remove();
+        removedSlotsCount++;
+        removedChildIds.push(child._id);
+      } else if (isPowerupProp && tagIds.length === 0) {
+        // Look closely at untagged properties to see if they look like priority values (e.g. "12", "14")
+        const text = await child.text;
+        const isNumericValue = text && text.length === 1 && typeof text[0] === 'string' && !isNaN(Number(text[0])) && text[0].trim() !== '';
+        const isTextValue = text && text.length === 1 && typeof text[0] === 'string' && ['manual', 'incremental', 'default', 'inherited'].includes(text[0].trim().toLowerCase());
+        
+        if (isNumericValue || isTextValue) {
+          console.log(`[CardPriority Cleanup] Deleting untagged zombie property child: ${child._id} (Value: "${text![0]}")`);
+          await child.remove();
+          removedSlotsCount++;
+          removedChildIds.push(child._id);
+        } else {
+          console.log(`[CardPriority Cleanup] WARNING: Ignored untagged powerup property ${child._id} (Value did not look like CardPriority data)`);
+        }
+      }
+    }
+
+    console.log(`[CardPriority Cleanup] Deleting cardPriority powerup tag from parent...`);
+    await rem.removePowerup('cardPriority');
+    
+    console.log(`[CardPriority Cleanup] Emptying properties via setPowerupProperty as fallback...`);
+    try {
+      await rem.setPowerupProperty('cardPriority', 'priority', []);
+      await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
+      await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
+    } catch (e) {}
+    
+    console.log(`[CardPriority Cleanup] SUCCESS. Removed powerup and ${removedSlotsCount} slots: [${removedChildIds.join(', ')}]`);
+    console.log(`[CardPriority Cleanup] NOTE: GlobalRemChanged will likely recreate the powerup instantly because the rem has cards. This is EXPECTED and will result in a clean powerup. `);
+    console.log(`======================================================\n`);
+    
+    return { success: true, removedSlotsCount, removedChildIds };
+  } catch (error) {
+    console.error(`[CardPriority Cleanup] ERROR removing cardPriority from rem ${rem._id}:`, error);
+    console.log(`======================================================\n`);
+    return { success: false, error };
+  } finally {
+    setTimeout(async () => {
+      await plugin.storage.setSession('plugin_operation_active', false);
+      console.log(`[CardPriority Cleanup] Released plugin_operation_active flag.`);
+    }, 100);
+  }
+}
+
+/**
+ * Sanitizes a Rem's children by removing the CardPriority powerup from Rems that should not have it.
+ * - Removes from property slots (isPowerupProp / isProp).
+ * - Removes from regular rems that do not have any flashcards.
+ * - PRESERVES legitimate descendant flashcards to avoid losing manual priority ratings.
+ */
+export async function sanitizeCardPriorityFromDescendants(plugin: RNPlugin, rem: PluginRem, recursive: boolean = false) {
+  let cleanedCount = 0;
+  let preservedCount = 0;
+
+  async function processRem(target: PluginRem) {
+    const children = await target.getChildrenRem();
+    for (const child of children) {
+      const hasPowerup = await child.hasPowerup('cardPriority');
+
+      if (hasPowerup) {
+        const cards = await child.getCards();
+        if (cards && cards.length > 0) {
+          console.log(`[Sanitize] Preserving CardPriority on legitimate flashcard: ${child._id}`);
+          preservedCount++;
+        } else {
+          console.log(`[Sanitize] Removing CardPriority from non-flashcard rem: ${child._id}`);
+          await child.removePowerup('cardPriority');
+          cleanedCount++;
+        }
+      }
+
+      // If recursive is on, dive deeper
+      if (recursive) {
+        await processRem(child);
+      }
+    }
+  }
+
+  console.log(`\n======================================================`);
+  console.log(`[Sanitize] Starting safe sanitize for Rem: ${rem._id}`);
+  await plugin.storage.setSession('plugin_operation_active', true);
+
+  try {
+    await processRem(rem);
+    console.log(`[Sanitize] Completed. Cleaned: ${cleanedCount}, Preserved: ${preservedCount}`);
+    return { success: true, cleanedCount, preservedCount };
+  } catch (error) {
+    console.error(`[Sanitize] Error:`, error);
+    return { success: false, error };
+  } finally {
+    setTimeout(async () => {
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }, 100);
+  }
+}
+
+export async function cleanUpDuplicateCardPrioritySlots(plugin: RNPlugin) {
+  const confirmed = confirm(
+    '⚠️ Clean Up Duplicate CardPriority Slots\n\n' +
+    'This will detect and remove the cardPriority powerup and all its slots from any Rem that has duplicate slots.\n\n' +
+    'You can then run "Update all inherited Card Priorities" to recalculate them.\n\n' +
+    'Continue?'
+  );
+
+  if (!confirmed) return;
+
+  await plugin.app.toast('Scanning for duplicate slots...');
+  await plugin.storage.setSession('plugin_operation_active', true);
+
+  try {
+    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+    const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+
+    const prioritySlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'priority');
+    const sourceSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'prioritySource');
+    const updatedSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'lastUpdated');
+
+    const slotIds = new Set(
+      [prioritySlot?._id, sourceSlot?._id, updatedSlot?._id].filter(Boolean)
+    );
+
+    let remsWithDuplicates = 0;
+    const cpPowerupId = cardPriorityPowerup?._id;
+
+    for (const rem of taggedRems) {
+      const children = await rem.getChildrenRem();
+      const slotCounts = new Map<string, number>();
+
+      for (const child of children) {
+        const isProp = await child.isProperty();
+        const isPowerupProp = await child.isPowerupProperty();
+        
+        if (isProp || isPowerupProp) {
+          const tags = await child.getTagRems();
+          const tagIds = tags.map(t => t._id);
+          for (const tagId of tagIds) {
+            if (slotIds.has(tagId) || tagId === cpPowerupId) {
+              const countKey = slotIds.has(tagId) ? tagId : 'general_powerup_tag';
+              slotCounts.set(countKey, (slotCounts.get(countKey) || 0) + 1);
+            }
+          }
+        }
+      }
+
+      const hasDuplicates = Array.from(slotCounts.values()).some((count) => count > 1);
+
+      if (hasDuplicates) {
+        await removeCardPriorityFromRem(plugin, rem);
+        remsWithDuplicates++;
+      }
+    }
+
+    if (remsWithDuplicates > 0) {
+      await plugin.app.toast(`✅ Cleaned up ${remsWithDuplicates} rems with duplicate slots.`);
+    } else {
+      await plugin.app.toast('No duplicate slots found. Your database is clean!');
+    }
+  } catch (error) {
+    console.error('Error during duplicate slots cleanup:', error);
+    await plugin.app.toast('❌ Error during cleanup. Check console for details.');
+  } finally {
+    await plugin.storage.setSession('plugin_operation_active', false);
+  }
+}

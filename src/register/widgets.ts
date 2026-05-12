@@ -66,7 +66,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('debug', WidgetLocation.Popup, {
     dimensions: {
-      width: 400,
+      width: 450,
       height: 800,
     },
   });
