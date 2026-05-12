@@ -128,6 +128,9 @@ export function IncRemMainView() {
   // Track in-flight priority changes so cache reloads don't overwrite them with stale data.
   const pendingPriorityChanges = useRef<Record<string, number>>({});
 
+  // Container ref used to locate the rendered <svg> for export.
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+
   // Track current filter/sort state for "Back to IncRem List" flow
   const currentListState = useRef<IncRemListState | null>(null);
 
@@ -349,6 +352,157 @@ export function IncRemMainView() {
     currentListState.current = state;
   };
 
+  const handleExportGraphSvg = () => {
+    const container = chartContainerRef.current;
+    if (!container || !graphBins) return;
+
+    const liveSvg = container.querySelector('svg');
+    if (!liveSvg) return;
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const svg = liveSvg.cloneNode(true) as SVGSVGElement;
+    svg.setAttribute('xmlns', SVG_NS);
+    svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+    const chartWidth = parseFloat(svg.getAttribute('width') || '') || liveSvg.clientWidth || 800;
+    const chartHeight = parseFloat(svg.getAttribute('height') || '') || liveSvg.clientHeight || 350;
+    const titleBandHeight = 56;
+    const legendBandHeight = 32;
+    const headerHeight = titleBandHeight + legendBandHeight;
+    const padding = 12;
+
+    const tooltipFor = (bin: GraphDataPoint): string => {
+      const incTotal = bin.incRemDue + bin.incRemNotDue;
+      const cardTotal = bin.cardDue + bin.cardNotDue;
+      const incPct = incTotal > 0 ? Math.round((bin.incRemNotDue / incTotal) * 100) : 0;
+      const cardPct = cardTotal > 0 ? Math.round((bin.cardNotDue / cardTotal) * 100) : 0;
+      return (
+        `Priority ${bin.range}\n` +
+        `Incremental Rems: ${incTotal}  (Due ${bin.incRemDue} · Processed ${bin.incRemNotDue} = ${incPct}%)\n` +
+        `Rems with Cards:  ${cardTotal}  (Due ${bin.cardDue} · Processed ${bin.cardNotDue} = ${cardPct}%)`
+      );
+    };
+
+    // Inject <title> per bar so native browser tooltips show the bucket breakdown on hover.
+    // The <title> MUST be a direct child of the element that receives the pointer event
+    // (Chrome/Safari don't walk up to ancestors), so we attach it to the <path> shape
+    // inside each <g class="recharts-bar-rectangle">, not to the group itself.
+    const barSeries = svg.querySelectorAll('.recharts-bar');
+    barSeries.forEach((series) => {
+      const rects = series.querySelectorAll('.recharts-bar-rectangle');
+      rects.forEach((rectGroup, idx) => {
+        const bin = graphBins[idx];
+        if (!bin) return;
+        const titleText = tooltipFor(bin);
+        rectGroup.querySelectorAll('path, rect').forEach((shape) => {
+          const titleEl = document.createElementNS(SVG_NS, 'title');
+          titleEl.textContent = titleText;
+          shape.insertBefore(titleEl, shape.firstChild);
+        });
+      });
+    });
+
+    // Wrap all existing children so we can prepend a header band with the title.
+    const wrapperG = document.createElementNS(SVG_NS, 'g');
+    wrapperG.setAttribute('transform', `translate(0, ${headerHeight})`);
+    while (svg.firstChild) wrapperG.appendChild(svg.firstChild);
+
+    const totalHeight = chartHeight + headerHeight + padding;
+    svg.setAttribute('width', String(chartWidth));
+    svg.setAttribute('height', String(totalHeight));
+    svg.setAttribute('viewBox', `0 0 ${chartWidth} ${totalHeight}`);
+
+    // White background so the file looks correct when opened anywhere (incl. dark mode browsers).
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('x', '0');
+    bg.setAttribute('y', '0');
+    bg.setAttribute('width', String(chartWidth));
+    bg.setAttribute('height', String(totalHeight));
+    bg.setAttribute('fill', '#ffffff');
+    svg.appendChild(bg);
+
+    const incCount = allIncRems?.length || 0;
+    const cardCount = allCardInfos?.filter(c => c.cardCount === undefined || c.cardCount > 0).length || 0;
+
+    const titleEl = document.createElementNS(SVG_NS, 'text');
+    titleEl.setAttribute('x', String(chartWidth / 2));
+    titleEl.setAttribute('y', '24');
+    titleEl.setAttribute('text-anchor', 'middle');
+    titleEl.setAttribute('font-family', 'system-ui, -apple-system, "Segoe UI", sans-serif');
+    titleEl.setAttribute('font-size', '14');
+    titleEl.setAttribute('font-weight', '600');
+    titleEl.setAttribute('fill', '#374151');
+    titleEl.textContent = 'KB Priority Distribution';
+    svg.appendChild(titleEl);
+
+    const subtitleEl = document.createElementNS(SVG_NS, 'text');
+    subtitleEl.setAttribute('x', String(chartWidth / 2));
+    subtitleEl.setAttribute('y', '44');
+    subtitleEl.setAttribute('text-anchor', 'middle');
+    subtitleEl.setAttribute('font-family', 'system-ui, -apple-system, "Segoe UI", sans-serif');
+    subtitleEl.setAttribute('font-size', '11');
+    subtitleEl.setAttribute('fill', '#9ca3af');
+    subtitleEl.textContent = `(${incCount.toLocaleString()} IncRems, ${cardCount.toLocaleString()} Rems with Cards)`;
+    svg.appendChild(subtitleEl);
+
+    // Manual legend row — Recharts renders <Legend> as HTML outside the SVG, so it's
+    // not in the cloned tree. We draw it directly into the SVG here.
+    const legendEntries: Array<{ label: string; color: string }> = [
+      { label: 'IncRems · Due', color: INC_REM_DUE_COLOR },
+      { label: 'IncRems · Processed', color: INC_REM_NOT_DUE_COLOR },
+      { label: 'Cards · Due', color: CARD_DUE_COLOR },
+      { label: 'Cards · Processed', color: CARD_NOT_DUE_COLOR },
+    ];
+    const legendY = titleBandHeight + legendBandHeight / 2;
+    const swatchSize = 12;
+    const gapAfterSwatch = 6;
+    const gapBetweenEntries = 18;
+    const legendFontFamily = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+    const legendFontSize = 11;
+    // Approximate char width to lay out horizontally without measuring DOM
+    const approxCharWidth = 6.2;
+    const entryWidths = legendEntries.map(e => swatchSize + gapAfterSwatch + e.label.length * approxCharWidth);
+    const totalLegendWidth = entryWidths.reduce((s, w) => s + w, 0) + gapBetweenEntries * (legendEntries.length - 1);
+    let cursorX = (chartWidth - totalLegendWidth) / 2;
+
+    legendEntries.forEach((entry, i) => {
+      const swatch = document.createElementNS(SVG_NS, 'rect');
+      swatch.setAttribute('x', String(cursorX));
+      swatch.setAttribute('y', String(legendY - swatchSize / 2));
+      swatch.setAttribute('width', String(swatchSize));
+      swatch.setAttribute('height', String(swatchSize));
+      swatch.setAttribute('fill', entry.color);
+      swatch.setAttribute('rx', '2');
+      svg.appendChild(swatch);
+
+      const label = document.createElementNS(SVG_NS, 'text');
+      label.setAttribute('x', String(cursorX + swatchSize + gapAfterSwatch));
+      label.setAttribute('y', String(legendY));
+      label.setAttribute('dominant-baseline', 'central');
+      label.setAttribute('font-family', legendFontFamily);
+      label.setAttribute('font-size', String(legendFontSize));
+      label.setAttribute('fill', '#374151');
+      label.textContent = entry.label;
+      svg.appendChild(label);
+
+      cursorX += entryWidths[i] + gapBetweenEntries;
+    });
+
+    svg.appendChild(wrapperG);
+
+    const xml = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${xml}`], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `kb-priority-distribution-${stamp}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleDocumentFilterChange = async (documentId: string | null) => {
     setSelectedDocumentId(documentId);
     if (documentId) {
@@ -404,9 +558,24 @@ export function IncRemMainView() {
     <div className="flex flex-col h-full" style={{ backgroundColor: 'var(--rn-clr-background-primary)' }}>
       {/* Graph toggle button in a small bar above the table */}
       <div
-        className="flex items-center justify-end px-4 py-1 shrink-0"
+        className="flex items-center justify-end gap-1 px-4 py-1 shrink-0"
         style={{ borderBottom: '1px solid var(--rn-clr-border-primary)' }}
       >
+        {showGraph && (
+          <button
+            onClick={handleExportGraphSvg}
+            className="px-2 py-1 text-xs rounded transition-colors"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-tertiary)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-primary)'; }}
+            title="Export graph as interactive SVG (hover over bars in your browser to see the bucket breakdown)"
+          >
+            ⬇️ Export SVG
+          </button>
+        )}
         <button
           onClick={() => setShowGraph(!showGraph)}
           className="px-2 py-1 text-xs rounded transition-colors"
@@ -435,7 +604,7 @@ export function IncRemMainView() {
               </span>
             </h4>
 
-            <div style={{ width: '100%', height: 350 }}>
+            <div ref={chartContainerRef} style={{ width: '100%', height: 350 }}>
               <ResponsiveContainer width="100%" height="100%" minHeight={350} minWidth={100}>
                 <BarChart
                   data={graphBins}
