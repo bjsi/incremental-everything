@@ -19,6 +19,7 @@ import {
   addPageToHistory,
   getReadingStatistics,
   getAllPDFsInRem,
+  getActivePdfForIncRem,
   setActivePdfForIncRem,
   safeRemTextToString,
   PageHistoryEntry,
@@ -63,8 +64,12 @@ function PageRangeWidget() {
 
   // PDFs available on the IncRem context (computed after IncRem resolves).
   // When length > 1 the header renders a selector that switches the panel's
-  // PDF view and pins the chosen PDF as active for this IncRem.
+  // PDF *view*. Pinning the viewed PDF as active is a separate action
+  // (the "📌 Set as active" button next to the selector).
   const [pdfOptions, setPdfOptions] = useState<Array<{ remId: string; name: string; isPreferred: boolean }>>([]);
+  // Currently-pinned active PDF for the IncRem, used to mark the option in
+  // the dropdown and decide whether the "Set as active" button is visible.
+  const [activePdfId, setActivePdfId] = useState<string | null>(null);
 
   const handleInitIncrementalRem = async (remId: string) => {
     try {
@@ -406,8 +411,8 @@ function PageRangeWidget() {
           setIsCurrentRemIncremental(isIncremental);
 
           // Build the PDF selector options for this IncRem. Hidden in the UI
-          // when length <= 1; otherwise lets the user switch the panel's view
-          // and pin the chosen PDF as active.
+          // when length <= 1. Also resolve the currently-active PDF so we can
+          // mark it in the dropdown with 📌.
           try {
             const pdfs = await getAllPDFsInRem(plugin, currentRem);
             const options = await Promise.all(
@@ -418,9 +423,12 @@ function PageRangeWidget() {
               }))
             );
             setPdfOptions(options);
+            const activePdf = await getActivePdfForIncRem(plugin, currentRem);
+            setActivePdfId(activePdf?._id ?? null);
           } catch (e) {
             console.error('[page-range] Failed to load PDF options:', e);
             setPdfOptions([]);
+            setActivePdfId(null);
           }
         }
 
@@ -523,18 +531,24 @@ function PageRangeWidget() {
 
   const handleClose = () => plugin.widget.closePopup();
 
-  // Switch which PDF the panel is viewing for the current IncRem.
-  // Pins the chosen PDF as active so future opens of this IncRem (queue,
-  // Reader, Priority Editor) follow the same choice.
+  // Switch which PDF the panel is viewing. View-only — does NOT change the
+  // active pin. The user pins explicitly via the "📌 Set as active" button.
   const handlePdfChange = async (newPdfId: string) => {
     if (!contextData || newPdfId === contextData.pdfRemId) return;
-    if (contextData.incrementalRemId) {
-      await setActivePdfForIncRem(plugin, contextData.incrementalRemId, newPdfId);
-    }
     await plugin.storage.setSession('pageRangeContext', {
       ...contextData,
       pdfRemId: newPdfId,
     });
+  };
+
+  // Pin the currently-viewed PDF as the IncRem's active PDF. Shown only
+  // while viewing a non-active PDF; hidden once the view matches the pin.
+  const handleSetActive = async () => {
+    if (!contextData?.incrementalRemId || !contextData.pdfRemId) return;
+    if (contextData.pdfRemId === activePdfId) return;
+    await setActivePdfForIncRem(plugin, contextData.incrementalRemId, contextData.pdfRemId);
+    setActivePdfId(contextData.pdfRemId);
+    await plugin.app.toast('Active PDF updated');
   };
 
 
@@ -793,7 +807,10 @@ function PageRangeWidget() {
       </div>
 
       {/* PDF Selector — only shown when the IncRem has >1 PDF source.
-          Selecting an option pins it as active and reloads the panel for that PDF. */}
+          Selecting an option changes only what the panel displays. To pin a
+          PDF as active for the IncRem, use the "📌 Set as active" button
+          (appears whenever the viewed PDF is not already the active one).
+          ★ = #preferthispdf · 📌 = currently active for this IncRem. */}
       {pdfOptions.length > 1 && (
         <div
           className="flex items-center gap-2 px-4 py-1.5 shrink-0"
@@ -813,16 +830,28 @@ function PageRangeWidget() {
               border: '1px solid var(--rn-clr-border-primary)',
               maxWidth: '360px',
             }}
-            title="Switch which PDF the panel is managing — pins it as active for this Rem"
+            title="Switch which PDF the panel is displaying (view-only — use the 📌 button to pin)"
           >
             {pdfOptions.map((opt) => (
               <option key={opt.remId} value={opt.remId}>
-                {opt.name}{opt.isPreferred ? ' ★' : ''}
+                {opt.name}{opt.isPreferred ? ' ★' : ''}{opt.remId === activePdfId ? ' 📌' : ''}
               </option>
             ))}
           </select>
+          {contextData?.pdfRemId && contextData.pdfRemId !== activePdfId && (
+            <button
+              onClick={handleSetActive}
+              className="px-2 py-1 text-xs rounded transition-colors whitespace-nowrap"
+              style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#3b82f6'; }}
+              title="Pin this PDF as the active one for this Inc Rem"
+            >
+              📌 Set as active
+            </button>
+          )}
           <span className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-            ★ = #preferthispdf · selecting pins this PDF as active
+            ★ #preferthispdf · 📌 active
           </span>
         </div>
       )}

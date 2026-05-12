@@ -4,7 +4,7 @@ import {
   useRunAsync,
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
-import { useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
@@ -15,6 +15,8 @@ import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { PriorityBadge } from '../components';
 import {
   getActivePdfForIncRem,
+  setActivePdfForIncRem,
+  getAllPDFsInRem,
   findHTMLinRem,
   getIncrementalPageRange,
   getPageHistory,
@@ -61,30 +63,94 @@ export function PriorityEditor() {
     []
   );
 
-  // Host (PDF or HTML) resolution. Keyed on `remId` only so it does NOT refetch
-  // when the card priority cache flushes — host structure doesn't change with
-  // priority. The state name `pdfRemId` is kept for backwards compat — it now
-  // stores either a PDF or an HTML host id.
-  const hostInfo = useRunAsync(async () => {
+  // Bumped after the user pins a new active PDF, so the host-info refetch
+  // picks up the new active-PDF resolution. Otherwise `useRunAsync` keyed on
+  // `remId` alone would not re-fire.
+  const [pinRefreshCounter, setPinRefreshCounter] = useState(0);
+
+  // Host (PDF or HTML) resolution. Returns the full PDF option list and the
+  // current active-PDF id so the inline selector below can render. Keyed on
+  // `remId` (+ pinRefreshCounter) to avoid refetching when the card priority
+  // cache flushes — host structure doesn't change with priority.
+  type HostInfo =
+    | { hostKind: 'pdf'; pdfOptions: Array<{ remId: string; name: string; isPreferred: boolean }>; activePdfId: string | null; htmlRemId: null; htmlRemName: null }
+    | { hostKind: 'html'; pdfOptions: []; activePdfId: null; htmlRemId: string; htmlRemName: string | null }
+    | { hostKind: null; pdfOptions: []; activePdfId: null; htmlRemId: null; htmlRemName: null };
+
+  const hostInfo = useRunAsync(async (): Promise<HostInfo | null> => {
     if (!remId) return null;
     const rem = await plugin.rem.findOne(remId);
     if (!rem) return null;
-    const pdfRem = await getActivePdfForIncRem(plugin as any, rem);
-    const hostRem = pdfRem ?? await findHTMLinRem(plugin as any, rem);
-    if (!hostRem) {
-      return { pdfRemId: null, pdfRemName: null, hostKind: null as 'pdf' | 'html' | null };
-    }
-    const pdfRemName = hostRem.text ? await safeRemTextToString(plugin as any, hostRem.text) : null;
-    return {
-      pdfRemId: hostRem._id,
-      pdfRemName,
-      hostKind: (pdfRem ? 'pdf' : 'html') as 'pdf' | 'html',
-    };
-  }, [remId]);
 
-  const hostPdfRemId = hostInfo?.pdfRemId ?? null;
-  const hostPdfRemName = hostInfo?.pdfRemName ?? null;
+    const pdfs = await getAllPDFsInRem(plugin as any, rem);
+
+    if (pdfs.length > 0) {
+      const pdfOptions = await Promise.all(
+        pdfs.map(async (p) => ({
+          remId: p.rem._id,
+          name: await safeRemTextToString(plugin as any, p.rem.text),
+          isPreferred: p.isPreferred,
+        }))
+      );
+      const activePdf = await getActivePdfForIncRem(plugin as any, rem);
+      return {
+        hostKind: 'pdf',
+        pdfOptions,
+        activePdfId: activePdf?._id ?? null,
+        htmlRemId: null,
+        htmlRemName: null,
+      };
+    }
+
+    const htmlRem = await findHTMLinRem(plugin as any, rem);
+    if (!htmlRem) {
+      return { hostKind: null, pdfOptions: [], activePdfId: null, htmlRemId: null, htmlRemName: null };
+    }
+    const htmlRemName = htmlRem.text ? await safeRemTextToString(plugin as any, htmlRem.text) : null;
+    return {
+      hostKind: 'html',
+      pdfOptions: [],
+      activePdfId: null,
+      htmlRemId: htmlRem._id,
+      htmlRemName,
+    };
+  }, [remId, pinRefreshCounter]);
+
+  const pdfOptions = hostInfo?.pdfOptions ?? [];
+  const activePdfId = hostInfo?.activePdfId ?? null;
   const hostKind = hostInfo?.hostKind ?? null;
+
+  // User-chosen view-only override. null = follow the active pin. Resets when
+  // the rem changes so each IncRem starts at its own active PDF.
+  const [selectedPdfRemId, setSelectedPdfRemId] = useState<string | null>(null);
+  useEffect(() => { setSelectedPdfRemId(null); }, [remId]);
+
+  // The host id whose data the panel currently displays.
+  const viewedPdfRemId =
+    hostKind === 'pdf'
+      ? (selectedPdfRemId && pdfOptions.some((o) => o.remId === selectedPdfRemId)
+          ? selectedPdfRemId
+          : activePdfId)
+      : hostInfo?.htmlRemId ?? null;
+
+  const viewedHostName =
+    hostKind === 'pdf'
+      ? pdfOptions.find((o) => o.remId === viewedPdfRemId)?.name ?? null
+      : hostInfo?.htmlRemName ?? null;
+
+  // Kept names for downstream code that already reads these.
+  const hostPdfRemId = viewedPdfRemId;
+  const hostPdfRemName = viewedHostName;
+
+  // Pin the currently-viewed PDF as the IncRem's active PDF.
+  const handleSetActive = useCallback(async () => {
+    if (!remId || !viewedPdfRemId || viewedPdfRemId === activePdfId) return;
+    await setActivePdfForIncRem(plugin as any, remId, viewedPdfRemId);
+    setPinRefreshCounter((c) => c + 1);
+    // Clear the local override now that the pin matches what we were viewing.
+    setSelectedPdfRemId(null);
+    await plugin.app.toast('Active PDF updated');
+  }, [plugin, remId, viewedPdfRemId, activePdfId]);
 
   // SUPER OPTIMIZED: Combine priority queries into a single hook.
   // Host range/history/stats are fetched in a separate tracker below so that
@@ -233,14 +299,19 @@ export function PriorityEditor() {
 
   const openPdfPanel = useCallback(async () => {
     if (!remId || !hostPdfRemId) return;
+    // Carry over the currently-viewed PDF (not just the active one) so the
+    // PDF Control Panel opens on the same PDF the user was inspecting here.
+    // Also pre-populate `allPdfRemIds` so the panel's selector renders
+    // immediately without re-deriving the list.
     await plugin.storage.setSession('pageRangeContext', {
       incrementalRemId: remId,
       pdfRemId: hostPdfRemId,
       totalPages: undefined,
       currentPage: undefined,
+      allPdfRemIds: pdfOptions.length > 0 ? pdfOptions.map((o) => o.remId) : undefined,
     });
     await plugin.widget.openPopup(pageRangeWidgetId, { remId });
-  }, [remId, hostPdfRemId, plugin]);
+  }, [remId, hostPdfRemId, plugin, pdfOptions]);
 
   // Memoize computed values
   const showCardEditor = useMemo(
@@ -518,7 +589,9 @@ export function PriorityEditor() {
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs">📄</span>
                   <span className="text-xs font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>PDF Range</span>
-                  {hostPdfRemName && (
+                  {/* Single-PDF case: show the name inline. Multi-PDF case: the
+                      name is shown in the selector below, so we omit it here. */}
+                  {hostPdfRemName && pdfOptions.length <= 1 && (
                     <span className="text-[10px] truncate max-w-[100px]" style={{ color: 'var(--rn-clr-content-tertiary)' }}
                       title={hostPdfRemName}>{hostPdfRemName}</span>
                   )}
@@ -545,6 +618,45 @@ export function PriorityEditor() {
                   <span className="text-[10px]" style={{ color: 'var(--rn-clr-content-tertiary)', opacity: 0.6 }}>No range</span>
                 )}
               </div>
+
+              {/* PDF Selector — appears only when the IncRem has multiple PDFs.
+                  Selecting an option changes what the panel displays (range,
+                  position, history, stats) but does NOT pin. The "📌 Set as
+                  active" button (only visible while viewing a non-pinned PDF)
+                  is the explicit pin action. ★ = #preferthispdf · 📌 = active. */}
+              {pdfOptions.length > 1 && (
+                <div className="flex items-center gap-1 mb-2">
+                  <select
+                    value={viewedPdfRemId ?? ''}
+                    onChange={(e) => setSelectedPdfRemId(e.target.value)}
+                    title="View this PDF's data (does not change the active PDF)"
+                    className="text-[11px] px-1.5 py-1 rounded flex-1 min-w-0"
+                    style={{
+                      border: '1px solid var(--rn-clr-border-primary)',
+                      backgroundColor: 'var(--rn-clr-background-primary)',
+                      color: 'var(--rn-clr-content-primary)',
+                    }}
+                  >
+                    {pdfOptions.map((opt) => (
+                      <option key={opt.remId} value={opt.remId}>
+                        {opt.name}{opt.isPreferred ? ' ★' : ''}{opt.remId === activePdfId ? ' 📌' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {viewedPdfRemId && viewedPdfRemId !== activePdfId && (
+                    <button
+                      onClick={handleSetActive}
+                      title="Pin this PDF as the active one for this Inc Rem"
+                      className="px-2 py-1 text-[11px] rounded whitespace-nowrap transition-colors"
+                      style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#3b82f6'; }}
+                    >
+                      📌 Set as active
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Editing area */}
               {pdfEdit.mode === 'range' && (
