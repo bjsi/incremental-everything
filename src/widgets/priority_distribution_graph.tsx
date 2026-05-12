@@ -14,14 +14,61 @@ import { PRIORITY_GRAPH_DATA_KEY_PREFIX } from '../lib/consts';
 
 interface GraphDataPoint {
   range: string;
-  incRem: number;
-  card: number;
+  incRemDue: number;
+  incRemNotDue: number;
+  cardDue: number;
+  cardNotDue: number;
 }
 
 interface PriorityGraphData {
   bins: GraphDataPoint[];
   binsKbRelative?: GraphDataPoint[];
   lastUpdated?: string;
+}
+
+const INC_REM_DUE_COLOR = '#3b82f6';
+const INC_REM_NOT_DUE_COLOR = '#bfdbfe';
+const CARD_DUE_COLOR = '#ef4444';
+const CARD_NOT_DUE_COLOR = '#fecaca';
+
+function PriorityBinTooltip({ active, payload, label }: any) {
+  if (!active || !payload || payload.length === 0) return null;
+  const data = payload[0]?.payload as GraphDataPoint | undefined;
+  if (!data) return null;
+
+  const incTotal = (data.incRemDue ?? 0) + (data.incRemNotDue ?? 0);
+  const cardTotal = (data.cardDue ?? 0) + (data.cardNotDue ?? 0);
+  const incPct = incTotal > 0 ? Math.round((data.incRemNotDue / incTotal) * 100) : 0;
+  const cardPct = cardTotal > 0 ? Math.round((data.cardNotDue / cardTotal) * 100) : 0;
+
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        border: 'none',
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+        background: 'white',
+        padding: '8px 10px',
+        fontSize: 12,
+        color: '#374151',
+        lineHeight: 1.4,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ color: INC_REM_DUE_COLOR, fontWeight: 600 }}>
+        Incremental Rems: {incTotal}
+      </div>
+      <div style={{ marginLeft: 8 }}>
+        Due: {data.incRemDue ?? 0} · Processed: {data.incRemNotDue ?? 0} ({incPct}%)
+      </div>
+      <div style={{ color: CARD_DUE_COLOR, fontWeight: 600, marginTop: 4 }}>
+        Rems with Cards: {cardTotal}
+      </div>
+      <div style={{ marginLeft: 8 }}>
+        Due: {data.cardDue ?? 0} · Processed: {data.cardNotDue ?? 0} ({cardPct}%)
+      </div>
+    </div>
+  );
 }
 
 // Export as a reusable component, not just a widget
@@ -109,28 +156,28 @@ export function PriorityDistributionGraphComponent({ documentId }: { documentId:
             <YAxis
               yAxisId="left"
               orientation="left"
-              stroke="#3b82f6"
+              stroke={INC_REM_DUE_COLOR}
               allowDecimals={false}
-              label={{ value: 'IncRems', angle: -90, position: 'insideLeft', fill: '#3b82f6', fontSize: 10 }}
+              label={{ value: 'IncRems', angle: -90, position: 'insideLeft', fill: INC_REM_DUE_COLOR, fontSize: 10 }}
             />
 
             {/* Right Y-Axis for Rems with Cards */}
             <YAxis
               yAxisId="right"
               orientation="right"
-              stroke="#ef4444"
+              stroke={CARD_DUE_COLOR}
               allowDecimals={false}
-              label={{ value: 'Rems with Cards', angle: 90, position: 'insideRight', fill: '#ef4444', fontSize: 10 }}
+              label={{ value: 'Rems with Cards', angle: 90, position: 'insideRight', fill: CARD_DUE_COLOR, fontSize: 10 }}
             />
 
-            <Tooltip
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-            />
+            <Tooltip content={<PriorityBinTooltip />} />
             <Legend verticalAlign="top" height={36} />
 
-            {/* Bars linked to specific axes */}
-            <Bar yAxisId="left" dataKey="incRem" name="Incremental Rems" fill="#3b82f6" />
-            <Bar yAxisId="right" dataKey="card" name="Rems with Cards" fill="#ef4444" />
+            {/* Stacked bars: processed (bottom, lighter), due (top, saturated) */}
+            <Bar yAxisId="left" stackId="incRem" dataKey="incRemNotDue" name="IncRems · Processed" fill={INC_REM_NOT_DUE_COLOR} />
+            <Bar yAxisId="left" stackId="incRem" dataKey="incRemDue" name="IncRems · Due" fill={INC_REM_DUE_COLOR} />
+            <Bar yAxisId="right" stackId="card" dataKey="cardNotDue" name="Cards · Processed" fill={CARD_NOT_DUE_COLOR} />
+            <Bar yAxisId="right" stackId="card" dataKey="cardDue" name="Cards · Due" fill={CARD_DUE_COLOR} />
 
           </BarChart>
         </ResponsiveContainer>
