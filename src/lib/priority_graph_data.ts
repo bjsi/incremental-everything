@@ -32,7 +32,9 @@ export interface PriorityGraphData {
  */
 function createBins(): GraphDataPoint[] {
     return Array(20).fill(0).map((_, i) => ({
-        range: `${i * 5}-${(i + 1) * 5}`,
+        // Integer-priority labels. Last bucket spans [95, 100] inclusive because
+        // priority is clamped to 100 when binning.
+        range: i === 19 ? '95-100' : `${i * 5}-${i * 5 + 4}`,
         incRemDue: 0,
         incRemNotDue: 0,
         cardDue: 0,
