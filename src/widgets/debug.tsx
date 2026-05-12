@@ -8,7 +8,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
-import { sanitizeCardPriorityFromDescendants } from '../lib/card_priority/batch';
+import { getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -57,17 +57,8 @@ function Debug() {
          currentParent = await currentParent.getParentRem();
       }
 
-      let hasSpuriousTags = false;
-      const children = await rem.getChildrenRem();
-      for (const child of children) {
-        if (await child.hasPowerup('cardPriority')) {
-          const cards = await child.getCards();
-          if (!cards || cards.length === 0) {
-            hasSpuriousTags = true;
-            break;
-          }
-        }
-      }
+      const spuriousRems = await getSpuriousCardPriorityTags(rp, rem, false);
+      const hasSpuriousTags = spuriousRems.length > 0;
 
       return {
         incrementalRem,
@@ -76,6 +67,7 @@ function Debug() {
         isCardDisabledLocally,
         isCardDisabledInAncestors,
         hasSpuriousTags,
+        spuriousRems,
         rem
       };
     },
@@ -84,7 +76,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, rem } = debugData;
+  const { incrementalRem, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, spuriousRems, rem } = debugData;
 
   const handleDeepLog = async () => {
     console.log(`\n=================== DEEP LOG REM: ${rem._id} ===================`);
@@ -125,16 +117,37 @@ function Debug() {
   };
 
   const handleSanitize = async () => {
-    const confirmed = confirm('Are you sure you want to sanitize this rem? This will safely remove the CardPriority powerup from its property slots and any non-flashcard descendants, while preserving legitimate flashcards.');
-    if (!confirmed) return;
+    if (!spuriousRems || spuriousRems.length === 0) return;
     
-    await plugin.app.toast('Sanitizing rogue properties...');
-    const result = await sanitizeCardPriorityFromDescendants(plugin, rem, false);
-    if (result.success) {
-       await plugin.app.toast(`Sanitized! Cleaned ${result.cleanedCount} rogue tags. Preserved ${result.preservedCount} flashcards.`);
-    } else {
-       await plugin.app.toast('Sanitize failed. Check console.');
+    let totalCleaned = 0;
+    const CHUNK_SIZE = 20;
+    
+    for (let i = 0; i < spuriousRems.length; i += CHUNK_SIZE) {
+      const chunk = spuriousRems.slice(i, i + CHUNK_SIZE);
+      const listString = chunk.map((r: any) => `- ${r.name} (${r.id})`).join('\n');
+      
+      const chunkMsg = spuriousRems.length > CHUNK_SIZE 
+        ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(spuriousRems.length/CHUNK_SIZE)})` 
+        : '';
+        
+      const confirmed = confirm(`This will remove CardPriority from ${chunk.length} non-flashcard rem(s) ${chunkMsg}:\n\n${listString}\n\nContinue?`);
+      
+      if (!confirmed) {
+        if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
+        return;
+      }
+      
+      await plugin.app.toast(`Sanitizing ${chunk.length} rogue properties...`);
+      const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map((r: any) => r.id));
+      if (result.success) {
+        totalCleaned += result.cleanedCount;
+      } else {
+        await plugin.app.toast('Sanitize failed during batch. Check console.');
+        return;
+      }
     }
+    
+    await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tags total.`);
   };
 
   const preStyle = { backgroundColor: 'var(--rn-clr-background-secondary)', padding: '8px', borderRadius: '4px', marginTop: '4px', fontSize: '11px', overflowX: 'auto' as 'auto' };

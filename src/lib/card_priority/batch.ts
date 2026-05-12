@@ -562,47 +562,54 @@ export async function removeCardPriorityFromRem(plugin: RNPlugin, rem: PluginRem
 }
 
 /**
- * Sanitizes a Rem's children by removing the CardPriority powerup from Rems that should not have it.
- * - Removes from property slots (isPowerupProp / isProp).
- * - Removes from regular rems that do not have any flashcards.
- * - PRESERVES legitimate descendant flashcards to avoid losing manual priority ratings.
+ * Scans a Rem's children to find Rems that have the CardPriority powerup but no flashcards natively.
  */
-export async function sanitizeCardPriorityFromDescendants(plugin: RNPlugin, rem: PluginRem, recursive: boolean = false) {
-  let cleanedCount = 0;
-  let preservedCount = 0;
+export async function getSpuriousCardPriorityTags(plugin: RNPlugin, rem: PluginRem, recursive: boolean = false) {
+  const rogueRems: { id: string; name: string }[] = [];
 
-  async function processRem(target: PluginRem) {
+  async function scanRem(target: PluginRem) {
     const children = await target.getChildrenRem();
     for (const child of children) {
       const hasPowerup = await child.hasPowerup('cardPriority');
-
       if (hasPowerup) {
         const cards = await child.getCards();
-        if (cards && cards.length > 0) {
-          console.log(`[Sanitize] Preserving CardPriority on legitimate flashcard: ${child._id}`);
-          preservedCount++;
-        } else {
-          console.log(`[Sanitize] Removing CardPriority from non-flashcard rem: ${child._id}`);
-          await child.removePowerup('cardPriority');
-          cleanedCount++;
+        if (!cards || cards.length === 0) {
+          const textRaw = await child.text;
+          const textString = textRaw ? await plugin.richText.toString(textRaw) : 'Untitled';
+          rogueRems.push({ id: child._id, name: textString || 'Untitled' });
         }
       }
-
-      // If recursive is on, dive deeper
       if (recursive) {
-        await processRem(child);
+        await scanRem(child);
       }
     }
   }
 
+  await scanRem(rem);
+  return rogueRems;
+}
+
+/**
+ * Removes the CardPriority powerup from a specific list of Rem IDs.
+ */
+export async function removeCardPriorityFromSpecificRems(plugin: RNPlugin, remIds: string[]) {
+  let cleanedCount = 0;
+  
   console.log(`\n======================================================`);
-  console.log(`[Sanitize] Starting safe sanitize for Rem: ${rem._id}`);
+  console.log(`[Sanitize] Starting safe sanitize for ${remIds.length} Rems`);
   await plugin.storage.setSession('plugin_operation_active', true);
 
   try {
-    await processRem(rem);
-    console.log(`[Sanitize] Completed. Cleaned: ${cleanedCount}, Preserved: ${preservedCount}`);
-    return { success: true, cleanedCount, preservedCount };
+    for (const id of remIds) {
+      const child = await plugin.rem.findOne(id);
+      if (child) {
+        console.log(`[Sanitize] Removing CardPriority from non-flashcard rem: ${child._id}`);
+        await child.removePowerup('cardPriority');
+        cleanedCount++;
+      }
+    }
+    console.log(`[Sanitize] Completed. Cleaned: ${cleanedCount}`);
+    return { success: true, cleanedCount };
   } catch (error) {
     console.error(`[Sanitize] Error:`, error);
     return { success: false, error };
