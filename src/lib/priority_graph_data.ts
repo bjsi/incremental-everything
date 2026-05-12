@@ -30,11 +30,21 @@ export interface PriorityGraphData {
 /**
  * Creates 20 empty bins covering priority ranges 0-5, 5-10, ..., 95-100.
  */
-function createBins(): GraphDataPoint[] {
+type BinLabelStyle = 'integer' | 'range';
+
+/**
+ * @param style 'integer' for discrete priority values (`0-4, 5-9, ..., 95-100`),
+ *              'range' for continuous percentile space with half-open bins
+ *              (`0-5, 5-10, ..., 95-100`).
+ */
+function createBins(style: BinLabelStyle = 'integer'): GraphDataPoint[] {
     return Array(20).fill(0).map((_, i) => ({
-        // Integer-priority labels. Last bucket spans [95, 100] inclusive because
-        // priority is clamped to 100 when binning.
-        range: i === 19 ? '95-100' : `${i * 5}-${i * 5 + 4}`,
+        range: style === 'integer'
+            // Discrete integer labels. Last bucket spans [95, 100] inclusive
+            // because priority is clamped to 100 when binning.
+            ? (i === 19 ? '95-100' : `${i * 5}-${i * 5 + 4}`)
+            // Continuous half-open ranges for percentile-space binning.
+            : `${i * 5}-${(i + 1) * 5}`,
         incRemDue: 0,
         incRemNotDue: 0,
         cardDue: 0,
@@ -66,8 +76,8 @@ export function computePriorityGraphData(
     const kbIncRemPercentiles = calculateAllPercentiles(allKbIncRems);
     const kbCardPercentiles = calculateAllPercentiles(validKbCardInfos);
 
-    const binsAbsolute = createBins();
-    const binsKbRelative = createBins();
+    const binsAbsolute = createBins('integer');
+    const binsKbRelative = createBins('range');
     const now = Date.now();
 
     // Fill bins from document-scoped IncRems
