@@ -1,4 +1,4 @@
-import { RNPlugin } from '@remnote/plugin-sdk';
+import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import {
   allCardPriorityInfoKey,
   cardPriorityShieldHistoryKey,
@@ -8,6 +8,7 @@ import {
 import { CardPriorityInfo } from './types';
 import { calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
+import { safeRemTextToString } from '../pdfUtils';
 
 export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   const confirmed = confirm(
@@ -464,3 +465,282 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   alert(resultMessage);
 }
 
+export async function removeCardPriorityFromRem(plugin: RNPlugin, rem: PluginRem) {
+  console.log(`\n======================================================`);
+  console.log(`[CardPriority Cleanup] Starting cleanup for rem: ${rem._id}`);
+  
+  // Set flag to block GlobalRemChanged overriding us
+  await plugin.storage.setSession('plugin_operation_active', true);
+  try {
+    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+    const cpPowerupId = cardPriorityPowerup?._id;
+
+    const prioritySlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'priority');
+    const sourceSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'prioritySource');
+    const updatedSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'lastUpdated');
+
+    const slotIds = new Set(
+      [prioritySlot?._id, sourceSlot?._id, updatedSlot?._id].filter(Boolean)
+    );
+    console.log(`[CardPriority Cleanup] Extracted slot IDs:`, Array.from(slotIds), `Powerup ID:`, cpPowerupId);
+
+    const children = await rem.getChildrenRem();
+    console.log(`[CardPriority Cleanup] Found ${children.length} total children on rem ${rem._id}`);
+
+    let removedSlotsCount = 0;
+    const removedChildIds: string[] = [];
+
+    // First pass: identify and delete all explicit CardPriority properties
+    for (const child of children) {
+      const isProp = await child.isProperty();
+      const isPowerupProp = await child.isPowerupProperty();
+      
+      // CRITICAL: Do not touch regular children (e.g. descendant flashcards)
+      if (!isPowerupProp && !isProp) {
+        continue;
+      }
+
+      const tags = await child.getTagRems();
+      const tagIds = tags.map(t => t._id);
+      
+      const textRaw = await child.text;
+      const textString = textRaw ? await plugin.richText.toString(textRaw) : '';
+      const tagsMapped = await Promise.all(tags.map(async t => t.text ? await plugin.richText.toString(t.text) : t._id));
+      
+      const hasSlotTag = tagIds.some(id => slotIds.has(id));
+      const hasPowerupTag = cpPowerupId ? tagIds.includes(cpPowerupId) : false;
+      
+      console.log(`[CardPriority Cleanup] Child ${child._id}: text="${textString}", isProp=${isProp}, isPowerupProp=${isPowerupProp}, tags=[${tagsMapped.join(', ')}], hasSlotTag=${hasSlotTag}`);
+      
+      if (hasSlotTag || hasPowerupTag) {
+        console.log(`[CardPriority Cleanup] Deleting known CardPriority property child: ${child._id} (text: "${textString}")`);
+        await child.remove();
+        removedSlotsCount++;
+        removedChildIds.push(child._id);
+      } else if (isPowerupProp && tagIds.length === 0) {
+        // Look closely at untagged properties to see if they look like priority values (e.g. "12", "14")
+        const text = await child.text;
+        const isNumericValue = text && text.length === 1 && typeof text[0] === 'string' && !isNaN(Number(text[0])) && text[0].trim() !== '';
+        const isTextValue = text && text.length === 1 && typeof text[0] === 'string' && ['manual', 'incremental', 'default', 'inherited'].includes(text[0].trim().toLowerCase());
+        
+        if (isNumericValue || isTextValue) {
+          console.log(`[CardPriority Cleanup] Deleting untagged zombie property child: ${child._id} (Value: "${text![0]}")`);
+          await child.remove();
+          removedSlotsCount++;
+          removedChildIds.push(child._id);
+        } else {
+          console.log(`[CardPriority Cleanup] WARNING: Ignored untagged powerup property ${child._id} (Value did not look like CardPriority data)`);
+        }
+      }
+    }
+
+    console.log(`[CardPriority Cleanup] Deleting cardPriority powerup tag from parent...`);
+    await rem.removePowerup('cardPriority');
+    
+    console.log(`[CardPriority Cleanup] Emptying properties via setPowerupProperty as fallback...`);
+    try {
+      await rem.setPowerupProperty('cardPriority', 'priority', []);
+      await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
+      await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
+    } catch (e) {}
+    
+    console.log(`[CardPriority Cleanup] SUCCESS. Removed powerup and ${removedSlotsCount} slots: [${removedChildIds.join(', ')}]`);
+    console.log(`[CardPriority Cleanup] NOTE: GlobalRemChanged will likely recreate the powerup instantly because the rem has cards. This is EXPECTED and will result in a clean powerup. `);
+    console.log(`======================================================\n`);
+    
+    return { success: true, removedSlotsCount, removedChildIds };
+  } catch (error) {
+    console.error(`[CardPriority Cleanup] ERROR removing cardPriority from rem ${rem._id}:`, error);
+    console.log(`======================================================\n`);
+    return { success: false, error };
+  } finally {
+    setTimeout(async () => {
+      await plugin.storage.setSession('plugin_operation_active', false);
+      console.log(`[CardPriority Cleanup] Released plugin_operation_active flag.`);
+    }, 100);
+  }
+}
+
+export interface RogueTagResult {
+  id: string;
+  name: string;
+  parentId?: string;
+  parentName?: string;
+}
+
+/**
+ * Scans a Rem's children to find Rems that have the CardPriority powerup but no flashcards natively.
+ */
+export async function getSpuriousCardPriorityTags(plugin: RNPlugin, rem: PluginRem, recursive: boolean = false) {
+  const guaranteedRogue: RogueTagResult[] = [];
+  const suspicious: RogueTagResult[] = [];
+
+  // Fetch slot DEFINITION Rems (templates, not instances) — this is read-only and safe.
+  // Each slot definition has an _id that RemNote uses to tag the actual slot instances on rems.
+  const slotDefs = [
+    { powerup: 'incremental', slot: 'repHist' },
+    { powerup: 'incremental', slot: 'originalIncDate' },
+    { powerup: 'incremental', slot: 'nextRepDate' },
+    { powerup: 'incremental', slot: 'priority' },
+    { powerup: 'cardPriority', slot: 'priority' },
+    { powerup: 'cardPriority', slot: 'prioritySource' },
+    { powerup: 'cardPriority', slot: 'lastUpdated' },
+    { powerup: 'videoExtract', slot: 'videoUrl' },
+    { powerup: 'videoExtract', slot: 'startTime' },
+    { powerup: 'videoExtract', slot: 'endTime' },
+    { powerup: 'dismissed', slot: 'dismissedHistory' },
+    { powerup: 'dismissed', slot: 'dismissedDate' },
+  ];
+
+  const ownSlotDefinitionIds = new Set<string>();
+  for (const { powerup, slot } of slotDefs) {
+    const defRem = await plugin.powerup.getPowerupSlotByCode(powerup, slot);
+    if (defRem) {
+      ownSlotDefinitionIds.add(defRem._id);
+    }
+  }
+
+  async function scanRem(target: PluginRem) {
+    const children = await target.getChildrenRem();
+    const targetName = await safeRemTextToString(plugin, target.text);
+
+    for (const child of children) {
+      const hasPowerup = await child.hasPowerup('cardPriority');
+      if (hasPowerup) {
+        const isProp = await child.isProperty();
+        const isPowerupProp = await child.isPowerupProperty();
+        
+        // ONLY target property nodes. Structural rems (folders/documents) used for inheritance MUST be preserved.
+        if (isProp || isPowerupProp) {
+          const cards = await child.getCards();
+          if (!cards || cards.length === 0) {
+            const textRaw = await child.text;
+            const textString = await safeRemTextToString(plugin, textRaw);
+            
+            // Check if this child's text references one of our own slot definitions.
+            // RemNote links slot instances to their definitions via a reference in the
+            // rich text content: text[0]._id points to the slot definition Rem.
+            const isOwnSlot = textRaw 
+              && textRaw.length > 0 
+              && typeof textRaw[0] === 'object' 
+              && (textRaw[0] as any)?._id 
+              && ownSlotDefinitionIds.has((textRaw[0] as any)._id);
+            
+            if (isOwnSlot) {
+              guaranteedRogue.push({ id: child._id, name: textString, parentId: target._id, parentName: targetName });
+            } else {
+              suspicious.push({ id: child._id, name: textString, parentId: target._id, parentName: targetName });
+            }
+          }
+        }
+      }
+      if (recursive) {
+        await scanRem(child);
+      }
+    }
+  }
+
+  await scanRem(rem);
+  return { guaranteedRogue, suspicious };
+}
+
+/**
+ * Removes the CardPriority powerup from a specific list of Rem IDs.
+ */
+export async function removeCardPriorityFromSpecificRems(plugin: RNPlugin, remIds: string[]) {
+  let cleanedCount = 0;
+  
+  console.log(`\n======================================================`);
+  console.log(`[Sanitize] Starting safe sanitize for ${remIds.length} Rems`);
+  await plugin.storage.setSession('plugin_operation_active', true);
+
+  try {
+    for (const id of remIds) {
+      const child = await plugin.rem.findOne(id);
+      if (child) {
+        console.log(`[Sanitize] Removing CardPriority from non-flashcard rem: ${child._id}`);
+        await child.removePowerup('cardPriority');
+        cleanedCount++;
+      }
+    }
+    console.log(`[Sanitize] Completed. Cleaned: ${cleanedCount}`);
+    return { success: true, cleanedCount };
+  } catch (error) {
+    console.error(`[Sanitize] Error:`, error);
+    return { success: false, error, cleanedCount: 0 };
+  } finally {
+    setTimeout(async () => {
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }, 100);
+  }
+}
+
+export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
+  await plugin.app.toast('Scanning knowledge base for rogue CardPriority tags...');
+  
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+  
+  let allGuaranteed: RogueTagResult[] = [];
+  let allSuspicious: RogueTagResult[] = [];
+  
+  for (const rem of taggedRems) {
+    const { guaranteedRogue, suspicious } = await getSpuriousCardPriorityTags(plugin, rem, false);
+    allGuaranteed.push(...guaranteedRogue);
+    allSuspicious.push(...suspicious);
+  }
+
+  if (allGuaranteed.length === 0 && allSuspicious.length === 0) {
+    await plugin.app.toast('No rogue tags found. Your database is clean!');
+    return;
+  }
+
+  let totalCleaned = 0;
+  const CHUNK_SIZE = 20;
+
+  if (allGuaranteed.length > 0) {
+    for (let i = 0; i < allGuaranteed.length; i += CHUNK_SIZE) {
+      const chunk = allGuaranteed.slice(i, i + CHUNK_SIZE);
+      const listString = chunk.map(r => `- ${r.name} (${r.id})`).join('\n');
+      
+      const chunkMsg = allGuaranteed.length > CHUNK_SIZE 
+        ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(allGuaranteed.length/CHUNK_SIZE)})` 
+        : '';
+        
+      const confirmed = confirm(`Found ${allGuaranteed.length} GUARANTEED rogue properties. This will safely remove CardPriority from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
+      
+      if (!confirmed) {
+        if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
+        return;
+      }
+      
+      await plugin.app.toast(`Sanitizing ${chunk.length} guaranteed rogue properties...`);
+      const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map(r => r.id));
+      if (result.success) {
+        totalCleaned += result.cleanedCount;
+      } else {
+        await plugin.app.toast('Sanitize failed during batch. Check console.');
+        return;
+      }
+    }
+  }
+
+  if (allSuspicious.length > 0) {
+    const proceed = confirm(`We successfully processed the guaranteed tags.\n\nHowever, we also found ${allSuspicious.length} SUSPICIOUS properties.\nThese are property nodes from other plugins that have CardPriority but 0 flashcards. They might be bugs, or they might be intentional.\n\nDo you want to review them one by one?`);
+    
+    if (proceed) {
+      for (const rem of allSuspicious) {
+        const confirmDelete = confirm(`⚠️ Suspicious Property Found\n\nProperty Text: "${rem.name}"\nParent Rem: "${rem.parentName}"\n\nThis property has no flashcards. Do you want to remove CardPriority from it?`);
+        
+        if (confirmDelete) {
+          const result = await removeCardPriorityFromSpecificRems(plugin, [rem.id]);
+          if (result.success) {
+            totalCleaned += result.cleanedCount;
+          }
+        }
+      }
+    }
+  }
+
+  await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tags across your KB.`);
+}

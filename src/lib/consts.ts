@@ -141,6 +141,9 @@ export const pendingScrollRequestKey = 'pending-scroll-request';
 // Priority Review Graph
 export const priorityGraphPowerupCode = 'priority_review_graph';
 export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';
+// Synced index of every graph Rem ID we've written graph data for. Used to find
+// orphaned `GRAPH_DATA_KEY_PREFIX + remId` entries on startup so they can be cleared.
+export const REVIEW_GRAPH_INDEX_KEY = 'priority_review_graph_index';
 
 // Priority Graph (document-scope, inline in inc_rem_counter)
 export const PRIORITY_GRAPH_DATA_KEY_PREFIX = 'priority_graph_data_';

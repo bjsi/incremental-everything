@@ -46,6 +46,7 @@ import {
 import { handleQuickPriorityChange } from '../lib/quick_priority';
 import {
   removeAllCardPriorityTags,
+  sanitizeAllRogueCardPriorityTags,
   updateAllCardPriorities,
   setCardPriority,
 } from '../lib/card_priority';
@@ -1290,6 +1291,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       'Completely remove all CardPriority powerup tags and data from your knowledge base',
     action: async () => {
       await removeAllCardPriorityTags(plugin);
+    },
+  });
+
+  // Sanitize rogue tags command
+  await plugin.app.registerCommand({
+    id: 'sanitize-rogue-card-priority-tags',
+    name: 'Sanitize Rogue CardPriority Tags',
+    description:
+      'Detects and removes the CardPriority powerup from properties and non-flashcards across your KB',
+    action: async () => {
+      await sanitizeAllRogueCardPriorityTags(plugin);
     },
   });
 

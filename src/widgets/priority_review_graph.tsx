@@ -35,7 +35,7 @@ function PriorityReviewGraph() {
 
   // Get the Rem ID this widget is attached to
   const context = useTrackerPlugin(async (rp) => {
-    return await rp.widget.getWidgetContext<{ widgetInstanceId: string; remId: string }>();
+    return await rp.widget.getWidgetContext<any>();
   }, []);
 
   const remId = context?.remId;

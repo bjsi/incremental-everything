@@ -11,6 +11,7 @@ import {
 import { CardPriorityInfo } from '../card_priority';
 import { calculateAllPercentiles } from '../utils';
 import { buildComprehensiveScope } from '../scope_helpers';
+import { registerReviewGraphKey } from './cleanup';
 import * as _ from 'remeda'; // Ensure remeda is imported for uniqBy if available, or use custom
 
 // Possible powerup codes for the Card Cluster built-in powerup.
@@ -435,15 +436,20 @@ Created: ${timestamp}`;
 
   // 7. Generate Graph Data and Insert Graph Widget
 
-  // Initialize bins (0-5, 5-10, ... 95-100)
-  const createBins = () => Array(20).fill(0).map((_, i) => ({
-    range: `${i * 5}-${(i + 1) * 5}`,
+  // Initialize bins. Two label styles:
+  //   'integer' for discrete absolute-priority values → `0-4, 5-9, ..., 95-100`
+  //   'range'   for continuous percentile space      → `0-5, 5-10, ..., 95-100`
+  // Last bucket is inclusive of 100 in both styles (priority/percentile is clamped).
+  const createBins = (style: 'integer' | 'range') => Array(20).fill(0).map((_, i) => ({
+    range: style === 'integer'
+      ? (i === 19 ? '95-100' : `${i * 5}-${i * 5 + 4}`)
+      : `${i * 5}-${(i + 1) * 5}`,
     incRem: 0,
     card: 0,
   }));
 
-  const binsAbsolute = createBins();
-  const binsRelative = createBins();
+  const binsAbsolute = createBins('integer');
+  const binsRelative = createBins('range');
 
   for (const item of mixedItems) {
     // Fill Absolute Bins
@@ -485,6 +491,9 @@ Created: ${timestamp}`;
     };
 
     await plugin.storage.setSynced(GRAPH_DATA_KEY_PREFIX + graphRem._id, graphData);
+    // Track this graph Rem so the startup sweep can clear its data later
+    // if the user deletes the Priority Review Document.
+    await registerReviewGraphKey(plugin, graphRem._id);
   }
 
 
