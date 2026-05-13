@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   renderWidget,
   usePlugin,
@@ -5,6 +6,7 @@ import {
   useTrackerPlugin,
   WidgetLocation,
   BuiltInPowerupCodes,
+  Card,
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
@@ -75,9 +77,68 @@ function Debug() {
     [remId]
   );
 
+  const [cardCompare, setCardCompare] = useState<{
+    remCards: { id: string; type: string; nextRepTime?: number; historyLen: number }[];
+    filteredCards: { id: string; type: string; nextRepTime?: number; historyLen: number }[];
+    onlyInRem: string[];
+    onlyInAll: string[];
+    totalKb: number;
+    match: boolean;
+  } | null>(null);
+  const [isComparing, setIsComparing] = useState(false);
+
   if (!debugData) return null;
 
   const { incrementalRem, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, rem } = debugData;
+
+  const handleCardCompare = async () => {
+    if (!remId) return;
+    setIsComparing(true);
+    try {
+      const rem = await plugin.rem.findOne(remId);
+      if (!rem) { await plugin.app.toast('No rem found!'); return; }
+
+      const remCards = await rem.getCards();
+      const allCards = await plugin.card.getAll();
+      const filteredCards = (allCards || []).filter((c: Card) => c.remId === remId);
+
+      const parse = (c: Card) => ({
+        id: c._id,
+        type: typeof c.type === 'object' && c.type !== null ? `cloze:${(c.type as { clozeId: string }).clozeId}` : String(c.type),
+        nextRepTime: c.nextRepetitionTime,
+        historyLen: c.repetitionHistory?.length ?? 0,
+      });
+
+      const remCardsParsed = remCards.map(parse);
+      const filteredCardsParsed = filteredCards.map(parse);
+      const remIdSet = new Set(remCards.map((c: Card) => c._id));
+      const filtIdSet = new Set(filteredCards.map((c: Card) => c._id));
+      const onlyInRem = remCards.filter((c: Card) => !filtIdSet.has(c._id)).map((c: Card) => c._id);
+      const onlyInAll = filteredCards.filter((c: Card) => !remIdSet.has(c._id)).map((c: Card) => c._id);
+
+      const result = {
+        remCards: remCardsParsed,
+        filteredCards: filteredCardsParsed,
+        onlyInRem,
+        onlyInAll,
+        totalKb: allCards?.length ?? 0,
+        match: onlyInRem.length === 0 && onlyInAll.length === 0,
+      };
+
+      console.log(`\n========== CARD COMPARE: ${remId} ==========`);
+      console.log('rem.getCards():', JSON.stringify(remCardsParsed, null, 2));
+      console.log('card.getAll() filtered:', JSON.stringify(filteredCardsParsed, null, 2));
+      console.log('Only in rem.getCards():', onlyInRem);
+      console.log('Only in card.getAll():', onlyInAll);
+      console.log('Total KB cards:', result.totalKb);
+      console.log('Match:', result.match);
+      console.log('===========================================\n');
+
+      setCardCompare(result);
+    } finally {
+      setIsComparing(false);
+    }
+  };
 
   const handleDeepLog = async () => {
     console.log(`\n=================== DEEP LOG REM: ${rem._id} ===================`);
@@ -99,7 +160,7 @@ function Debug() {
       const isProp = await child.isProperty();
       const isPowerupProp = await child.isPowerupProperty();
       const childTags = await child.getTagRems();
-      const textRaw = await child.text;
+      const textRaw = child.text;
       const textString = textRaw ? await plugin.richText.toString(textRaw) : '';
       
       const childTagsMapped = await Promise.all(childTags.map(async t => ({ 
@@ -276,6 +337,46 @@ function Debug() {
           />
         </div>
       )}
+
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Card API Comparison
+          <button
+            onClick={handleCardCompare}
+            disabled={isComparing}
+            style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isComparing ? 'wait' : 'pointer' }}
+          >
+            {isComparing ? 'Running…' : 'Run Comparison'}
+          </button>
+        </h2>
+        {!cardCompare && <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)' }}>Click "Run Comparison" to compare rem.getCards() vs card.getAll() for this rem.</div>}
+        {cardCompare && (
+          <div>
+            <div className="flex gap-4 mb-2">
+              <Info className="" label="rem.getCards()" data={<strong>{cardCompare.remCards.length}</strong>} />
+              <Info className="" label="card.getAll() filtered" data={<strong>{cardCompare.filteredCards.length}</strong>} />
+              <Info className="" label="Total KB Cards" data={cardCompare.totalKb} />
+            </div>
+            <Info className="" label="Match?" data={
+              cardCompare.match
+                ? <span style={{ color: '#22c55e', fontWeight: 600 }}>YES — counts and IDs agree</span>
+                : <span style={{ color: '#ef4444', fontWeight: 600 }}>NO — mismatch detected!</span>
+            } />
+            {!cardCompare.match && cardCompare.onlyInRem.length > 0 && (
+              <Info className="" label="Only in rem.getCards()" data={<pre style={preStyle}>{JSON.stringify(cardCompare.onlyInRem, null, 2)}</pre>} />
+            )}
+            {!cardCompare.match && cardCompare.onlyInAll.length > 0 && (
+              <Info className="" label="Only in card.getAll()" data={<pre style={preStyle}>{JSON.stringify(cardCompare.onlyInAll, null, 2)}</pre>} />
+            )}
+            <Info className="" label="rem.getCards() — cards" data={
+              <pre style={preStyle}>{JSON.stringify(cardCompare.remCards, null, 2)}</pre>
+            } />
+            <Info className="" label="card.getAll() filtered — cards" data={
+              <pre style={preStyle}>{JSON.stringify(cardCompare.filteredCards, null, 2)}</pre>
+            } />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
