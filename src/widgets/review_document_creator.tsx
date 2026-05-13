@@ -29,6 +29,7 @@ function ReviewDocumentCreator() {
   const [itemCount, setItemCount] = useState(50);
   const [useFullKB, setUseFullKB] = useState(false);
   const [filterPaused, setFilterPaused] = useState(true);
+  const [pausedPriorityThreshold, setPausedPriorityThreshold] = useState(20);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -69,6 +70,7 @@ function ReviewDocumentCreator() {
         itemCount: itemCount,
         cardRatio: flashcardRatio || 6,
         filterPaused,
+        pausedPriorityThreshold,
       };
 
       setSuccessMessage('Creating review document...');
@@ -306,11 +308,27 @@ function ReviewDocumentCreator() {
             disabled={isCreating}
             style={{ marginTop: '2px', flexShrink: 0 }}
           />
-          <div>
+          <div className="flex flex-col gap-2 flex-1">
             <div className="font-semibold text-sm">Skip paused documents</div>
-            <div className="rn-clr-content-secondary text-xs mt-1">
+            <div className="rn-clr-content-secondary text-xs">
               Exclude flashcard rems from documents with Deck Status = "Paused". Skipped high-priority items will trigger a warning.
             </div>
+            {filterPaused && (
+              <div className="flex items-center gap-2 text-xs mt-1">
+                <span className="rn-clr-content-secondary">Always keep items with priority</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={pausedPriorityThreshold}
+                  onChange={(e) => setPausedPriorityThreshold(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+                  disabled={isCreating}
+                  className="rn-clr-background rounded"
+                  style={{ width: '56px', padding: '2px 6px', border: '1px solid var(--rn-clr-border, #d1d5db)', fontSize: '12px' }}
+                />
+                <span className="rn-clr-content-secondary">or less (even if paused)</span>
+              </div>
+            )}
           </div>
         </label>
       </div>

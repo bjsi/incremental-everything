@@ -166,6 +166,8 @@ export interface ReviewDocumentConfig {
   cardRatio: number | 'no-cards' | 'no-rem';
   /** When true, flashcard rems inside paused documents are excluded and reported. Default: true. */
   filterPaused: boolean;
+  /** Items with priority ≤ this value are kept even when filterPaused is true. Default: 20. */
+  pausedPriorityThreshold: number;
 }
 
 /**
@@ -175,7 +177,7 @@ export async function createPriorityReviewDocument(
   plugin: RNPlugin,
   config: ReviewDocumentConfig
 ): Promise<{ doc: PluginRem; actualItemCount: number; skippedPausedItems: SkippedPausedItem[] }> {
-  const { scopeRemId, itemCount, cardRatio, filterPaused } = config;
+  const { scopeRemId, itemCount, cardRatio, filterPaused, pausedPriorityThreshold } = config;
 
   // 1. Create the review document with rem reference in title
   const timestamp = new Date().toLocaleString('en-US', {
@@ -360,7 +362,9 @@ export async function createPriorityReviewDocument(
 
     // Lazy paused-document check — only runs for cards actually pulled into
     // consideration, so ancestor walks are bounded by how many cards we need.
-    if (filterPaused && await isInPausedDocument(item.rem)) {
+    // High-priority items (priority ≤ pausedPriorityThreshold) bypass the filter
+    // and are always included regardless of pause status.
+    if (filterPaused && item.priority > pausedPriorityThreshold && await isInPausedDocument(item.rem)) {
       skippedPausedItems.push({
         remId: item.rem._id,
         name: await safeRemTextToString(plugin, item.rem.text),
