@@ -1,4 +1,4 @@
-import { RNPlugin, PluginRem, RichTextInterface, RemId } from '@remnote/plugin-sdk';
+import { RNPlugin, PluginRem, RichTextInterface, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem';
 import { getCardRandomness, getSortingRandomness, applySortingCriteria } from '../sorting';
 import { getDueCardsWithPriorities } from '../card_priority';
@@ -12,6 +12,7 @@ import { CardPriorityInfo } from '../card_priority';
 import { calculateAllPercentiles } from '../utils';
 import { buildComprehensiveScope } from '../scope_helpers';
 import { registerReviewGraphKey } from './cleanup';
+import { safeRemTextToString } from '../pdfUtils';
 import * as _ from 'remeda'; // Ensure remeda is imported for uniqBy if available, or use custom
 
 // Possible powerup codes for the Card Cluster built-in powerup.
@@ -132,10 +133,41 @@ export async function extractOriginalScopeFromPriorityReview(
   return undefined;
 }
 
+export interface SkippedPausedItem {
+  remId: string;
+  name: string;
+  priority: number;
+}
+
+/**
+ * Walks the ancestor chain of a rem to detect if it lives inside a paused
+ * document. A document is considered paused when its Deck powerup Status
+ * slot equals "Paused".
+ *
+ * Note: card.getAll() returns cards for paused-document rems (unlike
+ * rem.getCards() which returns []). This check is the reliable way to
+ * detect that state without relying on rem.getCards() behaviour.
+ */
+async function isInPausedDocument(rem: PluginRem): Promise<boolean> {
+  let cursor = await rem.getParentRem();
+  while (cursor) {
+    if (await cursor.hasPowerup(BuiltInPowerupCodes.Deck)) {
+      const status = await cursor.getPowerupProperty(BuiltInPowerupCodes.Deck, 'Status');
+      return status === 'Paused';
+    }
+    cursor = await cursor.getParentRem();
+  }
+  return false;
+}
+
 export interface ReviewDocumentConfig {
   scopeRemId: string | null;  // null = full KB
   itemCount: number;
   cardRatio: number | 'no-cards' | 'no-rem';
+  /** When true, flashcard rems inside paused documents are excluded and reported. Default: true. */
+  filterPaused: boolean;
+  /** Items with priority ≤ this value are kept even when filterPaused is true. Default: 20. */
+  pausedPriorityThreshold: number;
 }
 
 /**
@@ -144,8 +176,8 @@ export interface ReviewDocumentConfig {
 export async function createPriorityReviewDocument(
   plugin: RNPlugin,
   config: ReviewDocumentConfig
-): Promise<{ doc: PluginRem; actualItemCount: number }> {
-  const { scopeRemId, itemCount, cardRatio } = config;
+): Promise<{ doc: PluginRem; actualItemCount: number; skippedPausedItems: SkippedPausedItem[] }> {
+  const { scopeRemId, itemCount, cardRatio, filterPaused, pausedPriorityThreshold } = config;
 
   // 1. Create the review document with rem reference in title
   const timestamp = new Date().toLocaleString('en-US', {
@@ -207,13 +239,20 @@ export async function createPriorityReviewDocument(
   const dueIncRems = scopedIncRems.filter(rem => rem.nextRepDate <= now);
 
   // Cards
-  // This fetches the actual cards we will use. 
+  // This fetches the actual cards we will use.
   // It might find cards NOT present in allCardInfos if the cache is stale.
   const cardsWithPriority = await getDueCardsWithPriorities(
     plugin,
     scopeRem,
     true
   );
+
+  // Skipped paused items are collected lazily inside addCard as cards are pulled.
+  // card.getAll() (used by the cache) returns cards for paused rems while
+  // rem.getCards() returns [] — the Deck powerup Status slot is the reliable
+  // signal. We check only candidates actually considered for inclusion, so the
+  // list stays small and meaningful.
+  const skippedPausedItems: SkippedPausedItem[] = [];
 
   // --- DEBUG & FIX START ---
 
@@ -321,6 +360,19 @@ export async function createPriorityReviewDocument(
     // Always advance past already-added rems so the caller can keep iterating
     if (addedRemIds.has(item.rem._id)) return true;
 
+    // Lazy paused-document check — only runs for cards actually pulled into
+    // consideration, so ancestor walks are bounded by how many cards we need.
+    // High-priority items (priority ≤ pausedPriorityThreshold) bypass the filter
+    // and are always included regardless of pause status.
+    if (filterPaused && item.priority > pausedPriorityThreshold && await isInPausedDocument(item.rem)) {
+      skippedPausedItems.push({
+        remId: item.rem._id,
+        name: await safeRemTextToString(plugin, item.rem.text),
+        priority: item.priority,
+      });
+      return true; // advance index without adding to mixedItems
+    }
+
     // Lookup percentile with debug log if missing
     let percentile = cardPercentiles[item.rem._id];
     if (percentile === undefined) {
@@ -403,6 +455,15 @@ export async function createPriorityReviewDocument(
     }
   }
 
+  // 6. Finalise skipped list and log
+  if (skippedPausedItems.length > 0) {
+    skippedPausedItems.sort((a, b) => a.priority - b.priority);
+    console.log(
+      `[PRD] ${skippedPausedItems.length} flashcard rems skipped (paused documents):`,
+      skippedPausedItems.map((s) => `P${s.priority} — ${s.name} [${s.remId}]`)
+    );
+  }
+
   // 6. Add metadata to document
   const scopeName = scopeRemId
     ? (await plugin.rem.findOne(scopeRemId))?.text?.join('') || 'Document'
@@ -420,9 +481,13 @@ export async function createPriorityReviewDocument(
     return sum + count;
   }, 0);
 
-  const metadataText = `Scope: ${scopeName} 
+  const skippedLine = skippedPausedItems.length > 0
+    ? `\nSkipped (paused docs): ${skippedPausedItems.length} flashcard rems`
+    : '';
+
+  const metadataText = `Scope: ${scopeName}
 Scope Size: ${scopedIncRems.length} IncRems, ${universeCardInfos.length} Rems with Cards, ${totalCardsInScope} Cards
-Selected Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} IncRems, ${mixedItems.filter(i => i.type === 'flashcard').length} Rems with Cards)
+Selected Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} IncRems, ${mixedItems.filter(i => i.type === 'flashcard').length} Rems with Cards)${skippedLine}
 Randomness: IncRem ${incRemRandPct}%, Cards ${cardRandPct}%
 Created: ${timestamp}`;
 
@@ -524,5 +589,5 @@ Created: ${timestamp}`;
     if (typeTag) { await childRem.addTag(typeTag); }
   }
 
-  return { doc: reviewDoc, actualItemCount: mixedItems.length };
+  return { doc: reviewDoc, actualItemCount: mixedItems.length, skippedPausedItems };
 }
