@@ -175,7 +175,7 @@ function ReviewDocumentCreator() {
   }
 
   return (
-    <div className="p-5 flex flex-col gap-4" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '800px', margin: '0 auto', maxHeight: '90vh', overflowY: 'auto' }} onKeyDown={handleWrapperKeyDown}>
+    <div className="p-5 flex flex-col gap-4" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '800px', margin: '0 auto' }} onKeyDown={handleWrapperKeyDown}>
 
       {/* Header */}
       <div>

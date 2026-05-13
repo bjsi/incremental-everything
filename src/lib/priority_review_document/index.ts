@@ -275,7 +275,7 @@ export async function createPriorityReviewDocument(
 
       console.log(
         `[PRD] Filtered ${skippedPausedItems.length} flashcard rems from paused documents:`,
-        skippedPausedItems.map((s) => `P${s.priority} — ${s.name}`)
+        skippedPausedItems.map((s) => `P${s.priority} — ${s.name} [${s.remId}]`)
       );
     }
   }
