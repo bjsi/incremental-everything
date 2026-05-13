@@ -67,6 +67,10 @@ export async function getCardPriority(
 
   const now = Date.now();
   const startOfToday = dayjs().startOf('day').valueOf();
+  // `?? Infinity`: disabled cards have nextRepetitionTime === null, which maps to
+  // Infinity and therefore never satisfies the <= now check. This implicitly excludes
+  // disabled cards from due counts and, consequently, from Priority Review Documents
+  // and the due-card-priority cache — without any explicit disabled-card filter.
   const dueCards = cards.filter((card) => (card.nextRepetitionTime ?? Infinity) <= now).length;
   const dueCardsOverdue = cards.filter((card) => (card.nextRepetitionTime ?? Infinity) <= startOfToday).length;
 
@@ -421,7 +425,8 @@ async function getDueCardsWithPrioritiesSlow(
   const allCards = await plugin.card.getAll();
   const now = Date.now();
 
-  // Build a map of remId -> due card count
+  // Build a map of remId -> due card count.
+  // Disabled cards (nextRepetitionTime === null → Infinity) are excluded implicitly.
   const remDueCardCount = new Map<RemId, number>();
   for (const card of allCards) {
     if ((card.nextRepetitionTime ?? Infinity) <= now) {
