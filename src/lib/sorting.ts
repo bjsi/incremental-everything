@@ -56,6 +56,24 @@ export const getCardRandomness = async (plugin: RNPlugin) => {
   return val == null ? DEFAULT_CARD_RANDOMNESS : val;
 };
 
+export interface SortingPreset {
+  name: string;
+  randomness: number;
+  cardRandomness: number;
+  cardsPerRem: CardsPerRem;
+}
+
+export const getSortingPresets = async (plugin: RNPlugin): Promise<SortingPreset[]> => {
+  const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+  const val = await plugin.storage.getSynced<SortingPreset[]>(`sortingPresets_${kbId}`);
+  return val ?? [];
+};
+
+export const setSortingPresets = async (plugin: RNPlugin, presets: SortingPreset[]): Promise<void> => {
+  const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
+  await plugin.storage.setSynced(`sortingPresets_${kbId}`, presets);
+};
+
 // Add function to apply sorting with randomness
 export function applySortingCriteria<T extends { priority: number }>(
   items: T[],

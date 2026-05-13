@@ -7,9 +7,12 @@ import {
   setCardsPerRem,
   CardsPerRem,
   DEFAULT_CARDS_PER_REM,
-  getCardRandomness,  // Add this
-  setCardRandomness,   // Add this
-  DEFAULT_CARD_RANDOMNESS  // Add this
+  getCardRandomness,
+  setCardRandomness,
+  DEFAULT_CARD_RANDOMNESS,
+  SortingPreset,
+  getSortingPresets,
+  setSortingPresets,
 } from '../lib/sorting';
 import { useState, useEffect } from 'react';
 import { noIncRemTimerKey } from '../lib/consts';
@@ -80,7 +83,12 @@ export function SortingCriteria() {
     []
   );
 
+  const savedPresets = useTrackerPlugin(async (rp) => await getSortingPresets(rp), []);
+  const presets = savedPresets ?? [];
+
   const [sliderValue, setSliderValue] = useState<number | undefined>(undefined);
+  const [selectedPresetName, setSelectedPresetName] = useState('');
+  const [newPresetName, setNewPresetName] = useState('');
 
   const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -104,6 +112,39 @@ export function SortingCriteria() {
   const handleSliderChange = (value: number) => {
     setSliderValue(value);
     setCardsPerRem(plugin, sliderValueToCards(value));
+  };
+
+  const handleLoadPreset = async (name: string) => {
+    const preset = presets.find(p => p.name === name);
+    if (!preset) { setSelectedPresetName(''); return; }
+    setSelectedPresetName(name);
+    await setSortingRandomness(plugin, preset.randomness);
+    await setCardRandomness(plugin, preset.cardRandomness);
+    await setCardsPerRem(plugin, preset.cardsPerRem);
+    await plugin.app.toast(`Loaded preset "${name}"`);
+  };
+
+  const handleSavePreset = async () => {
+    const name = newPresetName.trim();
+    if (!name) return;
+    const preset: SortingPreset = {
+      name,
+      randomness: sortingRandomness ?? DEFAULT_RANDOMNESS,
+      cardRandomness: cardRandomness ?? DEFAULT_CARD_RANDOMNESS,
+      cardsPerRem: sliderValueToCards(sliderValue!),
+    };
+    const updated = [...presets.filter(p => p.name !== name), preset];
+    await setSortingPresets(plugin, updated);
+    setNewPresetName('');
+    setSelectedPresetName(name);
+    await plugin.app.toast(`Saved preset "${name}"`);
+  };
+
+  const handleDeletePreset = async (name: string) => {
+    const updated = presets.filter(p => p.name !== name);
+    await setSortingPresets(plugin, updated);
+    setSelectedPresetName('');
+    await plugin.app.toast(`Deleted preset "${name}"`);
   };
 
   // --- CONDITIONAL RETURN ---
@@ -165,6 +206,75 @@ export function SortingCriteria() {
           Knowledge Base: {currentKbName}
         </div>
       )}
+
+      {/* Preset Selector */}
+      <div style={{
+        border: '1px solid var(--rn-clr-border-primary)',
+        borderRadius: '6px',
+        padding: '10px 12px',
+        backgroundColor: 'var(--rn-clr-background-secondary)',
+      }}>
+        <div className="text-xs font-semibold mb-2" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+          🎛️ Presets
+        </div>
+        {presets.length > 0 && (
+          <div className="flex items-center gap-2 mb-2">
+            <select
+              value={selectedPresetName}
+              onChange={(e) => handleLoadPreset(e.target.value)}
+              className="text-xs px-2 py-1 rounded flex-1"
+              style={{
+                border: '1px solid var(--rn-clr-border-primary)',
+                backgroundColor: 'var(--rn-clr-background-primary)',
+                color: 'var(--rn-clr-content-primary)',
+              }}
+            >
+              <option value="">— select to load —</option>
+              {presets.map((p) => (
+                <option key={p.name} value={p.name}>{p.name}</option>
+              ))}
+            </select>
+            {selectedPresetName && (
+              <button
+                onClick={() => handleDeletePreset(selectedPresetName)}
+                className="text-xs px-2 py-1 rounded"
+                style={{ backgroundColor: '#dc2626', color: 'white', border: 'none', cursor: 'pointer' }}
+                title="Delete this preset"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newPresetName}
+            onChange={(e) => setNewPresetName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSavePreset(); }}
+            placeholder="Preset name…"
+            className="text-xs px-2 py-1 rounded flex-1"
+            style={{
+              border: '1px solid var(--rn-clr-border-primary)',
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+            }}
+          />
+          <button
+            onClick={handleSavePreset}
+            disabled={!newPresetName.trim()}
+            className="text-xs px-2 py-1 rounded"
+            style={{
+              backgroundColor: newPresetName.trim() ? '#3b82f6' : 'var(--rn-clr-background-tertiary)',
+              color: newPresetName.trim() ? 'white' : 'var(--rn-clr-content-tertiary)',
+              border: 'none',
+              cursor: newPresetName.trim() ? 'pointer' : 'default',
+            }}
+          >
+            💾 Save
+          </button>
+        </div>
+      </div>
 
       {/* Randomness slider is unchanged */}
       <div className="flex flex-col gap-2 ">
