@@ -161,18 +161,20 @@ export async function buildDocumentScope(
  */
 export async function buildComprehensiveScope(
   plugin: RNPlugin,
-  scopeRemId: RemId
+  scopeRemId: RemId,
+  _visited: Set<RemId> = new Set()
 ): Promise<Set<RemId>> {
+  if (_visited.has(scopeRemId)) return new Set();
+  _visited.add(scopeRemId);
+
   const scopeRem = await plugin.rem.findOne(scopeRemId);
   if (!scopeRem) return new Set();
 
+  const isTopLevel = _visited.size === 1; // only scopeRemId itself added so far
+
   const descendants = await scopeRem.getDescendants();
-
-  // This captures items inside Portals and Tables
   const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-
   const folderQueueRems = await scopeRem.allRemInFolderQueue();
-  const sources = await scopeRem.getSources();
 
   const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
     powerupCode,
@@ -191,21 +193,51 @@ export async function buildComprehensiveScope(
 
   // Collect PDF sources from scopeRem and all descendants
   const { pdfSourceIds } = await collectPdfSourcesFromRems([scopeRem, ...descendants]);
-
-  // Find PDF extracts (highlights) that belong to PDF sources
   const pdfExtractIds = await findPdfExtractIds(plugin, pdfSourceIds);
-
-  // Find descendants of PDF sources (notes/flashcards inside PDFs)
   const pdfDescendantIds = await getPdfDescendantIds(plugin, pdfSourceIds);
 
-  return new Set<RemId>([
+  // Collect sources from every rem gathered so far, then recursively expand each.
+  const allGatheredRems = [scopeRem, ...descendants, ...allRemsInContext, ...folderQueueRems];
+  const seenIds = new Set<RemId>();
+  const uniqueRems = allGatheredRems.filter(r => {
+    if (seenIds.has(r._id)) return false;
+    seenIds.add(r._id);
+    return true;
+  });
+
+  const allSourceIds = new Set<RemId>();
+  await Promise.all(
+    uniqueRems.map(async rem => {
+      try {
+        const remSources = await rem.getSources();
+        for (const src of remSources) allSourceIds.add(src._id);
+      } catch {}
+    })
+  );
+
+  const sourceScopes = await Promise.all(
+    [...allSourceIds].map(id => buildComprehensiveScope(plugin, id, _visited))
+  );
+
+  const result = new Set<RemId>([
     scopeRem._id,
     ...descendants.map(r => r._id),
     ...allRemsInContext.map(r => r._id),
     ...folderQueueRems.map(r => r._id),
-    ...sources.map(r => r._id),
+    ...sourceScopes.flatMap(s => [...s]),
     ...referencingRems,
     ...pdfExtractIds,
     ...pdfDescendantIds
   ]);
+
+  if (isTopLevel) {
+    console.log(`[buildComprehensiveScope] ✓ Found ${descendants.length} descendants`);
+    console.log(`[buildComprehensiveScope] ✓ Found ${allRemsInContext.length} rems in document/portal context`);
+    console.log(`[buildComprehensiveScope] ✓ Found ${folderQueueRems.length} rems via allRemInFolderQueue`);
+    console.log(`[buildComprehensiveScope] ✓ Found ${referencingRems.length} referencing rems`);
+    console.log(`[buildComprehensiveScope] ✓ Found ${allSourceIds.size} unique source documents (expanded into ${sourceScopes.reduce((n, s) => n + s.size, 0)} rems)`);
+    console.log(`[buildComprehensiveScope] Comprehensive scope contains ${result.size} unique rems`);
+  }
+
+  return result;
 }
