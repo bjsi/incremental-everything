@@ -4,7 +4,7 @@ import {
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useRef, useEffect } from 'react';
-import { createPriorityReviewDocument } from '../lib/priority_review_document';
+import { createPriorityReviewDocument, SkippedPausedItem } from '../lib/priority_review_document';
 import { getCardsPerRem } from '../lib/sorting';
 
 function ReviewDocumentCreator() {
@@ -28,9 +28,11 @@ function ReviewDocumentCreator() {
   // Form state
   const [itemCount, setItemCount] = useState(50);
   const [useFullKB, setUseFullKB] = useState(false);
+  const [filterPaused, setFilterPaused] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
+  const [skippedItems, setSkippedItems] = useState<SkippedPausedItem[]>([]);
   const [focusedSection, setFocusedSection] = useState<'scope' | 'number' | null>(null);
 
   const scopeFirstRadioRef = useRef<HTMLInputElement>(null);
@@ -59,17 +61,19 @@ function ReviewDocumentCreator() {
     setIsCreating(true);
     setErrorMessage('');
     setSuccessMessage('');
+    setSkippedItems([]);
 
     try {
       const config = {
         scopeRemId: useFullKB ? null : context?.scopeRemId || null,
         itemCount: itemCount,
         cardRatio: flashcardRatio || 6,
+        filterPaused,
       };
 
       setSuccessMessage('Creating review document...');
 
-      const { doc, actualItemCount } = await createPriorityReviewDocument(plugin, config);
+      const { doc, actualItemCount, skippedPausedItems } = await createPriorityReviewDocument(plugin, config);
 
       // Wait for document to be fully created
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -88,10 +92,14 @@ function ReviewDocumentCreator() {
         setSuccessMessage(`✅ Successfully created review document with ${actualItemCount} items`);
       }
 
-      // Close the popup after a short delay so user sees the success message
-      setTimeout(() => {
-        plugin.widget.closePopup();
-      }, 2000);
+      setSkippedItems(skippedPausedItems);
+
+      // Auto-close only when there are no skipped items to review
+      if (skippedPausedItems.length === 0) {
+        setTimeout(() => {
+          plugin.widget.closePopup();
+        }, 2000);
+      }
 
     } catch (error) {
       console.error('Error creating review document:', error);
@@ -167,7 +175,7 @@ function ReviewDocumentCreator() {
   }
 
   return (
-    <div className="p-5 flex flex-col gap-4" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '800px', margin: '0 auto' }} onKeyDown={handleWrapperKeyDown}>
+    <div className="p-5 flex flex-col gap-4" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: '800px', margin: '0 auto', maxHeight: '90vh', overflowY: 'auto' }} onKeyDown={handleWrapperKeyDown}>
 
       {/* Header */}
       <div>
@@ -288,6 +296,25 @@ function ReviewDocumentCreator() {
         </button>
       </div>
 
+      {/* Paused Documents Filter */}
+      <div className="rn-clr-background-secondary rounded-lg p-4" style={{ border: '1px solid var(--rn-clr-border, #e5e7eb)' }}>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filterPaused}
+            onChange={(e) => setFilterPaused(e.target.checked)}
+            disabled={isCreating}
+            style={{ marginTop: '2px', flexShrink: 0 }}
+          />
+          <div>
+            <div className="font-semibold text-sm">Skip paused documents</div>
+            <div className="rn-clr-content-secondary text-xs mt-1">
+              Exclude flashcard rems from documents with Deck Status = "Paused". Skipped high-priority items will trigger a warning.
+            </div>
+          </div>
+        </label>
+      </div>
+
       {/* Info Box */}
       <div
         className="rounded-lg"
@@ -353,6 +380,34 @@ function ReviewDocumentCreator() {
       )}
       {successMessage && (
         <div style={{ color: '#10b981', fontSize: '14px' }}>{successMessage}</div>
+      )}
+
+      {skippedItems.length > 0 && (
+        <div style={{ padding: '12px', backgroundColor: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.45)', borderRadius: '8px', fontSize: '13px' }}>
+          <div style={{ fontWeight: 600, marginBottom: '6px' }}>
+            ⚠️ {skippedItems.length} flashcard rem{skippedItems.length !== 1 ? 's' : ''} skipped — inside paused documents
+            {skippedItems.some(i => i.priority < 20) && (
+              <span style={{ color: '#ef4444', marginLeft: '8px' }}>— includes HIGH PRIORITY items!</span>
+            )}
+          </div>
+          <div style={{ color: 'var(--rn-clr-content-secondary)', fontSize: '11px', marginBottom: '8px' }}>
+            These items were excluded from the review document. Consider unpausing their documents or reviewing them separately.
+          </div>
+          <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {skippedItems.map((item) => (
+              <div key={item.remId} style={{ display: 'flex', alignItems: 'baseline', gap: '8px', padding: '3px 0', borderBottom: '1px solid rgba(0,0,0,0.06)', fontSize: '12px', color: item.priority < 20 ? '#ef4444' : 'var(--rn-clr-content-primary)' }}>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600, flexShrink: 0 }}>P{item.priority}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || item.remId}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => plugin.widget.closePopup()}
+            style={{ marginTop: '10px', padding: '6px 14px', borderRadius: '6px', border: 'none', fontSize: '12px', cursor: 'pointer', backgroundColor: '#6b7280', color: 'white' }}
+          >
+            Close
+          </button>
+        </div>
       )}
     </div>
   );
