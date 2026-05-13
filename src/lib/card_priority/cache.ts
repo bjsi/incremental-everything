@@ -416,7 +416,7 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   console.log(`[Card Priority Cache] Found ${untaggedRemIds.length} untagged rems with cards for deferred processing`);
 
   if (enrichedTaggedPriorities.length > 0) {
-    await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} pre-tagged card priorities in ${phase1Time}s`);
+    await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} pre-tagged card priorities in ${totalTime}s`);
   }
 
   if (untaggedRemIds.length > 0) {
