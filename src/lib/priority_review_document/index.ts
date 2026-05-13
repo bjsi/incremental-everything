@@ -245,40 +245,12 @@ export async function createPriorityReviewDocument(
     true
   );
 
-  // Filter out rems inside paused documents when requested.
+  // Skipped paused items are collected lazily inside addCard as cards are pulled.
   // card.getAll() (used by the cache) returns cards for paused rems while
-  // rem.getCards() returns [] — so without this step paused past-due cards
-  // would appear in the PRD. We detect the paused state via the Deck powerup
-  // Status slot on the ancestor chain, which is reliable and requires no
-  // rem.getCards() call.
-  let skippedPausedItems: SkippedPausedItem[] = [];
-  let filteredCardsWithPriority = cardsWithPriority;
-
-  if (filterPaused && cardsWithPriority.length > 0) {
-    const pausedFlags = await Promise.all(
-      cardsWithPriority.map((item) => isInPausedDocument(item.rem))
-    );
-
-    filteredCardsWithPriority = cardsWithPriority.filter((_, i) => !pausedFlags[i]);
-    const skippedEntries = cardsWithPriority.filter((_, i) => pausedFlags[i]);
-
-    if (skippedEntries.length > 0) {
-      skippedPausedItems = (
-        await Promise.all(
-          skippedEntries.map(async (item) => ({
-            remId: item.rem._id,
-            name: await safeRemTextToString(plugin, item.rem.text),
-            priority: item.priority,
-          }))
-        )
-      ).sort((a, b) => a.priority - b.priority);
-
-      console.log(
-        `[PRD] Filtered ${skippedPausedItems.length} flashcard rems from paused documents:`,
-        skippedPausedItems.map((s) => `P${s.priority} — ${s.name} [${s.remId}]`)
-      );
-    }
-  }
+  // rem.getCards() returns [] — the Deck powerup Status slot is the reliable
+  // signal. We check only candidates actually considered for inclusion, so the
+  // list stays small and meaningful.
+  const skippedPausedItems: SkippedPausedItem[] = [];
 
   // --- DEBUG & FIX START ---
 
@@ -295,7 +267,7 @@ export async function createPriorityReviewDocument(
   // Safety merge: Identify cards that are Due but missing from the Universe Cache
   // This handles edge cases where getDueCardsWithPriorities logic differs slightly
   const universeRemIds = new Set(universeCardInfos.map(c => c.remId));
-  const missingCards = filteredCardsWithPriority.filter(c => !universeRemIds.has(c.rem._id));
+  const missingCards = cardsWithPriority.filter(c => !universeRemIds.has(c.rem._id));
 
   if (missingCards.length > 0) {
     // 2. Deduplicate missing items by RemId so we don't add the same Rem multiple times
@@ -334,7 +306,7 @@ export async function createPriorityReviewDocument(
   const cardRandomness = await getCardRandomness(plugin);
 
   const sortedIncRems = applySortingCriteria((dueIncRems as any[]), incRemRandomness);
-  const sortedCards = applySortingCriteria(filteredCardsWithPriority, cardRandomness);
+  const sortedCards = applySortingCriteria(cardsWithPriority, cardRandomness);
 
   // 5. Mix Items & Attach Pre-calculated Percentiles
   interface MixedItem {
@@ -385,6 +357,17 @@ export async function createPriorityReviewDocument(
 
     // Always advance past already-added rems so the caller can keep iterating
     if (addedRemIds.has(item.rem._id)) return true;
+
+    // Lazy paused-document check — only runs for cards actually pulled into
+    // consideration, so ancestor walks are bounded by how many cards we need.
+    if (filterPaused && await isInPausedDocument(item.rem)) {
+      skippedPausedItems.push({
+        remId: item.rem._id,
+        name: await safeRemTextToString(plugin, item.rem.text),
+        priority: item.priority,
+      });
+      return true; // advance index without adding to mixedItems
+    }
 
     // Lookup percentile with debug log if missing
     let percentile = cardPercentiles[item.rem._id];
@@ -466,6 +449,15 @@ export async function createPriorityReviewDocument(
     for (let i = 0; i < itemCount && i < sortedCards.length; i++) {
       await addCard(i);
     }
+  }
+
+  // 6. Finalise skipped list and log
+  if (skippedPausedItems.length > 0) {
+    skippedPausedItems.sort((a, b) => a.priority - b.priority);
+    console.log(
+      `[PRD] ${skippedPausedItems.length} flashcard rems skipped (paused documents):`,
+      skippedPausedItems.map((s) => `P${s.priority} — ${s.name} [${s.remId}]`)
+    );
   }
 
   // 6. Add metadata to document
