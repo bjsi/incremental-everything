@@ -333,8 +333,8 @@ function ReviewDocumentCreator() {
         </label>
       </div>
 
-      {/* Info Box */}
-      <div
+      {/* Info Box — hidden when warning panel is shown */}
+      {skippedItems.length === 0 && <div
         className="rounded-lg"
         style={{
           padding: '12px',
@@ -352,7 +352,7 @@ function ReviewDocumentCreator() {
         • Practice RemNote regular document-scope queue from this Priority Review document<br />
         • After finishing the review of all Cards/IncRems, delete the created document<br />
         • You can find all your Priority Review Documents searching for the tag "Priority Review Queue"
-      </div>
+      </div>}
 
       {/* Summary and Actions */}
       <div className="flex items-center gap-2 flex-wrap mt-1">
