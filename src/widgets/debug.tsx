@@ -12,6 +12,8 @@ import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
 import { getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
+import { safeRemTextToString } from '../lib/pdfUtils';
+import { powerupCode } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
@@ -90,6 +92,7 @@ function Debug() {
     deckRemId: string | null;
   } | null>(null);
   const [isComparing, setIsComparing] = useState(false);
+  const [isPdfDebugging, setIsPdfDebugging] = useState(false);
 
   if (!debugData) return null;
 
@@ -208,6 +211,100 @@ function Debug() {
     }
     console.log(`=================================================================\n`);
     await plugin.app.toast('Deep log printed to console! Please check Developer Tools.');
+  };
+
+  const handleDebugPDF = async () => {
+    if (!remId) return;
+    setIsPdfDebugging(true);
+    try {
+      const rootRem = await plugin.rem.findOne(remId);
+      if (!rootRem) { await plugin.app.toast('No rem found!'); return; }
+
+      const POWERUP_LABELS: [string, string][] = [
+        ['PDFHighlight', BuiltInPowerupCodes.PDFHighlight],
+        ['PDFPageNumber', BuiltInPowerupCodes.PDFPageNumber],
+        ['Highlight', BuiltInPowerupCodes.Highlight],
+        ['HTMLHighlight', BuiltInPowerupCodes.HTMLHighlight],
+        ['WebHighlight', BuiltInPowerupCodes.WebHighlight],
+        ['UploadedFile', BuiltInPowerupCodes.UploadedFile],
+        ['Document', BuiltInPowerupCodes.Document],
+        ['Deck', BuiltInPowerupCodes.Deck],
+        ['Header', BuiltInPowerupCodes.Header],
+        ['Link', BuiltInPowerupCodes.Link],
+        ['Sources', BuiltInPowerupCodes.Sources],
+        ['ImportedDocument', BuiltInPowerupCodes.ImportedDocument],
+        ['DisableCards', BuiltInPowerupCodes.DisableCards],
+        ['UsedAsTag', BuiltInPowerupCodes.UsedAsTag],
+        ['Incremental', powerupCode],
+      ];
+
+      interface RemNode {
+        id: string;
+        name: string;
+        parentId: string | null;
+        depth: number;
+        powerups: string[];
+        tags: string[];
+        highlightData: string | null;
+      }
+
+      const nodes: RemNode[] = [];
+      const MAX_NODES = 600;
+
+      const collectNodes = async (currentRem: any, depth: number, parentId: string | null) => {
+        if (nodes.length >= MAX_NODES) return;
+
+        const name = await safeRemTextToString(plugin, currentRem.text);
+
+        const activePowerups: string[] = [];
+        for (const [label, code] of POWERUP_LABELS) {
+          if (await currentRem.hasPowerup(code)) activePowerups.push(label);
+        }
+
+        const tagRems = await currentRem.getTagRems();
+        const tags: string[] = await Promise.all(
+          tagRems.map((t: any) => safeRemTextToString(plugin, t.text))
+        );
+
+        let highlightData: string | null = null;
+        if (activePowerups.includes('PDFHighlight')) {
+          try {
+            const raw = await currentRem.getPowerupProperty(BuiltInPowerupCodes.PDFHighlight, 'Data');
+            highlightData = raw ? String(raw) : null;
+          } catch { /* ignore */ }
+        }
+
+        nodes.push({ id: currentRem._id, name, parentId, depth, powerups: activePowerups, tags, highlightData });
+
+        const children = await currentRem.getChildrenRem();
+        for (const child of children) {
+          await collectNodes(child, depth + 1, currentRem._id);
+        }
+      };
+
+      await collectNodes(rootRem, 0, null);
+
+      const indent = (depth: number) => '  '.repeat(depth);
+      const treeLines: string[] = [];
+      for (const node of nodes) {
+        const pwStr = node.powerups.length ? ` [${node.powerups.join(', ')}]` : '';
+        const tagStr = node.tags.length ? ` #tags:[${node.tags.join(', ')}]` : '';
+        const dataStr = node.highlightData ? ` DATA:${node.highlightData.slice(0, 80)}` : '';
+        treeLines.push(`${indent(node.depth)}• "${node.name}" (${node.id})${pwStr}${tagStr}${dataStr}`);
+      }
+
+      console.log(`\n========== PDF TREE DEBUG: "${await safeRemTextToString(plugin, rootRem.text)}" (${remId}) ==========`);
+      console.log(`Total nodes collected: ${nodes.length}${nodes.length >= MAX_NODES ? ' (TRUNCATED at limit)' : ''}`);
+      console.log('\n--- TREE VIEW ---');
+      console.log(treeLines.join('\n'));
+      console.log('\n--- RAW JSON ---');
+      console.log(JSON.stringify(nodes, null, 2));
+      console.log('===========================================\n');
+
+      await plugin.app.toast(`PDF Debug: ${nodes.length} nodes logged to console. Open DevTools to inspect.`);
+    } finally {
+      setIsPdfDebugging(false);
+    }
   };
 
   const handleSanitize = async () => {
@@ -433,6 +530,21 @@ function Debug() {
             } />
           </div>
         )}
+      </div>
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          PDF Structure Debug
+          <button
+            onClick={handleDebugPDF}
+            disabled={isPdfDebugging}
+            style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isPdfDebugging ? 'wait' : 'pointer' }}
+          >
+            {isPdfDebugging ? 'Scanning…' : 'Debug PDF'}
+          </button>
+        </h2>
+        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)' }}>
+          Opens the focused rem's full descendant tree in the console — remIDs, powerups, tags, and highlight data. Run on a working PDF and a broken one to compare structures.
+        </div>
       </div>
     </div>
   );
