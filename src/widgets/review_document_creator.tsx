@@ -5,7 +5,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPriorityReviewDocument, SkippedPausedItem } from '../lib/priority_review_document';
-import { getCardsPerRem } from '../lib/sorting';
+import { getCardsPerRem, getSortingPresets, setSortingRandomness, setCardRandomness, setCardsPerRem, SortingPreset } from '../lib/sorting';
 
 function ReviewDocumentCreator() {
   const plugin = usePlugin();
@@ -25,6 +25,9 @@ function ReviewDocumentCreator() {
     []
   );
 
+  const savedPresets = useTrackerPlugin(async (rp) => await getSortingPresets(rp), []);
+  const presets = savedPresets ?? [];
+
   // Form state
   const [itemCount, setItemCount] = useState(50);
   const [useFullKB, setUseFullKB] = useState(false);
@@ -35,6 +38,7 @@ function ReviewDocumentCreator() {
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [skippedItems, setSkippedItems] = useState<SkippedPausedItem[]>([]);
   const [focusedSection, setFocusedSection] = useState<'scope' | 'number' | null>(null);
+  const [pendingPreset, setPendingPreset] = useState<SortingPreset | null>(null);
 
   const scopeFirstRadioRef = useRef<HTMLInputElement>(null);
   const scopeSecondRadioRef = useRef<HTMLInputElement>(null);
@@ -278,6 +282,69 @@ function ReviewDocumentCreator() {
         >
           {ratioToLabel(flashcardRatio)}
         </div>
+
+        {presets.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => {
+              const preset = presets.find((p) => p.name === e.target.value);
+              if (preset) setPendingPreset(preset);
+            }}
+            disabled={isCreating}
+            className="text-xs px-2 py-1 rounded mb-3 w-full"
+            style={{
+              border: '1px solid var(--rn-clr-border, #e5e7eb)',
+              backgroundColor: 'var(--rn-clr-background-primary)',
+              color: 'var(--rn-clr-content-primary)',
+            }}
+          >
+            <option value="">— apply a sorting preset —</option>
+            {presets.map((p) => (
+              <option key={p.name} value={p.name}>{p.name}</option>
+            ))}
+          </select>
+        )}
+
+        {pendingPreset && (
+          <div
+            style={{
+              padding: '10px 12px',
+              marginBottom: '12px',
+              backgroundColor: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.45)',
+              borderRadius: '6px',
+              fontSize: '13px',
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: '6px' }}>
+              Apply preset "{pendingPreset.name}"?
+            </div>
+            <div className="rn-clr-content-secondary" style={{ fontSize: '12px', marginBottom: '10px' }}>
+              This will permanently update your global sorting criteria settings.
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  await setSortingRandomness(plugin, pendingPreset.randomness);
+                  await setCardRandomness(plugin, pendingPreset.cardRandomness);
+                  await setCardsPerRem(plugin, pendingPreset.cardsPerRem);
+                  setPendingPreset(null);
+                  await plugin.app.toast(`Applied preset "${pendingPreset.name}"`);
+                }}
+                style={{ padding: '5px 14px', borderRadius: '4px', border: 'none', fontSize: '12px', cursor: 'pointer', backgroundColor: '#3b82f6', color: 'white', fontWeight: 600 }}
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setPendingPreset(null)}
+                style={{ padding: '5px 14px', borderRadius: '4px', border: 'none', fontSize: '12px', cursor: 'pointer', backgroundColor: '#6b7280', color: 'white' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         <button
           onClick={handleOpenSortingSettings}
           style={{

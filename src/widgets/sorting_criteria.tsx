@@ -108,6 +108,17 @@ export function SortingCriteria() {
     }
   }, [storedCards]);
 
+  useEffect(() => {
+    if (sortingRandomness === undefined || cardRandomness === undefined || storedCards === undefined) return;
+    const match = (savedPresets ?? []).find(
+      (p) =>
+        p.randomness === sortingRandomness &&
+        p.cardRandomness === cardRandomness &&
+        p.cardsPerRem === storedCards
+    );
+    setSelectedPresetName(match?.name ?? '');
+  }, [sortingRandomness, cardRandomness, storedCards, savedPresets]);
+
   // --- EVENT HANDLER ---
   const handleSliderChange = (value: number) => {
     setSliderValue(value);
@@ -116,8 +127,7 @@ export function SortingCriteria() {
 
   const handleLoadPreset = async (name: string) => {
     const preset = presets.find(p => p.name === name);
-    if (!preset) { setSelectedPresetName(''); return; }
-    setSelectedPresetName(name);
+    if (!preset) return;
     await setSortingRandomness(plugin, preset.randomness);
     await setCardRandomness(plugin, preset.cardRandomness);
     await setCardsPerRem(plugin, preset.cardsPerRem);
@@ -136,14 +146,12 @@ export function SortingCriteria() {
     const updated = [...presets.filter(p => p.name !== name), preset];
     await setSortingPresets(plugin, updated);
     setNewPresetName('');
-    setSelectedPresetName(name);
     await plugin.app.toast(`Saved preset "${name}"`);
   };
 
   const handleDeletePreset = async (name: string) => {
     const updated = presets.filter(p => p.name !== name);
     await setSortingPresets(plugin, updated);
-    setSelectedPresetName('');
     await plugin.app.toast(`Deleted preset "${name}"`);
   };
 
