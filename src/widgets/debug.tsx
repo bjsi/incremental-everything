@@ -11,7 +11,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
-import { getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems } from '../lib/card_priority/batch';
+import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { powerupCode } from '../lib/consts';
@@ -492,6 +492,52 @@ function Debug() {
     }
   };
 
+  const handleCleanDescendants = async () => {
+    if (!rem) return;
+    await plugin.app.toast('Scanning descendants for cardPriority tags on non-flashcard Rems...');
+    const candidates = await findNonFlashcardDescendantsWithCardPriority(plugin, rem);
+
+    if (candidates.length === 0) {
+      await plugin.app.toast('No non-flashcard descendants with cardPriority found.');
+      return;
+    }
+
+    const CHUNK_SIZE = 20;
+    let totalCleaned = 0;
+
+    for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
+      const chunk = candidates.slice(i, i + CHUNK_SIZE);
+      const listString = chunk.map((r: any) => `- ${r.name}`).join('\n');
+      const chunkMsg = candidates.length > CHUNK_SIZE
+        ? ` (Batch ${Math.floor(i / CHUNK_SIZE) + 1} of ${Math.ceil(candidates.length / CHUNK_SIZE)})`
+        : '';
+
+      const confirmed = confirm(
+        `Found ${candidates.length} descendant Rem(s) with cardPriority but no flashcards.\n\n` +
+        `This will remove the cardPriority powerup (and its slots) from ${chunk.length} of them${chunkMsg}:\n\n` +
+        `${listString}\n\nContinue?`
+      );
+
+      if (!confirmed) {
+        if (totalCleaned > 0) {
+          await plugin.app.toast(`Aborted. Cleaned ${totalCleaned} descendant(s) total.`);
+        }
+        return;
+      }
+
+      await plugin.app.toast(`Cleaning ${chunk.length} descendant(s)...`);
+      const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map((r: any) => r.id));
+      if (result.success) {
+        totalCleaned += result.cleanedCount;
+      } else {
+        await plugin.app.toast('Cleanup failed during batch. Check console.');
+        return;
+      }
+    }
+
+    await plugin.app.toast(`Done! Cleaned ${totalCleaned} non-flashcard descendant(s).`);
+  };
+
   const handleSanitize = async () => {
     if (!hasSpuriousTags) return;
     
@@ -608,20 +654,37 @@ function Debug() {
         <div style={{ marginTop: '16px' }}>
            <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
              Card Priority Powerup
-             <button
-               onClick={handleSanitize}
-               style={{
-                 fontSize: '11px',
-                 padding: '2px 8px',
-                 backgroundColor: 'var(--rn-clr-background-warning)',
-                 color: 'var(--rn-clr-content-warning)',
-                 border: '1px solid var(--rn-clr-border-warning)',
-                 borderRadius: '4px',
-                 cursor: 'pointer'
-               }}
-             >
-               Sanitize Rogue Tags
-             </button>
+             <div style={{ display: 'flex', gap: '6px' }}>
+               <button
+                 onClick={handleCleanDescendants}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-warning)',
+                   color: 'var(--rn-clr-content-warning)',
+                   border: '1px solid var(--rn-clr-border-warning)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="Scan all descendants of this Rem and remove cardPriority from non-flashcard Rems"
+               >
+                 Clean Descendants (No Cards)
+               </button>
+               <button
+                 onClick={handleSanitize}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-warning)',
+                   color: 'var(--rn-clr-content-warning)',
+                   border: '1px solid var(--rn-clr-border-warning)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+               >
+                 Sanitize Rogue Tags
+               </button>
+             </div>
            </h2>
            {hasSpuriousTags && (
              <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--rn-clr-border-warning)' }}>

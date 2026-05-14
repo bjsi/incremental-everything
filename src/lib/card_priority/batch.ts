@@ -675,6 +675,62 @@ export async function removeCardPriorityFromSpecificRems(plugin: RNPlugin, remId
   }
 }
 
+/**
+ * Walks ALL descendants of `rem` and returns content Rems (not properties/slots)
+ * that have the cardPriority powerup but no flashcards. IncRems are excluded.
+ *
+ * Complements getSpuriousCardPriorityTags (which only inspects property/slot
+ * nodes among direct children) by catching real content Rems anywhere in the
+ * subtree that picked up a spurious cardPriority tag (e.g. from a cascade run).
+ */
+export async function findNonFlashcardDescendantsWithCardPriority(
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<RogueTagResult[]> {
+  const results: RogueTagResult[] = [];
+  const descendants = await rem.getDescendants();
+  console.log(`[NonFlashcardDescendants] Scanning ${descendants.length} descendants of ${rem._id}`);
+
+  // Build an authoritative set of remIds that own cards by querying the global
+  // card index once. rem.getCards() is known to miss certain card types
+  // (e.g. multi-line concept/property flashcards, some cloze variants) — the
+  // existing Card API Comparison in the Debug widget exists specifically to
+  // surface this discrepancy. Using card.getAll() avoids false positives where
+  // a real flashcard-bearing Rem would be flagged for removal.
+  const allCards = (await plugin.card.getAll()) || [];
+  const remIdsWithCards = new Set<string>();
+  for (const c of allCards) {
+    if (c.remId) remIdsWithCards.add(c.remId);
+  }
+  console.log(`[NonFlashcardDescendants] Indexed ${remIdsWithCards.size} card-bearing Rems out of ${allCards.length} total cards`);
+
+  for (const descendant of descendants) {
+    const hasCardPriority = await descendant.hasPowerup('cardPriority');
+    if (!hasCardPriority) continue;
+
+    // Skip property/slot rems — handled by the existing Sanitize Rogue Tags flow.
+    const isProp = await descendant.isProperty();
+    const isPowerupProp = await descendant.isPowerupProperty();
+    if (isProp || isPowerupProp) continue;
+
+    // Authoritative card check: skip if either index reports a card for this rem.
+    if (remIdsWithCards.has(descendant._id)) continue;
+    const cards = await descendant.getCards();
+    if (cards && cards.length > 0) continue;
+
+    // We intentionally do NOT skip IncRems: if an IncRem has no flashcards,
+    // its cardPriority tag is still spurious (there's no card for it to apply to).
+    const name = await safeRemTextToString(plugin, descendant.text);
+    results.push({
+      id: descendant._id,
+      name: (name || '(untitled)').slice(0, 120),
+    });
+  }
+
+  console.log(`[NonFlashcardDescendants] Found ${results.length} non-flashcard descendants with cardPriority`);
+  return results;
+}
+
 export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
   await plugin.app.toast('Scanning knowledge base for rogue CardPriority tags...');
   
