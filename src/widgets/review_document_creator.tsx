@@ -5,7 +5,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPriorityReviewDocument, SkippedPausedItem } from '../lib/priority_review_document';
-import { getCardsPerRem, getSortingPresets, setSortingRandomness, setCardRandomness, setCardsPerRem, SortingPreset } from '../lib/sorting';
+import { getCardsPerRem, getSortingRandomness, getCardRandomness, getSortingPresets, setSortingRandomness, setCardRandomness, setCardsPerRem, SortingPreset, DEFAULT_RANDOMNESS, DEFAULT_CARD_RANDOMNESS } from '../lib/sorting';
 
 function ReviewDocumentCreator() {
   const plugin = usePlugin();
@@ -24,6 +24,9 @@ function ReviewDocumentCreator() {
     async (rp) => await getCardsPerRem(rp),
     []
   );
+
+  const sortingRandomness = useTrackerPlugin(async (rp) => await getSortingRandomness(rp), []);
+  const cardRandomness = useTrackerPlugin(async (rp) => await getCardRandomness(rp), []);
 
   const savedPresets = useTrackerPlugin(async (rp) => await getSortingPresets(rp), []);
   const presets = savedPresets ?? [];
@@ -59,7 +62,13 @@ function ReviewDocumentCreator() {
   const ratioToLabel = (ratio: number | 'no-cards' | 'no-rem'): string => {
     if (ratio === 'no-cards') return 'Only Incremental Rems';
     if (ratio === 'no-rem') return 'Only Flashcards';
-    return `${ratio} flashcard${ratio !== 1 ? 's' : ''} for every incremental rem`;
+    return `${ratio} flashcard${ratio !== 1 ? 's' : ''} per inc rem`;
+  };
+
+  const randomnessToLabel = (r: number): string => {
+    const pct = r * 100;
+    const display = pct > 0 && pct < 1 ? pct.toFixed(1) : Math.round(pct).toString();
+    return `${display}% swapped`;
   };
 
   const handleCreate = async () => {
@@ -316,10 +325,27 @@ function ReviewDocumentCreator() {
               fontSize: '13px',
             }}
           >
-            <div style={{ fontWeight: 600, marginBottom: '6px' }}>
+            <div style={{ fontWeight: 600, marginBottom: '8px' }}>
               Apply preset "{pendingPreset.name}"?
             </div>
-            <div className="rn-clr-content-secondary" style={{ fontSize: '12px', marginBottom: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px 12px', fontSize: '11px', marginBottom: '10px' }}>
+              <div style={{ fontWeight: 600, color: 'var(--rn-clr-content-secondary)' }}></div>
+              <div style={{ fontWeight: 600, color: 'var(--rn-clr-content-secondary)' }}>Current</div>
+              <div style={{ fontWeight: 600, color: 'var(--rn-clr-content-secondary)' }}>New</div>
+
+              <div style={{ color: 'var(--rn-clr-content-secondary)' }}>Flashcard ratio</div>
+              <div>{ratioToLabel(flashcardRatio!)}</div>
+              <div style={{ fontWeight: 600 }}>{ratioToLabel(pendingPreset.cardsPerRem)}</div>
+
+              <div style={{ color: 'var(--rn-clr-content-secondary)' }}>IncRem randomness</div>
+              <div>{randomnessToLabel(sortingRandomness ?? DEFAULT_RANDOMNESS)}</div>
+              <div style={{ fontWeight: 600 }}>{randomnessToLabel(pendingPreset.randomness)}</div>
+
+              <div style={{ color: 'var(--rn-clr-content-secondary)' }}>Flashcard randomness</div>
+              <div>{randomnessToLabel(cardRandomness ?? DEFAULT_CARD_RANDOMNESS)}</div>
+              <div style={{ fontWeight: 600 }}>{randomnessToLabel(pendingPreset.cardRandomness)}</div>
+            </div>
+            <div className="rn-clr-content-secondary" style={{ fontSize: '11px', marginBottom: '10px', fontStyle: 'italic' }}>
               This will permanently update your global sorting criteria settings.
             </div>
             <div className="flex gap-2">
