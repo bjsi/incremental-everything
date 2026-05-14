@@ -31,6 +31,16 @@ function ReviewDocumentCreator() {
   const savedPresets = useTrackerPlugin(async (rp) => await getSortingPresets(rp), []);
   const presets = savedPresets ?? [];
 
+  const activePresetName =
+    sortingRandomness !== undefined && cardRandomness !== undefined && flashcardRatio !== undefined
+      ? presets.find(
+          (p) =>
+            p.randomness === sortingRandomness &&
+            p.cardRandomness === cardRandomness &&
+            p.cardsPerRem === flashcardRatio
+        )?.name ?? null
+      : null;
+
   // Form state
   const [itemCount, setItemCount] = useState(50);
   const [useFullKB, setUseFullKB] = useState(false);
@@ -280,7 +290,14 @@ function ReviewDocumentCreator() {
 
       {/* Content Mix - READ ONLY with Settings Button */}
       <div className="rn-clr-background-secondary rounded-lg p-4" style={{ border: '1px solid var(--rn-clr-border, #e5e7eb)' }}>
-        <div className="font-semibold mb-3">Content Mix (from Sorting Criteria)</div>
+        <div className="flex items-baseline gap-2 mb-3">
+          <div className="font-semibold">Content Mix (from Sorting Criteria)</div>
+          {activePresetName && (
+            <div className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+              preset: <span style={{ fontWeight: 600, color: 'var(--rn-clr-content-primary)' }}>{activePresetName}</span>
+            </div>
+          )}
+        </div>
         <div
           className="rn-clr-background rn-clr-content-primary rounded mb-3"
           style={{
