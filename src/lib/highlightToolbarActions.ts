@@ -117,10 +117,10 @@ export async function handleToggleIncremental(
     return false;
   }
 
-  await initIncrementalRem(plugin as any, rem);
-
   const { pdfRemId: docId, pageIndex } = await getPdfInfoFromHighlight(plugin as any, rem);
-  const contextRemId = await resolveContextRemId(plugin, docId, { checkEditorTimer: false });
+  const contextRemId = await resolveContextRemId(plugin, docId, { checkEditorTimer: true });
+
+  await initIncrementalRem(plugin as any, rem, { explicitParentId: contextRemId ?? undefined });
 
   if (contextRemId && docId) {
     try {

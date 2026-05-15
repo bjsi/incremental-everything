@@ -34,7 +34,6 @@ function EditorReviewTimer() {
   // button and addPageToHistory's page argument.
   const [hostRemId, setHostRemId] = useState<string | null>(null);
   const [hostKind, setHostKind] = useState<'pdf' | 'html' | null>(null);
-  const [bookmarkHighlightId, setBookmarkHighlightId] = useState<string | null>(null);
   // PDFs available on the timer's IncRem. When length > 1 a small switcher
   // appears next to the page controls.
   const [pdfOptions, setPdfOptions] = useState<Array<{ remId: string; name: string; isPreferred: boolean }>>([]);
@@ -108,7 +107,6 @@ function EditorReviewTimer() {
         setPdfRemId(null);
         setHostRemId(null);
         setHostKind(null);
-        setBookmarkHighlightId(null);
         setPdfOptions([]);
         return;
       }
@@ -128,13 +126,9 @@ function EditorReviewTimer() {
       if (host) {
         setHostRemId(host._id);
         setHostKind(pdfRem ? 'pdf' : 'html');
-        const history = await getPageHistory(plugin, timerData.remId, host._id);
-        const lastEntry = history[history.length - 1];
-        setBookmarkHighlightId(lastEntry?.highlightId ?? null);
       } else {
         setHostRemId(null);
         setHostKind(null);
-        setBookmarkHighlightId(null);
       }
 
       // Populate PDF selector options (shown only when >1 PDF)
@@ -169,10 +163,21 @@ function EditorReviewTimer() {
     setHostKind('pdf');
     setIsPdfNote(true);
 
-    const history = await getPageHistory(plugin, timerData.remId, newPdfId);
-    const lastEntry = history[history.length - 1];
-    setBookmarkHighlightId(lastEntry?.highlightId ?? null);
   }, [plugin, timerData?.remId, pdfRemId]);
+
+  // Reactively track the latest bookmark highlight from page history so the
+  // Scroll button appears as soon as handleCreateExtract (or any other path)
+  // writes a new entry via addPageToHistory → setSynced. A plain useEffect
+  // would only run on mount and miss mid-session writes.
+  const bookmarkHighlightId = useTrackerPlugin(
+    async (rp) => {
+      if (!timerData?.remId || !hostRemId) return null;
+      const history = await getPageHistory(rp as any, timerData.remId, hostRemId);
+      const lastEntry = history[history.length - 1];
+      return lastEntry?.highlightId ?? null;
+    },
+    [timerData?.remId, hostRemId]
+  ) ?? null;
 
   const isPaused = !!(timerData?.pausedAt);
 
