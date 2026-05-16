@@ -173,34 +173,50 @@ function EditorReviewTimer() {
 
   }, [plugin, timerData?.remId, pdfRemId]);
 
-  // Reactively track the latest bookmark highlight across PDF and HTML histories
-  // so the Scroll button appears whether the bookmark was saved in PDF reader
-  // mode or Text Reader (HTML) mode. Returns the most-recent entry with a
-  // highlightId and the host rem ID it belongs to.
+  // Reactively track the latest bookmark highlight across PDF and HTML histories.
+  // Host rem ID is resolved INSIDE the tracker (not from React state) so the
+  // tracker subscribes to the active-PDF synced key and re-fires correctly.
+  // Using React state (hostRemId) as a dep would cause the tracker to run once
+  // with hostRemId=null (before loadHostData completes), subscribe to nothing,
+  // and never re-fire — making existing bookmarks invisible until a new one
+  // is saved mid-session.
   const bookmarkInfo = useTrackerPlugin(
     async (rp) => {
       if (!timerData?.remId) return null;
+
+      const rem = await rp.rem.findOne(timerData.remId);
+      if (!rem) return null;
+
       let best: { highlightId: string; hostRemId: string; timestamp: number } | null = null;
 
-      if (hostRemId) {
-        const history = await getPageHistory(rp as any, timerData.remId, hostRemId);
+      // PDF history — resolving via getActivePdfForIncRem subscribes the tracker
+      // to the active-PDF synced key so it re-fires on host changes.
+      const pdfRem = await getActivePdfForIncRem(rp as any, rem);
+      if (pdfRem) {
+        const history = await getPageHistory(rp as any, timerData.remId, pdfRem._id);
         const last = history[history.length - 1];
+        console.log('[EditorReviewTimer] bookmarkInfo tracker — PDF history', { remId: timerData.remId, pdfRemId: pdfRem._id, historyLength: history.length, lastEntry: last });
         if (last?.highlightId) {
-          best = { highlightId: last.highlightId, hostRemId, timestamp: last.timestamp };
+          best = { highlightId: last.highlightId, hostRemId: pdfRem._id, timestamp: last.timestamp };
         }
       }
 
-      if (htmlRemId && htmlRemId !== hostRemId) {
-        const htmlHistory = await getPageHistory(rp as any, timerData.remId, htmlRemId);
+      // HTML (Text Reader) history — check even when a PDF is present, bookmarks
+      // saved in Text Reader mode are stored under the HTML rem's history key.
+      const htmlRem = await findHTMLinRem(rp as any, rem);
+      if (htmlRem && htmlRem._id !== pdfRem?._id) {
+        const htmlHistory = await getPageHistory(rp as any, timerData.remId, htmlRem._id);
         const last = htmlHistory[htmlHistory.length - 1];
+        console.log('[EditorReviewTimer] bookmarkInfo tracker — HTML history', { htmlRemId: htmlRem._id, historyLength: htmlHistory.length, lastEntry: last });
         if (last?.highlightId && (!best || last.timestamp > best.timestamp)) {
-          best = { highlightId: last.highlightId, hostRemId: htmlRemId, timestamp: last.timestamp };
+          best = { highlightId: last.highlightId, hostRemId: htmlRem._id, timestamp: last.timestamp };
         }
       }
 
+      console.log('[EditorReviewTimer] bookmarkInfo result', best);
       return best;
     },
-    [timerData?.remId, hostRemId, htmlRemId]
+    [timerData?.remId]
   ) ?? null;
 
   const bookmarkHighlightId = bookmarkInfo?.highlightId ?? null;

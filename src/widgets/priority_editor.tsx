@@ -386,13 +386,18 @@ export function PriorityEditor() {
           {hostKind === 'pdf' && hostPdfRemId && (() => {
             const last = pdfHistory?.[pdfHistory.length - 1];
             const hasPage = typeof last?.page === 'number';
-            // Check both PDF and HTML (Text Reader) histories for a bookmark icon
-            const hasBookmark = !!last?.highlightId || htmlHistory.some(e => e.highlightId);
+            // Fresh = last entry itself has a highlightId.
+            // Stale = an older entry has a highlightId but last doesn't.
+            const lastHasBookmark = !!last?.highlightId;
+            const hasAnyBookmark = lastHasBookmark
+              || pdfHistory.some(e => e.highlightId)
+              || htmlHistory.some(e => e.highlightId);
+            const isStaleBookmark = !lastHasBookmark && hasAnyBookmark;
             const hasRange = !!pdfRange;
-            const hasAnyState = hasRange || hasPage || hasBookmark;
+            const hasAnyState = hasRange || hasPage || hasAnyBookmark;
             const titleParts = [
               hasRange ? `p.${pdfRange!.start}–${pdfRange!.end || '∞'}` : null,
-              hasBookmark ? 'saved bookmark' : null,
+              hasAnyBookmark ? (isStaleBookmark ? 'stale bookmark' : 'saved bookmark') : null,
             ].filter(Boolean);
             const title = titleParts.length > 0
               ? `PDF: ${titleParts.join(' · ')}`
@@ -412,11 +417,15 @@ export function PriorityEditor() {
               >
                 📄
                 {hasRange && ` p.${pdfRange!.start}–${pdfRange!.end || '∞'}`}
-                {(hasPage || hasBookmark) && (
+                {(hasPage || hasAnyBookmark) && (
                   <span style={{ color: '#10b981', marginLeft: '2px' }}>
                     {hasPage && `(${last!.page})`}
-                    {hasPage && hasBookmark && ' '}
-                    {hasBookmark && '🔖'}
+                    {hasPage && hasAnyBookmark && ' '}
+                    {hasAnyBookmark && (
+                      <span style={{ opacity: isStaleBookmark ? 0.5 : 1 }} title={isStaleBookmark ? 'Stale bookmark — a newer page-only record exists' : undefined}>
+                        🔖
+                      </span>
+                    )}
                   </span>
                 )}
                 {!hasAnyState && ' —'}
@@ -795,11 +804,14 @@ export function PriorityEditor() {
                 </div>
               )}
 
-              {/* Scroll to Bookmark — checks both PDF and HTML (Text Reader) histories
-                  so bookmarks saved in either reading mode surface this button. Uses
-                  the most-recent entry with a highlightId across both sources. */}
+              {/* Scroll to Bookmark — checks both PDF and HTML (Text Reader) histories.
+                  Shows even when bookmark is stale (newer page-only record exists),
+                  with a dimmed style and tooltip warning to signal staleness. */}
               {(() => {
-                // Find the most recent bookmark across PDF and HTML (Text Reader) histories.
+                const lastPdfEntry = pdfHistory[pdfHistory.length - 1];
+                const lastHtmlEntry = htmlHistory[htmlHistory.length - 1];
+                const lastEntryIsBookmark = !!lastPdfEntry?.highlightId || !!lastHtmlEntry?.highlightId;
+
                 let bestHighlightId: string | null = null;
                 let bestHostRemId: string | null = hostPdfRemId;
                 let bestTs = -1;
@@ -810,6 +822,7 @@ export function PriorityEditor() {
                   if (e.highlightId && e.timestamp > bestTs) { bestTs = e.timestamp; bestHighlightId = e.highlightId; bestHostRemId = secondaryHtmlRemId; }
                 }
                 if (!bestHighlightId) return null;
+                const isStale = !lastEntryIsBookmark;
                 const bookmarkHighlightId = bestHighlightId;
                 const bookmarkHost = bestHostRemId;
                 return (
@@ -825,12 +838,15 @@ export function PriorityEditor() {
                     className="w-full mt-2 py-1 rounded text-[11px] font-semibold transition-colors"
                     style={{
                       backgroundColor: 'var(--rn-clr-background-secondary)',
-                      color: 'var(--rn-clr-blue, #3b82f6)',
-                      border: '2px solid var(--rn-clr-blue, #3b82f6)',
+                      color: isStale ? 'var(--rn-clr-content-tertiary)' : 'var(--rn-clr-blue, #3b82f6)',
+                      border: `2px solid ${isStale ? 'var(--rn-clr-border-primary)' : 'var(--rn-clr-blue, #3b82f6)'}`,
+                      opacity: isStale ? 0.7 : 1,
                     }}
-                    title="Scroll to Bookmark: Open the PDF and jump to your last saved reading position"
+                    title={isStale
+                      ? '⚠️ Stale bookmark — a newer page-only record exists. Scrolls to last saved highlight position.'
+                      : 'Scroll to Bookmark: Open the PDF and jump to your last saved reading position'}
                   >
-                    🔖 Scroll to Position
+                    🔖 {isStale ? 'Scroll (stale)' : 'Scroll to Position'}
                   </button>
                 );
               })()}
