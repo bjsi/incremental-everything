@@ -1339,7 +1339,6 @@ export const findHTMLinRem = async (
 
   // Check sources
   const sources = await rem.getSources();
-  console.log(`    [findHTMLinRem] Checking ${sources.length} sources`);
 
   const foundHtmlLinks: PluginRem[] = [];
 

@@ -223,8 +223,6 @@ export function PriorityEditor() {
           ? getPageHistory(plugin as any, remId, secondaryHtmlRemId)
           : Promise.resolve([] as PageHistoryEntry[]),
       ]);
-      console.log('[PriorityEditor] Fetched host history',
-        { incRemId: remId, hostRemId: hostPdfRemId, hostKind, historyLength: history.length, htmlHistoryLength: htmlHistory.length, lastEntry: history[history.length - 1] });
       return { pdfRange: range, pdfHistory: history, pdfStats: stats as any, htmlHistory };
     },
     [remId, hostPdfRemId, hostKind, secondaryHtmlRemId]

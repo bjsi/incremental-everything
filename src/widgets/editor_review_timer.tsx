@@ -195,7 +195,6 @@ function EditorReviewTimer() {
       if (pdfRem) {
         const history = await getPageHistory(rp as any, timerData.remId, pdfRem._id);
         const last = history[history.length - 1];
-        console.log('[EditorReviewTimer] bookmarkInfo tracker — PDF history', { remId: timerData.remId, pdfRemId: pdfRem._id, historyLength: history.length, lastEntry: last });
         if (last?.highlightId) {
           best = { highlightId: last.highlightId, hostRemId: pdfRem._id, timestamp: last.timestamp };
         }
@@ -207,13 +206,11 @@ function EditorReviewTimer() {
       if (htmlRem && htmlRem._id !== pdfRem?._id) {
         const htmlHistory = await getPageHistory(rp as any, timerData.remId, htmlRem._id);
         const last = htmlHistory[htmlHistory.length - 1];
-        console.log('[EditorReviewTimer] bookmarkInfo tracker — HTML history', { htmlRemId: htmlRem._id, historyLength: htmlHistory.length, lastEntry: last });
         if (last?.highlightId && (!best || last.timestamp > best.timestamp)) {
           best = { highlightId: last.highlightId, hostRemId: htmlRem._id, timestamp: last.timestamp };
         }
       }
 
-      console.log('[EditorReviewTimer] bookmarkInfo result', best);
       return best;
     },
     [timerData?.remId]
