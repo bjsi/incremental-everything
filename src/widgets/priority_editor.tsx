@@ -73,7 +73,7 @@ export function PriorityEditor() {
   // `remId` (+ pinRefreshCounter) to avoid refetching when the card priority
   // cache flushes — host structure doesn't change with priority.
   type HostInfo =
-    | { hostKind: 'pdf'; pdfOptions: Array<{ remId: string; name: string; isPreferred: boolean }>; activePdfId: string | null; htmlRemId: null; htmlRemName: null }
+    | { hostKind: 'pdf'; pdfOptions: Array<{ remId: string; name: string; isPreferred: boolean }>; activePdfId: string | null; htmlRemId: string | null; htmlRemName: string | null }
     | { hostKind: 'html'; pdfOptions: []; activePdfId: null; htmlRemId: string; htmlRemName: string | null }
     | { hostKind: null; pdfOptions: []; activePdfId: null; htmlRemId: null; htmlRemName: null };
 
@@ -93,12 +93,16 @@ export function PriorityEditor() {
         }))
       );
       const activePdf = await getActivePdfForIncRem(plugin as any, rem);
+      // Also resolve the HTML rem — bookmarks saved in Text Reader mode are
+      // stored under the HTML rem's history key even when a PDF is present.
+      const htmlRem = await findHTMLinRem(plugin as any, rem);
+      const htmlRemName = htmlRem?.text ? await safeRemTextToString(plugin as any, htmlRem.text) : null;
       return {
         hostKind: 'pdf',
         pdfOptions,
         activePdfId: activePdf?._id ?? null,
-        htmlRemId: null,
-        htmlRemName: null,
+        htmlRemId: htmlRem?._id ?? null,
+        htmlRemName,
       };
     }
 
@@ -141,6 +145,10 @@ export function PriorityEditor() {
   // Kept names for downstream code that already reads these.
   const hostPdfRemId = viewedPdfRemId;
   const hostPdfRemName = viewedHostName;
+
+  // When the primary host is a PDF, this holds the parallel HTML rem ID (if any)
+  // so hostData can also fetch history for bookmarks saved in Text Reader mode.
+  const secondaryHtmlRemId = hostKind === 'pdf' ? (hostInfo?.htmlRemId ?? null) : null;
 
   // Pin the currently-viewed PDF as the IncRem's active PDF.
   const handleSetActive = useCallback(async () => {
@@ -205,23 +213,27 @@ export function PriorityEditor() {
   const hostData = useTrackerPlugin(
     async (plugin) => {
       if (!remId || !hostPdfRemId) return null;
-      const [range, history, stats] = await Promise.all([
+      const [range, history, stats, htmlHistory] = await Promise.all([
         hostKind === 'pdf'
           ? getIncrementalPageRange(plugin as any, remId, hostPdfRemId)
           : Promise.resolve(null),
         getPageHistory(plugin as any, remId, hostPdfRemId),
         getReadingStatistics(plugin as any, remId, hostPdfRemId),
+        secondaryHtmlRemId
+          ? getPageHistory(plugin as any, remId, secondaryHtmlRemId)
+          : Promise.resolve([] as PageHistoryEntry[]),
       ]);
       console.log('[PriorityEditor] Fetched host history',
-        { incRemId: remId, hostRemId: hostPdfRemId, hostKind, historyLength: history.length, lastEntry: history[history.length - 1] });
-      return { pdfRange: range, pdfHistory: history, pdfStats: stats as any };
+        { incRemId: remId, hostRemId: hostPdfRemId, hostKind, historyLength: history.length, htmlHistoryLength: htmlHistory.length, lastEntry: history[history.length - 1] });
+      return { pdfRange: range, pdfHistory: history, pdfStats: stats as any, htmlHistory };
     },
-    [remId, hostPdfRemId, hostKind]
+    [remId, hostPdfRemId, hostKind, secondaryHtmlRemId]
   );
 
   const pdfRange = hostData?.pdfRange ?? null;
   const pdfHistory = hostData?.pdfHistory ?? [];
   const pdfStats: any = hostData?.pdfStats ?? null;
+  const htmlHistory: PageHistoryEntry[] = hostData?.htmlHistory ?? [];
 
   const rem = remData?.rem ?? null;
   const incRemInfo = remData?.incRemInfo ?? null;
@@ -374,7 +386,8 @@ export function PriorityEditor() {
           {hostKind === 'pdf' && hostPdfRemId && (() => {
             const last = pdfHistory?.[pdfHistory.length - 1];
             const hasPage = typeof last?.page === 'number';
-            const hasBookmark = !!last?.highlightId;
+            // Check both PDF and HTML (Text Reader) histories for a bookmark icon
+            const hasBookmark = !!last?.highlightId || htmlHistory.some(e => e.highlightId);
             const hasRange = !!pdfRange;
             const hasAnyState = hasRange || hasPage || hasBookmark;
             const titleParts = [
@@ -782,23 +795,28 @@ export function PriorityEditor() {
                 </div>
               )}
 
-              {/* Scroll to Bookmark — only when the LAST history entry carries a highlightId.
-                  A manual position recorded after a highlight bookmark would otherwise
-                  jump to a stale highlight, so we suppress the button in that case. */}
+              {/* Scroll to Bookmark — checks both PDF and HTML (Text Reader) histories
+                  so bookmarks saved in either reading mode surface this button. Uses
+                  the most-recent entry with a highlightId across both sources. */}
               {(() => {
-                const history = pdfHistory ?? [];
-                const lastEntry = history[history.length - 1];
-                const bookmarkHighlightId = lastEntry?.highlightId;
-                if (!bookmarkHighlightId) return null;
+                // Find the most recent bookmark across PDF and HTML (Text Reader) histories.
+                let bestHighlightId: string | null = null;
+                let bestHostRemId: string | null = hostPdfRemId;
+                let bestTs = -1;
+                for (const e of pdfHistory) {
+                  if (e.highlightId && e.timestamp > bestTs) { bestTs = e.timestamp; bestHighlightId = e.highlightId; bestHostRemId = hostPdfRemId; }
+                }
+                for (const e of htmlHistory) {
+                  if (e.highlightId && e.timestamp > bestTs) { bestTs = e.timestamp; bestHighlightId = e.highlightId; bestHostRemId = secondaryHtmlRemId; }
+                }
+                if (!bestHighlightId) return null;
+                const bookmarkHighlightId = bestHighlightId;
+                const bookmarkHost = bestHostRemId;
                 return (
                   <button
                     onClick={async () => {
-                      // openAndScrollToHighlight handles cold-open vs warm-open:
-                      // polls for the pane to mount, then retries the scroll
-                      // through PDF.js's boot window so a single click works
-                      // even when the PDF was previously closed.
-                      if (hostPdfRemId) {
-                        await openAndScrollToHighlight(plugin, hostPdfRemId, bookmarkHighlightId);
+                      if (bookmarkHost) {
+                        await openAndScrollToHighlight(plugin, bookmarkHost, bookmarkHighlightId);
                       } else {
                         const bookmarkRem = await plugin.rem.findOne(bookmarkHighlightId);
                         bookmarkRem?.scrollToReaderHighlight();
