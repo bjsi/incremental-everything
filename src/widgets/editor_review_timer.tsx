@@ -13,7 +13,7 @@ import { handleCardPriorityInheritance } from '../lib/card_priority/card_priorit
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
-import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
+import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, resolveSessionBookmarkCarry, safeRemTextToString } from '../lib/pdfUtils';
 import { openAndScrollToHighlight } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
@@ -287,7 +287,10 @@ function EditorReviewTimer() {
       // to PDFs — pass null for HTML so the entry is page-less.
       if (hostRemId) {
         const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
-        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
+        // Carry a session bookmark forward so this reading-time entry does not
+        // bury it and make the Scroll button appear stale.
+        const carryHighlightId = await resolveSessionBookmarkCarry(plugin, timerData.remId, hostRemId, pageArg);
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds, carryHighlightId);
       }
 
       if (timerData.origin === 'queue') {
@@ -411,7 +414,10 @@ function EditorReviewTimer() {
       // to PDFs — pass null for HTML so the entry is page-less.
       if (hostRemId) {
         const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
-        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
+        // Carry a session bookmark forward so this reading-time entry does not
+        // bury it and make the Scroll button appear stale.
+        const carryHighlightId = await resolveSessionBookmarkCarry(plugin, timerData.remId, hostRemId, pageArg);
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds, carryHighlightId);
       }
 
       // Always create a new repetition, just like Mode 2
@@ -518,7 +524,10 @@ function EditorReviewTimer() {
       // to PDFs — pass null for HTML so the entry is page-less.
       if (hostRemId) {
         const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
-        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
+        // Carry a session bookmark forward so this reading-time entry does not
+        // bury it and make the Scroll button appear stale.
+        const carryHighlightId = await resolveSessionBookmarkCarry(plugin, timerData.remId, hostRemId, pageArg);
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds, carryHighlightId);
       }
 
       const finalRep: IncrementalRep = {

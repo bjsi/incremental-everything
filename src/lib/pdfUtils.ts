@@ -327,6 +327,39 @@ export const addPageToHistory = async (
 };
 
 /**
+ * Decide whether a just-ended review session (timer "End Review"/"Next", queue
+ * "Next") should carry the last bookmark's highlightId forward into the
+ * reading-time history entry it is about to write.
+ *
+ * Without this, the session-end page-only entry shadows a bookmark created
+ * during the session under the "last entry only" detection used by the
+ * Scroll-to-Position buttons, making the bookmark appear stale.
+ *
+ * Carries the most-recent history entry's highlightId UNLESS the user navigated
+ * to a different page: if `pageToRecord` is a real page number that differs
+ * from the bookmark's page, the bookmark is genuinely stale and is NOT carried.
+ * Text Reader / HTML bookmarks have no page (`undefined`), so they always carry.
+ *
+ * Returns the highlightId to pass to addPageToHistory, or undefined.
+ */
+export const resolveSessionBookmarkCarry = async (
+  plugin: RNPlugin,
+  incrementalRemId: string,
+  hostRemId: string,
+  pageToRecord: number | null
+): Promise<string | undefined> => {
+  const history = await getPageHistory(plugin, incrementalRemId, hostRemId);
+  const lastEntry = history[history.length - 1];
+  if (!lastEntry?.highlightId) return undefined;
+  const bookmarkPage = lastEntry.page; // undefined for Text Reader / HTML bookmarks
+  if (bookmarkPage === undefined || pageToRecord == null || bookmarkPage === pageToRecord) {
+    return lastEntry.highlightId;
+  }
+  // User navigated to a different page — the bookmark is stale, do not carry.
+  return undefined;
+};
+
+/**
  * Calculate total time spent reading for a specific rem/PDF combination
  * Only counts sessions with recorded duration (from queue reading)
  */
