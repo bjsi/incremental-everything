@@ -360,6 +360,7 @@ function HistoryItem({
                                         e.stopPropagation();
                                         setEditingPriority((prev) => (prev === null ? priorityInfo.priority : null));
                                     }}
+                                    className="ml-auto"
                                     style={{ cursor: 'pointer' }}
                                     title="Click to change priority"
                                 >
