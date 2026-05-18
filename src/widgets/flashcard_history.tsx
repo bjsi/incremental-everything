@@ -12,6 +12,10 @@ import '../style.css';
 import '../App.css';
 import { timeSince } from "../lib/utils";
 import { safeRemTextToString } from "../lib/pdfUtils";
+import { PriorityBadge } from "../components";
+import { InlinePriorityEditor } from "../components/InlineEditors";
+import { getCardPriority, CardPriorityInfo, CARD_PRIORITY_CODE } from "../lib/card_priority";
+import { pendingPrioritySaveKey } from "../lib/consts";
 
 const NUM_TO_LOAD_IN_BATCH = 30;
 
@@ -278,6 +282,50 @@ function HistoryItem({
 }) {
     const plugin = usePlugin();
 
+    const [priorityInfo, setPriorityInfo] = useState<CardPriorityInfo | null>(null);
+    const [editingPriority, setEditingPriority] = useState<number | null>(null);
+
+    // Load the rem's card priority for the badge
+    useEffect(() => {
+        let cancelled = false;
+        async function loadPriority() {
+            const rem = await plugin.rem.findOne(remId);
+            if (!rem || cancelled) return;
+            const info = await getCardPriority(plugin, rem);
+            if (!cancelled) setPriorityInfo(info);
+        }
+        loadPriority();
+        return () => { cancelled = true; };
+    }, [plugin, remId]);
+
+    // Delegate the DB write to the persistent background tracker (index.tsx) via
+    // pendingPrioritySaveKey, mirroring priority.tsx. The widget never writes to the
+    // DB directly — this survives popup teardown and avoids racing the queue.
+    const savePriority = async () => {
+        if (editingPriority === null) return;
+        const newPriority = editingPriority;
+        setEditingPriority(null);
+
+        const rem = await plugin.rem.findOne(remId);
+        if (!rem) return;
+
+        const hasPowerup = await rem.hasPowerup(CARD_PRIORITY_CODE);
+
+        plugin.storage.setSession(pendingPrioritySaveKey, {
+            remId,
+            incPriority: null,
+            cardPriority: newPriority,
+            cardSource: 'manual',
+            needsAddPowerup: !hasPowerup,
+            triggerCascade: true,
+        }).catch(console.error);
+
+        // Optimistically reflect the change in the badge.
+        setPriorityInfo((prev) =>
+            prev ? { ...prev, priority: newPriority, source: 'manual' } : prev
+        );
+    };
+
     const openRem = async (remId: RemId) => {
         const rem = await plugin.rem.findOne(remId);
         if (rem) {
@@ -302,19 +350,40 @@ function HistoryItem({
                         }}
                     />
                 </div>
-                <div className="flex-grow min-w-0" onClick={() => openRem(remId)}>
-                    {data.score !== undefined && (
+                <div className="flex-grow min-w-0">
+                    {(data.score !== undefined || priorityInfo) && (
                         <div className="flex items-center gap-1.5 mb-0.5">
-                            <RatingBadge score={data.score} />
+                            {data.score !== undefined && <RatingBadge score={data.score} />}
+                            {priorityInfo && (
+                                <span
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingPriority((prev) => (prev === null ? priorityInfo.priority : null));
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                    title="Click to change priority"
+                                >
+                                    <PriorityBadge
+                                        priority={priorityInfo.priority}
+                                        percentile={priorityInfo.kbPercentile ?? undefined}
+                                        compact
+                                        useAbsoluteColoring={priorityInfo.kbPercentile == null}
+                                        source={priorityInfo.source}
+                                        isCardPriority
+                                    />
+                                </span>
+                            )}
                         </div>
                     )}
-                    <RemViewer
-                        remId={remId}
-                        width="100%"
-                        className="font-light cursor-pointer line-clamp-2"
-                    />
-                    <div className="text-xs rn-clr-content-tertiary">
-                        Seen {timeSince(new Date(data.time))}
+                    <div onClick={() => openRem(remId)}>
+                        <RemViewer
+                            remId={remId}
+                            width="100%"
+                            className="font-light cursor-pointer line-clamp-2"
+                        />
+                        <div className="text-xs rn-clr-content-tertiary">
+                            Seen {timeSince(new Date(data.time))}
+                        </div>
                     </div>
                 </div>
                 <div
@@ -333,6 +402,16 @@ function HistoryItem({
                     />
                 </div>
             </div>
+            {editingPriority !== null && (
+                <div className="px-1 pb-1" onClick={(e) => e.stopPropagation()}>
+                    <InlinePriorityEditor
+                        value={editingPriority}
+                        onChange={setEditingPriority}
+                        onSave={savePriority}
+                        onCancel={() => setEditingPriority(null)}
+                    />
+                </div>
+            )}
             {data.open && (
                 <div className="m-2">
                     <RemHierarchyEditorTree height="auto" width="100%" remId={remId} />
