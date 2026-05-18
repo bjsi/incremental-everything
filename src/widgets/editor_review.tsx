@@ -83,8 +83,7 @@ async function handleEditorReview(
 const PrioritySlider: React.FC<{
   onChange: (value: number) => void;
   value: number;
-  onSubmit: (e: React.KeyboardEvent) => void;
-}> = ({ onChange, value, onSubmit }) => {
+}> = ({ onChange, value }) => {
   return (
     <div className="flex flex-col gap-2">
       <div className="rn-clr-content-secondary priority-label">Lower = more important</div>
@@ -108,11 +107,6 @@ const PrioritySlider: React.FC<{
             const num = parseInt(e.target.value);
             if (!isNaN(num)) {
               onChange(Math.min(100, Math.max(0, num)));
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              onSubmit(e);
             }
           }}
           className="priority-input"
@@ -282,6 +276,28 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
     await plugin.widget.closePopup();
   };
 
+  const handleConfirmRef = useRef(handleConfirm);
+  const handleStartTimerRef = useRef(handleStartTimer);
+  handleConfirmRef.current = handleConfirm;
+  handleStartTimerRef.current = handleStartTimer;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      // Let buttons and selects handle Enter natively to avoid double-firing
+      if (tag === 'button' || tag === 'select') return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        handleStartTimerRef.current();
+      } else {
+        handleConfirmRef.current(e as any);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return (
     <form onSubmit={handleConfirm} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
@@ -296,11 +312,6 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
           step="0.1"
           value={days}
           onChange={(e) => setDays(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              handleConfirm(e);
-            }
-          }}
           className="priority-input"
         />
         <div className="rn-clr-content-secondary h-4">{futureDate}</div>
@@ -329,7 +340,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
 
       <div>
         <label className="font-semibold">Priority</label>
-        <PrioritySlider value={priority} onChange={setPriority} onSubmit={handleConfirm} />
+        <PrioritySlider value={priority} onChange={setPriority} />
       </div>
 
       {ancestorInfo && (
@@ -392,7 +403,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
             border: 'none',
           }}
         >
-          Confirm Review
+          Confirm Review <span style={{ opacity: 0.65, fontWeight: 'normal', fontSize: '0.75em' }}>[Enter]</span>
         </button>
         <button
           type="button"
@@ -404,7 +415,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
             border: 'none',
           }}
         >
-          ⏱️ Start Timer
+          ⏱️ Start Timer <span style={{ opacity: 0.65, fontWeight: 'normal', fontSize: '0.75em' }}>[Ctrl+Enter]</span>
         </button>
       </div>
     </form>

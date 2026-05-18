@@ -1,11 +1,10 @@
 import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
+import { buildComprehensiveScope } from '../scope_helpers';
 import { findClosestAncestorWithAnyPriority } from '../priority_inheritance';
 import dayjs from 'dayjs';
 import {
   allCardPriorityInfoKey,
-  powerupCode,
-  nextRepDateSlotCode,
 } from '../consts';
 import {
   CardPriorityInfo,
@@ -303,43 +302,7 @@ export async function getDueCardsWithPriorities(
 
   if (scopeRem) {
     console.log(`[getDueCardsWithPriorities] Gathering comprehensive scope...`);
-
-    const descendants = await scopeRem.getDescendants();
-    console.log(`[getDueCardsWithPriorities] ✓ Found ${descendants.length} descendants`);
-
-    const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-    console.log(
-      `[getDueCardsWithPriorities] ✓ Found ${allRemsInContext.length} rems in document/portal context`
-    );
-
-    const folderQueueRems = await scopeRem.allRemInFolderQueue();
-    console.log(`[getDueCardsWithPriorities] ✓ Found ${folderQueueRems.length} rems via allRemInFolderQueue`);
-
-    const sources = await scopeRem.getSources();
-    console.log(`[getDueCardsWithPriorities] ✓ Found ${sources.length} sources`);
-
-    const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(powerupCode, nextRepDateSlotCode);
-
-    const referencingRems = ((await scopeRem.remsReferencingThis()) || [])
-      .map((rem) => {
-        if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-          return rem.parent;
-        } else {
-          return rem._id;
-        }
-      })
-      .filter((id) => id !== null && id !== undefined) as RemId[];
-
-    console.log(`[getDueCardsWithPriorities] ✓ Found ${referencingRems.length} referencing rems`);
-
-    scopeRemIds = new Set<RemId>();
-    scopeRemIds.add(scopeRem._id);
-    descendants.forEach((rem) => scopeRemIds.add(rem._id));
-    allRemsInContext.forEach((rem) => scopeRemIds.add(rem._id));
-    folderQueueRems.forEach((rem) => scopeRemIds.add(rem._id));
-    sources.forEach((rem) => scopeRemIds.add(rem._id));
-    referencingRems.forEach((id) => scopeRemIds.add(id));
-
+    scopeRemIds = await buildComprehensiveScope(plugin, scopeRem._id);
     console.log(`[getDueCardsWithPriorities] Comprehensive scope contains ${scopeRemIds.size} unique rems`);
   } else {
     scopeRemIds = new Set(allCardInfos.map((info) => info.remId));
@@ -440,44 +403,7 @@ async function getDueCardsWithPrioritiesSlow(
 
   if (scopeRem) {
     console.log(`[getDueCardsWithPrioritiesSlow] Starting comprehensive scope gathering...`);
-
-    const descendants = await scopeRem.getDescendants();
-    console.log(`[getDueCardsWithPrioritiesSlow] ✓ Found ${descendants.length} descendants`);
-
-    const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-    console.log(
-      `[getDueCardsWithPrioritiesSlow] ✓ Found ${allRemsInContext.length} rems in document/portal context`
-    );
-
-    const folderQueueRems = await scopeRem.allRemInFolderQueue();
-    console.log(`[getDueCardsWithPrioritiesSlow] ✓ Found ${folderQueueRems.length} rems via allRemInFolderQueue`);
-
-    const sources = await scopeRem.getSources();
-    console.log(`[getDueCardsWithPrioritiesSlow] ✓ Found ${sources.length} sources`);
-
-    const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(powerupCode, nextRepDateSlotCode);
-
-    const referencingRems = ((await scopeRem.remsReferencingThis()) || [])
-      .map((rem) => {
-        if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-          return rem.parent;
-        } else {
-          return rem._id;
-        }
-      })
-      .filter((id) => id !== null && id !== undefined) as RemId[];
-
-    console.log(`[getDueCardsWithPrioritiesSlow] ✓ Found ${referencingRems.length} referencing rems`);
-
-    remsToCheckIds = new Set<RemId>([
-      scopeRem._id,
-      ...descendants.map(d => d._id),
-      ...allRemsInContext.map(r => r._id),
-      ...folderQueueRems.map(r => r._id),
-      ...sources.map(r => r._id),
-      ...referencingRems
-    ]);
-
+    remsToCheckIds = await buildComprehensiveScope(plugin, scopeRem._id);
     console.log(`[getDueCardsWithPrioritiesSlow] Comprehensive scope: ${remsToCheckIds.size} unique rems`);
   } else {
     // Full KB scope - use all rems that have due cards

@@ -10,6 +10,10 @@ import {
 import { timeSince } from "../lib/utils";
 import { IncrementalHistoryData } from "../lib/history_utils";
 import { safeRemTextToString } from "../lib/pdfUtils";
+import { PriorityBadge } from "../components";
+import { InlinePriorityEditor } from "../components/InlineEditors";
+import { getIncrementalRemFromRem, IncrementalRem } from "../lib/incremental_rem";
+import { allIncrementalRemKey, pendingPrioritySaveKey } from "../lib/consts";
 
 const NUM_TO_LOAD_IN_BATCH = 30;
 
@@ -25,6 +29,24 @@ function IncrementalHistory() {
 
     // Search State
     const [searchText, setSearchText] = useState("");
+
+    // KB-wide priority percentile map for IncRem priority badges
+    const [percentileMap, setPercentileMap] = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        let cancelled = false;
+        async function buildPercentiles() {
+            const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+            const sorted = [...allIncRems].sort((a, b) => a.priority - b.priority);
+            const map: Record<string, number> = {};
+            sorted.forEach((item, index) => {
+                map[item.remId] = Math.round(((index + 1) / sorted.length) * 100);
+            });
+            if (!cancelled) setPercentileMap(map);
+        }
+        buildPercentiles();
+        return () => { cancelled = true; };
+    }, [plugin, historyDataRaw]);
 
     // Backfill Effect: Fetch text for items that don't have it
     useEffect(() => {
@@ -183,6 +205,7 @@ function IncrementalHistory() {
                     key={data.key || Math.random()}
                     setData={(c) => setData(data.key, c)}
                     closeIndex={() => closeIndex(data.key)}
+                    percentile={percentileMap[data.remId]}
                 />
             ))}
             {numUnloaded > 0 && (
@@ -226,13 +249,52 @@ function HistoryItem({
     remId,
     setData,
     closeIndex,
+    percentile,
 }: {
     data: IncrementalHistoryData;
     remId: string;
     setData: (changes: Partial<IncrementalHistoryData>) => void;
     closeIndex: () => void;
+    percentile?: number;
 }) {
     const plugin = usePlugin();
+
+    const [incPriority, setIncPriority] = useState<number | null>(null);
+    const [editingPriority, setEditingPriority] = useState<number | null>(null);
+
+    // Load the Incremental Rem priority for the badge
+    useEffect(() => {
+        let cancelled = false;
+        async function loadPriority() {
+            const rem = await plugin.rem.findOne(remId);
+            if (!rem || cancelled) return;
+            const incRem = await getIncrementalRemFromRem(plugin, rem);
+            if (!cancelled) setIncPriority(incRem ? incRem.priority : null);
+        }
+        loadPriority();
+        return () => { cancelled = true; };
+    }, [plugin, remId]);
+
+    // Delegate the DB write to the persistent background tracker (index.tsx) via
+    // pendingPrioritySaveKey, mirroring priority.tsx. The widget never writes to the
+    // DB directly — this survives sidebar/popup teardown and avoids racing the queue.
+    const savePriority = async () => {
+        if (editingPriority === null) return;
+        const newPriority = editingPriority;
+        setEditingPriority(null);
+
+        plugin.storage.setSession(pendingPrioritySaveKey, {
+            remId,
+            incPriority: newPriority,
+            cardPriority: null,
+            cardSource: 'manual',
+            needsAddPowerup: false,
+            triggerCascade: true,
+        }).catch(console.error);
+
+        // Optimistically reflect the change in the badge.
+        setIncPriority(newPriority);
+    };
 
     const openRem = async (remId: RemId) => {
         const rem = await plugin.rem.findOne(remId);
@@ -263,17 +325,37 @@ function HistoryItem({
                         }}
                     />
                 </div>
-                <div className="flex-grow min-w-0" onClick={() => openRem(remId)}>
+                <div className="flex-grow min-w-0">
                     <div className="flex items-center gap-1.5 mb-0.5">
                         <EventBadge eventType={data.eventType} />
+                        {incPriority !== null && (
+                            <span
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingPriority((prev) => (prev === null ? incPriority : null));
+                                }}
+                                className="ml-auto"
+                                style={{ cursor: 'pointer' }}
+                                title="Click to change priority"
+                            >
+                                <PriorityBadge
+                                    priority={incPriority}
+                                    percentile={percentile}
+                                    compact
+                                    useAbsoluteColoring={percentile == null}
+                                />
+                            </span>
+                        )}
                     </div>
-                    <RemViewer
-                        remId={remId}
-                        width="100%"
-                        className="font-light cursor-pointer line-clamp-2"
-                    />
-                    <div className="text-xs rn-clr-content-tertiary">
-                        {timeLabel}
+                    <div onClick={() => openRem(remId)}>
+                        <RemViewer
+                            remId={remId}
+                            width="100%"
+                            className="font-light cursor-pointer line-clamp-2"
+                        />
+                        <div className="text-xs rn-clr-content-tertiary">
+                            {timeLabel}
+                        </div>
                     </div>
                 </div>
                 <div
@@ -292,6 +374,16 @@ function HistoryItem({
                     />
                 </div>
             </div>
+            {editingPriority !== null && (
+                <div className="px-1 pb-1" onClick={(e) => e.stopPropagation()}>
+                    <InlinePriorityEditor
+                        value={editingPriority}
+                        onChange={setEditingPriority}
+                        onSave={savePriority}
+                        onCancel={() => setEditingPriority(null)}
+                    />
+                </div>
+            )}
             {data.open && (
                 <div className="m-2">
                     <RemHierarchyEditorTree height="auto" width="100%" remId={remId} />

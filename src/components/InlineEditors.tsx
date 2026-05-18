@@ -35,6 +35,7 @@ export function InlinePriorityEditor({ value, onChange, onSave, onCancel }: Inli
           else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
           else keyboard.handleKeyDown(e);
         }}
+        onFocus={(e) => e.target.select()}
         className="w-14 text-xs p-1 rounded text-center"
         style={{ border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)' }}
         autoFocus

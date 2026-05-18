@@ -32,7 +32,7 @@ import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetiti
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, calculateWeightedShield, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
-import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, addPageToHistory, getPageHistory, getCurrentPageKey, getDescendantsToDepth } from '../lib/pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, addPageToHistory, getPageHistory, getCurrentPageKey, getDescendantsToDepth, resolveSessionBookmarkCarry } from '../lib/pdfUtils';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
 import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
@@ -302,7 +302,10 @@ export function AnswerButtons() {
         const currentPage = await plugin.storage.getSynced<number>(pageKey);
 
         if (currentPage) {
-          await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
+          // Carry a session bookmark forward so this reading-time entry does
+          // not bury it and make the Scroll button appear stale.
+          const carryHighlightId = await resolveSessionBookmarkCarry(plugin, rem._id, pdfRem._id, currentPage);
+          await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage, undefined, carryHighlightId);
         }
       }
     }

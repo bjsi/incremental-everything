@@ -21,12 +21,13 @@ export const handleCardPriorityInheritance = async (
     const startTime = Date.now();
 
     try {
-        // 1. Check if the Rem already has a *set* cardPriority tag with a non-default source.
+        // 1. Check if the Rem already has a *set* cardPriority tag with a manual source.
         const existingSource = await rem.getPowerupProperty('cardPriority', 'prioritySource');
 
-        // If the Rem is tagged AND the source is 'manual' or 'inherited', we stop.
-        // We proceed if the Rem is untagged (existingSource is null) or if the tag source is 'default'.
-        if (existingSource && typeof existingSource === 'string' && existingSource.toLowerCase() !== 'default') {
+        // Only bail out if the source is 'manual' (user explicitly set it and we must not overwrite).
+        // 'inherited' is overwritable: the IncRem's own priority takes precedence over an
+        // ancestor-inherited value. 'default' and null (no tag) also proceed.
+        if (existingSource && typeof existingSource === 'string' && existingSource.toLowerCase() === 'manual') {
             return;
         }
 

@@ -13,7 +13,7 @@ import { handleCardPriorityInheritance } from '../lib/card_priority/card_priorit
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
-import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, safeRemTextToString } from '../lib/pdfUtils';
+import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, resolveSessionBookmarkCarry, safeRemTextToString } from '../lib/pdfUtils';
 import { openAndScrollToHighlight } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
@@ -34,10 +34,12 @@ function EditorReviewTimer() {
   // button and addPageToHistory's page argument.
   const [hostRemId, setHostRemId] = useState<string | null>(null);
   const [hostKind, setHostKind] = useState<'pdf' | 'html' | null>(null);
-  const [bookmarkHighlightId, setBookmarkHighlightId] = useState<string | null>(null);
   // PDFs available on the timer's IncRem. When length > 1 a small switcher
   // appears next to the page controls.
   const [pdfOptions, setPdfOptions] = useState<Array<{ remId: string; name: string; isPreferred: boolean }>>([]);
+  // HTML rem ID parallel to hostRemId — set even when a PDF is also present
+  // so the bookmark Scroll button can surface bookmarks saved in Text Reader mode.
+  const [htmlRemId, setHtmlRemId] = useState<string | null>(null);
 
   const timerData = useTrackerPlugin(
     async (rp) => {
@@ -108,13 +110,15 @@ function EditorReviewTimer() {
         setPdfRemId(null);
         setHostRemId(null);
         setHostKind(null);
-        setBookmarkHighlightId(null);
+        setHtmlRemId(null);
         setPdfOptions([]);
         return;
       }
 
       const pdfRem = await getActivePdfForIncRem(plugin, rem);
-      const htmlRem = pdfRem ? null : await findHTMLinRem(plugin, rem);
+      // Always resolve the HTML rem — even when a PDF is present, bookmarks
+      // created in Text Reader mode are stored under the HTML rem's history key.
+      const htmlRem = await findHTMLinRem(plugin, rem);
       const host = pdfRem ?? htmlRem;
 
       if (pdfRem) {
@@ -128,14 +132,12 @@ function EditorReviewTimer() {
       if (host) {
         setHostRemId(host._id);
         setHostKind(pdfRem ? 'pdf' : 'html');
-        const history = await getPageHistory(plugin, timerData.remId, host._id);
-        const lastEntry = history[history.length - 1];
-        setBookmarkHighlightId(lastEntry?.highlightId ?? null);
       } else {
         setHostRemId(null);
         setHostKind(null);
-        setBookmarkHighlightId(null);
       }
+
+      setHtmlRemId(htmlRem?._id ?? null);
 
       // Populate PDF selector options (shown only when >1 PDF)
       try {
@@ -169,10 +171,53 @@ function EditorReviewTimer() {
     setHostKind('pdf');
     setIsPdfNote(true);
 
-    const history = await getPageHistory(plugin, timerData.remId, newPdfId);
-    const lastEntry = history[history.length - 1];
-    setBookmarkHighlightId(lastEntry?.highlightId ?? null);
   }, [plugin, timerData?.remId, pdfRemId]);
+
+  // Reactively track the latest bookmark highlight across PDF and HTML histories.
+  // Host rem ID is resolved INSIDE the tracker (not from React state) so the
+  // tracker subscribes to the active-PDF synced key and re-fires correctly.
+  // Using React state (hostRemId) as a dep would cause the tracker to run once
+  // with hostRemId=null (before loadHostData completes), subscribe to nothing,
+  // and never re-fire — making existing bookmarks invisible until a new one
+  // is saved mid-session.
+  const bookmarkInfo = useTrackerPlugin(
+    async (rp) => {
+      if (!timerData?.remId) return null;
+
+      const rem = await rp.rem.findOne(timerData.remId);
+      if (!rem) return null;
+
+      let best: { highlightId: string; hostRemId: string; timestamp: number } | null = null;
+
+      // PDF history — resolving via getActivePdfForIncRem subscribes the tracker
+      // to the active-PDF synced key so it re-fires on host changes.
+      const pdfRem = await getActivePdfForIncRem(rp as any, rem);
+      if (pdfRem) {
+        const history = await getPageHistory(rp as any, timerData.remId, pdfRem._id);
+        const last = history[history.length - 1];
+        if (last?.highlightId) {
+          best = { highlightId: last.highlightId, hostRemId: pdfRem._id, timestamp: last.timestamp };
+        }
+      }
+
+      // HTML (Text Reader) history — check even when a PDF is present, bookmarks
+      // saved in Text Reader mode are stored under the HTML rem's history key.
+      const htmlRem = await findHTMLinRem(rp as any, rem);
+      if (htmlRem && htmlRem._id !== pdfRem?._id) {
+        const htmlHistory = await getPageHistory(rp as any, timerData.remId, htmlRem._id);
+        const last = htmlHistory[htmlHistory.length - 1];
+        if (last?.highlightId && (!best || last.timestamp > best.timestamp)) {
+          best = { highlightId: last.highlightId, hostRemId: htmlRem._id, timestamp: last.timestamp };
+        }
+      }
+
+      return best;
+    },
+    [timerData?.remId]
+  ) ?? null;
+
+  const bookmarkHighlightId = bookmarkInfo?.highlightId ?? null;
+  const bookmarkHostRemId = bookmarkInfo?.hostRemId ?? hostRemId;
 
   const isPaused = !!(timerData?.pausedAt);
 
@@ -239,7 +284,10 @@ function EditorReviewTimer() {
       // to PDFs — pass null for HTML so the entry is page-less.
       if (hostRemId) {
         const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
-        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
+        // Carry a session bookmark forward so this reading-time entry does not
+        // bury it and make the Scroll button appear stale.
+        const carryHighlightId = await resolveSessionBookmarkCarry(plugin, timerData.remId, hostRemId, pageArg);
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds, carryHighlightId);
       }
 
       if (timerData.origin === 'queue') {
@@ -363,7 +411,10 @@ function EditorReviewTimer() {
       // to PDFs — pass null for HTML so the entry is page-less.
       if (hostRemId) {
         const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
-        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
+        // Carry a session bookmark forward so this reading-time entry does not
+        // bury it and make the Scroll button appear stale.
+        const carryHighlightId = await resolveSessionBookmarkCarry(plugin, timerData.remId, hostRemId, pageArg);
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds, carryHighlightId);
       }
 
       // Always create a new repetition, just like Mode 2
@@ -470,7 +521,10 @@ function EditorReviewTimer() {
       // to PDFs — pass null for HTML so the entry is page-less.
       if (hostRemId) {
         const pageArg = hostKind === 'pdf' ? pdfControls.currentPage : null;
-        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds);
+        // Carry a session bookmark forward so this reading-time entry does not
+        // bury it and make the Scroll button appear stale.
+        const carryHighlightId = await resolveSessionBookmarkCarry(plugin, timerData.remId, hostRemId, pageArg);
+        await addPageToHistory(plugin, timerData.remId, hostRemId, pageArg, reviewTimeSeconds, carryHighlightId);
       }
 
       const finalRep: IncrementalRep = {
@@ -651,23 +705,32 @@ function EditorReviewTimer() {
           {hostRemId && bookmarkHighlightId && (
             <button
               onClick={async () => {
-                // Re-read the latest highlightId from page history at click
-                // time so we never scroll to a stale position. During a review
-                // session the user may create new extracts (via the highlight
-                // toolbar) which append newer bookmark entries, but the
-                // bookmarkHighlightId state was captured once at session start.
+                // Re-read at click time from both PDF and HTML histories to
+                // catch any bookmark saved mid-session after the tracker last ran.
                 let freshHighlightId = bookmarkHighlightId;
+                let freshHostRemId = bookmarkHostRemId ?? hostRemId;
                 if (timerData?.remId) {
-                  const history = await getPageHistory(plugin, timerData.remId, hostRemId);
-                  const lastEntry = history[history.length - 1];
-                  if (lastEntry?.highlightId) {
-                    freshHighlightId = lastEntry.highlightId;
+                  let latestTs = 0;
+                  if (hostRemId) {
+                    const history = await getPageHistory(plugin, timerData.remId, hostRemId);
+                    const last = history[history.length - 1];
+                    if (last?.highlightId && last.timestamp > latestTs) {
+                      latestTs = last.timestamp;
+                      freshHighlightId = last.highlightId;
+                      freshHostRemId = hostRemId;
+                    }
+                  }
+                  if (htmlRemId && htmlRemId !== hostRemId) {
+                    const htmlHistory = await getPageHistory(plugin, timerData.remId, htmlRemId);
+                    const last = htmlHistory[htmlHistory.length - 1];
+                    if (last?.highlightId && last.timestamp > latestTs) {
+                      latestTs = last.timestamp;
+                      freshHighlightId = last.highlightId;
+                      freshHostRemId = htmlRemId;
+                    }
                   }
                 }
-                // openAndScrollToHighlight handles cold/warm open and survives
-                // the layout reorganization that destroys this widget's iframe
-                // on cold opens.
-                await openAndScrollToHighlight(plugin, hostRemId, freshHighlightId);
+                await openAndScrollToHighlight(plugin, freshHostRemId, freshHighlightId);
               }}
               style={{
                 padding: '4px 10px',

@@ -25,6 +25,7 @@ import {
   QueueSessionCache,
   autoAssignCardPriority,
   getCardPriority,
+  setCardPriority,
   PrioritySource,
 } from '../lib/card_priority';
 import { IncrementalRem, getIncrementalRemFromRem } from '../lib/incremental_rem';
@@ -937,7 +938,31 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
         const isManualUpdate = manualPendingRems.includes(data.remId);
 
         if (inQueue && !isManualUpdate) {
-          // console.log('LISTENER: (Debounced) GlobalRemChanged fired, but skipping processing because user is in the queue.');
+          // Special case: if an IncRem just gained a direct card while in queue,
+          // apply the IncRem's priority as 'incremental' cardPriority immediately.
+          // We skip the full autoAssignCardPriority (inheritance walk + cache update)
+          // to avoid disrupting the running session; the tag write alone is enough
+          // for the next cache rebuild to pick up the correct value.
+          // Only handles cards on the IncRem itself — cards on descendants are covered
+          // by handleCardPriorityInheritance when Dismiss is clicked.
+          if (hasIncremental) {
+            try {
+              const cards = await rem.getCards();
+              if (cards && cards.length > 0) {
+                const existingSource = await rem.getPowerupProperty('cardPriority', 'prioritySource');
+                const sourceStr = typeof existingSource === 'string' ? existingSource.toLowerCase() : null;
+                if (!sourceStr || sourceStr === 'default' || sourceStr === 'inherited') {
+                  const incRemForPriority = cachedIncRem || await getIncrementalRemFromRem(plugin, rem);
+                  if (incRemForPriority) {
+                    console.log('[GlobalRemChanged] In-queue card creation on IncRem, applying cardPriority:', data.remId);
+                    await setCardPriority(plugin, rem, incRemForPriority.priority, 'incremental');
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('[GlobalRemChanged] In-queue cardPriority assignment failed:', err);
+            }
+          }
           return;
         }
 

@@ -229,11 +229,14 @@ export async function createPriorityReviewDocument(
   const scopeRem = scopeRemId ? (await plugin.rem.findOne(scopeRemId)) ?? null : null;
   const now = Date.now();
 
+  // Build scope once and reuse for both IncRems and Cards
+  const comprehensiveScopeIds = scopeRem
+    ? await buildComprehensiveScope(plugin, scopeRem._id)
+    : null;
+
   // IncRems
   let scopedIncRems = allIncRems;
-  if (scopeRem) {
-    // Also use comprehensive scope for IncRems to catch portals/tables
-    const comprehensiveScopeIds = await buildComprehensiveScope(plugin, scopeRem._id);
+  if (comprehensiveScopeIds) {
     scopedIncRems = allIncRems.filter(r => comprehensiveScopeIds.has(r.remId));
   }
   const dueIncRems = scopedIncRems.filter(rem => rem.nextRepDate <= now);
@@ -254,15 +257,11 @@ export async function createPriorityReviewDocument(
   // list stays small and meaningful.
   const skippedPausedItems: SkippedPausedItem[] = [];
 
-  // --- DEBUG & FIX START ---
-
   // 3b. Establish "Universe" for Percentiles
   // We start with the cached data (allCardInfos) filtered by scope
   const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
   let universeCardInfos = allCardInfos;
-  if (scopeRem) {
-    // FIX: Use comprehensive scope to capture portal contents
-    const comprehensiveScopeIds = await buildComprehensiveScope(plugin, scopeRem._id);
+  if (comprehensiveScopeIds) {
     universeCardInfos = allCardInfos.filter(c => comprehensiveScopeIds.has(c.remId));
   }
 
@@ -473,20 +472,22 @@ export async function createPriorityReviewDocument(
   const incRemRandPct = Math.round(incRemRandomness * 100);
   const cardRandPct = Math.round(cardRandomness * 100);
 
-  // Total Cards: 
-  // - If cardCount is defined (cached item), use it (even if 0).
-  // - If cardCount is missing (merged from due list), assume 1 (since it is due, it must have cards).
-  const totalCardsInScope = universeCardInfos.reduce((sum, info) => {
-    const count = typeof info.cardCount === 'number' ? info.cardCount : 1;
-    return sum + count;
+  // universeCardInfos includes inheritance-only rems (tagged for priority propagation
+  // but with cardCount: 0). Filter to actual card-bearing rems for the summary counts.
+  const remsWithCards = universeCardInfos.filter(c => (typeof c.cardCount === 'number' ? c.cardCount : 1) > 0);
+  const totalCardsInScope = remsWithCards.reduce((sum, info) => {
+    return sum + (typeof info.cardCount === 'number' ? info.cardCount : 1);
   }, 0);
+  const dueCardsInScope = remsWithCards.reduce((sum, info) => sum + (info.dueCards || 0), 0);
+  const dueCardRemsCount = remsWithCards.filter(c => (c.dueCards || 0) > 0).length;
 
   const skippedLine = skippedPausedItems.length > 0
     ? `\nSkipped (paused docs): ${skippedPausedItems.length} flashcard rems`
     : '';
 
   const metadataText = `Scope: ${scopeName}
-Scope Size: ${scopedIncRems.length} IncRems, ${universeCardInfos.length} Rems with Cards, ${totalCardsInScope} Cards
+Scope Size: ${scopedIncRems.length} IncRems, ${remsWithCards.length} Rems with Cards, ${totalCardsInScope} Cards
+Due: ${dueIncRems.length} IncRems, ${dueCardRemsCount} Rems with Cards, ${dueCardsInScope} Cards
 Selected Items: ${mixedItems.length} (${mixedItems.filter(i => i.type === 'incremental').length} IncRems, ${mixedItems.filter(i => i.type === 'flashcard').length} Rems with Cards)${skippedLine}
 Randomness: IncRem ${incRemRandPct}%, Cards ${cardRandPct}%
 Created: ${timestamp}`;
