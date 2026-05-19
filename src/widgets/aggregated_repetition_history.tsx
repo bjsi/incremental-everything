@@ -251,7 +251,13 @@ const TreeNode = ({
                         {hasChildren ? (expanded ? '▼' : '▶') : '•'}
                     </div>
 
-                    <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{
+                        flex: 1,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                    }}>
                         {node.isIncremental && <span style={{ color: 'var(--rn-clr-green, #22c55e)', marginRight: '4px' }}>●</span>}
                         {node.isDismissed && <span style={{ color: 'var(--rn-clr-orange, #f59e0b)', marginRight: '4px' }}>●</span>}
                         {nameSegments === undefined
