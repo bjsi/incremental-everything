@@ -620,81 +620,96 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return result;
       };
 
-      // 1. Create child rem
-      const clozeRem = await plugin.rem.createRem();
-      if (!clozeRem) return;
+      // Suppress GlobalRemChanged during the batch of writes below.
+      // Without this, each write (createRem, setText, setParent, addTag, addPowerup,
+      // parent setText, setCardPriority × 3 properties) fires a GlobalRemChanged event.
+      // After the 1s debounce, each runs the expensive property drift path
+      // (autoAssignCardPriority → ancestor walk → cache flush), causing a ~60s UI freeze.
+      await plugin.storage.setSession('plugin_operation_active', true);
 
-      await clozeRem.setText(buildChildText());
-      await clozeRem.setParent(rem);
+      try {
+        // 1. Create child rem
+        const clozeRem = await plugin.rem.createRem();
+        if (!clozeRem) return;
 
-      let clozeExtractTag = await plugin.rem.findByName(['cloze-extract'], null);
-      if (!clozeExtractTag) {
-        clozeExtractTag = await plugin.rem.createRem();
-        if (clozeExtractTag) await clozeExtractTag.setText(['cloze-extract']);
-      }
-      if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
+        await clozeRem.setText(buildChildText());
+        await clozeRem.setParent(rem);
 
-      // 2. Apply the Remove Parent powerup to the cloze rem so its parent is hidden
-      // from queue display only when this specific cloze is the current card.
-      // Tagging the parent with Remove from Queue (the previous behavior) would
-      // also hide it for sibling/descendant flashcards (e.g. descriptor children),
-      // breaking their context. Scoping the effect to the cloze itself avoids that.
-      await clozeRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
+        let clozeExtractTag = await plugin.rem.findByName(['cloze-extract'], null);
+        if (!clozeExtractTag) {
+          clozeExtractTag = await plugin.rem.createRem();
+          if (clozeExtractTag) await clozeExtractTag.setText(['cloze-extract']);
+        }
+        if (clozeExtractTag) await clozeRem.addTag(clozeExtractTag._id);
 
-      // 3. Mark selected text in parent with yellow highlight + red font.
-      // Uses the same section-relative positions (sect_r_start/sect_r_end).
-      const processParentSection = (richText: RichTextInterface, localStart: number, localEnd: number): RichTextInterface => {
-        const arr: any[] = [];
-        let currIdx = 0;
-        for (const item of richText) {
-          const isStr  = typeof item === 'string';
-          const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
-          // Text-only positions: non-'m' nodes pass through unchanged.
-          const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 0;
+        // 2. Apply the Remove Parent powerup to the cloze rem so its parent is hidden
+        // from queue display only when this specific cloze is the current card.
+        // Tagging the parent with Remove from Queue (the previous behavior) would
+        // also hide it for sibling/descendant flashcards (e.g. descriptor children),
+        // breaking their context. Scoping the effect to the cloze itself avoids that.
+        await clozeRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
 
-          if (nodeLen === 0) {
-            arr.push(item);
-          } else {
-            const nodeStart = currIdx;
-            const nodeEnd   = currIdx + nodeLen;
-            if (nodeEnd <= localStart || nodeStart >= localEnd) {
+        // 3. Mark selected text in parent with yellow highlight + red font.
+        // Uses the same section-relative positions (sect_r_start/sect_r_end).
+        const processParentSection = (richText: RichTextInterface, localStart: number, localEnd: number): RichTextInterface => {
+          const arr: any[] = [];
+          let currIdx = 0;
+          for (const item of richText) {
+            const isStr  = typeof item === 'string';
+            const node   = isStr ? { i: 'm' as const, text: item as string } : (item as any);
+            // Text-only positions: non-'m' nodes pass through unchanged.
+            const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 0;
+
+            if (nodeLen === 0) {
               arr.push(item);
             } else {
-              const textStr  = node.text || '';
-              const relStart = Math.max(0, localStart - nodeStart);
-              const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
-              if (relStart > 0) {
-                arr.push(isStr ? textStr.substring(0, relStart) : { ...node, text: textStr.substring(0, relStart) });
+              const nodeStart = currIdx;
+              const nodeEnd   = currIdx + nodeLen;
+              if (nodeEnd <= localStart || nodeStart >= localEnd) {
+                arr.push(item);
+              } else {
+                const textStr  = node.text || '';
+                const relStart = Math.max(0, localStart - nodeStart);
+                const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
+                if (relStart > 0) {
+                  arr.push(isStr ? textStr.substring(0, relStart) : { ...node, text: textStr.substring(0, relStart) });
+                }
+                arr.push({ ...node, text: textStr.substring(relStart, relEnd), [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
+                if (relEnd < nodeLen) {
+                  arr.push(isStr ? textStr.substring(relEnd) : { ...node, text: textStr.substring(relEnd) });
+                }
               }
-              arr.push({ ...node, text: textStr.substring(relStart, relEnd), [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
-              if (relEnd < nodeLen) {
-                arr.push(isStr ? textStr.substring(relEnd) : { ...node, text: textStr.substring(relEnd) });
-              }
+              currIdx += nodeLen;
             }
-            currIdx += nodeLen;
           }
+          return arr;
+        };
+
+        if (isBack) {
+          await rem.setBackText(processParentSection(backText, sect_r_start, sect_r_end));
+        } else {
+          await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
         }
-        return arr;
-      };
 
-      if (isBack) {
-        await rem.setBackText(processParentSection(backText, sect_r_start, sect_r_end));
-      } else {
-        await rem.setText(processParentSection(frontText, sect_r_start, sect_r_end));
+        // Apply the auto-priority computed at the top (before the new cloze existed,
+        // so the existing-cloze count was correct).
+        await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual');
+        await updateCardPriorityCache(plugin, clozeRem._id, true, {
+          remId: clozeRem._id,
+          priority: autoPriority.priority,
+          source: 'manual',
+          cardCount: 1,
+          dueCards: 1,
+        } as any);
+
+        return { clozeRem, parentRem: rem, autoPriority };
+      } finally {
+        // Clear the suppression flag after a delay longer than the GlobalRemChanged
+        // debounce (1000ms) so any pending events are also suppressed.
+        setTimeout(async () => {
+          await plugin.storage.setSession('plugin_operation_active', false);
+        }, 2000);
       }
-
-      // Apply the auto-priority computed at the top (before the new cloze existed,
-      // so the existing-cloze count was correct).
-      await setCardPriority(plugin, clozeRem, autoPriority.priority, 'manual');
-      await updateCardPriorityCache(plugin, clozeRem._id, true, {
-        remId: clozeRem._id,
-        priority: autoPriority.priority,
-        source: 'manual',
-        cardCount: 1,
-        dueCards: 1,
-      } as any);
-
-      return { clozeRem, parentRem: rem, autoPriority };
   };
 
   plugin.app.registerCommand({
