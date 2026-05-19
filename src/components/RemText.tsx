@@ -1,6 +1,35 @@
 import React from 'react';
 import { usePlugin, useRunAsync } from '@remnote/plugin-sdk';
-import { resolveRemTextSegments } from '../lib/richTextRemRefs';
+import { resolveRemTextSegments, RemTextSegment } from '../lib/richTextRemRefs';
+
+/**
+ * Renders pre-resolved rem-text segments as plain spans:
+ *  - text segments      → plain text (references already wrapped in `[ ]`)
+ *  - pin segments       → a 📌 icon whose hover tooltip is the referenced text
+ *
+ * Synchronous and embed-free, so it is cheap even in long lists.
+ */
+export function RemTextSegments({
+  segments,
+  className,
+}: {
+  segments: RemTextSegment[];
+  className?: string;
+}) {
+  return (
+    <span className={className}>
+      {segments.map((seg, i) =>
+        seg.kind === 'pin' ? (
+          <span key={i} title={seg.text} style={{ cursor: 'help', opacity: 0.7 }}>
+            📌
+          </span>
+        ) : (
+          <React.Fragment key={i}>{seg.text}</React.Fragment>
+        )
+      )}
+    </span>
+  );
+}
 
 interface RemTextProps {
   /** Rem whose text to render. Provide this or `text`. */
@@ -11,11 +40,10 @@ interface RemTextProps {
 }
 
 /**
- * Lightweight renderer for a rem's text:
- *  - normal rem references → their text wrapped in `[ ]` markers
- *  - pin references         → a 📌 icon whose hover tooltip is the referenced text
- *
- * Renders plain spans only (no SDK embed), so it is cheap in long lists.
+ * Lightweight renderer for a rem's text. Resolves rem references asynchronously
+ * (normal references → `[ ]`-wrapped text, pins → tooltip icon) then renders
+ * plain spans. Use {@link RemTextSegments} directly when segments are already
+ * resolved upstream.
  */
 export function RemText({ remId, text, className }: RemTextProps) {
   const plugin = usePlugin();
@@ -37,17 +65,5 @@ export function RemText({ remId, text, className }: RemTextProps) {
     return <span className={className}>[Empty rem]</span>;
   }
 
-  return (
-    <span className={className}>
-      {segments.map((seg, i) =>
-        seg.kind === 'pin' ? (
-          <span key={i} title={seg.text} style={{ cursor: 'help', opacity: 0.7 }}>
-            📌
-          </span>
-        ) : (
-          <React.Fragment key={i}>{seg.text}</React.Fragment>
-        )
-      )}
-    </span>
-  );
+  return <RemTextSegments segments={segments} className={className} />;
 }

@@ -28,6 +28,7 @@ import {
 } from '../lib/hierarchical_parent_selector/treeHelpers';
 import { createRemUnderParent } from '../lib/highlightActions';
 import { getIncrementalPageRange } from '../lib/pdfUtils';
+import { RemTextSegments } from '../components';
 
 // ============================================================================
 // STYLES
@@ -277,7 +278,7 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         }}
         title={isSuggested ? `Suggested — its page range contains page ${node.name}` : node.name}
       >
-        {node.name.length > 50 ? `${node.name.slice(0, 50)}...` : node.name}
+        <RemTextSegments segments={node.nameSegments} />
       </span>
 
       <AddChildButton

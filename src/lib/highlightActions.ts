@@ -112,6 +112,7 @@ import {
   ParentTreeNode,
   ParentSelectorContext,
 } from './hierarchical_parent_selector/types';
+import { resolveRemTextSegments } from './richTextRemRefs';
 import {
   findAllRemsForPDFAsTree,
   findAllRemsForHTMLAsTree,
@@ -397,6 +398,7 @@ export const createRemFromHighlight = async (
     rootCandidates.push({
       remId: sourceDocument._id,
       name: sourceText,
+      nameSegments: await resolveRemTextSegments(plugin, sourceDocument.text || []),
       priority: null,
       percentile: null,
       isIncremental: false,
