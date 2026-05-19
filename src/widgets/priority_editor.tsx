@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, cardPriorityCacheRefreshKey, pageRangeWidgetId } from '../lib/consts';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, pageRangeWidgetId } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { calculateRelativePercentile, formatDuration } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
@@ -57,11 +57,13 @@ export function PriorityEditor() {
   const pdfEndRef = useRef<HTMLInputElement>(null);
   const pdfPageRef = useRef<HTMLInputElement>(null);
 
-  // Listen for cache refresh signal to force re-evaluation of all data
-  const refreshSignal = useTrackerPlugin(
-    (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
-    []
-  );
+  // NOTE: We intentionally do NOT subscribe to the global cardPriorityCacheRefreshKey
+  // here. This widget is registered as RightSideOfEditor, meaning RemNote creates one
+  // instance per visible rem. Subscribing all instances to a global cache-flush signal
+  // causes N widgets × M cache-flushes worth of heavy async queries (getIncrementalRemFromRem,
+  // getCardPriority, getCards, etc.) to fire simultaneously, blocking the UI for 30+ seconds.
+  // The useTrackerPlugin hooks below already provide built-in reactivity for this rem's
+  // own powerup property changes — the global broadcast is not needed.
 
   // Bumped after the user pins a new active PDF, so the host-info refetch
   // picks up the new active-PDF resolution. Otherwise `useRunAsync` keyed on
@@ -118,7 +120,7 @@ export function PriorityEditor() {
       htmlRemId: htmlRem._id,
       htmlRemName,
     };
-  }, [remId, pinRefreshCounter, refreshSignal]);
+  }, [remId, pinRefreshCounter]);
 
   const pdfOptions = hostInfo?.pdfOptions ?? [];
   const activePdfId = hostInfo?.activePdfId ?? null;
@@ -203,7 +205,7 @@ export function PriorityEditor() {
         displayMode: displayMode || 'all',
       };
     },
-    [remId, refreshSignal]
+    [remId]
   );
 
   // Host data (range / history / stats). Reads only from the synced storage
