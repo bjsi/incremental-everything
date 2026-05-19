@@ -576,7 +576,7 @@ export function CardPriorityDisplay() {
                     fontWeight: isKbShieldActive ? 700 : 'inherit',
                     color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
                   }}>
-                    KB: <PriorityBadge priority={shieldStatus.kb.absolute} percentile={shieldStatus.kb.percentile} compact />
+                    KB: <strong style={{ color: percentileToHslColor(shieldStatus.kb.percentile ?? shieldStatus.kb.absolute) }}>{shieldStatus.kb.absolute}</strong>
                     {shieldStatus.kb.percentile !== undefined && ` (${shieldStatus.kb.percentile.toFixed(1)}%)`}
                   </span>
                 )}
@@ -586,7 +586,7 @@ export function CardPriorityDisplay() {
                     fontWeight: isDocShieldActive ? 700 : 'inherit',
                     color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
                   }}>
-                    Doc: <PriorityBadge priority={shieldStatus.doc.absolute} percentile={shieldStatus.doc.percentile} compact />
+                    Doc: <strong style={{ color: percentileToHslColor(shieldStatus.doc.percentile ?? shieldStatus.doc.absolute) }}>{shieldStatus.doc.absolute}</strong>
                     {shieldStatus.doc.percentile !== undefined && ` (${shieldStatus.doc.percentile.toFixed(1)}%)`}
                   </span>
                 )}

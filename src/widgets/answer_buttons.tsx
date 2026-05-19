@@ -805,7 +805,7 @@ export function AnswerButtons() {
                         animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
                         color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
                       }}>
-                        KB: <strong>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile?.toFixed(1)}%)
+                        KB: <strong style={{ color: percentileToHslColor(shieldStatusAsync.kb.percentile ?? shieldStatusAsync.kb.absolute) }}>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile?.toFixed(1)}%)
                       </span>
                     ) : (
                       <span>KB: 100%</span>
@@ -815,7 +815,7 @@ export function AnswerButtons() {
                         animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
                         color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
                       }}>
-                        Doc: <strong>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile?.toFixed(1)}%)
+                        Doc: <strong style={{ color: percentileToHslColor(shieldStatusAsync.doc.percentile ?? shieldStatusAsync.doc.absolute) }}>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile?.toFixed(1)}%)
                       </span>
                     ) : (
                       sessionCache?.dueIncRemsInScope && <span>Doc: 100%</span>
