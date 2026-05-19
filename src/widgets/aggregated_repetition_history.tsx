@@ -4,7 +4,8 @@ import { IncrementalRep } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
-import { safeRemTextToString } from '../lib/pdfUtils'; // Reuse this safe string converter
+import { resolveRemTextSegments } from '../lib/richTextRemRefs';
+import { RemTextSegments } from '../components';
 
 // --- Types ---
 
@@ -204,10 +205,10 @@ const TreeNode = ({
     const [expanded, setExpanded] = useState(false);
     const node = data.nodes[nodeId];
 
-    const remName = useRunAsync(async () => {
-        if (!node) return 'Untitled';
-        return await safeRemTextToString(plugin, node.remText) || 'Untitled';
-    }, [node?.remText]) || 'Loading...';
+    const nameSegments = useRunAsync(async () => {
+        if (!node) return [];
+        return await resolveRemTextSegments(plugin, node.remText);
+    }, [node?.remText]);
 
     if (!node) return null;
 
@@ -253,7 +254,11 @@ const TreeNode = ({
                     <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {node.isIncremental && <span style={{ color: 'var(--rn-clr-green, #22c55e)', marginRight: '4px' }}>●</span>}
                         {node.isDismissed && <span style={{ color: 'var(--rn-clr-orange, #f59e0b)', marginRight: '4px' }}>●</span>}
-                        {remName}
+                        {nameSegments === undefined
+                            ? 'Loading...'
+                            : nameSegments.length > 0
+                                ? <RemTextSegments segments={nameSegments} />
+                                : 'Untitled'}
                     </div>
 
                     <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', minWidth: '40px', textAlign: 'right' }}>
@@ -446,7 +451,7 @@ function AggregatedRepetitionHistoryPopup() {
     }, []);
 
     const containerStyle: React.CSSProperties = {
-        width: '450px',
+        width: '550px',
         maxHeight: '850px',
         backgroundColor: 'var(--rn-clr-background-primary)',
         borderRadius: '12px',
