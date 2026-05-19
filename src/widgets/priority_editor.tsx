@@ -77,26 +77,26 @@ export function PriorityEditor() {
     | { hostKind: 'html'; pdfOptions: []; activePdfId: null; htmlRemId: string; htmlRemName: string | null }
     | { hostKind: null; pdfOptions: []; activePdfId: null; htmlRemId: null; htmlRemName: null };
 
-  const hostInfo = useRunAsync(async (): Promise<HostInfo | null> => {
+  const hostInfo = useTrackerPlugin(async (rp): Promise<HostInfo | null> => {
     if (!remId) return null;
-    const rem = await plugin.rem.findOne(remId);
+    const rem = await rp.rem.findOne(remId);
     if (!rem) return null;
 
-    const pdfs = await getAllPDFsInRem(plugin as any, rem);
+    const pdfs = await getAllPDFsInRem(rp as any, rem);
 
     if (pdfs.length > 0) {
       const pdfOptions = await Promise.all(
         pdfs.map(async (p) => ({
           remId: p.rem._id,
-          name: await safeRemTextToString(plugin as any, p.rem.text),
+          name: await safeRemTextToString(rp as any, p.rem.text),
           isPreferred: p.isPreferred,
         }))
       );
-      const activePdf = await getActivePdfForIncRem(plugin as any, rem);
+      const activePdf = await getActivePdfForIncRem(rp as any, rem);
       // Also resolve the HTML rem — bookmarks saved in Text Reader mode are
       // stored under the HTML rem's history key even when a PDF is present.
-      const htmlRem = await findHTMLinRem(plugin as any, rem);
-      const htmlRemName = htmlRem?.text ? await safeRemTextToString(plugin as any, htmlRem.text) : null;
+      const htmlRem = await findHTMLinRem(rp as any, rem);
+      const htmlRemName = htmlRem?.text ? await safeRemTextToString(rp as any, htmlRem.text) : null;
       return {
         hostKind: 'pdf',
         pdfOptions,
@@ -106,11 +106,11 @@ export function PriorityEditor() {
       };
     }
 
-    const htmlRem = await findHTMLinRem(plugin as any, rem);
+    const htmlRem = await findHTMLinRem(rp as any, rem);
     if (!htmlRem) {
       return { hostKind: null, pdfOptions: [], activePdfId: null, htmlRemId: null, htmlRemName: null };
     }
-    const htmlRemName = htmlRem.text ? await safeRemTextToString(plugin as any, htmlRem.text) : null;
+    const htmlRemName = htmlRem.text ? await safeRemTextToString(rp as any, htmlRem.text) : null;
     return {
       hostKind: 'html',
       pdfOptions: [],
@@ -118,7 +118,7 @@ export function PriorityEditor() {
       htmlRemId: htmlRem._id,
       htmlRemName,
     };
-  }, [remId, pinRefreshCounter]);
+  }, [remId, pinRefreshCounter, refreshSignal]);
 
   const pdfOptions = hostInfo?.pdfOptions ?? [];
   const activePdfId = hostInfo?.activePdfId ?? null;
