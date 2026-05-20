@@ -418,66 +418,175 @@ async function loadDocumentData(
     scope: ScopeMode,
     onProgress: (p: number, label: string) => void
 ): Promise<LoadedDocumentData> {
-    onProgress(0.05, 'Gathering rems…');
+    onProgress(0.02, 'Fetching tagged rems…');
 
-    let inScopeIds: Set<string>;
-    let inScopeRems: PluginRem[];
+    // Same bulk strategy as Global: pull inc/dism/cardPriority taggedRems plus all
+    // cards once, then iterate the scope without per-rem hasPowerup / getCards calls.
+    const [incPup, dismPup, cpPup] = await Promise.all([
+        plugin.powerup.getPowerupByCode(powerupCode),
+        plugin.powerup.getPowerupByCode(dismissedPowerupCode),
+        plugin.powerup.getPowerupByCode(CARD_PRIORITY_CODE),
+    ]);
+    const [incRems, dismRems, cpRems, allCards] = await Promise.all([
+        (incPup?.taggedRem() as Promise<PluginRem[] | undefined>) || Promise.resolve([]),
+        (dismPup?.taggedRem() as Promise<PluginRem[] | undefined>) || Promise.resolve([]),
+        (cpPup?.taggedRem() as Promise<PluginRem[] | undefined>) || Promise.resolve([]),
+        plugin.card.getAll(),
+    ]);
 
+    // pluginRemById: every PluginRem we already have (no findOne needed for these).
+    const pluginRemById = new Map<string, PluginRem>();
+    for (const r of cpRems || []) pluginRemById.set(r._id, r);
+    for (const r of incRems || []) pluginRemById.set(r._id, r);
+    for (const r of dismRems || []) pluginRemById.set(r._id, r);
+
+    const incSet = new Set((incRems || []).map((r) => r._id));
+    const dismSet = new Set((dismRems || []).map((r) => r._id));
+
+    const cardsByRem = new Map<string, CardData[]>();
+    for (const c of allCards || []) {
+        const cd: CardData = {
+            id: c._id,
+            remId: c.remId,
+            history: (c as any).repetitionHistory || [],
+        };
+        let arr = cardsByRem.get(c.remId);
+        if (!arr) {
+            arr = [];
+            cardsByRem.set(c.remId, arr);
+        }
+        arr.push(cd);
+    }
+
+    onProgress(0.12, 'Gathering scope…');
+
+    let scopeIds: string[];
     if (scope === 'descendants') {
         const descendants = await rootRem.getDescendants();
         const all = [rootRem, ...descendants];
-        inScopeIds = new Set(all.map((r) => r._id));
-        inScopeRems = all;
+        for (const r of all) {
+            if (!pluginRemById.has(r._id)) pluginRemById.set(r._id, r);
+        }
+        scopeIds = all.map((r) => r._id);
     } else {
-        const scopeIds = await buildComprehensiveScope(plugin, rootRem._id);
-        inScopeIds = new Set(scopeIds);
-        const fetched = await chunked(
-            Array.from(scopeIds),
-            async (id) => plugin.rem.findOne(id),
-            (done, total) =>
-                onProgress(0.05 + 0.15 * (done / Math.max(1, total)), `Loading rems (${done}/${total})`)
-        );
-        inScopeRems = fetched.filter((r): r is PluginRem => !!r);
+        const set = await buildComprehensiveScope(plugin, rootRem._id);
+        scopeIds = Array.from(set);
     }
 
-    onProgress(0.2, `Reading history for ${inScopeRems.length} rems…`);
+    onProgress(0.3, `Resolving ${scopeIds.length} rems…`);
 
-    const remDataList: RemData[] = await chunked(
-        inScopeRems,
-        (r) => loadRemData(plugin, r),
-        (done, total) =>
-            onProgress(0.2 + 0.6 * (done / Math.max(1, total)), `History (${done}/${total})`)
-    );
+    // Any scope ids whose PluginRem we don't already have — fetch in parallel.
+    // For typical KBs this is a small minority since cardPriority covers most.
+    const missingIds: string[] = [];
+    for (const id of scopeIds) {
+        if (!pluginRemById.has(id)) missingIds.push(id);
+    }
+    if (missingIds.length > 0) {
+        await chunked(
+            missingIds,
+            async (id) => {
+                const r = await plugin.rem.findOne(id);
+                if (r) pluginRemById.set(id, r);
+                return null;
+            },
+            (done, total) =>
+                onProgress(0.3 + 0.2 * (done / Math.max(1, total)), `Loading rems (${done}/${total})`)
+        );
+    }
+
+    onProgress(0.5, 'Classifying…');
+
+    // Classify scope rems: data-bearing (inc/dism tagged or has cards) vs structural-only.
+    const remDataList: RemData[] = [];
     const remDataById: Record<string, RemData> = {};
-    for (const rd of remDataList) remDataById[rd.id] = rd;
+    const stubData: Record<string, { parentId: string | null; remText: any }> = {};
+    const taggedScopeIds: string[] = []; // need history reads
 
-    onProgress(0.85, 'Resolving ancestors…');
+    for (const id of scopeIds) {
+        const rem = pluginRemById.get(id);
+        if (!rem) continue;
+        const isInc = incSet.has(id);
+        const isDism = dismSet.has(id);
+        const cards = cardsByRem.get(id) || [];
+        if (isInc || isDism) {
+            taggedScopeIds.push(id);
+        } else if (cards.length > 0) {
+            // Card-only rem: no history to fetch — populate immediately.
+            const rd: RemData = {
+                id,
+                parentId: rem.parent || null,
+                remText: rem.text,
+                isInc: false,
+                isDism: false,
+                incHistory: [],
+                dismHistory: [],
+                cards,
+            };
+            remDataById[id] = rd;
+            remDataList.push(rd);
+        } else {
+            // No data — keep as structural node so the tree stays connected.
+            stubData[id] = { parentId: rem.parent || null, remText: rem.text };
+        }
+    }
 
-    // For comprehensive: include structural ancestors not in scope so each in-scope
-    // rem connects upward to a root. Walk parents in-memory using rd.parentId then
-    // findOne for any ancestor we don't already know.
+    onProgress(0.55, `Reading histories for ${taggedScopeIds.length} tagged rems…`);
+
+    // Read histories only for tagged-in-scope rems — orders of magnitude less than
+    // running loadRemData on every scope rem.
+    await chunked(
+        taggedScopeIds,
+        async (id) => {
+            const rem = pluginRemById.get(id);
+            if (!rem) return null;
+            const isInc = incSet.has(id);
+            const isDism = dismSet.has(id);
+            const cards = cardsByRem.get(id) || [];
+            const [incHistory, dismHistory] = await Promise.all([
+                isInc ? readIncHistoryRaw(rem) : Promise.resolve([] as IncrementalRep[]),
+                isDism ? readDismHistoryRaw(rem) : Promise.resolve([] as IncrementalRep[]),
+            ]);
+            const rd: RemData = {
+                id,
+                parentId: rem.parent || null,
+                remText: rem.text,
+                isInc,
+                isDism,
+                incHistory,
+                dismHistory,
+                cards,
+            };
+            remDataById[id] = rd;
+            remDataList.push(rd);
+            return null;
+        },
+        (done, total) =>
+            onProgress(0.55 + 0.3 * (done / Math.max(1, total)), `Histories (${done}/${total})`)
+    );
+
+    onProgress(0.87, 'Resolving ancestors…');
+
+    // For comprehensive: walk parents to add structural ancestors not in scope.
     const ancestorIds = new Set<string>();
+    const inScopeSet = new Set<string>([...Object.keys(remDataById), ...Object.keys(stubData)]);
     if (scope === 'comprehensive') {
         for (const rd of remDataList) {
             let p = rd.parentId;
-            while (p && !inScopeIds.has(p) && !ancestorIds.has(p)) {
+            while (p && !inScopeSet.has(p) && !ancestorIds.has(p)) {
                 ancestorIds.add(p);
-                const ancestor = await plugin.rem.findOne(p);
+                let ancestor = pluginRemById.get(p);
+                if (!ancestor) {
+                    ancestor = (await plugin.rem.findOne(p)) || undefined;
+                    if (ancestor) pluginRemById.set(p, ancestor);
+                }
                 if (!ancestor) break;
                 p = ancestor.parent || null;
             }
         }
     }
-
-    // Materialise ancestor stubs in parallel.
-    const stubData: Record<string, { parentId: string | null; remText: any }> = {};
-    if (ancestorIds.size > 0) {
-        const ids = Array.from(ancestorIds);
-        await chunked(ids, async (id) => {
-            const r = await plugin.rem.findOne(id);
-            if (r) stubData[id] = { parentId: r.parent || null, remText: r.text };
-            return null;
-        });
+    for (const id of ancestorIds) {
+        const r = pluginRemById.get(id);
+        if (r) stubData[id] = { parentId: r.parent || null, remText: r.text };
     }
 
     onProgress(0.95, 'Building tree…');
