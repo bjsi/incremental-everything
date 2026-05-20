@@ -20,6 +20,38 @@ import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { formatDuration, tryParseJson } from '../lib/utils';
 import { resolveRemTextSegments } from '../lib/richTextRemRefs';
 import { RemTextSegments } from '../components';
+import '../style.css';
+import '../App.css';
+
+// ---------------------------------------------------------------------------
+// Style helpers (mirroring the statistics plugin's chartHelpers)
+// ---------------------------------------------------------------------------
+const ACCENT_COLOR = '#3362f0';
+function getBoxStyle(): React.CSSProperties {
+    return {
+        backgroundColor: 'var(--rn-clr-background-secondary)',
+        borderColor: 'var(--rn-clr-border-primary)',
+        color: 'var(--rn-clr-content-primary)',
+    };
+}
+function getInputStyle(): React.CSSProperties {
+    return {
+        backgroundColor: 'var(--rn-clr-background-primary)',
+        borderColor: 'var(--rn-clr-border-primary)',
+        color: 'var(--rn-clr-content-primary)',
+    };
+}
+function getButtonStyle(isSelected: boolean): React.CSSProperties {
+    return {
+        backgroundColor: isSelected ? ACCENT_COLOR : 'var(--rn-clr-background-primary)',
+        color: isSelected ? '#fff' : 'var(--rn-clr-content-secondary)',
+        border: isSelected ? 'none' : '1px solid var(--rn-clr-border-primary)',
+        boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.15)' : '0 1px 2px 0 rgba(0,0,0,0.05)',
+        fontWeight: isSelected ? 600 : 400,
+        transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+        transition: 'all 0.2s ease-in-out',
+    };
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -915,27 +947,6 @@ async function buildSubtreeForTop(
 // UI components
 // ---------------------------------------------------------------------------
 
-const periodPresets: { id: Period; label: string }[][] = [
-    [
-        { id: 'today', label: 'Today' },
-        { id: 'week', label: 'Week' },
-        { id: 'month', label: 'Month' },
-        { id: 'year', label: 'Year' },
-        { id: 'all', label: 'All' },
-    ],
-    [
-        { id: 'yesterday', label: 'Yesterday' },
-        { id: 'thisWeek', label: 'This Week' },
-        { id: 'thisMonth', label: 'This Month' },
-        { id: 'thisYear', label: 'This Year' },
-    ],
-    [
-        { id: 'lastWeek', label: 'Last Week' as any },
-        { id: 'lastMonth', label: 'Last Month' },
-        { id: 'lastYear', label: 'Last Year' },
-    ],
-];
-
 function PeriodPicker({
     period,
     onChange,
@@ -949,37 +960,54 @@ function PeriodPicker({
     customEnd: string;
     onCustomChange: (s: string, e: string) => void;
 }) {
-    const btn = (id: Period, label: string) => {
-        const active = id === period;
-        return (
-            <button
-                key={id}
-                onClick={() => onChange(id)}
-                style={{
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    border: '1px solid var(--rn-clr-border-primary)',
-                    background: active ? 'var(--rn-clr-blue-500, #3b82f6)' : 'transparent',
-                    color: active ? '#fff' : 'var(--rn-clr-content-primary)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    minWidth: 90,
-                }}
-            >
-                {label}
-            </button>
-        );
-    };
+    const inputStyle = getInputStyle();
+    const renderPresetBtn = (label: string, id: Period) => (
+        <button
+            onClick={() => onChange(id)}
+            className="w-full h-full rounded px-2 py-1 text-xs transition-all hover:opacity-90 flex items-center justify-center"
+            style={getButtonStyle(id === period)}
+        >
+            {label}
+        </button>
+    );
+
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {periodPresets.map((row, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {row.map((p) => btn(p.id, p.label))}
+        <div>
+            {/* 5x3 grid matching the statistics plugin */}
+            <div className="grid gap-1 md:gap-1.5 grid-cols-3 sm:grid-cols-5">
+                <div style={{ gridColumn: '1', gridRow: '1 / 3' }}>
+                    {renderPresetBtn('Today', 'today')}
                 </div>
-            ))}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: 10, color: 'var(--rn-clr-content-tertiary)' }}>Start</span>
+                <div style={{ gridColumn: '1', gridRow: '3' }}>
+                    {renderPresetBtn('Yesterday', 'yesterday')}
+                </div>
+
+                <div style={{ gridColumn: '2', gridRow: '1' }}>{renderPresetBtn('Week', 'week')}</div>
+                <div style={{ gridColumn: '2', gridRow: '2' }}>{renderPresetBtn('This Week', 'thisWeek')}</div>
+                <div style={{ gridColumn: '2', gridRow: '3' }}>{renderPresetBtn('Last Week', 'lastWeek')}</div>
+
+                <div style={{ gridColumn: '3', gridRow: '1' }}>{renderPresetBtn('Month', 'month')}</div>
+                <div style={{ gridColumn: '3', gridRow: '2' }}>{renderPresetBtn('This Month', 'thisMonth')}</div>
+                <div style={{ gridColumn: '3', gridRow: '3' }}>{renderPresetBtn('Last Month', 'lastMonth')}</div>
+
+                <div style={{ gridColumn: '4', gridRow: '1' }}>{renderPresetBtn('Year', 'year')}</div>
+                <div style={{ gridColumn: '4', gridRow: '2' }}>{renderPresetBtn('This Year', 'thisYear')}</div>
+                <div style={{ gridColumn: '4', gridRow: '3' }}>{renderPresetBtn('Last Year', 'lastYear')}</div>
+
+                <div style={{ gridColumn: '5', gridRow: '1 / 4' }}>
+                    <button
+                        onClick={() => onChange('all')}
+                        className="w-full h-full rounded px-2 py-1 text-xs transition-all hover:opacity-90 flex items-center justify-center font-bold"
+                        style={getButtonStyle(period === 'all')}
+                    >
+                        All
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 md:gap-4 items-end mt-3">
+                <div className="flex flex-col flex-1 min-w-[120px]">
+                    <span className="text-xs opacity-70 mb-1">Start Date</span>
                     <input
                         type="date"
                         value={customStart}
@@ -987,11 +1015,12 @@ function PeriodPicker({
                             onCustomChange(e.target.value, customEnd);
                             onChange('custom');
                         }}
-                        style={{ fontSize: 12, padding: '4px 6px' }}
+                        className="border rounded px-2 py-1 text-sm w-full"
+                        style={inputStyle}
                     />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: 10, color: 'var(--rn-clr-content-tertiary)' }}>End</span>
+                <div className="flex flex-col flex-1 min-w-[120px]">
+                    <span className="text-xs opacity-70 mb-1">End Date</span>
                     <input
                         type="date"
                         value={customEnd}
@@ -999,21 +1028,17 @@ function PeriodPicker({
                             onCustomChange(customStart, e.target.value);
                             onChange('custom');
                         }}
-                        style={{ fontSize: 12, padding: '4px 6px' }}
+                        className="border rounded px-2 py-1 text-sm w-full"
+                        style={inputStyle}
                     />
                 </div>
                 {period === 'custom' && (
                     <button
                         onClick={() => onChange('today')}
-                        style={{
-                            fontSize: 11,
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--rn-clr-blue-500, #3b82f6)',
-                            cursor: 'pointer',
-                        }}
+                        className="text-xs hover:underline mb-2 ml-auto"
+                        style={{ color: ACCENT_COLOR }}
                     >
-                        Clear
+                        Clear Filter
                     </button>
                 )}
             </div>
@@ -1629,151 +1654,212 @@ function StudyDashboardPopup() {
     };
 
     return (
-        <div style={containerStyle}>
+        <div style={containerStyle} className="statisticsBody">
             {/* Header */}
             <div
-                style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--rn-clr-border-primary)',
-                    background: 'var(--rn-clr-background-secondary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                }}
+                style={{ flex: '0 0 auto', padding: '1rem', borderBottom: '1px solid var(--rn-clr-border-primary)' }}
+                className="md:px-6"
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 16 }}>📊</span>
-                    <span style={{ fontWeight: 600, fontSize: 14 }}>Study Dashboard</span>
-                </div>
-                <button
-                    onClick={() => plugin.widget.closePopup()}
-                    style={{
-                        background: 'none',
-                        border: 'none',
-                        fontSize: 18,
-                        cursor: 'pointer',
-                        opacity: 0.6,
-                    }}
-                    title="Close"
-                >
-                    ✕
-                </button>
-            </div>
-
-            {/* Filters */}
-            <div
-                style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--rn-clr-border-primary)',
-                    background: 'var(--rn-clr-background-secondary)',
-                    display: 'flex',
-                    gap: 24,
-                    flexWrap: 'wrap',
-                }}
-            >
-                <div>
-                    <div
-                        style={{
-                            fontSize: 10,
-                            fontWeight: 600,
-                            color: 'var(--rn-clr-content-tertiary)',
-                            textTransform: 'uppercase',
-                            marginBottom: 6,
-                        }}
-                    >
-                        Context
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <label
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}
+                <div className="flex items-center justify-between gap-2 md:gap-3">
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-6 h-6 md:w-7 md:h-7"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ color: ACCENT_COLOR }}
                         >
-                            <input
-                                type="radio"
-                                checked={contextMode === 'global'}
-                                onChange={() => setContextMode('global')}
-                            />
-                            Global
-                        </label>
-                        <label
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                fontSize: 12,
-                                cursor: ctxRemId ? 'pointer' : 'not-allowed',
-                                opacity: ctxRemId ? 1 : 0.5,
-                            }}
-                        >
-                            <input
-                                type="radio"
-                                disabled={!ctxRemId}
-                                checked={contextMode === 'document'}
-                                onChange={() => setContextMode('document')}
-                            />
-                            Document
-                        </label>
-                    </div>
-                    {contextMode === 'document' && (
-                        <div style={{ marginTop: 8 }}>
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        <div>
                             <div
-                                style={{
-                                    fontSize: 10,
-                                    fontWeight: 600,
-                                    color: 'var(--rn-clr-content-tertiary)',
-                                    textTransform: 'uppercase',
-                                    marginBottom: 4,
-                                }}
+                                className="font-bold text-lg md:text-2xl"
+                                style={{ color: 'var(--rn-clr-content-primary)' }}
                             >
-                                Scope
+                                Study Dashboard
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 12, cursor: 'pointer' }}>
-                                    <input
-                                        type="radio"
-                                        checked={scope === 'descendants'}
-                                        onChange={() => setScope('descendants')}
-                                    />{' '}
-                                    Descendants Only
-                                </label>
-                                <label style={{ fontSize: 12, cursor: 'pointer' }}>
-                                    <input
-                                        type="radio"
-                                        checked={scope === 'comprehensive'}
-                                        onChange={() => setScope('comprehensive')}
-                                    />{' '}
-                                    Comprehensive
-                                </label>
+                            <div className="text-xs md:text-sm opacity-60 hidden sm:block">
+                                Filterable summary of Incremental, Dismissed, and Flashcard activity
                             </div>
                         </div>
-                    )}
-                </div>
-                <div style={{ flex: 1 }}>
-                    <div
-                        style={{
-                            fontSize: 10,
-                            fontWeight: 600,
-                            color: 'var(--rn-clr-content-tertiary)',
-                            textTransform: 'uppercase',
-                            marginBottom: 6,
-                        }}
-                    >
-                        Period
                     </div>
-                    <PeriodPicker
-                        period={period}
-                        onChange={setPeriod}
-                        customStart={customStart}
-                        customEnd={customEnd}
-                        onCustomChange={(s, e) => {
-                            setCustomStart(s);
-                            setCustomEnd(e);
+                    <button
+                        onClick={() => plugin.widget.closePopup()}
+                        className="flex items-center justify-center p-2 rounded-lg transition-all hover:opacity-80"
+                        style={{
+                            backgroundColor: 'var(--rn-clr-background-secondary)',
+                            border: '1px solid var(--rn-clr-border-primary)',
+                            cursor: 'pointer',
                         }}
-                    />
+                        title="Close"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
                 </div>
             </div>
 
-            {/* Progress / Summary / Hierarchy */}
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            {/* Scrollable body */}
+            <div className="custom-scroll" style={{ flex: '1 1 0', overflowY: 'auto', overflowX: 'hidden', padding: '1rem' }}>
+                {/* --- Controls section --- */}
+                <div
+                    className="mb-6 p-4 md:p-6 border rounded-lg shadow-sm fade-in"
+                    style={{ ...getBoxStyle(), borderRadius: '12px' }}
+                >
+                    <div className="flex flex-col md:flex-row gap-6">
+                        {/* Context column */}
+                        <div
+                            className="flex-1 md:border-r md:pr-6 flex flex-col pb-4 md:pb-0 border-b md:border-b-0"
+                            style={{ borderColor: 'var(--rn-clr-border-primary)' }}
+                        >
+                            <div className="flex items-center gap-2 mb-2 md:mb-3">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-4 h-4"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    style={{ opacity: 0.7 }}
+                                >
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                </svg>
+                                <h4 className="font-bold text-xs md:text-sm uppercase tracking-wide opacity-70">
+                                    Context
+                                </h4>
+                            </div>
+                            <div className="flex flex-col gap-1.5 md:gap-2">
+                                <label className="flex items-center space-x-2 cursor-pointer text-sm md:text-base">
+                                    <input
+                                        type="radio"
+                                        checked={contextMode === 'global'}
+                                        onChange={() => setContextMode('global')}
+                                        className="form-radio w-4 h-4"
+                                        style={{ accentColor: ACCENT_COLOR }}
+                                    />
+                                    <span>Global</span>
+                                </label>
+                                <label
+                                    className="flex items-center space-x-2 cursor-pointer text-sm md:text-base"
+                                    style={{ opacity: ctxRemId ? 1 : 0.5, cursor: ctxRemId ? 'pointer' : 'not-allowed' }}
+                                >
+                                    <input
+                                        type="radio"
+                                        disabled={!ctxRemId}
+                                        checked={contextMode === 'document'}
+                                        onChange={() => setContextMode('document')}
+                                        className="form-radio w-4 h-4"
+                                        style={{ accentColor: ACCENT_COLOR }}
+                                    />
+                                    <span>Document</span>
+                                </label>
+                            </div>
+
+                            {contextMode === 'document' && (
+                                <div className="mt-2 pl-6 flex flex-col gap-1">
+                                    <div className="text-xs opacity-50 uppercase tracking-wide mb-1">Scope</div>
+                                    <label className="flex items-center space-x-2 cursor-pointer text-xs">
+                                        <input
+                                            type="radio"
+                                            checked={scope === 'descendants'}
+                                            onChange={() => setScope('descendants')}
+                                            className="form-radio h-3 w-3"
+                                            style={{ accentColor: ACCENT_COLOR }}
+                                        />
+                                        <span>Descendants Only</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer text-xs">
+                                        <input
+                                            type="radio"
+                                            checked={scope === 'comprehensive'}
+                                            onChange={() => setScope('comprehensive')}
+                                            className="form-radio h-3 w-3"
+                                            style={{ accentColor: ACCENT_COLOR }}
+                                        />
+                                        <span>Comprehensive</span>
+                                        <span
+                                            className="opacity-50 hover:opacity-100 cursor-help transition-opacity"
+                                            title="Descendants, Rems that reference or are tagged with this rem and its descendants, Sources, Portals and Table Views"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="14"
+                                                height="14"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            >
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                            </svg>
+                                        </span>
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Period column */}
+                        <div className="flex-[3] flex flex-col gap-2 md:gap-3">
+                            <div className="flex items-center gap-2 mb-2 md:mb-3">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-4 h-4"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    style={{ opacity: 0.7 }}
+                                >
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                                <h4 className="font-bold text-xs md:text-sm uppercase tracking-wide opacity-70">
+                                    Period
+                                </h4>
+                            </div>
+                            <PeriodPicker
+                                period={period}
+                                onChange={setPeriod}
+                                customStart={customStart}
+                                customEnd={customEnd}
+                                onCustomChange={(s, e) => {
+                                    setCustomStart(s);
+                                    setCustomEnd(e);
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Progress / Summary / Hierarchy */}
                 {progress.running && (
                     <div style={{ padding: '12px 16px' }}>
                         <div
