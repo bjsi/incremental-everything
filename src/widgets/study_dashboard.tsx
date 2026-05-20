@@ -566,22 +566,24 @@ async function loadDocumentData(
 
     onProgress(0.87, 'Resolving ancestors…');
 
-    // For comprehensive: walk parents to add structural ancestors not in scope.
+    // Walk every in-scope node's parent chain — both data-bearing rems AND structural
+    // stubs — and add any unseen ancestors as new structural stubs. Doing this for both
+    // scope modes (not just comprehensive) protects against fragmented trees when a
+    // rem's `.parent` points outside whatever the scope-builder gathered.
     const ancestorIds = new Set<string>();
     const inScopeSet = new Set<string>([...Object.keys(remDataById), ...Object.keys(stubData)]);
-    if (scope === 'comprehensive') {
-        for (const rd of remDataList) {
-            let p = rd.parentId;
-            while (p && !inScopeSet.has(p) && !ancestorIds.has(p)) {
-                ancestorIds.add(p);
-                let ancestor = pluginRemById.get(p);
-                if (!ancestor) {
-                    ancestor = (await plugin.rem.findOne(p)) || undefined;
-                    if (ancestor) pluginRemById.set(p, ancestor);
-                }
-                if (!ancestor) break;
-                p = ancestor.parent || null;
+    const startingIds: string[] = [...Object.keys(remDataById), ...Object.keys(stubData)];
+    for (const id of startingIds) {
+        let p = (remDataById[id]?.parentId ?? stubData[id]?.parentId) || null;
+        while (p && !inScopeSet.has(p) && !ancestorIds.has(p)) {
+            ancestorIds.add(p);
+            let ancestor = pluginRemById.get(p);
+            if (!ancestor) {
+                ancestor = (await plugin.rem.findOne(p)) || undefined;
+                if (ancestor) pluginRemById.set(p, ancestor);
             }
+            if (!ancestor) break;
+            p = ancestor.parent || null;
         }
     }
     for (const id of ancestorIds) {
@@ -674,11 +676,34 @@ function aggregateDocumentData(
 
     for (const rid of rawRootIds) compute(rid);
 
-    // Drop roots whose entire subtree has no reps in the selected period.
-    const filteredRootIds = rawRootIds.filter((id) => {
-        const n = nodes[id];
-        return n && (n.aggr.incRemReps > 0 || n.aggr.cardReps > 0);
-    });
+    // Drop roots whose entire subtree has no reps in the selected period, then
+    // sort by total time descending (same convention as Global mode).
+    const filteredRootIds = rawRootIds
+        .filter((id) => {
+            const n = nodes[id];
+            return n && (n.aggr.incRemReps > 0 || n.aggr.cardReps > 0);
+        })
+        .sort((a, b) => {
+            const na = nodes[a].aggr;
+            const nb = nodes[b].aggr;
+            const tA = na.cardTimeMs + na.incRemTimeSec * 1000;
+            const tB = nb.cardTimeMs + nb.incRemTimeSec * 1000;
+            return tB - tA;
+        });
+
+    // Also sort each node's filtered children by total time descending.
+    for (const id of Object.keys(nodes)) {
+        const node = nodes[id];
+        if (node.childrenIds.length > 1) {
+            node.childrenIds.sort((a, b) => {
+                const na = nodes[a].aggr;
+                const nb = nodes[b].aggr;
+                const tA = na.cardTimeMs + na.incRemTimeSec * 1000;
+                const tB = nb.cardTimeMs + nb.incRemTimeSec * 1000;
+                return tB - tA;
+            });
+        }
+    }
 
     // Summary — walk remDataList directly.
     const summary: SummaryStats = {
@@ -1148,6 +1173,20 @@ function aggregateGlobalData(
             return nodes[id];
         };
         compute(topId);
+
+        // Sort each node's children by total time descending.
+        for (const nid of Object.keys(nodes)) {
+            const n = nodes[nid];
+            if (n.childrenIds.length > 1) {
+                n.childrenIds.sort((a, b) => {
+                    const na = nodes[a].aggr;
+                    const nb = nodes[b].aggr;
+                    const tA = na.cardTimeMs + na.incRemTimeSec * 1000;
+                    const tB = nb.cardTimeMs + nb.incRemTimeSec * 1000;
+                    return tB - tA;
+                });
+            }
+        }
 
         subtreesByTop.set(topId, { nodes, rootIds: [topId] });
     }
