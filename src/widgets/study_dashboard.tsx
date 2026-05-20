@@ -20,7 +20,7 @@ import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { formatDuration, tryParseJson } from '../lib/utils';
 import { resolveRemTextSegments } from '../lib/richTextRemRefs';
-import { RemTextSegments } from '../components';
+import { RemText, RemTextSegments } from '../components';
 import '../style.css';
 import '../App.css';
 
@@ -1786,20 +1786,14 @@ function StudyDashboardPopup() {
     }, []);
     const ctxRemId: string | undefined = (ctx as any)?.contextData?.remId;
 
-    const [contextMode, setContextMode] = useState<ContextMode>(
-        ctxRemId ? 'document' : 'global'
-    );
+    // Default to Global: it's the most common entry point and avoids surprising
+    // the user by silently scoping to whatever rem they happened to have focused.
+    // The user can switch to Document at any time (still allowed only when ctxRemId is present).
+    const [contextMode, setContextMode] = useState<ContextMode>('global');
     const [scope, setScope] = useState<ScopeMode>('comprehensive');
-    const [period, setPeriod] = useState<Period>('today');
+    const [period, setPeriod] = useState<Period>('thisYear');
     const [customStart, setCustomStart] = useState('');
     const [customEnd, setCustomEnd] = useState('');
-
-    useEffect(() => {
-        // Update default context once ctx loads
-        if (ctxRemId && contextMode !== 'document') {
-            setContextMode('document');
-        }
-    }, [ctxRemId]);
 
     const { startMs, endMs } = useMemo(
         () => resolvePeriod(period, customStart, customEnd),
@@ -2017,10 +2011,7 @@ function StudyDashboardPopup() {
                 >
                     <div className="flex flex-col md:flex-row gap-6">
                         {/* Context column */}
-                        <div
-                            className="flex-1 md:border-r md:pr-6 flex flex-col pb-4 md:pb-0 border-b md:border-b-0"
-                            style={{ borderColor: 'var(--rn-clr-border-primary)' }}
-                        >
+                        <div className="flex-1 md:pr-6 flex flex-col pb-4 md:pb-0">
                             <div className="flex items-center gap-2 mb-2 md:mb-3">
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
@@ -2062,7 +2053,13 @@ function StudyDashboardPopup() {
                                         className="form-radio w-4 h-4"
                                         style={{ accentColor: ACCENT_COLOR }}
                                     />
-                                    <span>Document</span>
+                                    <span
+                                        className="truncate"
+                                        style={{ maxWidth: '28ch', display: 'inline-block', verticalAlign: 'bottom' }}
+                                        title={ctxRemId ? undefined : 'No rem context — open the dashboard from an editor or queue card to enable Document mode.'}
+                                    >
+                                        {ctxRemId ? <RemText remId={ctxRemId} /> : 'Document'}
+                                    </span>
                                 </label>
                             </div>
 
