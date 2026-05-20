@@ -1184,6 +1184,37 @@ function SummaryCard({ summary }: { summary: SummaryStats }) {
                     )}
                 </div>
             </div>
+            {(() => {
+                const totalItems =
+                    summary.incTaggedCount + summary.dismTaggedCount + summary.cardsCount;
+                const totalWithReps =
+                    summary.incTaggedWithRepsCount +
+                    summary.dismTaggedWithRepsCount +
+                    summary.cardsWithRepsCount;
+                const totalReps = summary.incReps + summary.dismReps + summary.cardReps;
+                // Sum on a common scale (seconds): inc/dism are seconds, cards are ms.
+                const totalTimeSec =
+                    summary.incTimeSec + summary.dismTimeSec + Math.round(summary.cardTimeMs / 1000);
+                return (
+                    <div
+                        style={{
+                            ...rowStyle,
+                            background: 'var(--rn-clr-background-secondary)',
+                            fontWeight: 600,
+                        }}
+                    >
+                        <div>Total</div>
+                        <div style={{ textAlign: 'right' }}>{totalItems}</div>
+                        <div style={{ textAlign: 'right' }}>{totalWithReps}</div>
+                        <div style={{ textAlign: 'right' }}>{totalReps || '-'}</div>
+                        <div style={{ textAlign: 'right' }}>
+                            {totalTimeSec ? formatDuration(totalTimeSec) : '-'}
+                        </div>
+                        <div style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>-</div>
+                        <div style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>-</div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
