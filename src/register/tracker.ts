@@ -156,22 +156,31 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   };
 
   plugin.track(async (rp) => {
-    const pendingRemId = await rp.storage.getSession<string>('pendingInheritanceCascade');
-    if (!pendingRemId) return;
+    const pending = await rp.storage.getSession<string | string[]>('pendingInheritanceCascade');
+    if (!pending || (Array.isArray(pending) && pending.length === 0)) return;
 
     // Clear immediately to prevent re-trigger on the next track() tick
     await plugin.storage.setSession('pendingInheritanceCascade', null);
 
+    const remIds = Array.isArray(pending) ? pending : [pending];
+
     if (cascadeRunning) {
-      // Cascade already in progress — add to the queue for a follow-up pass
-      pendingCascadeRemIds.add(pendingRemId);
-      console.log('[Tracker] Cascade queued (cascade running) for remId:', pendingRemId);
+      // Cascade already in progress — add all to the queue for a follow-up pass
+      for (const id of remIds) pendingCascadeRemIds.add(id);
+      console.log('[Tracker] Cascade queued (cascade running) for', remIds.length, 'remId(s)');
       return;
     }
 
-    // Run the cascade immediately — no debounce needed.
-    console.log('[Tracker] Cascade triggered for remId:', pendingRemId);
-    await runCascade(pendingRemId);
+    // Run the cascade for the first remId; queue the rest so the runCascade
+    // finally-block drains them in sequence.
+    const [first, ...rest] = remIds;
+    for (const id of rest) pendingCascadeRemIds.add(id);
+    console.log(
+      '[Tracker] Cascade triggered for remId:',
+      first,
+      rest.length > 0 ? `(+ ${rest.length} queued)` : ''
+    );
+    await runCascade(first);
   });
 
   // Pending priority save watcher
