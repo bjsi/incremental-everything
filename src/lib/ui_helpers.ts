@@ -84,14 +84,22 @@ export async function registerPluginHidingCSS(plugin: ReactRNPlugin) {
 export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
   const css = `
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"],
-    [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] { 
+    [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] {
       background-color: #75ccf8 !important;
       padding-bottom: 2.7px;
-    } 
+    }
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"],
-    [data-rem-tags~="html-highlight"][data-rem-tags~="incremental"] { 
+    [data-rem-tags~="html-highlight"][data-rem-tags~="incremental"] {
       background-color: #75f8b2 !important;
       padding-bottom: 2.7px;
+    }
+
+    [data-rem-tags~="pdfextract"] .hierarchy-editor__tag-bar__tag {
+      font-size: 0px;
+    }
+    [data-rem-tags~="pdfextract"] .hierarchy-editor__tag-bar__tag:before {
+      font-size: 12px;
+      content: '✂️';
     }
   `;
 
