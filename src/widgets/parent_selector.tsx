@@ -231,16 +231,22 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         gap: '8px',
         padding: `8px 16px 8px ${indentPadding}px`,
         cursor: 'pointer',
-        backgroundColor: isSelected
+        backgroundColor: isSelected && isSuggested
+          ? '#dbeafe'
+          : isSelected
           ? 'var(--rn-clr-background-tertiary)'
           : isSuggested
           ? 'var(--rn-clr-blue-light, #eff6ff)'
           : 'transparent',
-        borderLeft: isSelected
+        borderLeft: isSelected && isSuggested
+          ? '3px solid #1d4ed8'
+          : isSelected
           ? '3px solid #3b82f6'
           : isSuggested
           ? '3px solid var(--rn-clr-blue, #3b82f6)'
           : '3px solid transparent',
+        outline: isSelected && isSuggested ? '1px dashed #93c5fd' : 'none',
+        outlineOffset: '-2px',
         transition: 'background-color 0.1s ease',
       }}
     >
@@ -260,8 +266,8 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         </span>
       )}
 
-      {isSuggested && !isSelected && (
-        <span style={{ fontSize: '11px', color: 'var(--rn-clr-blue, #3b82f6)' }} title="Suggested: this rem's page range contains the highlighted page">
+      {isSuggested && (
+        <span style={{ fontSize: '11px', color: isSelected ? '#1d4ed8' : 'var(--rn-clr-blue, #3b82f6)' }} title="Suggested: this rem's page range contains the highlighted page">
           ★
         </span>
       )}
@@ -270,7 +276,7 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         style={{
           flex: 1,
           fontSize: '13px',
-          color: isSuggested && !isSelected ? 'var(--rn-clr-blue, #1e40af)' : 'var(--rn-clr-content-primary)',
+          color: isSuggested ? (isSelected ? '#1d4ed8' : 'var(--rn-clr-blue, #1e40af)') : 'var(--rn-clr-content-primary)',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
