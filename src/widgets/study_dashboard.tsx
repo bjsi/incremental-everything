@@ -718,24 +718,36 @@ async function buildGlobalDashboard(
     // Stash text for every rem we touch while walking chains; this avoids a
     // second pass to fetch text for structural ancestor nodes when building subtrees.
     const remTextCache = new Map<string, any>();
+    // In-flight chain promises so concurrent callers share work for shared ancestors.
+    // Without this, parallel sibling rems would each re-walk the same parent path,
+    // multiplying RPC traffic and pushing the WebSocket into timeout territory.
+    const inFlightChains = new Map<string, Promise<string[]>>();
+    const buildChain = async (id: string): Promise<string[]> => {
+        const r: PluginRem | undefined = await plugin.rem.findOne(id);
+        if (!r) {
+            const chain = [id];
+            parentChainCache.set(id, chain);
+            return chain;
+        }
+        if (!remTextCache.has(id)) remTextCache.set(id, r.text);
+        const parentId = r.parent || null;
+        const parentChain = parentId ? await ancestorChain(parentId) : [];
+        const chain = [id, ...parentChain];
+        parentChainCache.set(id, chain);
+        return chain;
+    };
     async function ancestorChain(id: string): Promise<string[]> {
         const cached = parentChainCache.get(id);
         if (cached) return cached;
-        const chain: string[] = [];
-        let cur: string | null = id;
-        while (cur) {
-            if (parentChainCache.has(cur)) {
-                chain.push(...parentChainCache.get(cur)!);
-                break;
-            }
-            chain.push(cur);
-            const r: PluginRem | undefined = await plugin.rem.findOne(cur);
-            if (!r) break;
-            if (!remTextCache.has(cur)) remTextCache.set(cur, r.text);
-            cur = r.parent || null;
+        const pending = inFlightChains.get(id);
+        if (pending) return pending;
+        const p = buildChain(id);
+        inFlightChains.set(id, p);
+        try {
+            return await p;
+        } finally {
+            inFlightChains.delete(id);
         }
-        parentChainCache.set(id, chain);
-        return chain;
     }
 
     // For every rem with data in the period, attribute to its top ancestor.
@@ -784,79 +796,92 @@ async function buildGlobalDashboard(
     };
 
     const remEntries = Array.from(remDataById.values());
+    const AGG_CHUNK = 50;
     let processed = 0;
-    for (const rd of remEntries) {
-        // Build ancestor chain for this rem (parent + above). Need parent info — look up if missing.
-        if (rd.parentId === null && !parentChainCache.has(rd.id)) {
-            const r = await plugin.rem.findOne(rd.id);
-            rd.parentId = r?.parent || null;
-            if (r) rd.remText = rd.remText ?? r.text;
-        }
-        const chain = await ancestorChain(rd.id);
-        const topId = chain[chain.length - 1] || rd.id;
+    for (let i = 0; i < remEntries.length; i += AGG_CHUNK) {
+        const chunk = remEntries.slice(i, i + AGG_CHUNK);
+        // Resolve ancestor chains in parallel; the shared inFlightChains cache
+        // makes sibling rems reuse each other's parent lookups instead of
+        // duplicating RPC traffic, which is what was overwhelming the WebSocket.
+        const resolved = await Promise.all(
+            chunk.map(async (rd) => {
+                if (rd.parentId === null && !parentChainCache.has(rd.id)) {
+                    const r = await plugin.rem.findOne(rd.id);
+                    rd.parentId = r?.parent || null;
+                    if (r) rd.remText = rd.remText ?? r.text;
+                }
+                const chain = await ancestorChain(rd.id);
+                return { rd, chain };
+            })
+        );
 
-        const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
-        const top = ensureTop(topId);
-        top.aggr = addStats(top.aggr, self);
-        if (rd.isInc) {
-            top.aggrIncTagged += 1;
-            summary.incTaggedCount += 1;
-            if (hasIncReps) {
-                top.aggrIncTaggedWithReps += 1;
-                summary.incTaggedWithRepsCount += 1;
+        // Accumulator updates are in-memory; do them sequentially to avoid races on shared maps.
+        for (const { rd, chain } of resolved) {
+            const topId = chain[chain.length - 1] || rd.id;
+            const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
+            const top = ensureTop(topId);
+            top.aggr = addStats(top.aggr, self);
+            if (rd.isInc) {
+                top.aggrIncTagged += 1;
+                summary.incTaggedCount += 1;
+                if (hasIncReps) {
+                    top.aggrIncTaggedWithReps += 1;
+                    summary.incTaggedWithRepsCount += 1;
+                }
+                let incReps = 0;
+                let incTime = 0;
+                for (const rep of rd.incHistory) {
+                    if (!rep || typeof rep.date !== 'number') continue;
+                    if (rep.date < startMs || rep.date >= endMs) continue;
+                    if (!isRealIncRep(rep.eventType)) continue;
+                    incReps += 1;
+                    incTime += rep.reviewTimeSeconds || 0;
+                }
+                summary.incReps += incReps;
+                summary.incTimeSec += incTime;
             }
-            let incReps = 0;
-            let incTime = 0;
-            for (const rep of rd.incHistory) {
-                if (!rep || typeof rep.date !== 'number') continue;
-                if (rep.date < startMs || rep.date >= endMs) continue;
-                if (!isRealIncRep(rep.eventType)) continue;
-                incReps += 1;
-                incTime += rep.reviewTimeSeconds || 0;
+            if (rd.isDism) {
+                top.aggrDismTagged += 1;
+                summary.dismTaggedCount += 1;
+                if (hasDismReps) {
+                    top.aggrDismTaggedWithReps += 1;
+                    summary.dismTaggedWithRepsCount += 1;
+                }
+                let dismReps = 0;
+                let dismTime = 0;
+                for (const rep of rd.dismHistory) {
+                    if (!rep || typeof rep.date !== 'number') continue;
+                    if (rep.date < startMs || rep.date >= endMs) continue;
+                    if (!isRealIncRep(rep.eventType)) continue;
+                    dismReps += 1;
+                    dismTime += rep.reviewTimeSeconds || 0;
+                }
+                summary.dismReps += dismReps;
+                summary.dismTimeSec += dismTime;
             }
-            summary.incReps += incReps;
-            summary.incTimeSec += incTime;
-        }
-        if (rd.isDism) {
-            top.aggrDismTagged += 1;
-            summary.dismTaggedCount += 1;
-            if (hasDismReps) {
-                top.aggrDismTaggedWithReps += 1;
-                summary.dismTaggedWithRepsCount += 1;
+            top.aggrCardsCount += rd.cards.length;
+            summary.cardsCount += rd.cards.length;
+            for (const card of rd.cards) {
+                let cardHasReps = false;
+                for (const rep of card.history || []) {
+                    if (!rep || typeof rep.date !== 'number') continue;
+                    if (rep.date < startMs || rep.date >= endMs) continue;
+                    if (!isRealCardScore(rep.score)) continue;
+                    const t = Math.min(Math.max(0, rep.responseTime || 0), cardCapMs);
+                    summary.cardReps += 1;
+                    summary.cardTimeMs += t;
+                    if (rep.score === QueueInteractionScore.AGAIN) summary.cardForgot += 1;
+                    cardHasReps = true;
+                }
+                if (cardHasReps) summary.cardsWithRepsCount += 1;
             }
-            let dismReps = 0;
-            let dismTime = 0;
-            for (const rep of rd.dismHistory) {
-                if (!rep || typeof rep.date !== 'number') continue;
-                if (rep.date < startMs || rep.date >= endMs) continue;
-                if (!isRealIncRep(rep.eventType)) continue;
-                dismReps += 1;
-                dismTime += rep.reviewTimeSeconds || 0;
-            }
-            summary.dismReps += dismReps;
-            summary.dismTimeSec += dismTime;
-        }
-        top.aggrCardsCount += rd.cards.length;
-        summary.cardsCount += rd.cards.length;
-        for (const card of rd.cards) {
-            let cardHasReps = false;
-            for (const rep of card.history || []) {
-                if (!rep || typeof rep.date !== 'number') continue;
-                if (rep.date < startMs || rep.date >= endMs) continue;
-                if (!isRealCardScore(rep.score)) continue;
-                const t = Math.min(Math.max(0, rep.responseTime || 0), cardCapMs);
-                summary.cardReps += 1;
-                summary.cardTimeMs += t;
-                if (rep.score === QueueInteractionScore.AGAIN) summary.cardForgot += 1;
-                cardHasReps = true;
-            }
-            if (cardHasReps) summary.cardsWithRepsCount += 1;
         }
 
-        processed += 1;
-        if (processed % 100 === 0) {
-            onProgress(0.65 + 0.3 * (processed / Math.max(1, remEntries.length)), `Aggregating (${processed}/${remEntries.length})`);
-        }
+        processed += chunk.length;
+        onProgress(
+            0.65 + 0.3 * (processed / Math.max(1, remEntries.length)),
+            `Aggregating (${processed}/${remEntries.length})`
+        );
     }
 
     onProgress(0.95, 'Building subtrees…');
