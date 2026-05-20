@@ -106,6 +106,19 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
   await plugin.app.registerCSS('pdf-inc-highlight-styling', css);
 }
 
+export async function registerTagBadgeCSS(plugin: ReactRNPlugin) {
+  const css = `
+    [data-rem-tags~="incremental"] .hierarchy-editor__tag-bar__tag {
+      font-size: 0px;
+    }
+    [data-rem-tags~="incremental"] .hierarchy-editor__tag-bar__tag:before {
+      font-size: 12px;
+      content: '🔍';
+    }
+  `;
+  await plugin.app.registerCSS('tag-badge-styling', css);
+}
+
 export async function registerClozeExtractCSS(plugin: ReactRNPlugin) {
   const css = `
     /* Badge: violet ↑ pill before the bullet */
