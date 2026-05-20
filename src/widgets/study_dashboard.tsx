@@ -491,7 +491,7 @@ async function buildDocumentTree(
     function compute(id: string): TreeNode {
         if (nodes[id]) return nodes[id];
         const data = remDataById[id] || null;
-        const childrenIds = childMap[id] || [];
+        const rawChildrenIds = childMap[id] || [];
 
         const self = data ? statsFromRem(data, startMs, endMs, cardCapMs) : null;
         let aggr = self ? self.self : emptyStats();
@@ -503,7 +503,9 @@ async function buildDocumentTree(
             data && data.isDism && self && self.hasDismReps ? 1 : 0;
         let aggrCardsCount = data ? data.cards.length : 0;
 
-        for (const c of childrenIds) {
+        // Keep only children whose subtree has reps in the selected period.
+        const childrenIds: string[] = [];
+        for (const c of rawChildrenIds) {
             const child = compute(c);
             aggr = addStats(aggr, child.aggr);
             aggrIncTagged += child.aggrIncTagged;
@@ -511,6 +513,9 @@ async function buildDocumentTree(
             aggrIncTaggedWithReps += child.aggrIncTaggedWithReps;
             aggrDismTaggedWithReps += child.aggrDismTaggedWithReps;
             aggrCardsCount += child.aggrCardsCount;
+            if (child.aggr.incRemReps > 0 || child.aggr.cardReps > 0) {
+                childrenIds.push(c);
+            }
         }
 
         nodes[id] = {
@@ -529,6 +534,14 @@ async function buildDocumentTree(
     }
 
     for (const rid of rootIds) compute(rid);
+
+    // Drop roots whose entire subtree has no reps in the selected period.
+    const filteredRootIds = rootIds.filter((id) => {
+        const n = nodes[id];
+        return n && (n.aggr.incRemReps > 0 || n.aggr.cardReps > 0);
+    });
+    rootIds.length = 0;
+    rootIds.push(...filteredRootIds);
 
     // Summary from root totals: sum aggrs across roots
     const summary: SummaryStats = {
@@ -844,12 +857,7 @@ async function buildGlobalDashboard(
 
     const topLevels = Array.from(topAggrs.entries())
         .map(([topId, v]) => ({ topId, ...v }))
-        .filter(
-            (t) =>
-                t.aggrIncTagged > 0 ||
-                t.aggrDismTagged > 0 ||
-                t.aggrCardsCount > 0
-        )
+        .filter((t) => t.aggr.incRemReps > 0 || t.aggr.cardReps > 0)
         .sort((a, b) => b.aggr.cardTimeMs + b.aggr.incRemTimeSec * 1000 - (a.aggr.cardTimeMs + a.aggr.incRemTimeSec * 1000));
 
     onProgress(1, 'Done');
@@ -902,7 +910,7 @@ async function buildSubtreeForTop(
     function compute(id: string): TreeNode {
         if (nodes[id]) return nodes[id];
         const data = remDataById[id];
-        const childrenIds = childMap[id] || [];
+        const rawChildrenIds = childMap[id] || [];
 
         const self = data ? statsFromRem(data, startMs, endMs, cardCapMs) : null;
         let aggr = self ? self.self : emptyStats();
@@ -914,7 +922,8 @@ async function buildSubtreeForTop(
             data && data.isDism && self && self.hasDismReps ? 1 : 0;
         let aggrCardsCount = data ? data.cards.length : 0;
 
-        for (const c of childrenIds) {
+        const childrenIds: string[] = [];
+        for (const c of rawChildrenIds) {
             const child = compute(c);
             aggr = addStats(aggr, child.aggr);
             aggrIncTagged += child.aggrIncTagged;
@@ -922,6 +931,9 @@ async function buildSubtreeForTop(
             aggrIncTaggedWithReps += child.aggrIncTaggedWithReps;
             aggrDismTaggedWithReps += child.aggrDismTaggedWithReps;
             aggrCardsCount += child.aggrCardsCount;
+            if (child.aggr.incRemReps > 0 || child.aggr.cardReps > 0) {
+                childrenIds.push(c);
+            }
         }
 
         nodes[id] = {
