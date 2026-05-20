@@ -401,15 +401,23 @@ async function loadRemData(
     };
 }
 
-async function buildDocumentTree(
+// Period-independent loaded data for Document mode. Cached per (rootRemId, scope).
+interface LoadedDocumentData {
+    rootRemId: string;
+    scope: ScopeMode;
+    remDataList: RemData[];
+    remDataById: Record<string, RemData>;
+    stubData: Record<string, { parentId: string | null; remText: any }>;
+    childMap: Record<string, string[]>;
+    rawRootIds: string[]; // unfiltered roots — period filter applied at aggregate time
+}
+
+async function loadDocumentData(
     plugin: ReturnType<typeof usePlugin>,
     rootRem: PluginRem,
     scope: ScopeMode,
-    startMs: number,
-    endMs: number,
-    cardCapMs: number,
     onProgress: (p: number, label: string) => void
-): Promise<{ tree: BuiltTree; summary: SummaryStats }> {
+): Promise<LoadedDocumentData> {
     onProgress(0.05, 'Gathering rems…');
 
     let inScopeIds: Set<string>;
@@ -443,10 +451,11 @@ async function buildDocumentTree(
     const remDataById: Record<string, RemData> = {};
     for (const rd of remDataList) remDataById[rd.id] = rd;
 
-    onProgress(0.85, 'Building tree…');
+    onProgress(0.85, 'Resolving ancestors…');
 
     // For comprehensive: include structural ancestors not in scope so each in-scope
-    // rem connects upward to a root. We walk parents and add them as ancestor stubs.
+    // rem connects upward to a root. Walk parents in-memory using rd.parentId then
+    // findOne for any ancestor we don't already know.
     const ancestorIds = new Set<string>();
     if (scope === 'comprehensive') {
         for (const rd of remDataList) {
@@ -460,7 +469,7 @@ async function buildDocumentTree(
         }
     }
 
-    // Materialise ancestor stubs
+    // Materialise ancestor stubs in parallel.
     const stubData: Record<string, { parentId: string | null; remText: any }> = {};
     if (ancestorIds.size > 0) {
         const ids = Array.from(ancestorIds);
@@ -471,40 +480,60 @@ async function buildDocumentTree(
         });
     }
 
-    // Build child map
+    onProgress(0.95, 'Building tree…');
+
+    // Build child map (period-independent — just the static hierarchy).
     const allNodeIds = new Set<string>([...Object.keys(remDataById), ...Object.keys(stubData)]);
     const childMap: Record<string, string[]> = {};
-    const rootIds: string[] = [];
+    const rawRootIds: string[] = [];
 
     for (const id of allNodeIds) {
-        const parentId =
-            (remDataById[id]?.parentId ?? stubData[id]?.parentId) || null;
+        const parentId = (remDataById[id]?.parentId ?? stubData[id]?.parentId) || null;
         if (parentId && allNodeIds.has(parentId)) {
             (childMap[parentId] ||= []).push(id);
         } else {
-            rootIds.push(id);
+            rawRootIds.push(id);
         }
     }
 
-    // Compute per-node selfStats and totals, then aggregate bottom-up via DFS.
-    const nodes: Record<string, TreeNode> = {};
+    onProgress(1, 'Loaded');
 
+    return {
+        rootRemId: rootRem._id,
+        scope,
+        remDataList,
+        remDataById,
+        stubData,
+        childMap,
+        rawRootIds,
+    };
+}
+
+// Aggregate already-loaded document data for a specific period. Pure in-memory work.
+function aggregateDocumentData(
+    data: LoadedDocumentData,
+    startMs: number,
+    endMs: number,
+    cardCapMs: number,
+    onProgress: (p: number, label: string) => void
+): { tree: BuiltTree; summary: SummaryStats } {
+    const { remDataList, remDataById, stubData, childMap, rawRootIds } = data;
+    onProgress(0.05, 'Aggregating…');
+
+    const nodes: Record<string, TreeNode> = {};
     function compute(id: string): TreeNode {
         if (nodes[id]) return nodes[id];
-        const data = remDataById[id] || null;
+        const d = remDataById[id] || null;
         const rawChildrenIds = childMap[id] || [];
 
-        const self = data ? statsFromRem(data, startMs, endMs, cardCapMs) : null;
+        const self = d ? statsFromRem(d, startMs, endMs, cardCapMs) : null;
         let aggr = self ? self.self : emptyStats();
-        let aggrIncTagged = data && data.isInc ? 1 : 0;
-        let aggrDismTagged = data && data.isDism ? 1 : 0;
-        let aggrIncTaggedWithReps =
-            data && data.isInc && self && self.hasIncReps ? 1 : 0;
-        let aggrDismTaggedWithReps =
-            data && data.isDism && self && self.hasDismReps ? 1 : 0;
-        let aggrCardsCount = data ? data.cards.length : 0;
+        let aggrIncTagged = d && d.isInc ? 1 : 0;
+        let aggrDismTagged = d && d.isDism ? 1 : 0;
+        let aggrIncTaggedWithReps = d && d.isInc && self && self.hasIncReps ? 1 : 0;
+        let aggrDismTaggedWithReps = d && d.isDism && self && self.hasDismReps ? 1 : 0;
+        let aggrCardsCount = d ? d.cards.length : 0;
 
-        // Keep only children whose subtree has reps in the selected period.
         const childrenIds: string[] = [];
         for (const c of rawChildrenIds) {
             const child = compute(c);
@@ -522,29 +551,27 @@ async function buildDocumentTree(
         nodes[id] = {
             id,
             childrenIds,
-            selfData: data,
+            selfData: d,
             aggr,
             aggrIncTagged,
             aggrDismTagged,
             aggrIncTaggedWithReps,
             aggrDismTaggedWithReps,
             aggrCardsCount,
-            remText: data?.remText ?? stubData[id]?.remText,
+            remText: d?.remText ?? stubData[id]?.remText,
         };
         return nodes[id];
     }
 
-    for (const rid of rootIds) compute(rid);
+    for (const rid of rawRootIds) compute(rid);
 
     // Drop roots whose entire subtree has no reps in the selected period.
-    const filteredRootIds = rootIds.filter((id) => {
+    const filteredRootIds = rawRootIds.filter((id) => {
         const n = nodes[id];
         return n && (n.aggr.incRemReps > 0 || n.aggr.cardReps > 0);
     });
-    rootIds.length = 0;
-    rootIds.push(...filteredRootIds);
 
-    // Summary from root totals: sum aggrs across roots
+    // Summary — walk remDataList directly.
     const summary: SummaryStats = {
         incTaggedCount: 0,
         incTaggedWithRepsCount: 0,
@@ -561,14 +588,11 @@ async function buildDocumentTree(
         cardForgot: 0,
     };
 
-    // Walk all rem-data (not ancestor stubs) to compute summary directly — cleaner than
-    // splitting inc vs dism after-the-fact from aggregated stats.
     for (const rd of remDataList) {
-        const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
+        const { hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
         if (rd.isInc) {
             summary.incTaggedCount += 1;
             if (hasIncReps) summary.incTaggedWithRepsCount += 1;
-            // Inc/Dism reps shown separately in summary, so attribute only inc-history reps here.
             let incReps = 0;
             let incTime = 0;
             for (const rep of rd.incHistory) {
@@ -611,13 +635,10 @@ async function buildDocumentTree(
             }
             if (cardHasReps) summary.cardsWithRepsCount += 1;
         }
-        // Unused variable: self — kept above just to compute hasIncReps/hasDismReps.
-        void self;
     }
 
     onProgress(1, 'Done');
-
-    return { tree: { nodes, rootIds }, summary };
+    return { tree: { nodes, rootIds: filteredRootIds }, summary };
 }
 
 // Period-independent loaded data — fetched once per (re)load and reused across
@@ -1681,6 +1702,9 @@ function StudyDashboardPopup() {
     // Cached global-mode raw data — survives across period changes.
     // Invalidated only when the context switches into Global from scratch (per session).
     const globalDataRef = useRef<LoadedGlobalData | null>(null);
+    // Cached document-mode raw data — survives across period changes for the same
+    // (rootRemId, scope). Different rem or scope invalidates and reloads.
+    const docDataRef = useRef<LoadedDocumentData | null>(null);
 
     const run = useCallback(async () => {
         if (cardCapMs == null) return;
@@ -1698,16 +1722,25 @@ function StudyDashboardPopup() {
                     setProgress({ running: false, percent: 0, label: '' });
                     return;
                 }
-                const { tree, summary: s } = await buildDocumentTree(
-                    plugin,
-                    rootRem,
-                    scope,
+                // Reuse cached document data when the rem + scope match; period
+                // changes hit only the aggregate path.
+                const cached = docDataRef.current;
+                if (!cached || cached.rootRemId !== rootRem._id || cached.scope !== scope) {
+                    const loaded = await loadDocumentData(plugin, rootRem, scope, (p, label) => {
+                        if (runId !== runIdRef.current) return;
+                        setProgress({ running: true, percent: 0.8 * p, label });
+                    });
+                    if (runId !== runIdRef.current) return;
+                    docDataRef.current = loaded;
+                }
+                const { tree, summary: s } = aggregateDocumentData(
+                    docDataRef.current!,
                     startMs,
                     endMs,
                     cardCapMs,
                     (p, label) => {
                         if (runId !== runIdRef.current) return;
-                        setProgress({ running: true, percent: p, label });
+                        setProgress({ running: true, percent: 0.8 + 0.2 * p, label });
                     }
                 );
                 if (runId !== runIdRef.current) return;
