@@ -632,6 +632,8 @@ async function buildGlobalDashboard(
     parentChainCache: Map<string, string[]>;
     // map of remId -> RemData for any rem we've already loaded (incremental / dismissed / card-bearing)
     remDataById: Map<string, RemData>;
+    // Pre-built subtrees keyed by top-level rem id — expansion is instant.
+    subtreesByTop: Map<string, BuiltTree>;
 }> {
     onProgress(0.02, 'Fetching tagged rems…');
 
@@ -713,6 +715,9 @@ async function buildGlobalDashboard(
 
     // Parent-chain cache: remId -> [self, parent, grandparent, ..., topAncestor]
     const parentChainCache = new Map<string, string[]>();
+    // Stash text for every rem we touch while walking chains; this avoids a
+    // second pass to fetch text for structural ancestor nodes when building subtrees.
+    const remTextCache = new Map<string, any>();
     async function ancestorChain(id: string): Promise<string[]> {
         const cached = parentChainCache.get(id);
         if (cached) return cached;
@@ -726,6 +731,7 @@ async function buildGlobalDashboard(
             chain.push(cur);
             const r: PluginRem | undefined = await plugin.rem.findOne(cur);
             if (!r) break;
+            if (!remTextCache.has(cur)) remTextCache.set(cur, r.text);
             cur = r.parent || null;
         }
         parentChainCache.set(id, chain);
@@ -853,7 +859,98 @@ async function buildGlobalDashboard(
         }
     }
 
-    onProgress(0.97, 'Sorting…');
+    onProgress(0.95, 'Building subtrees…');
+
+    // Pre-build a subtree per top-level using already-gathered data. No new RPC calls.
+    // For each rem-with-data, its parent chain (already cached) gives us its position in
+    // the hierarchy. We walk those chains in-memory to assemble parent→children links
+    // and aggregate stats bottom-up. Structural ancestors (chain entries not in
+    // remDataById) become tree-backbone nodes carrying only their text.
+    const topToChildMap = new Map<string, Map<string, Set<string>>>();
+    const topToNodeIds = new Map<string, Set<string>>();
+
+    for (const rd of remDataById.values()) {
+        const chain = parentChainCache.get(rd.id) || [rd.id];
+        if (chain.length === 0) continue;
+        const topId = chain[chain.length - 1];
+
+        let nodeIds = topToNodeIds.get(topId);
+        if (!nodeIds) {
+            nodeIds = new Set();
+            topToNodeIds.set(topId, nodeIds);
+        }
+        let childMap = topToChildMap.get(topId);
+        if (!childMap) {
+            childMap = new Map();
+            topToChildMap.set(topId, childMap);
+        }
+        for (let i = 0; i < chain.length; i++) {
+            const id = chain[i];
+            nodeIds.add(id);
+            if (i < chain.length - 1) {
+                const parentId = chain[i + 1];
+                let cset = childMap.get(parentId);
+                if (!cset) {
+                    cset = new Set();
+                    childMap.set(parentId, cset);
+                }
+                cset.add(id);
+            }
+        }
+    }
+
+    const subtreesByTop = new Map<string, BuiltTree>();
+    for (const [topId] of topToNodeIds) {
+        const childMap = topToChildMap.get(topId) || new Map<string, Set<string>>();
+        const nodes: Record<string, TreeNode> = {};
+
+        const compute = (id: string): TreeNode => {
+            if (nodes[id]) return nodes[id];
+            const data = remDataById.get(id) || null;
+            const rawChildrenIds = Array.from(childMap.get(id) || []);
+
+            const self = data ? statsFromRem(data, startMs, endMs, cardCapMs) : null;
+            let aggr = self ? self.self : emptyStats();
+            let aggrIncTagged = data && data.isInc ? 1 : 0;
+            let aggrDismTagged = data && data.isDism ? 1 : 0;
+            let aggrIncTaggedWithReps = data && data.isInc && self && self.hasIncReps ? 1 : 0;
+            let aggrDismTaggedWithReps = data && data.isDism && self && self.hasDismReps ? 1 : 0;
+            let aggrCardsCount = data ? data.cards.length : 0;
+
+            const childrenIds: string[] = [];
+            for (const c of rawChildrenIds) {
+                const child = compute(c);
+                aggr = addStats(aggr, child.aggr);
+                aggrIncTagged += child.aggrIncTagged;
+                aggrDismTagged += child.aggrDismTagged;
+                aggrIncTaggedWithReps += child.aggrIncTaggedWithReps;
+                aggrDismTaggedWithReps += child.aggrDismTaggedWithReps;
+                aggrCardsCount += child.aggrCardsCount;
+                if (child.aggr.incRemReps > 0 || child.aggr.cardReps > 0) {
+                    childrenIds.push(c);
+                }
+            }
+
+            nodes[id] = {
+                id,
+                childrenIds,
+                selfData: data,
+                aggr,
+                aggrIncTagged,
+                aggrDismTagged,
+                aggrIncTaggedWithReps,
+                aggrDismTaggedWithReps,
+                aggrCardsCount,
+                remText: data?.remText ?? remTextCache.get(id),
+            };
+            return nodes[id];
+        };
+        compute(topId);
+
+        subtreesByTop.set(topId, { nodes, rootIds: [topId] });
+    }
+
+    onProgress(0.99, 'Sorting…');
 
     const topLevels = Array.from(topAggrs.entries())
         .map(([topId, v]) => ({ topId, ...v }))
@@ -861,98 +958,7 @@ async function buildGlobalDashboard(
         .sort((a, b) => b.aggr.cardTimeMs + b.aggr.incRemTimeSec * 1000 - (a.aggr.cardTimeMs + a.aggr.incRemTimeSec * 1000));
 
     onProgress(1, 'Done');
-    return { topLevels, summary, parentChainCache, remDataById };
-}
-
-// Build subtree for a given top-level rem on demand (Global mode).
-async function buildSubtreeForTop(
-    plugin: ReturnType<typeof usePlugin>,
-    topId: string,
-    startMs: number,
-    endMs: number,
-    cardCapMs: number,
-    remDataCache: Map<string, RemData>
-): Promise<BuiltTree> {
-    const topRem = await plugin.rem.findOne(topId);
-    if (!topRem) return { nodes: {}, rootIds: [] };
-
-    const descendants = await topRem.getDescendants();
-    const all = [topRem, ...descendants];
-
-    // For each rem, load data unless cached
-    const remDataList: RemData[] = await chunked(all, async (r) => {
-        const cached = remDataCache.get(r._id);
-        if (cached) {
-            // ensure parent/text are filled
-            if (!cached.remText) cached.remText = r.text;
-            if (cached.parentId === null) cached.parentId = r.parent || null;
-            return cached;
-        }
-        const data = await loadRemData(plugin, r);
-        remDataCache.set(r._id, data);
-        return data;
-    });
-    const remDataById: Record<string, RemData> = {};
-    for (const rd of remDataList) remDataById[rd.id] = rd;
-
-    const ids = Object.keys(remDataById);
-    const childMap: Record<string, string[]> = {};
-    const present = new Set(ids);
-    let rootId: string | null = null;
-    for (const id of ids) {
-        const p = remDataById[id].parentId;
-        if (p && present.has(p)) (childMap[p] ||= []).push(id);
-        else rootId = id; // top-level inside this subtree
-    }
-    if (!rootId) rootId = topId;
-
-    const nodes: Record<string, TreeNode> = {};
-    function compute(id: string): TreeNode {
-        if (nodes[id]) return nodes[id];
-        const data = remDataById[id];
-        const rawChildrenIds = childMap[id] || [];
-
-        const self = data ? statsFromRem(data, startMs, endMs, cardCapMs) : null;
-        let aggr = self ? self.self : emptyStats();
-        let aggrIncTagged = data && data.isInc ? 1 : 0;
-        let aggrDismTagged = data && data.isDism ? 1 : 0;
-        let aggrIncTaggedWithReps =
-            data && data.isInc && self && self.hasIncReps ? 1 : 0;
-        let aggrDismTaggedWithReps =
-            data && data.isDism && self && self.hasDismReps ? 1 : 0;
-        let aggrCardsCount = data ? data.cards.length : 0;
-
-        const childrenIds: string[] = [];
-        for (const c of rawChildrenIds) {
-            const child = compute(c);
-            aggr = addStats(aggr, child.aggr);
-            aggrIncTagged += child.aggrIncTagged;
-            aggrDismTagged += child.aggrDismTagged;
-            aggrIncTaggedWithReps += child.aggrIncTaggedWithReps;
-            aggrDismTaggedWithReps += child.aggrDismTaggedWithReps;
-            aggrCardsCount += child.aggrCardsCount;
-            if (child.aggr.incRemReps > 0 || child.aggr.cardReps > 0) {
-                childrenIds.push(c);
-            }
-        }
-
-        nodes[id] = {
-            id,
-            childrenIds,
-            selfData: data || null,
-            aggr,
-            aggrIncTagged,
-            aggrDismTagged,
-            aggrIncTaggedWithReps,
-            aggrDismTaggedWithReps,
-            aggrCardsCount,
-            remText: data?.remText,
-        };
-        return nodes[id];
-    }
-    compute(rootId);
-
-    return { nodes, rootIds: [rootId] };
+    return { topLevels, summary, parentChainCache, remDataById, subtreesByTop };
 }
 
 // ---------------------------------------------------------------------------
@@ -1405,43 +1411,24 @@ function HierarchyTree({ tree }: { tree: BuiltTree }) {
     );
 }
 
-// Global top-level row with lazy subtree.
+// Global top-level row, rendering a pre-built subtree synchronously.
 function GlobalTopLevelRow({
     topId,
     pre,
-    startMs,
-    endMs,
-    cardCapMs,
-    remDataCache,
+    subtree,
 }: {
     topId: string;
     pre: NonNullable<DashboardData['topLevels']>[number];
-    startMs: number;
-    endMs: number;
-    cardCapMs: number;
-    remDataCache: Map<string, RemData>;
+    subtree: BuiltTree | null;
 }) {
-    const plugin = usePlugin();
     const [expanded, setExpanded] = useState(false);
-    const [subtree, setSubtree] = useState<BuiltTree | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [text, setText] = useState<any>(null);
 
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            const rem = await plugin.rem.findOne(topId);
-            if (!cancelled && rem) setText(rem.text);
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [topId, plugin]);
-
-    // Synthetic node for the top-level row's display
-    const pseudoNode: TreeNode = {
+    // Use the pre-built tree's root node when available — its remText was populated
+    // from remTextCache during the build pass — otherwise fall back to a pseudo node.
+    const rootNode = subtree?.nodes[topId];
+    const displayNode: TreeNode = rootNode ?? {
         id: topId,
-        childrenIds: [], // we don't render children here; the subtree handles it
+        childrenIds: [],
         selfData: null,
         aggr: pre.aggr,
         aggrIncTagged: pre.aggrIncTagged,
@@ -1449,54 +1436,21 @@ function GlobalTopLevelRow({
         aggrIncTaggedWithReps: pre.aggrIncTaggedWithReps,
         aggrDismTaggedWithReps: pre.aggrDismTaggedWithReps,
         aggrCardsCount: pre.aggrCardsCount,
-        remText: text,
+        remText: null,
     };
-
-    const onToggle = async () => {
-        if (expanded) {
-            setExpanded(false);
-            return;
-        }
-        setExpanded(true);
-        if (subtree) return;
-        setLoading(true);
-        try {
-            const t = await buildSubtreeForTop(plugin, topId, startMs, endMs, cardCapMs, remDataCache);
-            setSubtree(t);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const hasChildren = (rootNode?.childrenIds.length ?? 0) > 0;
 
     return (
         <div>
             <HierarchyRow
-                node={pseudoNode}
+                node={displayNode}
                 depth={0}
                 expanded={expanded}
-                hasChildren={true}
-                onToggle={onToggle}
+                hasChildren={hasChildren}
+                onToggle={() => setExpanded((v) => !v)}
             />
-            {expanded && (
-                <div>
-                    {loading && (
-                        <div
-                            style={{
-                                fontSize: 11,
-                                color: 'var(--rn-clr-content-tertiary)',
-                                padding: '6px 8px',
-                                paddingLeft: 30,
-                            }}
-                        >
-                            Loading subtree…
-                        </div>
-                    )}
-                    {subtree && (
-                        <div style={{ paddingLeft: 0 }}>
-                            <SubtreeRenderer tree={subtree} startDepth={1} hideRoot={true} />
-                        </div>
-                    )}
-                </div>
+            {expanded && subtree && (
+                <SubtreeRenderer tree={subtree} startDepth={0} hideRoot={true} />
             )}
         </div>
     );
@@ -1618,7 +1572,7 @@ function StudyDashboardPopup() {
     });
     const [docTree, setDocTree] = useState<BuiltTree | null>(null);
     const [globalTops, setGlobalTops] = useState<DashboardData['topLevels']>(undefined);
-    const [globalRemDataCache, setGlobalRemDataCache] = useState<Map<string, RemData>>(
+    const [globalSubtreesByTop, setGlobalSubtreesByTop] = useState<Map<string, BuiltTree>>(
         new Map()
     );
     const [summary, setSummary] = useState<SummaryStats | null>(null);
@@ -1662,7 +1616,7 @@ function StudyDashboardPopup() {
                 });
                 if (runId !== runIdRef.current) return;
                 setGlobalTops(r.topLevels);
-                setGlobalRemDataCache(r.remDataById);
+                setGlobalSubtreesByTop(r.subtreesByTop);
                 setSummary(r.summary);
             }
         } catch (err) {
@@ -1980,10 +1934,7 @@ function StudyDashboardPopup() {
                                     key={t.topId}
                                     topId={t.topId}
                                     pre={t}
-                                    startMs={startMs}
-                                    endMs={endMs}
-                                    cardCapMs={cardCapMs || DEFAULT_RESPONSE_TIME_LIMIT_SEC * 1000}
-                                    remDataCache={globalRemDataCache}
+                                    subtree={globalSubtreesByTop.get(t.topId) || null}
                                 />
                             ))}
                         </div>
