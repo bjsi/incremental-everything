@@ -39,7 +39,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   });
 
   // Track queue state and current rem to detect when powerup is removed
-  let intervalId: NodeJS.Timeout | null = null;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
   let lastCheckedRemId: string | null = null;
   let pollCount = 0;
   const MAX_POLLS_PER_REM = 60; // 60 polls * 500ms = 30 seconds max per item
