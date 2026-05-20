@@ -103,6 +103,7 @@ The plugin now features **Automatic Light Mode**.
 - If you want to turn a highlight into an incremental Rem, click on the highlight and click the puzzle piece icon.
 - 📄 **PDFs & Web**
   - **Visual Status**: Highlights turn **Green** when toggled as Incremental, and **Blue** when extracted.
+  - **Tag Badges**: To keep the editor uncluttered, the `Incremental` and `pdfextract` tag labels are replaced by compact emoji badges — **🔍** for `Incremental` and **✂️** for `pdfextract` — so you can still identify item types at a glance without losing horizontal space.
   - **PDF Control Panel**: Manage chapters, set page ranges, and view reading history for long documents.
   - **Multi-PDF Switcher** *(new)*: When an Inc Rem has multiple PDF sources, a dropdown appears in the Reader (next to the 📝 Document Notes icon), in the Editor Review Timer, in the Execute Repetition popup, in the PDF Control Panel, and in the Editor Toolbar — letting you switch the PDF in view and pin a chosen one as active for that Inc Rem. Resolution order is **explicit pin → `#preferthispdf` → first PDF**, applied uniformly across every surface.
   - **Position Tracking**: The plugin automatically saves your last read page when using the PDF Chapter workflow or creating extracts.
