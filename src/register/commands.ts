@@ -1624,6 +1624,33 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Open Study Dashboard Command
+  plugin.app.registerCommand({
+    id: 'open-study-dashboard',
+    name: 'Open Study Dashboard',
+    description:
+      'Open the Study Dashboard: filterable summary of Incremental/Dismissed/Flashcard activity, with hierarchy.',
+    quickCode: 'sdb',
+    action: async () => {
+      // Resolve a context rem (focused rem in editor, current card in queue).
+      let remId: string | undefined;
+      const url = await plugin.window.getURL();
+      const isQueue = url.includes('/flashcards');
+      if (isQueue) {
+        const card = await plugin.queue.getCurrentCard();
+        if (card?.remId) remId = card.remId;
+        if (!remId) {
+          const cur = await plugin.storage.getSession<string>(currentIncRemKey);
+          if (cur) remId = cur;
+        }
+      } else {
+        const focused = await plugin.focus.getFocusedRem();
+        if (focused?._id) remId = focused._id;
+      }
+      await plugin.widget.openPopup('study_dashboard', remId ? { remId } : undefined);
+    },
+  });
+
   // Open Sorting Criteria Widget Command
   plugin.app.registerCommand({
     id: 'open-sorting-criteria',

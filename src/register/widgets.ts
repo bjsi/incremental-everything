@@ -246,6 +246,13 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerWidget('study_dashboard', WidgetLocation.Popup, {
+    dimensions: {
+      width: '900px',
+      height: 850,
+    },
+  });
+
   plugin.app.registerWidget('flashcard_repetition_history', WidgetLocation.Popup, {
     dimensions: {
       width: '1150px',
