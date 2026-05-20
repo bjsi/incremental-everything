@@ -16,6 +16,7 @@ import {
     powerupCode,
     repHistorySlotCode,
 } from '../lib/consts';
+import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { formatDuration, tryParseJson } from '../lib/utils';
 import { resolveRemTextSegments } from '../lib/richTextRemRefs';
@@ -619,40 +620,59 @@ async function buildDocumentTree(
     return { tree: { nodes, rootIds }, summary };
 }
 
-async function buildGlobalDashboard(
-    plugin: ReturnType<typeof usePlugin>,
-    startMs: number,
-    endMs: number,
-    cardCapMs: number,
-    onProgress: (p: number, label: string) => void
-): Promise<{
-    topLevels: DashboardData['topLevels'];
-    summary: SummaryStats;
-    // also keep a parent-chain cache so subtree expansion is faster
-    parentChainCache: Map<string, string[]>;
-    // map of remId -> RemData for any rem we've already loaded (incremental / dismissed / card-bearing)
+// Period-independent loaded data — fetched once per (re)load and reused across
+// period changes. Caches survive between aggregations so subsequent aggregations
+// hit zero RPCs.
+interface LoadedGlobalData {
     remDataById: Map<string, RemData>;
-    // Pre-built subtrees keyed by top-level rem id — expansion is instant.
-    subtreesByTop: Map<string, BuiltTree>;
-}> {
+    parentChainCache: Map<string, string[]>;
+    remTextCache: Map<string, any>;
+    // Pre-populated parent map sourced from taggedRem PluginRems (free `.parent` access).
+    // Covers Incremental + Dismissed + cardPriority rems — typically ~all rems-with-data
+    // in a healthy KB, so chain walks need almost no `findOne` RPCs.
+    parentByRemId: Map<string, string | null>;
+}
+
+async function loadGlobalData(
+    plugin: ReturnType<typeof usePlugin>,
+    onProgress: (p: number, label: string) => void
+): Promise<LoadedGlobalData> {
     onProgress(0.02, 'Fetching tagged rems…');
 
-    const incPup = await plugin.powerup.getPowerupByCode(powerupCode);
-    const dismPup = await plugin.powerup.getPowerupByCode(dismissedPowerupCode);
-    const [incRems, dismRems, allCards] = await Promise.all([
+    const [incPup, dismPup, cpPup] = await Promise.all([
+        plugin.powerup.getPowerupByCode(powerupCode),
+        plugin.powerup.getPowerupByCode(dismissedPowerupCode),
+        plugin.powerup.getPowerupByCode(CARD_PRIORITY_CODE),
+    ]);
+    const [incRems, dismRems, cpRems, allCards] = await Promise.all([
         (incPup?.taggedRem() as Promise<PluginRem[] | undefined>) || Promise.resolve([]),
         (dismPup?.taggedRem() as Promise<PluginRem[] | undefined>) || Promise.resolve([]),
+        (cpPup?.taggedRem() as Promise<PluginRem[] | undefined>) || Promise.resolve([]),
         plugin.card.getAll(),
     ]);
     const incList = incRems || [];
     const dismList = dismRems || [];
+    const cpList = cpRems || [];
 
     onProgress(
-        0.1,
-        `Inc: ${incList.length}, Dism: ${dismList.length}, Cards: ${allCards?.length || 0}`
+        0.08,
+        `Inc: ${incList.length}, Dism: ${dismList.length}, CardPri: ${cpList.length}, Cards: ${allCards?.length || 0}`
     );
 
-    // Index unique tagged rems
+    // Pre-populate parent and text caches from every taggedRem PluginRem we have.
+    // For ~all rems-with-data in a healthy KB this eliminates the need to call
+    // `findOne` during chain walking — chains become essentially in-memory.
+    const parentByRemId = new Map<string, string | null>();
+    const remTextCache = new Map<string, any>();
+    const seedParent = (r: PluginRem) => {
+        if (!parentByRemId.has(r._id)) parentByRemId.set(r._id, r.parent || null);
+        if (!remTextCache.has(r._id)) remTextCache.set(r._id, r.text);
+    };
+    for (const r of cpList) seedParent(r);
+    for (const r of incList) seedParent(r);
+    for (const r of dismList) seedParent(r);
+
+    // Index unique inc/dism tagged rems — we need to read their histories.
     const taggedById = new Map<string, PluginRem>();
     for (const r of incList) taggedById.set(r._id, r);
     for (const r of dismList) taggedById.set(r._id, r);
@@ -670,10 +690,10 @@ async function buildGlobalDashboard(
             return null;
         },
         (done, total) =>
-            onProgress(0.1 + 0.4 * (done / Math.max(1, total)), `History (${done}/${total})`)
+            onProgress(0.08 + 0.55 * (done / Math.max(1, total)), `History (${done}/${total})`)
     );
 
-    onProgress(0.55, 'Processing cards…');
+    onProgress(0.65, 'Processing cards…');
 
     // Group cards by remId. We use plugin.card.getAll() rather than per-rem fetches.
     const cardsByRem = new Map<string, CardData[]>();
@@ -698,10 +718,12 @@ async function buildGlobalDashboard(
         if (existing) {
             existing.cards = cards;
         } else {
+            // Card-only rem. Pull parent/text from the cardPriority-seeded map if
+            // present; otherwise leave null and ancestorChain will findOne lazily.
             remDataById.set(remId, {
                 id: remId,
-                parentId: null, // resolved later when computing parent chain
-                remText: null,
+                parentId: parentByRemId.has(remId) ? parentByRemId.get(remId) || null : null,
+                remText: remTextCache.get(remId) ?? null,
                 isInc: false,
                 isDism: false,
                 incHistory: [],
@@ -711,26 +733,28 @@ async function buildGlobalDashboard(
         }
     }
 
-    onProgress(0.65, 'Walking ancestor chains…');
+    onProgress(0.7, 'Walking ancestor chains…');
 
     // Parent-chain cache: remId -> [self, parent, grandparent, ..., topAncestor]
     const parentChainCache = new Map<string, string[]>();
-    // Stash text for every rem we touch while walking chains; this avoids a
-    // second pass to fetch text for structural ancestor nodes when building subtrees.
-    const remTextCache = new Map<string, any>();
     // In-flight chain promises so concurrent callers share work for shared ancestors.
-    // Without this, parallel sibling rems would each re-walk the same parent path,
-    // multiplying RPC traffic and pushing the WebSocket into timeout territory.
     const inFlightChains = new Map<string, Promise<string[]>>();
     const buildChain = async (id: string): Promise<string[]> => {
-        const r: PluginRem | undefined = await plugin.rem.findOne(id);
-        if (!r) {
-            const chain = [id];
-            parentChainCache.set(id, chain);
-            return chain;
+        let parentId: string | null;
+        if (parentByRemId.has(id)) {
+            // We already know the parent (from a taggedRem PluginRem) — no RPC needed.
+            parentId = parentByRemId.get(id) || null;
+        } else {
+            const r: PluginRem | undefined = await plugin.rem.findOne(id);
+            if (!r) {
+                const chain = [id];
+                parentChainCache.set(id, chain);
+                return chain;
+            }
+            parentId = r.parent || null;
+            parentByRemId.set(id, parentId);
+            if (!remTextCache.has(id)) remTextCache.set(id, r.text);
         }
-        if (!remTextCache.has(id)) remTextCache.set(id, r.text);
-        const parentId = r.parent || null;
         const parentChain = parentId ? await ancestorChain(parentId) : [];
         const chain = [id, ...parentChain];
         parentChainCache.set(id, chain);
@@ -749,6 +773,52 @@ async function buildGlobalDashboard(
             inFlightChains.delete(id);
         }
     }
+
+    // Walk chains for every rem-with-data. With parentByRemId mostly populated this is
+    // dominated by in-memory work; only un-tagged ancestors (rare) trigger findOne.
+    const remEntries = Array.from(remDataById.values());
+    const WALK_CHUNK = 50;
+    let walked = 0;
+    for (let i = 0; i < remEntries.length; i += WALK_CHUNK) {
+        const chunk = remEntries.slice(i, i + WALK_CHUNK);
+        await Promise.all(
+            chunk.map(async (rd) => {
+                await ancestorChain(rd.id);
+                // Fill in parentId / remText if we now have them and didn't before.
+                if (rd.parentId === null && parentByRemId.has(rd.id)) {
+                    rd.parentId = parentByRemId.get(rd.id) || null;
+                }
+                if (!rd.remText && remTextCache.has(rd.id)) {
+                    rd.remText = remTextCache.get(rd.id);
+                }
+            })
+        );
+        walked += chunk.length;
+        onProgress(
+            0.7 + 0.28 * (walked / Math.max(1, remEntries.length)),
+            `Resolving (${walked}/${remEntries.length})`
+        );
+    }
+
+    onProgress(1, 'Loaded');
+    return { remDataById, parentChainCache, remTextCache, parentByRemId };
+}
+
+// Aggregate already-loaded data for a specific period. Pure in-memory work —
+// no RPC calls. Safe to call repeatedly on period changes.
+function aggregateGlobalData(
+    data: LoadedGlobalData,
+    startMs: number,
+    endMs: number,
+    cardCapMs: number,
+    onProgress: (p: number, label: string) => void
+): {
+    topLevels: DashboardData['topLevels'];
+    summary: SummaryStats;
+    subtreesByTop: Map<string, BuiltTree>;
+} {
+    const { remDataById, parentChainCache, remTextCache } = data;
+    onProgress(0.05, 'Aggregating…');
 
     // For every rem with data in the period, attribute to its top ancestor.
     const summary: SummaryStats = {
@@ -795,96 +865,73 @@ async function buildGlobalDashboard(
         return t;
     };
 
+    // Walk remDataById in-memory — all chains were resolved during loadGlobalData,
+    // so this is pure CPU work (no awaits).
     const remEntries = Array.from(remDataById.values());
-    const AGG_CHUNK = 50;
-    let processed = 0;
-    for (let i = 0; i < remEntries.length; i += AGG_CHUNK) {
-        const chunk = remEntries.slice(i, i + AGG_CHUNK);
-        // Resolve ancestor chains in parallel; the shared inFlightChains cache
-        // makes sibling rems reuse each other's parent lookups instead of
-        // duplicating RPC traffic, which is what was overwhelming the WebSocket.
-        const resolved = await Promise.all(
-            chunk.map(async (rd) => {
-                if (rd.parentId === null && !parentChainCache.has(rd.id)) {
-                    const r = await plugin.rem.findOne(rd.id);
-                    rd.parentId = r?.parent || null;
-                    if (r) rd.remText = rd.remText ?? r.text;
-                }
-                const chain = await ancestorChain(rd.id);
-                return { rd, chain };
-            })
-        );
-
-        // Accumulator updates are in-memory; do them sequentially to avoid races on shared maps.
-        for (const { rd, chain } of resolved) {
-            const topId = chain[chain.length - 1] || rd.id;
-            const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
-            const top = ensureTop(topId);
-            top.aggr = addStats(top.aggr, self);
-            if (rd.isInc) {
-                top.aggrIncTagged += 1;
-                summary.incTaggedCount += 1;
-                if (hasIncReps) {
-                    top.aggrIncTaggedWithReps += 1;
-                    summary.incTaggedWithRepsCount += 1;
-                }
-                let incReps = 0;
-                let incTime = 0;
-                for (const rep of rd.incHistory) {
-                    if (!rep || typeof rep.date !== 'number') continue;
-                    if (rep.date < startMs || rep.date >= endMs) continue;
-                    if (!isRealIncRep(rep.eventType)) continue;
-                    incReps += 1;
-                    incTime += rep.reviewTimeSeconds || 0;
-                }
-                summary.incReps += incReps;
-                summary.incTimeSec += incTime;
+    for (let i = 0; i < remEntries.length; i++) {
+        const rd = remEntries[i];
+        const chain = parentChainCache.get(rd.id) || [rd.id];
+        const topId = chain[chain.length - 1] || rd.id;
+        const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
+        const top = ensureTop(topId);
+        top.aggr = addStats(top.aggr, self);
+        if (rd.isInc) {
+            top.aggrIncTagged += 1;
+            summary.incTaggedCount += 1;
+            if (hasIncReps) {
+                top.aggrIncTaggedWithReps += 1;
+                summary.incTaggedWithRepsCount += 1;
             }
-            if (rd.isDism) {
-                top.aggrDismTagged += 1;
-                summary.dismTaggedCount += 1;
-                if (hasDismReps) {
-                    top.aggrDismTaggedWithReps += 1;
-                    summary.dismTaggedWithRepsCount += 1;
-                }
-                let dismReps = 0;
-                let dismTime = 0;
-                for (const rep of rd.dismHistory) {
-                    if (!rep || typeof rep.date !== 'number') continue;
-                    if (rep.date < startMs || rep.date >= endMs) continue;
-                    if (!isRealIncRep(rep.eventType)) continue;
-                    dismReps += 1;
-                    dismTime += rep.reviewTimeSeconds || 0;
-                }
-                summary.dismReps += dismReps;
-                summary.dismTimeSec += dismTime;
+            let incReps = 0;
+            let incTime = 0;
+            for (const rep of rd.incHistory) {
+                if (!rep || typeof rep.date !== 'number') continue;
+                if (rep.date < startMs || rep.date >= endMs) continue;
+                if (!isRealIncRep(rep.eventType)) continue;
+                incReps += 1;
+                incTime += rep.reviewTimeSeconds || 0;
             }
-            top.aggrCardsCount += rd.cards.length;
-            summary.cardsCount += rd.cards.length;
-            for (const card of rd.cards) {
-                let cardHasReps = false;
-                for (const rep of card.history || []) {
-                    if (!rep || typeof rep.date !== 'number') continue;
-                    if (rep.date < startMs || rep.date >= endMs) continue;
-                    if (!isRealCardScore(rep.score)) continue;
-                    const t = Math.min(Math.max(0, rep.responseTime || 0), cardCapMs);
-                    summary.cardReps += 1;
-                    summary.cardTimeMs += t;
-                    if (rep.score === QueueInteractionScore.AGAIN) summary.cardForgot += 1;
-                    cardHasReps = true;
-                }
-                if (cardHasReps) summary.cardsWithRepsCount += 1;
-            }
+            summary.incReps += incReps;
+            summary.incTimeSec += incTime;
         }
-
-        processed += chunk.length;
-        onProgress(
-            0.65 + 0.3 * (processed / Math.max(1, remEntries.length)),
-            `Aggregating (${processed}/${remEntries.length})`
-        );
+        if (rd.isDism) {
+            top.aggrDismTagged += 1;
+            summary.dismTaggedCount += 1;
+            if (hasDismReps) {
+                top.aggrDismTaggedWithReps += 1;
+                summary.dismTaggedWithRepsCount += 1;
+            }
+            let dismReps = 0;
+            let dismTime = 0;
+            for (const rep of rd.dismHistory) {
+                if (!rep || typeof rep.date !== 'number') continue;
+                if (rep.date < startMs || rep.date >= endMs) continue;
+                if (!isRealIncRep(rep.eventType)) continue;
+                dismReps += 1;
+                dismTime += rep.reviewTimeSeconds || 0;
+            }
+            summary.dismReps += dismReps;
+            summary.dismTimeSec += dismTime;
+        }
+        top.aggrCardsCount += rd.cards.length;
+        summary.cardsCount += rd.cards.length;
+        for (const card of rd.cards) {
+            let cardHasReps = false;
+            for (const rep of card.history || []) {
+                if (!rep || typeof rep.date !== 'number') continue;
+                if (rep.date < startMs || rep.date >= endMs) continue;
+                if (!isRealCardScore(rep.score)) continue;
+                const t = Math.min(Math.max(0, rep.responseTime || 0), cardCapMs);
+                summary.cardReps += 1;
+                summary.cardTimeMs += t;
+                if (rep.score === QueueInteractionScore.AGAIN) summary.cardForgot += 1;
+                cardHasReps = true;
+            }
+            if (cardHasReps) summary.cardsWithRepsCount += 1;
+        }
     }
 
-    onProgress(0.95, 'Building subtrees…');
+    onProgress(0.7, 'Building subtrees…');
 
     // Pre-build a subtree per top-level using already-gathered data. No new RPC calls.
     // For each rem-with-data, its parent chain (already cached) gives us its position in
@@ -975,15 +1022,13 @@ async function buildGlobalDashboard(
         subtreesByTop.set(topId, { nodes, rootIds: [topId] });
     }
 
-    onProgress(0.99, 'Sorting…');
-
     const topLevels = Array.from(topAggrs.entries())
         .map(([topId, v]) => ({ topId, ...v }))
         .filter((t) => t.aggr.incRemReps > 0 || t.aggr.cardReps > 0)
         .sort((a, b) => b.aggr.cardTimeMs + b.aggr.incRemTimeSec * 1000 - (a.aggr.cardTimeMs + a.aggr.incRemTimeSec * 1000));
 
     onProgress(1, 'Done');
-    return { topLevels, summary, parentChainCache, remDataById, subtreesByTop };
+    return { topLevels, summary, subtreesByTop };
 }
 
 // ---------------------------------------------------------------------------
@@ -1633,6 +1678,9 @@ function StudyDashboardPopup() {
     );
     const [summary, setSummary] = useState<SummaryStats | null>(null);
     const runIdRef = useRef(0);
+    // Cached global-mode raw data — survives across period changes.
+    // Invalidated only when the context switches into Global from scratch (per session).
+    const globalDataRef = useRef<LoadedGlobalData | null>(null);
 
     const run = useCallback(async () => {
         if (cardCapMs == null) return;
@@ -1666,10 +1714,26 @@ function StudyDashboardPopup() {
                 setDocTree(tree);
                 setSummary(s);
             } else {
-                const r = await buildGlobalDashboard(plugin, startMs, endMs, cardCapMs, (p, label) => {
+                // Load raw data once and cache. Period changes only re-aggregate (in-memory).
+                if (!globalDataRef.current) {
+                    const loaded = await loadGlobalData(plugin, (p, label) => {
+                        if (runId !== runIdRef.current) return;
+                        // Loading occupies the first 80% of the progress bar.
+                        setProgress({ running: true, percent: 0.8 * p, label });
+                    });
                     if (runId !== runIdRef.current) return;
-                    setProgress({ running: true, percent: p, label });
-                });
+                    globalDataRef.current = loaded;
+                }
+                const r = aggregateGlobalData(
+                    globalDataRef.current,
+                    startMs,
+                    endMs,
+                    cardCapMs,
+                    (p, label) => {
+                        if (runId !== runIdRef.current) return;
+                        setProgress({ running: true, percent: 0.8 + 0.2 * p, label });
+                    }
+                );
                 if (runId !== runIdRef.current) return;
                 setGlobalTops(r.topLevels);
                 setGlobalSubtreesByTop(r.subtreesByTop);
