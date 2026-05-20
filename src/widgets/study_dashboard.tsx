@@ -1582,6 +1582,30 @@ function StudyDashboardPopup() {
         [period, customStart, customEnd]
     );
 
+    // Reflect the resolved range in the Start/End date inputs when a preset is picked.
+    // For 'all', leave the inputs blank (no meaningful start). 'custom' leaves them as typed.
+    useEffect(() => {
+        if (period === 'custom') return;
+        if (period === 'all') {
+            if (customStart !== '') setCustomStart('');
+            if (customEnd !== '') setCustomEnd('');
+            return;
+        }
+        const toIsoDate = (ms: number) => {
+            const d = new Date(ms);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+        const newStart = toIsoDate(startMs);
+        // endMs is exclusive (start of the day after the last included day);
+        // subtract 1ms so the input shows the inclusive last day.
+        const newEnd = toIsoDate(endMs - 1);
+        if (newStart !== customStart) setCustomStart(newStart);
+        if (newEnd !== customEnd) setCustomEnd(newEnd);
+    }, [period, startMs, endMs]);
+
     const cardCapMs = useRunAsync(async () => {
         const v = await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING);
         return ((v ?? DEFAULT_RESPONSE_TIME_LIMIT_SEC) as number) * 1000;
