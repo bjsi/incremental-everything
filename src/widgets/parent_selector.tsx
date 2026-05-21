@@ -564,8 +564,28 @@ function ParentSelectorWidget() {
         } catch (error) {
           console.error('[ParentSelector:Widget] Error expanding to last destination:', error);
         }
+      } else if (contextData.contextRemId) {
+        // No prior memory but we know which IncRem the user is currently reviewing
+        // (from queue or editor review timer) — suggest that one.
+        try {
+          const { tree: expandedTree, foundIndex } = await expandToLastDestination(
+            plugin,
+            initialTree,
+            contextData.contextRemId,
+            incrementalRemsToUse
+          );
+
+          initialTree = expandedTree;
+          setSuggestedRemId(contextData.contextRemId);
+          if (foundIndex >= 0) {
+            setSelectedIndex(foundIndex);
+          }
+        } catch (error) {
+          console.error('[ParentSelector:Widget] Error expanding to contextRemId:', error);
+        }
       } else {
-        // No prior memory: suggest the tightest-range IncRem containing the highlight page
+        // No prior memory and no active IncRem context: suggest the tightest-range
+        // IncRem whose page range contains the highlight page.
         const pageIndex = (contextData as any).highlightPageIndex as number | null | undefined;
         if (pageIndex != null && contextData.pdfRemId) {
           try {
