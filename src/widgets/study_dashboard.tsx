@@ -1508,6 +1508,12 @@ function HierarchyRow({
     const retention = a.cardReps > 0 ? (remembered / a.cardReps) * 100 : 0;
     const isStructural = !node.selfData;
 
+    // Subtle per-level shading so the eye can follow the hierarchy. Uses a neutral
+    // grey with alpha so it works in both light and dark themes. Caps at depth 6 to
+    // avoid the background getting too dark for very deep nesting.
+    const shadeAlpha = depth === 0 ? 0 : Math.min(0.04 + (depth - 1) * 0.025, 0.16);
+    const rowBg = shadeAlpha > 0 ? `rgba(127, 127, 127, ${shadeAlpha})` : 'transparent';
+
     return (
         <div
             style={{
@@ -1520,6 +1526,7 @@ function HierarchyRow({
                 cursor: hasChildren ? 'pointer' : 'default',
                 alignItems: 'center',
                 opacity: isStructural ? 0.8 : 1,
+                background: rowBg,
             }}
             onClick={(e) => {
                 if (hasChildren) {
