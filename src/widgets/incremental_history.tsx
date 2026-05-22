@@ -221,8 +221,13 @@ function IncrementalHistory() {
 }
 
 /** Small pill badge to differentiate event types */
-function EventBadge({ eventType }: { eventType?: 'reviewed' | 'created' }) {
-    const isCreated = eventType === 'created';
+function EventBadge({ eventType }: { eventType?: 'reviewed' | 'created' | 'dismissed' }) {
+    const palette =
+        eventType === 'created'
+            ? { bg: 'rgba(16,185,129,0.15)', fg: '#10b981', label: 'Created' }
+            : eventType === 'dismissed'
+                ? { bg: 'rgba(239,68,68,0.15)', fg: '#ef4444', label: 'Dismissed' }
+                : { bg: 'rgba(99,102,241,0.12)', fg: '#818cf8', label: 'Reviewed' };
     return (
         <span
             style={{
@@ -233,13 +238,13 @@ function EventBadge({ eventType }: { eventType?: 'reviewed' | 'created' }) {
                 textTransform: 'uppercase',
                 padding: '1px 5px',
                 borderRadius: 3,
-                backgroundColor: isCreated ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.12)',
-                color: isCreated ? '#10b981' : '#818cf8',
+                backgroundColor: palette.bg,
+                color: palette.fg,
                 flexShrink: 0,
                 alignSelf: 'center',
             }}
         >
-            {isCreated ? 'Created' : 'Reviewed'}
+            {palette.label}
         </span>
     );
 }
@@ -304,9 +309,12 @@ function HistoryItem({
     };
 
     const isCreated = data.eventType === 'created';
+    const isDismissedOnly = data.eventType === 'dismissed';
     const timeLabel = isCreated
         ? `Created ${timeSince(new Date(data.time))}`
-        : `Seen ${timeSince(new Date(data.time))}`;
+        : isDismissedOnly
+            ? `Dismissed ${timeSince(new Date(data.time))}`
+            : `Seen ${timeSince(new Date(data.time))}`;
 
     return (
         <div className="px-1 py-4 border-b border-gray-100" key={data.key}>
@@ -328,6 +336,9 @@ function HistoryItem({
                 <div className="flex-grow min-w-0">
                     <div className="flex items-center gap-1.5 mb-0.5">
                         <EventBadge eventType={data.eventType} />
+                        {data.eventType === 'reviewed' && data.wasDismissed && (
+                            <EventBadge eventType="dismissed" />
+                        )}
                         {incPriority !== null && (
                             <span
                                 onClick={(e) => {

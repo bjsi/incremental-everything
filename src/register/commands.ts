@@ -29,6 +29,7 @@ import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent } from '../lib/pdfUtils';
 import { transferToDismissed } from '../lib/dismissed';
+import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import dayjs from 'dayjs';
@@ -1790,6 +1791,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // 4. Transfer history to dismissed powerup
         await transferToDismissed(plugin, rem, updatedHistory);
 
+        // 4b. Record the dismissal in the Incremental History widget
+        await addToIncrementalHistory(plugin, rem._id, { dismissed: true });
+
         // 5. Remove from session cache
         await removeIncrementalRemCache(plugin, rem._id);
 
@@ -1845,6 +1849,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             // Transfer existing history to dismissed (no new rep entry needed)
             await transferToDismissed(plugin, r, incRemInfo.history || []);
           }
+          // Log a standalone dismissal in the Incremental History widget
+          await addDismissalToIncrementalHistory(plugin, r._id);
           // Remove from session cache
           await removeIncrementalRemCache(plugin, r._id);
           // Remove incremental powerup

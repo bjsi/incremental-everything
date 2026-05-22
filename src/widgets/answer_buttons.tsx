@@ -38,6 +38,7 @@ import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
+import { addToIncrementalHistory } from '../lib/history_utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
@@ -449,6 +450,9 @@ export function AnswerButtons() {
 
             // Save updated history to dismissed powerup BEFORE removing incremental
             await transferToDismissed(plugin, rem, updatedHistory);
+
+            // Reflect the dismissal in the Incremental History widget
+            await addToIncrementalHistory(plugin, rem._id, { dismissed: true });
 
             // Remove from session cache
             await removeIncrementalRemCache(plugin, rem._id);

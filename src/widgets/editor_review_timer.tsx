@@ -539,6 +539,7 @@ function EditorReviewTimer() {
 
       // Transfer history to Dismissed powerup and remove Incremental powerup
       await transferToDismissed(plugin, currentRem, updatedHistory);
+      await addToIncrementalHistory(plugin, timerData.remId, { dismissed: true });
       await removeIncrementalRemCache(plugin, currentRem._id);
       await currentRem.removePowerup(powerupCode);
     } finally {
