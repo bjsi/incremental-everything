@@ -832,34 +832,6 @@ function EditorReviewTimer() {
           </button>
         )}
 
-        {/* "Dismiss" button — always available while a timer is active. When a
-            queueList is present it advances to the next item; otherwise it
-            simply ends the timer (Ctrl+Shift+J / Start Timer flows). */}
-        <button
-          onClick={handleDismiss}
-          style={{
-            padding: '6px 14px',
-            fontSize: '13px',
-            backgroundColor: '#ef4444',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#dc2626';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ef4444';
-          }}
-          title={timerData.queueList && timerData.queueList.length > 0
-            ? 'Dismiss: Remove incremental status, add Dismissed powerup, and advance to next item'
-            : 'Dismiss: Remove incremental status, add Dismissed powerup, and end the timer'}
-        >
-          ✓ Dismiss
-        </button>
-
         {/* "Back to..." button — shown when origin is queue or inc-rem-list/main-view */}
         {(timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
           <button
@@ -935,6 +907,33 @@ function EditorReviewTimer() {
           }}
         >
           ↗ Go to Rem
+        </button>
+        {/* "Dismiss" button — always available while a timer is active. When a
+            queueList is present it advances to the next item; otherwise it
+            simply ends the timer (Ctrl+Shift+J / Start Timer flows). */}
+        <button
+          onClick={handleDismiss}
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            backgroundColor: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#dc2626';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ef4444';
+          }}
+          title={timerData.queueList && timerData.queueList.length > 0
+            ? 'Dismiss: Remove incremental status, add Dismissed powerup, and advance to next item'
+            : 'Dismiss: Remove incremental status, add Dismissed powerup, and end the timer'}
+        >
+          ✓ Dismiss
         </button>
         <button
           onClick={handleCancel}
