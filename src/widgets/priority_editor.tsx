@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getCardPriority, setCardPriority, CardPriorityInfo } from '../lib/card_priority';
-import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, cardPriorityCacheRefreshKey, pageRangeWidgetId } from '../lib/consts';
+import { allIncrementalRemKey, powerupCode, prioritySlotCode, allCardPriorityInfoKey, pageRangeWidgetId } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { calculateRelativePercentile, formatDuration } from '../lib/utils';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
@@ -57,11 +57,13 @@ export function PriorityEditor() {
   const pdfEndRef = useRef<HTMLInputElement>(null);
   const pdfPageRef = useRef<HTMLInputElement>(null);
 
-  // Listen for cache refresh signal to force re-evaluation of all data
-  const refreshSignal = useTrackerPlugin(
-    (rp) => rp.storage.getSession(cardPriorityCacheRefreshKey),
-    []
-  );
+  // NOTE: We intentionally do NOT subscribe to the global cardPriorityCacheRefreshKey
+  // here. This widget is registered as RightSideOfEditor, meaning RemNote creates one
+  // instance per visible rem. Subscribing all instances to a global cache-flush signal
+  // causes N widgets × M cache-flushes worth of heavy async queries (getIncrementalRemFromRem,
+  // getCardPriority, getCards, etc.) to fire simultaneously, blocking the UI for 30+ seconds.
+  // The useTrackerPlugin hooks below already provide built-in reactivity for this rem's
+  // own powerup property changes — the global broadcast is not needed.
 
   // Bumped after the user pins a new active PDF, so the host-info refetch
   // picks up the new active-PDF resolution. Otherwise `useRunAsync` keyed on
@@ -77,26 +79,26 @@ export function PriorityEditor() {
     | { hostKind: 'html'; pdfOptions: []; activePdfId: null; htmlRemId: string; htmlRemName: string | null }
     | { hostKind: null; pdfOptions: []; activePdfId: null; htmlRemId: null; htmlRemName: null };
 
-  const hostInfo = useRunAsync(async (): Promise<HostInfo | null> => {
+  const hostInfo = useTrackerPlugin(async (rp): Promise<HostInfo | null> => {
     if (!remId) return null;
-    const rem = await plugin.rem.findOne(remId);
+    const rem = await rp.rem.findOne(remId);
     if (!rem) return null;
 
-    const pdfs = await getAllPDFsInRem(plugin as any, rem);
+    const pdfs = await getAllPDFsInRem(rp as any, rem);
 
     if (pdfs.length > 0) {
       const pdfOptions = await Promise.all(
         pdfs.map(async (p) => ({
           remId: p.rem._id,
-          name: await safeRemTextToString(plugin as any, p.rem.text),
+          name: await safeRemTextToString(rp as any, p.rem.text),
           isPreferred: p.isPreferred,
         }))
       );
-      const activePdf = await getActivePdfForIncRem(plugin as any, rem);
+      const activePdf = await getActivePdfForIncRem(rp as any, rem);
       // Also resolve the HTML rem — bookmarks saved in Text Reader mode are
       // stored under the HTML rem's history key even when a PDF is present.
-      const htmlRem = await findHTMLinRem(plugin as any, rem);
-      const htmlRemName = htmlRem?.text ? await safeRemTextToString(plugin as any, htmlRem.text) : null;
+      const htmlRem = await findHTMLinRem(rp as any, rem);
+      const htmlRemName = htmlRem?.text ? await safeRemTextToString(rp as any, htmlRem.text) : null;
       return {
         hostKind: 'pdf',
         pdfOptions,
@@ -106,11 +108,11 @@ export function PriorityEditor() {
       };
     }
 
-    const htmlRem = await findHTMLinRem(plugin as any, rem);
+    const htmlRem = await findHTMLinRem(rp as any, rem);
     if (!htmlRem) {
       return { hostKind: null, pdfOptions: [], activePdfId: null, htmlRemId: null, htmlRemName: null };
     }
-    const htmlRemName = htmlRem.text ? await safeRemTextToString(plugin as any, htmlRem.text) : null;
+    const htmlRemName = htmlRem.text ? await safeRemTextToString(rp as any, htmlRem.text) : null;
     return {
       hostKind: 'html',
       pdfOptions: [],
@@ -203,7 +205,7 @@ export function PriorityEditor() {
         displayMode: displayMode || 'all',
       };
     },
-    [remId, refreshSignal]
+    [remId]
   );
 
   // Host data (range / history / stats). Reads only from the synced storage

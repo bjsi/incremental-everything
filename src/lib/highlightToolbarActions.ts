@@ -80,26 +80,17 @@ export async function handleCreateExtract(plugin: ReactRNPlugin, remId: string) 
   const highlight = await plugin.rem.findOne(remId);
   if (!highlight) return;
 
-  const { pdfRemId: docId, pageIndex } = await getPdfInfoFromHighlight(plugin as any, highlight);
+  const { pdfRemId: docId } = await getPdfInfoFromHighlight(plugin as any, highlight);
   const contextRemId = await resolveContextRemId(plugin, docId, { checkEditorTimer: true });
 
+  // createRemFromHighlight opens the parent-selector popup and returns immediately.
+  // Bookmark + toast are handled inside createRemUnderParent once the user confirms
+  // a parent — doing them here would fire even when the user cancels.
   await createRemFromHighlight(plugin as any, highlight, {
     makeIncremental: true,
     contextRemId,
     showPriorityPopupIfNew: true,
   });
-
-  if (contextRemId && docId) {
-    try {
-      await addPageToHistory(plugin as any, contextRemId, docId, pageIndex, undefined, highlight._id);
-      if (pageIndex !== null) {
-        await setIncrementalReadingPosition(plugin as any, contextRemId, docId, pageIndex);
-      }
-      await plugin.app.toast('✅ Extract created & bookmark updated');
-    } catch (e) {
-      console.error('Failed to update bookmark position via Toolbar', e);
-    }
-  }
 }
 
 export async function handleToggleIncremental(

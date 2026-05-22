@@ -28,6 +28,7 @@ import {
 } from '../lib/hierarchical_parent_selector/treeHelpers';
 import { createRemUnderParent } from '../lib/highlightActions';
 import { getIncrementalPageRange } from '../lib/pdfUtils';
+import { RemTextSegments } from '../components';
 
 // ============================================================================
 // STYLES
@@ -230,16 +231,22 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         gap: '8px',
         padding: `8px 16px 8px ${indentPadding}px`,
         cursor: 'pointer',
-        backgroundColor: isSelected
+        backgroundColor: isSelected && isSuggested
+          ? '#dbeafe'
+          : isSelected
           ? 'var(--rn-clr-background-tertiary)'
           : isSuggested
           ? 'var(--rn-clr-blue-light, #eff6ff)'
           : 'transparent',
-        borderLeft: isSelected
+        borderLeft: isSelected && isSuggested
+          ? '3px solid #1d4ed8'
+          : isSelected
           ? '3px solid #3b82f6'
           : isSuggested
           ? '3px solid var(--rn-clr-blue, #3b82f6)'
           : '3px solid transparent',
+        outline: isSelected && isSuggested ? '1px dashed #93c5fd' : 'none',
+        outlineOffset: '-2px',
         transition: 'background-color 0.1s ease',
       }}
     >
@@ -259,8 +266,8 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         </span>
       )}
 
-      {isSuggested && !isSelected && (
-        <span style={{ fontSize: '11px', color: 'var(--rn-clr-blue, #3b82f6)' }} title="Suggested: this rem's page range contains the highlighted page">
+      {isSuggested && (
+        <span style={{ fontSize: '11px', color: isSelected ? '#1d4ed8' : 'var(--rn-clr-blue, #3b82f6)' }} title="Suggested: this rem's page range contains the highlighted page">
           ★
         </span>
       )}
@@ -269,7 +276,7 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         style={{
           flex: 1,
           fontSize: '13px',
-          color: isSuggested && !isSelected ? 'var(--rn-clr-blue, #1e40af)' : 'var(--rn-clr-content-primary)',
+          color: isSuggested ? (isSelected ? '#1d4ed8' : 'var(--rn-clr-blue, #1e40af)') : 'var(--rn-clr-content-primary)',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
@@ -277,7 +284,7 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         }}
         title={isSuggested ? `Suggested — its page range contains page ${node.name}` : node.name}
       >
-        {node.name.length > 50 ? `${node.name.slice(0, 50)}...` : node.name}
+        <RemTextSegments segments={node.nameSegments} />
       </span>
 
       <AddChildButton
@@ -557,8 +564,28 @@ function ParentSelectorWidget() {
         } catch (error) {
           console.error('[ParentSelector:Widget] Error expanding to last destination:', error);
         }
+      } else if (contextData.contextRemId) {
+        // No prior memory but we know which IncRem the user is currently reviewing
+        // (from queue or editor review timer) — suggest that one.
+        try {
+          const { tree: expandedTree, foundIndex } = await expandToLastDestination(
+            plugin,
+            initialTree,
+            contextData.contextRemId,
+            incrementalRemsToUse
+          );
+
+          initialTree = expandedTree;
+          setSuggestedRemId(contextData.contextRemId);
+          if (foundIndex >= 0) {
+            setSelectedIndex(foundIndex);
+          }
+        } catch (error) {
+          console.error('[ParentSelector:Widget] Error expanding to contextRemId:', error);
+        }
       } else {
-        // No prior memory: suggest the tightest-range IncRem containing the highlight page
+        // No prior memory and no active IncRem context: suggest the tightest-range
+        // IncRem whose page range contains the highlight page.
         const pageIndex = (contextData as any).highlightPageIndex as number | null | undefined;
         if (pageIndex != null && contextData.pdfRemId) {
           try {

@@ -4,6 +4,7 @@ import { TypeBadge } from './TypeBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { TimeBadge } from './TimeBadge';
 import { InlinePriorityEditor } from './InlineEditors';
+import { RemText } from './RemText';
 import { formatDuration, timeSince } from '../lib/utils';
 
 export interface IncRemRowData {
@@ -60,8 +61,8 @@ export function IncRemRow({
           className="flex-1 min-w-0 text-sm"
           style={{ color: 'var(--rn-clr-content-primary)' }}
         >
-          <div className="truncate" title={incRem.breadcrumb ? `${incRem.breadcrumb} > ${incRem.remText}` : incRem.remText}>
-            {incRem.remText || 'Loading...'}
+          <div className="line-clamp-2" title={incRem.breadcrumb || undefined}>
+            <RemText remId={incRem.remId} />
           </div>
           {((incRem.historyCount !== undefined && incRem.historyCount > 0) || (incRem.totalTimeSpent !== undefined && incRem.totalTimeSpent > 0) || incRem.lastReviewDate || incRem.createdAt) ? (
             <div className="text-xs mt-0.5 flex items-center gap-2" style={{ color: 'var(--rn-clr-content-tertiary)' }}>

@@ -25,7 +25,7 @@ import { enableHideInQueueIntegrationId } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { registerJumpToRemHelper } from '../register/window';
-import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS } from '../lib/ui_helpers';
+import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS } from '../lib/ui_helpers';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -74,6 +74,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerPdfHighlightCSS(plugin);
   await registerPluginHidingCSS(plugin);
   await registerClozeExtractCSS(plugin);
+  await registerTagBadgeCSS(plugin);
 
   await registerCommands(plugin);
 

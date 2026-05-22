@@ -9,6 +9,7 @@ import {
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import { ParentTreeNode, getLastDestinationKey } from './types';
+import { resolveRemTextSegments } from '../richTextRemRefs';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../consts';
 import { IncrementalRem } from '../incremental_rem';
 import { safeRemTextToString, findPDFinRem, findHTMLinRem, getKnownHtmlRemsKey } from '../pdfUtils';
@@ -64,6 +65,7 @@ export async function createTreeNode(
   parentId: RemId | null = null
 ): Promise<ParentTreeNode> {
   const remText = await safeRemTextToString(plugin, rem.text);
+  const nameSegments = await resolveRemTextSegments(plugin, rem.text);
   const isIncremental = await rem.hasPowerup(powerupCode);
 
   // Check if has children (for expand indicator)
@@ -88,6 +90,7 @@ export async function createTreeNode(
   return {
     remId: rem._id,
     name: remText,
+    nameSegments,
     priority,
     percentile,
     isIncremental,

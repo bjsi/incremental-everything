@@ -378,9 +378,17 @@ function BatchCardPriority() {
 
       setSuccessMessage(`✅ Applied cardPriority to ${appliedCount} rem(s)`);
 
-      // Delegate inheritance cascade to background tracker
-      if (anchorRemId) {
-        await plugin.storage.setSession('pendingInheritanceCascade', anchorRemId);
+      // Delegate inheritance cascade to background tracker.
+      // We cascade from each modified rem, not from the anchor: tagged/referencing
+      // rems are scattered across the KB and are NOT descendants of the anchor,
+      // so a cascade rooted at the anchor would never reach the subtrees whose
+      // inherited cardPriority just became stale.
+      const cascadeRemIds = selectedRems
+        .filter((r) => !(r.hasManualCardPriority && !overwriteExisting))
+        .map((r) => r.remId);
+
+      if (cascadeRemIds.length > 0) {
+        await plugin.storage.setSession('pendingInheritanceCascade', cascadeRemIds);
       } else {
         await plugin.storage.setSession('plugin_operation_active', false);
       }

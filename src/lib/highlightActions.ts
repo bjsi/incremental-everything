@@ -112,6 +112,7 @@ import {
   ParentTreeNode,
   ParentSelectorContext,
 } from './hierarchical_parent_selector/types';
+import { resolveRemTextSegments } from './richTextRemRefs';
 import {
   findAllRemsForPDFAsTree,
   findAllRemsForHTMLAsTree,
@@ -294,18 +295,29 @@ export const createRemUnderParent = async (
 
   await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
 
-  // Save reading position/bookmark for the queue item.
+  // Save reading position/bookmark for the active IncRem context.
   // pageIndex is null for HTML / PDF Text Reader highlights — we still record
   // the bookmark by highlight rem id so jumps work in those modes too.
+  //
+  // Prefer the explicit contextRemId (resolved by the caller from queue OR editor
+  // review timer). Fall back to pageRangeContext for legacy callers that don't pass it.
   if (makeIncremental) {
     const { pdfRemId: actualPdf, pageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
     if (actualPdf) {
         try {
-            const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
-            if (queueCtx && queueCtx.pdfRemId === actualPdf && queueCtx.incrementalRemId) {
-                await addPageToHistory(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex, undefined, highlightRem._id);
+            let bookmarkRemId: RemId | null = null;
+            if (contextRemId) {
+              bookmarkRemId = contextRemId;
+            } else {
+              const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
+              if (queueCtx && queueCtx.pdfRemId === actualPdf && queueCtx.incrementalRemId) {
+                bookmarkRemId = queueCtx.incrementalRemId;
+              }
+            }
+            if (bookmarkRemId) {
+                await addPageToHistory(plugin, bookmarkRemId, actualPdf, pageIndex, undefined, highlightRem._id);
                 if (pageIndex !== null) {
-                    await setIncrementalReadingPosition(plugin, queueCtx.incrementalRemId, actualPdf, pageIndex);
+                    await setIncrementalReadingPosition(plugin, bookmarkRemId, actualPdf, pageIndex);
                 }
             }
         } catch(e) {
@@ -397,6 +409,7 @@ export const createRemFromHighlight = async (
     rootCandidates.push({
       remId: sourceDocument._id,
       name: sourceText,
+      nameSegments: await resolveRemTextSegments(plugin, sourceDocument.text || []),
       priority: null,
       percentile: null,
       isIncremental: false,

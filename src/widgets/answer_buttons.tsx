@@ -38,6 +38,7 @@ import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
+import { addToIncrementalHistory } from '../lib/history_utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
@@ -450,6 +451,9 @@ export function AnswerButtons() {
             // Save updated history to dismissed powerup BEFORE removing incremental
             await transferToDismissed(plugin, rem, updatedHistory);
 
+            // Reflect the dismissal in the Incremental History widget
+            await addToIncrementalHistory(plugin, rem._id, { dismissed: true });
+
             // Remove from session cache
             await removeIncrementalRemCache(plugin, rem._id);
 
@@ -805,7 +809,7 @@ export function AnswerButtons() {
                         animation: isKbShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
                         color: isKbShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
                       }}>
-                        KB: <strong>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile?.toFixed(1)}%)
+                        KB: <strong style={{ color: percentileToHslColor(shieldStatusAsync.kb.percentile ?? shieldStatusAsync.kb.absolute) }}>{shieldStatusAsync.kb.absolute}</strong> ({shieldStatusAsync.kb.percentile?.toFixed(1)}%)
                       </span>
                     ) : (
                       <span>KB: 100%</span>
@@ -815,7 +819,7 @@ export function AnswerButtons() {
                         animation: isDocShieldActive ? 'shieldTextGlow 2s ease-in-out infinite' : 'none',
                         color: isDocShieldActive ? 'var(--rn-clr-blue)' : 'inherit'
                       }}>
-                        Doc: <strong>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile?.toFixed(1)}%)
+                        Doc: <strong style={{ color: percentileToHslColor(shieldStatusAsync.doc.percentile ?? shieldStatusAsync.doc.absolute) }}>{shieldStatusAsync.doc.absolute}</strong> ({shieldStatusAsync.doc.percentile?.toFixed(1)}%)
                       </span>
                     ) : (
                       sessionCache?.dueIncRemsInScope && <span>Doc: 100%</span>

@@ -821,13 +821,20 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
 
       // Also capture nextRepDate for manual date reset detection
       // (only relevant when powerup is still present, so direct rem read is fine)
+      //
+      // IMPORTANT: normalize to start-of-day. The cached nextRepDate may be a raw
+      // epoch (Date.now() + interval * 86400000) with sub-day precision, while
+      // getIncrementalRemFromRem resolves the Daily Document reference via
+      // dayjs('YYYY-MM-DD') → midnight-aligned timestamp. Without normalizing,
+      // the same calendar day produces different millisecond values → false-positive
+      // "manual date reset" on every GlobalRemChanged (e.g. when creating a cloze).
       if (!currentIncRem && !capturedHistory) {
         // Skip nextRepDate capture — powerup is gone, this was a removal event
       } else {
         const incRemForDate = currentIncRem || (cachedIncRem as any);
         if (incRemForDate && incRemForDate.nextRepDate) {
           if (!pendingNextRepDateMap.has(data.remId)) {
-            pendingNextRepDateMap.set(data.remId, incRemForDate.nextRepDate);
+            pendingNextRepDateMap.set(data.remId, dayjs(incRemForDate.nextRepDate).startOf('day').valueOf());
           }
         }
       }
@@ -872,7 +879,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
             // Get the CURRENT nextRepDate from the rem itself
             const currentIncRem = await getIncrementalRemFromRem(plugin, rem);
 
-            if (currentIncRem && currentIncRem.nextRepDate !== oldNextRepDate) {
+            if (currentIncRem && dayjs(currentIncRem.nextRepDate).startOf('day').valueOf() !== oldNextRepDate) {
               // Check if this change was made by the plugin using a session flag
               const pluginIsUpdating = await plugin.storage.getSession<boolean>('plugin_updating_srs_data');
 

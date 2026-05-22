@@ -1,4 +1,5 @@
 import { RemId, RichTextInterface } from '@remnote/plugin-sdk';
+import { RemTextSegment } from '../richTextRemRefs';
 
 /**
  * Represents a node in the hierarchical parent selector tree.
@@ -6,7 +7,8 @@ import { RemId, RichTextInterface } from '@remnote/plugin-sdk';
  */
 export interface ParentTreeNode {
   remId: RemId;
-  name: string;
+  name: string;                   // Plain-text name (used for sorting/filtering/tooltips)
+  nameSegments: RemTextSegment[];  // Display segments — pins render as an icon, not text
   priority: number | null;
   percentile: number | null;
   isIncremental: boolean;

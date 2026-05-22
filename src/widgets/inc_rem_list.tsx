@@ -25,6 +25,11 @@ export function IncRemList() {
   // Track in-flight priority changes so cache reloads don't overwrite them with stale data.
   const pendingPriorityChanges = useRef<Record<string, number>>({});
 
+  // Once the first load finishes, cache-driven refreshes run silently in the
+  // background instead of swapping the list for a "Loading..." placeholder.
+  const hasLoadedOnceRef = useRef(false);
+  const loadInFlightRef = useRef(false);
+
   // Track current filter/sort state so we can store it before launching review
   const currentListState = useRef<IncRemListState | null>(null);
 
@@ -93,8 +98,14 @@ export function IncRemList() {
   );
 
   const loadIncRemDetails = async (incRems: IncrementalRem[]) => {
-    if (loadingRems) return;
-    setLoadingRems(true);
+    if (loadInFlightRef.current) return;
+    loadInFlightRef.current = true;
+
+    // Only show the full "Loading..." placeholder on the first load. Cache-driven
+    // background refreshes keep the existing list mounted, so the scroll position
+    // (and any open rem-reference hover popup) is preserved.
+    const isInitialLoad = !hasLoadedOnceRef.current;
+    if (isInitialLoad) setLoadingRems(true);
 
     const sortedByPriority = [...incRems].sort((a, b) => a.priority - b.priority);
     const percentiles: Record<string, number> = {};
@@ -155,7 +166,9 @@ export function IncRemList() {
     }
 
     setIncRemsWithDetails(finalDetails);
-    setLoadingRems(false);
+    hasLoadedOnceRef.current = true;
+    loadInFlightRef.current = false;
+    if (isInitialLoad) setLoadingRems(false);
   };
 
   const handleClose = () => plugin.widget.closePopup();

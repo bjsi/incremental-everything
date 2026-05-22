@@ -241,8 +241,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
 
   plugin.app.registerWidget('aggregated_repetition_history', WidgetLocation.Popup, {
     dimensions: {
-      width: '450px',
+      width: '550px',
       height: 'auto',
+    },
+  });
+
+  plugin.app.registerWidget('study_dashboard', WidgetLocation.Popup, {
+    dimensions: {
+      width: '900px',
+      height: 850,
     },
   });
 
