@@ -513,6 +513,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                       : '⇔'; // fallback
       const remType = rem.type;
 
+      // Inherited cloze/card hint properties from the original rem must be stripped from
+      // the new cloze rem. Otherwise RemNote treats orphaned hints as belonging to the
+      // newly-created cloze and renders them in the wrong position.
+      const stripInheritedHintProps = (n: any) => {
+        delete n[RICH_TEXT_FORMATTING.CLOZE_HINT];
+        delete n[RICH_TEXT_FORMATTING.CARD_HINT_FRONT];
+        delete n[RICH_TEXT_FORMATTING.CARD_HINT_BACK];
+        delete n[RICH_TEXT_FORMATTING.MULTILINE_CARD_HINT];
+        delete n[RICH_TEXT_FORMATTING.HIDDEN_CLOZE];
+        delete n[RICH_TEXT_FORMATTING.REVEALED_CLOZE];
+      };
+
       // Process one rich text section. localStart/localEnd are section-relative character positions.
       // - Delimiter nodes (i:'s') → replaced by arrowChar.
       // - Existing cloze marks outside the selection → stripped, yellow highlight + red font applied.
@@ -549,6 +561,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             const baseNode: any = { ...node };
             const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
             delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
+            stripInheritedHintProps(baseNode);
 
             if (!inSel) {
               if (hadCloze) {
@@ -579,6 +592,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             const baseNode: any = { ...node };
             const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
             delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
+            stripInheritedHintProps(baseNode);
             if (inSel) {
               arr.push({ ...baseNode, [RICH_TEXT_FORMATTING.CLOZE]: clozeId });
             } else if (hadCloze) {
