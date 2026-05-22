@@ -1,7 +1,8 @@
 import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { defaultPriorityId, priorityStepSizeId } from './consts';
-import { getInitialPriority } from './priority_inheritance';
+import { findClosestAncestorWithAnyPriority } from './priority_inheritance';
 import { getIncrementalRemFromRem } from './incremental_rem';
+import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from './card_priority/types';
 
 // Cap on how many step-size decrements (= priority-number increments)
 // can be auto-applied to a new cloze. Even on the 12th cloze, we apply 10 steps.
@@ -62,13 +63,41 @@ export async function computeClozeAutoPriority(
   let parentPriority: number;
   let parentPrioritySource: 'incremental' | 'card-or-inherited';
 
-  const incInfo = await getIncrementalRemFromRem(plugin, parentRem);
-  if (incInfo) {
-    parentPriority = incInfo.priority;
-    parentPrioritySource = 'incremental';
-  } else {
-    parentPriority = await getInitialPriority(plugin, parentRem, defaultPriority);
+  // Cloze-specific precedence: manual cardPriority wins over IncRem on the same rem.
+  // Rationale: IncRem priority targets the incremental side; a manual cardPriority is a
+  // deliberate user choice for the flashcard side, which is what a cloze child inherits.
+  // (createExtract intentionally prefers IncRem and is unaffected.)
+  //
+  //   1. parentRem's own manual cardPriority.
+  //   2. parentRem's own IncRem priority.
+  //   3. Closest ancestor — `findClosestAncestorWithAnyPriority(..., 'Card')` prefers
+  //      manual/incremental cardPriority over IncRem on the same ancestor. This is what
+  //      makes the grandparent's manual cardPriority=8 win over its own IncRem=13.
+  //      Note: NOT getInitialPriority, which walks with 'IncRem' precedence.
+  //   4. Plugin default.
+  const ownPriorityValue = await parentRem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+  const ownSource = await parentRem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
+  const parsedManual =
+    ownPriorityValue && ownSource === 'manual' ? parseInt(ownPriorityValue as string) : NaN;
+
+  if (!isNaN(parsedManual)) {
+    parentPriority = parsedManual;
     parentPrioritySource = 'card-or-inherited';
+  } else {
+    const incInfo = await getIncrementalRemFromRem(plugin, parentRem);
+    if (incInfo) {
+      parentPriority = incInfo.priority;
+      parentPrioritySource = 'incremental';
+    } else {
+      const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, parentRem, 'Card');
+      if (ancestorInfo) {
+        parentPriority = ancestorInfo.priority;
+        parentPrioritySource = ancestorInfo.sourceType === 'IncRem' ? 'incremental' : 'card-or-inherited';
+      } else {
+        parentPriority = defaultPriority;
+        parentPrioritySource = 'card-or-inherited';
+      }
+    }
   }
 
   // Count existing cloze-extract children (live count — robust to manual deletions)
