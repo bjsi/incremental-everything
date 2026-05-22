@@ -30,6 +30,9 @@ function IncrementalHistory() {
     // Search State
     const [searchText, setSearchText] = useState("");
 
+    // Event-type filter (radio buttons under the search box)
+    const [filterEvent, setFilterEvent] = useState<'ALL' | 'reviewed' | 'created' | 'dismissed'>('ALL');
+
     // KB-wide priority percentile map for IncRem priority badges
     const [percentileMap, setPercentileMap] = useState<Record<string, number>>({});
 
@@ -115,7 +118,18 @@ function IncrementalHistory() {
                 return item.kbId === currentKbId;
             });
 
-            // 2. Search Filter
+            // 2. Event-type filter. "dismissed" includes both standalone dismissals
+            //    and reviewed-and-then-dismissed entries (which display both badges).
+            if (filterEvent !== 'ALL') {
+                filtered = filtered.filter((item) => {
+                    if (filterEvent === 'dismissed') {
+                        return item.eventType === 'dismissed' || !!item.wasDismissed;
+                    }
+                    return item.eventType === filterEvent;
+                });
+            }
+
+            // 3. Search Filter
             if (searchText.trim().length > 0) {
                 const lowerSearch = searchText.toLowerCase();
                 const tokens = lowerSearch.split(/\s+/).filter(t => t.length > 0);
@@ -147,7 +161,7 @@ function IncrementalHistory() {
             setFilteredData(filtered);
         }
         filterData();
-    }, [historyDataRaw, plugin, searchText]);
+    }, [historyDataRaw, plugin, searchText, filterEvent]);
 
     const closeIndex = (itemKey: number) => {
         // Find index in original list
@@ -192,6 +206,20 @@ function IncrementalHistory() {
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
                 />
+                <div className="flex flex-wrap gap-4 mt-2 text-sm rn-clr-content-primary">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterEvent === 'ALL'} onChange={() => setFilterEvent('ALL')} /> All
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterEvent === 'reviewed'} onChange={() => setFilterEvent('reviewed')} /> Reviewed
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterEvent === 'created'} onChange={() => setFilterEvent('created')} /> Created
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" checked={filterEvent === 'dismissed'} onChange={() => setFilterEvent('dismissed')} /> Dismissed
+                    </label>
+                </div>
             </div>
             {filteredData.length === 0 && (
                 <div className="p-2 rn-clr-content-primary">

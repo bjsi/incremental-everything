@@ -94,7 +94,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: betaFirstReviewIntervalId,
     title: 'First Review Interval (Beta Scheduler)',
     description:
-      'Interval in days assigned after completing the first review. Not to be confused with "Initial Interval", which controls when a new IncRem first appears in the queue (before any review). Only used when the Beta Scheduler is enabled.',
+      'Interval in days assigned after completing the first review. Not to be confused with "Initial Interval", which controls when a new IncRem first appears in the queue (before any review). Only used when the Beta Scheduler is enabled. Default: 5 days.',
     defaultValue: 5,
   });
 
@@ -102,7 +102,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: betaMaxIntervalId,
     title: 'Max Interval (Beta Scheduler)',
     description:
-      'Upper bound in days the interval gradually approaches. The interval will never exceed this value. Only used when the Beta Scheduler is enabled.',
+      'Upper bound in days the interval gradually approaches. The interval will never exceed this value. Only used when the Beta Scheduler is enabled. Default: 30 days.',
     defaultValue: 30,
   });
 
