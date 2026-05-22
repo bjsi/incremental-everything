@@ -491,8 +491,8 @@ function EditorReviewTimer() {
     // The widget will automatically refresh due to useTrackerPlugin dependency changes
   };
 
-  const handleDismissAndNext = async () => {
-    if (!timerData || timerData.queueList.length === 0) return;
+  const handleDismiss = async () => {
+    if (!timerData) return;
 
     const currentRem = await plugin.rem.findOne(timerData.remId);
     if (!currentRem) {
@@ -547,6 +547,25 @@ function EditorReviewTimer() {
     }
 
     await plugin.app.toast(`✓ Dismissed: ${timerData.remName}`);
+
+    const hasNext = !!(timerData.queueList && timerData.queueList.length > 0);
+
+    if (!hasNext) {
+      // No queueList → end the timer in place (mirrors handleEndReview's teardown
+      // without recording another repetition, since dismissal already finalized it).
+      await plugin.storage.setSession('editor-review-timer-rem-id', undefined);
+      await plugin.storage.setSession('editor-review-timer-start', undefined);
+      await plugin.storage.setSession('editor-review-timer-interval', undefined);
+      await plugin.storage.setSession('editor-review-timer-priority', undefined);
+      await plugin.storage.setSession('editor-review-timer-rem-name', undefined);
+      await plugin.storage.setSession('editor-review-timer-from-queue', undefined);
+      await plugin.storage.setSession('editor-review-timer-origin', undefined);
+      await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
+      await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
+      await plugin.storage.setSession('editor-review-timer-queue-list', undefined);
+      await forceSaveSession(plugin);
+      return;
+    }
 
     // Advance to the next item in queue
     const nextRemId = timerData.queueList[0];
@@ -813,32 +832,33 @@ function EditorReviewTimer() {
           </button>
         )}
 
-        {/* "Dismiss" button — shown alongside "Next" when queue has items (inc-rem-list/main-view origin) */}
-        {timerData.queueList && timerData.queueList.length > 0 &&
-          (timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
-            <button
-              onClick={handleDismissAndNext}
-              style={{
-                padding: '6px 14px',
-                fontSize: '13px',
-                backgroundColor: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#dc2626';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#ef4444';
-              }}
-              title="Dismiss: Remove incremental status, add Dismissed powerup, and advance to next item"
-            >
-              ✓ Dismiss
-            </button>
-          )}
+        {/* "Dismiss" button — always available while a timer is active. When a
+            queueList is present it advances to the next item; otherwise it
+            simply ends the timer (Ctrl+Shift+J / Start Timer flows). */}
+        <button
+          onClick={handleDismiss}
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            backgroundColor: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#dc2626';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ef4444';
+          }}
+          title={timerData.queueList && timerData.queueList.length > 0
+            ? 'Dismiss: Remove incremental status, add Dismissed powerup, and advance to next item'
+            : 'Dismiss: Remove incremental status, add Dismissed powerup, and end the timer'}
+        >
+          ✓ Dismiss
+        </button>
 
         {/* "Back to..." button — shown when origin is queue or inc-rem-list/main-view */}
         {(timerData.origin === 'queue' || timerData.origin === 'inc-rem-list' || timerData.origin === 'inc-rem-main-view') && (
