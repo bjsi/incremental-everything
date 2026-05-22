@@ -13,7 +13,7 @@ import {
   alwaysUseLightModeOnMobileId,
   alwaysUseLightModeOnWebId,
   remnoteEnvironmentId,
-  showRemsAsIsolatedInQueueId,
+  isolatedQueueModeId,
   displayFsrsDsrId,
   fsrsWeightsId,
   displayQueueToolbarPriorityId,
@@ -245,12 +245,37 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     defaultValue: true,
   });
 
-  plugin.settings.registerBooleanSetting({
-    id: showRemsAsIsolatedInQueueId,
-    title: 'Show regular Rems in isolated view (Queue)',
+  plugin.settings.registerDropdownSetting({
+    id: isolatedQueueModeId,
+    title: 'Use Isolated Card View in Queue for',
     description:
-      'When enabled, incremental Rems that are plain Rems will use the isolated card view in the queue instead of the full document context. Switch back to context with the button in the queue.',
-    defaultValue: false,
+      'Choose which incremental items use the isolated card view as their default view in the queue. ' +
+      'Highlights that do NOT use the isolated card view will be shown inside the PDF/HTML reader instead, ' +
+      'and regular Rems that do NOT use it will be shown in the full document context. ' +
+      'You can always toggle between the two views with the button in the queue — this setting only determines the initial view.',
+    defaultValue: 'highlights',
+    options: [
+      {
+        key: 'highlights',
+        label: 'Highlights (PDF/HTML)',
+        value: 'highlights',
+      },
+      {
+        key: 'rems',
+        label: 'Regular Rems',
+        value: 'rems',
+      },
+      {
+        key: 'both',
+        label: 'Both',
+        value: 'both',
+      },
+      {
+        key: 'none',
+        label: 'None',
+        value: 'none',
+      },
+    ],
   });
 
   plugin.settings.registerBooleanSetting({

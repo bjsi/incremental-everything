@@ -155,6 +155,7 @@ export function IsolatedCardViewer({
       await createRemFromHighlight(plugin as ReactRNPlugin, rem, {
         makeIncremental,
         sourceDocumentId,
+        showPriorityPopupIfNew: makeIncremental,
       });
     } catch (error) {
       console.error('Error creating rem:', error);

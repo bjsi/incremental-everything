@@ -19,7 +19,8 @@ export const betaMaxIntervalId = 'beta-max-interval';
 export const collapseQueueTopBar = 'collapse-queue-top-bar';
 export const defaultPriorityId = 'default-priority';
 export const defaultCardPriorityId = 'defaultCardPriority';
-export const showRemsAsIsolatedInQueueId = 'show-rems-as-isolated-in-queue';
+export const isolatedQueueModeId = 'isolated-queue-view-mode';
+export type IsolatedQueueMode = 'highlights' | 'rems' | 'both' | 'none';
 export const priorityStepSizeId = 'priority-step-size';
 export const enableHideInQueueIntegrationId = 'enable-hide-in-queue-integration';
 
