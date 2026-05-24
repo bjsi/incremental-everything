@@ -1394,6 +1394,42 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   plugin.app.registerCommand({
+    id: 'toggle-ignore-tag',
+    name: 'Toggle Ignore Tag',
+    description: 'Tag/untag the focused Rem with #ignore — marks already-read snippets that were left for archive/consultation only.',
+    keyboardShortcut: 'ctrl+shift+i',
+    quickCode: 'ign',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('No focused Rem.');
+        return;
+      }
+
+      let ignoreTagRem = await plugin.rem.findByName(['ignore'], null);
+      if (!ignoreTagRem) {
+        ignoreTagRem = await plugin.rem.createRem();
+        if (!ignoreTagRem) {
+          await plugin.app.toast('Could not create #ignore tag.');
+          return;
+        }
+        await ignoreTagRem.setText(['ignore']);
+      }
+
+      const tags = await rem.getTagRems();
+      const alreadyTagged = tags.some((t) => t._id === ignoreTagRem!._id);
+
+      if (alreadyTagged) {
+        await rem.removeTag(ignoreTagRem._id);
+        await plugin.app.toast('Removed #ignore.');
+      } else {
+        await rem.addTag(ignoreTagRem._id);
+        await plugin.app.toast('Tagged with #ignore.');
+      }
+    },
+  });
+
+  plugin.app.registerCommand({
     id: 'test-mobile-detection',
     name: '🧪 Test Mobile & Platform Detection',
     action: async () => {
