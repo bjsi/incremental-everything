@@ -9,6 +9,29 @@ import { safeRemTextToString } from './pdfUtils';
 
 export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
+// Powerup-property bookkeeping rems (e.g. the "Size" rem RemNote creates under
+// every Header heading) show up in getChildrenRem() but aren't user content —
+// they'd clutter the preview AND get incorrectly reparented if we touched them.
+// Filter via every isPowerup*/isSlot* flag the SDK exposes.
+export async function isMetaRem(rem: PluginRem): Promise<boolean> {
+  try {
+    const checks = await Promise.all([
+      (rem as any).isPowerupProperty?.(),
+      (rem as any).isPowerupPropertyListItem?.(),
+      (rem as any).isPowerupSlot?.(),
+      (rem as any).isSlot?.(),
+    ]);
+    return checks.some((v) => v === true);
+  } catch {
+    return false;
+  }
+}
+
+async function filterStructural(rems: PluginRem[]): Promise<PluginRem[]> {
+  const flags = await Promise.all(rems.map((r) => isMetaRem(r)));
+  return rems.filter((_, i) => !flags[i]);
+}
+
 // Detection. The SDK types getFontSize as 'H1'|'H2'|'H3'|undefined, but at
 // runtime it also returns 'H4'|'H5'|'H6' (confirmed via probe). Cast accordingly.
 export async function getHeadingLevel(rem: PluginRem): Promise<HeadingLevel | null> {
@@ -92,7 +115,8 @@ export async function collectCandidates(
 
   const visit = async (rem: PluginRem, depth: number) => {
     const level = await getHeadingLevel(rem);
-    const children = (await rem.getChildrenRem()) || [];
+    const rawChildren = (await rem.getChildrenRem()) || [];
+    const children = await filterStructural(rawChildren);
     const hasChildren = children.length > 0;
     const text = await safeRemTextToString(plugin, (rem as any).text);
     const parentId = (rem as any).parent as string;

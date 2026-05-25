@@ -13,6 +13,7 @@ import {
   buildPlan,
   applyPlan,
   getHeadingLevel,
+  isMetaRem,
   HeadingLevel,
   ProposedNode,
   OUTLINE_SNAPSHOT_KEY,
@@ -37,13 +38,23 @@ async function buildBeforeTree(
   const visit = async (rem: PluginRem): Promise<BeforeNode> => {
     const level = await getHeadingLevel(rem);
     const text = await safeRemTextToString(plugin, (rem as any).text);
-    const childRems = (await rem.getChildrenRem()) || [];
+    const rawChildren = (await rem.getChildrenRem()) || [];
+    // Skip powerup-property bookkeeping rems (e.g. the auto-created "Size"
+    // child every Header heading gets) so the Before panel matches what the
+    // user sees in RemNote.
+    const childRems: PluginRem[] = [];
+    for (const c of rawChildren) {
+      if (!(await isMetaRem(c))) childRems.push(c);
+    }
     const children: BeforeNode[] = [];
     for (const c of childRems) children.push(await visit(c));
     return { remId: rem._id, level, text, children };
   };
   const out: BeforeNode[] = [];
-  for (const r of entryRems) out.push(await visit(r));
+  for (const r of entryRems) {
+    if (await isMetaRem(r)) continue;
+    out.push(await visit(r));
+  }
   return out;
 }
 

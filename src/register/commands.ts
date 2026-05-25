@@ -69,6 +69,7 @@ import {
   OUTLINE_SNAPSHOT_KEY,
   OutlineSnapshot,
   revertSnapshot,
+  isMetaRem,
 } from '../lib/outline_restructure';
 
 
@@ -2214,7 +2215,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           }
           scopeRootId = root._id;
           const children = (await root.getChildrenRem()) || [];
-          inputRemIds = children.map((c) => c._id);
+          // Drop powerup-property bookkeeping rems (e.g. the auto "Size" child
+          // on Header headings); they aren't content and must not be moved.
+          const filtered: typeof children = [];
+          for (const c of children) {
+            if (!(await isMetaRem(c))) filtered.push(c);
+          }
+          inputRemIds = filtered.map((c) => c._id);
         } else {
           // Multi-rem selection → scope root is the common parent (we use the
           // first selected rem's parent as a proxy; users typically select
@@ -2248,7 +2255,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         }
         scopeRootId = root._id;
         const children = (await root.getChildrenRem()) || [];
-        inputRemIds = children.map((c) => c._id);
+        const filtered: typeof children = [];
+        for (const c of children) {
+          if (!(await isMetaRem(c))) filtered.push(c);
+        }
+        inputRemIds = filtered.map((c) => c._id);
       }
 
       if (!scopeRootId || inputRemIds.length === 0) {
