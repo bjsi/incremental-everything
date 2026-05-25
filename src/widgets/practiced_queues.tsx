@@ -904,7 +904,10 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
                                 <div className="text-xl font-bold text-gray-500 dark:text-gray-400">
                                     {formatAge(session.prevCardFirstRep)}
                                     {session.prevCardInterval && (
-                                        <span className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1">
+                                        <span
+                                            className="text-sm font-normal text-gray-400 dark:text-gray-500 ml-1"
+                                            title={session.prevCardNextRepTime ? `Next review: ${new Date(session.prevCardNextRepTime).toLocaleDateString('en-GB')}` : undefined}
+                                        >
                                             (Ivl: {formatInterval(session.prevCardInterval)})
                                         </span>
                                     )}
@@ -943,39 +946,40 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
                                     </>
                                 )}
                                 {session.prevCardFsrsD !== undefined && session.prevCardFsrsS !== undefined && (
-                                    <div className="mt-1 text-xs text-gray-400 dark:text-gray-500 flex items-center gap-2" title="FSRS Difficulty and Stability after this repetition, and next scheduled review date">
-                                        <span>
-                                            D: {session.prevCardFsrsD.toFixed(1)} S: {formatStabilityDays(session.prevCardFsrsS)}
-                                            {session.prevCardNextRepTime && ` ${new Date(session.prevCardNextRepTime).toLocaleDateString('en-GB')}`}
-                                        </span>
-                                        {session.prevCardId && (
-                                            <span
-                                                role="button"
-                                                style={{
-                                                    cursor: 'pointer',
-                                                    fontSize: '13px',
-                                                    opacity: 0.6,
-                                                    padding: '1px 3px',
-                                                    borderRadius: '4px',
-                                                    transition: 'opacity 0.15s',
-                                                }}
-                                                onClick={async (e) => {
-                                                    e.stopPropagation();
-                                                    if (!session.prevCardId) return;
-                                                    const card = await plugin.card.findOne(session.prevCardId);
-                                                    await plugin.widget.openPopup('flashcard_repetition_history', {
-                                                        remId: card?.remId,
-                                                        cardId: session.prevCardId,
-                                                    });
-                                                }}
-                                                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-                                                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
-                                                title="Inspect full repetition history"
-                                            >
-                                                🔬
+                                    <>
+                                        <div className="mt-1 text-xs text-gray-400 dark:text-gray-500 flex items-center gap-2" title="FSRS Difficulty and Stability after this repetition">
+                                            <span>
+                                                D: {session.prevCardFsrsD.toFixed(1)} · S: {formatStabilityDays(session.prevCardFsrsS)}
                                             </span>
-                                        )}
-                                    </div>
+                                            {session.prevCardId && (
+                                                <span
+                                                    role="button"
+                                                    style={{
+                                                        cursor: 'pointer',
+                                                        fontSize: '13px',
+                                                        opacity: 0.6,
+                                                        padding: '1px 3px',
+                                                        borderRadius: '4px',
+                                                        transition: 'opacity 0.15s',
+                                                    }}
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        if (!session.prevCardId) return;
+                                                        const card = await plugin.card.findOne(session.prevCardId);
+                                                        await plugin.widget.openPopup('flashcard_repetition_history', {
+                                                            remId: card?.remId,
+                                                            cardId: session.prevCardId,
+                                                        });
+                                                    }}
+                                                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
+                                                    title="Inspect full repetition history"
+                                                >
+                                                    🔬
+                                                </span>
+                                            )}
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}

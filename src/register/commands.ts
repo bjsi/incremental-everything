@@ -1485,6 +1485,31 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Open Weighted Shield Popup Command
+  plugin.app.registerCommand({
+    id: 'open-weighted-shield',
+    name: 'Open Weighted Shield Popup',
+    description: 'Open the Weighted Shield breakdown popup.',
+    quickCode: 'wsh',
+    action: async () => {
+      let subQueueId: string | null = null;
+      const url = await plugin.window.getURL();
+
+      // Check if we are in the queue to get context
+      if (url.includes('/flashcards')) {
+        subQueueId = (await plugin.storage.getSession<string | null>(currentSubQueueIdKey)) ?? null;
+      } else {
+        // In editor, use focused rem
+        const focusedRem = await plugin.focus.getFocusedRem();
+        subQueueId = focusedRem?._id || null;
+      }
+
+      await plugin.widget.openPopup('weighted_shield_popup', {
+        subQueueId,
+      });
+    },
+  });
+
   // Dismiss Incremental Rem command (Ctrl+D)
   // In Queue: replicates the Dismiss button (card priority inheritance, review time, transfer to dismissed, remove powerup)
   // In Editor: dismisses the focused Incremental Rem (transfer history to dismissed, remove powerup)
