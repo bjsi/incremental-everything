@@ -5,7 +5,7 @@ import {
   WidgetLocation,
   PluginRem,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import '../style.css';
 import '../App.css';
 import {
@@ -14,7 +14,6 @@ import {
   applyPlan,
   getHeadingLevel,
   HeadingLevel,
-  OutlineCandidate,
   ProposedNode,
   OUTLINE_SNAPSHOT_KEY,
 } from '../lib/outline_restructure';
@@ -151,7 +150,7 @@ function Row(props: {
 
 // ─── Widget ──────────────────────────────────────────────────────────────────
 
-type WidgetContext = {
+type WidgetContextData = {
   scopeRootId: string;
   inputRemIds: string[]; // top-level entry rems for the walk
 };
@@ -159,10 +158,13 @@ type WidgetContext = {
 const OutlineRestructurePreview = () => {
   const plugin = usePlugin();
 
-  const ctx = useRunAsync(
+  const rawCtx = useRunAsync(
     async () => await plugin.widget.getWidgetContext<WidgetLocation.Popup>(),
     []
-  ) as WidgetContext | undefined;
+  );
+  // openPopup's second arg arrives under contextData, not directly on the
+  // context object — same shape RemNote uses for every popup in this codebase.
+  const ctx = (rawCtx as any)?.contextData as WidgetContextData | undefined;
 
   // preserveMap: per-rem override of preserveChildren. Defaults true for
   // paragraph rems that have children (the algorithm's default). Toggling
