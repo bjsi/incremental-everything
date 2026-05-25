@@ -8,6 +8,7 @@ import {
   RichTextInterface,
   RemType,
   QueueInteractionScore,
+  AppEvents,
 } from '@remnote/plugin-sdk';
 import {
   powerupCode,
@@ -2186,6 +2187,58 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // ─── Selection cache for Omnibar-invoked commands ────────────────────────
+  //
+  // Cmd+/ Omnibar steals editor focus before our command runs. By the time the
+  // action fires, plugin.editor.getSelection() / getSelectedRem() / focus all
+  // return undefined — RemNote's internal commands work because they capture
+  // the selection synchronously when the palette opens, but plugins have no
+  // such hook. Workaround: cache every non-empty selection as it happens, with
+  // a TTL, and let the command fall back to that cache when live APIs are empty.
+  //
+  // The cache is only WRITTEN on positive selection events (so opening the
+  // Omnibar — which fires a clear-selection event — doesn't wipe what we had).
+  const SELECTION_CACHE_KEY = 'lastEditorSelectionCache';
+  const SELECTION_CACHE_TTL_MS = 30_000;
+  type CachedSelection =
+    | { kind: 'rem'; remIds: string[]; capturedAt: number }
+    | { kind: 'text'; remId: string; capturedAt: number };
+
+  plugin.event.addListener(
+    AppEvents.EditorSelectionChanged,
+    undefined,
+    async () => {
+      try {
+        const sel = await plugin.editor.getSelection();
+        if (
+          sel?.type === SelectionType.Rem &&
+          (sel as any).remIds?.length > 0
+        ) {
+          const entry: CachedSelection = {
+            kind: 'rem',
+            remIds: (sel as any).remIds,
+            capturedAt: Date.now(),
+          };
+          await plugin.storage.setSession(SELECTION_CACHE_KEY, entry);
+        } else if (
+          sel?.type === SelectionType.Text &&
+          (sel as any).remId
+        ) {
+          const entry: CachedSelection = {
+            kind: 'text',
+            remId: (sel as any).remId,
+            capturedAt: Date.now(),
+          };
+          await plugin.storage.setSession(SELECTION_CACHE_KEY, entry);
+        }
+        // null / undefined / empty selection: leave the cache alone so an
+        // Omnibar focus shift doesn't blow away the user's last real choice.
+      } catch {
+        /* swallow — best-effort tracker */
+      }
+    }
+  );
+
   // ─── Restructure Outline by Headings ──────────────────────────────────────
   //
   // Re-nests a flat or mis-pasted document so that paragraphs and lower-level
@@ -2200,15 +2253,62 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Restructure Outline by Headings',
     quickCode: 'roh',
     action: async () => {
-      const selection = await plugin.editor.getSelection();
+      // Cmd+/ Omnibar invocation blurs the editor, which makes
+      // plugin.editor.getSelection() / getSelectedRem() / focus all return
+      // undefined by the time the action fires. Try the live APIs first
+      // (which work fine for direct keyboard-shortcut invocations), then
+      // fall back to the EditorSelectionChanged cache populated above.
+      const remSel = await (plugin.editor as any).getSelectedRem?.();
+      const fullSel = await plugin.editor.getSelection();
+      const focusedRem = await plugin.focus.getFocusedRem();
+
+      let remIds: string[] | undefined;
+      let textRemId: string | undefined;
+      let resolvedFocusedRemId: string | undefined = focusedRem?._id;
+
+      if (remSel?.remIds?.length) {
+        remIds = remSel.remIds;
+      } else if (
+        fullSel?.type === SelectionType.Rem &&
+        (fullSel as any).remIds?.length
+      ) {
+        remIds = (fullSel as any).remIds;
+      } else if (
+        fullSel?.type === SelectionType.Text &&
+        (fullSel as any).remId
+      ) {
+        textRemId = (fullSel as any).remId;
+      }
+
+      // Live APIs empty → consult the cache. Only honor it if no live signal
+      // is present at all (so a real single-rem focus never gets shadowed by
+      // a stale multi-rem selection from earlier).
+      if (!remIds && !textRemId && !resolvedFocusedRemId) {
+        const cached =
+          (await plugin.storage.getSession<CachedSelection>(
+            SELECTION_CACHE_KEY
+          )) || null;
+        const ageMs = cached ? Date.now() - cached.capturedAt : Infinity;
+        console.log(
+          '[outline-restructure] live selection empty; cache age (ms):',
+          ageMs,
+          'cache:',
+          cached
+        );
+        if (cached && ageMs < SELECTION_CACHE_TTL_MS) {
+          if (cached.kind === 'rem') remIds = cached.remIds;
+          else if (cached.kind === 'text') resolvedFocusedRemId = cached.remId;
+        }
+      }
+
       let scopeRootId: string | undefined;
       let inputRemIds: string[] = [];
 
-      if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
-        if (selection.remIds.length === 1) {
+      if (remIds && remIds.length > 0) {
+        if (remIds.length === 1) {
           // Single rem selected in the outline → that rem is the container,
           // its children are the entry points for the walk.
-          const root = await plugin.rem.findOne(selection.remIds[0]);
+          const root = await plugin.rem.findOne(remIds[0]);
           if (!root) {
             await plugin.app.toast('Selected rem not found.');
             return;
@@ -2226,24 +2326,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           // Multi-rem selection → scope root is the common parent (we use the
           // first selected rem's parent as a proxy; users typically select
           // siblings). The selected rems themselves are the entry points.
-          const first = await plugin.rem.findOne(selection.remIds[0]);
+          const first = await plugin.rem.findOne(remIds[0]);
           if (!first) {
             await plugin.app.toast('Selection invalid.');
             return;
           }
           scopeRootId = (first as any).parent as string;
-          inputRemIds = selection.remIds;
+          inputRemIds = remIds;
         }
       } else {
         // Text selection or no selection → fall back to focused rem as the
         // container root, walk its children.
-        let rootId: string | undefined;
-        if (selection?.type === SelectionType.Text && selection.remId) {
-          rootId = selection.remId;
-        } else {
-          const focused = await plugin.focus.getFocusedRem();
-          if (focused) rootId = focused._id;
-        }
+        const rootId = textRemId ?? resolvedFocusedRemId;
         if (!rootId) {
           await plugin.app.toast('No rem selected or focused.');
           return;
