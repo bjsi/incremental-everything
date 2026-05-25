@@ -186,6 +186,24 @@ export function buildPlan(
 
   const ops: PlanOp[] = [];
   const positionByParent: Record<string, number> = {};
+
+  // For the scope root, start position counting at the smallest original
+  // position of any candidate that was already a direct child of it. This
+  // keeps the restructured subtree where the user's selection was — unselected
+  // siblings ABOVE the selection stay above, those BELOW stay below. Without
+  // this, the algorithm would pack the restructured rems at positions 0, 1,
+  // 2, ... in the scope root, pushing every unselected sibling downward.
+  // Single-rem invocations are unaffected: the scope root is the selected
+  // rem itself, and its descendants are positioned from 0 as before.
+  const rootDirectChildren = candidates.filter(
+    (c) => c.originalParentId === scopeRootId
+  );
+  if (rootDirectChildren.length > 0) {
+    positionByParent[scopeRootId] = Math.min(
+      ...rootDirectChildren.map((c) => c.originalPosition)
+    );
+  }
+
   const nextPos = (parentId: string): number => {
     const p = positionByParent[parentId] ?? 0;
     positionByParent[parentId] = p + 1;
