@@ -2114,32 +2114,68 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'shift+F3',
     quickCode: 'case',
     action: async () => {
-      const selection = await plugin.editor.getSelectedText();
-      if (!selection?.richText?.length) {
+      const richTextToPlain = (rt: any[] | undefined): string =>
+        (rt || [])
+          .map((e: any) => (typeof e === 'string' ? e : e?.text ?? ''))
+          .join('');
+
+      const applyNextCase = (richText: any[], fullText: string, next: 'lower' | 'title' | 'upper') =>
+        next === 'title'
+          ? transformTitleCase(richText, fullText)
+          : transformCase(
+              richText,
+              next === 'upper' ? (s) => s.toUpperCase() : (s) => s.toLowerCase()
+            );
+
+      const selection = await plugin.editor.getSelection();
+
+      // Multi-rem path: when one or more whole rems are selected in the outline,
+      // transform each rem's text (and back text, for concept/descriptor rems).
+      if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+        const rems = (await plugin.rem.findMany(selection.remIds)) || [];
+        if (rems.length === 0) {
+          await plugin.app.toast('No rems found in selection.');
+          return;
+        }
+
+        // Detect the current case from all text concatenated, so the cycle
+        // (lower → title → upper → lower) advances consistently for the batch.
+        const combined = rems
+          .map((r) => `${richTextToPlain(r.text as any[])}\n${richTextToPlain(r.backText as any[])}`)
+          .join('\n');
+        const next = nextCase(detectCase(combined));
+
+        for (const rem of rems) {
+          const frontRT = (rem.text || []) as any[];
+          if (frontRT.length > 0) {
+            const frontFull = richTextToPlain(frontRT);
+            await rem.setText(applyNextCase(frontRT, frontFull, next));
+          }
+          const backRT = (rem.backText || []) as any[];
+          if (backRT.length > 0) {
+            const backFull = richTextToPlain(backRT);
+            await rem.setBackText(applyNextCase(backRT, backFull, next));
+          }
+        }
+        return;
+      }
+
+      // Single-rem path: transform just the selected text range.
+      const textSelection = await plugin.editor.getSelectedText();
+      if (!textSelection?.richText?.length) {
         await plugin.app.toast('No text selected.');
         return;
       }
 
-      const fullText = selection.richText
-        .map((e: any) => (typeof e === 'string' ? e : e?.text ?? ''))
-        .join('');
-
-      const current = detectCase(fullText);
-      const next = nextCase(current);
-
-      const transformed =
-        next === 'title'
-          ? transformTitleCase(selection.richText, fullText)
-          : transformCase(
-            selection.richText,
-            next === 'upper' ? (s) => s.toUpperCase() : (s) => s.toLowerCase()
-          );
+      const fullText = richTextToPlain(textSelection.richText);
+      const next = nextCase(detectCase(fullText));
+      const transformed = applyNextCase(textSelection.richText, fullText, next);
 
       await plugin.editor.delete();
       await plugin.editor.insertRichText(transformed);
       await plugin.editor.selectText({
-        start: selection.range.start,
-        end: selection.range.start + fullText.length,
+        start: textSelection.range.start,
+        end: textSelection.range.start + fullText.length,
       });
     },
   });
