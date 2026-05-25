@@ -8,7 +8,7 @@ import {
 } from "@remnote/plugin-sdk";
 import '../style.css';
 import '../App.css';
-import { timeSince } from "../lib/utils";
+import { timeSince, formatStabilityDays } from "../lib/utils";
 import {
     DAILY_AGGREGATES_KEY,
     DailyAggregate,
@@ -56,6 +56,8 @@ export interface PracticedQueueSession {
     prevCardRepCount?: number;
     prevCardInterval?: number;
     prevCardNextRepTime?: number;
+    prevCardFsrsD?: number;
+    prevCardFsrsS?: number;
 
     currentCardId?: string;
     prevCardId?: string;
@@ -939,6 +941,41 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
                                             return null;
                                         })()}
                                     </>
+                                )}
+                                {session.prevCardFsrsD !== undefined && session.prevCardFsrsS !== undefined && (
+                                    <div className="mt-1 text-xs text-gray-400 dark:text-gray-500 flex items-center gap-2" title="FSRS Difficulty and Stability after this repetition, and next scheduled review date">
+                                        <span>
+                                            D: {session.prevCardFsrsD.toFixed(1)} S: {formatStabilityDays(session.prevCardFsrsS)}
+                                            {session.prevCardNextRepTime && ` ${new Date(session.prevCardNextRepTime).toLocaleDateString('en-GB')}`}
+                                        </span>
+                                        {session.prevCardId && (
+                                            <span
+                                                role="button"
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    fontSize: '13px',
+                                                    opacity: 0.6,
+                                                    padding: '1px 3px',
+                                                    borderRadius: '4px',
+                                                    transition: 'opacity 0.15s',
+                                                }}
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (!session.prevCardId) return;
+                                                    const card = await plugin.card.findOne(session.prevCardId);
+                                                    await plugin.widget.openPopup('flashcard_repetition_history', {
+                                                        remId: card?.remId,
+                                                        cardId: session.prevCardId,
+                                                    });
+                                                }}
+                                                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                                                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
+                                                title="Inspect full repetition history"
+                                            >
+                                                🔬
+                                            </span>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}
