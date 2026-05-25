@@ -3,7 +3,11 @@
     "allow": [
       "Bash(grep -n \"period={period}\\\\|period,\" /Users/hugomarins/incremental-everything/src/widgets/study_dashboard.tsx)",
       "Read(//Users/hugomarins/RemNote-Statistics-Plugin/src/**)",
-      "Bash(awk '/PowerupSlotCodeMap: \\\\{/,/^};/' /Users/hugomarins/incremental-everything/node_modules/@remnote/plugin-sdk/dist/interfaces.d.ts)"
+      "Bash(awk '/PowerupSlotCodeMap: \\\\{/,/^};/' /Users/hugomarins/incremental-everything/node_modules/@remnote/plugin-sdk/dist/interfaces.d.ts)",
+      "Bash(awk 'NR==1404,NR==1500' /Users/hugomarins/incremental-everything/src/register/commands.ts)",
+      "Bash(awk 'NR==1820,NR==1900' /Users/hugomarins/incremental-everything/src/register/commands.ts)",
+      "Bash(awk -F: '{print $1, $2}')",
+      "Bash(awk '$1 > 1700 && $1 < 1820')"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

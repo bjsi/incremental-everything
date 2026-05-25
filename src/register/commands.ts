@@ -2239,6 +2239,47 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     }
   );
 
+  // Drop-in replacement for `plugin.editor.getSelection()` that recovers the
+  // selection when invoked via Cmd+/ Omnibar (which blurs the editor before
+  // the command runs). Order of precedence:
+  //   1. live getSelection() — works for direct shortcut invocations.
+  //   2. live getSelectedRem() — sometimes survives focus shifts.
+  //   3. fresh cache entry from the EditorSelectionChanged listener (above).
+  // Returns a synthetic selection in the SDK's shape so existing call sites
+  // need only swap the API call, no other refactor.
+  const getEffectiveSelection = async () => {
+    const live = await plugin.editor.getSelection();
+    if (live) return live;
+
+    const remSel = await (plugin.editor as any).getSelectedRem?.();
+    if (remSel?.remIds?.length) return remSel;
+
+    const cached =
+      (await plugin.storage.getSession<CachedSelection>(
+        SELECTION_CACHE_KEY
+      )) || null;
+    const ageMs = cached ? Date.now() - cached.capturedAt : Infinity;
+    if (!cached || ageMs >= SELECTION_CACHE_TTL_MS) return undefined;
+
+    if (cached.kind === 'rem') {
+      return {
+        type: SelectionType.Rem,
+        remIds: cached.remIds,
+      } as any;
+    } else {
+      // Single-rem cache → synthesize a zero-width text-cursor selection.
+      // The richText/range fields are required by the SDK type but unused
+      // by the downstream code paths we care about (they only read remId).
+      return {
+        type: SelectionType.Text,
+        remId: cached.remId,
+        richText: [],
+        isReverse: false,
+        range: { start: 0, end: 0 },
+      } as any;
+    }
+  };
+
   // ─── Restructure Outline by Headings ──────────────────────────────────────
   //
   // Re-nests a flat or mis-pasted document so that paragraphs and lower-level
