@@ -283,16 +283,23 @@ export async function applyPlan(
   };
 }
 
-// Revert applies snapshot ops in REVERSE order so that any rem whose old
-// parent was itself moved during the original apply ends up correctly placed.
+// Revert applies snapshot ops in FORWARD order. Original positions are
+// captured in document order (0, 1, 2, ...); restoring forward means each
+// setParent inserts at an index that already has the prior siblings in place,
+// so positions line up naturally. Iterating backward instead causes RemNote
+// to clamp high positions to the (still-empty) end of the list, which then
+// shuffles every subsequent insert and corrupts the order.
+//
+// When a moved rem's old parent was ALSO moved during the original apply,
+// forward order still works because that parent appears earlier in the ops
+// list (we collected candidates depth-first, so parents precede children).
 export async function revertSnapshot(
   plugin: RNPlugin,
   snapshot: OutlineSnapshot
 ): Promise<void> {
   await plugin.storage.setSession('plugin_operation_active', true);
   try {
-    for (let i = snapshot.ops.length - 1; i >= 0; i--) {
-      const op = snapshot.ops[i];
+    for (const op of snapshot.ops) {
       const rem = await plugin.rem.findOne(op.remId);
       if (!rem) continue;
       await rem.setParent(op.oldParentId, op.oldPosition);
