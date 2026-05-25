@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(grep -n \"period={period}\\\\|period,\" /Users/hugomarins/incremental-everything/src/widgets/study_dashboard.tsx)",
-      "Read(//Users/hugomarins/RemNote-Statistics-Plugin/src/**)"
+      "Read(//Users/hugomarins/RemNote-Statistics-Plugin/src/**)",
+      "Bash(awk '/PowerupSlotCodeMap: \\\\{/,/^};/' /Users/hugomarins/incremental-everything/node_modules/@remnote/plugin-sdk/dist/interfaces.d.ts)"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

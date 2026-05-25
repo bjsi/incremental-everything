@@ -2180,6 +2180,88 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // TEMP PROBE — remove after H4-H6 detection is figured out.
+  // Run this command with the cursor inside an H1/H2/H3/H4/H5/H6 rem to see
+  // exactly what the SDK exposes for each heading level (typed getFontSize,
+  // the Header powerup's Size slot, raw object fields, and DOM classes).
+  plugin.app.registerCommand({
+    id: 'debug_probe_heading_level',
+    name: 'Debug: Probe Heading Level of Focused Rem',
+    quickCode: 'phl',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      if (!focused) {
+        await plugin.app.toast('No focused rem.');
+        console.log('[heading-probe] no focused rem');
+        return;
+      }
+
+      // 1. Typed SDK call (documented as H1|H2|H3|undefined).
+      let fontSizeViaApi: any = undefined;
+      try { fontSizeViaApi = await (focused as any).getFontSize?.(); }
+      catch (e) { fontSizeViaApi = `THREW: ${(e as any)?.message}`; }
+
+      // 2. Header powerup membership + its `Size` slot (the likely storage
+      //    location for H4/H5/H6 since the SDK type for getFontSize lags).
+      let hasHeaderPowerup: any = undefined;
+      let headerSizeAsString: any = undefined;
+      let headerSizeAsRichText: any = undefined;
+      let headerSizeAsRem: any = undefined;
+      try {
+        hasHeaderPowerup = await focused.hasPowerup(BuiltInPowerupCodes.Header);
+      } catch (e) { hasHeaderPowerup = `THREW: ${(e as any)?.message}`; }
+      try {
+        headerSizeAsString = await (focused as any).getPowerupProperty?.(
+          BuiltInPowerupCodes.Header, 'Size'
+        );
+      } catch (e) { headerSizeAsString = `THREW: ${(e as any)?.message}`; }
+      try {
+        headerSizeAsRichText = await (focused as any).getPowerupPropertyAsRichText?.(
+          BuiltInPowerupCodes.Header, 'Size'
+        );
+      } catch (e) { headerSizeAsRichText = `THREW: ${(e as any)?.message}`; }
+      try {
+        headerSizeAsRem = await (focused as any).getPowerupPropertyAsRem?.(
+          BuiltInPowerupCodes.Header, 'Size'
+        );
+      } catch (e) { headerSizeAsRem = `THREW: ${(e as any)?.message}`; }
+
+      // 3. Dump every enumerable, non-function property of the rem object —
+      //    catches any hidden field RemNote sets that the typed SDK omits.
+      const rawKeys = Object.keys(focused as any);
+      const rawSnapshot: Record<string, any> = {};
+      for (const k of rawKeys) {
+        try {
+          const v = (focused as any)[k];
+          if (typeof v !== 'function') rawSnapshot[k] = v;
+        } catch { /* skip */ }
+      }
+
+      // 4. DOM classes — last-resort signal (h4/h5/h6 styling lives here even
+      //    if no API exposes the level).
+      const domClassesByRemId: string[] = [];
+      try {
+        const els = document.querySelectorAll(`[data-rem-id="${focused._id}"]`);
+        els.forEach((el) => domClassesByRemId.push(el.className));
+      } catch { /* not in main document */ }
+
+      console.log('[heading-probe] focused rem _id:', focused._id);
+      console.log('[heading-probe] getFontSize() →', fontSizeViaApi);
+      console.log('[heading-probe] hasPowerup(Header):', hasHeaderPowerup);
+      console.log('[heading-probe] Header.Size (string):', headerSizeAsString);
+      console.log('[heading-probe] Header.Size (rich text):', headerSizeAsRichText);
+      console.log('[heading-probe] Header.Size (as rem):', headerSizeAsRem);
+      console.log('[heading-probe] rem keys:', rawKeys);
+      console.log('[heading-probe] rem snapshot:', rawSnapshot);
+      console.log('[heading-probe] DOM classes for this remId:', domClassesByRemId);
+      console.log('[heading-probe] full rem object (inspectable):', focused);
+
+      await plugin.app.toast(
+        `Heading probe logged. getFontSize=${JSON.stringify(fontSizeViaApi)} | Header.Size=${JSON.stringify(headerSizeAsString)}`
+      );
+    },
+  });
+
   const skipMasteryDrill = Boolean(
     await plugin.settings.getSetting('skip_mastery_drill')
   );
