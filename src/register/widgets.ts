@@ -267,6 +267,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Wide variant: same component, registered at ~2× width so the `wsh` command
+  // can show Incremental Rems and Cards side-by-side when both groups are present.
+  plugin.app.registerWidget('weighted_shield_popup_wide', WidgetLocation.Popup, {
+    dimensions: {
+      width: '1150px',
+      height: 900,
+    },
+  });
+
   // Consolidated PDF highlight toolbar: bookmark, create extract, and toggle
   // incremental — one widget hosts all three icons, so RemNote only spins up a
   // single plugin iframe per toolbar render instead of three.

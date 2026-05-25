@@ -1567,7 +1567,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         });
       }
 
-      await plugin.widget.openPopup('weighted_shield_popup', {
+      // Use the wide variant only when there's something to put side-by-side
+      // (both Incremental Rems and Cards). Otherwise the standard narrow popup
+      // is enough and avoids a half-empty wide canvas.
+      const popupId = groups.length >= 2 ? 'weighted_shield_popup_wide' : 'weighted_shield_popup';
+      await plugin.widget.openPopup(popupId, {
         groups,
       });
     },
