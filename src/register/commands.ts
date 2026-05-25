@@ -22,7 +22,15 @@ import {
   nextInQueueCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
+  allCardPriorityInfoKey,
+  allIncrementalRemKey,
+  seenCardInSessionKey,
+  seenRemInSessionKey,
 } from '../lib/consts';
+import { computeWeightedShieldBreakdown } from '../lib/utils';
+import { CardPriorityInfo } from '../lib/card_priority/types';
+import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
+import { buildDocumentScope } from '../lib/scope_helpers';
 import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -1504,8 +1512,51 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         subQueueId = focusedRem?._id || null;
       }
 
+      // Pull the prioritized universes from the session cache and compute breakdowns
+      // for both Incremental Rems and Cards. Respect the queue's seen-in-session lists
+      // when present so this matches what the in-queue tooltip shows.
+      const [allIncRems, allCardInfos, seenRemIds, seenCardIds] = await Promise.all([
+        plugin.storage.getSession<IncrementalRemType[]>(allIncrementalRemKey).then((v) => v ?? []),
+        plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey).then((v) => v ?? []),
+        plugin.storage.getSession<string[]>(seenRemInSessionKey).then((v) => v ?? []),
+        plugin.storage.getSession<string[]>(seenCardInSessionKey).then((v) => v ?? []),
+      ]);
+
+      const seenRemSet = new Set(seenRemIds);
+      const seenCardSet = new Set(seenCardIds);
+      const cardDuePredicate = (info: CardPriorityInfo) =>
+        info.dueCards > 0 && !seenCardSet.has(info.remId);
+      const incRemDuePredicate = (r: IncrementalRemType) =>
+        Date.now() >= r.nextRepDate && !seenRemSet.has(r.remId);
+
+      const docScope: Set<string> | null = subQueueId
+        ? await buildDocumentScope(plugin as any, subQueueId)
+        : null;
+
+      const groups: { title: string; itemLabel: string; kb: any; doc: any }[] = [];
+
+      if (allIncRems.length > 0) {
+        const docItems = docScope ? allIncRems.filter((r) => docScope.has(r.remId)) : [];
+        groups.push({
+          title: 'Incremental Rems',
+          itemLabel: 'IncRem',
+          kb: computeWeightedShieldBreakdown(allIncRems, incRemDuePredicate),
+          doc: docItems.length > 0 ? computeWeightedShieldBreakdown(docItems, incRemDuePredicate) : null,
+        });
+      }
+
+      if (allCardInfos.length > 0) {
+        const docItems = docScope ? allCardInfos.filter((c) => docScope.has(c.remId)) : [];
+        groups.push({
+          title: 'Cards',
+          itemLabel: 'Cards',
+          kb: computeWeightedShieldBreakdown(allCardInfos, cardDuePredicate),
+          doc: docItems.length > 0 ? computeWeightedShieldBreakdown(docItems, cardDuePredicate) : null,
+        });
+      }
+
       await plugin.widget.openPopup('weighted_shield_popup', {
-        subQueueId,
+        groups,
       });
     },
   });

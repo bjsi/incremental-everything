@@ -2,10 +2,21 @@ import { renderWidget, usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import { WeightedShieldBreakdown } from '../lib/utils';
 
-interface WeightedShieldPopupContext {
-  kbBreakdown: WeightedShieldBreakdown;
-  docBreakdown?: WeightedShieldBreakdown | null;
+interface WeightedShieldGroup {
+  title: string;
   itemLabel: string;
+  kb: WeightedShieldBreakdown;
+  doc?: WeightedShieldBreakdown | null;
+}
+
+interface WeightedShieldPopupContext {
+  // Single-item-type form used by the in-queue WeightedShieldTooltip.
+  kbBreakdown?: WeightedShieldBreakdown;
+  docBreakdown?: WeightedShieldBreakdown | null;
+  itemLabel?: string;
+  // Multi-section form used by the `wsh` command: one group per item type
+  // (Incremental Rems, Cards), each with its own KB and optional Doc breakdowns.
+  groups?: WeightedShieldGroup[];
 }
 
 const WEIGHT_K = 2.3026;
@@ -359,7 +370,11 @@ function WeightedShieldPopup() {
     );
   }
 
+  const hasGroups = !!ctx.groups && ctx.groups.length > 0;
   const itemLabel = ctx.itemLabel || 'items';
+  const blurbSubject = hasGroups
+    ? 'each prioritized item'
+    : itemLabel.toLowerCase() === 'cards' ? 'rem with cards' : 'incremental rem';
 
   return (
     <div style={{
@@ -393,28 +408,66 @@ function WeightedShieldPopup() {
         borderBottom: '1px solid var(--rn-clr-background-tertiary)',
         paddingBottom: '10px',
       }}>
-        Each {itemLabel.toLowerCase() === 'cards' ? 'rem with cards' : 'incremental rem'} is
+        Each {blurbSubject} is
         weighted by priority percentile: top-priority items (0%) carry ~10× the weight of
         bottom-priority items (100%), using W = e^(−2.3026 × p/100).
         The shield shows what fraction of total priority weight has been processed.
         Higher = better. Items in the current queue card count as "being processed".
       </div>
 
-      {/* KB breakdown */}
-      <BreakdownSection
-        breakdown={ctx.kbBreakdown}
-        scopeLabel="🌐 Knowledge Base"
-        itemLabel={itemLabel}
-      />
-
-      {/* Doc breakdown */}
-      {ctx.docBreakdown && (
-        <div style={{ paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+      {hasGroups ? (
+        ctx.groups!.map((group, i) => (
+          <div
+            key={i}
+            style={i > 0 ? {
+              paddingTop: '10px',
+              borderTop: '2px solid var(--rn-clr-background-tertiary)',
+            } : undefined}
+          >
+            <div style={{
+              fontSize: '13px',
+              fontWeight: 700,
+              marginBottom: '8px',
+              color: 'var(--rn-clr-content-primary)',
+            }}>
+              {group.title}
+            </div>
+            <BreakdownSection
+              breakdown={group.kb}
+              scopeLabel="🌐 Knowledge Base"
+              itemLabel={group.itemLabel}
+            />
+            {group.doc && (
+              <div style={{ paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+                <BreakdownSection
+                  breakdown={group.doc}
+                  scopeLabel="📄 Document Scope"
+                  itemLabel={group.itemLabel}
+                />
+              </div>
+            )}
+          </div>
+        ))
+      ) : ctx.kbBreakdown ? (
+        <>
           <BreakdownSection
-            breakdown={ctx.docBreakdown}
-            scopeLabel="📄 Document Scope"
+            breakdown={ctx.kbBreakdown}
+            scopeLabel="🌐 Knowledge Base"
             itemLabel={itemLabel}
           />
+          {ctx.docBreakdown && (
+            <div style={{ paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+              <BreakdownSection
+                breakdown={ctx.docBreakdown}
+                scopeLabel="📄 Document Scope"
+                itemLabel={itemLabel}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ padding: '12px', color: 'var(--rn-clr-content-tertiary)', textAlign: 'center' }}>
+          No prioritized items found.
         </div>
       )}
     </div>
