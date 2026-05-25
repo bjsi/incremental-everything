@@ -4,10 +4,13 @@
   "name": "Incremental Everything",
   "author": "Jamesb and Hugomarins (cont. Jonathangimeno)",
   "repoUrl": "https://github.com/bjsi/incremental-everything",
+  "supportUrl": "https://github.com/bjsi/incremental-everything/issues",
+  "projectUrl": "https://github.com/bjsi/incremental-everything/wiki",
+	"changeLogUrl": "https://github.com/bjsi/incremental-everything/wiki/Changelog",
   "version": {
     "major": 0,
     "minor": 2,
-    "patch": 248
+    "patch": 255
   },
   "unlisted": false,
   "theme": [],

@@ -106,6 +106,24 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
   await plugin.app.registerCSS('pdf-inc-highlight-styling', css);
 }
 
+export async function registerIgnoreTagCSS(plugin: ReactRNPlugin) {
+  const css = `
+    /* Shrink and dim rems tagged with #ignore so they read as archived snippets */
+    [data-rem-container-tags~="ignore"] .rem-text * {
+      font-size: 0.85rem !important;
+    }
+    [data-rem-container-tags~="ignore"] .rem-text:not(:focus-within):not(:hover) * {
+      opacity: 0.88;
+    }
+
+    /* Hide the #ignore tag chip in the editor tag bar to declutter */
+    [data-rem-tags~="ignore"] .hierarchy-editor__tag-bar__tag {
+      display: none;
+    }
+  `;
+  await plugin.app.registerCSS('ignore-tag-styling', css);
+}
+
 export async function registerTagBadgeCSS(plugin: ReactRNPlugin) {
   const css = `
     [data-rem-tags~="incremental"] .hierarchy-editor__tag-bar__tag {

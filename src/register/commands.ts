@@ -65,276 +65,23 @@ import {
   transformCase,
   transformTitleCase,
 } from '../lib/text_case_converter_utils';
+import {
+  OUTLINE_SNAPSHOT_KEY,
+  OutlineSnapshot,
+  revertSnapshot,
+  isMetaRem,
+} from '../lib/outline_restructure';
+import {
+  registerSelectionTracker,
+  getEffectiveSelection,
+} from '../lib/editor_selection';
+import { createExtract } from '../lib/extract';
 
 
 export async function registerCommands(plugin: ReactRNPlugin) {
-  const createExtract = async (): Promise<PluginRem | PluginRem[] | undefined> => {
-    let selection = await plugin.editor.getSelection();
-    const url = await plugin.window.getURL();
-
-    if (url.includes('/flashcards')) {
-      const currentQueueItem = await plugin.queue.getCurrentCard();
-      let isTargetingQueueContext = false;
-
-      if (!selection || !selection.type) {
-        isTargetingQueueContext = true;
-      } else if (currentQueueItem) {
-        if (selection.type === SelectionType.Rem && selection.remIds.includes(currentQueueItem.remId)) {
-          isTargetingQueueContext = true;
-        } else if (selection.type === SelectionType.Text && selection.remId === currentQueueItem.remId && selection.range.start === selection.range.end) {
-          isTargetingQueueContext = true;
-        }
-      } else {
-        const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-        if (currentIncRemId) {
-          if (selection.type === SelectionType.Rem && selection.remIds.includes(currentIncRemId)) {
-            isTargetingQueueContext = true;
-          } else if (selection.type === SelectionType.Text && selection.remId === currentIncRemId && selection.range.start === selection.range.end) {
-            isTargetingQueueContext = true;
-          }
-        }
-      }
-
-      if (isTargetingQueueContext) {
-        let targetRemId = currentQueueItem?.remId;
-        if (!targetRemId) {
-          targetRemId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
-        }
-
-        if (targetRemId) {
-          selection = {
-            type: SelectionType.Rem,
-            remIds: [targetRemId]
-          } as any;
-        }
-      }
-    }
-
-    if (!selection) {
-      // plugin.editor.getSelection() returns undefined when focus is inside the PDF
-      // iframe. plugin.reader.addHighlight() also returns null in that context —
-      // it requires a RemNote-internal pending highlight available only through the
-      // PDFHighlightToolbar widget flow. Keyboard shortcuts cannot create PDF highlights.
-      return;
-    }
-
-    if (selection.type === SelectionType.Text && selection.range.start === selection.range.end) {
-      // Fallback empty text selections to Rem selection behavior
-      (selection as any).type = SelectionType.Rem;
-      (selection as any).remIds = [selection.remId];
-    }
-
-    // Extract within extract
-    if (selection.type === SelectionType.Text) {
-      // 1. Fetch the Rem
-      const rem = await plugin.rem.findOne(selection.remId);
-      if (!rem) return;
-
-      // 2. Extract selected text
-      const extractRem = await plugin.rem.createRem();
-      if (!extractRem) return;
-
-      // Look for a reference pin to the original PDF Highlight in the parent
-      let pdfExtractPin: any = null;
-      if (rem.text) {
-        let pdfExtractTagRem: PluginRem | undefined;
-        try {
-          pdfExtractTagRem = await plugin.rem.findByName(['pdfextract'], null) || undefined;
-        } catch (e) {
-          // ignore
-        }
-
-        for (const item of rem.text) {
-          if (typeof item === 'object' && item !== null && item.i === 'q' && item._id) {
-            const referencedRem = await plugin.rem.findOne(item._id);
-            if (referencedRem) {
-              const isPdfHighlight = await referencedRem.hasPowerup(BuiltInPowerupCodes.PDFHighlight);
-              let hasTag = false;
-              if (pdfExtractTagRem) {
-                const tags = await referencedRem.getTagRems();
-                hasTag = tags.some(t => t._id === pdfExtractTagRem!._id);
-              }
-
-              if (isPdfHighlight || hasTag) {
-                // Copy the exact pin
-                pdfExtractPin = { ...item, pin: true };
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      const newText: any[] = [
-        ...selection.richText,
-        { i: 'q', _id: rem._id, pin: true }
-      ];
-
-      if (pdfExtractPin) {
-        newText.push(' ', pdfExtractPin);
-      }
-
-      await extractRem.setText(newText);
-      await extractRem.setParent(rem);
-
-      // 3. Hide the source rem from queue display when this extract is reviewed.
-      //
-      // Preferred path: tag the PARENT (source rem) with Remove from Queue. This
-      // survives extract relocation cleanly — if the user later deletes the parent
-      // and lets extracts stand on their own, the powerup goes with the parent
-      // and the standalone extracts behave normally.
-      //
-      // Fallback path: if Remove from Queue isn't registered (neither our
-      // Hide-in-Queue integration nor the standalone plugin is active), tag the
-      // EXTRACT itself with Remove Parent (always registered). This works but
-      // has a relocation caveat: if the extract is later moved under a new
-      // parent, that new parent will be hidden too — the user must remove the
-      // powerup manually in that case.
-      //
-      // Detecting via getPowerupByCode (rather than our integration setting alone)
-      // ensures users with only the standalone plugin still hit the preferred path.
-      const rfqPowerup = await plugin.powerup.getPowerupByCode(REMOVE_FROM_QUEUE_POWERUP_CODE);
-      if (rfqPowerup) {
-        await rem.addPowerup(REMOVE_FROM_QUEUE_POWERUP_CODE);
-      } else {
-        await extractRem.addPowerup(REMOVE_PARENT_POWERUP_CODE);
-      }
-
-      // Make Incremental
-      // Pass the explicit parent since the SDK cache may not yet reflect `extractRem.setParent(rem)`
-      await initIncrementalRem(plugin, extractRem, { explicitParentId: rem._id });
-      // 4. Locate and Modify
-      const r_start = Math.min(selection.range.start, selection.range.end);
-
-      const frontText = rem.text || [];
-      const backText  = rem.backText || [];
-
-      // Plain text extractor — non-text nodes (i:'q' pins etc.) contribute empty string.
-      // This gives us text-only positions that are immune to RemNote's reference node
-      // cursor-width (which counts i:'q' as 2 chars, not 1).
-      const rtPlainStr = (rt: RichTextInterface): string =>
-        rt.map((item: any) => typeof item === 'string' ? item : (item.i === 'm' ? (item.text || '') : '')).join('');
-
-      const frontStr = rtPlainStr(frontText);
-      const backStr  = rtPlainStr(backText);
-      const selStr   = rtPlainStr(selection.richText as RichTextInterface);
-      const selLen   = selStr.length;
-      const hasBackText = backText.length > 0;
-
-      // Detect which section contains the selection via string-matching (text-only positions).
-      // Prefer front; fall back to back; fall back to r_start heuristic.
-      let isBack = false;
-      let sect_r_start = 0;
-
-      const posInFront = frontStr.indexOf(selStr);
-      const posInBack  = hasBackText ? backStr.indexOf(selStr) : -1;
-
-      if (posInFront >= 0 && (posInBack < 0 || r_start < frontStr.length)) {
-        isBack = false;
-        sect_r_start = posInFront;
-      } else if (posInBack >= 0) {
-        isBack = true;
-        sect_r_start = posInBack;
-      } else {
-        // Last resort: use r_start directly (may still be slightly off for rems with pins)
-        isBack = false;
-        sect_r_start = r_start;
-      }
-
-      const sect_r_end = sect_r_start + selLen;
-
-      // Process rich text using text-only positions (non-text nodes have length 0 and pass
-      // through unchanged). This avoids any mismatch with RemNote's cursor model for pins.
-      const processRichText = (richText: RichTextInterface, localStart: number, localEnd: number): RichTextInterface => {
-        const newArray: any[] = [];
-        let currIdx = 0;
-        let pinInserted = false;
-        for (const item of richText) {
-          const isString = typeof item === 'string';
-          const textNode = isString ? { i: 'm' as const, text: item } : (item as any);
-          const nodeLen = textNode.i === 'm' ? (textNode.text?.length || 0) : 0;
-
-          if (nodeLen === 0) {
-            // Non-text node: insert the new pin here if the selection ends exactly at this point
-            if (!pinInserted && currIdx >= localEnd && localEnd > localStart) {
-              newArray.push({ i: 'q', _id: extractRem._id, pin: true });
-              pinInserted = true;
-            }
-            newArray.push(item);
-          } else {
-            const nodeStart = currIdx;
-            const nodeEnd   = currIdx + nodeLen;
-
-            if (nodeEnd <= localStart || nodeStart >= localEnd) {
-              newArray.push(item);
-            } else {
-              const textStr  = textNode.text || '';
-              const relStart = Math.max(0, localStart - nodeStart);
-              const relEnd   = Math.min(nodeLen, localEnd - nodeStart);
-
-              if (relStart > 0) {
-                newArray.push({ ...textNode, text: textStr.substring(0, relStart) });
-              }
-              newArray.push({
-                ...textNode,
-                text: textStr.substring(relStart, relEnd),
-                [RICH_TEXT_FORMATTING.HIGHLIGHT]: 6, // RemColor.Blue = 6
-              });
-              if (nodeEnd >= localEnd) {
-                newArray.push({ i: 'q', _id: extractRem._id, pin: true });
-                pinInserted = true;
-              }
-              if (relEnd < nodeLen) {
-                newArray.push({ ...textNode, text: textStr.substring(relEnd) });
-              }
-            }
-            currIdx += nodeLen;
-          }
-        }
-        if (!pinInserted && localEnd <= currIdx && localStart < currIdx) {
-          newArray.push({ i: 'q', _id: extractRem._id, pin: true });
-        }
-        return newArray;
-      };
-
-      // 6. Save the Changes
-      if (isBack) {
-        await rem.setBackText(processRichText(backText, sect_r_start, sect_r_end));
-      } else {
-        await rem.setText(processRichText(frontText, sect_r_start, sect_r_end));
-      }
-
-      return extractRem;
-    } else if (selection.type === SelectionType.Rem) {
-      const rems = (await plugin.rem.findMany(selection.remIds)) || [];
-      // Single outer flag bracket for the entire batch — each initIncrementalRem
-      // skips its own flag management so the flag stays UP for the whole loop.
-      await plugin.storage.setSession('plugin_operation_active', true);
-      try {
-        for (const rem of rems) {
-          await initIncrementalRem(plugin, rem, { skipFlagManagement: true });
-        }
-      } finally {
-        // Don't clear the flag — each initIncrementalRem fires pendingInheritanceCascade,
-        // and the cascade tracker will clear the flag when the cascade completes.
-        // Only clear defensively if no rems were processed (e.g., empty selection).
-        if (rems.length === 0) {
-          await plugin.storage.setSession('plugin_operation_active', false);
-        }
-      }
-      return rems;
-    } else {
-      // WebReader or other reader selection — fall back to addHighlight + initIncrementalRem.
-      // Note: PDF iframe selections are unreachable here because getSelection() returns
-      // undefined for them and we already returned early above.
-      const highlight = await plugin.reader.addHighlight();
-      if (!highlight) {
-        return;
-      }
-      await initIncrementalRem(plugin, highlight);
-      return highlight;
-    }
-  };
+  // Subscribe to EditorSelectionChanged so getEffectiveSelection() can recover
+  // multi-rem selections after Cmd+/ Omnibar steals focus. See lib/editor_selection.ts.
+  registerSelectionTracker(plugin);
 
 
 
@@ -345,7 +92,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'opt+shift+x',
     quickCode: 'ep',
     action: async () => {
-      const result = await createExtract();
+      const result = await createExtract(plugin);
       if (!result) {
         return;
       }
@@ -513,6 +260,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
                       : '⇔'; // fallback
       const remType = rem.type;
 
+      // Inherited cloze/card hint properties from the original rem must be stripped from
+      // the new cloze rem. Otherwise RemNote treats orphaned hints as belonging to the
+      // newly-created cloze and renders them in the wrong position.
+      const stripInheritedHintProps = (n: any) => {
+        delete n[RICH_TEXT_FORMATTING.CLOZE_HINT];
+        delete n[RICH_TEXT_FORMATTING.CARD_HINT_FRONT];
+        delete n[RICH_TEXT_FORMATTING.CARD_HINT_BACK];
+        delete n[RICH_TEXT_FORMATTING.MULTILINE_CARD_HINT];
+        delete n[RICH_TEXT_FORMATTING.HIDDEN_CLOZE];
+        delete n[RICH_TEXT_FORMATTING.REVEALED_CLOZE];
+      };
+
       // Process one rich text section. localStart/localEnd are section-relative character positions.
       // - Delimiter nodes (i:'s') → replaced by arrowChar.
       // - Existing cloze marks outside the selection → stripped, yellow highlight + red font applied.
@@ -549,6 +308,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             const baseNode: any = { ...node };
             const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
             delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
+            stripInheritedHintProps(baseNode);
 
             if (!inSel) {
               if (hadCloze) {
@@ -579,6 +339,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             const baseNode: any = { ...node };
             const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
             delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
+            stripInheritedHintProps(baseNode);
             if (inSel) {
               arr.push({ ...baseNode, [RICH_TEXT_FORMATTING.CLOZE]: clozeId });
             } else if (hadCloze) {
@@ -1137,7 +898,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Make Incremental (Extract)',
     quickCode: 'ext',
     action: async () => {
-      createExtract();
+      createExtract(plugin);
     },
   });
 
@@ -1376,6 +1137,42 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'inc',
     action: async () => {
       await plugin.widget.openPopup('inc_rem_main_view');
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'toggle-ignore-tag',
+    name: 'Toggle Ignore Tag',
+    description: 'Tag/untag the focused Rem with #ignore — marks already-read snippets that were left for archive/consultation only.',
+    keyboardShortcut: 'ctrl+shift+i',
+    quickCode: 'ign',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('No focused Rem.');
+        return;
+      }
+
+      let ignoreTagRem = await plugin.rem.findByName(['ignore'], null);
+      if (!ignoreTagRem) {
+        ignoreTagRem = await plugin.rem.createRem();
+        if (!ignoreTagRem) {
+          await plugin.app.toast('Could not create #ignore tag.');
+          return;
+        }
+        await ignoreTagRem.setText(['ignore']);
+      }
+
+      const tags = await rem.getTagRems();
+      const alreadyTagged = tags.some((t) => t._id === ignoreTagRem!._id);
+
+      if (alreadyTagged) {
+        await rem.removeTag(ignoreTagRem._id);
+        await plugin.app.toast('Removed #ignore.');
+      } else {
+        await rem.addTag(ignoreTagRem._id);
+        await plugin.app.toast('Tagged with #ignore.');
+      }
     },
   });
 
@@ -1811,8 +1608,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       } else {
         // Editor context: dismiss focused Incremental Rem(s)
-        // Supports both single-focus and multi-select
-        const selection = await plugin.editor.getSelection();
+        // Supports both single-focus and multi-select (the latter via the
+        // Omnibar-resilient selection helper).
+        const selection = await getEffectiveSelection(plugin);
         const remsToDissmiss: PluginRem[] = [];
 
         if (selection?.type === SelectionType.Rem) {
@@ -2003,8 +1801,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
 
-      // Determine target rems: multi-select → all selected; otherwise → focused rem
-      const selection = await plugin.editor.getSelection();
+      // Determine target rems: multi-select → all selected; otherwise → focused rem.
+      // Uses the Omnibar-resilient selection helper so Cmd+/ invocations work too.
+      const selection = await getEffectiveSelection(plugin);
       let targetRems: PluginRem[] = [];
 
       if (selection?.type === SelectionType.Rem && selection.remIds.length > 0) {
@@ -2064,33 +1863,281 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'shift+F3',
     quickCode: 'case',
     action: async () => {
-      const selection = await plugin.editor.getSelectedText();
-      if (!selection?.richText?.length) {
+      const richTextToPlain = (rt: any[] | undefined): string =>
+        (rt || [])
+          .map((e: any) => (typeof e === 'string' ? e : e?.text ?? ''))
+          .join('');
+
+      const applyNextCase = (richText: any[], fullText: string, next: 'lower' | 'title' | 'upper') =>
+        next === 'title'
+          ? transformTitleCase(richText, fullText)
+          : transformCase(
+              richText,
+              next === 'upper' ? (s) => s.toUpperCase() : (s) => s.toLowerCase()
+            );
+
+      const selection = await getEffectiveSelection(plugin);
+
+      // Multi-rem path: when one or more whole rems are selected in the outline,
+      // transform each rem's text (and back text, for concept/descriptor rems).
+      if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+        const rems = (await plugin.rem.findMany(selection.remIds)) || [];
+        if (rems.length === 0) {
+          await plugin.app.toast('No rems found in selection.');
+          return;
+        }
+
+        // Detect the current case from all text concatenated, so the cycle
+        // (lower → title → upper → lower) advances consistently for the batch.
+        const combined = rems
+          .map((r) => `${richTextToPlain(r.text as any[])}\n${richTextToPlain(r.backText as any[])}`)
+          .join('\n');
+        const next = nextCase(detectCase(combined));
+
+        for (const rem of rems) {
+          const frontRT = (rem.text || []) as any[];
+          if (frontRT.length > 0) {
+            const frontFull = richTextToPlain(frontRT);
+            await rem.setText(applyNextCase(frontRT, frontFull, next));
+          }
+          const backRT = (rem.backText || []) as any[];
+          if (backRT.length > 0) {
+            const backFull = richTextToPlain(backRT);
+            await rem.setBackText(applyNextCase(backRT, backFull, next));
+          }
+        }
+        return;
+      }
+
+      // Single-rem path: transform just the selected text range.
+      const textSelection = await plugin.editor.getSelectedText();
+      if (!textSelection?.richText?.length) {
         await plugin.app.toast('No text selected.');
         return;
       }
 
-      const fullText = selection.richText
-        .map((e: any) => (typeof e === 'string' ? e : e?.text ?? ''))
-        .join('');
-
-      const current = detectCase(fullText);
-      const next = nextCase(current);
-
-      const transformed =
-        next === 'title'
-          ? transformTitleCase(selection.richText, fullText)
-          : transformCase(
-            selection.richText,
-            next === 'upper' ? (s) => s.toUpperCase() : (s) => s.toLowerCase()
-          );
+      const fullText = richTextToPlain(textSelection.richText);
+      const next = nextCase(detectCase(fullText));
+      const transformed = applyNextCase(textSelection.richText, fullText, next);
 
       await plugin.editor.delete();
       await plugin.editor.insertRichText(transformed);
       await plugin.editor.selectText({
-        start: selection.range.start,
-        end: selection.range.start + fullText.length,
+        start: textSelection.range.start,
+        end: textSelection.range.start + fullText.length,
       });
+    },
+  });
+
+  // ─── Restructure Outline by Headings ──────────────────────────────────────
+  //
+  // Re-nests a flat or mis-pasted document so that paragraphs and lower-level
+  // headings sit under their preceding higher-level heading.
+  //   - Selection contains multiple rems → walk those rems + descendants.
+  //   - Selection is a single rem (or just a focused rem with no range)
+  //     → walk that rem's descendants; the rem itself stays as container root.
+  // Opens a side-by-side preview popup before applying anything; the actual
+  // reparenting + undo snapshot live in lib/outline_restructure.ts.
+  plugin.app.registerCommand({
+    id: 'restructure_outline_by_headings',
+    name: 'Restructure Outline by Headings',
+    quickCode: 'roh',
+    action: async () => {
+      // Resolves live editor selection if present, else the cached selection
+      // from the EditorSelectionChanged tracker (lib/editor_selection.ts) —
+      // necessary for Cmd+/ Omnibar invocations which blur the editor.
+      const selection = await getEffectiveSelection(plugin);
+      const focusedRem = selection ? undefined : await plugin.focus.getFocusedRem();
+
+      let remIds: string[] | undefined;
+      let textRemId: string | undefined;
+      const resolvedFocusedRemId: string | undefined = focusedRem?._id;
+
+      if (
+        selection?.type === SelectionType.Rem &&
+        selection.remIds?.length
+      ) {
+        remIds = selection.remIds;
+      } else if (
+        selection?.type === SelectionType.Text &&
+        selection.remId
+      ) {
+        textRemId = selection.remId;
+      }
+
+      let scopeRootId: string | undefined;
+      let inputRemIds: string[] = [];
+
+      if (remIds && remIds.length > 0) {
+        if (remIds.length === 1) {
+          // Single rem selected in the outline → that rem is the container,
+          // its children are the entry points for the walk.
+          const root = await plugin.rem.findOne(remIds[0]);
+          if (!root) {
+            await plugin.app.toast('Selected rem not found.');
+            return;
+          }
+          scopeRootId = root._id;
+          const children = (await root.getChildrenRem()) || [];
+          // Drop powerup-property bookkeeping rems (e.g. the auto "Size" child
+          // on Header headings); they aren't content and must not be moved.
+          const filtered: typeof children = [];
+          for (const c of children) {
+            if (!(await isMetaRem(c))) filtered.push(c);
+          }
+          inputRemIds = filtered.map((c) => c._id);
+        } else {
+          // Multi-rem selection → scope root is the common parent (we use the
+          // first selected rem's parent as a proxy; users typically select
+          // siblings). The selected rems themselves are the entry points.
+          const first = await plugin.rem.findOne(remIds[0]);
+          if (!first) {
+            await plugin.app.toast('Selection invalid.');
+            return;
+          }
+          scopeRootId = (first as any).parent as string;
+          inputRemIds = remIds;
+        }
+      } else {
+        // Text selection or no selection → fall back to focused rem as the
+        // container root, walk its children.
+        const rootId = textRemId ?? resolvedFocusedRemId;
+        if (!rootId) {
+          await plugin.app.toast('No rem selected or focused.');
+          return;
+        }
+        const root = await plugin.rem.findOne(rootId);
+        if (!root) {
+          await plugin.app.toast('Rem not found.');
+          return;
+        }
+        scopeRootId = root._id;
+        const children = (await root.getChildrenRem()) || [];
+        const filtered: typeof children = [];
+        for (const c of children) {
+          if (!(await isMetaRem(c))) filtered.push(c);
+        }
+        inputRemIds = filtered.map((c) => c._id);
+      }
+
+      if (!scopeRootId || inputRemIds.length === 0) {
+        await plugin.app.toast(
+          'Nothing to restructure (no descendants in scope).'
+        );
+        return;
+      }
+
+      await plugin.widget.openPopup('outline_restructure_preview', {
+        scopeRootId,
+        inputRemIds,
+      });
+    },
+  });
+
+  // Reverts the most recent Restructure Outline by Headings operation in this
+  // session. Same action as the Undo button on the sidebar widget.
+  plugin.app.registerCommand({
+    id: 'revert_last_outline_restructure',
+    name: 'Revert Last Outline Restructure',
+    quickCode: 'rolr',
+    action: async () => {
+      const snapshot = await plugin.storage.getSession<OutlineSnapshot>(
+        OUTLINE_SNAPSHOT_KEY
+      );
+      if (!snapshot) {
+        await plugin.app.toast('No recent outline restructure to revert.');
+        return;
+      }
+      try {
+        await revertSnapshot(plugin, snapshot);
+        await plugin.storage.setSession(OUTLINE_SNAPSHOT_KEY, undefined);
+        await plugin.app.toast('Outline restructure reverted.');
+      } catch (e) {
+        console.error('[outline-restructure] revert failed:', e);
+        await plugin.app.toast(`Revert failed: ${(e as any)?.message ?? e}`);
+      }
+    },
+  });
+
+  // TEMP PROBE — remove after H4-H6 detection is figured out.
+  // Run this command with the cursor inside an H1/H2/H3/H4/H5/H6 rem to see
+  // exactly what the SDK exposes for each heading level (typed getFontSize,
+  // the Header powerup's Size slot, raw object fields, and DOM classes).
+  plugin.app.registerCommand({
+    id: 'debug_probe_heading_level',
+    name: 'Debug: Probe Heading Level of Focused Rem',
+    quickCode: 'phl',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      if (!focused) {
+        await plugin.app.toast('No focused rem.');
+        console.log('[heading-probe] no focused rem');
+        return;
+      }
+
+      // 1. Typed SDK call (documented as H1|H2|H3|undefined).
+      let fontSizeViaApi: any = undefined;
+      try { fontSizeViaApi = await (focused as any).getFontSize?.(); }
+      catch (e) { fontSizeViaApi = `THREW: ${(e as any)?.message}`; }
+
+      // 2. Header powerup membership + its `Size` slot (the likely storage
+      //    location for H4/H5/H6 since the SDK type for getFontSize lags).
+      let hasHeaderPowerup: any = undefined;
+      let headerSizeAsString: any = undefined;
+      let headerSizeAsRichText: any = undefined;
+      let headerSizeAsRem: any = undefined;
+      try {
+        hasHeaderPowerup = await focused.hasPowerup(BuiltInPowerupCodes.Header);
+      } catch (e) { hasHeaderPowerup = `THREW: ${(e as any)?.message}`; }
+      try {
+        headerSizeAsString = await (focused as any).getPowerupProperty?.(
+          BuiltInPowerupCodes.Header, 'Size'
+        );
+      } catch (e) { headerSizeAsString = `THREW: ${(e as any)?.message}`; }
+      try {
+        headerSizeAsRichText = await (focused as any).getPowerupPropertyAsRichText?.(
+          BuiltInPowerupCodes.Header, 'Size'
+        );
+      } catch (e) { headerSizeAsRichText = `THREW: ${(e as any)?.message}`; }
+      try {
+        headerSizeAsRem = await (focused as any).getPowerupPropertyAsRem?.(
+          BuiltInPowerupCodes.Header, 'Size'
+        );
+      } catch (e) { headerSizeAsRem = `THREW: ${(e as any)?.message}`; }
+
+      // 3. Dump every enumerable, non-function property of the rem object —
+      //    catches any hidden field RemNote sets that the typed SDK omits.
+      const rawKeys = Object.keys(focused as any);
+      const rawSnapshot: Record<string, any> = {};
+      for (const k of rawKeys) {
+        try {
+          const v = (focused as any)[k];
+          if (typeof v !== 'function') rawSnapshot[k] = v;
+        } catch { /* skip */ }
+      }
+
+      // 4. DOM classes — last-resort signal (h4/h5/h6 styling lives here even
+      //    if no API exposes the level).
+      const domClassesByRemId: string[] = [];
+      try {
+        const els = document.querySelectorAll(`[data-rem-id="${focused._id}"]`);
+        els.forEach((el) => domClassesByRemId.push(el.className));
+      } catch { /* not in main document */ }
+
+      console.log('[heading-probe] focused rem _id:', focused._id);
+      console.log('[heading-probe] getFontSize() →', fontSizeViaApi);
+      console.log('[heading-probe] hasPowerup(Header):', hasHeaderPowerup);
+      console.log('[heading-probe] Header.Size (string):', headerSizeAsString);
+      console.log('[heading-probe] Header.Size (rich text):', headerSizeAsRichText);
+      console.log('[heading-probe] Header.Size (as rem):', headerSizeAsRem);
+      console.log('[heading-probe] rem keys:', rawKeys);
+      console.log('[heading-probe] rem snapshot:', rawSnapshot);
+      console.log('[heading-probe] DOM classes for this remId:', domClassesByRemId);
+      console.log('[heading-probe] full rem object (inspectable):', focused);
+
+      await plugin.app.toast(
+        `Heading probe logged. getFontSize=${JSON.stringify(fontSizeViaApi)} | Header.Size=${JSON.stringify(headerSizeAsString)}`
+      );
     },
   });
 

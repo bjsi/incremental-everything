@@ -7,7 +7,13 @@ import {
   RichTextInterface,
   RichTextElementInterface,
 } from '@remnote/plugin-sdk';
-import { parentSelectorWidgetId, powerupCode, allIncrementalRemKey } from './consts';
+import {
+  parentSelectorWidgetId,
+  powerupCode,
+  allIncrementalRemKey,
+  incrementalQueueActiveKey,
+  currentIncRemKey,
+} from './consts';
 import { initIncrementalRem } from './incremental_rem';
 import { IncrementalRem } from './incremental_rem';
 import { removeIncrementalRemCache } from './incremental_rem/cache';
@@ -328,8 +334,26 @@ export const createRemUnderParent = async (
 
   // Clean up the original highlight
   await removeIncrementalRemCache(plugin, highlightRem._id);
-  // Remove "Incremental" powerup from the highlight
-  await highlightRem.removePowerup(powerupCode);
+
+  // If the highlight is the current queue item, removing its powerup will tear
+  // down the queue widget before its own tracker can react. Fire the queue
+  // advance simultaneously so the IPC reaches RemNote before the widget sandbox
+  // is destroyed (same pattern as the Dismiss button in answer_buttons.tsx).
+  const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
+  const currentQueueRemId = isQueueActive
+    ? await plugin.storage.getSession<string>(currentIncRemKey)
+    : undefined;
+  const highlightIsCurrentQueueItem =
+    !!isQueueActive && currentQueueRemId === highlightRem._id;
+
+  if (highlightIsCurrentQueueItem) {
+    await Promise.allSettled([
+      highlightRem.removePowerup(powerupCode),
+      plugin.queue.removeCurrentCardFromQueue(true),
+    ]);
+  } else {
+    await highlightRem.removePowerup(powerupCode);
+  }
   // Removed setHighlightColor('Yellow') -> CSS now handles styling via "pdfextract" tag
 
   const actionText = makeIncremental ? 'incremental rem' : 'rem';

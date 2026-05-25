@@ -29,6 +29,7 @@ interface ShieldHistoryEntry {
 
 interface ChartData {
   date: string;
+  originalDate: string;
   absolute: number | null;
   relative: number | null;
   universeSize: number; // NEW: Universe size for the chart
@@ -37,6 +38,24 @@ interface ChartData {
   processingPercentage?: number;
   weightedShield?: number | null;
 }
+
+type TimePeriod = 'month' | '3m' | '6m' | 'year' | 'all';
+
+const TIME_PERIOD_OPTIONS: { value: TimePeriod; label: string }[] = [
+  { value: 'month', label: '1M' },
+  { value: '3m', label: '3M' },
+  { value: '6m', label: '6M' },
+  { value: 'year', label: '1Y' },
+  { value: 'all', label: 'All' },
+];
+
+const PERIOD_TO_DAYS: Record<TimePeriod, number | null> = {
+  month: 30,
+  '3m': 90,
+  '6m': 180,
+  year: 365,
+  all: null,
+};
 
 function PriorityShieldGraph() {
   const plugin = usePlugin();
@@ -50,6 +69,7 @@ function PriorityShieldGraph() {
   }>>({});
 
   const [showWeightedShield, setShowWeightedShield] = useState(false);
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('3m');
 
   const getZState = (title: string) => {
     return zoomState[title] || {
@@ -120,8 +140,19 @@ function PriorityShieldGraph() {
     const sortedData = unsortedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return sortedData.map(item => ({
       ...item,
+      originalDate: item.date,
       date: dayjs(item.date).format('MMM DD'),
     }));
+  };
+
+  const filterByPeriod = <T extends { originalDate?: string }>(data: T[] | null | undefined, period: TimePeriod): T[] => {
+    if (!data || data.length === 0) return [];
+    const days = PERIOD_TO_DAYS[period];
+    if (days === null) return data;
+    const cutoff = dayjs().subtract(days, 'day').startOf('day');
+    const filtered = data.filter(d => d.originalDate && dayjs(d.originalDate).isAfter(cutoff));
+    // If the period filter removes everything (e.g. very old data), fall back to full data
+    return filtered.length > 0 ? filtered : data;
   };
 
   // --- Incremental Rem Data ---
@@ -588,10 +619,15 @@ function PriorityShieldGraph() {
     );
   };
 
-  const hasKbData = kbChartData && kbChartData.length > 0;
-  const hasDocData = docChartData && docChartData.length > 0;
-  const hasCardKbData = cardKbChartData && cardKbChartData.length > 0;
-  const hasCardDocData = cardDocChartData && cardDocChartData.length > 0;
+  const filteredKbChartData = filterByPeriod(kbChartData, timePeriod);
+  const filteredDocChartData = filterByPeriod(docChartData, timePeriod);
+  const filteredCardKbChartData = filterByPeriod(cardKbChartData, timePeriod);
+  const filteredCardDocChartData = filterByPeriod(cardDocChartData, timePeriod);
+
+  const hasKbData = filteredKbChartData.length > 0;
+  const hasDocData = filteredDocChartData.length > 0;
+  const hasCardKbData = filteredCardKbChartData.length > 0;
+  const hasCardDocData = filteredCardDocChartData.length > 0;
 
   if (!hasKbData && !hasDocData && !hasCardKbData && !hasCardDocData) {
     return <div className="p-4">No history data found. Start reviewing to build your graph!</div>;
@@ -602,25 +638,46 @@ function PriorityShieldGraph() {
     <div className="p-4 flex flex-col" style={{ width: '1030px' }}>
       <div className="flex flex-col items-center mb-6 relative">
         <h3 className="text-lg font-bold">Priority Shield History</h3>
-        <label className="flex items-center gap-1.5 mt-2 text-sm cursor-pointer select-none" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-          <input
-            type="checkbox"
-            checked={showWeightedShield}
-            onChange={(e) => setShowWeightedShield(e.target.checked)}
-            style={{ cursor: 'pointer' }}
-          />
-          Show Weighted Shield
-        </label>
+        <div className="flex items-center gap-4 mt-2 text-sm flex-wrap justify-center" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showWeightedShield}
+              onChange={(e) => setShowWeightedShield(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            Show Weighted Shield
+          </label>
+          <div className="flex items-center gap-2 select-none" role="radiogroup" aria-label="Time period">
+            <span className="text-xs uppercase tracking-wider opacity-70">Period:</span>
+            {TIME_PERIOD_OPTIONS.map(opt => (
+              <label key={opt.value} className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name="time-period"
+                  value={opt.value}
+                  checked={timePeriod === opt.value}
+                  onChange={() => {
+                    setTimePeriod(opt.value);
+                    setZoomState({});
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Show document-level charts if we have an effective scope (original or current) */}
       {effectiveDocScopeId && hasDocData && renderChart(
-        docChartData!,
+        filteredDocChartData,
         `📄 ${documentName || 'Document'} IncRem Shield`,
         '#e74c3c', '#f39c12', '#9b59b6'
       )}
       {effectiveDocScopeId && hasCardDocData && renderChart(
-        cardDocChartData!,
+        filteredCardDocChartData,
         `📄 ${documentName || 'Document'} Card Shield`,
         '#d35400', '#f1c40f', '#16a085'
       )}
@@ -630,12 +687,12 @@ function PriorityShieldGraph() {
       )}
 
       {hasKbData && renderChart(
-        kbChartData,
+        filteredKbChartData,
         '🌐 Knowledge Base IncRem Shield',
         '#8884d8', '#82ca9d', '#e91e63'
       )}
       {hasCardKbData && renderChart(
-        cardKbChartData,
+        filteredCardKbChartData,
         '🌐 Knowledge Base Card Shield',
         '#c0392b', '#e67e22', '#2980b9'
       )}

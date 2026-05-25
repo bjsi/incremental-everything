@@ -285,6 +285,27 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Outline Restructure preview popup (Before | After + per-rem preserve toggles).
+  plugin.app.registerWidget('outline_restructure_preview', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1100,
+      height: 800,
+    },
+  });
+
+  // Outline Restructure undo banner — appears in the sidebar after an apply,
+  // stays until the user clicks Undo or dismisses it.
+  plugin.app.registerWidget(
+    'outline_restructure_undo',
+    WidgetLocation.SidebarEnd,
+    {
+      dimensions: {
+        width: '100%',
+        height: 'auto',
+      },
+    }
+  );
+
   // Mastery Drill widgets are gated behind the 'skip_mastery_drill' setting.
   if (!skipMasteryDrill) {
     // Mastery Drill popup
