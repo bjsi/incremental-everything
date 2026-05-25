@@ -65,6 +65,11 @@ import {
   transformCase,
   transformTitleCase,
 } from '../lib/text_case_converter_utils';
+import {
+  OUTLINE_SNAPSHOT_KEY,
+  OutlineSnapshot,
+  revertSnapshot,
+} from '../lib/outline_restructure';
 
 
 export async function registerCommands(plugin: ReactRNPlugin) {
@@ -2177,6 +2182,111 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         start: textSelection.range.start,
         end: textSelection.range.start + fullText.length,
       });
+    },
+  });
+
+  // ─── Restructure Outline by Headings ──────────────────────────────────────
+  //
+  // Re-nests a flat or mis-pasted document so that paragraphs and lower-level
+  // headings sit under their preceding higher-level heading.
+  //   - Selection contains multiple rems → walk those rems + descendants.
+  //   - Selection is a single rem (or just a focused rem with no range)
+  //     → walk that rem's descendants; the rem itself stays as container root.
+  // Opens a side-by-side preview popup before applying anything; the actual
+  // reparenting + undo snapshot live in lib/outline_restructure.ts.
+  plugin.app.registerCommand({
+    id: 'restructure_outline_by_headings',
+    name: 'Restructure Outline by Headings',
+    quickCode: 'roh',
+    action: async () => {
+      const selection = await plugin.editor.getSelection();
+      let scopeRootId: string | undefined;
+      let inputRemIds: string[] = [];
+
+      if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+        if (selection.remIds.length === 1) {
+          // Single rem selected in the outline → that rem is the container,
+          // its children are the entry points for the walk.
+          const root = await plugin.rem.findOne(selection.remIds[0]);
+          if (!root) {
+            await plugin.app.toast('Selected rem not found.');
+            return;
+          }
+          scopeRootId = root._id;
+          const children = (await root.getChildrenRem()) || [];
+          inputRemIds = children.map((c) => c._id);
+        } else {
+          // Multi-rem selection → scope root is the common parent (we use the
+          // first selected rem's parent as a proxy; users typically select
+          // siblings). The selected rems themselves are the entry points.
+          const first = await plugin.rem.findOne(selection.remIds[0]);
+          if (!first) {
+            await plugin.app.toast('Selection invalid.');
+            return;
+          }
+          scopeRootId = (first as any).parent as string;
+          inputRemIds = selection.remIds;
+        }
+      } else {
+        // Text selection or no selection → fall back to focused rem as the
+        // container root, walk its children.
+        let rootId: string | undefined;
+        if (selection?.type === SelectionType.Text && selection.remId) {
+          rootId = selection.remId;
+        } else {
+          const focused = await plugin.focus.getFocusedRem();
+          if (focused) rootId = focused._id;
+        }
+        if (!rootId) {
+          await plugin.app.toast('No rem selected or focused.');
+          return;
+        }
+        const root = await plugin.rem.findOne(rootId);
+        if (!root) {
+          await plugin.app.toast('Rem not found.');
+          return;
+        }
+        scopeRootId = root._id;
+        const children = (await root.getChildrenRem()) || [];
+        inputRemIds = children.map((c) => c._id);
+      }
+
+      if (!scopeRootId || inputRemIds.length === 0) {
+        await plugin.app.toast(
+          'Nothing to restructure (no descendants in scope).'
+        );
+        return;
+      }
+
+      await plugin.widget.openPopup('outline_restructure_preview', {
+        scopeRootId,
+        inputRemIds,
+      });
+    },
+  });
+
+  // Reverts the most recent Restructure Outline by Headings operation in this
+  // session. Same action as the Undo button on the sidebar widget.
+  plugin.app.registerCommand({
+    id: 'revert_last_outline_restructure',
+    name: 'Revert Last Outline Restructure',
+    quickCode: 'rolr',
+    action: async () => {
+      const snapshot = await plugin.storage.getSession<OutlineSnapshot>(
+        OUTLINE_SNAPSHOT_KEY
+      );
+      if (!snapshot) {
+        await plugin.app.toast('No recent outline restructure to revert.');
+        return;
+      }
+      try {
+        await revertSnapshot(plugin, snapshot);
+        await plugin.storage.setSession(OUTLINE_SNAPSHOT_KEY, undefined);
+        await plugin.app.toast('Outline restructure reverted.');
+      } catch (e) {
+        console.error('[outline-restructure] revert failed:', e);
+        await plugin.app.toast(`Revert failed: ${(e as any)?.message ?? e}`);
+      }
     },
   });
 
