@@ -26,6 +26,7 @@ import {
   allIncrementalRemKey,
   seenCardInSessionKey,
   seenRemInSessionKey,
+  priorityCalcScopeRemIdsKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown } from '../lib/utils';
 import { CardPriorityInfo } from '../lib/card_priority/types';
@@ -1502,9 +1503,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async () => {
       let subQueueId: string | null = null;
       const url = await plugin.window.getURL();
+      const inQueue = url.includes('/flashcards');
 
       // Check if we are in the queue to get context
-      if (url.includes('/flashcards')) {
+      if (inQueue) {
         subQueueId = (await plugin.storage.getSession<string | null>(currentSubQueueIdKey)) ?? null;
       } else {
         // In editor, use focused rem
@@ -1515,11 +1517,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       // Pull the prioritized universes from the session cache and compute breakdowns
       // for both Incremental Rems and Cards. Respect the queue's seen-in-session lists
       // when present so this matches what the in-queue tooltip shows.
-      const [allIncRems, allCardInfos, seenRemIds, seenCardIds] = await Promise.all([
+      const [allIncRems, allCardInfos, seenRemIds, seenCardIds, cachedScopeIds] = await Promise.all([
         plugin.storage.getSession<IncrementalRemType[]>(allIncrementalRemKey).then((v) => v ?? []),
         plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey).then((v) => v ?? []),
         plugin.storage.getSession<string[]>(seenRemInSessionKey).then((v) => v ?? []),
         plugin.storage.getSession<string[]>(seenCardInSessionKey).then((v) => v ?? []),
+        plugin.storage.getSession<string[] | null>(priorityCalcScopeRemIdsKey),
       ]);
 
       const seenRemSet = new Set(seenRemIds);
@@ -1529,14 +1532,23 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const incRemDuePredicate = (r: IncrementalRemType) =>
         Date.now() >= r.nextRepDate && !seenRemSet.has(r.remId);
 
-      const docScope: Set<string> | null = subQueueId
-        ? await buildDocumentScope(plugin as any, subQueueId)
-        : null;
+      // Prefer the queue's precomputed scope (built once at QueueEnter) over a fresh
+      // buildDocumentScope traversal — the latter is the slow part. Fall back to a
+      // live build only when invoked outside the queue (focused-rem case).
+      let docScope: Set<string> | null = null;
+      if (subQueueId) {
+        if (inQueue && cachedScopeIds && cachedScopeIds.length > 0) {
+          docScope = new Set(cachedScopeIds);
+        } else {
+          docScope = await buildDocumentScope(plugin as any, subQueueId);
+        }
+      }
 
       const groups: { title: string; itemLabel: string; kb: any; doc: any }[] = [];
 
+      const scope = docScope;
       if (allIncRems.length > 0) {
-        const docItems = docScope ? allIncRems.filter((r) => docScope.has(r.remId)) : [];
+        const docItems = scope ? allIncRems.filter((r) => scope.has(r.remId)) : [];
         groups.push({
           title: 'Incremental Rems',
           itemLabel: 'IncRem',
@@ -1546,7 +1558,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       if (allCardInfos.length > 0) {
-        const docItems = docScope ? allCardInfos.filter((c) => docScope.has(c.remId)) : [];
+        const docItems = scope ? allCardInfos.filter((c) => scope.has(c.remId)) : [];
         groups.push({
           title: 'Cards',
           itemLabel: 'Cards',
