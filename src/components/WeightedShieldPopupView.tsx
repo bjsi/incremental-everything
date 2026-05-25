@@ -421,6 +421,14 @@ export function WeightedShieldPopup() {
           // Two groups (both IncRems and Cards) lay out side by side — the
           // wide widget registration gives us the horizontal real estate.
           const useTwoCols = groups.length >= 2;
+          const iconForLabel = (label: string): string | null => {
+            const l = label.toLowerCase();
+            if (l === 'cards') return 'https://cdn-icons-png.flaticon.com/512/9145/9145670.png';
+            if (l === 'increm' || l === 'incrementalrem' || l === 'incremental rems') {
+              return 'https://cdn-icons-png.flaticon.com/512/3626/3626838.png';
+            }
+            return null;
+          };
           const renderGroup = (group: WeightedShieldGroup, i: number) => (
             <div
               key={i}
@@ -429,13 +437,30 @@ export function WeightedShieldPopup() {
                 borderTop: '2px solid var(--rn-clr-background-tertiary)',
               } : undefined}
             >
-              <div style={{
+              <div style={useTwoCols ? {
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '17px',
+                fontWeight: 800,
+                marginBottom: '12px',
+                paddingBottom: '8px',
+                borderBottom: '2px solid var(--rn-clr-background-tertiary)',
+                color: 'var(--rn-clr-content-primary)',
+              } : {
                 fontSize: '13px',
                 fontWeight: 700,
                 marginBottom: '8px',
                 color: 'var(--rn-clr-content-primary)',
               }}>
-                {group.title}
+                {useTwoCols && iconForLabel(group.itemLabel) && (
+                  <img
+                    src={iconForLabel(group.itemLabel)!}
+                    alt=""
+                    style={{ width: '22px', height: '22px', flexShrink: 0 }}
+                  />
+                )}
+                <span>{group.title}</span>
               </div>
               <BreakdownSection
                 breakdown={group.kb}
