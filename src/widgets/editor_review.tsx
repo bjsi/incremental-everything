@@ -44,6 +44,14 @@ async function handleEditorReview(
   const computedNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
   const newNextRepDate = overrideNextRepDate ?? computedNextRepDate;
 
+  // The interval stored in history must reflect the EFFECTIVE interval used
+  // for the next rep date, not the algorithm-calculated one. When the user
+  // chooses "Keep Current Date" or "Custom Interval", overrideNextRepDate
+  // differs from the computed value.
+  const effectiveIntervalDays = overrideNextRepDate
+    ? Math.round(((overrideNextRepDate - Date.now()) / (1000 * 60 * 60 * 24)) * 10) / 10
+    : intervalDays;
+
   // Calculate early/late status
   const scheduledDate = incRem.nextRepDate;
   const actualDate = Date.now();
@@ -66,7 +74,7 @@ async function handleEditorReview(
     {
       date: actualDate,
       scheduled: scheduledDate,
-      interval: intervalDays,
+      interval: effectiveIntervalDays,
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
       reviewTimeSeconds: reviewTimeSeconds,
@@ -389,17 +397,36 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
 
   const handleConfirmRef = useRef(handleConfirm);
   const handleStartTimerRef = useRef(handleStartTimer);
+  const handleKeepCurrentDateRef = useRef(handleKeepCurrentDate);
+  const handleUseNewDateRef = useRef(handleUseNewDate);
+  const handleCustomIntervalConfirmRef = useRef(handleCustomIntervalConfirm);
   handleConfirmRef.current = handleConfirm;
   handleStartTimerRef.current = handleStartTimer;
+  handleKeepCurrentDateRef.current = handleKeepCurrentDate;
+  handleUseNewDateRef.current = handleUseNewDate;
+  handleCustomIntervalConfirmRef.current = handleCustomIntervalConfirm;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // When regression dialog is open, Enter confirms the dialog actions
+      // When regression dialog is open, handle dialog-specific shortcuts
       if (regressionInfo) {
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' || e.key === 'ArrowLeft') {
           e.preventDefault();
           setRegressionInfo(null);
           setCustomIntervalMode(false);
+        } else if (!customIntervalMode && (e.key === 'Enter' || e.key === '1')) {
+          e.preventDefault();
+          handleKeepCurrentDateRef.current();
+        } else if (e.key === '2') {
+          e.preventDefault();
+          handleUseNewDateRef.current();
+        } else if (e.key === '3') {
+          e.preventDefault();
+          if (customIntervalMode) {
+            handleCustomIntervalConfirmRef.current();
+          } else {
+            setCustomIntervalMode(true);
+          }
         }
         return;
       }
@@ -482,6 +509,12 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
                 onClick={handleKeepCurrentDate}
               >
                 Keep Current Date ({dayjs(regressionInfo.currentNextRepDate).format('MMM D')})
+                {!customIntervalMode && (
+                  <span style={{ opacity: 0.65, fontWeight: 'normal', fontSize: '0.85em', marginLeft: '6px' }}>[Enter/1]</span>
+                )}
+                {customIntervalMode && (
+                  <span style={{ opacity: 0.65, fontWeight: 'normal', fontSize: '0.85em', marginLeft: '6px' }}>[1]</span>
+                )}
               </button>
               <button
                 className="px-3 py-2 rounded text-xs font-semibold transition-opacity hover:opacity-80"
@@ -489,6 +522,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
                 onClick={handleUseNewDate}
               >
                 Use New Date ({regressionInfo.newDaysAway}d → {dayjs(regressionInfo.newNextRepDate).format('MMM D')})
+                <span style={{ opacity: 0.65, fontWeight: 'normal', fontSize: '0.85em', marginLeft: '6px' }}>[2]</span>
               </button>
 
               {!customIntervalMode ? (
@@ -498,6 +532,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
                   onClick={() => setCustomIntervalMode(true)}
                 >
                   Custom Interval…
+                  <span style={{ opacity: 0.65, fontWeight: 'normal', fontSize: '0.85em', marginLeft: '6px' }}>[3]</span>
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
@@ -517,6 +552,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
+                        e.stopPropagation();
                         handleCustomIntervalConfirm();
                       }
                     }}
@@ -527,7 +563,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
                     onClick={handleCustomIntervalConfirm}
                     disabled={!customInterval || isNaN(parseInt(customInterval))}
                   >
-                    ✓
+                    ✓ <span style={{ opacity: 0.65, fontWeight: 'normal', fontSize: '0.85em' }}>[Enter/3]</span>
                   </button>
                 </div>
               )}
@@ -541,7 +577,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
                 setCustomIntervalMode(false);
               }}
             >
-              Go Back
+              Go Back <span style={{ opacity: 0.65, fontSize: '0.85em' }}>[← / Esc]</span>
             </button>
           </div>
         </div>
