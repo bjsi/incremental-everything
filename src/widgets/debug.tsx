@@ -13,7 +13,14 @@ import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
 import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import {
+  safeRemTextToString,
+  getAllPDFsInRem,
+  getPageHistory,
+  getPageHistoryKey,
+  getReadingStatistics,
+} from '../lib/pdfUtils';
+import { formatDuration } from '../lib/utils';
 import { powerupCode } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -95,6 +102,40 @@ function Debug() {
   const [isComparing, setIsComparing] = useState(false);
   const [isPdfDebugging, setIsPdfDebugging] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
+  const [isDumpingHistory, setIsDumpingHistory] = useState(false);
+  const [isCleaningInflation, setIsCleaningInflation] = useState(false);
+  const [inflationPreview, setInflationPreview] = useState<null | {
+    cutoffMs: number;
+    perPdf: Array<{
+      pdfRemId: string;
+      pdfName: string;
+      storageKey: string;
+      stripCount: number;
+      keptCount: number;
+      strippedSecondsTotal: number;
+      keptSecondsTotal: number;
+      beforeTotalSeconds: number;
+      afterTotalSeconds: number;
+      preserved: Array<{ index: number; timestamp: number; sessionDuration: number; reason: string }>;
+      stripped: Array<{ index: number; timestamp: number; sessionDuration: number; reason: string }>;
+      patched: any[];
+    }>;
+  }>(null);
+  const [pageHistoryDump, setPageHistoryDump] = useState<null | {
+    perPdf: Array<{
+      pdfRemId: string;
+      pdfName: string;
+      storageKey: string;
+      total: number;
+      entryCount: number;
+      durationsCount: number;
+      durationsSum: number;
+      durationsMin: number | null;
+      durationsMax: number | null;
+      capped14400Count: number;
+      raw: any[];
+    }>;
+  }>(null);
 
   if (!debugData) return null;
 
@@ -492,6 +533,228 @@ function Debug() {
     }
   };
 
+  const handleDumpPageHistory = async () => {
+    if (!remId) return;
+    setIsDumpingHistory(true);
+    try {
+      const focusedRem = await plugin.rem.findOne(remId);
+      if (!focusedRem) {
+        await plugin.app.toast('No rem found!');
+        return;
+      }
+
+      const pdfs = await getAllPDFsInRem(plugin, focusedRem);
+      if (pdfs.length === 0) {
+        await plugin.app.toast('No PDF sources found on this rem.');
+        return;
+      }
+
+      const perPdf: NonNullable<typeof pageHistoryDump>['perPdf'] = [];
+
+      console.log(`\n========== PAGE HISTORY DUMP: ${remId} ==========`);
+      for (const { rem: pdfRem } of pdfs) {
+        const pdfName = await safeRemTextToString(plugin, pdfRem.text);
+        const storageKey = getPageHistoryKey(remId, pdfRem._id);
+        const raw = await plugin.storage.getSynced(storageKey);
+        const parsed = await getPageHistory(plugin, remId, pdfRem._id);
+        const stats = await getReadingStatistics(plugin, remId, pdfRem._id);
+
+        const durations = parsed
+          .map((e) => e.sessionDuration)
+          .filter((d): d is number => typeof d === 'number' && d > 0);
+        const durationsSum = durations.reduce((s, d) => s + d, 0);
+        const durationsMin = durations.length ? Math.min(...durations) : null;
+        const durationsMax = durations.length ? Math.max(...durations) : null;
+        const capped14400Count = durations.filter((d) => d >= 14400).length;
+
+        console.log(`\n--- PDF: "${pdfName}" (${pdfRem._id}) ---`);
+        console.log(`Storage key: ${storageKey}`);
+        console.log(`Entries: ${parsed.length}`);
+        console.log(`Entries with sessionDuration > 0: ${durations.length}`);
+        console.log(`Sum of sessionDurations: ${durationsSum}s = ${formatDuration(durationsSum)}`);
+        console.log(`getReadingStatistics().totalTimeSeconds: ${stats.totalTimeSeconds}s = ${formatDuration(stats.totalTimeSeconds)}`);
+        console.log(`Min duration: ${durationsMin}s   Max duration: ${durationsMax}s   Capped(>=14400): ${capped14400Count}`);
+        console.log(`Raw storage value:`, raw);
+        console.log(`Parsed history (JSON):`);
+        console.log(JSON.stringify(parsed, null, 2));
+
+        perPdf.push({
+          pdfRemId: pdfRem._id,
+          pdfName,
+          storageKey,
+          total: stats.totalTimeSeconds,
+          entryCount: parsed.length,
+          durationsCount: durations.length,
+          durationsSum,
+          durationsMin,
+          durationsMax,
+          capped14400Count,
+          raw: parsed,
+        });
+      }
+      console.log(`===========================================\n`);
+
+      setPageHistoryDump({ perPdf });
+      await plugin.app.toast(`Dumped page history for ${pdfs.length} PDF(s) — see console + UI.`);
+    } catch (e) {
+      console.error('[DumpPageHistory] Error:', e);
+      await plugin.app.toast('Dump failed — check console for details.');
+    } finally {
+      setIsDumpingHistory(false);
+    }
+  };
+
+  // Cutoff: ae25eeb (2026-02-04) — the commit that started preserving
+  // reviewTimeSeconds onto the Dismissed powerup's history. Before this
+  // date, page-history sessionDuration is sometimes the only surviving
+  // record of review time (rep history was lost on dismissal), so we must
+  // not touch it.
+  const PAGE_HISTORY_CLEANUP_CUTOFF_MS = Date.UTC(2026, 1, 4); // Feb 4 2026 UTC
+
+  const buildInflationPlan = async () => {
+    if (!remId) return null;
+    const focusedRem = await plugin.rem.findOne(remId);
+    if (!focusedRem) return null;
+
+    // Source of authoritative rep durations: active IncRem history first,
+    // then Dismissed history (for already-dismissed rems like the one in
+    // this report).
+    const incRemInfo = await getIncrementalRemFromRem(plugin, focusedRem);
+    const dismissedInfo = await getDismissedHistoryFromRem(plugin, focusedRem);
+    const repHistory: Array<{ date: number; reviewTimeSeconds?: number }> =
+      (incRemInfo?.history as any) ?? (dismissedInfo?.history as any) ?? [];
+
+    const pdfs = await getAllPDFsInRem(plugin, focusedRem);
+    if (pdfs.length === 0) return null;
+
+    const TIMESTAMP_TOLERANCE_MS = 5000;
+    const DURATION_TOLERANCE_S = 2;
+
+    const perPdf: NonNullable<typeof inflationPreview>['perPdf'] = [];
+
+    for (const { rem: pdfRem } of pdfs) {
+      const pdfName = await safeRemTextToString(plugin, pdfRem.text);
+      const storageKey = getPageHistoryKey(remId, pdfRem._id);
+      const history = await getPageHistory(plugin, remId, pdfRem._id);
+
+      const matchesRep = (entry: { timestamp: number; sessionDuration?: number }) => {
+        const dur = entry.sessionDuration;
+        if (typeof dur !== 'number') return false;
+        return repHistory.some(r => {
+          if (typeof r.reviewTimeSeconds !== 'number') return false;
+          if (Math.abs(r.date - entry.timestamp) > TIMESTAMP_TOLERANCE_MS) return false;
+          if (Math.abs(r.reviewTimeSeconds - dur) > DURATION_TOLERANCE_S) return false;
+          return true;
+        });
+      };
+
+      const preserved: NonNullable<typeof inflationPreview>['perPdf'][number]['preserved'] = [];
+      const stripped: NonNullable<typeof inflationPreview>['perPdf'][number]['stripped'] = [];
+
+      const beforeTotal = history.reduce((s, e) => s + (e.sessionDuration ?? 0), 0);
+
+      const patched = history.map((entry, idx) => {
+        if (typeof entry.sessionDuration !== 'number') return entry;
+        if (entry.timestamp < PAGE_HISTORY_CLEANUP_CUTOFF_MS) {
+          preserved.push({ index: idx, timestamp: entry.timestamp, sessionDuration: entry.sessionDuration, reason: 'before cutoff' });
+          return entry;
+        }
+        if (matchesRep(entry)) {
+          preserved.push({ index: idx, timestamp: entry.timestamp, sessionDuration: entry.sessionDuration, reason: 'matches rep' });
+          return entry;
+        }
+        stripped.push({ index: idx, timestamp: entry.timestamp, sessionDuration: entry.sessionDuration, reason: 'no matching rep — inflated bookmark' });
+        const { sessionDuration: _drop, ...rest } = entry as any;
+        return rest;
+      });
+
+      const afterTotal = patched.reduce((s, e: any) => s + (e.sessionDuration ?? 0), 0);
+
+      perPdf.push({
+        pdfRemId: pdfRem._id,
+        pdfName,
+        storageKey,
+        stripCount: stripped.length,
+        keptCount: preserved.length,
+        strippedSecondsTotal: stripped.reduce((s, e) => s + e.sessionDuration, 0),
+        keptSecondsTotal: preserved.reduce((s, e) => s + e.sessionDuration, 0),
+        beforeTotalSeconds: beforeTotal,
+        afterTotalSeconds: afterTotal,
+        preserved,
+        stripped,
+        patched,
+      });
+    }
+
+    return { cutoffMs: PAGE_HISTORY_CLEANUP_CUTOFF_MS, perPdf };
+  };
+
+  const handlePreviewInflationCleanup = async () => {
+    if (!remId) return;
+    setIsCleaningInflation(true);
+    try {
+      const plan = await buildInflationPlan();
+      if (!plan) {
+        await plugin.app.toast('No PDF sources found on this rem.');
+        return;
+      }
+      setInflationPreview(plan);
+
+      console.log(`\n========== INFLATION CLEANUP PREVIEW: ${remId} ==========`);
+      console.log(`Cutoff: ${new Date(plan.cutoffMs).toISOString().slice(0, 10)} UTC (${plan.cutoffMs})`);
+      for (const p of plan.perPdf) {
+        console.log(`\n--- ${p.pdfName} (${p.pdfRemId}) ---`);
+        console.log(`Before total: ${p.beforeTotalSeconds}s   After total: ${p.afterTotalSeconds}s`);
+        console.log(`Would strip ${p.stripCount} entr(ies) totaling ${p.strippedSecondsTotal}s`);
+        console.log(`Would keep  ${p.keptCount} entr(ies) totaling ${p.keptSecondsTotal}s`);
+        console.log('Preserved:', p.preserved);
+        console.log('Stripped:', p.stripped);
+      }
+      console.log(`===========================================\n`);
+
+      const totalStrip = plan.perPdf.reduce((s, p) => s + p.stripCount, 0);
+      await plugin.app.toast(`Preview ready — ${totalStrip} entr(ies) would be stripped. Review then click Apply.`);
+    } catch (e) {
+      console.error('[InflationCleanup preview] Error:', e);
+      await plugin.app.toast('Preview failed — check console.');
+    } finally {
+      setIsCleaningInflation(false);
+    }
+  };
+
+  const handleApplyInflationCleanup = async () => {
+    if (!inflationPreview) return;
+    const totalStrip = inflationPreview.perPdf.reduce((s, p) => s + p.stripCount, 0);
+    if (totalStrip === 0) {
+      await plugin.app.toast('Nothing to strip.');
+      return;
+    }
+    const summary = inflationPreview.perPdf
+      .filter(p => p.stripCount > 0)
+      .map(p => `• ${p.pdfName}: strip ${p.stripCount}, total ${formatDuration(p.beforeTotalSeconds)} → ${formatDuration(p.afterTotalSeconds)}`)
+      .join('\n');
+    const confirmed = confirm(
+      `Apply inflation cleanup?\n\nThis will rewrite page-history storage for the following PDF(s):\n\n${summary}\n\nContinue?`
+    );
+    if (!confirmed) return;
+
+    setIsCleaningInflation(true);
+    try {
+      for (const p of inflationPreview.perPdf) {
+        if (p.stripCount === 0) continue;
+        await plugin.storage.setSynced(p.storageKey, p.patched);
+        console.log(`[InflationCleanup] Rewrote ${p.storageKey} — stripped ${p.stripCount} entr(ies).`);
+      }
+      await plugin.app.toast(`Cleanup applied. Stripped ${totalStrip} entr(ies).`);
+      setInflationPreview(null);
+    } catch (e) {
+      console.error('[InflationCleanup apply] Error:', e);
+      await plugin.app.toast('Apply failed — check console.');
+    } finally {
+      setIsCleaningInflation(false);
+    }
+  };
+
   const handleCleanDescendants = async () => {
     if (!rem) return;
     await plugin.app.toast('Scanning descendants for cardPriority tags on non-flashcard Rems...');
@@ -802,6 +1065,116 @@ function Debug() {
         <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)' }}>
           Opens the focused rem's full descendant tree in the console — remIDs, powerups, tags, and highlight data. Run on a working PDF and a broken one to compare structures.
         </div>
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Page History Dump (addPageToHistory raw data)
+          <button
+            onClick={handleDumpPageHistory}
+            disabled={isDumpingHistory}
+            style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isDumpingHistory ? 'wait' : 'pointer' }}
+          >
+            {isDumpingHistory ? 'Dumping…' : 'Dump Page History'}
+          </button>
+        </h2>
+        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '8px' }}>
+          For every PDF source on this rem, fetches the raw page-history array stored by <code>addPageToHistory</code>
+          (storage key <code>pdfHistory_&lt;remId&gt;_&lt;pdfRemId&gt;</code>), shows per-entry summary, and dumps the
+          full JSON to console.
+        </div>
+        {pageHistoryDump && pageHistoryDump.perPdf.map((p) => (
+          <div key={p.pdfRemId} style={{ marginTop: '12px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px' }}>
+            <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '6px' }}>
+              📄 {p.pdfName} <span style={{ color: 'var(--rn-clr-content-tertiary)', fontWeight: 400 }}>({p.pdfRemId})</span>
+            </div>
+            <div style={{ fontSize: '11px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', marginBottom: '6px' }}>
+              <div>Total entries: <strong>{p.entryCount}</strong></div>
+              <div>With duration &gt; 0: <strong>{p.durationsCount}</strong></div>
+              <div>Sum of durations: <strong>{formatDuration(p.durationsSum)}</strong> ({p.durationsSum}s)</div>
+              <div>getReadingStatistics total: <strong>{formatDuration(p.total)}</strong> ({p.total}s)</div>
+              <div>Min duration: <strong>{p.durationsMin ?? '—'}s</strong></div>
+              <div>Max duration: <strong>{p.durationsMax ?? '—'}s</strong></div>
+              <div>Entries ≥ 14400s (4h cap): <strong style={{ color: p.capped14400Count > 0 ? '#ef4444' : 'inherit' }}>{p.capped14400Count}</strong></div>
+              <div style={{ fontFamily: 'monospace', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>{p.storageKey}</div>
+            </div>
+            <details>
+              <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>
+                Show raw entries ({p.entryCount})
+              </summary>
+              <pre style={preStyle}>{JSON.stringify(p.raw, null, 2)}</pre>
+            </details>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Clean Inflated Page-History Durations
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={handlePreviewInflationCleanup}
+              disabled={isCleaningInflation}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isCleaningInflation ? 'wait' : 'pointer' }}
+            >
+              {isCleaningInflation ? 'Working…' : 'Preview'}
+            </button>
+            <button
+              onClick={handleApplyInflationCleanup}
+              disabled={isCleaningInflation || !inflationPreview}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', border: '1px solid var(--rn-clr-border-warning)', borderRadius: '4px', cursor: (isCleaningInflation || !inflationPreview) ? 'not-allowed' : 'pointer' }}
+            >
+              Apply
+            </button>
+          </div>
+        </h2>
+        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '8px' }}>
+          Strips <code>sessionDuration</code> from page-history entries that don't match a rep in the IncRem/Dismissed
+          history. Cutoff: <strong>2026-02-04</strong> (entries before that are preserved — rep history wasn't
+          carried onto Dismissed before this date, so page-history may be the only record). Tolerance: ±5s timestamp,
+          ±2s duration. Click Preview first; Apply rewrites storage.
+        </div>
+        {inflationPreview && inflationPreview.perPdf.map((p) => (
+          <div key={p.pdfRemId} style={{ marginTop: '12px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px' }}>
+            <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '6px' }}>
+              📄 {p.pdfName} <span style={{ color: 'var(--rn-clr-content-tertiary)', fontWeight: 400 }}>({p.pdfRemId})</span>
+            </div>
+            <div style={{ fontSize: '11px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', marginBottom: '6px' }}>
+              <div>Before total: <strong>{formatDuration(p.beforeTotalSeconds)}</strong> ({p.beforeTotalSeconds}s)</div>
+              <div>After total: <strong style={{ color: '#10b981' }}>{formatDuration(p.afterTotalSeconds)}</strong> ({p.afterTotalSeconds}s)</div>
+              <div>Would strip: <strong style={{ color: p.stripCount > 0 ? '#ef4444' : 'inherit' }}>{p.stripCount}</strong> entries ({formatDuration(p.strippedSecondsTotal)})</div>
+              <div>Would keep: <strong>{p.keptCount}</strong> entries ({formatDuration(p.keptSecondsTotal)})</div>
+            </div>
+            {p.stripped.length > 0 && (
+              <details>
+                <summary style={{ fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>
+                  Entries to strip ({p.stripped.length})
+                </summary>
+                <pre style={preStyle}>{JSON.stringify(p.stripped.map(s => ({
+                  index: s.index,
+                  timestamp: s.timestamp,
+                  date: dayjs(s.timestamp).format('YYYY-MM-DD HH:mm:ss'),
+                  sessionDuration: s.sessionDuration,
+                  reason: s.reason,
+                })), null, 2)}</pre>
+              </details>
+            )}
+            {p.preserved.length > 0 && (
+              <details>
+                <summary style={{ fontSize: '11px', cursor: 'pointer', color: '#10b981' }}>
+                  Entries to keep ({p.preserved.length})
+                </summary>
+                <pre style={preStyle}>{JSON.stringify(p.preserved.map(s => ({
+                  index: s.index,
+                  timestamp: s.timestamp,
+                  date: dayjs(s.timestamp).format('YYYY-MM-DD HH:mm:ss'),
+                  sessionDuration: s.sessionDuration,
+                  reason: s.reason,
+                })), null, 2)}</pre>
+              </details>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

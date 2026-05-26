@@ -1,6 +1,6 @@
 // lib/pdfUtils.ts
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { powerupCode, allIncrementalRemKey, incremReviewStartTimeKey } from './consts';
+import { powerupCode, allIncrementalRemKey } from './consts';
 import { IncrementalRem } from './incremental_rem/types';
 
 export interface PageRangeContext {
@@ -254,41 +254,17 @@ export const addPageToHistory = async (
     page = currentPage || 1;
   }
 
+  // sessionDuration is only recorded when an explicit override is passed by a
+  // session-boundary caller (queue "Next", editor review timer end). Bookmark/
+  // highlight events and manual UI saves must NOT record a duration — letting
+  // them auto-compute from incremReviewStartTimeKey compounds the same anchor
+  // across many events and inflates totals (see git blame for context).
   let sessionDuration: number | undefined;
-
-  // --- DIRECT CALCULATION LOGIC ---
-  if (sessionDurationOverride !== undefined) {
-    if (sessionDurationOverride > 2) {
-      if (sessionDurationOverride > 14400) {
-        console.log(`[addPageToHistory] ⚠️ Override duration too long (${sessionDurationOverride}s). Ignoring.`);
-      } else {
-        sessionDuration = sessionDurationOverride;
-        console.log(`[addPageToHistory] ✅ SAVED Override Duration: ${sessionDuration}s`);
-      }
-    }
-  } else {
-    try {
-      const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-
-      if (startTime) {
-        const calculatedDuration = Math.round((Date.now() - startTime) / 1000);
-
-        // ✅ FILTER: Only record meaningful sessions (> 2 seconds)
-        // This ignores the "0s" noise from React re-renders
-        if (calculatedDuration > 2) {
-          if (calculatedDuration > 14400) {
-            console.log(`[addPageToHistory] ⚠️ Duration too long (${calculatedDuration}s). Ignoring.`);
-          } else {
-            sessionDuration = calculatedDuration;
-            console.log(`[addPageToHistory] ✅ SAVED Duration: ${sessionDuration}s`);
-          }
-        }
-      }
-    } catch (e) {
-      console.error("[addPageToHistory] Error calculating duration:", e);
-    }
+  if (sessionDurationOverride !== undefined
+      && sessionDurationOverride > 2
+      && sessionDurationOverride <= 14400) {
+    sessionDuration = sessionDurationOverride;
   }
-  // --------------------------------
 
   const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
 
