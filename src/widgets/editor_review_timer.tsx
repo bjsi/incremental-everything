@@ -303,7 +303,10 @@ function EditorReviewTimer() {
         await plugin.app.toast(`✓ ${timerData.remName}: Repetition updated (${timeDisplay})`);
       } else {
         // Mode 2: Started from Editor command. We need to create the repetition right now.
-        const newNextRepDate = Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24;
+        // If the user chose "Keep Current Date" in the regression dialog before starting
+        // the timer, the override will be set in session storage. Use it instead of computing.
+        const dateOverride = await plugin.storage.getSession<number>('editor-review-timer-date-override');
+        const newNextRepDate = dateOverride ?? (Date.now() + (timerData.interval || 0) * 1000 * 60 * 60 * 24);
 
         // Calculate early/late status
         const scheduledDate = incRem.nextRepDate;
@@ -350,6 +353,7 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-origin', undefined);
     await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
     await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
+    await plugin.storage.setSession('editor-review-timer-date-override', undefined);
 
     // Explicitly end the active session when Ending Review
     await forceSaveSession(plugin);
@@ -563,6 +567,7 @@ function EditorReviewTimer() {
       await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
       await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
       await plugin.storage.setSession('editor-review-timer-queue-list', undefined);
+      await plugin.storage.setSession('editor-review-timer-date-override', undefined);
       await forceSaveSession(plugin);
       return;
     }
@@ -632,6 +637,7 @@ function EditorReviewTimer() {
     await plugin.storage.setSession('editor-review-timer-origin', undefined);
     await plugin.storage.setSession('editor-review-timer-paused-at', undefined);
     await plugin.storage.setSession('editor-review-timer-accumulated-ms', undefined);
+    await plugin.storage.setSession('editor-review-timer-date-override', undefined);
     // Clear stored list state if cancelling
     await plugin.storage.setSession('inc-rem-list-state', undefined);
     await plugin.storage.setSession('inc-rem-main-view-state', undefined);

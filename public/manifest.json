@@ -6,11 +6,11 @@
   "repoUrl": "https://github.com/bjsi/incremental-everything",
   "supportUrl": "https://github.com/bjsi/incremental-everything/issues",
   "projectUrl": "https://github.com/bjsi/incremental-everything/wiki",
-	"changeLogUrl": "https://github.com/bjsi/incremental-everything/wiki/Changelog",
+  "changeLogUrl": "https://github.com/bjsi/incremental-everything/wiki/Changelog",
   "version": {
     "major": 0,
     "minor": 2,
-    "patch": 258
+    "patch": 259
   },
   "unlisted": false,
   "theme": [],
