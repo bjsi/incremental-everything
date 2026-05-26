@@ -306,7 +306,13 @@ export function AnswerButtons() {
           // Carry a session bookmark forward so this reading-time entry does
           // not bury it and make the Scroll button appear stale.
           const carryHighlightId = await resolveSessionBookmarkCarry(plugin, rem._id, pdfRem._id, currentPage);
-          await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage, undefined, carryHighlightId);
+          // Compute review duration here (addPageToHistory no longer auto-
+          // computes — bookmark/UI callers must not record durations).
+          const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+          const reviewTimeSeconds = startTime
+            ? Math.round((Date.now() - startTime) / 1000)
+            : undefined;
+          await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage, reviewTimeSeconds, carryHighlightId);
         }
       }
     }

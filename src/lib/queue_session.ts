@@ -5,10 +5,11 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from './pdfUtils';
-import { autoFocusQueueDashboardId } from './consts';
+import { autoFocusQueueDashboardId, fsrsWeightsId } from './consts';
 import { isMobileDevice } from './mobileUtils';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
 import { PRACTICED_QUEUES_HISTORY_KEY, rollOverOldSessions } from './queue_aggregates';
+import { computeFSRSState, parseWeightsString } from './fsrs';
 
 const ACTIVE_SESSION_KEY = 'activeQueueSession';
 const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
@@ -717,6 +718,15 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
             if (card.nextRepetitionTime && lastRepTime) {
               currentSession.prevCardInterval = card.nextRepetitionTime - lastRepTime;
               currentSession.prevCardNextRepTime = card.nextRepetitionTime;
+            }
+            if (card.repetitionHistory && card.repetitionHistory.length > 0) {
+              const weightsRaw = await plugin.settings.getSetting<string>(fsrsWeightsId);
+              const weights = parseWeightsString(weightsRaw);
+              const fsrs = computeFSRSState(card.repetitionHistory, weights);
+              if (fsrs) {
+                currentSession.prevCardFsrsD = fsrs.d;
+                currentSession.prevCardFsrsS = fsrs.s;
+              }
             }
           }
         }

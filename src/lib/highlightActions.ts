@@ -3,6 +3,7 @@ import {
   PluginRem,
   ReactRNPlugin,
   RemId,
+  RICH_TEXT_FORMATTING,
   RichTextElementRemInterface,
   RichTextInterface,
   RichTextElementInterface,
@@ -37,13 +38,13 @@ const sanitizeRichTextForSetText = (richText: RichTextInterface): RichTextInterf
       case 'm': {
         // RichTextElementTextInterface
         const clean: any = { i: 'm', text: el.text ?? '' };
-        // Copy known optional formatting properties (only if present)
+        // Drive the formatting allowlist from the SDK enum so new formatting
+        // types (sup/sub/str/clozes/links/code-language/hints/…) don't get
+        // silently stripped during highlight → IncRem inheritance.
         const textKeys = [
           'workInProgressTag', 'workInProgressRem', 'workInProgressPortal',
           'block', 'title',
-          // RICH_TEXT_FORMATTING enum values (string keys)
-          'cloze', 'u', 'b', 'l', 'code', 'rc', 'hc',
-          'h', 'tc', 'dl', 'cl', 'q', 'il',
+          ...Object.values(RICH_TEXT_FORMATTING),
         ];
         for (const k of textKeys) {
           if (k in el) clean[k] = el[k];
@@ -446,13 +447,21 @@ export const createRemFromHighlight = async (
     });
   }
 
-  const lastSelectedDestination = await getLastSelectedDestination(
-    plugin,
-    sourceDocument._id,
-    normalizedContextRemId
-  );
-
   const { pageIndex: highlightPageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
+
+  // When the highlight itself is the rem under review, normalizedContextRemId is
+  // null and the lastSelectedDestination key collapses to a global "last parent
+  // used for any PDF-highlight extraction from this PDF". That stale value
+  // would pin the suggestion regardless of the current page, so skip it and let
+  // the parent selector fall through to page-range matching.
+  const skipLastDestination = normalizedContextRemId === null && highlightPageIndex !== null;
+  const lastSelectedDestination = skipLastDestination
+    ? null
+    : await getLastSelectedDestination(
+        plugin,
+        sourceDocument._id,
+        normalizedContextRemId
+      );
 
   const context = buildContextForSelector(
     sourceDocument._id,

@@ -263,7 +263,16 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('weighted_shield_popup', WidgetLocation.Popup, {
     dimensions: {
       width: '560px',
-      height: 700,
+      height: 900,
+    },
+  });
+
+  // Wide variant: same component, registered at ~2× width so the `wsh` command
+  // can show Incremental Rems and Cards side-by-side when both groups are present.
+  plugin.app.registerWidget('weighted_shield_popup_wide', WidgetLocation.Popup, {
+    dimensions: {
+      width: '1150px',
+      height: 900,
     },
   });
 

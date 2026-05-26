@@ -81,7 +81,12 @@ export async function handleCreateExtract(plugin: ReactRNPlugin, remId: string) 
   if (!highlight) return;
 
   const { pdfRemId: docId } = await getPdfInfoFromHighlight(plugin as any, highlight);
-  const contextRemId = await resolveContextRemId(plugin, docId, { checkEditorTimer: true });
+  let contextRemId = await resolveContextRemId(plugin, docId, { checkEditorTimer: true });
+
+  // If the resolved context is the highlight itself (happens when the highlight
+  // is the queue's current item), it's not a useful parent suggestion — drop it
+  // so the parent selector falls through to page-range matching instead.
+  if (contextRemId === remId) contextRemId = null;
 
   // createRemFromHighlight opens the parent-selector popup and returns immediately.
   // Bookmark + toast are handled inside createRemUnderParent once the user confirms

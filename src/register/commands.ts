@@ -22,7 +22,16 @@ import {
   nextInQueueCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
+  allCardPriorityInfoKey,
+  allIncrementalRemKey,
+  seenCardInSessionKey,
+  seenRemInSessionKey,
+  priorityCalcScopeRemIdsKey,
 } from '../lib/consts';
+import { computeWeightedShieldBreakdown } from '../lib/utils';
+import { CardPriorityInfo } from '../lib/card_priority/types';
+import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
+import { buildDocumentScope } from '../lib/scope_helpers';
 import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -1481,6 +1490,89 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       await plugin.widget.openPopup('priority_shield_graph', {
         subQueueId,
+      });
+    },
+  });
+
+  // Open Weighted Shield Popup Command
+  plugin.app.registerCommand({
+    id: 'open-weighted-shield',
+    name: 'Open Weighted Shield Popup',
+    description: 'Open the Weighted Shield breakdown popup.',
+    quickCode: 'wsh',
+    action: async () => {
+      let subQueueId: string | null = null;
+      const url = await plugin.window.getURL();
+      const inQueue = url.includes('/flashcards');
+
+      // Check if we are in the queue to get context
+      if (inQueue) {
+        subQueueId = (await plugin.storage.getSession<string | null>(currentSubQueueIdKey)) ?? null;
+      } else {
+        // In editor, use focused rem
+        const focusedRem = await plugin.focus.getFocusedRem();
+        subQueueId = focusedRem?._id || null;
+      }
+
+      // Pull the prioritized universes from the session cache and compute breakdowns
+      // for both Incremental Rems and Cards. Respect the queue's seen-in-session lists
+      // when present so this matches what the in-queue tooltip shows.
+      const [allIncRems, allCardInfos, seenRemIds, seenCardIds, cachedScopeIds] = await Promise.all([
+        plugin.storage.getSession<IncrementalRemType[]>(allIncrementalRemKey).then((v) => v ?? []),
+        plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey).then((v) => v ?? []),
+        plugin.storage.getSession<string[]>(seenRemInSessionKey).then((v) => v ?? []),
+        plugin.storage.getSession<string[]>(seenCardInSessionKey).then((v) => v ?? []),
+        plugin.storage.getSession<string[] | null>(priorityCalcScopeRemIdsKey),
+      ]);
+
+      const seenRemSet = new Set(seenRemIds);
+      const seenCardSet = new Set(seenCardIds);
+      const cardDuePredicate = (info: CardPriorityInfo) =>
+        info.dueCards > 0 && !seenCardSet.has(info.remId);
+      const incRemDuePredicate = (r: IncrementalRemType) =>
+        Date.now() >= r.nextRepDate && !seenRemSet.has(r.remId);
+
+      // Prefer the queue's precomputed scope (built once at QueueEnter) over a fresh
+      // buildDocumentScope traversal — the latter is the slow part. Fall back to a
+      // live build only when invoked outside the queue (focused-rem case).
+      let docScope: Set<string> | null = null;
+      if (subQueueId) {
+        if (inQueue && cachedScopeIds && cachedScopeIds.length > 0) {
+          docScope = new Set(cachedScopeIds);
+        } else {
+          docScope = await buildDocumentScope(plugin as any, subQueueId);
+        }
+      }
+
+      const groups: { title: string; itemLabel: string; kb: any; doc: any }[] = [];
+
+      const scope = docScope;
+      if (allIncRems.length > 0) {
+        const docItems = scope ? allIncRems.filter((r) => scope.has(r.remId)) : [];
+        groups.push({
+          title: 'Incremental Rems',
+          itemLabel: 'IncRem',
+          kb: computeWeightedShieldBreakdown(allIncRems, incRemDuePredicate),
+          doc: docItems.length > 0 ? computeWeightedShieldBreakdown(docItems, incRemDuePredicate) : null,
+        });
+      }
+
+      if (allCardInfos.length > 0) {
+        const docItems = scope ? allCardInfos.filter((c) => scope.has(c.remId)) : [];
+        groups.push({
+          title: 'Cards',
+          itemLabel: 'Cards',
+          kb: computeWeightedShieldBreakdown(allCardInfos, cardDuePredicate),
+          doc: docItems.length > 0 ? computeWeightedShieldBreakdown(docItems, cardDuePredicate) : null,
+        });
+      }
+
+      // Use the wide variant only when there's something to put side-by-side
+      // (both Incremental Rems and Cards). Otherwise the standard narrow popup
+      // is enough and avoids a half-empty wide canvas.
+      const popupId = groups.length >= 2 ? 'weighted_shield_popup_wide' : 'weighted_shield_popup';
+      await plugin.widget.openPopup(popupId, {
+        groups,
       });
     },
   });
