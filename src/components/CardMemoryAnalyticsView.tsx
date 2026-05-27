@@ -17,6 +17,7 @@ import {
 import { CardPriorityInfo } from '../lib/card_priority/types';
 import { allCardPriorityInfoKey, cardAnalyticsCacheKey, fsrsWeightsId } from '../lib/consts';
 import { parseWeightsString } from '../lib/fsrs';
+import { Period, resolvePeriod } from '../lib/period';
 import { formatTimeAgo } from '../lib/utils';
 
 // --- Formatting helpers ---------------------------------------------------
@@ -354,6 +355,122 @@ function AnalyticsTable({ breakdown }: { breakdown: CardAnalyticsBreakdown }) {
 
 // --- Status bar ------------------------------------------------------------
 
+// --- Period picker (compact, inline) -------------------------------------
+
+const PERIOD_PRESETS: Array<{ id: Period; label: string }> = [
+  { id: 'today', label: 'Today' },
+  { id: 'yesterday', label: 'Yesterday' },
+  { id: 'week', label: 'Last 7d' },
+  { id: 'thisWeek', label: 'This Week' },
+  { id: 'lastWeek', label: 'Last Week' },
+  { id: 'month', label: 'Last 30d' },
+  { id: 'thisMonth', label: 'This Month' },
+  { id: 'lastMonth', label: 'Last Month' },
+  { id: 'year', label: 'Last 365d' },
+  { id: 'thisYear', label: 'This Year' },
+  { id: 'lastYear', label: 'Last Year' },
+  { id: 'all', label: 'All' },
+  { id: 'custom', label: 'Custom' },
+];
+
+function PeriodPickerCompact({
+  period,
+  customStart,
+  customEnd,
+  disabled,
+  onChange,
+  onCustomChange,
+}: {
+  period: Period;
+  customStart: string;
+  customEnd: string;
+  disabled: boolean;
+  onChange: (p: Period) => void;
+  onCustomChange: (s: string, e: string) => void;
+}) {
+  const btnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '3px 9px',
+    fontSize: '10.5px',
+    fontWeight: active ? 700 : 500,
+    border: '1px solid var(--rn-clr-background-tertiary)',
+    borderRadius: '4px',
+    background: active ? '#3362f0' : 'var(--rn-clr-background-primary)',
+    color: active ? 'white' : 'var(--rn-clr-content-primary)',
+    cursor: disabled ? 'wait' : 'pointer',
+    opacity: disabled ? 0.6 : 1,
+    whiteSpace: 'nowrap',
+  });
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '4px',
+        marginBottom: '10px',
+        padding: '8px 12px',
+        borderRadius: '6px',
+        background: 'var(--rn-clr-background-secondary)',
+        border: '1px solid var(--rn-clr-background-tertiary)',
+      }}
+    >
+      <span
+        style={{
+          fontSize: '10px',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color: 'var(--rn-clr-content-tertiary)',
+          marginRight: '4px',
+        }}
+      >
+        Period
+      </span>
+      {PERIOD_PRESETS.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(p.id)}
+          style={btnStyle(period === p.id)}
+        >
+          {p.label}
+        </button>
+      ))}
+      {period === 'custom' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+          <input
+            type="date"
+            value={customStart}
+            disabled={disabled}
+            onChange={(e) => onCustomChange(e.target.value, customEnd)}
+            style={{
+              fontSize: '10.5px',
+              padding: '2px 4px',
+              border: '1px solid var(--rn-clr-background-tertiary)',
+              borderRadius: '4px',
+            }}
+          />
+          <span style={{ fontSize: '10.5px', color: 'var(--rn-clr-content-tertiary)' }}>→</span>
+          <input
+            type="date"
+            value={customEnd}
+            disabled={disabled}
+            onChange={(e) => onCustomChange(customStart, e.target.value)}
+            style={{
+              fontSize: '10.5px',
+              padding: '2px 4px',
+              border: '1px solid var(--rn-clr-background-tertiary)',
+              borderRadius: '4px',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatusBar({
   breakdown,
   ignorePreReset,
@@ -487,46 +604,56 @@ export function CardMemoryAnalyticsView() {
   const [cache, setCache] = React.useState<CardAnalyticsBreakdown | null>(null);
   const [progress, setProgress] = React.useState<ProgressInfo>({ done: 0, total: 0 });
   const [error, setError] = React.useState<string | null>(null);
-  // Toggle the user controls in the status bar. Default OFF → keep full
-  // history (matches Study Dashboard / Practiced Queues). Flipping triggers
-  // an immediate recompute so the table reflects the chosen mode.
+  // Default ignorePreReset → OFF (matches Study Dashboard).
   const [ignorePreReset, setIgnorePreReset] = React.useState<boolean>(false);
+  // Period filter — same Period type used by the Study Dashboard. Default
+  // 'thisYear' as requested. Custom dates are stored as raw "YYYY-MM-DD"
+  // strings (the format <input type="date"> emits).
+  const [period, setPeriod] = React.useState<Period>('thisYear');
+  const [customStart, setCustomStart] = React.useState<string>('');
+  const [customEnd, setCustomEnd] = React.useState<string>('');
 
-  const compute = React.useCallback(async (flag: boolean) => {
-    setError(null);
-    setState('computing');
-    setProgress({ done: 0, total: 0 });
-    try {
-      const [infos, weightsRaw, capSec] = await Promise.all([
-        plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-        plugin.settings.getSetting<string>(fsrsWeightsId),
-        // Per-rep responseTime cap (seconds). Same setting the Study Dashboard
-        // and Practiced Queues read so per-rep outliers don't dominate CPM.
-        plugin.settings.getSetting<number>('flashcard_response_time_limit'),
-      ]);
-      const weights = parseWeightsString(weightsRaw);
-      const cardCapMs = ((capSec ?? 180) as number) * 1000;
-      const breakdown = await computeCardAnalyticsBreakdown(
-        plugin as any,
-        infos ?? [],
-        weights,
-        cardCapMs,
-        flag,
-        (done, total) => setProgress({ done, total }),
-      );
-      await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
-      setCache(breakdown);
-      setState('ready');
-    } catch (e: any) {
-      console.error('[CardMemoryAnalytics] compute failed', e);
-      setError(e?.message || String(e));
-      setState('idle');
-    }
-  }, [plugin]);
+  const compute = React.useCallback(
+    async (flag: boolean, p: Period, cs: string, ce: string) => {
+      setError(null);
+      setState('computing');
+      setProgress({ done: 0, total: 0 });
+      try {
+        const [infos, weightsRaw, capSec] = await Promise.all([
+          plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
+          plugin.settings.getSetting<string>(fsrsWeightsId),
+          // Per-rep responseTime cap (seconds). Same setting the Study Dashboard
+          // and Practiced Queues read so per-rep outliers don't dominate CPM.
+          plugin.settings.getSetting<number>('flashcard_response_time_limit'),
+        ]);
+        const weights = parseWeightsString(weightsRaw);
+        const cardCapMs = ((capSec ?? 180) as number) * 1000;
+        const { startMs, endMs } = resolvePeriod(p, cs, ce);
+        const breakdown = await computeCardAnalyticsBreakdown(
+          plugin as any,
+          infos ?? [],
+          weights,
+          cardCapMs,
+          flag,
+          { id: p, startMs, endMs, customStart: cs, customEnd: ce },
+          (done, total) => setProgress({ done, total }),
+        );
+        await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
+        setCache(breakdown);
+        setState('ready');
+      } catch (e: any) {
+        console.error('[CardMemoryAnalytics] compute failed', e);
+        setError(e?.message || String(e));
+        setState('idle');
+      }
+    },
+    [plugin],
+  );
 
   // Mount: prefer the session cache; fall back to auto-computing with the
-  // default toggle value. The cache stores its own `ignorePreReset` so we sync
-  // the toggle to whatever the cached data was computed with.
+  // default toggle value + default period. The cache stores its own
+  // `ignorePreReset` and period so we sync the UI to whatever the cached data
+  // was computed with.
   React.useEffect(() => {
     let cancelled = false;
     plugin.storage
@@ -536,13 +663,16 @@ export function CardMemoryAnalyticsView() {
         if (c && c.buckets && c.buckets.length === 10) {
           setCache(c);
           setIgnorePreReset(c.ignorePreReset ?? false);
+          setPeriod(((c.period as Period) ?? 'thisYear'));
+          setCustomStart(c.periodCustomStart ?? '');
+          setCustomEnd(c.periodCustomEnd ?? '');
           setState('ready');
         } else {
-          compute(false);
+          compute(false, 'thisYear', '', '');
         }
       })
       .catch(() => {
-        if (!cancelled) compute(false);
+        if (!cancelled) compute(false, 'thisYear', '', '');
       });
     return () => {
       cancelled = true;
@@ -551,7 +681,17 @@ export function CardMemoryAnalyticsView() {
 
   const handleToggleIgnorePreReset = (next: boolean) => {
     setIgnorePreReset(next);
-    compute(next);
+    compute(next, period, customStart, customEnd);
+  };
+  const handlePeriodChange = (p: Period) => {
+    setPeriod(p);
+    // For preset periods, ignore stale custom-date inputs.
+    if (p !== 'custom') compute(ignorePreReset, p, customStart, customEnd);
+  };
+  const handleCustomChange = (s: string, e: string) => {
+    setCustomStart(s);
+    setCustomEnd(e);
+    if (period === 'custom') compute(ignorePreReset, 'custom', s, e);
   };
 
   return (
@@ -572,6 +712,14 @@ export function CardMemoryAnalyticsView() {
         </div>
       )}
 
+      <PeriodPickerCompact
+        period={period}
+        customStart={customStart}
+        customEnd={customEnd}
+        disabled={state === 'computing'}
+        onChange={handlePeriodChange}
+        onCustomChange={handleCustomChange}
+      />
       {state === 'computing' && <ProgressDisplay progress={progress} />}
       {state === 'ready' && cache && (
         <>
@@ -579,7 +727,7 @@ export function CardMemoryAnalyticsView() {
             breakdown={cache}
             ignorePreReset={ignorePreReset}
             onToggleIgnorePreReset={handleToggleIgnorePreReset}
-            onRecompute={() => compute(ignorePreReset)}
+            onRecompute={() => compute(ignorePreReset, period, customStart, customEnd)}
             disabled={state !== 'ready'}
           />
           <AnalyticsTable breakdown={cache} />
@@ -592,17 +740,19 @@ export function CardMemoryAnalyticsView() {
             }}
           >
             <strong>Reads:</strong> 10 priority-percentile buckets of cards (priority
-            inherited from the owning Rem). <strong>Reps / Time / CPM / Retention</strong>{' '}
-            iterate the full history filtered to gradeable scores (Again / Hard / Good /
-            Easy) with each rep's <em>responseTime</em> capped at the{' '}
+            inherited from the owning Rem).{' '}
+            <strong>Period-filtered</strong> (only reps in the chosen range):{' '}
+            <em>Reps, Time, CPM, t/rep, Lapses, Retention, Avg pR, R-dev, Grade</em>. Each
+            rep's <code>responseTime</code> is capped at the{' '}
             <code>flashcard_response_time_limit</code> setting — matches the Study Dashboard
-            and Practiced Queues conventions. <strong>Avg pR</strong> averages the
-            FSRS-predicted retrievability at the moment of each repetition.{' '}
-            <strong>R-dev = Retention − Avg pR</strong> in percentage points: positive means
-            you remember better than FSRS expected, negative means worse.{' '}
-            <strong>Lapses</strong> are averaged only over non-new cards.{' '}
-            <strong>D / R / S</strong> are the current FSRS state averaged across cards that
-            have ever been reviewed.
+            and Practiced Queues conventions.{' '}
+            <strong>Always-current</strong> (KB state, unaffected by period):{' '}
+            <em>Items, Due, Done, %New, %Stale, D, R, S</em>. <strong>Cost</strong> is
+            lifetime per-card coverage when period = All; otherwise it's annualized as{' '}
+            <em>time-in-period / period-length</em> averaged across cards with reps in the
+            period. <strong>R-dev = Retention − Avg pR</strong> in percentage points:
+            positive means you remember better than FSRS expected, negative means worse.{' '}
+            <strong>Lapses</strong> are averaged only over non-new cards.
           </div>
         </>
       )}

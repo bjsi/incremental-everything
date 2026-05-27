@@ -59,6 +59,17 @@ export interface CardAnalyticsBreakdown {
    * can sync the toggle to the data it's showing and recompute on mismatch.
    */
   ignorePreReset: boolean;
+  /**
+   * The period applied to per-rep stats. Persisted so the view can sync its
+   * picker to the data it's showing and recompute on mismatch. Stored as the
+   * raw Period id + the resolved [startMs, endMs) bounds; the resolver is not
+   * idempotent across midnights, so storing the bounds is safer than only the id.
+   */
+  period: string;          // raw Period id, e.g. 'thisYear'
+  periodStartMs: number;
+  periodEndMs: number;
+  periodCustomStart: string;
+  periodCustomEnd: string;
 }
 
 interface AccData {
@@ -159,29 +170,34 @@ function computeCardStats(
   now: number,
   cardCapMs: number,
   ignorePreReset: boolean,
+  startMs: number,
+  endMs: number,
 ): PerCardStats {
   const history = card.repetitionHistory ?? [];
   const sorted = [...history].sort((a: any, b: any) => a.date - b.date);
 
-  // Default iteration set is the FULL history (matches study_dashboard /
-  // practiced_queues). When the user opts in via the "ignore pre-RESET" toggle
-  // — useful after imports that bring foreign repetition histories — we slice
-  // off everything up to and including the last RESET.
-  let iter: any[] = sorted;
+  // Effective history = post-RESET slice when the toggle is on, else the full
+  // history. FSRS replay below also uses the effective history so D/R/S and
+  // Avg pR stay consistent with the reps actually being counted.
+  let effective: any[] = sorted;
   if (ignorePreReset) {
     const lastResetIdx = sorted.map((h: any) => h.score).lastIndexOf(QueueInteractionScore.RESET);
-    if (lastResetIdx !== -1) iter = sorted.slice(lastResetIdx + 1);
+    if (lastResetIdx !== -1) effective = sorted.slice(lastResetIdx + 1);
   }
 
+  const inPeriod = (h: any) => h && typeof h.date === 'number' && h.date >= startMs && h.date < endMs;
+  const isAllPeriod = startMs <= 0;
+
+  // ---- Period-filtered tallies (Reps, Time, Lapses, Retention, Grade) ----
   let gradeableReps = 0;
   let totalTimeMs = 0;
   let agains = 0;
   let sumGrade = 0;
   let gradeCount = 0;
-  let firstGradeableDate: number | null = null;
 
-  for (const h of iter) {
+  for (const h of effective) {
     if (!isGradeable(h.score)) continue;
+    if (!inPeriod(h)) continue;
     gradeableReps++;
     const t = Math.min(Math.max(0, h.responseTime || 0), cardCapMs);
     totalTimeMs += t;
@@ -191,43 +207,63 @@ function computeCardStats(
       sumGrade += g;
       gradeCount++;
     }
-    if (firstGradeableDate === null) firstGradeableDate = h.date;
   }
-
-  const isNew = gradeableReps === 0;
   const lapses = agains;
 
-  // Due: matches card_priority/index.ts convention exactly.
+  // ---- Always-current population flags (isNew, isDue, isStale) ------------
+  //
+  // %New / %Stale / Due describe the card's CURRENT state in the KB — they
+  // don't shift when the user narrows the period. A card with reviews from
+  // years ago but none in "This Week" should not count as new.
+  let everGradeable = false;
+  for (const h of effective) {
+    if (isGradeable(h.score)) { everGradeable = true; break; }
+  }
+  const isNew = !everGradeable;
+
   const nextRep = card.nextRepetitionTime as number | undefined;
   const isDue = (nextRep ?? Infinity) <= now;
 
-  // Stale: matches flashcard_repetition_history.tsx — overdue by > 2× last interval.
   let isStale = false;
-  const lastRep = sorted.length > 0 ? sorted[sorted.length - 1] : null;
+  const lastRep = effective.length > 0 ? effective[effective.length - 1] : null;
   if (lastRep && nextRep && nextRep > lastRep.date) {
     const lastInterval = nextRep - lastRep.date;
     const staleDate = lastRep.date + 2 * lastInterval;
     isStale = now > staleDate;
   }
 
-  // Cost: matches flashcard_repetition_history.tsx coverage-based formula,
-  // anchored on the first gradeable rep of the full history. responseTime is
-  // already capped above, so a single outlier doesn't blow up the per-card cost.
+  // ---- Cost ---------------------------------------------------------------
+  // Period = 'all' → existing per-card coverage formula (lifetime cost).
+  // Finite period → annualized: time spent in period / period length in years.
   let cost: number | null = null;
-  const firstRepDate = firstGradeableDate;
-  if (firstRepDate && totalTimeMs > 0) {
+  if (totalTimeMs > 0) {
     const totalMinutes = totalTimeMs / 60000;
     const yearMs = 1000 * 60 * 60 * 24 * 365;
-    if (nextRep && nextRep > now) {
-      const coverageYears = (nextRep - firstRepDate) / yearMs;
-      if (coverageYears > 0) cost = totalMinutes / coverageYears;
+    if (isAllPeriod) {
+      let firstGradeableDate: number | null = null;
+      for (const h of effective) {
+        if (isGradeable(h.score)) { firstGradeableDate = h.date; break; }
+      }
+      if (firstGradeableDate) {
+        if (nextRep && nextRep > now) {
+          const coverageYears = (nextRep - firstGradeableDate) / yearMs;
+          if (coverageYears > 0) cost = totalMinutes / coverageYears;
+        } else {
+          const ageYears = (now - firstGradeableDate) / yearMs;
+          if (ageYears > 0) cost = totalMinutes / ageYears;
+        }
+      }
     } else {
-      const ageYears = (now - firstRepDate) / yearMs;
-      if (ageYears > 0) cost = totalMinutes / ageYears;
+      const periodYears = (endMs - startMs) / yearMs;
+      if (periodYears > 0) cost = totalMinutes / periodYears;
     }
   }
 
-  // Predicted R at every step (skip first/learning where r is null).
+  // ---- FSRS state + Avg pR ------------------------------------------------
+  // FSRS state (D / R today / S) is always-current — replayed over the full
+  // effective history regardless of period.
+  // Avg pR (predicted retrievability at the moment of each rep) is averaged
+  // only over reps in the period — same period filter as Reps/Time/Retention.
   let sumPredR = 0;
   let predRCount = 0;
   let d: number | null = null;
@@ -236,14 +272,16 @@ function computeCardStats(
 
   if (!isNew) {
     try {
-      const steps = computeFSRSStatesPerReview(history, weights);
-      for (const step of steps) {
-        if (step.r !== null && !Number.isNaN(step.r)) {
-          sumPredR += step.r;
-          predRCount++;
-        }
+      const steps = computeFSRSStatesPerReview(effective, weights);
+      for (let i = 0; i < effective.length; i++) {
+        const h = effective[i];
+        const step = steps[i];
+        if (!step || step.r === null || Number.isNaN(step.r)) continue;
+        if (!inPeriod(h)) continue;
+        sumPredR += step.r;
+        predRCount++;
       }
-      const state = computeFSRSState(history, weights);
+      const state = computeFSRSState(effective, weights);
       if (state) {
         d = state.d;
         s = state.s;
@@ -369,14 +407,25 @@ function finalize(acc: AccData, label: string): CardBucketStats {
  * FSRS replay (CPU only — no further async). We yield to the event loop every
  * `YIELD_EVERY` cards so the popup stays responsive while progress updates.
  */
+export interface PeriodSpec {
+  /** Period id (e.g. 'thisYear'). Stored on the breakdown for cache-sync. */
+  id: string;
+  startMs: number;
+  endMs: number;
+  customStart: string;
+  customEnd: string;
+}
+
 export async function computeCardAnalyticsBreakdown(
   plugin: RNPlugin,
   cardPriorityInfos: CardPriorityInfo[],
   weights: number[] | null,
   cardCapMs: number,
   ignorePreReset: boolean,
+  period: PeriodSpec,
   onProgress?: (done: number, total: number) => void,
 ): Promise<CardAnalyticsBreakdown> {
+  const { startMs, endMs } = period;
   // Map remId → inherited rem priority. Filter out rems with explicit zero cards.
   const remPriority = new Map<string, number>();
   for (const info of cardPriorityInfos) {
@@ -414,7 +463,7 @@ export async function computeCardAnalyticsBreakdown(
     const percentile = ((i + 1) / N) * 100;
     const bIdx = Math.min(Math.floor(percentile / 10), 9);
 
-    const stats = computeCardStats(card, weights, now, cardCapMs, ignorePreReset);
+    const stats = computeCardStats(card, weights, now, cardCapMs, ignorePreReset, startMs, endMs);
     accumulate(bucketAccs[bIdx], stats, priority);
     accumulate(overallAcc, stats, priority);
 
@@ -434,5 +483,10 @@ export async function computeCardAnalyticsBreakdown(
     computedAt: Date.now(),
     cardsSkippedNoPriority,
     ignorePreReset,
+    period: period.id,
+    periodStartMs: period.startMs,
+    periodEndMs: period.endMs,
+    periodCustomStart: period.customStart,
+    periodCustomEnd: period.customEnd,
   };
 }
