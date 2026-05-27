@@ -1362,6 +1362,21 @@ function Priority() {
               }}
             />
 
+            {cardInfo && (
+              <div className="flex items-center justify-between text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                <span>Source: <strong>{cardInfo.source}</strong></span>
+                {cardInfo.source === 'inherited' && (
+                  <button
+                    onClick={convertToManual}
+                    className="text-xs hover:underline"
+                    style={{ color: '#3b82f6' }}
+                  >
+                    Convert to Manual
+                  </button>
+                )}
+              </div>
+            )}
+
             {performanceMode === PERFORMANCE_MODE_FULL && (
               <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
                 {isLoadingDerivedData ? (
