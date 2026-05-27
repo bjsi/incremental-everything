@@ -19,7 +19,7 @@ import {
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { formatDuration, tryParseJson } from '../lib/utils';
-import { Period, resolvePeriod } from '../lib/period';
+import { Period, resolvePeriod, parseDateInput, formatDateForDisplay } from '../lib/period';
 import { resolveRemTextSegments } from '../lib/richTextRemRefs';
 import { RemText, RemTextSegments } from '../components';
 import '../style.css';
@@ -1161,6 +1161,58 @@ function PeriodPicker({
         </button>
     );
 
+    // Local draft state for custom date text inputs — typing does NOT trigger
+    // recomputation. Only blur or Enter commits the parsed value.
+    const [draftStart, setDraftStart] = useState(formatDateForDisplay(customStart));
+    const [draftEnd, setDraftEnd] = useState(formatDateForDisplay(customEnd));
+
+    // Sync drafts when canonical values change externally (preset selected).
+    useEffect(() => {
+        setDraftStart(formatDateForDisplay(customStart));
+    }, [customStart]);
+    useEffect(() => {
+        setDraftEnd(formatDateForDisplay(customEnd));
+    }, [customEnd]);
+
+    const commitStart = () => {
+        const parsed = parseDateInput(draftStart);
+        if (parsed) {
+            setDraftStart(formatDateForDisplay(parsed));
+            if (parsed !== customStart) {
+                onCustomChange(parsed, customEnd);
+                onChange('custom');
+            }
+        } else if (draftStart === '') {
+            if (customStart !== '') {
+                onCustomChange('', customEnd);
+                onChange('custom');
+            }
+        } else {
+            setDraftStart(formatDateForDisplay(customStart));
+        }
+    };
+
+    const commitEnd = () => {
+        const parsed = parseDateInput(draftEnd);
+        if (parsed) {
+            setDraftEnd(formatDateForDisplay(parsed));
+            if (parsed !== customEnd) {
+                onCustomChange(customStart, parsed);
+                onChange('custom');
+            }
+        } else if (draftEnd === '') {
+            if (customEnd !== '') {
+                onCustomChange(customStart, '');
+                onChange('custom');
+            }
+        } else {
+            setDraftEnd(formatDateForDisplay(customEnd));
+        }
+    };
+
+    const isStartInvalid = draftStart !== '' && !parseDateInput(draftStart);
+    const isEndInvalid = draftEnd !== '' && !parseDateInput(draftEnd);
+
     return (
         <div>
             {/* 5x3 grid matching the statistics plugin */}
@@ -1198,29 +1250,65 @@ function PeriodPicker({
             <div className="flex flex-wrap gap-2 md:gap-4 items-end mt-3">
                 <div className="flex flex-col flex-1 min-w-[120px]">
                     <span className="text-xs opacity-70 mb-1">Start Date</span>
-                    <input
-                        type="date"
-                        value={customStart}
-                        onChange={(e) => {
-                            onCustomChange(e.target.value, customEnd);
-                            onChange('custom');
-                        }}
-                        className="border rounded px-2 py-1 text-sm w-full"
-                        style={inputStyle}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <input
+                            type="text"
+                            placeholder="DD/MM/YYYY"
+                            value={draftStart}
+                            onChange={(e) => setDraftStart(e.target.value)}
+                            onBlur={commitStart}
+                            onKeyDown={(e) => { if (e.key === 'Enter') commitStart(); }}
+                            className="border rounded px-2 py-1 text-sm w-full"
+                            style={{
+                                ...inputStyle,
+                                borderColor: isStartInvalid ? '#ef4444' : inputStyle.borderColor,
+                            }}
+                        />
+                        <input
+                            type="date"
+                            className="date-picker-icon-only"
+                            value={customStart}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setDraftStart(formatDateForDisplay(v));
+                                onCustomChange(v, customEnd);
+                                onChange('custom');
+                            }}
+                            title="Pick from calendar"
+                            tabIndex={-1}
+                        />
+                    </div>
                 </div>
                 <div className="flex flex-col flex-1 min-w-[120px]">
                     <span className="text-xs opacity-70 mb-1">End Date</span>
-                    <input
-                        type="date"
-                        value={customEnd}
-                        onChange={(e) => {
-                            onCustomChange(customStart, e.target.value);
-                            onChange('custom');
-                        }}
-                        className="border rounded px-2 py-1 text-sm w-full"
-                        style={inputStyle}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <input
+                            type="text"
+                            placeholder="DD/MM/YYYY"
+                            value={draftEnd}
+                            onChange={(e) => setDraftEnd(e.target.value)}
+                            onBlur={commitEnd}
+                            onKeyDown={(e) => { if (e.key === 'Enter') commitEnd(); }}
+                            className="border rounded px-2 py-1 text-sm w-full"
+                            style={{
+                                ...inputStyle,
+                                borderColor: isEndInvalid ? '#ef4444' : inputStyle.borderColor,
+                            }}
+                        />
+                        <input
+                            type="date"
+                            className="date-picker-icon-only"
+                            value={customEnd}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setDraftEnd(formatDateForDisplay(v));
+                                onCustomChange(customStart, v);
+                                onChange('custom');
+                            }}
+                            title="Pick from calendar"
+                            tabIndex={-1}
+                        />
+                    </div>
                 </div>
                 {period === 'custom' && (
                     <button
