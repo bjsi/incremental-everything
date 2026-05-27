@@ -98,6 +98,67 @@ interface ProgressInfo {
   total: number;
 }
 
+// --- Column tooltips -------------------------------------------------------
+//
+// Native `title` attribute — rendered by the OS as a hover tooltip.
+// Multi-line via "\n". Kept terse so hover doesn't take a paragraph to read.
+
+const GROUP_TOOLTIPS = {
+  identity:
+    'Which priority-percentile bucket this row represents, plus the raw priority range of its cards.',
+  population:
+    'Always-current snapshot of the cards in this bucket. NOT affected by the period filter — these describe the KB right now.',
+  throughput:
+    'Period-filtered — what happened during the selected time range. responseTime per rep is capped at the flashcard_response_time_limit setting (same convention as the Study Dashboard / Practiced Queues).',
+  outcome:
+    'Period-filtered — quality of recall during the selected time range.',
+  fsrsToday:
+    'Current FSRS model state averaged across cards that have been reviewed at least once. Always reflects today, regardless of period filter.',
+} as const;
+
+const COL_TOOLTIPS = {
+  bucket:
+    'Priority-percentile bucket. Cards are sorted ascending by their owning Rem\'s priority and split into 10 deciles of equal size.',
+  absPrio:
+    'Min–max RAW priority values (0–100) found in this bucket. The bucket label is the percentile range; this column shows the underlying priority numbers.',
+  items:
+    'Number of CARDS in this bucket. Each Rem contributes one entry per card it owns; paused/disabled cards are included.',
+  due:
+    'Cards whose nextRepetitionTime is in the past — RemNote would schedule them now. Disabled cards (no nextRepetitionTime) are not counted as due.',
+  done:
+    '% of cards already processed (not due) = (cards − due) / cards.',
+  pctNew:
+    '% of cards that have never been graded (no Again/Hard/Good/Easy in their effective history). Always-current.',
+  pctStale:
+    '% of cards overdue by more than 2× their last scheduled interval — i.e., now > lastRepDate + 2 × (nextRepDate − lastRepDate). High values suggest the schedule has drifted past usefulness. Always-current.',
+  reps:
+    'Total gradeable reps (Again / Hard / Good / Easy) in the period. Avg per card in parentheses. Period-filtered.',
+  time:
+    'Total response time in the period — each rep capped at flashcard_response_time_limit so a single long pause doesn\'t dominate. Avg per card in parentheses. Period-filtered.',
+  cpm:
+    'Cards per minute = totalGradeableReps / (totalTime in minutes), computed at bucket level (not averaged from per-card averages). Period-filtered.',
+  tPerRep:
+    'Average response time per rep = totalTime / totalGradeableReps. Period-filtered.',
+  cost:
+    'Time investment per card per year.\nPeriod = All → per-card lifetime cost: totalMinutes / coverageYears (coverage = nextRep − firstRep, or now − firstRep), averaged.\nFinite period → annualized: time-in-period / period-length, averaged over cards that had reps in the period.',
+  lapses:
+    'Average count of Again responses per non-new card. New cards are excluded from the denominator so never-reviewed cards don\'t dilute the average. Period-filtered.',
+  retention:
+    'Observed pass rate at the bucket level = (gradeableReps − Again) / gradeableReps. Period-filtered. Same definition as the Study Dashboard / Practiced Queues.',
+  avgPR:
+    'Average FSRS-predicted retrievability across every gradeable rep in the period, EXCEPT the first rep of each card / each post-RESET lifetime (the model has no prior state to predict from).\nFor learning/relearning reps where FSRS leaves r undefined, the forgetting curve is computed locally using the previous gradeable rep\'s stability — so Avg pR\'s denominator matches Retention\'s.',
+  rDev:
+    'Retention − Avg pR (percentage points).\nPositive: you remember better than FSRS expected (schedule could be relaxed).\nNegative: you forget more than predicted (schedule may be stale, or grading has been too generous).',
+  grade:
+    'Average grade across gradeable reps in the period: 1=Again, 2=Hard, 3=Good, 4=Easy.',
+  d:
+    'Current FSRS Difficulty (1–10), averaged across cards reviewed at least once. Lower = card behaves easier for you. Always-current.',
+  r:
+    'Current FSRS Retrievability AS OF NOW, averaged across reviewed cards. Decays as time since the last review grows; a high R means you\'re currently very likely to recall the card. Always-current.',
+  s:
+    'Current FSRS Stability in days, averaged across reviewed cards. Roughly: how long until R drops to ~90%. Higher = more durable memory. Always-current.',
+} as const;
+
 // --- Table -----------------------------------------------------------------
 
 const cellStyle: React.CSSProperties = {
@@ -117,6 +178,7 @@ const headerCellStyle: React.CSSProperties = {
   color: 'var(--rn-clr-content-tertiary)',
   textAlign: 'right',
   whiteSpace: 'nowrap',
+  cursor: 'help',
 };
 
 const groupHeaderStyle: React.CSSProperties = {
@@ -129,6 +191,7 @@ const groupHeaderStyle: React.CSSProperties = {
   textAlign: 'center',
   background: 'var(--rn-clr-background-secondary)',
   borderBottom: '1px solid var(--rn-clr-background-tertiary)',
+  cursor: 'help',
 };
 
 function BucketRow({ b, isOverall, idx }: { b: CardBucketStats; isOverall: boolean; idx: number }) {
@@ -269,80 +332,80 @@ function AnalyticsTable({ breakdown }: { breakdown: CardAnalyticsBreakdown }) {
         <thead>
           {/* Group header row — spans grouped sub-columns. */}
           <tr>
-            <th style={groupHeaderStyle} colSpan={2}>
+            <th style={groupHeaderStyle} colSpan={2} title={GROUP_TOOLTIPS.identity}>
               Identity
             </th>
-            <th style={groupHeaderStyle} colSpan={5}>
+            <th style={groupHeaderStyle} colSpan={5} title={GROUP_TOOLTIPS.population}>
               Population
             </th>
-            <th style={groupHeaderStyle} colSpan={5}>
+            <th style={groupHeaderStyle} colSpan={5} title={GROUP_TOOLTIPS.throughput}>
               Throughput
             </th>
-            <th style={groupHeaderStyle} colSpan={6}>
+            <th style={groupHeaderStyle} colSpan={6} title={GROUP_TOOLTIPS.outcome}>
               Outcome
             </th>
-            <th style={groupHeaderStyle} colSpan={3}>
+            <th style={groupHeaderStyle} colSpan={3} title={GROUP_TOOLTIPS.fsrsToday}>
               FSRS today
             </th>
           </tr>
           {/* Column header row */}
           <tr style={{ borderBottom: '2px solid var(--rn-clr-background-tertiary)' }}>
-            <th style={{ ...headerCellStyle, textAlign: 'left' }}>Bucket</th>
-            <th style={{ ...headerCellStyle, textAlign: 'center' }} title="Min–max absolute priority of cards in this bucket">
+            <th style={{ ...headerCellStyle, textAlign: 'left' }} title={COL_TOOLTIPS.bucket}>Bucket</th>
+            <th style={{ ...headerCellStyle, textAlign: 'center' }} title={COL_TOOLTIPS.absPrio}>
               Abs.Prio
             </th>
-            <th style={headerCellStyle} title="Total cards in this bucket">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.items}>
               Items
             </th>
-            <th style={headerCellStyle} title="Cards with nextRepetitionTime ≤ now">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.due}>
               Due
             </th>
-            <th style={{ ...headerCellStyle, textAlign: 'center' }} title="% of cards already processed (not due)">
+            <th style={{ ...headerCellStyle, textAlign: 'center' }} title={COL_TOOLTIPS.done}>
               Done
             </th>
-            <th style={headerCellStyle} title="% of cards never graded">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.pctNew}>
               %New
             </th>
-            <th style={headerCellStyle} title="% of cards overdue by &gt; 2× last interval">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.pctStale}>
               %Stale
             </th>
-            <th style={headerCellStyle} title="Total reps (avg per card)">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.reps}>
               Reps
             </th>
-            <th style={headerCellStyle} title="Total response time (avg per card)">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.time}>
               Time
             </th>
-            <th style={headerCellStyle} title="Cards per minute = totalGradeableReps / (totalTime in minutes)">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.cpm}>
               CPM
             </th>
-            <th style={headerCellStyle} title="Average response time per repetition">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.tPerRep}>
               t/rep
             </th>
-            <th style={headerCellStyle} title="Average per-card cost (minutes per year), coverage-based">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.cost}>
               Cost
             </th>
-            <th style={headerCellStyle} title="Average lapses (Again responses) per non-new card">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.lapses}>
               Lapses
             </th>
-            <th style={headerCellStyle} title="Observed retention = (gradeable - Again) / gradeable">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.retention}>
               Retention
             </th>
-            <th style={headerCellStyle} title="Average FSRS-predicted retrievability across every gradeable rep">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.avgPR}>
               Avg pR
             </th>
-            <th style={headerCellStyle} title="Retention − Avg pR (percentage points)">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.rDev}>
               R-dev
             </th>
-            <th style={headerCellStyle} title="Average grade (1=Again, 2=Hard, 3=Good, 4=Easy)">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.grade}>
               Grade
             </th>
-            <th style={headerCellStyle} title="Current FSRS Difficulty (1–10)">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.d}>
               D
             </th>
-            <th style={headerCellStyle} title="Current FSRS Retrievability (today)">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.r}>
               R
             </th>
-            <th style={headerCellStyle} title="Current FSRS Stability (days)">
+            <th style={headerCellStyle} title={COL_TOOLTIPS.s}>
               S
             </th>
           </tr>
@@ -964,7 +1027,13 @@ export function CardMemoryAnalyticsView() {
             <em>Items, Due, Done, %New, %Stale, D, R, S</em>. <strong>Cost</strong> is
             lifetime per-card coverage when period = All; otherwise it's annualized as{' '}
             <em>time-in-period / period-length</em> averaged across cards with reps in the
-            period. <strong>R-dev = Retention − Avg pR</strong> in percentage points:
+            period. <strong>Avg pR</strong> averages the FSRS-predicted retrievability at the moment
+            of every gradeable rep (skipping only the first rep of each card / each
+            post-RESET lifetime, which has no prior model state). For learning and
+            relearning reps — where FSRS leaves <em>r</em> undefined — the forgetting
+            curve is computed from the previous gradeable rep's stability so that Avg pR
+            and Retention share the same denominator.{' '}
+            <strong>R-dev = Retention − Avg pR</strong> in percentage points:
             positive means you remember better than FSRS expected, negative means worse.{' '}
             <strong>Lapses</strong> are averaged only over non-new cards.
           </div>

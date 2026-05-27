@@ -12,7 +12,12 @@
 
 import { RNPlugin, QueueInteractionScore } from '@remnote/plugin-sdk';
 import { CardPriorityInfo } from './card_priority/types';
-import { computeFSRSState, computeFSRSStatesPerReview } from './fsrs';
+import {
+  computeFSRSState,
+  computeFSRSStatesPerReview,
+  forgettingCurve,
+  resolveWeights,
+} from './fsrs';
 
 export interface CardBucketStats {
   label: string;          // "0-10%" or "All KB"
@@ -273,14 +278,57 @@ function computeCardStats(
   if (!isNew) {
     try {
       const steps = computeFSRSStatesPerReview(effective, weights);
+      // FSRS leaves step.r null for learning/relearning state reps; we want
+      // Avg pR's denominator to match Retention's (every gradeable rep except
+      // the first of each FSRS "lifetime"), so we compute the forgetting-curve
+      // r ourselves for those cases using the previous gradeable rep's stability.
+      const { w } = resolveWeights(weights);
+      const DECAY = -w[20];
+      const FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
+
+      let lastGradeableIdx: number | null = null;
       for (let i = 0; i < effective.length; i++) {
         const h = effective[i];
-        const step = steps[i];
-        if (!step || step.r === null || Number.isNaN(step.r)) continue;
-        if (!inPeriod(h)) continue;
-        sumPredR += step.r;
-        predRCount++;
+
+        // RESET ends the current "lifetime" — the next gradeable rep is
+        // effectively a brand-new card and gets skipped just like the first
+        // rep of a fresh card.
+        if (h.score === QueueInteractionScore.RESET) {
+          lastGradeableIdx = null;
+          continue;
+        }
+        if (!isGradeable(h.score)) continue;
+
+        // First gradeable rep of this lifetime: no prior FSRS state to predict
+        // from. Per design, we skip it (no contribution to numerator or
+        // denominator), but still advance the reference for downstream reps.
+        if (lastGradeableIdx === null) {
+          lastGradeableIdx = i;
+          continue;
+        }
+
+        if (inPeriod(h)) {
+          const step = steps[i];
+          let r: number | null = step?.r ?? null;
+          if (r === null) {
+            // Learning/relearning rep: replicate the FSRS forgetting curve
+            // using the previous gradeable rep's stability.
+            const prevS = steps[lastGradeableIdx]?.s ?? 0;
+            const prevDate = effective[lastGradeableIdx].date;
+            const elapsedDays = (h.date - prevDate) / (1000 * 60 * 60 * 24);
+            if (prevS > 0 && elapsedDays >= 0) {
+              r = forgettingCurve(elapsedDays, prevS, DECAY, FACTOR);
+            }
+          }
+          if (r !== null && Number.isFinite(r)) {
+            sumPredR += r;
+            predRCount++;
+          }
+        }
+
+        lastGradeableIdx = i;
       }
+
       const state = computeFSRSState(effective, weights);
       if (state) {
         d = state.d;
