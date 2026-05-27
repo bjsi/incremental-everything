@@ -33,6 +33,10 @@ export const allIncrementalRemKey = 'all-incremental-rem';
 export const currentIncRemKey = 'current-inc-rem';
 export const allCardPriorityInfoKey = 'all-card-priority-info-key';
 export const cardAnalyticsCacheKey = 'card-analytics-cache-key';
+// Local-storage keys for "last selected period" — survives across sessions /
+// app restarts (device-specific). Stored shape: { period, customStart, customEnd }.
+export const cardAnalyticsLastPeriodKey = 'card-analytics-last-period';
+export const studyDashboardLastPeriodKey = 'study-dashboard-last-period';
 export const incremReviewStartTimeKey = 'increm-review-start-time';
 // Intentional reactive signal: bump this key (via setSession) to trigger an IncRem cache reload.
 // The tracker reads it via `rp` (reactive), but calls loadIncrementalRemCache with the

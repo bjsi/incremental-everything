@@ -15,7 +15,12 @@ import {
   computeCardAnalyticsBreakdown,
 } from '../lib/card_analytics';
 import { CardPriorityInfo } from '../lib/card_priority/types';
-import { allCardPriorityInfoKey, cardAnalyticsCacheKey, fsrsWeightsId } from '../lib/consts';
+import {
+  allCardPriorityInfoKey,
+  cardAnalyticsCacheKey,
+  cardAnalyticsLastPeriodKey,
+  fsrsWeightsId,
+} from '../lib/consts';
 import { parseWeightsString } from '../lib/fsrs';
 import { Period, resolvePeriod, parseDateInput, formatDateForDisplay } from '../lib/period';
 import { formatTimeAgo } from '../lib/utils';
@@ -370,6 +375,7 @@ const PERIOD_PRESETS: Array<{ id: Period; label: string }> = [
   { id: 'thisYear', label: 'This Year' },
   { id: 'lastYear', label: 'Last Year' },
   { id: 'all', label: 'All' },
+  { id: 'since', label: 'Since…' },
   { id: 'custom', label: 'Custom' },
 ];
 
@@ -495,6 +501,72 @@ function CustomDateInputs({
   );
 }
 
+// Single-date variant for the 'since' period — only a start date matters;
+// end is implicitly "now". Reuses customStart as the source of truth.
+function SinceDateInput({
+  customStart,
+  disabled,
+  onCustomChange,
+  customEnd,
+}: {
+  customStart: string;
+  customEnd: string;
+  disabled: boolean;
+  onCustomChange: (s: string, e: string) => void;
+}) {
+  const [draft, setDraft] = React.useState(formatDateForDisplay(customStart));
+  React.useEffect(() => {
+    setDraft(formatDateForDisplay(customStart));
+  }, [customStart]);
+
+  const commit = () => {
+    const parsed = parseDateInput(draft);
+    if (parsed) {
+      setDraft(formatDateForDisplay(parsed));
+      if (parsed !== customStart) onCustomChange(parsed, customEnd);
+    } else if (draft === '') {
+      if (customStart !== '') onCustomChange('', customEnd);
+    } else {
+      setDraft(formatDateForDisplay(customStart));
+    }
+  };
+
+  const isInvalid = draft !== '' && !parseDateInput(draft);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+      <span style={{ fontSize: '10.5px', color: 'var(--rn-clr-content-tertiary)' }}>From</span>
+      <input
+        type="text"
+        placeholder="DD/MM/YYYY"
+        value={draft}
+        disabled={disabled}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
+        style={{
+          ...dateInputStyle,
+          borderColor: isInvalid ? '#ef4444' : undefined,
+        }}
+      />
+      <input
+        type="date"
+        className="date-picker-icon-only"
+        value={customStart}
+        disabled={disabled}
+        onChange={(e) => {
+          const v = e.target.value;
+          setDraft(formatDateForDisplay(v));
+          onCustomChange(v, customEnd);
+        }}
+        title="Pick from calendar"
+        tabIndex={-1}
+      />
+      <span style={{ fontSize: '10.5px', color: 'var(--rn-clr-content-tertiary)' }}>→ now</span>
+    </div>
+  );
+}
+
 function PeriodPickerCompact({
   period,
   customStart,
@@ -562,6 +634,14 @@ function PeriodPickerCompact({
       ))}
       {period === 'custom' && (
         <CustomDateInputs
+          customStart={customStart}
+          customEnd={customEnd}
+          disabled={disabled}
+          onCustomChange={onCustomChange}
+        />
+      )}
+      {period === 'since' && (
+        <SinceDateInput
           customStart={customStart}
           customEnd={customEnd}
           disabled={disabled}
@@ -740,6 +820,12 @@ export function CardMemoryAnalyticsView() {
           (done, total) => setProgress({ done, total }),
         );
         await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
+        // Persist the period selection across app restarts (device-local).
+        // Stored independently from the session cache so it survives full
+        // RemNote restarts when the in-memory cache is gone.
+        plugin.storage
+          .setLocal(cardAnalyticsLastPeriodKey, { period: p, customStart: cs, customEnd: ce })
+          .catch(() => {});
         setCache(breakdown);
         setState('ready');
       } catch (e: any) {
@@ -751,15 +837,19 @@ export function CardMemoryAnalyticsView() {
     [plugin],
   );
 
-  // Mount: prefer the session cache; fall back to auto-computing with the
-  // default toggle value + default period. The cache stores its own
-  // `ignorePreReset` and period so we sync the UI to whatever the cached data
-  // was computed with.
+  // Mount: prefer the in-memory session cache (instant). If absent, fall back
+  // to the last-selected period saved in device-local storage so that re-opens
+  // after a full RemNote restart still remember the user's choice. If neither
+  // source is available, default to 'thisYear'.
   React.useEffect(() => {
     let cancelled = false;
-    plugin.storage
-      .getSession<CardAnalyticsBreakdown | null>(cardAnalyticsCacheKey)
-      .then((c) => {
+    Promise.all([
+      plugin.storage.getSession<CardAnalyticsBreakdown | null>(cardAnalyticsCacheKey),
+      plugin.storage.getLocal<{ period?: Period; customStart?: string; customEnd?: string } | null>(
+        cardAnalyticsLastPeriodKey,
+      ),
+    ])
+      .then(([c, saved]) => {
         if (cancelled) return;
         if (c && c.buckets && c.buckets.length === 10) {
           setCache(c);
@@ -768,8 +858,22 @@ export function CardMemoryAnalyticsView() {
           setCustomStart(c.periodCustomStart ?? '');
           setCustomEnd(c.periodCustomEnd ?? '');
           setState('ready');
+          return;
+        }
+        // No session cache — restore last-selected period from local storage.
+        const p = (saved?.period ?? 'thisYear') as Period;
+        const cs = saved?.customStart ?? '';
+        const ce = saved?.customEnd ?? '';
+        setPeriod(p);
+        setCustomStart(cs);
+        setCustomEnd(ce);
+        // 'custom' / 'since' without a usable start date can't compute — skip
+        // the auto-compute and wait for the user to type / pick one.
+        const hasUsableStart = !!cs;
+        if ((p === 'custom' || p === 'since') && !hasUsableStart) {
+          setState('idle');
         } else {
-          compute(false, 'thisYear', '', '');
+          compute(false, p, cs, ce);
         }
       })
       .catch(() => {
@@ -786,13 +890,22 @@ export function CardMemoryAnalyticsView() {
   };
   const handlePeriodChange = (p: Period) => {
     setPeriod(p);
-    // For preset periods, ignore stale custom-date inputs.
-    if (p !== 'custom') compute(ignorePreReset, p, customStart, customEnd);
+    // For 'custom' and 'since', the start date drives the filter — only
+    // recompute once it's been provided. Other presets are self-contained.
+    if (p === 'custom') return;
+    if (p === 'since' && !customStart) return;
+    compute(ignorePreReset, p, customStart, customEnd);
   };
   const handleCustomChange = (s: string, e: string) => {
     setCustomStart(s);
     setCustomEnd(e);
-    if (period === 'custom') compute(ignorePreReset, 'custom', s, e);
+    // Both 'custom' and 'since' use customStart, so either should recompute
+    // when their relevant date(s) are populated.
+    if (period === 'custom') {
+      compute(ignorePreReset, 'custom', s, e);
+    } else if (period === 'since' && s) {
+      compute(ignorePreReset, 'since', s, e);
+    }
   };
 
   return (

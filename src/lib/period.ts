@@ -23,6 +23,7 @@ export type Period =
   | 'thisYear'
   | 'lastYear'
   | 'all'
+  | 'since'   // From a user-picked start date through "now". customStart holds the start.
   | 'custom';
 
 export function getStartOfDay(date: Date): number {
@@ -171,6 +172,13 @@ export function resolvePeriod(
       return { startMs: soyLast, endMs: soy };
     case 'all':
       return { startMs: 0, endMs: now.getTime() + 86400000 };
+    case 'since': {
+      // "From this day on" — start = picked date, end = now (open-ended).
+      // We reuse customStart for the date; customEnd is ignored.
+      const s = new Date(customStart);
+      const sMs = isNaN(s.getTime()) ? 0 : getStartOfDay(s);
+      return { startMs: sMs, endMs: now.getTime() + 86400000 };
+    }
     case 'custom': {
       const s = new Date(customStart);
       const e = new Date(customEnd);

@@ -15,6 +15,7 @@ import {
     dismissedPowerupCode,
     powerupCode,
     repHistorySlotCode,
+    studyDashboardLastPeriodKey,
 } from '../lib/consts';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
@@ -1176,16 +1177,19 @@ function PeriodPicker({
 
     const commitStart = () => {
         const parsed = parseDateInput(draftStart);
+        // Editing Start Date while in 'since' keeps the period as 'since' —
+        // for all other modes (including 'custom'), it switches to 'custom'.
+        const nextPeriod: Period = period === 'since' ? 'since' : 'custom';
         if (parsed) {
             setDraftStart(formatDateForDisplay(parsed));
             if (parsed !== customStart) {
                 onCustomChange(parsed, customEnd);
-                onChange('custom');
+                onChange(nextPeriod);
             }
         } else if (draftStart === '') {
             if (customStart !== '') {
                 onCustomChange('', customEnd);
-                onChange('custom');
+                onChange(nextPeriod);
             }
         } else {
             setDraftStart(formatDateForDisplay(customStart));
@@ -1193,6 +1197,7 @@ function PeriodPicker({
     };
 
     const commitEnd = () => {
+        // 'since' has no end date — editing End Date always switches to 'custom'.
         const parsed = parseDateInput(draftEnd);
         if (parsed) {
             setDraftEnd(formatDateForDisplay(parsed));
@@ -1236,13 +1241,23 @@ function PeriodPicker({
                 <div style={{ gridColumn: '4', gridRow: '2' }}>{renderPresetBtn('This Year', 'thisYear')}</div>
                 <div style={{ gridColumn: '4', gridRow: '3' }}>{renderPresetBtn('Last Year', 'lastYear')}</div>
 
-                <div style={{ gridColumn: '5', gridRow: '1 / 4' }}>
+                <div style={{ gridColumn: '5', gridRow: '1 / 3' }}>
                     <button
                         onClick={() => onChange('all')}
                         className="w-full h-full rounded px-2 py-1 text-xs transition-all hover:opacity-90 flex items-center justify-center font-bold"
                         style={getButtonStyle(period === 'all')}
                     >
                         All
+                    </button>
+                </div>
+                <div style={{ gridColumn: '5', gridRow: '3' }}>
+                    <button
+                        onClick={() => onChange('since')}
+                        title="From this day on (start date below; end = now)"
+                        className="w-full h-full rounded px-2 py-1 text-xs transition-all hover:opacity-90 flex items-center justify-center"
+                        style={getButtonStyle(period === 'since')}
+                    >
+                        Since…
                     </button>
                 </div>
             </div>
@@ -1310,7 +1325,7 @@ function PeriodPicker({
                         />
                     </div>
                 </div>
-                {period === 'custom' && (
+                {(period === 'custom' || period === 'since') && (
                     <button
                         onClick={() => onChange('today')}
                         className="text-xs hover:underline mb-2 ml-auto"
@@ -1835,9 +1850,12 @@ function StudyDashboardPopup() {
     );
 
     // Reflect the resolved range in the Start/End date inputs when a preset is picked.
-    // For 'all', leave the inputs blank (no meaningful start). 'custom' leaves them as typed.
+    // - 'custom' leaves them as typed.
+    // - 'since' is driven by customStart; we leave both inputs alone (the user
+    //   picked the start, end is implicitly "now").
+    // - 'all' clears the inputs (no meaningful start).
     useEffect(() => {
-        if (period === 'custom') return;
+        if (period === 'custom' || period === 'since') return;
         if (period === 'all') {
             if (customStart !== '') setCustomStart('');
             if (customEnd !== '') setCustomEnd('');
@@ -1857,6 +1875,38 @@ function StudyDashboardPopup() {
         if (newStart !== customStart) setCustomStart(newStart);
         if (newEnd !== customEnd) setCustomEnd(newEnd);
     }, [period, startMs, endMs]);
+
+    // Hydrate period selection from device-local storage on mount, then persist
+    // whenever the user changes it. The ref gate prevents the persist effect
+    // from firing with the default 'thisYear' before hydration completes.
+    const periodHydratedRef = useRef(false);
+    useEffect(() => {
+        let cancelled = false;
+        plugin.storage
+            .getLocal<{ period?: Period; customStart?: string; customEnd?: string } | null>(
+                studyDashboardLastPeriodKey
+            )
+            .then((saved) => {
+                if (cancelled) return;
+                if (saved?.period) setPeriod(saved.period);
+                if (saved?.customStart !== undefined) setCustomStart(saved.customStart);
+                if (saved?.customEnd !== undefined) setCustomEnd(saved.customEnd);
+            })
+            .catch(() => {})
+            .finally(() => {
+                if (!cancelled) periodHydratedRef.current = true;
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [plugin]);
+
+    useEffect(() => {
+        if (!periodHydratedRef.current) return;
+        plugin.storage
+            .setLocal(studyDashboardLastPeriodKey, { period, customStart, customEnd })
+            .catch(() => {});
+    }, [plugin, period, customStart, customEnd]);
 
     const cardCapMs = useRunAsync(async () => {
         const v = await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING);
