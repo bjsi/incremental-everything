@@ -515,15 +515,20 @@ export function CardMemoryAnalyticsView() {
     setState('computing');
     setProgress({ done: 0, total: 0 });
     try {
-      const [infos, weightsRaw] = await Promise.all([
+      const [infos, weightsRaw, capSec] = await Promise.all([
         plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
         plugin.settings.getSetting<string>(fsrsWeightsId),
+        // Per-rep responseTime cap (seconds). Same setting the Study Dashboard
+        // and Practiced Queues read so per-rep outliers don't dominate CPM.
+        plugin.settings.getSetting<number>('flashcard_response_time_limit'),
       ]);
       const weights = parseWeightsString(weightsRaw);
+      const cardCapMs = ((capSec ?? 180) as number) * 1000;
       const breakdown = await computeCardAnalyticsBreakdown(
         plugin as any,
         infos ?? [],
         weights,
+        cardCapMs,
         (done, total) => setProgress({ done, total }),
       );
       await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
@@ -569,12 +574,15 @@ export function CardMemoryAnalyticsView() {
             }}
           >
             <strong>Reads:</strong> 10 priority-percentile buckets of cards (priority
-            inherited from the owning Rem). <strong>Throughput</strong> is computed at
-            bucket level (total reps / total time) rather than averaging per-card averages.{' '}
-            <strong>Avg pR</strong> averages the FSRS-predicted retrievability at the moment
-            of each repetition. <strong>R-dev = Retention − Avg pR</strong> in percentage
-            points: positive means you remember better than FSRS expected, negative means
-            worse. <strong>Lapses</strong> are averaged only over non-new cards.{' '}
+            inherited from the owning Rem). <strong>Reps / Time / CPM / Retention</strong>{' '}
+            iterate the full history filtered to gradeable scores (Again / Hard / Good /
+            Easy) with each rep's <em>responseTime</em> capped at the{' '}
+            <code>flashcard_response_time_limit</code> setting — matches the Study Dashboard
+            and Practiced Queues conventions. <strong>Avg pR</strong> averages the
+            FSRS-predicted retrievability at the moment of each repetition.{' '}
+            <strong>R-dev = Retention − Avg pR</strong> in percentage points: positive means
+            you remember better than FSRS expected, negative means worse.{' '}
+            <strong>Lapses</strong> are averaged only over non-new cards.{' '}
             <strong>D / R / S</strong> are the current FSRS state averaged across cards that
             have ever been reviewed.
           </div>

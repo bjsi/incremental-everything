@@ -25,13 +25,15 @@ export interface CardBucketStats {
   newPct: number;
   staleCount: number;
   stalePct: number;
-  // Throughput
-  totReps: number;
-  totTimeMs: number;
+  // Throughput — all aggregates use gradeable reps (Again/Hard/Good/Easy)
+  // over the full history, with each rep's responseTime capped at cardCapMs
+  // (matches study_dashboard / practiced_queues).
+  totReps: number;        // total gradeable reps
+  totTimeMs: number;      // total capped response time
   avgReps: number;        // totReps / cards
   avgTimeMs: number;      // totTimeMs / cards
-  cpm: number;            // totGradeableReps / (totTimeMs / 60_000)
-  avgTimePerRepMs: number;// totTimeMs / totGradeableReps
+  cpm: number;            // totReps / (totTimeMs / 60_000)
+  avgTimePerRepMs: number;// totTimeMs / totReps
   avgCostMinPerYear: number; // mean of per-card cost over cards with cost
   // Outcome
   avgLapses: number;      // mean over non-new cards
@@ -61,8 +63,7 @@ interface AccData {
   due: number;
   newCount: number;
   staleCount: number;
-  // Throughput aggregates
-  totReps: number;
+  // Throughput aggregates (all over gradeable reps in the FULL history, capped responseTime)
   totGradeableReps: number;
   totTimeMs: number;
   totAgains: number;
@@ -86,8 +87,9 @@ interface PerCardStats {
   isDue: boolean;
   isNew: boolean;
   isStale: boolean;
-  reps: number;
+  /** Gradeable repetitions over the FULL history (matches study_dashboard.cardReps). */
   gradeableReps: number;
+  /** Sum of response time across gradeable reps, each capped at cardCapMs. */
   totalTimeMs: number;
   agains: number;
   lapses: number;
@@ -109,7 +111,6 @@ function makeAcc(): AccData {
     due: 0,
     newCount: 0,
     staleCount: 0,
-    totReps: 0,
     totGradeableReps: 0,
     totTimeMs: 0,
     totAgains: 0,
@@ -147,32 +148,41 @@ function gradeValue(score: QueueInteractionScore): number | null {
   }
 }
 
-function computeCardStats(card: any, weights: number[] | null, now: number): PerCardStats {
+function computeCardStats(
+  card: any,
+  weights: number[] | null,
+  now: number,
+  cardCapMs: number,
+): PerCardStats {
   const history = card.repetitionHistory ?? [];
   const sorted = [...history].sort((a: any, b: any) => a.date - b.date);
 
-  const lastResetIdx = sorted.map((h: any) => h.score).lastIndexOf(QueueInteractionScore.RESET);
-  const active = lastResetIdx !== -1 ? sorted.slice(lastResetIdx + 1) : sorted;
-
-  const gradeable = active.filter((h: any) => isGradeable(h.score));
-  const gradeableReps = gradeable.length;
-  const isNew = gradeableReps === 0;
-
-  const reps = active.length;
-  const totalTimeMs = gradeable.reduce((acc: number, h: any) => acc + (h.responseTime || 0), 0);
-  const agains = gradeable.filter((h: any) => h.score === QueueInteractionScore.AGAIN).length;
-  const lapses = agains;
-
-  // Average grade (1-4)
+  // Match study_dashboard / practiced_queues: iterate the FULL history (no
+  // post-RESET slicing), count only gradeable scores, and cap each rep's
+  // responseTime at the user setting so a single long pause doesn't dominate.
+  let gradeableReps = 0;
+  let totalTimeMs = 0;
+  let agains = 0;
   let sumGrade = 0;
   let gradeCount = 0;
-  for (const h of gradeable) {
+  let firstGradeableDate: number | null = null;
+
+  for (const h of sorted as any[]) {
+    if (!isGradeable(h.score)) continue;
+    gradeableReps++;
+    const t = Math.min(Math.max(0, h.responseTime || 0), cardCapMs);
+    totalTimeMs += t;
+    if (h.score === QueueInteractionScore.AGAIN) agains++;
     const g = gradeValue(h.score);
     if (g !== null) {
       sumGrade += g;
       gradeCount++;
     }
+    if (firstGradeableDate === null) firstGradeableDate = h.date;
   }
+
+  const isNew = gradeableReps === 0;
+  const lapses = agains;
 
   // Due: matches card_priority/index.ts convention exactly.
   const nextRep = card.nextRepetitionTime as number | undefined;
@@ -187,9 +197,11 @@ function computeCardStats(card: any, weights: number[] | null, now: number): Per
     isStale = now > staleDate;
   }
 
-  // Cost: matches flashcard_repetition_history.tsx — coverage if future, else card age.
+  // Cost: matches flashcard_repetition_history.tsx coverage-based formula,
+  // anchored on the first gradeable rep of the full history. responseTime is
+  // already capped above, so a single outlier doesn't blow up the per-card cost.
   let cost: number | null = null;
-  const firstRepDate = active.length > 0 ? (active[0] as any).date : null;
+  const firstRepDate = firstGradeableDate;
   if (firstRepDate && totalTimeMs > 0) {
     const totalMinutes = totalTimeMs / 60000;
     const yearMs = 1000 * 60 * 60 * 24 * 365;
@@ -233,7 +245,6 @@ function computeCardStats(card: any, weights: number[] | null, now: number): Per
     isDue,
     isNew,
     isStale,
-    reps,
     gradeableReps,
     totalTimeMs,
     agains,
@@ -257,7 +268,6 @@ function accumulate(acc: AccData, stats: PerCardStats, priority: number) {
   if (stats.isNew) acc.newCount++;
   if (stats.isStale) acc.staleCount++;
 
-  acc.totReps += stats.reps;
   acc.totGradeableReps += stats.gradeableReps;
   acc.totTimeMs += stats.totalTimeMs;
   acc.totAgains += stats.agains;
@@ -293,7 +303,7 @@ function finalize(acc: AccData, label: string): CardBucketStats {
   const donePct = cards > 0 ? ((cards - acc.due) / cards) * 100 : 100;
   const newPct = cards > 0 ? (acc.newCount / cards) * 100 : 0;
   const stalePct = cards > 0 ? (acc.staleCount / cards) * 100 : 0;
-  const avgReps = cards > 0 ? acc.totReps / cards : 0;
+  const avgReps = cards > 0 ? acc.totGradeableReps / cards : 0;
   const avgTimeMs = cards > 0 ? acc.totTimeMs / cards : 0;
   const cpm = acc.totTimeMs > 0 ? acc.totGradeableReps / (acc.totTimeMs / 60000) : 0;
   const avgTimePerRepMs = acc.totGradeableReps > 0 ? acc.totTimeMs / acc.totGradeableReps : 0;
@@ -321,7 +331,7 @@ function finalize(acc: AccData, label: string): CardBucketStats {
     newPct,
     staleCount: acc.staleCount,
     stalePct,
-    totReps: acc.totReps,
+    totReps: acc.totGradeableReps,
     totTimeMs: acc.totTimeMs,
     avgReps,
     avgTimeMs,
@@ -350,6 +360,7 @@ export async function computeCardAnalyticsBreakdown(
   plugin: RNPlugin,
   cardPriorityInfos: CardPriorityInfo[],
   weights: number[] | null,
+  cardCapMs: number,
   onProgress?: (done: number, total: number) => void,
 ): Promise<CardAnalyticsBreakdown> {
   // Map remId → inherited rem priority. Filter out rems with explicit zero cards.
@@ -389,7 +400,7 @@ export async function computeCardAnalyticsBreakdown(
     const percentile = ((i + 1) / N) * 100;
     const bIdx = Math.min(Math.floor(percentile / 10), 9);
 
-    const stats = computeCardStats(card, weights, now);
+    const stats = computeCardStats(card, weights, now, cardCapMs);
     accumulate(bucketAccs[bIdx], stats, priority);
     accumulate(overallAcc, stats, priority);
 
