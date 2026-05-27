@@ -190,6 +190,28 @@ function isRealCardScore(score: number | undefined): boolean {
     );
 }
 
+// When the "Ignore reps before last RESET" toggle is active, drop everything
+// up to and including the last RESET in each card's history. Useful after
+// importing documents whose foreign repetition history would otherwise pollute
+// retention / CPM / time metrics. Pre-RESET history is preserved on disk —
+// this is purely a presentation-time filter.
+function effectiveCardHistory(
+    history: any[] | undefined,
+    ignorePreReset: boolean
+): any[] {
+    if (!history || history.length === 0) return [];
+    if (!ignorePreReset) return history;
+    let lastResetIdx = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i] && history[i].score === QueueInteractionScore.RESET) {
+            lastResetIdx = i;
+            break;
+        }
+    }
+    if (lastResetIdx === -1) return history;
+    return history.slice(lastResetIdx + 1);
+}
+
 function getStartOfDay(date: Date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -296,7 +318,8 @@ function statsFromRem(
     rem: RemData,
     startMs: number,
     endMs: number,
-    cardCapMs: number
+    cardCapMs: number,
+    ignorePreReset: boolean
 ): { self: PeriodStats; hasIncReps: boolean; hasDismReps: boolean } {
     const s = emptyStats();
     let hasIncReps = false;
@@ -319,7 +342,7 @@ function statsFromRem(
     }
     for (const card of rem.cards) {
         let cardHasReps = false;
-        for (const rep of card.history || []) {
+        for (const rep of effectiveCardHistory(card.history, ignorePreReset)) {
             if (!rep || typeof rep.date !== 'number') continue;
             if (rep.date < startMs || rep.date >= endMs) continue;
             if (!isRealCardScore(rep.score)) continue;
@@ -626,6 +649,7 @@ function aggregateDocumentData(
     startMs: number,
     endMs: number,
     cardCapMs: number,
+    ignorePreReset: boolean,
     onProgress: (p: number, label: string) => void
 ): { tree: BuiltTree; summary: SummaryStats } {
     const { remDataList, remDataById, stubData, childMap, rawRootIds } = data;
@@ -637,7 +661,7 @@ function aggregateDocumentData(
         const d = remDataById[id] || null;
         const rawChildrenIds = childMap[id] || [];
 
-        const self = d ? statsFromRem(d, startMs, endMs, cardCapMs) : null;
+        const self = d ? statsFromRem(d, startMs, endMs, cardCapMs, ignorePreReset) : null;
         let aggr = self ? self.self : emptyStats();
         let aggrIncTagged = d && d.isInc ? 1 : 0;
         let aggrDismTagged = d && d.isDism ? 1 : 0;
@@ -723,7 +747,7 @@ function aggregateDocumentData(
     };
 
     for (const rd of remDataList) {
-        const { hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
+        const { hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs, ignorePreReset);
         if (rd.isInc) {
             summary.incTaggedCount += 1;
             if (hasIncReps) summary.incTaggedWithRepsCount += 1;
@@ -757,7 +781,7 @@ function aggregateDocumentData(
         for (const card of rd.cards) {
             summary.cardsCount += 1;
             let cardHasReps = false;
-            for (const rep of card.history || []) {
+            for (const rep of effectiveCardHistory(card.history, ignorePreReset)) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
                 if (!isRealCardScore(rep.score)) continue;
@@ -966,6 +990,7 @@ function aggregateGlobalData(
     startMs: number,
     endMs: number,
     cardCapMs: number,
+    ignorePreReset: boolean,
     onProgress: (p: number, label: string) => void
 ): {
     topLevels: DashboardData['topLevels'];
@@ -1027,7 +1052,7 @@ function aggregateGlobalData(
         const rd = remEntries[i];
         const chain = parentChainCache.get(rd.id) || [rd.id];
         const topId = chain[chain.length - 1] || rd.id;
-        const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
+        const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs, ignorePreReset);
         const top = ensureTop(topId);
         top.aggr = addStats(top.aggr, self);
         if (rd.isInc) {
@@ -1072,7 +1097,7 @@ function aggregateGlobalData(
         summary.cardsCount += rd.cards.length;
         for (const card of rd.cards) {
             let cardHasReps = false;
-            for (const rep of card.history || []) {
+            for (const rep of effectiveCardHistory(card.history, ignorePreReset)) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
                 if (!isRealCardScore(rep.score)) continue;
@@ -1136,7 +1161,7 @@ function aggregateGlobalData(
             const data = remDataById.get(id) || null;
             const rawChildrenIds = Array.from(childMap.get(id) || []);
 
-            const self = data ? statsFromRem(data, startMs, endMs, cardCapMs) : null;
+            const self = data ? statsFromRem(data, startMs, endMs, cardCapMs, ignorePreReset) : null;
             let aggr = self ? self.self : emptyStats();
             let aggrIncTagged = data && data.isInc ? 1 : 0;
             let aggrDismTagged = data && data.isDism ? 1 : 0;
@@ -1796,6 +1821,12 @@ function StudyDashboardPopup() {
     // Default to Global: it's the most common entry point and avoids surprising
     // the user by silently scoping to whatever rem they happened to have focused.
     // The user can switch to Document at any time (still allowed only when ctxRemId is present).
+    // Mirror of the same toggle in the Card Priority × Memory Analytics widget.
+    // Default OFF → use full history (matches existing behavior). When ON, drop
+    // every rep up to and including the last RESET on each card — useful after
+    // importing documents whose foreign repetition history would otherwise
+    // skew retention, time, and CPM.
+    const [ignorePreReset, setIgnorePreReset] = useState<boolean>(false);
     const [contextMode, setContextMode] = useState<ContextMode>('global');
     const [scope, setScope] = useState<ScopeMode>('comprehensive');
     const [period, setPeriod] = useState<Period>('thisYear');
@@ -1887,6 +1918,7 @@ function StudyDashboardPopup() {
                     startMs,
                     endMs,
                     cardCapMs,
+                    ignorePreReset,
                     (p, label) => {
                         if (runId !== runIdRef.current) return;
                         setProgress({ running: true, percent: 0.8 + 0.2 * p, label });
@@ -1911,6 +1943,7 @@ function StudyDashboardPopup() {
                     startMs,
                     endMs,
                     cardCapMs,
+                    ignorePreReset,
                     (p, label) => {
                         if (runId !== runIdRef.current) return;
                         setProgress({ running: true, percent: 0.8 + 0.2 * p, label });
@@ -1928,7 +1961,7 @@ function StudyDashboardPopup() {
                 setProgress({ running: false, percent: 1, label: '' });
             }
         }
-    }, [plugin, contextMode, ctxRemId, scope, startMs, endMs, cardCapMs]);
+    }, [plugin, contextMode, ctxRemId, scope, startMs, endMs, cardCapMs, ignorePreReset]);
 
     useEffect(() => {
         if (cardCapMs == null) return;
@@ -2151,6 +2184,29 @@ function StudyDashboardPopup() {
                                 }}
                             />
                         </div>
+                    </div>
+
+                    {/* Filter row — toggle for ignoring pre-RESET history. */}
+                    <div
+                        className="mt-3 pt-3 flex items-center gap-2 text-xs"
+                        style={{ borderTop: '1px solid var(--rn-clr-background-secondary)' }}
+                    >
+                        <label
+                            className="flex items-center gap-2 cursor-pointer"
+                            title="Useful after importing documents with foreign repetition history: only count card reps after the last RESET on each card."
+                        >
+                            <input
+                                type="checkbox"
+                                checked={ignorePreReset}
+                                onChange={(e) => setIgnorePreReset(e.target.checked)}
+                                className="form-checkbox h-3.5 w-3.5"
+                                style={{ accentColor: ACCENT_COLOR }}
+                            />
+                            <span className="opacity-80">Ignore card reps before last RESET</span>
+                        </label>
+                        <span className="opacity-50" style={{ fontSize: '10px' }}>
+                            (recomputes stats; does not modify stored history)
+                        </span>
                     </div>
                 </div>
 
