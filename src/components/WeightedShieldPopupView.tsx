@@ -1,6 +1,7 @@
 import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import { WeightedShieldBreakdown } from '../lib/utils';
+import { CardMemoryAnalyticsView } from './CardMemoryAnalyticsView';
 
 interface WeightedShieldGroup {
   title: string;
@@ -353,10 +354,13 @@ function BreakdownSection({
   );
 }
 
+type TabId = 'shield' | 'cardMemory';
+
 export function WeightedShieldPopup() {
   const plugin = usePlugin();
 
   const [ctx, setCtx] = React.useState<WeightedShieldPopupContext | null>(null);
+  const [tab, setTab] = React.useState<TabId>('shield');
 
   React.useEffect(() => {
     plugin.widget.getWidgetContext<any>().then((c) => setCtx(c?.contextData as WeightedShieldPopupContext));
@@ -376,6 +380,23 @@ export function WeightedShieldPopup() {
     ? 'each prioritized item'
     : itemLabel.toLowerCase() === 'cards' ? 'rem with cards' : 'incremental rem';
 
+  // The Card Priority × Memory Analytics tab is only meaningful in the wide
+  // popup (where both Incremental Rems and Cards groups are present). The
+  // narrow popup is shown when only one group exists — no tabs there.
+  const showTabs = hasGroups && ctx.groups!.length >= 2;
+
+  const tabBtnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '8px 14px',
+    fontSize: '12px',
+    fontWeight: active ? 700 : 500,
+    color: active ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-secondary)',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
+    cursor: 'pointer',
+    marginBottom: '-1px',
+  });
+
   return (
     <div style={{
       padding: '16px',
@@ -387,35 +408,60 @@ export function WeightedShieldPopup() {
       overflowY: 'auto',
       boxSizing: 'border-box',
     }}>
-      {/* Title */}
-      <div style={{
-        fontSize: '15px',
-        fontWeight: 700,
-        marginBottom: '6px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}>
-        <span>⚖️ Weighted Shield Breakdown</span>
-      </div>
+      {showTabs && (
+        <div
+          role="tablist"
+          style={{
+            display: 'flex',
+            gap: '4px',
+            marginBottom: '10px',
+            borderBottom: '1px solid var(--rn-clr-background-tertiary)',
+          }}
+        >
+          <button type="button" role="tab" aria-selected={tab === 'shield'} style={tabBtnStyle(tab === 'shield')} onClick={() => setTab('shield')}>
+            ⚖️ Weighted Shield Breakdown
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'cardMemory'} style={tabBtnStyle(tab === 'cardMemory')} onClick={() => setTab('cardMemory')}>
+            🃏 Card Priority × Memory Analytics
+          </button>
+        </div>
+      )}
 
-      {/* Explanation */}
-      <div style={{
-        fontSize: '11px',
-        color: 'var(--rn-clr-content-tertiary)',
-        marginBottom: '14px',
-        lineHeight: '1.5',
-        borderBottom: '1px solid var(--rn-clr-background-tertiary)',
-        paddingBottom: '10px',
-      }}>
-        Each {blurbSubject} is
-        weighted by priority percentile: top-priority items (0%) carry ~10× the weight of
-        bottom-priority items (100%), using W = e^(−2.3026 × p/100).
-        The shield shows what fraction of total priority weight has been processed.
-        Higher = better. Items in the current queue card count as "being processed".
-      </div>
+      {showTabs && tab === 'cardMemory' ? (
+        <CardMemoryAnalyticsView />
+      ) : (
+        <>
+          {/* Title (only when tabs aren't there to label the view) */}
+          {!showTabs && (
+            <div style={{
+              fontSize: '15px',
+              fontWeight: 700,
+              marginBottom: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}>
+              <span>⚖️ Weighted Shield Breakdown</span>
+            </div>
+          )}
 
-      {hasGroups ? (
+          {/* Explanation */}
+          <div style={{
+            fontSize: '11px',
+            color: 'var(--rn-clr-content-tertiary)',
+            marginBottom: '14px',
+            lineHeight: '1.5',
+            borderBottom: '1px solid var(--rn-clr-background-tertiary)',
+            paddingBottom: '10px',
+          }}>
+            Each {blurbSubject} is
+            weighted by priority percentile: top-priority items (0%) carry ~10× the weight of
+            bottom-priority items (100%), using W = e^(−2.3026 × p/100).
+            The shield shows what fraction of total priority weight has been processed.
+            Higher = better. Items in the current queue card count as "being processed".
+          </div>
+
+          {hasGroups ? (
         (() => {
           const groups = ctx.groups!;
           // Two groups (both IncRems and Cards) lay out side by side — the
@@ -503,10 +549,12 @@ export function WeightedShieldPopup() {
             </div>
           )}
         </>
-      ) : (
-        <div style={{ padding: '12px', color: 'var(--rn-clr-content-tertiary)', textAlign: 'center' }}>
-          No prioritized items found.
-        </div>
+          ) : (
+            <div style={{ padding: '12px', color: 'var(--rn-clr-content-tertiary)', textAlign: 'center' }}>
+              No prioritized items found.
+            </div>
+          )}
+        </>
       )}
     </div>
   );
