@@ -356,10 +356,16 @@ function AnalyticsTable({ breakdown }: { breakdown: CardAnalyticsBreakdown }) {
 
 function StatusBar({
   breakdown,
+  ignorePreReset,
+  onToggleIgnorePreReset,
   onRecompute,
+  disabled,
 }: {
   breakdown: CardAnalyticsBreakdown;
+  ignorePreReset: boolean;
+  onToggleIgnorePreReset: (next: boolean) => void;
   onRecompute: () => void;
+  disabled: boolean;
 }) {
   // Live-updating "X minutes ago" — re-render every 30s.
   const [, setTick] = React.useState(0);
@@ -394,22 +400,46 @@ function StatusBar({
           </span>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onRecompute}
-        style={{
-          padding: '4px 10px',
-          fontSize: '11px',
-          fontWeight: 600,
-          borderRadius: '4px',
-          border: '1px solid var(--rn-clr-background-tertiary)',
-          background: 'var(--rn-clr-background-primary)',
-          color: 'var(--rn-clr-content-primary)',
-          cursor: 'pointer',
-        }}
-      >
-        ↻ Recompute
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            cursor: disabled ? 'wait' : 'pointer',
+            opacity: disabled ? 0.6 : 1,
+            color: 'var(--rn-clr-content-secondary)',
+          }}
+          title="Useful after importing documents with foreign repetition history: only count reps after the last RESET on each card."
+        >
+          <input
+            type="checkbox"
+            checked={ignorePreReset}
+            disabled={disabled}
+            onChange={(e) => onToggleIgnorePreReset(e.target.checked)}
+            style={{ cursor: disabled ? 'wait' : 'pointer' }}
+          />
+          Ignore reps before last RESET
+        </label>
+        <button
+          type="button"
+          onClick={onRecompute}
+          disabled={disabled}
+          style={{
+            padding: '4px 10px',
+            fontSize: '11px',
+            fontWeight: 600,
+            borderRadius: '4px',
+            border: '1px solid var(--rn-clr-background-tertiary)',
+            background: 'var(--rn-clr-background-primary)',
+            color: 'var(--rn-clr-content-primary)',
+            cursor: disabled ? 'wait' : 'pointer',
+            opacity: disabled ? 0.6 : 1,
+          }}
+        >
+          ↻ Recompute
+        </button>
+      </div>
     </div>
   );
 }
@@ -448,43 +478,6 @@ function ProgressDisplay({ progress }: { progress: ProgressInfo }) {
   );
 }
 
-function ComputePrompt({ onCompute }: { onCompute: () => void }) {
-  return (
-    <div style={{ padding: '24px', textAlign: 'center' }}>
-      <div
-        style={{
-          fontSize: '13px',
-          color: 'var(--rn-clr-content-secondary)',
-          marginBottom: '12px',
-          lineHeight: 1.5,
-        }}
-      >
-        This view replays FSRS over every card in your knowledge base to derive
-        per-bucket retention, retrievability, difficulty, and cost.
-        <br />
-        For large knowledge bases this may take several seconds — the result is
-        cached for the session.
-      </div>
-      <button
-        type="button"
-        onClick={onCompute}
-        style={{
-          padding: '8px 18px',
-          fontSize: '12px',
-          fontWeight: 600,
-          borderRadius: '6px',
-          border: '1px solid var(--rn-clr-background-tertiary)',
-          background: '#3b82f6',
-          color: 'white',
-          cursor: 'pointer',
-        }}
-      >
-        Compute analytics
-      </button>
-    </div>
-  );
-}
-
 // --- Main view -------------------------------------------------------------
 
 export function CardMemoryAnalyticsView() {
@@ -494,23 +487,12 @@ export function CardMemoryAnalyticsView() {
   const [cache, setCache] = React.useState<CardAnalyticsBreakdown | null>(null);
   const [progress, setProgress] = React.useState<ProgressInfo>({ done: 0, total: 0 });
   const [error, setError] = React.useState<string | null>(null);
+  // Toggle the user controls in the status bar. Default OFF → keep full
+  // history (matches Study Dashboard / Practiced Queues). Flipping triggers
+  // an immediate recompute so the table reflects the chosen mode.
+  const [ignorePreReset, setIgnorePreReset] = React.useState<boolean>(false);
 
-  // Load cached breakdown (session-persisted) on first mount.
-  React.useEffect(() => {
-    plugin.storage
-      .getSession<CardAnalyticsBreakdown | null>(cardAnalyticsCacheKey)
-      .then((c) => {
-        if (c && c.buckets && c.buckets.length === 10) {
-          setCache(c);
-          setState('ready');
-        }
-      })
-      .catch(() => {
-        // Cache miss / parse error is fine — user will just compute manually.
-      });
-  }, []);
-
-  const compute = React.useCallback(async () => {
+  const compute = React.useCallback(async (flag: boolean) => {
     setError(null);
     setState('computing');
     setProgress({ done: 0, total: 0 });
@@ -529,6 +511,7 @@ export function CardMemoryAnalyticsView() {
         infos ?? [],
         weights,
         cardCapMs,
+        flag,
         (done, total) => setProgress({ done, total }),
       );
       await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
@@ -540,6 +523,36 @@ export function CardMemoryAnalyticsView() {
       setState('idle');
     }
   }, [plugin]);
+
+  // Mount: prefer the session cache; fall back to auto-computing with the
+  // default toggle value. The cache stores its own `ignorePreReset` so we sync
+  // the toggle to whatever the cached data was computed with.
+  React.useEffect(() => {
+    let cancelled = false;
+    plugin.storage
+      .getSession<CardAnalyticsBreakdown | null>(cardAnalyticsCacheKey)
+      .then((c) => {
+        if (cancelled) return;
+        if (c && c.buckets && c.buckets.length === 10) {
+          setCache(c);
+          setIgnorePreReset(c.ignorePreReset ?? false);
+          setState('ready');
+        } else {
+          compute(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) compute(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [plugin, compute]);
+
+  const handleToggleIgnorePreReset = (next: boolean) => {
+    setIgnorePreReset(next);
+    compute(next);
+  };
 
   return (
     <div style={{ paddingTop: '4px' }}>
@@ -559,11 +572,16 @@ export function CardMemoryAnalyticsView() {
         </div>
       )}
 
-      {state === 'idle' && !cache && <ComputePrompt onCompute={compute} />}
       {state === 'computing' && <ProgressDisplay progress={progress} />}
       {state === 'ready' && cache && (
         <>
-          <StatusBar breakdown={cache} onRecompute={compute} />
+          <StatusBar
+            breakdown={cache}
+            ignorePreReset={ignorePreReset}
+            onToggleIgnorePreReset={handleToggleIgnorePreReset}
+            onRecompute={() => compute(ignorePreReset)}
+            disabled={state !== 'ready'}
+          />
           <AnalyticsTable breakdown={cache} />
           <div
             style={{

@@ -54,6 +54,11 @@ export interface CardAnalyticsBreakdown {
   computedAt: number;
   /** Cards seen from card.getAll() whose rem was missing from the priority cache (skipped). */
   cardsSkippedNoPriority: number;
+  /**
+   * Whether pre-RESET history was excluded. Persisted in the cache so the view
+   * can sync the toggle to the data it's showing and recompute on mismatch.
+   */
+  ignorePreReset: boolean;
 }
 
 interface AccData {
@@ -153,13 +158,21 @@ function computeCardStats(
   weights: number[] | null,
   now: number,
   cardCapMs: number,
+  ignorePreReset: boolean,
 ): PerCardStats {
   const history = card.repetitionHistory ?? [];
   const sorted = [...history].sort((a: any, b: any) => a.date - b.date);
 
-  // Match study_dashboard / practiced_queues: iterate the FULL history (no
-  // post-RESET slicing), count only gradeable scores, and cap each rep's
-  // responseTime at the user setting so a single long pause doesn't dominate.
+  // Default iteration set is the FULL history (matches study_dashboard /
+  // practiced_queues). When the user opts in via the "ignore pre-RESET" toggle
+  // — useful after imports that bring foreign repetition histories — we slice
+  // off everything up to and including the last RESET.
+  let iter: any[] = sorted;
+  if (ignorePreReset) {
+    const lastResetIdx = sorted.map((h: any) => h.score).lastIndexOf(QueueInteractionScore.RESET);
+    if (lastResetIdx !== -1) iter = sorted.slice(lastResetIdx + 1);
+  }
+
   let gradeableReps = 0;
   let totalTimeMs = 0;
   let agains = 0;
@@ -167,7 +180,7 @@ function computeCardStats(
   let gradeCount = 0;
   let firstGradeableDate: number | null = null;
 
-  for (const h of sorted as any[]) {
+  for (const h of iter) {
     if (!isGradeable(h.score)) continue;
     gradeableReps++;
     const t = Math.min(Math.max(0, h.responseTime || 0), cardCapMs);
@@ -361,6 +374,7 @@ export async function computeCardAnalyticsBreakdown(
   cardPriorityInfos: CardPriorityInfo[],
   weights: number[] | null,
   cardCapMs: number,
+  ignorePreReset: boolean,
   onProgress?: (done: number, total: number) => void,
 ): Promise<CardAnalyticsBreakdown> {
   // Map remId → inherited rem priority. Filter out rems with explicit zero cards.
@@ -400,7 +414,7 @@ export async function computeCardAnalyticsBreakdown(
     const percentile = ((i + 1) / N) * 100;
     const bIdx = Math.min(Math.floor(percentile / 10), 9);
 
-    const stats = computeCardStats(card, weights, now, cardCapMs);
+    const stats = computeCardStats(card, weights, now, cardCapMs, ignorePreReset);
     accumulate(bucketAccs[bIdx], stats, priority);
     accumulate(overallAcc, stats, priority);
 
@@ -419,5 +433,6 @@ export async function computeCardAnalyticsBreakdown(
     totalCards: N,
     computedAt: Date.now(),
     cardsSkippedNoPriority,
+    ignorePreReset,
   };
 }
