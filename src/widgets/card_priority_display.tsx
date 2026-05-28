@@ -19,7 +19,12 @@ import {
   displayFsrsDsrId,
   fsrsWeightsId,
 } from '../lib/consts';
-import { CardPriorityInfo, QueueSessionCache, getCardPriority } from '../lib/card_priority';
+import {
+  CardPriorityInfo,
+  QueueSessionCache,
+  expandCardInfosToCards,
+  getCardPriority,
+} from '../lib/card_priority';
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
@@ -390,28 +395,39 @@ export function CardPriorityDisplay() {
     return computeShieldStatus(rem._id, sessionCache, allPrioritizedCardInfo, seenCardIds, scopeRemIds);
   }, [rem, sessionCache, useLightMode, allPrioritizedCardInfo, seenCardIds, scopeRemIds]);
 
-  // --- Weighted Shield: computed dynamically so it stays fresh as seenCardIds changes ---
+  // --- Weighted Shield: per-CARD bucketing (matches Card Priority × Memory
+  // Analytics). Expand each CardPriorityInfo into one item per card and use
+  // the card's own nextRepetitionTime to decide due-ness, instead of "any
+  // card of this rem is due → the rem is due".
+  const seenCardSet = useMemo(() => new Set(seenCardIds), [seenCardIds]);
   const weightedIsDuePredicate = useCallback(
-    (info: CardPriorityInfo) => info.dueCards > 0 && (!seenCardIds.includes(info.remId) || info.remId === rem?._id),
-    [seenCardIds, rem?._id]
+    (item: { remId: string; nextRepetitionTime?: number | null }) => {
+      const due = (item.nextRepetitionTime ?? Infinity) <= Date.now();
+      // Same "current rem still counts as due" override as before so the
+      // value doesn't tick up the moment you grade the card you're seeing.
+      return due && (!seenCardSet.has(item.remId) || item.remId === rem?._id);
+    },
+    [seenCardSet, rem?._id]
   );
 
   const weightedShieldStatus = useMemo(() => {
     if (!displayWeightedShield || useLightMode || !rem || !allPrioritizedCardInfo || allPrioritizedCardInfo.length === 0) return null;
 
-    const kbWeighted = calculateWeightedShield(allPrioritizedCardInfo, weightedIsDuePredicate);
+    const allCardItems = expandCardInfosToCards(allPrioritizedCardInfo);
+    const kbWeighted = calculateWeightedShield(allCardItems, weightedIsDuePredicate);
 
     let docWeighted: number | null = null;
-    let docItems: CardPriorityInfo[] | null = null;
+    let docItems: ReturnType<typeof expandCardInfosToCards> | null = null;
     if (scopeRemIds) {
       const scopeSet = new Set(scopeRemIds);
-      docItems = allPrioritizedCardInfo.filter(c => scopeSet.has(c.remId));
-      if (docItems.length > 0) {
-        docWeighted = calculateWeightedShield(docItems, weightedIsDuePredicate);
-      }
+      docItems = expandCardInfosToCards(
+        allPrioritizedCardInfo.filter((c) => scopeSet.has(c.remId))
+      );
+      if (docItems.length === 0) docItems = null;
+      else docWeighted = calculateWeightedShield(docItems, weightedIsDuePredicate);
     }
 
-    return { kb: kbWeighted, doc: docWeighted, docItems };
+    return { kb: kbWeighted, doc: docWeighted, allItems: allCardItems, docItems };
   }, [displayWeightedShield, useLightMode, rem, allPrioritizedCardInfo, weightedIsDuePredicate, scopeRemIds]);
 
 
@@ -612,7 +628,7 @@ export function CardPriorityDisplay() {
             <WeightedShieldTooltip
               kbValue={weightedShieldStatus.kb}
               docValue={weightedShieldStatus.doc}
-              allItems={allPrioritizedCardInfo}
+              allItems={weightedShieldStatus.allItems}
               isDuePredicate={weightedIsDuePredicate}
               docItems={weightedShieldStatus.docItems}
               itemLabel="Cards"

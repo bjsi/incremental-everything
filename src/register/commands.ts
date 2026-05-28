@@ -29,7 +29,7 @@ import {
   priorityCalcScopeRemIdsKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown } from '../lib/utils';
-import { CardPriorityInfo } from '../lib/card_priority/types';
+import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { initIncrementalRem } from './powerups';
@@ -1527,8 +1527,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       const seenRemSet = new Set(seenRemIds);
       const seenCardSet = new Set(seenCardIds);
-      const cardDuePredicate = (info: CardPriorityInfo) =>
-        info.dueCards > 0 && !seenCardSet.has(info.remId);
       const incRemDuePredicate = (r: IncrementalRemType) =>
         Date.now() >= r.nextRepDate && !seenRemSet.has(r.remId);
 
@@ -1558,12 +1556,25 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       if (allCardInfos.length > 0) {
-        const docItems = scope ? allCardInfos.filter((c) => scope.has(c.remId)) : [];
+        // Per-CARD bucketing: expand each CardPriorityInfo into one item per
+        // card so the deciles, due counts and the headline shield value are
+        // computed over cards (matching the Card Priority × Memory Analytics
+        // tab) instead of over rems-with-cards.
+        const nowMs = Date.now();
+        const perCardDuePredicate = (item: { remId: string; nextRepetitionTime?: number | null }) =>
+          (item.nextRepetitionTime ?? Infinity) <= nowMs && !seenCardSet.has(item.remId);
+
+        const allCardItems = expandCardInfosToCards(allCardInfos);
+        const docCardItems = scope
+          ? expandCardInfosToCards(allCardInfos.filter((c) => scope.has(c.remId)))
+          : [];
         groups.push({
           title: 'Cards',
           itemLabel: 'Cards',
-          kb: computeWeightedShieldBreakdown(allCardInfos, cardDuePredicate),
-          doc: docItems.length > 0 ? computeWeightedShieldBreakdown(docItems, cardDuePredicate) : null,
+          kb: computeWeightedShieldBreakdown(allCardItems, perCardDuePredicate),
+          doc: docCardItems.length > 0
+            ? computeWeightedShieldBreakdown(docCardItems, perCardDuePredicate)
+            : null,
         });
       }
 

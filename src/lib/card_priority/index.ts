@@ -72,6 +72,9 @@ export async function getCardPriority(
   // and the due-card-priority cache — without any explicit disabled-card filter.
   const dueCards = cards.filter((card) => (card.nextRepetitionTime ?? Infinity) <= now).length;
   const dueCardsOverdue = cards.filter((card) => (card.nextRepetitionTime ?? Infinity) <= startOfToday).length;
+  // Per-card nextRep, captured here so the Weighted Shield of Cards can be
+  // bucketed per-card later without re-fetching every card.
+  const cardsNextRep: (number | null)[] = cards.map((c) => c.nextRepetitionTime ?? null);
 
   if (priorityValue) {
     const parsedPriority = parseInt(priorityValue);
@@ -85,6 +88,7 @@ export async function getCardPriority(
       cardCount: cards.length,
       dueCards,
       dueCardsOverdue,
+      cardsNextRep,
     };
   } else {
     const ancestorPriority = await findClosestAncestorWithPriority(plugin, rem);
@@ -98,6 +102,7 @@ export async function getCardPriority(
         cardCount: cards.length,
         dueCards,
         dueCardsOverdue,
+        cardsNextRep,
       };
     }
 
@@ -110,6 +115,7 @@ export async function getCardPriority(
       cardCount: cards.length,
       dueCards,
       dueCardsOverdue,
+      cardsNextRep,
     };
   }
 }

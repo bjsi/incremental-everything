@@ -24,6 +24,7 @@ import {
   CardPriorityInfo,
   QueueSessionCache,
   autoAssignCardPriority,
+  expandCardInfosToCards,
   getCardPriority,
   setCardPriority,
   PrioritySource,
@@ -418,23 +419,28 @@ export function registerQueueEnterListener(
       const seenCardIds_ws = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
       const storedScopeIds = (await plugin.storage.getSession<RemId[]>(priorityCalcScopeRemIdsKey)) || [];
 
-      // Card KB weighted shield
+      // Card KB weighted shield — per-CARD bucketing (not per-rem-with-cards).
+      // Expand each CardPriorityInfo into one item per card so the percentile
+      // ranks are over the actual card population, matching the Card Priority
+      // × Memory Analytics tab.
+      const seenCardIdsSet = new Set(seenCardIds_ws);
+      const nowMs_ws = Date.now();
+      const perCardDue = (item: { remId: string; nextRepetitionTime?: number | null }) =>
+        (item.nextRepetitionTime ?? Infinity) <= nowMs_ws && !seenCardIdsSet.has(item.remId);
+
       if (allCardInfos.length > 0) {
-        sessionCache.weightedShieldCardKB = calculateWeightedShield(
-          allCardInfos,
-          (info) => info.dueCards > 0 && !seenCardIds_ws.includes(info.remId)
-        );
+        const allCardItems = expandCardInfosToCards(allCardInfos);
+        sessionCache.weightedShieldCardKB = calculateWeightedShield(allCardItems, perCardDue);
       }
 
       // Card Doc weighted shield
       if (dueCardsInScope.length > 0 && storedScopeIds.length > 0) {
         const scopeSet = new Set(storedScopeIds);
-        const docCardItems = allCardInfos.filter(info => scopeSet.has(info.remId));
+        const docCardItems = expandCardInfosToCards(
+          allCardInfos.filter((info) => scopeSet.has(info.remId))
+        );
         if (docCardItems.length > 0) {
-          sessionCache.weightedShieldCardDoc = calculateWeightedShield(
-            docCardItems,
-            (info) => info.dueCards > 0 && !seenCardIds_ws.includes(info.remId)
-          );
+          sessionCache.weightedShieldCardDoc = calculateWeightedShield(docCardItems, perCardDue);
         }
       }
 

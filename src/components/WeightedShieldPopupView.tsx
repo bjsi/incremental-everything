@@ -255,7 +255,7 @@ function BreakdownSection({
       }}>
         <div>
           <span style={{ fontWeight: 600 }}>Total: </span>
-          {breakdown.totalItems.toLocaleString()} {itemLabel.toLowerCase() === 'cards' ? 'Rems with Cards' : 'Incremental Rems'}
+          {breakdown.totalItems.toLocaleString()} {itemLabel.toLowerCase() === 'cards' ? 'Cards' : 'Incremental Rems'}
         </div>
         <div>
           <span style={{ fontWeight: 600, color: breakdown.dueItems > 0 ? '#ef4444' : 'inherit' }}>Due: </span>
@@ -378,7 +378,7 @@ export function WeightedShieldPopup() {
   const itemLabel = ctx.itemLabel || 'items';
   const blurbSubject = hasGroups
     ? 'each prioritized item'
-    : itemLabel.toLowerCase() === 'cards' ? 'rem with cards' : 'incremental rem';
+    : itemLabel.toLowerCase() === 'cards' ? 'card' : 'incremental rem';
 
   // The Card Priority × Memory Analytics tab is only meaningful in the wide
   // popup (where both Incremental Rems and Cards groups are present). The
