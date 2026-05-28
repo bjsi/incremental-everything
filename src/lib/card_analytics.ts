@@ -75,6 +75,14 @@ export interface CardAnalyticsBreakdown {
   periodEndMs: number;
   periodCustomStart: string;
   periodCustomEnd: string;
+  /**
+   * Pre-finalized stats per absolute-priority threshold T (index 0..100).
+   * `byPriorityPrefix[T]` aggregates every card whose owning Rem's priority
+   * is ≤ T — i.e. the subset "Priority ≤ T". The view's threshold slider
+   * reads this directly, so dragging the slider is just an array lookup.
+   * `byPriorityPrefix[100]` equals `overall` (modulo label / priorityRange).
+   */
+  byPriorityPrefix: CardBucketStats[];
 }
 
 interface AccData {
@@ -122,6 +130,37 @@ interface PerCardStats {
   d: number | null;
   s: number | null;
   rToday: number | null;
+}
+
+/**
+ * Element-wise sum of two AccData. Used to build the by-priority prefix-sum
+ * table — adding each priority bucket to the running total. minPriority /
+ * maxPriority are merged by min/max; everything else is additive.
+ */
+function mergeAcc(a: AccData, b: AccData): AccData {
+  return {
+    count: a.count + b.count,
+    minPriority: Math.min(a.minPriority, b.minPriority),
+    maxPriority: Math.max(a.maxPriority, b.maxPriority),
+    due: a.due + b.due,
+    newCount: a.newCount + b.newCount,
+    staleCount: a.staleCount + b.staleCount,
+    totGradeableReps: a.totGradeableReps + b.totGradeableReps,
+    totTimeMs: a.totTimeMs + b.totTimeMs,
+    totAgains: a.totAgains + b.totAgains,
+    totLapses: a.totLapses + b.totLapses,
+    nonNewCards: a.nonNewCards + b.nonNewCards,
+    sumCost: a.sumCost + b.sumCost,
+    cardsWithCost: a.cardsWithCost + b.cardsWithCost,
+    sumPredR: a.sumPredR + b.sumPredR,
+    predRCount: a.predRCount + b.predRCount,
+    sumGrade: a.sumGrade + b.sumGrade,
+    gradeCount: a.gradeCount + b.gradeCount,
+    sumD: a.sumD + b.sumD,
+    sumS: a.sumS + b.sumS,
+    sumRtoday: a.sumRtoday + b.sumRtoday,
+    fsrsCount: a.fsrsCount + b.fsrsCount,
+  };
 }
 
 function makeAcc(): AccData {
@@ -498,6 +537,10 @@ export async function computeCardAnalyticsBreakdown(
   const N = validCards.length;
   const bucketAccs: AccData[] = Array.from({ length: 10 }, makeAcc);
   const overallAcc = makeAcc();
+  // Per-absolute-priority accumulators (priority 0..100, inclusive). Used to
+  // produce a prefix-sum table so the threshold slider in the view becomes a
+  // pure array lookup instead of re-aggregating on every drag.
+  const byPriorityAccs: AccData[] = Array.from({ length: 101 }, makeAcc);
   const now = Date.now();
 
   const YIELD_EVERY = 1500;
@@ -510,10 +553,13 @@ export async function computeCardAnalyticsBreakdown(
     // 1-based index percentile so the last card lands at 100% → bucket index 9.
     const percentile = ((i + 1) / N) * 100;
     const bIdx = Math.min(Math.floor(percentile / 10), 9);
+    // Clamp priority into [0, 100] for the by-priority bucket index.
+    const pIdx = Math.max(0, Math.min(100, Math.round(priority)));
 
     const stats = computeCardStats(card, weights, now, cardCapMs, ignorePreReset, startMs, endMs);
     accumulate(bucketAccs[bIdx], stats, priority);
     accumulate(overallAcc, stats, priority);
+    accumulate(byPriorityAccs[pIdx], stats, priority);
 
     if ((i + 1) % YIELD_EVERY === 0) {
       if (onProgress) onProgress(i + 1, N);
@@ -523,6 +569,21 @@ export async function computeCardAnalyticsBreakdown(
   }
 
   if (onProgress) onProgress(N, N);
+
+  // Build prefix-sum accumulators: prefixAccs[T] aggregates every card with
+  // priority ≤ T. Each entry is then finalized for direct rendering. Sliding
+  // becomes an O(1) lookup at the view layer.
+  const prefixAccs: AccData[] = new Array(101);
+  let running = makeAcc();
+  for (let t = 0; t <= 100; t++) {
+    running = mergeAcc(running, byPriorityAccs[t]);
+    // Clone so the array entries don't share the same underlying object
+    // (otherwise every entry would point to the final accumulator).
+    prefixAccs[t] = { ...running };
+  }
+  const byPriorityPrefix: CardBucketStats[] = prefixAccs.map((acc, t) =>
+    finalize(acc, `Priority ≤ ${t}`),
+  );
 
   return {
     buckets: bucketAccs.map((acc, i) => finalize(acc, `${i * 10}-${(i + 1) * 10}%`)),
@@ -536,5 +597,6 @@ export async function computeCardAnalyticsBreakdown(
     periodEndMs: period.endMs,
     periodCustomStart: period.customStart,
     periodCustomEnd: period.customEnd,
+    byPriorityPrefix,
   };
 }

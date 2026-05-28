@@ -194,20 +194,34 @@ const groupHeaderStyle: React.CSSProperties = {
   cursor: 'help',
 };
 
-function BucketRow({ b, isOverall, idx }: { b: CardBucketStats; isOverall: boolean; idx: number }) {
-  const dim = !isOverall && b.cards === 0 ? 0.3 : 1;
-  const baseBg = isOverall
-    ? 'var(--rn-clr-background-tertiary)'
-    : idx % 2 === 0
-      ? 'transparent'
-      : 'var(--rn-clr-background-secondary)';
+function BucketRow({
+  b,
+  isOverall,
+  idx,
+  isSubset,
+}: {
+  b: CardBucketStats;
+  isOverall: boolean;
+  idx: number;
+  isSubset?: boolean;
+}) {
+  const dim = !isOverall && !isSubset && b.cards === 0 ? 0.3 : 1;
+  const baseBg = isSubset
+    // Subset (threshold-driven) row — distinct tint so it doesn't look like a bucket.
+    ? 'rgba(59, 130, 246, 0.08)'
+    : isOverall
+      ? 'var(--rn-clr-background-tertiary)'
+      : idx % 2 === 0
+        ? 'transparent'
+        : 'var(--rn-clr-background-secondary)';
 
   const trStyle: React.CSSProperties = {
     background: baseBg,
     opacity: dim,
-    borderTop: isOverall ? '2px solid var(--rn-clr-background-tertiary)' : 'none',
+    borderTop:
+      isOverall || isSubset ? '2px solid var(--rn-clr-background-tertiary)' : 'none',
     borderBottom: '1px solid var(--rn-clr-background-tertiary)',
-    fontWeight: isOverall ? 700 : 400,
+    fontWeight: isOverall || isSubset ? 700 : 400,
   };
 
   // Done bar — like MiniBar in the other tab, but more compact.
@@ -242,7 +256,7 @@ function BucketRow({ b, isOverall, idx }: { b: CardBucketStats; isOverall: boole
   return (
     <tr style={trStyle}>
       {/* Identity */}
-      <td style={{ ...cellStyle, textAlign: 'left', fontWeight: isOverall ? 700 : 500 }}>
+      <td style={{ ...cellStyle, textAlign: 'left', fontWeight: isOverall || isSubset ? 700 : 500 }}>
         {b.label}
       </td>
       <td style={{ ...cellStyle, textAlign: 'center', color: 'var(--rn-clr-content-tertiary)' }}>
@@ -307,6 +321,16 @@ function BucketRow({ b, isOverall, idx }: { b: CardBucketStats; isOverall: boole
 }
 
 function AnalyticsTable({ breakdown }: { breakdown: CardAnalyticsBreakdown }) {
+  // Threshold slider — drives the "Priority ≤ T" subset row at the bottom of
+  // the table. Lookup into the pre-finalized prefix table is O(1), so dragging
+  // is smooth without any recomputation.
+  const hasPrefix = Array.isArray(breakdown.byPriorityPrefix)
+    && breakdown.byPriorityPrefix.length === 101;
+  const [threshold, setThreshold] = React.useState<number>(100);
+  const subsetRow: CardBucketStats | null = hasPrefix
+    ? { ...breakdown.byPriorityPrefix[threshold], label: `Priority ≤ ${threshold}` }
+    : null;
+
   return (
     <div style={{ overflowX: 'auto', borderRadius: '6px', border: '1px solid var(--rn-clr-background-tertiary)' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1100px' }}>
@@ -418,6 +442,92 @@ function AnalyticsTable({ breakdown }: { breakdown: CardAnalyticsBreakdown }) {
             <BucketRow key={i} b={b} isOverall={false} idx={i} />
           ))}
           <BucketRow b={breakdown.overall} isOverall={true} idx={-1} />
+          {hasPrefix && subsetRow && (
+            <>
+              <tr style={{ background: 'var(--rn-clr-background-secondary)' }}>
+                <td colSpan={20} style={{ padding: '8px 10px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontSize: '11px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        color: 'var(--rn-clr-content-secondary)',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title="Recomputes the bottom row over every card whose owning Rem priority is ≤ this threshold. All current filters (period, ignore reps before last RESET) apply."
+                    >
+                      Threshold (Abs.Priority ≤)
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={threshold}
+                      onChange={(e) => setThreshold(parseInt(e.target.value, 10))}
+                      style={{ flex: 1, accentColor: '#3b82f6' }}
+                      aria-label="Absolute priority threshold"
+                    />
+                    <span
+                      style={{
+                        fontFamily: 'monospace',
+                        fontWeight: 700,
+                        minWidth: '44px',
+                        textAlign: 'right',
+                        color: 'var(--rn-clr-content-primary)',
+                      }}
+                    >
+                      {threshold}
+                    </span>
+                    {/* Relative percentile of the chosen threshold within the
+                        per-card universe — same metric as the WeightedShield
+                        popup's "Rel %ile". Reflects the share of cards whose
+                        owning Rem priority is ≤ T. */}
+                    {(() => {
+                      const total = breakdown.overall?.cards ?? 0;
+                      const relPctile = total > 0 ? (subsetRow.cards / total) * 100 : 0;
+                      return (
+                        <span
+                          title="Share of cards in the universe whose owning Rem priority is ≤ the threshold"
+                          style={{
+                            fontSize: '10.5px',
+                            color: 'var(--rn-clr-content-secondary)',
+                            whiteSpace: 'nowrap',
+                            paddingLeft: '6px',
+                            borderLeft: '1px solid var(--rn-clr-background-tertiary)',
+                          }}
+                        >
+                          <span
+                            style={{
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em',
+                              fontWeight: 700,
+                              color: 'var(--rn-clr-content-tertiary)',
+                              marginRight: '4px',
+                            }}
+                          >
+                            Rel %ile
+                          </span>
+                          <span style={{ fontWeight: 700, color: 'var(--rn-clr-content-primary)' }}>
+                            {relPctile.toFixed(1)}%
+                          </span>
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </td>
+              </tr>
+              <BucketRow b={subsetRow} isOverall={false} idx={-1} isSubset={true} />
+            </>
+          )}
         </tbody>
       </table>
     </div>
