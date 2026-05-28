@@ -215,9 +215,12 @@ export async function computeFSRSCalibrationBreakdown(
           const retained = h.score !== QueueInteractionScore.AGAIN ? 1 : 0;
 
           // ----- Grid A: predR × prior S -----
+          // Skip the ≤1mo stability bucket (index 0) entirely: short-term reps
+          // dominate volume and would distort the row/column totals, masking
+          // calibration behaviour on durable cards (the analysis target).
           const sColA = stabilityBucket(prevS);
           const rRowA = rBucket(predR);
-          if (sColA >= 0) {
+          if (sColA > 0) {
             const cell = accA[rRowA][sColA];
             cell.reps++;
             cell.retained += retained;

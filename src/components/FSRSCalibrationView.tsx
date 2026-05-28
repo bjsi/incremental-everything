@@ -456,10 +456,29 @@ export function FSRSCalibrationView() {
     }
   };
 
-  const rRowLabels = React.useMemo(
-    () => Array.from({ length: R_BUCKET_COUNT }, (_, i) => rBucketLabel(i)),
+  // Grid A renders rows in DESCENDING order of predicted retrievability
+  // (highest pR at top — easier to read against the column totals at the
+  // bottom). Build the index permutation once; we'll reuse it to reorder
+  // cells, row labels, and row totals together.
+  const rRowOrder = React.useMemo(
+    () => Array.from({ length: R_BUCKET_COUNT }, (_, i) => R_BUCKET_COUNT - 1 - i),
     [],
   );
+  const rRowLabelsDesc = React.useMemo(
+    () => rRowOrder.map((i) => rBucketLabel(i)),
+    [rRowOrder],
+  );
+
+  // Grid A excludes the ≤1mo stability column entirely (also filtered out of
+  // accumulation upstream, so totals here already reflect the exclusion).
+  const sColLabelsA = React.useMemo(() => S_BUCKET_LABELS.slice(1), []);
+  const gridAReordered = React.useMemo(() => {
+    if (!data) return null;
+    const cells = rRowOrder.map((i) => data.gridA[i].slice(1));
+    const rowTotals = rRowOrder.map((i) => data.gridARowTotals[i]);
+    const colTotals = data.gridAColTotals.slice(1);
+    return { cells, rowTotals, colTotals };
+  }, [data, rRowOrder]);
 
   return (
     <div style={{ paddingTop: '4px' }}>
@@ -505,9 +524,11 @@ export function FSRSCalibrationView() {
             blurb={
               <>
                 Every gradeable rep in the period (skipping the first rep of each post-RESET
-                lifetime) is placed into a cell by its FSRS-predicted retrievability at the
-                moment of the rep (rows, 5pp each) and the stability set by the previous
-                gradeable rep (columns). Each cell shows <em>n</em> reps, observed{' '}
+                lifetime <em>and</em> any rep whose prior stability is ≤ 1 month — short-term
+                learning reps would dominate the totals) is placed into a cell by its
+                FSRS-predicted retrievability at the moment of the rep (rows, 5pp each, shown
+                top-down high → low) and the stability set by the previous gradeable rep
+                (columns). Each cell shows <em>n</em> reps, observed{' '}
                 <strong>Retention</strong>, average <strong>pR</strong>, and{' '}
                 <strong>R-dev = Retention − pR</strong> in percentage points. Negative R-dev
                 (red) means FSRS over-predicted; positive (blue) means you recall better than
@@ -515,12 +536,12 @@ export function FSRSCalibrationView() {
               </>
             }
             rowHeader="Predicted R"
-            rowLabels={rRowLabels}
+            rowLabels={rRowLabelsDesc}
             colHeader="Prior stability"
-            colLabels={S_BUCKET_LABELS}
-            cells={data.gridA}
-            rowTotals={data.gridARowTotals}
-            colTotals={data.gridAColTotals}
+            colLabels={sColLabelsA}
+            cells={gridAReordered!.cells}
+            rowTotals={gridAReordered!.rowTotals}
+            colTotals={gridAReordered!.colTotals}
             overall={data.gridAOverall}
           />
 
