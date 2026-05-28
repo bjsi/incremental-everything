@@ -1,6 +1,6 @@
 import { Card, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../consts';
-import { CardPriorityInfo, PrioritySource } from './types';
+import { CardPriorityInfo, PrioritySource, calculateCardRemPercentilesFromCards } from './types';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
 
@@ -97,12 +97,13 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
       const updatedCache = Array.from(cacheMap.values());
 
       if (needsHeavyRecalc) {
-        const sortedCache = _.sortBy(updatedCache, (info) => info.priority);
-        const totalItems = sortedCache.length;
-        const enrichedCache = sortedCache.map((info, index) => {
-          const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-          return { ...info, kbPercentile: percentile };
-        });
+        // Per-card universe: kbPercentile is the rem's mean-rank percentile
+        // across the expanded card population (matches Weighted Shield).
+        const percentileByRem = calculateCardRemPercentilesFromCards(updatedCache);
+        const enrichedCache = updatedCache.map((info) => ({
+          ...info,
+          kbPercentile: percentileByRem[info.remId] ?? 0,
+        }));
         await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
       } else {
         await plugin.storage.setSession(allCardPriorityInfoKey, updatedCache);
@@ -298,15 +299,11 @@ export async function buildOptimizedCardPriorityCache(plugin: RNPlugin) {
 
   console.log(`[Card Priority Cache] Found ${cardPriorityInfos.length} raw entries. Calculating percentiles...`);
 
-  const sortedInfos = _.sortBy(cardPriorityInfos, (info) => info.priority);
-  const totalItems = sortedInfos.length;
-  const enrichedInfos = sortedInfos.map((info, index) => {
-    const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-    return {
-      ...info,
-      kbPercentile: percentile,
-    };
-  });
+  const percentileByRem = calculateCardRemPercentilesFromCards(cardPriorityInfos);
+  const enrichedInfos = cardPriorityInfos.map((info) => ({
+    ...info,
+    kbPercentile: percentileByRem[info.remId] ?? 0,
+  }));
 
   await plugin.storage.setSession(allCardPriorityInfoKey, enrichedInfos);
   const totalTime = Math.round((Date.now() - startTime) / 1000);
@@ -399,12 +396,11 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   }
 
   console.log(`[Card Priority Cache] Found ${taggedPriorities.length} tagged entries. Calculating percentiles...`);
-  const sortedInfos = _.sortBy(taggedPriorities, (info) => info.priority);
-  const totalItems = sortedInfos.length;
-  const enrichedTaggedPriorities = sortedInfos.map((info, index) => {
-    const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-    return { ...info, kbPercentile: percentile };
-  });
+  const percentileByRemPhase1 = calculateCardRemPercentilesFromCards(taggedPriorities);
+  const enrichedTaggedPriorities = taggedPriorities.map((info) => ({
+    ...info,
+    kbPercentile: percentileByRemPhase1[info.remId] ?? 0,
+  }));
 
   await plugin.storage.setSession(allCardPriorityInfoKey, enrichedTaggedPriorities);
 
@@ -487,12 +483,11 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
         const currentCache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
         const mergedCache = [...currentCache, ...newPriorities];
 
-        const sortedMergedCache = _.sortBy(mergedCache, (info) => info.priority);
-        const totalItems = sortedMergedCache.length;
-        const enrichedCache = sortedMergedCache.map((info, index) => {
-          const percentile = totalItems > 0 ? Math.round(((index + 1) / totalItems) * 100) : 0;
-          return { ...info, kbPercentile: percentile };
-        });
+        const percentileByRemDeferred = calculateCardRemPercentilesFromCards(mergedCache);
+        const enrichedCache = mergedCache.map((info) => ({
+          ...info,
+          kbPercentile: percentileByRemDeferred[info.remId] ?? 0,
+        }));
 
         await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
         await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());

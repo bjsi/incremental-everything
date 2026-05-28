@@ -49,6 +49,59 @@ export interface PerCardShieldItem {
  * synthetic items with the first `dueCards` of them stamped as due — preserves
  * the shield value approximately until the cache is rebuilt.
  */
+/**
+ * For a list of CardPriorityInfo (one entry per rem-with-cards), expand to a
+ * per-card universe and compute each rem's effective percentile as the MEAN
+ * percentile of its cards within that universe. Returns a `remId → percentile`
+ * map (percentile in [0, 100], rounded to 1 decimal).
+ *
+ * Why mean: cards of the same rem share a single priority value and therefore
+ * occupy adjacent indices in the sorted per-card list; their per-card
+ * percentiles span a small contiguous range. The mean is the natural single
+ * representative — it places the rem at the midpoint of its own card cluster
+ * and respects the fact that a rem with N cards has more presence in the card
+ * population than a rem with one card at the same priority.
+ *
+ * This unifies the percentile universe used by the Weighted Shield, the
+ * standard Priority Shield, the `kbPercentile` shown next to a rem's priority,
+ * and the Priority Review Document — all consume the same card-based ranking.
+ */
+export function calculateCardRemPercentilesFromCards(
+  infos: CardPriorityInfo[],
+): Record<string, number> {
+  if (!infos || infos.length === 0) return {};
+  const items = expandCardInfosToCards(infos);
+  if (items.length === 0) return {};
+
+  // Stable sort by priority. Items at the same priority keep their input
+  // order, which is the iteration order of `expandCardInfosToCards` — that
+  // groups a rem's cards together. Mean-rank is invariant to intra-tie order,
+  // so this is safe.
+  const sorted = [...items].sort((a, b) => a.priority - b.priority);
+  const N = sorted.length;
+
+  // Accumulate (sum of 1-based ranks, count) per rem.
+  const acc = new Map<string, { sum: number; count: number }>();
+  for (let i = 0; i < N; i++) {
+    const remId = sorted[i].remId;
+    const rank = i + 1;
+    const cur = acc.get(remId);
+    if (cur) {
+      cur.sum += rank;
+      cur.count += 1;
+    } else {
+      acc.set(remId, { sum: rank, count: 1 });
+    }
+  }
+
+  const out: Record<string, number> = {};
+  for (const [remId, { sum, count }] of acc) {
+    const meanRank = sum / count;
+    out[remId] = Math.round((meanRank / N) * 1000) / 10; // 1 decimal
+  }
+  return out;
+}
+
 export function expandCardInfosToCards(infos: CardPriorityInfo[]): PerCardShieldItem[] {
   const out: PerCardShieldItem[] = [];
   for (const info of infos) {

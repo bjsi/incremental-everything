@@ -24,6 +24,7 @@ import {
   CardPriorityInfo,
   QueueSessionCache,
   autoAssignCardPriority,
+  calculateCardRemPercentilesFromCards,
   expandCardInfosToCards,
   getCardPriority,
   setCardPriority,
@@ -374,7 +375,10 @@ export function registerQueueEnterListener(
           const startOfToday = dayjs().startOf('day').valueOf();
 
           const docCardInfos = allCardInfos.filter(info => priorityCalcScope.has(info.remId));
-          docPercentiles = calculateAllPercentiles(docCardInfos);
+          // Per-card universe: each rem's doc-scope percentile is the mean rank
+          // of its cards within the scoped per-card population (matches the
+          // Weighted Shield and the kbPercentile in the global cache).
+          docPercentiles = calculateCardRemPercentilesFromCards(docCardInfos);
           dueCardsInScope = dueCardsInKB.filter(info => priorityCalcScope.has(info.remId));
 
           const scopedIncRems = allIncRems.filter(rem => priorityCalcScope.has(rem.remId));

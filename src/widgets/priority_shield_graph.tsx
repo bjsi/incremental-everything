@@ -11,12 +11,13 @@ import {
   ResponsiveContainer,
   ReferenceArea,
 } from 'recharts';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   priorityShieldHistoryKey,
   documentPriorityShieldHistoryKey,
   cardPriorityShieldHistoryKey,
   documentCardPriorityShieldHistoryKey,
+  priorityShieldGraphPrefsKey,
 } from '../lib/consts';
 import dayjs from 'dayjs';
 
@@ -70,6 +71,42 @@ function PriorityShieldGraph() {
 
   const [showWeightedShield, setShowWeightedShield] = useState(false);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('3m');
+
+  // Hydrate { showWeightedShield, timePeriod } from device-local storage on
+  // mount, then persist on every change. The ref-gate prevents the persist
+  // effect from clobbering the saved value with the default before hydration
+  // completes. Same pattern used by the Study Dashboard and the analytics tab.
+  const prefsHydratedRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    plugin.storage
+      .getLocal<{ showWeightedShield?: boolean; timePeriod?: TimePeriod } | null>(
+        priorityShieldGraphPrefsKey
+      )
+      .then((saved) => {
+        if (cancelled) return;
+        if (typeof saved?.showWeightedShield === 'boolean') {
+          setShowWeightedShield(saved.showWeightedShield);
+        }
+        if (saved?.timePeriod && saved.timePeriod in PERIOD_TO_DAYS) {
+          setTimePeriod(saved.timePeriod);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) prefsHydratedRef.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [plugin]);
+
+  useEffect(() => {
+    if (!prefsHydratedRef.current) return;
+    plugin.storage
+      .setLocal(priorityShieldGraphPrefsKey, { showWeightedShield, timePeriod })
+      .catch(() => {});
+  }, [plugin, showWeightedShield, timePeriod]);
 
   const getZState = (title: string) => {
     return zoomState[title] || {
@@ -712,16 +749,18 @@ function PriorityShieldGraph() {
           </p>
         )}
 
-        <p className="mb-3">
-          <b>Universe Size:</b> This metric is represented differently depending on the graph type:
+        <div className="mb-3">
+          <p>
+            <b>Universe Size:</b> This metric is represented differently depending on the graph type:
+          </p>
           <ul className="list-disc pl-5 mt-1">
             <li><b>For Incremental Rems:</b> The chart tracks your processing lifecycle using three layered components:<br />
               - <b>Total Universe (Black dashed line):</b> The absolute maximum volume of material you have managed in this scope (Active + Dismissed).<br />
               - <b>Active Universe (Green line):</b> The physical volume of IncRems currently in your queue awaiting review.<br />
               - <b>Dismissed Area (Yellow shading):</b> The accumulated volume of material you have permanently marked with the `dismissed` powerup. The wider this area gets, the more backlog you've cleared!</li>
-            <li><b>For Cards:</b> It shows the <b>Universe Size (Dashed line)</b>, which is the total number of Rems with Cards. <i>Note:</i> The universe shown in the Card Shield is the number of <i>Rems</i> with cards, which is different from the total number of <i>flashcards</i> shown in other RemNote UI (since a single Rem can generate several flashcards). The `cardPriority` powerup is assigned per rem, not per individual flashcard.</li>
+            <li><b>For Cards:</b> It shows the <b>Universe Size (Dashed line)</b>, which is the total number of <i>cards</i> in scope (each card counts as one item — a Rem owning N cards contributes N to the universe). <i>Note:</i> History points recorded before 2026-05-27 used a per-Rem-with-cards universe; from that date onward the universe is per-card. Expect a one-time step in the Card shield charts on that date.</li>
           </ul>
-        </p>
+        </div>
 
         <p className="mb-3">
           <b>Absolute Priority</b> refers to the number set in the Incremental Rem or Flashcard priority property.
@@ -738,17 +777,22 @@ function PriorityShieldGraph() {
           <b>Weighted Shield</b> (⚖️) measures the fraction of your total priority-weighted workload that has been processed. Each item is weighted exponentially by priority: high-priority items (low percentile) carry ~10× the weight of low-priority items. Processing any item increases the shield, and processing high-priority items gives a bigger boost. 100% means everything is processed; a low value means significant high-priority material remains unreviewed. Toggle its display with the "Show Weighted Shield" checkbox at the top of the widget.
         </p>
 
-        <p>
-          <b>Understanding Universe Size Changes:</b> <br></br>
-          For <b>Incremental Rems</b>, tracking the visual layers paints a clear picture of your workflow:
+        <div>
+          <p>
+            <b>Understanding Universe Size Changes:</b>
+          </p>
+          <p className="mt-2">
+            For <b>Incremental Rems</b>, tracking the visual layers paints a clear picture of your workflow:
+          </p>
           <ul className="list-disc pl-5 mt-1">
             <li>If the <b>Active Universe (Green)</b> drops but the <b>Total Universe (Black)</b> remains steady and the <b>Dismissed Area (Yellow)</b> expands, you are efficiently processing and dismissing items faster than you add them!</li>
             <li>If the <b>Active Universe (Green)</b> climbs while the <b>Dismissed Area (Yellow)</b> stays flat, you are continuously adding new IncRems without clearing older ones. This influx automatically lowers your priority shield percentiles, as each item is now a smaller percentage of a larger workload.</li>
             <li>If the <b>Total Universe (Black)</b> drops natively, it means you have physically structurally deleted IncRems from your Knowledge Base, or fully removed the `Incremental` tag spanning outside the `Dismissed` review queue standard logic.</li>
           </ul>
-          <br></br>
-          For <b>Flashcards</b>, this number will usually only increase (unless you delete cards). The evolution will show you the size of your knowledge (considering you keep control of your due cards).
-        </p>
+          <p className="mt-2">
+            For <b>Flashcards</b>, this number will usually only increase (unless you delete cards). The evolution will show you the size of your knowledge (considering you keep control of your due cards).
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 import { IncrementalRem } from './incremental_rem';
-import { CardPriorityInfo } from './card_priority';
+import { CardPriorityInfo, calculateCardRemPercentilesFromCards } from './card_priority';
 import {
     allIncrementalRemKey,
     allCardPriorityInfoKey,
@@ -74,7 +74,9 @@ export function computePriorityGraphData(
     // Filter out inheritance-only rems (cardCount === 0) before percentile calculation
     const validKbCardInfos = allKbCardInfos.filter(c => c.cardCount === undefined || c.cardCount > 0);
     const kbIncRemPercentiles = calculateAllPercentiles(allKbIncRems);
-    const kbCardPercentiles = calculateAllPercentiles(validKbCardInfos);
+    // Per-card universe for cards: matches the Weighted Shield / kbPercentile
+    // semantics so the graph and the rem badges stay consistent.
+    const kbCardPercentiles = calculateCardRemPercentilesFromCards(validKbCardInfos);
 
     const binsAbsolute = createBins('integer');
     const binsKbRelative = createBins('range');

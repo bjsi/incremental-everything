@@ -8,7 +8,7 @@ import {
   GRAPH_DATA_KEY_PREFIX,
   allCardPriorityInfoKey
 } from '../consts';
-import { CardPriorityInfo } from '../card_priority';
+import { CardPriorityInfo, calculateCardRemPercentilesFromCards } from '../card_priority';
 import { calculateAllPercentiles } from '../utils';
 import { buildComprehensiveScope } from '../scope_helpers';
 import { registerReviewGraphKey } from './cleanup';
@@ -297,8 +297,11 @@ export async function createPriorityReviewDocument(
   // scopedIncRems is already filtered above
   const incRemPercentiles = calculateAllPercentiles(scopedIncRems as any);
 
-  // Use the SAFE universe list that definitely includes our due cards
-  const cardPercentiles = calculateAllPercentiles(universeCardInfos);
+  // Use the SAFE universe list that definitely includes our due cards.
+  // Per-card universe: each rem's percentile is the mean rank of its cards
+  // within the expanded per-card population — same value used by the
+  // Weighted Shield and the `kbPercentile` shown in the rem's priority badge.
+  const cardPercentiles = calculateCardRemPercentilesFromCards(universeCardInfos);
 
   // --- DEBUG & FIX END ---
 
