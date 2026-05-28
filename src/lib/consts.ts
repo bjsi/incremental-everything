@@ -36,6 +36,7 @@ export const cardAnalyticsCacheKey = 'card-analytics-cache-key';
 // Local-storage keys for "last selected period" — survives across sessions /
 // app restarts (device-specific). Stored shape: { period, customStart, customEnd }.
 export const cardAnalyticsLastPeriodKey = 'card-analytics-last-period';
+export const fsrsCalibrationLastPeriodKey = 'fsrs-calibration-last-period';
 export const studyDashboardLastPeriodKey = 'study-dashboard-last-period';
 // Priority Shield Graph: persists the "Show Weighted Shield" checkbox and the
 // 1M/3M/6M/1Y/All period filter across sessions. Device-specific.

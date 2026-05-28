@@ -2,6 +2,7 @@ import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import { WeightedShieldBreakdown } from '../lib/utils';
 import { CardMemoryAnalyticsView } from './CardMemoryAnalyticsView';
+import { FSRSCalibrationView } from './FSRSCalibrationView';
 
 interface WeightedShieldGroup {
   title: string;
@@ -354,7 +355,7 @@ function BreakdownSection({
   );
 }
 
-type TabId = 'shield' | 'cardMemory';
+type TabId = 'shield' | 'cardMemory' | 'fsrsCalibration';
 
 export function WeightedShieldPopup() {
   const plugin = usePlugin();
@@ -424,11 +425,16 @@ export function WeightedShieldPopup() {
           <button type="button" role="tab" aria-selected={tab === 'cardMemory'} style={tabBtnStyle(tab === 'cardMemory')} onClick={() => setTab('cardMemory')}>
             🃏 Card Priority × Memory Analytics
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'fsrsCalibration'} style={tabBtnStyle(tab === 'fsrsCalibration')} onClick={() => setTab('fsrsCalibration')}>
+            🎯 FSRS Calibration
+          </button>
         </div>
       )}
 
       {showTabs && tab === 'cardMemory' ? (
         <CardMemoryAnalyticsView />
+      ) : showTabs && tab === 'fsrsCalibration' ? (
+        <FSRSCalibrationView />
       ) : (
         <>
           {/* Title (only when tabs aren't there to label the view) */}

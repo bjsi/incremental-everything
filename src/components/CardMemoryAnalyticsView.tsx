@@ -743,7 +743,7 @@ function SinceDateInput({
   );
 }
 
-function PeriodPickerCompact({
+export function PeriodPickerCompact({
   period,
   customStart,
   customEnd,
