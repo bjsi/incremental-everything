@@ -140,7 +140,7 @@ const COL_TOOLTIPS = {
   tPerRep:
     'Average response time per rep = totalTime / totalGradeableReps. Period-filtered.',
   cost:
-    'Time investment per card per year.\nPeriod = All → per-card lifetime cost: totalMinutes / coverageYears (coverage = nextRep − firstRep, or now − firstRep), averaged.\nFinite period → annualized: time-in-period / period-length, averaged over cards that had reps in the period.',
+    'Time investment per card per year (min/y).\nPeriod = All → per-card lifetime cost: totalMinutes / coverageYears (coverage = nextRep − firstRep, or now − firstRep), averaged.\nFinite period → annualized: time-in-period / period-length, averaged over cards that had reps in the period.',
   lapses:
     'Average count of Again responses per non-new card. New cards are excluded from the denominator so never-reviewed cards don\'t dilute the average. Period-filtered.',
   retention:
@@ -280,7 +280,10 @@ function BucketRow({ b, isOverall, idx }: { b: CardBucketStats; isOverall: boole
       </td>
       <td style={cellStyle}>{fmtNum(b.cpm, 1)}</td>
       <td style={cellStyle}>{fmtTimeShort(b.avgTimePerRepMs)}</td>
-      <td style={cellStyle}>{fmtNum(b.avgCostMinPerYear, 1)}</td>
+      <td style={cellStyle}>
+        {fmtNum(b.avgCostMinPerYear, 1)}
+        <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '2px' }}>min/y</span>
+      </td>
       {/* Outcome */}
       <td style={cellStyle}>{fmtNum(b.avgLapses, 2)}</td>
       <td style={{ ...cellStyle, color: retentionColor(b.retention), fontWeight: 600 }}>
@@ -294,7 +297,7 @@ function BucketRow({ b, isOverall, idx }: { b: CardBucketStats; isOverall: boole
         {fmtNum(b.avgGrade, 1)}
       </td>
       {/* FSRS */}
-      <td style={cellStyle}>{fmtNum(b.avgD, 2)}</td>
+      <td style={cellStyle}>{fmtNum(b.avgD, 1)}</td>
       <td style={{ ...cellStyle, color: retentionColor(b.avgRtoday), fontWeight: 600 }}>
         {fmtPct(b.avgRtoday, 1)}
       </td>
@@ -883,11 +886,16 @@ export function CardMemoryAnalyticsView() {
           (done, total) => setProgress({ done, total }),
         );
         await plugin.storage.setSession(cardAnalyticsCacheKey, breakdown);
-        // Persist the period selection across app restarts (device-local).
-        // Stored independently from the session cache so it survives full
-        // RemNote restarts when the in-memory cache is gone.
+        // Persist user prefs (period + ignorePreReset) across app restarts
+        // (device-local). Stored independently from the session cache so it
+        // survives full RemNote restarts when the in-memory cache is gone.
         plugin.storage
-          .setLocal(cardAnalyticsLastPeriodKey, { period: p, customStart: cs, customEnd: ce })
+          .setLocal(cardAnalyticsLastPeriodKey, {
+            period: p,
+            customStart: cs,
+            customEnd: ce,
+            ignorePreReset: flag,
+          })
           .catch(() => {});
         setCache(breakdown);
         setState('ready');
@@ -908,9 +916,12 @@ export function CardMemoryAnalyticsView() {
     let cancelled = false;
     Promise.all([
       plugin.storage.getSession<CardAnalyticsBreakdown | null>(cardAnalyticsCacheKey),
-      plugin.storage.getLocal<{ period?: Period; customStart?: string; customEnd?: string } | null>(
-        cardAnalyticsLastPeriodKey,
-      ),
+      plugin.storage.getLocal<{
+        period?: Period;
+        customStart?: string;
+        customEnd?: string;
+        ignorePreReset?: boolean;
+      } | null>(cardAnalyticsLastPeriodKey),
     ])
       .then(([c, saved]) => {
         if (cancelled) return;
@@ -923,20 +934,22 @@ export function CardMemoryAnalyticsView() {
           setState('ready');
           return;
         }
-        // No session cache — restore last-selected period from local storage.
+        // No session cache — restore last-selected prefs from local storage.
         const p = (saved?.period ?? 'thisYear') as Period;
         const cs = saved?.customStart ?? '';
         const ce = saved?.customEnd ?? '';
+        const flag = saved?.ignorePreReset ?? false;
         setPeriod(p);
         setCustomStart(cs);
         setCustomEnd(ce);
+        setIgnorePreReset(flag);
         // 'custom' / 'since' without a usable start date can't compute — skip
         // the auto-compute and wait for the user to type / pick one.
         const hasUsableStart = !!cs;
         if ((p === 'custom' || p === 'since') && !hasUsableStart) {
           setState('idle');
         } else {
-          compute(false, p, cs, ce);
+          compute(flag, p, cs, ce);
         }
       })
       .catch(() => {
@@ -1025,9 +1038,9 @@ export function CardMemoryAnalyticsView() {
             and Practiced Queues conventions.{' '}
             <strong>Always-current</strong> (KB state, unaffected by period):{' '}
             <em>Items, Due, Done, %New, %Stale, D, R, S</em>. <strong>Cost</strong> is
-            lifetime per-card coverage when period = All; otherwise it's annualized as{' '}
-            <em>time-in-period / period-length</em> averaged across cards with reps in the
-            period. <strong>Avg pR</strong> averages the FSRS-predicted retrievability at the moment
+            expressed in <em>minutes per year (min/y)</em>: lifetime per-card coverage when
+            period = All; otherwise annualized as <em>time-in-period / period-length</em>{' '}
+            averaged across cards with reps in the period. <strong>Avg pR</strong> averages the FSRS-predicted retrievability at the moment
             of every gradeable rep (skipping only the first rep of each card / each
             post-RESET lifetime, which has no prior model state). For learning and
             relearning reps — where FSRS leaves <em>r</em> undefined — the forgetting

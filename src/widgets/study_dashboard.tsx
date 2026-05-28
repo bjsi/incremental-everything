@@ -1876,21 +1876,28 @@ function StudyDashboardPopup() {
         if (newEnd !== customEnd) setCustomEnd(newEnd);
     }, [period, startMs, endMs]);
 
-    // Hydrate period selection from device-local storage on mount, then persist
-    // whenever the user changes it. The ref gate prevents the persist effect
-    // from firing with the default 'thisYear' before hydration completes.
+    // Hydrate prefs (period + ignorePreReset) from device-local storage on
+    // mount, then persist whenever the user changes them. The ref gate
+    // prevents the persist effect from firing with the defaults before
+    // hydration completes.
     const periodHydratedRef = useRef(false);
     useEffect(() => {
         let cancelled = false;
         plugin.storage
-            .getLocal<{ period?: Period; customStart?: string; customEnd?: string } | null>(
-                studyDashboardLastPeriodKey
-            )
+            .getLocal<{
+                period?: Period;
+                customStart?: string;
+                customEnd?: string;
+                ignorePreReset?: boolean;
+            } | null>(studyDashboardLastPeriodKey)
             .then((saved) => {
                 if (cancelled) return;
                 if (saved?.period) setPeriod(saved.period);
                 if (saved?.customStart !== undefined) setCustomStart(saved.customStart);
                 if (saved?.customEnd !== undefined) setCustomEnd(saved.customEnd);
+                if (typeof saved?.ignorePreReset === 'boolean') {
+                    setIgnorePreReset(saved.ignorePreReset);
+                }
             })
             .catch(() => {})
             .finally(() => {
@@ -1904,9 +1911,14 @@ function StudyDashboardPopup() {
     useEffect(() => {
         if (!periodHydratedRef.current) return;
         plugin.storage
-            .setLocal(studyDashboardLastPeriodKey, { period, customStart, customEnd })
+            .setLocal(studyDashboardLastPeriodKey, {
+                period,
+                customStart,
+                customEnd,
+                ignorePreReset,
+            })
             .catch(() => {});
-    }, [plugin, period, customStart, customEnd]);
+    }, [plugin, period, customStart, customEnd, ignorePreReset]);
 
     const cardCapMs = useRunAsync(async () => {
         const v = await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING);
