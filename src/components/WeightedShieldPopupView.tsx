@@ -1,8 +1,99 @@
-import { usePlugin } from '@remnote/plugin-sdk';
+import { RNPlugin, usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
+import dayjs from 'dayjs';
 import { WeightedShieldBreakdown } from '../lib/utils';
+import {
+  cardPriorityShieldHistoryKey,
+  currentSubQueueIdKey,
+  documentCardPriorityShieldHistoryKey,
+  documentPriorityShieldHistoryKey,
+  priorityShieldHistoryKey,
+} from '../lib/consts';
 import { CardMemoryAnalyticsView } from './CardMemoryAnalyticsView';
 import { FSRSCalibrationView } from './FSRSCalibrationView';
+
+type ItemKind = 'incRem' | 'card';
+type ScopeKind = 'kb' | 'doc';
+
+/**
+ * Highest absolute-priority shield value reached in the last 30 days for the
+ * given scope+item-type. The shield value is a coverage cutoff (items with
+ * priority ≤ shield are protected), so a larger number = wider coverage =
+ * better. Returns null if no history is available.
+ *
+ * Mirrors the partition fallbacks used by PriorityShieldGraph: prefers a KB-keyed
+ * partition, falls back to legacy flat layout only on the primary KB.
+ */
+async function getMonthlyBestAbsolutePriorityShield(
+  plugin: RNPlugin,
+  itemKind: ItemKind,
+  scopeKind: ScopeKind,
+  docScopeId: string | null,
+): Promise<number | null> {
+  const key = itemKind === 'card'
+    ? (scopeKind === 'kb' ? cardPriorityShieldHistoryKey : documentCardPriorityShieldHistoryKey)
+    : (scopeKind === 'kb' ? priorityShieldHistoryKey : documentPriorityShieldHistoryKey);
+
+  const raw = (await plugin.storage.getSynced(key)) as any;
+  if (!raw) return null;
+
+  const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+  const currentKbId = kbData?._id || 'global';
+
+  let history: Record<string, { absolute?: number | null }> | undefined;
+
+  if (scopeKind === 'kb') {
+    if (raw[currentKbId] && typeof raw[currentKbId] === 'object') {
+      const keys = Object.keys(raw[currentKbId]);
+      if (keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
+        history = raw[currentKbId];
+      }
+    }
+    if (!history) {
+      const keys = Object.keys(raw);
+      if (keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
+        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+        if (isPrimary) {
+          const cleanLegacy: Record<string, any> = {};
+          for (const k of keys) {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(k)) cleanLegacy[k] = raw[k];
+          }
+          history = cleanLegacy;
+        }
+      }
+    }
+  } else {
+    if (!docScopeId) return null;
+    if (raw[currentKbId] && raw[currentKbId][docScopeId]) {
+      history = raw[currentKbId][docScopeId];
+    } else if (raw[docScopeId]) {
+      const dateKeys = Object.keys(raw[docScopeId]);
+      if (dateKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
+        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+        if (isPrimary) history = raw[docScopeId];
+      }
+    }
+  }
+
+  if (!history) return null;
+
+  const cutoff = dayjs().subtract(30, 'day').startOf('day');
+  let best: number | null = null;
+  for (const [dateStr, entry] of Object.entries(history)) {
+    if (!entry || entry.absolute == null) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+    if (!dayjs(dateStr).isAfter(cutoff)) continue;
+    if (best == null || entry.absolute > best) best = entry.absolute;
+  }
+  return best;
+}
+
+interface MonthlyBests {
+  kbIncRem: number | null;
+  docIncRem: number | null;
+  kbCard: number | null;
+  docCard: number | null;
+}
 
 interface WeightedShieldGroup {
   title: string;
@@ -26,9 +117,11 @@ const WEIGHT_K = 2.3026;
 function SubsetStatsPanel({
   sortedItems,
   totalWeight,
+  monthlyBestAbsolute,
 }: {
   sortedItems: { priority: number; isDue: boolean }[];
   totalWeight: number;
+  monthlyBestAbsolute: number | null;
 }) {
   const N = sortedItems.length;
   const minPriority = N > 0 ? sortedItems[0].priority : 0;
@@ -39,6 +132,14 @@ function SubsetStatsPanel({
   const sliderMax = Math.max(Math.ceil(maxPriority), sliderMin + 1);
 
   const [threshold, setThreshold] = React.useState<number>(Math.round(maxPriority));
+  // Until the user actually moves the slider, mirror the async-fetched monthly
+  // best as the threshold so the panel opens at the historical-high mark.
+  const [userTouched, setUserTouched] = React.useState(false);
+  React.useEffect(() => {
+    if (userTouched || monthlyBestAbsolute == null) return;
+    const clamped = Math.max(sliderMin, Math.min(sliderMax, Math.round(monthlyBestAbsolute)));
+    setThreshold(clamped);
+  }, [monthlyBestAbsolute, userTouched, sliderMin, sliderMax]);
 
   // Prefix sums of weight and due count, indexed [0..N]: cum[i] = sum over items 0..i-1.
   const prefix = React.useMemo(() => {
@@ -82,6 +183,20 @@ function SubsetStatsPanel({
     const relPercentile = (count / N) * 100;
     return { count, due, processedPct, meanWeight, weightShare, relPercentile };
   }, [threshold, sortedItems, N, prefix, totalWeight]);
+
+  // Fixed at the historical-high mark — independent of where the user drags
+  // the slider, so the caption keeps its meaning while the slider explores.
+  const monthlyBestDue = React.useMemo(() => {
+    if (monthlyBestAbsolute == null || N === 0) return null;
+    let lo = 0;
+    let hi = N;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (sortedItems[mid].priority <= monthlyBestAbsolute) lo = mid + 1;
+      else hi = mid;
+    }
+    return prefix.cumDue[lo];
+  }, [monthlyBestAbsolute, sortedItems, N, prefix]);
 
   if (N === 0) return null;
 
@@ -127,7 +242,10 @@ function SubsetStatsPanel({
           max={sliderMax}
           step={1}
           value={threshold}
-          onChange={(e) => setThreshold(parseInt(e.target.value, 10))}
+          onChange={(e) => {
+            setThreshold(parseInt(e.target.value, 10));
+            setUserTouched(true);
+          }}
           style={{ flex: 1 }}
         />
         <span style={{
@@ -141,6 +259,27 @@ function SubsetStatsPanel({
           {threshold}
         </span>
       </div>
+
+      {monthlyBestAbsolute != null && monthlyBestDue != null && (
+        <div style={{
+          fontSize: '11px',
+          marginBottom: '6px',
+          color: 'var(--rn-clr-content-tertiary)',
+          lineHeight: '1.4',
+        }}>
+          {monthlyBestDue > 0 ? (
+            <>
+              📈 Monthly higher shield: priority ≤{' '}
+              <b style={{ color: 'var(--rn-clr-content-secondary)' }}>{Math.round(monthlyBestAbsolute)}</b>
+              {' '}→{' '}
+              <b style={{ color: '#ef4444' }}>{monthlyBestDue.toLocaleString()}</b>
+              {' '}due to catch up
+            </>
+          ) : (
+            <>✓ At monthly higher priority shield (≤ <b>{Math.round(monthlyBestAbsolute)}</b>)</>
+          )}
+        </div>
+      )}
 
       {stats && (
         <div style={{
@@ -217,10 +356,12 @@ function BreakdownSection({
   breakdown,
   scopeLabel,
   itemLabel,
+  monthlyBestAbsolute,
 }: {
   breakdown: WeightedShieldBreakdown;
   scopeLabel: string;
   itemLabel: string;
+  monthlyBestAbsolute: number | null;
 }) {
   const shieldColor = breakdown.shieldValue >= 95
     ? '#22c55e'
@@ -349,6 +490,7 @@ function BreakdownSection({
         <SubsetStatsPanel
           sortedItems={breakdown.sortedItems}
           totalWeight={breakdown.totalWeight}
+          monthlyBestAbsolute={monthlyBestAbsolute}
         />
       )}
     </div>
@@ -362,9 +504,29 @@ export function WeightedShieldPopup() {
 
   const [ctx, setCtx] = React.useState<WeightedShieldPopupContext | null>(null);
   const [tab, setTab] = React.useState<TabId>('shield');
+  const [monthlyBests, setMonthlyBests] = React.useState<MonthlyBests | null>(null);
 
   React.useEffect(() => {
     plugin.widget.getWidgetContext<any>().then((c) => setCtx(c?.contextData as WeightedShieldPopupContext));
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Mirrors PriorityShieldGraph's effectiveDocScopeId — Priority Review Doc
+      // sessions store originalScopeId; regular sessions only have a sub-queue id.
+      const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
+      const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
+      const docScopeId = originalScopeId || subQueueId || null;
+      const [kbIncRem, docIncRem, kbCard, docCard] = await Promise.all([
+        getMonthlyBestAbsolutePriorityShield(plugin, 'incRem', 'kb', null),
+        getMonthlyBestAbsolutePriorityShield(plugin, 'incRem', 'doc', docScopeId),
+        getMonthlyBestAbsolutePriorityShield(plugin, 'card', 'kb', null),
+        getMonthlyBestAbsolutePriorityShield(plugin, 'card', 'doc', docScopeId),
+      ]);
+      if (!cancelled) setMonthlyBests({ kbIncRem, docIncRem, kbCard, docCard });
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   if (!ctx) {
@@ -481,7 +643,11 @@ export function WeightedShieldPopup() {
             }
             return null;
           };
-          const renderGroup = (group: WeightedShieldGroup, i: number) => (
+          const renderGroup = (group: WeightedShieldGroup, i: number) => {
+            const isCard = group.itemLabel.toLowerCase() === 'cards';
+            const kbBest = isCard ? (monthlyBests?.kbCard ?? null) : (monthlyBests?.kbIncRem ?? null);
+            const docBest = isCard ? (monthlyBests?.docCard ?? null) : (monthlyBests?.docIncRem ?? null);
+            return (
             <div
               key={i}
               style={!useTwoCols && i > 0 ? {
@@ -518,6 +684,7 @@ export function WeightedShieldPopup() {
                 breakdown={group.kb}
                 scopeLabel="🌐 Knowledge Base"
                 itemLabel={group.itemLabel}
+                monthlyBestAbsolute={kbBest}
               />
               {group.doc && (
                 <div style={{ paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
@@ -525,11 +692,13 @@ export function WeightedShieldPopup() {
                     breakdown={group.doc}
                     scopeLabel="📄 Document Scope"
                     itemLabel={group.itemLabel}
+                    monthlyBestAbsolute={docBest}
                   />
                 </div>
               )}
             </div>
-          );
+            );
+          };
           return useTwoCols ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               {groups.map(renderGroup)}
@@ -539,11 +708,17 @@ export function WeightedShieldPopup() {
           );
         })()
       ) : ctx.kbBreakdown ? (
+        (() => {
+          const isCard = itemLabel.toLowerCase() === 'cards';
+          const kbBest = isCard ? (monthlyBests?.kbCard ?? null) : (monthlyBests?.kbIncRem ?? null);
+          const docBest = isCard ? (monthlyBests?.docCard ?? null) : (monthlyBests?.docIncRem ?? null);
+          return (
         <>
           <BreakdownSection
             breakdown={ctx.kbBreakdown}
             scopeLabel="🌐 Knowledge Base"
             itemLabel={itemLabel}
+            monthlyBestAbsolute={kbBest}
           />
           {ctx.docBreakdown && (
             <div style={{ paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
@@ -551,10 +726,13 @@ export function WeightedShieldPopup() {
                 breakdown={ctx.docBreakdown}
                 scopeLabel="📄 Document Scope"
                 itemLabel={itemLabel}
+                monthlyBestAbsolute={docBest}
               />
             </div>
           )}
         </>
+          );
+        })()
           ) : (
             <div style={{ padding: '12px', color: 'var(--rn-clr-content-tertiary)', textAlign: 'center' }}>
               No prioritized items found.

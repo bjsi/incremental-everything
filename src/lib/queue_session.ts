@@ -504,19 +504,33 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       const isMobile = await isMobileDevice(plugin);
       const isMasteryDrill = scopeName === 'Mastery Drill';
       if (autoFocus && !isMobile && !isMasteryDrill) {
-        const focusDashboard = async () => {
-          try {
-            await plugin.window.openWidgetInRightSidebar('practiced_queues');
-          } catch (err) {
-            console.error('Failed to auto-focus Practiced Queues dashboard:', err);
+        // Handshake-based retry: open the tab, then poll a session-storage flag
+        // the widget sets when it mounts. If RemNote stole focus to the AI Tutor
+        // tab, the flag won't be (re)written for this attempt, so we re-issue.
+        // Bounded by a wall-clock deadline so we can't loop forever.
+        // Fire-and-forget retry: openWidgetInRightSidebar's promise can stall
+        // when RemNote steals focus to its own tab (e.g. AI Tutor on sidebar
+        // spawn), so we don't await it. Poll a flag the widget sets on mount,
+        // and re-issue the open call until the widget acknowledges or we hit
+        // the deadline.
+        const startedAt = Date.now();
+        const deadline = startedAt + 3000;
+        let attempt = 0;
+        const tryOpen = async (): Promise<void> => {
+          attempt++;
+          const a = attempt;
+          plugin.window.openWidgetInRightSidebar('practiced_queues').catch((err) =>
+            console.error(`[PQ-HANDSHAKE] attempt ${a} openWidgetInRightSidebar rejected:`, err)
+          );
+          for (let i = 0; i < 6; i++) {
+            await new Promise(r => setTimeout(r, 150));
+            const ts = await plugin.storage.getSession<number>('practiced_queues_visible');
+            if (ts && ts >= startedAt) return;
           }
+          if (Date.now() < deadline) return tryOpen();
+          console.warn(`[PQ-HANDSHAKE] gave up after ${a} attempts, t+${Date.now() - startedAt}ms`);
         };
-        // Immediate call: works when the sidebar is already open (just switches tab).
-        // When the sidebar is closed, this opens it — but RemNote also auto-focuses
-        // the AI Tutor tab on QueueEnter when it spawns the sidebar, racing us.
-        // Re-issue after a delay so our focus wins over RemNote's auto-focus.
-        await focusDashboard();
-        setTimeout(focusDashboard, 600);
+        void tryOpen();
       }
     } catch (error) {
       console.error('ERROR in QueueSession QueueEnter listener:', error);

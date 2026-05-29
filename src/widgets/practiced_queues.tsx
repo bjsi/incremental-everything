@@ -290,6 +290,16 @@ function PracticedQueues() {
         };
     }, [plugin]);
 
+    // Handshake with QueueEnter auto-focus loop in queue_session.ts: it polls
+    // this key to detect whether the tab actually became visible, retrying
+    // openWidgetInRightSidebar if RemNote stole focus to the AI Tutor tab.
+    useEffect(() => {
+        plugin.storage.setSession('practiced_queues_visible', Date.now());
+        return () => {
+            plugin.storage.setSession('practiced_queues_visible', null);
+        };
+    }, [plugin]);
+
     // Defensive: skip null entries (synced storage can leave nulls when a
     // partial write hits the storage quota — see queue_aggregates rollover).
     const filteredData = useMemo(() => {
