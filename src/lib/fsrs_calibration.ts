@@ -90,6 +90,15 @@ export interface FSRSCalibrationBreakdown {
   gridBColTotals: CellStats[];  // length 5
   gridBOverall: CellStats;
 
+  // Grid C: previous rep's predicted R × previous rep's prior stability →
+  // current rep's R-dev. Tests whether passing an overdue rep gave FSRS too
+  // much stability bonus (which would manifest as a negative R-dev on the
+  // *next* rep). Filtered to recalls (Hard/Good/Easy) on the previous rep.
+  gridC: CellStats[][];         // [prev predR row 0..19][prev S col 0..4]
+  gridCRowTotals: CellStats[];  // length 20
+  gridCColTotals: CellStats[];  // length 5
+  gridCOverall: CellStats;
+
   totalCards: number;
   ignorePreReset: boolean;
 
@@ -144,11 +153,14 @@ export async function computeFSRSCalibrationBreakdown(
 
   const allCards = (await plugin.card.getAll()) || [];
 
-  // Pre-allocate the accumulators for both grids.
+  // Pre-allocate the accumulators for all three grids.
   const accA: CellAcc[][] = Array.from({ length: R_BUCKET_COUNT }, () =>
     Array.from({ length: S_BUCKET_COUNT }, makeAcc),
   );
   const accB: CellAcc[][] = Array.from({ length: 4 }, () =>
+    Array.from({ length: S_BUCKET_COUNT }, makeAcc),
+  );
+  const accC: CellAcc[][] = Array.from({ length: R_BUCKET_COUNT }, () =>
     Array.from({ length: S_BUCKET_COUNT }, makeAcc),
   );
 
@@ -176,16 +188,19 @@ export async function computeFSRSCalibrationBreakdown(
     }
 
     // Indices (within `effective`) of the most recent gradeable rep and the
-    // one before that. Both reset on every RESET so a fresh lifetime starts
-    // with no prior state.
+    // one before that, plus the predicted R FSRS would have shown at the
+    // previous gradeable rep. All reset on every RESET so a fresh lifetime
+    // starts with no prior state.
     let lastGradeableIdx: number | null = null;
     let lastLastGradeableIdx: number | null = null;
+    let lastPredR: number | null = null;
 
     for (let i = 0; i < effective.length; i++) {
       const h = effective[i];
       if (h.score === QueueInteractionScore.RESET) {
         lastGradeableIdx = null;
         lastLastGradeableIdx = null;
+        lastPredR = null;
         continue;
       }
       if (!isGradeable(h.score)) continue;
@@ -196,44 +211,67 @@ export async function computeFSRSCalibrationBreakdown(
         continue;
       }
 
-      // For every subsequent rep, derive predR using FSRS state from the
-      // previous gradeable rep. Period filter applies only to whether we
-      // ACCUMULATE this rep; pointer updates still happen so later reps in
-      // the period get the right reference.
-      const inPeriod = h.date >= startMs && h.date < endMs;
-      if (inPeriod) {
-        const prevS = steps[lastGradeableIdx]?.s ?? 0;
-        const prevDate = effective[lastGradeableIdx].date;
-        const elapsedDays = (h.date - prevDate) / (1000 * 60 * 60 * 24);
+      // Compute predR for THIS rep on every iteration (not only when it falls
+      // inside the period). Grid C needs the *previous* rep's predR, which
+      // means we have to carry it forward even when the previous rep itself
+      // was out of period.
+      const prevS = steps[lastGradeableIdx]?.s ?? 0;
+      const prevDate = effective[lastGradeableIdx].date;
+      const elapsedDays = (h.date - prevDate) / (1000 * 60 * 60 * 24);
+      let predR: number | null = steps[i]?.r ?? null;
+      if (predR === null && prevS > 0 && elapsedDays >= 0) {
+        predR = forgettingCurve(elapsedDays, prevS, DECAY, FACTOR);
+      }
+      if (predR !== null && !Number.isFinite(predR)) predR = null;
 
-        let predR: number | null = steps[i]?.r ?? null;
-        if (predR === null && prevS > 0 && elapsedDays >= 0) {
-          predR = forgettingCurve(elapsedDays, prevS, DECAY, FACTOR);
+      const inPeriod = h.date >= startMs && h.date < endMs;
+      if (inPeriod && predR !== null) {
+        const retained = h.score !== QueueInteractionScore.AGAIN ? 1 : 0;
+
+        // ----- Grid A: predR × prior S -----
+        // Skip the ≤1mo stability bucket (index 0) entirely: short-term reps
+        // dominate volume and would distort the row/column totals, masking
+        // calibration behaviour on durable cards (the analysis target).
+        const sColA = stabilityBucket(prevS);
+        const rRowA = rBucket(predR);
+        if (sColA > 0) {
+          const cell = accA[rRowA][sColA];
+          cell.reps++;
+          cell.retained += retained;
+          cell.sumPredR += predR;
         }
 
-        if (predR !== null && Number.isFinite(predR)) {
-          const retained = h.score !== QueueInteractionScore.AGAIN ? 1 : 0;
-
-          // ----- Grid A: predR × prior S -----
-          // Skip the ≤1mo stability bucket (index 0) entirely: short-term reps
-          // dominate volume and would distort the row/column totals, masking
-          // calibration behaviour on durable cards (the analysis target).
-          const sColA = stabilityBucket(prevS);
-          const rRowA = rBucket(predR);
-          if (sColA > 0) {
-            const cell = accA[rRowA][sColA];
+        // ----- Grid B: previous grade × stability before that prev grade -----
+        if (lastLastGradeableIdx !== null) {
+          const prevGrade = gradeRow(effective[lastGradeableIdx].score);
+          const prevPrevS = steps[lastLastGradeableIdx]?.s ?? 0;
+          const sColB = stabilityBucket(prevPrevS);
+          if (prevGrade >= 0 && sColB >= 0) {
+            const cell = accB[prevGrade][sColB];
             cell.reps++;
             cell.retained += retained;
             cell.sumPredR += predR;
           }
+        }
 
-          // ----- Grid B: previous grade × stability before that prev grade -----
-          if (lastLastGradeableIdx !== null) {
-            const prevGrade = gradeRow(effective[lastGradeableIdx].score);
+        // ----- Grid C: previous rep's predR × previous rep's prior S -----
+        // Tests whether passing the previous rep (especially when overdue —
+        // low prev predR) gave FSRS too much stability bonus, which would
+        // show up as the current rep under-performing FSRS's expectation.
+        // Filtered to recall passes (Hard/Good/Easy); Again triggers the
+        // forget-stability formula, which has different dynamics.
+        if (lastLastGradeableIdx !== null && lastPredR !== null) {
+          const prevScore = effective[lastGradeableIdx].score;
+          const prevWasRecall =
+            prevScore === QueueInteractionScore.HARD ||
+            prevScore === QueueInteractionScore.GOOD ||
+            prevScore === QueueInteractionScore.EASY;
+          if (prevWasRecall) {
             const prevPrevS = steps[lastLastGradeableIdx]?.s ?? 0;
-            const sColB = stabilityBucket(prevPrevS);
-            if (prevGrade >= 0 && sColB >= 0) {
-              const cell = accB[prevGrade][sColB];
+            const sColC = stabilityBucket(prevPrevS);
+            const rRowC = rBucket(lastPredR);
+            if (sColC > 0) {
+              const cell = accC[rRowC][sColC];
               cell.reps++;
               cell.retained += retained;
               cell.sumPredR += predR;
@@ -245,6 +283,7 @@ export async function computeFSRSCalibrationBreakdown(
       // Advance the pointers regardless of period membership.
       lastLastGradeableIdx = lastGradeableIdx;
       lastGradeableIdx = i;
+      lastPredR = predR;
     }
 
     if ((cardIdx + 1) % YIELD_EVERY === 0) {
@@ -280,6 +319,7 @@ export async function computeFSRSCalibrationBreakdown(
 
   const a = finalizeGrid(accA, R_BUCKET_COUNT);
   const b = finalizeGrid(accB, 4);
+  const c = finalizeGrid(accC, R_BUCKET_COUNT);
 
   return {
     gridA: a.cells,
@@ -290,6 +330,10 @@ export async function computeFSRSCalibrationBreakdown(
     gridBRowTotals: b.rowTotals,
     gridBColTotals: b.colTotals,
     gridBOverall: b.overall,
+    gridC: c.cells,
+    gridCRowTotals: c.rowTotals,
+    gridCColTotals: c.colTotals,
+    gridCOverall: c.overall,
     totalCards: N,
     ignorePreReset,
     period: period.id,

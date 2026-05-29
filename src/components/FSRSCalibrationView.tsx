@@ -469,14 +469,22 @@ export function FSRSCalibrationView() {
     [rRowOrder],
   );
 
-  // Grid A excludes the ≤1mo stability column entirely (also filtered out of
-  // accumulation upstream, so totals here already reflect the exclusion).
-  const sColLabelsA = React.useMemo(() => S_BUCKET_LABELS.slice(1), []);
+  // Grid A and Grid C both exclude the ≤1mo stability column entirely (also
+  // filtered out of accumulation upstream) and present rows in descending
+  // order of predicted R.
+  const sColLabelsACDropped = React.useMemo(() => S_BUCKET_LABELS.slice(1), []);
   const gridAReordered = React.useMemo(() => {
     if (!data) return null;
     const cells = rRowOrder.map((i) => data.gridA[i].slice(1));
     const rowTotals = rRowOrder.map((i) => data.gridARowTotals[i]);
     const colTotals = data.gridAColTotals.slice(1);
+    return { cells, rowTotals, colTotals };
+  }, [data, rRowOrder]);
+  const gridCReordered = React.useMemo(() => {
+    if (!data) return null;
+    const cells = rRowOrder.map((i) => data.gridC[i].slice(1));
+    const rowTotals = rRowOrder.map((i) => data.gridCRowTotals[i]);
+    const colTotals = data.gridCColTotals.slice(1);
     return { cells, rowTotals, colTotals };
   }, [data, rRowOrder]);
 
@@ -538,11 +546,64 @@ export function FSRSCalibrationView() {
             rowHeader="Predicted R"
             rowLabels={rRowLabelsDesc}
             colHeader="Prior stability"
-            colLabels={sColLabelsA}
+            colLabels={sColLabelsACDropped}
             cells={gridAReordered!.cells}
             rowTotals={gridAReordered!.rowTotals}
             colTotals={gridAReordered!.colTotals}
             overall={data.gridAOverall}
+          />
+
+          <GridTable
+            title="C · Previous rep's predicted R × Previous rep's prior stability  →  current rep's R-dev"
+            blurb={
+              <>
+                Each rep is placed by the FSRS-predicted retrievability of its{' '}
+                <em>previous</em> rep (rows) and the stability that existed before that
+                previous rep (columns). Only counts cases where the previous rep was a
+                <strong> recall pass</strong> (Hard / Good / Easy) — Again uses a different
+                stability formula. Each cell still reports observed retention,{' '}
+                <strong>pR</strong>, and <strong>R-dev</strong> for the <em>current</em>{' '}
+                rep, exactly as in Grid A. ≤1mo prior stability is excluded for the same
+                short-term-volume reason as Grid A. Requires ≥3 gradeable reps in the
+                lifetime so the previous rep has its own prior to predict from.
+                <br />
+                <br />
+                <strong>What to look for:</strong> this grid tests whether passing an
+                overdue rep gave FSRS too much stability bonus on the next interval.
+                <ul style={{ marginTop: '4px', marginBottom: '4px', paddingLeft: '18px' }}>
+                  <li>
+                    <strong>Top rows (prev pR ≈ 95%)</strong> are on-schedule reps. R-dev
+                    near 0 here is the sanity baseline.
+                  </li>
+                  <li>
+                    <strong>Bottom rows (prev pR ≈ 50–70%)</strong> are the overdue passes —
+                    where the bonus from a successful late recall lands. If R-dev trends
+                    increasingly <span style={{ color: '#ef4444', fontWeight: 700 }}>
+                    negative</span> as prev pR drops, FSRS over-stretched the next
+                    prediction → the boost was excessive (consistent with your "leakage"
+                    hypothesis).
+                  </li>
+                  <li>
+                    Reading <em>down a single column</em> isolates "same prior-S regime,
+                    varying degrees of overdueness."
+                  </li>
+                  <li>
+                    Caveat: FSRS's recall-stability formula is <em>designed</em> to give a
+                    larger bonus when R was low at recall, so a mildly negative R-dev in
+                    low-pR rows is expected. The interesting signal is the{' '}
+                    <em>magnitude</em> of the drift relative to the top rows.
+                  </li>
+                </ul>
+              </>
+            }
+            rowHeader="Prev predicted R"
+            rowLabels={rRowLabelsDesc}
+            colHeader="Prev prior stability"
+            colLabels={sColLabelsACDropped}
+            cells={gridCReordered!.cells}
+            rowTotals={gridCReordered!.rowTotals}
+            colTotals={gridCReordered!.colTotals}
+            overall={data.gridCOverall}
           />
 
           <GridTable
