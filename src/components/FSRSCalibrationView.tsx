@@ -25,6 +25,32 @@ import { parseWeightsString } from '../lib/fsrs';
 import { Period, resolvePeriod } from '../lib/period';
 import { PeriodPickerCompact } from './CardMemoryAnalyticsView';
 
+// --- Cell merge helper ----------------------------------------------------
+// Used to fuse the (mostly empty) bottom-pR buckets of Grids A and B into a
+// single "0-40%" row. Reconstructs the underlying acc from each CellStats
+// (reps × retention/pR → retainedCount / sumPredR), sums, then re-derives.
+
+function mergeCells(cells: CellStats[]): CellStats {
+  let reps = 0;
+  let retainedSum = 0;
+  let predRSum = 0;
+  for (const c of cells) {
+    if (c.reps === 0 || !Number.isFinite(c.retention) || !Number.isFinite(c.avgPredR)) continue;
+    reps += c.reps;
+    retainedSum += (c.reps * c.retention) / 100;
+    predRSum += (c.reps * c.avgPredR) / 100;
+  }
+  if (reps === 0) return { reps: 0, retention: NaN, avgPredR: NaN, rDevPP: NaN };
+  const retention = (retainedSum / reps) * 100;
+  const avgPredR = (predRSum / reps) * 100;
+  return { reps, retention, avgPredR, rDevPP: retention - avgPredR };
+}
+
+// Number of pR rows shown individually at the top, before the merged bottom
+// bucket. The remaining (R_BUCKET_COUNT - INDIVIDUAL_TOP_ROWS) buckets get
+// folded into the "0-40%" row.
+const INDIVIDUAL_TOP_ROWS = 12; // 95-100% down to 40-45%
+
 // --- Formatting ----------------------------------------------------------
 
 function fmtInt(n: number): string {
@@ -456,37 +482,68 @@ export function FSRSCalibrationView() {
     }
   };
 
-  // Grid A renders rows in DESCENDING order of predicted retrievability
-  // (highest pR at top — easier to read against the column totals at the
-  // bottom). Build the index permutation once; we'll reuse it to reorder
-  // cells, row labels, and row totals together.
-  const rRowOrder = React.useMemo(
-    () => Array.from({ length: R_BUCKET_COUNT }, (_, i) => R_BUCKET_COUNT - 1 - i),
+  // Grids A and B (the pR-rowed grids) render rows in DESCENDING order of
+  // predicted retrievability. The top INDIVIDUAL_TOP_ROWS buckets are shown
+  // one per row (95-100% down to 40-45%); the remaining low-pR buckets are
+  // folded into a single "0-40%" row because they're almost always empty
+  // and otherwise just waste vertical space.
+  const topRowIndices = React.useMemo(
+    () =>
+      Array.from({ length: INDIVIDUAL_TOP_ROWS }, (_, k) => R_BUCKET_COUNT - 1 - k),
+    [],
+  );
+  const mergedRowIndices = React.useMemo(
+    () =>
+      Array.from(
+        { length: R_BUCKET_COUNT - INDIVIDUAL_TOP_ROWS },
+        (_, k) => R_BUCKET_COUNT - INDIVIDUAL_TOP_ROWS - 1 - k,
+      ),
     [],
   );
   const rRowLabelsDesc = React.useMemo(
-    () => rRowOrder.map((i) => rBucketLabel(i)),
-    [rRowOrder],
+    () => [...topRowIndices.map((i) => rBucketLabel(i)), '0–40%'],
+    [topRowIndices],
   );
 
-  // Grid A and Grid C both exclude the ≤1mo stability column entirely (also
-  // filtered out of accumulation upstream) and present rows in descending
-  // order of predicted R.
+  // Grids A and B both exclude the ≤1mo stability column entirely (also
+  // filtered out of accumulation upstream).
   const sColLabelsACDropped = React.useMemo(() => S_BUCKET_LABELS.slice(1), []);
+
+  const buildReordered = React.useCallback(
+    (grid: CellStats[][] | undefined, rowTotalsRaw: CellStats[] | undefined) => {
+      if (!grid || !rowTotalsRaw) return null;
+      const topCells = topRowIndices.map((i) => grid[i].slice(1));
+      const topRowTotals = topRowIndices.map((i) => rowTotalsRaw[i]);
+
+      const colCount = sColLabelsACDropped.length;
+      const mergedRowCells: CellStats[] = [];
+      for (let c = 0; c < colCount; c++) {
+        mergedRowCells.push(
+          mergeCells(mergedRowIndices.map((i) => grid[i].slice(1)[c])),
+        );
+      }
+      const mergedRowTotal = mergeCells(mergedRowIndices.map((i) => rowTotalsRaw[i]));
+
+      return {
+        cells: [...topCells, mergedRowCells],
+        rowTotals: [...topRowTotals, mergedRowTotal],
+      };
+    },
+    [topRowIndices, mergedRowIndices, sColLabelsACDropped],
+  );
+
   const gridAReordered = React.useMemo(() => {
     if (!data) return null;
-    const cells = rRowOrder.map((i) => data.gridA[i].slice(1));
-    const rowTotals = rRowOrder.map((i) => data.gridARowTotals[i]);
-    const colTotals = data.gridAColTotals.slice(1);
-    return { cells, rowTotals, colTotals };
-  }, [data, rRowOrder]);
+    const r = buildReordered(data.gridA, data.gridARowTotals);
+    if (!r) return null;
+    return { ...r, colTotals: data.gridAColTotals.slice(1) };
+  }, [data, buildReordered]);
   const gridCReordered = React.useMemo(() => {
     if (!data) return null;
-    const cells = rRowOrder.map((i) => data.gridC[i].slice(1));
-    const rowTotals = rRowOrder.map((i) => data.gridCRowTotals[i]);
-    const colTotals = data.gridCColTotals.slice(1);
-    return { cells, rowTotals, colTotals };
-  }, [data, rRowOrder]);
+    const r = buildReordered(data.gridC, data.gridCRowTotals);
+    if (!r) return null;
+    return { ...r, colTotals: data.gridCColTotals.slice(1) };
+  }, [data, buildReordered]);
 
   return (
     <div style={{ paddingTop: '4px' }}>
@@ -554,7 +611,7 @@ export function FSRSCalibrationView() {
           />
 
           <GridTable
-            title="C · Previous rep's predicted R × Previous rep's prior stability  →  current rep's R-dev"
+            title="B · Previous rep's predicted R × Previous rep's prior stability  →  current rep's R-dev"
             blurb={
               <>
                 Each rep is placed by the FSRS-predicted retrievability of its{' '}
@@ -607,7 +664,7 @@ export function FSRSCalibrationView() {
           />
 
           <GridTable
-            title="B · Previous grade × Stability before that grade"
+            title="C · Previous grade × Stability before that grade"
             blurb={
               <>
                 Every gradeable rep with at least two prior gradeable reps in its lifetime is
