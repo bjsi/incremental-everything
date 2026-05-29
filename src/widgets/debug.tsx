@@ -21,7 +21,7 @@ import {
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
-import { powerupCode, dismissedPowerupCode } from '../lib/consts';
+import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
@@ -619,6 +619,29 @@ function Debug() {
     }
   };
 
+  const handleCleanDismissed = async () => {
+    if (!remId) return;
+    try {
+      const focusedRem = await plugin.rem.findOne(remId);
+      if (!focusedRem) { await plugin.app.toast('No rem found!'); return; }
+
+      const hasPowerup = await focusedRem.hasPowerup(dismissedPowerupCode);
+      if (!hasPowerup) {
+        await plugin.app.toast('No dismissed powerup found!');
+        return;
+      }
+
+      await focusedRem.setPowerupProperty(dismissedPowerupCode, dismissedHistorySlotCode, []);
+      await focusedRem.setPowerupProperty(dismissedPowerupCode, dismissedDateSlotCode, []);
+      await focusedRem.removePowerup(dismissedPowerupCode);
+
+      await plugin.app.toast('Cleaned dismissed powerup and its slots!');
+    } catch (e) {
+      console.error('[CleanDismissed] Error:', e);
+      await plugin.app.toast('Failed to clean dismissed powerup.');
+    }
+  };
+
   // Cutoff: ae25eeb (2026-02-04) — the commit that started preserving
   // reviewTimeSeconds onto the Dismissed powerup's history. Before this
   // date, page-history sessionDuration is sometimes the only surviving
@@ -1117,7 +1140,15 @@ function Debug() {
 
       {dismissed && (
         <div style={{ marginTop: '16px' }}>
-           <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>Dismissed Powerup</h2>
+           <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+             Dismissed Powerup
+             <button
+               onClick={handleCleanDismissed}
+               style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: 'pointer' }}
+             >
+               Clean Dismissed Powerup
+             </button>
+           </h2>
            <Info className="dismissed-date" label="Dismissed Date" data={dismissed.dismissedDate ? `${dayjs(dismissed.dismissedDate).format('MMMM D, YYYY')} (${dayjs(dismissed.dismissedDate).fromNow()})` : 'None'} />
            <Info
             className="history"
