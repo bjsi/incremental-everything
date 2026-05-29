@@ -1,92 +1,10 @@
-import { RNPlugin, usePlugin } from '@remnote/plugin-sdk';
+import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
-import dayjs from 'dayjs';
 import { WeightedShieldBreakdown } from '../lib/utils';
-import {
-  cardPriorityShieldHistoryKey,
-  currentSubQueueIdKey,
-  documentCardPriorityShieldHistoryKey,
-  documentPriorityShieldHistoryKey,
-  priorityShieldHistoryKey,
-} from '../lib/consts';
+import { currentSubQueueIdKey } from '../lib/consts';
+import { getMonthlyBestAbsolutePriorityShield } from '../lib/shield_history';
 import { CardMemoryAnalyticsView } from './CardMemoryAnalyticsView';
 import { FSRSCalibrationView } from './FSRSCalibrationView';
-
-type ItemKind = 'incRem' | 'card';
-type ScopeKind = 'kb' | 'doc';
-
-/**
- * Highest absolute-priority shield value reached in the last 30 days for the
- * given scope+item-type. The shield value is a coverage cutoff (items with
- * priority ≤ shield are protected), so a larger number = wider coverage =
- * better. Returns null if no history is available.
- *
- * Mirrors the partition fallbacks used by PriorityShieldGraph: prefers a KB-keyed
- * partition, falls back to legacy flat layout only on the primary KB.
- */
-async function getMonthlyBestAbsolutePriorityShield(
-  plugin: RNPlugin,
-  itemKind: ItemKind,
-  scopeKind: ScopeKind,
-  docScopeId: string | null,
-): Promise<number | null> {
-  const key = itemKind === 'card'
-    ? (scopeKind === 'kb' ? cardPriorityShieldHistoryKey : documentCardPriorityShieldHistoryKey)
-    : (scopeKind === 'kb' ? priorityShieldHistoryKey : documentPriorityShieldHistoryKey);
-
-  const raw = (await plugin.storage.getSynced(key)) as any;
-  if (!raw) return null;
-
-  const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-  const currentKbId = kbData?._id || 'global';
-
-  let history: Record<string, { absolute?: number | null }> | undefined;
-
-  if (scopeKind === 'kb') {
-    if (raw[currentKbId] && typeof raw[currentKbId] === 'object') {
-      const keys = Object.keys(raw[currentKbId]);
-      if (keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
-        history = raw[currentKbId];
-      }
-    }
-    if (!history) {
-      const keys = Object.keys(raw);
-      if (keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
-        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-        if (isPrimary) {
-          const cleanLegacy: Record<string, any> = {};
-          for (const k of keys) {
-            if (/^\d{4}-\d{2}-\d{2}$/.test(k)) cleanLegacy[k] = raw[k];
-          }
-          history = cleanLegacy;
-        }
-      }
-    }
-  } else {
-    if (!docScopeId) return null;
-    if (raw[currentKbId] && raw[currentKbId][docScopeId]) {
-      history = raw[currentKbId][docScopeId];
-    } else if (raw[docScopeId]) {
-      const dateKeys = Object.keys(raw[docScopeId]);
-      if (dateKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
-        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-        if (isPrimary) history = raw[docScopeId];
-      }
-    }
-  }
-
-  if (!history) return null;
-
-  const cutoff = dayjs().subtract(30, 'day').startOf('day');
-  let best: number | null = null;
-  for (const [dateStr, entry] of Object.entries(history)) {
-    if (!entry || entry.absolute == null) continue;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
-    if (!dayjs(dateStr).isAfter(cutoff)) continue;
-    if (best == null || entry.absolute > best) best = entry.absolute;
-  }
-  return best;
-}
 
 interface MonthlyBests {
   kbIncRem: number | null;

@@ -31,6 +31,7 @@ import {
     saveAuthoritativeAggregates,
     type ProgressUpdate,
 } from "../lib/authoritative_aggregates";
+import { computeMonthlyShieldCatchUp, MonthlyShieldCatchUp } from "../lib/shield_history";
 
 export interface PracticedQueueSession {
     id: string;
@@ -721,6 +722,63 @@ function PracticedQueues() {
     );
 }
 
+function MonthlyShieldCatchUpPanel({ refreshKey }: { refreshKey: number }) {
+    const plugin = usePlugin();
+    const [data, setData] = useState<{
+        kbIncRem: MonthlyShieldCatchUp | null;
+        kbCard: MonthlyShieldCatchUp | null;
+        docIncRem: MonthlyShieldCatchUp | null;
+        docCard: MonthlyShieldCatchUp | null;
+    } | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const [kbIncRem, kbCard, docIncRem, docCard] = await Promise.all([
+                computeMonthlyShieldCatchUp(plugin, 'incRem', 'kb'),
+                computeMonthlyShieldCatchUp(plugin, 'card', 'kb'),
+                computeMonthlyShieldCatchUp(plugin, 'incRem', 'doc'),
+                computeMonthlyShieldCatchUp(plugin, 'card', 'doc'),
+            ]);
+            if (!cancelled) setData({ kbIncRem, kbCard, docIncRem, docCard });
+        })();
+        return () => { cancelled = true; };
+    }, [plugin, refreshKey]);
+
+    if (!data) return null;
+    const rows: { scopeIcon: string; scopeLabel: string; kindLabel: string; entry: MonthlyShieldCatchUp }[] = [];
+    if (data.kbIncRem) rows.push({ scopeIcon: '🌐', scopeLabel: 'KB', kindLabel: 'IncRem', entry: data.kbIncRem });
+    if (data.kbCard) rows.push({ scopeIcon: '🌐', scopeLabel: 'KB', kindLabel: 'Cards', entry: data.kbCard });
+    if (data.docIncRem) rows.push({ scopeIcon: '📄', scopeLabel: 'Doc', kindLabel: 'IncRem', entry: data.docIncRem });
+    if (data.docCard) rows.push({ scopeIcon: '📄', scopeLabel: 'Doc', kindLabel: 'Cards', entry: data.docCard });
+    if (rows.length === 0) return null;
+
+    return (
+        <div className="mt-3 p-2 bg-white/50 dark:bg-black/20 rounded text-xs">
+            <div className="uppercase font-bold text-gray-500 mb-1 tracking-wider">
+                📈 Monthly Higher Shield
+            </div>
+            <div className="flex flex-col gap-0.5">
+                {rows.map((row, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                        <span className="w-10 shrink-0">{row.scopeIcon} {row.scopeLabel}</span>
+                        <span className="w-14 shrink-0">{row.kindLabel}</span>
+                        {row.entry.dueCount > 0 ? (
+                            <>
+                                <span>priority ≤ <b className="text-gray-700 dark:text-gray-300">{Math.round(row.entry.monthlyBest)}</b></span>
+                                <span>→</span>
+                                <span><b className="text-red-500">{row.entry.dueCount.toLocaleString()}</b> due to catch up</span>
+                            </>
+                        ) : (
+                            <span>✓ At monthly higher priority shield (≤ <b className="text-gray-700 dark:text-gray-300">{Math.round(row.entry.monthlyBest)}</b>)</span>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQueueSession, onDelete: () => void, isLive?: boolean }) {
     const plugin = usePlugin();
 
@@ -995,6 +1053,8 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
                         )}
 
                     </div>
+
+                    <MonthlyShieldCatchUpPanel refreshKey={count + session.incRemsCount} />
 
                     <div className="text-xs text-green-600 font-medium mt-3 flex items-center gap-1">
                         <span className="relative flex h-2 w-2 mr-1">
