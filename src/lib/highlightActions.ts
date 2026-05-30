@@ -141,6 +141,18 @@ type CreateRemFromHighlightOptions = {
    * we can detect it automatically.
    */
   showPriorityPopupIfNew?: boolean;
+  /**
+   * True when the highlight being extracted is itself the item currently under
+   * review (e.g. the queue's current IncR, or the isolated card viewer). In that
+   * case there is no meaningful review parent, and the per-PDF "last destination"
+   * would just pin a stale global suggestion regardless of the current page — so
+   * we skip it and let page-range matching drive the suggestion instead.
+   *
+   * This must NOT be inferred from `contextRemId === null`: that is also true when
+   * the user simply triggers a highlight in the editor outside any review session,
+   * where we DO want to restore the last parent chosen for this PDF.
+   */
+  highlightIsActiveReviewItem?: boolean;
 };
 
 // Extended context that includes info about showing priority popup
@@ -387,7 +399,7 @@ export const createRemFromHighlight = async (
   highlightRem: PluginRem,
   options: CreateRemFromHighlightOptions
 ) => {
-  const { makeIncremental, sourceDocumentId, contextRemId, showPriorityPopupIfNew } = options;
+  const { makeIncremental, sourceDocumentId, contextRemId, showPriorityPopupIfNew, highlightIsActiveReviewItem } = options;
   const normalizedContextRemId = contextRemId ?? null;
 
   const highlightIsAlreadyIncremental = await highlightRem.hasPowerup(powerupCode);
@@ -449,12 +461,18 @@ export const createRemFromHighlight = async (
 
   const { pageIndex: highlightPageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
 
-  // When the highlight itself is the rem under review, normalizedContextRemId is
-  // null and the lastSelectedDestination key collapses to a global "last parent
-  // used for any PDF-highlight extraction from this PDF". That stale value
-  // would pin the suggestion regardless of the current page, so skip it and let
-  // the parent selector fall through to page-range matching.
-  const skipLastDestination = normalizedContextRemId === null && highlightPageIndex !== null;
+  // When the highlight itself is the rem under review, the lastSelectedDestination
+  // key collapses to a global "last parent used for any PDF-highlight extraction
+  // from this PDF". That stale value would pin the suggestion regardless of the
+  // current page, so skip it and let the parent selector fall through to page-range
+  // matching.
+  //
+  // This must be keyed off the explicit `highlightIsActiveReviewItem` flag, NOT
+  // `normalizedContextRemId === null`. The latter is also true when the user
+  // triggers a highlight in the editor outside any review session, where we DO
+  // want to restore the last parent remembered for this PDF (saved under the
+  // per-PDF key in createRemUnderParent).
+  const skipLastDestination = highlightIsActiveReviewItem === true && highlightPageIndex !== null;
   const lastSelectedDestination = skipLastDestination
     ? null
     : await getLastSelectedDestination(

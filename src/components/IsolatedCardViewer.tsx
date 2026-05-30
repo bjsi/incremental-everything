@@ -156,6 +156,10 @@ export function IsolatedCardViewer({
         makeIncremental,
         sourceDocumentId,
         showPriorityPopupIfNew: makeIncremental,
+        // The isolated card viewer shows the queue's current review item, so the
+        // highlight is itself under review — prefer page-range matching over the
+        // per-PDF last destination (preserves prior behavior).
+        highlightIsActiveReviewItem: true,
       });
     } catch (error) {
       console.error('Error creating rem:', error);
