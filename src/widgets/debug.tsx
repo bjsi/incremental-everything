@@ -11,7 +11,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
-import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems } from '../lib/card_priority/batch';
+import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -48,6 +48,8 @@ function Debug() {
     []
   );
   const remId = ctx?.contextData?.remId;
+  const [refreshKey, setRefreshKey] = useState(0);
+  
   const debugData = useTrackerPlugin(
     async (rp) => {
       const rem = await rp.rem.findOne(remId);
@@ -84,7 +86,7 @@ function Debug() {
         rem
       };
     },
-    [remId]
+    [remId, refreshKey]
   );
 
   const [cardCompare, setCardCompare] = useState<{
@@ -964,6 +966,7 @@ function Debug() {
       const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map((r: any) => r.id));
       if (result.success) {
         totalCleaned += result.cleanedCount;
+        setRefreshKey(k => k + 1);
       } else {
         await plugin.app.toast('Cleanup failed during batch. Check console.');
         return;
@@ -974,21 +977,28 @@ function Debug() {
   };
 
   const handleSanitize = async () => {
-    if (!hasSpuriousTags) return;
+    if (!rem) return;
+    await plugin.app.toast('Scanning for rogue properties...');
+    const { guaranteedRogue: allGuaranteed, suspicious: allSuspicious } = await getSpuriousCardPriorityTags(plugin, rem, true);
+    
+    if (allGuaranteed.length === 0 && allSuspicious.length === 0) {
+      await plugin.app.toast('No rogue properties found in this rem or its descendants.');
+      return;
+    }
     
     let totalCleaned = 0;
     const CHUNK_SIZE = 20;
     
-    if (guaranteedRogue.length > 0) {
-      for (let i = 0; i < guaranteedRogue.length; i += CHUNK_SIZE) {
-        const chunk = guaranteedRogue.slice(i, i + CHUNK_SIZE);
+    if (allGuaranteed.length > 0) {
+      for (let i = 0; i < allGuaranteed.length; i += CHUNK_SIZE) {
+        const chunk = allGuaranteed.slice(i, i + CHUNK_SIZE);
         const listString = chunk.map((r: any) => `- ${r.name}`).join('\n');
         
-        const chunkMsg = guaranteedRogue.length > CHUNK_SIZE 
-          ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(guaranteedRogue.length/CHUNK_SIZE)})` 
+        const chunkMsg = allGuaranteed.length > CHUNK_SIZE 
+          ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(allGuaranteed.length/CHUNK_SIZE)})` 
           : '';
           
-        const confirmed = confirm(`Found ${guaranteedRogue.length} GUARANTEED rogue properties. This will safely remove CardPriority from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
+        const confirmed = confirm(`Found ${allGuaranteed.length} GUARANTEED rogue properties. This will safely remove CardPriority from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
         
         if (!confirmed) {
           if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
@@ -999,6 +1009,7 @@ function Debug() {
         const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map((r: any) => r.id));
         if (result.success) {
           totalCleaned += result.cleanedCount;
+          setRefreshKey(k => k + 1);
         } else {
           await plugin.app.toast('Sanitize failed during batch. Check console.');
           return;
@@ -1006,17 +1017,18 @@ function Debug() {
       }
     }
 
-    if (suspicious.length > 0) {
-      const proceed = confirm(`We found ${suspicious.length} SUSPICIOUS properties.\nThese are property nodes from other plugins that have CardPriority but 0 flashcards. They might be bugs, or they might be intentional.\n\nDo you want to review them one by one?`);
+    if (allSuspicious.length > 0) {
+      const proceed = confirm(`We found ${allSuspicious.length} SUSPICIOUS properties.\nThese are property nodes from other plugins that have CardPriority but 0 flashcards. They might be bugs, or they might be intentional.\n\nDo you want to review them one by one?`);
       
       if (proceed) {
-        for (const r of suspicious) {
+        for (const r of allSuspicious) {
           const confirmDelete = confirm(`⚠️ Suspicious Property Found\n\nProperty Text: "${r.name}"\nParent Rem: "${r.parentName}"\n\nThis property has no flashcards. Do you want to remove CardPriority from it?`);
           
           if (confirmDelete) {
             const result = await removeCardPriorityFromSpecificRems(plugin, [r.id]);
             if (result.success) {
               totalCleaned += result.cleanedCount;
+              setRefreshKey(k => k + 1);
             }
           }
         }
@@ -1024,6 +1036,21 @@ function Debug() {
     }
     
     await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tags total.`);
+  };
+
+  const handleScrubPowerup = async () => {
+    if (!rem) return;
+    const proceed = confirm('This will delete all CardPriority property slots on this Rem and remove the powerup.\n\nBecause this Rem has flashcards, the plugin will automatically recreate the powerup cleanly in a few seconds. Use this to fix duplicate slots.\n\nContinue?');
+    if (!proceed) return;
+
+    await plugin.app.toast('Scrubbing CardPriority data...');
+    const result = await removeCardPriorityFromRem(plugin, rem);
+    if (result.success) {
+      await plugin.app.toast('Successfully scrubbed CardPriority. It should rebuild automatically soon.');
+      setRefreshKey(k => k + 1);
+    } else {
+      await plugin.app.toast('Failed to scrub CardPriority. Check console.');
+    }
   };
 
   const preStyle = { backgroundColor: 'var(--rn-clr-background-secondary)', padding: '8px', borderRadius: '4px', marginTop: '4px', fontSize: '11px', overflowX: 'auto' as 'auto' };
@@ -1118,6 +1145,21 @@ function Debug() {
                  }}
                >
                  Sanitize Rogue Tags
+               </button>
+               <button
+                 onClick={handleScrubPowerup}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-warning)',
+                   color: 'var(--rn-clr-content-warning)',
+                   border: '1px solid var(--rn-clr-border-warning)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="Delete all CardPriority slots and let the plugin recreate them to fix duplicates"
+               >
+                 Scrub Duplicate Slots
                </button>
              </div>
            </h2>
