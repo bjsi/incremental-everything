@@ -155,7 +155,7 @@ const SCOPE_EXPANSION_CONCURRENCY = 12;
  * (which gathering rule contributes the marginal rems/cards). Temporary instrument
  * to decide how to tighten over-collection; flip off (or remove) once settled.
  */
-const SCOPE_DIAGNOSTICS = true;
+const SCOPE_DIAGNOSTICS = false;
 
 /**
  * Builds a comprehensive scope for a given rem, mirroring RemNote's own
@@ -196,8 +196,13 @@ export async function buildComprehensiveScope(
   const fqSet = new Set<RemId>();          // allRemInFolderQueue (base truth)
   const topBodySet = new Set<RemId>();     // top rem + its descendants + its context
   const expansionBodySet = new Set<RemId>(); // bodies of recursed sources/tagged roots
-  const referencedSet = new Set<RemId>();  // remsBeingReferenced leaves
-  const backrefSet = new Set<RemId>();     // remsReferencingThis leaves
+  const referencedSet = new Set<RemId>();  // remsBeingReferenced leaves (any root)
+  const backrefSet = new Set<RemId>();     // remsReferencingThis leaves (any root)
+  // Leaves gathered specifically from the TOP document body — i.e. the ones option
+  // (B) would KEEP. The rest of referencedSet/backrefSet come from source/tagged
+  // expansion bodies and are what (B) would DROP.
+  const refFromTopSet = new Set<RemId>();
+  const backrefFromTopSet = new Set<RemId>();
 
   const slot = await plugin.powerup.getPowerupSlotByCode(powerupCode, nextRepDateSlotCode);
   const nextRepDateSlotId: RemId | null = slot?._id ?? null;
@@ -272,16 +277,19 @@ export async function buildComprehensiveScope(
         for (const r of referenced) {
           result.add(r._id);
           referencedSet.add(r._id);
+          if (isTopRoot) refFromTopSet.add(r._id);
         }
         for (const ref of referencing) {
           if (nextRepDateSlotId && (ref.text?.[0] as any)?._id === nextRepDateSlotId) {
             if (ref.parent) {
               result.add(ref.parent);
               backrefSet.add(ref.parent);
+              if (isTopRoot) backrefFromTopSet.add(ref.parent);
             }
           } else {
             result.add(ref._id);
             backrefSet.add(ref._id);
+            if (isTopRoot) backrefFromTopSet.add(ref._id);
           }
         }
       })
@@ -325,12 +333,17 @@ export async function buildComprehensiveScope(
   console.log(`[buildComprehensiveScope] Comprehensive scope contains ${result.size} unique rems`);
 
   if (SCOPE_DIAGNOSTICS) {
+    // Order matters: top-reachable ref/backref buckets are claimed BEFORE the
+    // "any root" sets, so the latter end up holding only the expansion-only
+    // remainder — exactly what option (B) would drop.
     await logScopeAttribution(plugin, result, [
       { name: 'allRemInFolderQueue (base truth)', ids: fqSet },
       { name: 'top document body (rem + descendants + context)', ids: topBodySet },
       { name: 'source/tagged expansion (their bodies)', ids: expansionBodySet },
-      { name: 'referenced — remsBeingReferenced (leaf)', ids: referencedSet },
-      { name: 'backreferenced — remsReferencingThis (leaf)', ids: backrefSet },
+      { name: 'referenced — from TOP body          [(B) KEEPS]', ids: refFromTopSet },
+      { name: 'backreferenced — from TOP body      [(B) KEEPS]', ids: backrefFromTopSet },
+      { name: 'referenced — expansion-only         [(B) DROPS]', ids: referencedSet },
+      { name: 'backreferenced — expansion-only     [(B) DROPS]', ids: backrefSet },
     ]);
   }
 
