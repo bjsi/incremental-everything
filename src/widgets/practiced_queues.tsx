@@ -873,7 +873,10 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
     if (isLive) {
         return (
             <div className="p-4 border-l-4 border-green-500 bg-green-500/5 rounded-r-lg shadow-sm mb-4">
-                <div onClick={handleOpen} className="cursor-pointer">
+                {/* No click-to-open on the live card: handleOpen navigates to the
+                    queue's source document, which closes the running queue —
+                    never wanted mid-review. Click-to-open stays on history items. */}
+                <div>
                     <div className="font-bold text-xl mb-3 truncate" title={session.scopeName || "Ad-hoc Queue"}>
                         {session.scopeName ? session.scopeName : (session.queueId ? (
                             <RemViewer remId={session.queueId} width="100%" />
