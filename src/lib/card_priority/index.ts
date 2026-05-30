@@ -273,7 +273,8 @@ export async function calculateNewPriority(
 export async function getDueCardsWithPriorities(
   plugin: RNPlugin,
   scopeRem: PluginRem | null,
-  includeNonPrioritized: boolean = true
+  includeNonPrioritized: boolean = true,
+  precomputedScopeIds?: Set<RemId>
 ): Promise<
   Array<{
     rem: PluginRem;
@@ -296,7 +297,7 @@ export async function getDueCardsWithPriorities(
 
   if (!allCardInfos || allCardInfos.length === 0) {
     console.warn(`[getDueCardsWithPriorities] Cache is empty! Consider running cache build first.`);
-    return getDueCardsWithPrioritiesSlow(plugin, scopeRem, includeNonPrioritized);
+    return getDueCardsWithPrioritiesSlow(plugin, scopeRem, includeNonPrioritized, precomputedScopeIds);
   }
 
   console.log(`[getDueCardsWithPriorities] Cache loaded: ${allCardInfos.length} card priority entries`);
@@ -306,7 +307,10 @@ export async function getDueCardsWithPriorities(
 
   let scopeRemIds: Set<RemId>;
 
-  if (scopeRem) {
+  if (precomputedScopeIds) {
+    scopeRemIds = precomputedScopeIds;
+    console.log(`[getDueCardsWithPriorities] Reusing precomputed scope: ${scopeRemIds.size} unique rems`);
+  } else if (scopeRem) {
     console.log(`[getDueCardsWithPriorities] Gathering comprehensive scope...`);
     scopeRemIds = await buildComprehensiveScope(plugin, scopeRem._id);
     console.log(`[getDueCardsWithPriorities] Comprehensive scope contains ${scopeRemIds.size} unique rems`);
@@ -372,7 +376,8 @@ export async function getDueCardsWithPriorities(
 async function getDueCardsWithPrioritiesSlow(
   plugin: RNPlugin,
   scopeRem: PluginRem | null,
-  includeNonPrioritized: boolean = true
+  includeNonPrioritized: boolean = true,
+  precomputedScopeIds?: Set<RemId>
 ): Promise<
   Array<{
     rem: PluginRem;
@@ -407,7 +412,10 @@ async function getDueCardsWithPrioritiesSlow(
 
   let remsToCheckIds: Set<RemId>;
 
-  if (scopeRem) {
+  if (precomputedScopeIds) {
+    remsToCheckIds = precomputedScopeIds;
+    console.log(`[getDueCardsWithPrioritiesSlow] Reusing precomputed scope: ${remsToCheckIds.size} unique rems`);
+  } else if (scopeRem) {
     console.log(`[getDueCardsWithPrioritiesSlow] Starting comprehensive scope gathering...`);
     remsToCheckIds = await buildComprehensiveScope(plugin, scopeRem._id);
     console.log(`[getDueCardsWithPrioritiesSlow] Comprehensive scope: ${remsToCheckIds.size} unique rems`);

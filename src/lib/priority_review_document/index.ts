@@ -247,7 +247,8 @@ export async function createPriorityReviewDocument(
   const cardsWithPriority = await getDueCardsWithPriorities(
     plugin,
     scopeRem,
-    true
+    true,
+    comprehensiveScopeIds ?? undefined
   );
 
   // Skipped paused items are collected lazily inside addCard as cards are pulled.
