@@ -1,6 +1,6 @@
 import { RNPlugin, PluginRem, RichTextInterface, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem';
-import { getCardRandomness, getSortingRandomness, applySortingCriteria } from '../sorting';
+import { getCardRandomness, getSortingRandomness, getWeightSelectionK, applySortingCriteria } from '../sorting';
 import { getDueCardsWithPriorities } from '../card_priority';
 import {
   allIncrementalRemKey,
@@ -309,9 +309,10 @@ export async function createPriorityReviewDocument(
   // 4. Apply sorting criteria (Randomness)
   const incRemRandomness = await getSortingRandomness(plugin);
   const cardRandomness = await getCardRandomness(plugin);
+  const weightK = await getWeightSelectionK(plugin);
 
-  const sortedIncRems = applySortingCriteria((dueIncRems as any[]), incRemRandomness);
-  const sortedCards = applySortingCriteria(cardsWithPriority, cardRandomness);
+  const sortedIncRems = applySortingCriteria((dueIncRems as any[]), incRemRandomness, weightK);
+  const sortedCards = applySortingCriteria(cardsWithPriority, cardRandomness, weightK);
 
   // 5. Mix Items & Attach Pre-calculated Percentiles
   interface MixedItem {
