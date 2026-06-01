@@ -1,0 +1,602 @@
+/**
+ * Card Priority × Memory Analytics — replays every card's FSRS history and
+ * aggregates per-card stats into 10 priority-percentile buckets plus an
+ * overall KB row. Used by the new tab in WeightedShieldPopupView.
+ *
+ * Card population follows the `card.getAll()` + filter-by-remId pattern so
+ * disabled / paused cards are included (matching other batch flows).
+ * Priority is inherited from the owning Rem (read from the existing
+ * allCardPriorityInfoKey cache); cards from rems missing in that cache are
+ * skipped.
+ */
+
+import { RNPlugin, QueueInteractionScore } from '@remnote/plugin-sdk';
+import { CardPriorityInfo } from './card_priority/types';
+import {
+  computeFSRSState,
+  computeFSRSStatesPerReview,
+  forgettingCurve,
+  resolveWeights,
+} from './fsrs';
+
+export interface CardBucketStats {
+  label: string;          // "0-10%" or "All KB"
+  priorityRange: string;  // e.g. "6-12", or "—"
+  // Population
+  cards: number;
+  due: number;
+  donePct: number;        // 0-100, (cards - due) / cards
+  newCount: number;
+  newPct: number;
+  staleCount: number;
+  stalePct: number;
+  // Throughput — all aggregates use gradeable reps (Again/Hard/Good/Easy)
+  // over the full history, with each rep's responseTime capped at cardCapMs
+  // (matches study_dashboard / practiced_queues).
+  totReps: number;        // total gradeable reps
+  totTimeMs: number;      // total capped response time
+  avgReps: number;        // totReps / cards
+  avgTimeMs: number;      // totTimeMs / cards
+  cpm: number;            // totReps / (totTimeMs / 60_000)
+  avgTimePerRepMs: number;// totTimeMs / totReps
+  avgCostMinPerYear: number; // mean of per-card cost over cards with cost
+  // Outcome
+  avgLapses: number;      // mean over non-new cards
+  retention: number;      // 0-100, (gradeableReps - agains) / gradeableReps
+  avgPredR: number;       // 0-100, mean predicted R over every step where r != null
+  rDevPP: number;         // retention - avgPredR (percentage points)
+  avgGrade: number;       // 1-4
+  // FSRS current state (today)
+  avgD: number;
+  avgRtoday: number;      // 0-100
+  avgS: number;           // days
+}
+
+export interface CardAnalyticsBreakdown {
+  buckets: CardBucketStats[];   // length 10
+  overall: CardBucketStats;
+  totalCards: number;
+  computedAt: number;
+  /** Cards seen from card.getAll() whose rem was missing from the priority cache (skipped). */
+  cardsSkippedNoPriority: number;
+  /**
+   * Whether pre-RESET history was excluded. Persisted in the cache so the view
+   * can sync the toggle to the data it's showing and recompute on mismatch.
+   */
+  ignorePreReset: boolean;
+  /**
+   * The period applied to per-rep stats. Persisted so the view can sync its
+   * picker to the data it's showing and recompute on mismatch. Stored as the
+   * raw Period id + the resolved [startMs, endMs) bounds; the resolver is not
+   * idempotent across midnights, so storing the bounds is safer than only the id.
+   */
+  period: string;          // raw Period id, e.g. 'thisYear'
+  periodStartMs: number;
+  periodEndMs: number;
+  periodCustomStart: string;
+  periodCustomEnd: string;
+  /**
+   * Pre-finalized stats per absolute-priority threshold T (index 0..100).
+   * `byPriorityPrefix[T]` aggregates every card whose owning Rem's priority
+   * is ≤ T — i.e. the subset "Priority ≤ T". The view's threshold slider
+   * reads this directly, so dragging the slider is just an array lookup.
+   * `byPriorityPrefix[100]` equals `overall` (modulo label / priorityRange).
+   */
+  byPriorityPrefix: CardBucketStats[];
+}
+
+interface AccData {
+  count: number;
+  minPriority: number;
+  maxPriority: number;
+  due: number;
+  newCount: number;
+  staleCount: number;
+  // Throughput aggregates (all over gradeable reps in the FULL history, capped responseTime)
+  totGradeableReps: number;
+  totTimeMs: number;
+  totAgains: number;
+  // Outcome aggregates
+  totLapses: number;
+  nonNewCards: number;
+  sumCost: number;
+  cardsWithCost: number;
+  sumPredR: number;
+  predRCount: number;
+  sumGrade: number;
+  gradeCount: number;
+  // FSRS aggregates
+  sumD: number;
+  sumS: number;
+  sumRtoday: number;
+  fsrsCount: number;
+}
+
+interface PerCardStats {
+  isDue: boolean;
+  isNew: boolean;
+  isStale: boolean;
+  /** Gradeable repetitions over the FULL history (matches study_dashboard.cardReps). */
+  gradeableReps: number;
+  /** Sum of response time across gradeable reps, each capped at cardCapMs. */
+  totalTimeMs: number;
+  agains: number;
+  lapses: number;
+  cost: number | null;
+  sumPredR: number;
+  predRCount: number;
+  sumGrade: number;
+  gradeCount: number;
+  d: number | null;
+  s: number | null;
+  rToday: number | null;
+}
+
+/**
+ * Element-wise sum of two AccData. Used to build the by-priority prefix-sum
+ * table — adding each priority bucket to the running total. minPriority /
+ * maxPriority are merged by min/max; everything else is additive.
+ */
+function mergeAcc(a: AccData, b: AccData): AccData {
+  return {
+    count: a.count + b.count,
+    minPriority: Math.min(a.minPriority, b.minPriority),
+    maxPriority: Math.max(a.maxPriority, b.maxPriority),
+    due: a.due + b.due,
+    newCount: a.newCount + b.newCount,
+    staleCount: a.staleCount + b.staleCount,
+    totGradeableReps: a.totGradeableReps + b.totGradeableReps,
+    totTimeMs: a.totTimeMs + b.totTimeMs,
+    totAgains: a.totAgains + b.totAgains,
+    totLapses: a.totLapses + b.totLapses,
+    nonNewCards: a.nonNewCards + b.nonNewCards,
+    sumCost: a.sumCost + b.sumCost,
+    cardsWithCost: a.cardsWithCost + b.cardsWithCost,
+    sumPredR: a.sumPredR + b.sumPredR,
+    predRCount: a.predRCount + b.predRCount,
+    sumGrade: a.sumGrade + b.sumGrade,
+    gradeCount: a.gradeCount + b.gradeCount,
+    sumD: a.sumD + b.sumD,
+    sumS: a.sumS + b.sumS,
+    sumRtoday: a.sumRtoday + b.sumRtoday,
+    fsrsCount: a.fsrsCount + b.fsrsCount,
+  };
+}
+
+function makeAcc(): AccData {
+  return {
+    count: 0,
+    minPriority: Infinity,
+    maxPriority: -Infinity,
+    due: 0,
+    newCount: 0,
+    staleCount: 0,
+    totGradeableReps: 0,
+    totTimeMs: 0,
+    totAgains: 0,
+    totLapses: 0,
+    nonNewCards: 0,
+    sumCost: 0,
+    cardsWithCost: 0,
+    sumPredR: 0,
+    predRCount: 0,
+    sumGrade: 0,
+    gradeCount: 0,
+    sumD: 0,
+    sumS: 0,
+    sumRtoday: 0,
+    fsrsCount: 0,
+  };
+}
+
+function isGradeable(score: QueueInteractionScore): boolean {
+  return (
+    score === QueueInteractionScore.AGAIN ||
+    score === QueueInteractionScore.HARD ||
+    score === QueueInteractionScore.GOOD ||
+    score === QueueInteractionScore.EASY
+  );
+}
+
+function gradeValue(score: QueueInteractionScore): number | null {
+  switch (score) {
+    case QueueInteractionScore.AGAIN: return 1;
+    case QueueInteractionScore.HARD: return 2;
+    case QueueInteractionScore.GOOD: return 3;
+    case QueueInteractionScore.EASY: return 4;
+    default: return null;
+  }
+}
+
+function computeCardStats(
+  card: any,
+  weights: number[] | null,
+  now: number,
+  cardCapMs: number,
+  ignorePreReset: boolean,
+  startMs: number,
+  endMs: number,
+): PerCardStats {
+  const history = card.repetitionHistory ?? [];
+  const sorted = [...history].sort((a: any, b: any) => a.date - b.date);
+
+  // Effective history = post-RESET slice when the toggle is on, else the full
+  // history. FSRS replay below also uses the effective history so D/R/S and
+  // Avg pR stay consistent with the reps actually being counted.
+  let effective: any[] = sorted;
+  if (ignorePreReset) {
+    const lastResetIdx = sorted.map((h: any) => h.score).lastIndexOf(QueueInteractionScore.RESET);
+    if (lastResetIdx !== -1) effective = sorted.slice(lastResetIdx + 1);
+  }
+
+  const inPeriod = (h: any) => h && typeof h.date === 'number' && h.date >= startMs && h.date < endMs;
+  const isAllPeriod = startMs <= 0;
+
+  // ---- Period-filtered tallies (Reps, Time, Lapses, Retention, Grade) ----
+  let gradeableReps = 0;
+  let totalTimeMs = 0;
+  let agains = 0;
+  let sumGrade = 0;
+  let gradeCount = 0;
+
+  for (const h of effective) {
+    if (!isGradeable(h.score)) continue;
+    if (!inPeriod(h)) continue;
+    gradeableReps++;
+    const t = Math.min(Math.max(0, h.responseTime || 0), cardCapMs);
+    totalTimeMs += t;
+    if (h.score === QueueInteractionScore.AGAIN) agains++;
+    const g = gradeValue(h.score);
+    if (g !== null) {
+      sumGrade += g;
+      gradeCount++;
+    }
+  }
+  const lapses = agains;
+
+  // ---- Always-current population flags (isNew, isDue, isStale) ------------
+  //
+  // %New / %Stale / Due describe the card's CURRENT state in the KB — they
+  // don't shift when the user narrows the period. A card with reviews from
+  // years ago but none in "This Week" should not count as new.
+  let everGradeable = false;
+  for (const h of effective) {
+    if (isGradeable(h.score)) { everGradeable = true; break; }
+  }
+  const isNew = !everGradeable;
+
+  const nextRep = card.nextRepetitionTime as number | undefined;
+  const isDue = (nextRep ?? Infinity) <= now;
+
+  let isStale = false;
+  const lastRep = effective.length > 0 ? effective[effective.length - 1] : null;
+  if (lastRep && nextRep && nextRep > lastRep.date) {
+    const lastInterval = nextRep - lastRep.date;
+    const staleDate = lastRep.date + 2 * lastInterval;
+    isStale = now > staleDate;
+  }
+
+  // ---- Cost ---------------------------------------------------------------
+  // Period = 'all' → existing per-card coverage formula (lifetime cost).
+  // Finite period → annualized: time spent in period / period length in years.
+  let cost: number | null = null;
+  if (totalTimeMs > 0) {
+    const totalMinutes = totalTimeMs / 60000;
+    const yearMs = 1000 * 60 * 60 * 24 * 365;
+    if (isAllPeriod) {
+      let firstGradeableDate: number | null = null;
+      for (const h of effective) {
+        if (isGradeable(h.score)) { firstGradeableDate = h.date; break; }
+      }
+      if (firstGradeableDate) {
+        if (nextRep && nextRep > now) {
+          const coverageYears = (nextRep - firstGradeableDate) / yearMs;
+          if (coverageYears > 0) cost = totalMinutes / coverageYears;
+        } else {
+          const ageYears = (now - firstGradeableDate) / yearMs;
+          if (ageYears > 0) cost = totalMinutes / ageYears;
+        }
+      }
+    } else {
+      const periodYears = (endMs - startMs) / yearMs;
+      if (periodYears > 0) cost = totalMinutes / periodYears;
+    }
+  }
+
+  // ---- FSRS state + Avg pR ------------------------------------------------
+  // FSRS state (D / R today / S) is always-current — replayed over the full
+  // effective history regardless of period.
+  // Avg pR (predicted retrievability at the moment of each rep) is averaged
+  // only over reps in the period — same period filter as Reps/Time/Retention.
+  let sumPredR = 0;
+  let predRCount = 0;
+  let d: number | null = null;
+  let s: number | null = null;
+  let rToday: number | null = null;
+
+  if (!isNew) {
+    try {
+      const steps = computeFSRSStatesPerReview(effective, weights);
+      // FSRS leaves step.r null for learning/relearning state reps; we want
+      // Avg pR's denominator to match Retention's (every gradeable rep except
+      // the first of each FSRS "lifetime"), so we compute the forgetting-curve
+      // r ourselves for those cases using the previous gradeable rep's stability.
+      const { w } = resolveWeights(weights);
+      const DECAY = -w[20];
+      const FACTOR = Math.pow(0.9, 1 / DECAY) - 1;
+
+      let lastGradeableIdx: number | null = null;
+      for (let i = 0; i < effective.length; i++) {
+        const h = effective[i];
+
+        // RESET ends the current "lifetime" — the next gradeable rep is
+        // effectively a brand-new card and gets skipped just like the first
+        // rep of a fresh card.
+        if (h.score === QueueInteractionScore.RESET) {
+          lastGradeableIdx = null;
+          continue;
+        }
+        if (!isGradeable(h.score)) continue;
+
+        // First gradeable rep of this lifetime: no prior FSRS state to predict
+        // from. Per design, we skip it (no contribution to numerator or
+        // denominator), but still advance the reference for downstream reps.
+        if (lastGradeableIdx === null) {
+          lastGradeableIdx = i;
+          continue;
+        }
+
+        if (inPeriod(h)) {
+          const step = steps[i];
+          let r: number | null = step?.r ?? null;
+          if (r === null) {
+            // Learning/relearning rep: replicate the FSRS forgetting curve
+            // using the previous gradeable rep's stability.
+            const prevS = steps[lastGradeableIdx]?.s ?? 0;
+            const prevDate = effective[lastGradeableIdx].date;
+            const elapsedDays = (h.date - prevDate) / (1000 * 60 * 60 * 24);
+            if (prevS > 0 && elapsedDays >= 0) {
+              r = forgettingCurve(elapsedDays, prevS, DECAY, FACTOR);
+            }
+          }
+          if (r !== null && Number.isFinite(r)) {
+            sumPredR += r;
+            predRCount++;
+          }
+        }
+
+        lastGradeableIdx = i;
+      }
+
+      const state = computeFSRSState(effective, weights);
+      if (state) {
+        d = state.d;
+        s = state.s;
+        rToday = state.r;
+      }
+    } catch {
+      // FSRS failure on a single card is non-fatal — its FSRS-derived stats just stay null.
+    }
+  }
+
+  return {
+    isDue,
+    isNew,
+    isStale,
+    gradeableReps,
+    totalTimeMs,
+    agains,
+    lapses,
+    cost,
+    sumPredR,
+    predRCount,
+    sumGrade,
+    gradeCount,
+    d,
+    s,
+    rToday,
+  };
+}
+
+function accumulate(acc: AccData, stats: PerCardStats, priority: number) {
+  acc.count++;
+  if (priority < acc.minPriority) acc.minPriority = priority;
+  if (priority > acc.maxPriority) acc.maxPriority = priority;
+  if (stats.isDue) acc.due++;
+  if (stats.isNew) acc.newCount++;
+  if (stats.isStale) acc.staleCount++;
+
+  acc.totGradeableReps += stats.gradeableReps;
+  acc.totTimeMs += stats.totalTimeMs;
+  acc.totAgains += stats.agains;
+
+  if (!stats.isNew) {
+    acc.totLapses += stats.lapses;
+    acc.nonNewCards++;
+  }
+  if (stats.cost !== null) {
+    acc.sumCost += stats.cost;
+    acc.cardsWithCost++;
+  }
+
+  acc.sumPredR += stats.sumPredR;
+  acc.predRCount += stats.predRCount;
+  acc.sumGrade += stats.sumGrade;
+  acc.gradeCount += stats.gradeCount;
+
+  if (stats.d !== null && stats.s !== null && stats.rToday !== null) {
+    acc.sumD += stats.d;
+    acc.sumS += stats.s;
+    acc.sumRtoday += stats.rToday;
+    acc.fsrsCount++;
+  }
+}
+
+function finalize(acc: AccData, label: string): CardBucketStats {
+  const cards = acc.count;
+  const priorityRange =
+    cards > 0 && Number.isFinite(acc.minPriority) && Number.isFinite(acc.maxPriority)
+      ? `${acc.minPriority}-${acc.maxPriority}`
+      : '—';
+  const donePct = cards > 0 ? ((cards - acc.due) / cards) * 100 : 100;
+  const newPct = cards > 0 ? (acc.newCount / cards) * 100 : 0;
+  const stalePct = cards > 0 ? (acc.staleCount / cards) * 100 : 0;
+  const avgReps = cards > 0 ? acc.totGradeableReps / cards : 0;
+  const avgTimeMs = cards > 0 ? acc.totTimeMs / cards : 0;
+  const cpm = acc.totTimeMs > 0 ? acc.totGradeableReps / (acc.totTimeMs / 60000) : 0;
+  const avgTimePerRepMs = acc.totGradeableReps > 0 ? acc.totTimeMs / acc.totGradeableReps : 0;
+  const avgCost = acc.cardsWithCost > 0 ? acc.sumCost / acc.cardsWithCost : 0;
+  const avgLapses = acc.nonNewCards > 0 ? acc.totLapses / acc.nonNewCards : 0;
+  const retention =
+    acc.totGradeableReps > 0
+      ? ((acc.totGradeableReps - acc.totAgains) / acc.totGradeableReps) * 100
+      : 0;
+  const avgPredR = acc.predRCount > 0 ? (acc.sumPredR / acc.predRCount) * 100 : 0;
+  // R-deviation only meaningful when both retention and predicted R have a basis.
+  const rDevPP = acc.totGradeableReps > 0 && acc.predRCount > 0 ? retention - avgPredR : 0;
+  const avgGrade = acc.gradeCount > 0 ? acc.sumGrade / acc.gradeCount : 0;
+  const avgD = acc.fsrsCount > 0 ? acc.sumD / acc.fsrsCount : 0;
+  const avgS = acc.fsrsCount > 0 ? acc.sumS / acc.fsrsCount : 0;
+  const avgRtoday = acc.fsrsCount > 0 ? (acc.sumRtoday / acc.fsrsCount) * 100 : 0;
+
+  return {
+    label,
+    priorityRange,
+    cards,
+    due: acc.due,
+    donePct,
+    newCount: acc.newCount,
+    newPct,
+    staleCount: acc.staleCount,
+    stalePct,
+    totReps: acc.totGradeableReps,
+    totTimeMs: acc.totTimeMs,
+    avgReps,
+    avgTimeMs,
+    cpm,
+    avgTimePerRepMs,
+    avgCostMinPerYear: avgCost,
+    avgLapses,
+    retention,
+    avgPredR,
+    rDevPP,
+    avgGrade,
+    avgD,
+    avgRtoday,
+    avgS,
+  };
+}
+
+/**
+ * Replay FSRS over every card and aggregate per priority-percentile bucket.
+ *
+ * The expensive part is `plugin.card.getAll()` (one call) and the per-card
+ * FSRS replay (CPU only — no further async). We yield to the event loop every
+ * `YIELD_EVERY` cards so the popup stays responsive while progress updates.
+ */
+export interface PeriodSpec {
+  /** Period id (e.g. 'thisYear'). Stored on the breakdown for cache-sync. */
+  id: string;
+  startMs: number;
+  endMs: number;
+  customStart: string;
+  customEnd: string;
+}
+
+export async function computeCardAnalyticsBreakdown(
+  plugin: RNPlugin,
+  cardPriorityInfos: CardPriorityInfo[],
+  weights: number[] | null,
+  cardCapMs: number,
+  ignorePreReset: boolean,
+  period: PeriodSpec,
+  onProgress?: (done: number, total: number) => void,
+): Promise<CardAnalyticsBreakdown> {
+  const { startMs, endMs } = period;
+  // Map remId → inherited rem priority. Filter out rems with explicit zero cards.
+  const remPriority = new Map<string, number>();
+  for (const info of cardPriorityInfos) {
+    if (info.cardCount === undefined || info.cardCount > 0) {
+      remPriority.set(info.remId, info.priority);
+    }
+  }
+
+  // Pull every card from the KB (includes disabled/paused — matches batch.ts pattern).
+  const allCards = (await plugin.card.getAll()) || [];
+
+  const validCards: any[] = [];
+  let cardsSkippedNoPriority = 0;
+  for (const c of allCards) {
+    if (remPriority.has(c.remId)) validCards.push(c);
+    else cardsSkippedNoPriority++;
+  }
+
+  // Sort by inherited priority so we can bucket by 1-based index percentile.
+  validCards.sort((a, b) => (remPriority.get(a.remId)! - remPriority.get(b.remId)!));
+
+  const N = validCards.length;
+  const bucketAccs: AccData[] = Array.from({ length: 10 }, makeAcc);
+  const overallAcc = makeAcc();
+  // Per-absolute-priority accumulators (priority 0..100, inclusive). Used to
+  // produce a prefix-sum table so the threshold slider in the view becomes a
+  // pure array lookup instead of re-aggregating on every drag.
+  const byPriorityAccs: AccData[] = Array.from({ length: 101 }, makeAcc);
+  const now = Date.now();
+
+  const YIELD_EVERY = 1500;
+
+  if (onProgress) onProgress(0, N);
+
+  for (let i = 0; i < N; i++) {
+    const card = validCards[i];
+    const priority = remPriority.get(card.remId)!;
+    // 1-based index percentile so the last card lands at 100% → bucket index 9.
+    const percentile = ((i + 1) / N) * 100;
+    const bIdx = Math.min(Math.floor(percentile / 10), 9);
+    // Clamp priority into [0, 100] for the by-priority bucket index.
+    const pIdx = Math.max(0, Math.min(100, Math.round(priority)));
+
+    const stats = computeCardStats(card, weights, now, cardCapMs, ignorePreReset, startMs, endMs);
+    accumulate(bucketAccs[bIdx], stats, priority);
+    accumulate(overallAcc, stats, priority);
+    accumulate(byPriorityAccs[pIdx], stats, priority);
+
+    if ((i + 1) % YIELD_EVERY === 0) {
+      if (onProgress) onProgress(i + 1, N);
+      // Yield to the event loop so the progress bar can repaint.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  if (onProgress) onProgress(N, N);
+
+  // Build prefix-sum accumulators: prefixAccs[T] aggregates every card with
+  // priority ≤ T. Each entry is then finalized for direct rendering. Sliding
+  // becomes an O(1) lookup at the view layer.
+  const prefixAccs: AccData[] = new Array(101);
+  let running = makeAcc();
+  for (let t = 0; t <= 100; t++) {
+    running = mergeAcc(running, byPriorityAccs[t]);
+    // Clone so the array entries don't share the same underlying object
+    // (otherwise every entry would point to the final accumulator).
+    prefixAccs[t] = { ...running };
+  }
+  const byPriorityPrefix: CardBucketStats[] = prefixAccs.map((acc, t) =>
+    finalize(acc, `Priority ≤ ${t}`),
+  );
+
+  return {
+    buckets: bucketAccs.map((acc, i) => finalize(acc, `${i * 10}-${(i + 1) * 10}%`)),
+    overall: finalize(overallAcc, 'All KB'),
+    totalCards: N,
+    computedAt: Date.now(),
+    cardsSkippedNoPriority,
+    ignorePreReset,
+    period: period.id,
+    periodStartMs: period.startMs,
+    periodEndMs: period.endMs,
+    periodCustomStart: period.customStart,
+    periodCustomEnd: period.customEnd,
+    byPriorityPrefix,
+  };
+}

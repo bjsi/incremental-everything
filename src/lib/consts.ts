@@ -32,6 +32,16 @@ export const fsrsWeightsId = 'fsrs-weights';
 export const allIncrementalRemKey = 'all-incremental-rem';
 export const currentIncRemKey = 'current-inc-rem';
 export const allCardPriorityInfoKey = 'all-card-priority-info-key';
+export const cardAnalyticsCacheKey = 'card-analytics-cache-key';
+// Local-storage keys for "last selected period" — survives across sessions /
+// app restarts (device-specific). Stored shape: { period, customStart, customEnd }.
+export const cardAnalyticsLastPeriodKey = 'card-analytics-last-period';
+export const fsrsCalibrationLastPeriodKey = 'fsrs-calibration-last-period';
+export const studyDashboardLastPeriodKey = 'study-dashboard-last-period';
+// Priority Shield Graph: persists the "Show Weighted Shield" checkbox and the
+// 1M/3M/6M/1Y/All period filter across sessions. Device-specific.
+// Stored shape: { showWeightedShield: boolean, timePeriod: 'month'|'3m'|'6m'|'year'|'all' }.
+export const priorityShieldGraphPrefsKey = 'priority-shield-graph-prefs';
 export const incremReviewStartTimeKey = 'increm-review-start-time';
 // Intentional reactive signal: bump this key (via setSession) to trigger an IncRem cache reload.
 // The tracker reads it via `rp` (reactive), but calls loadIncrementalRemCache with the

@@ -15,10 +15,12 @@ import {
     dismissedPowerupCode,
     powerupCode,
     repHistorySlotCode,
+    studyDashboardLastPeriodKey,
 } from '../lib/consts';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { formatDuration, tryParseJson } from '../lib/utils';
+import { Period, resolvePeriod, parseDateInput, formatDateForDisplay } from '../lib/period';
 import { resolveRemTextSegments } from '../lib/richTextRemRefs';
 import { RemText, RemTextSegments } from '../components';
 import '../style.css';
@@ -60,20 +62,6 @@ function getButtonStyle(isSelected: boolean): React.CSSProperties {
 
 type ContextMode = 'global' | 'document';
 type ScopeMode = 'descendants' | 'comprehensive';
-type Period =
-    | 'today'
-    | 'yesterday'
-    | 'week'
-    | 'thisWeek'
-    | 'lastWeek'
-    | 'month'
-    | 'thisMonth'
-    | 'lastMonth'
-    | 'year'
-    | 'thisYear'
-    | 'lastYear'
-    | 'all'
-    | 'custom';
 
 interface CardData {
     id: string;
@@ -190,85 +178,28 @@ function isRealCardScore(score: number | undefined): boolean {
     );
 }
 
-function getStartOfDay(date: Date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-}
-function getStartOfWeek(date: Date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    d.setDate(d.getDate() - day);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-}
-function getStartOfMonth(date: Date) {
-    const d = new Date(date);
-    d.setDate(1);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-}
-function getStartOfYear(date: Date) {
-    const d = new Date(date);
-    d.setMonth(0, 1);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-}
-
-function resolvePeriod(
-    p: Period,
-    customStart: string,
-    customEnd: string
-): { startMs: number; endMs: number } {
-    const now = new Date();
-    const sodToday = getStartOfDay(now);
-    const sodTomorrow = sodToday + 86400000;
-    const sodYesterday = sodToday - 86400000;
-    const sow = getStartOfWeek(now);
-    const sowLast = sow - 7 * 86400000;
-    const som = getStartOfMonth(now);
-    const lastMonth = new Date(now);
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    const somLast = getStartOfMonth(lastMonth);
-    const soy = getStartOfYear(now);
-    const lastYear = new Date(now);
-    lastYear.setFullYear(lastYear.getFullYear() - 1);
-    const soyLast = getStartOfYear(lastYear);
-
-    switch (p) {
-        case 'today':
-            return { startMs: sodToday, endMs: sodTomorrow };
-        case 'yesterday':
-            return { startMs: sodYesterday, endMs: sodToday };
-        case 'week':
-            return { startMs: now.getTime() - 7 * 86400000, endMs: now.getTime() };
-        case 'thisWeek':
-            return { startMs: sow, endMs: now.getTime() };
-        case 'lastWeek':
-            return { startMs: sowLast, endMs: sow };
-        case 'month':
-            return { startMs: now.getTime() - 30 * 86400000, endMs: now.getTime() };
-        case 'thisMonth':
-            return { startMs: som, endMs: now.getTime() };
-        case 'lastMonth':
-            return { startMs: somLast, endMs: som };
-        case 'year':
-            return { startMs: now.getTime() - 365 * 86400000, endMs: now.getTime() };
-        case 'thisYear':
-            return { startMs: soy, endMs: now.getTime() };
-        case 'lastYear':
-            return { startMs: soyLast, endMs: soy };
-        case 'all':
-            return { startMs: 0, endMs: now.getTime() + 86400000 };
-        case 'custom': {
-            const s = new Date(customStart);
-            const e = new Date(customEnd);
-            const sMs = isNaN(s.getTime()) ? 0 : getStartOfDay(s);
-            const eMs = isNaN(e.getTime()) ? now.getTime() + 86400000 : getStartOfDay(e) + 86400000;
-            return { startMs: sMs, endMs: eMs };
+// When the "Ignore reps before last RESET" toggle is active, drop everything
+// up to and including the last RESET in each card's history. Useful after
+// importing documents whose foreign repetition history would otherwise pollute
+// retention / CPM / time metrics. Pre-RESET history is preserved on disk —
+// this is purely a presentation-time filter.
+function effectiveCardHistory(
+    history: any[] | undefined,
+    ignorePreReset: boolean
+): any[] {
+    if (!history || history.length === 0) return [];
+    if (!ignorePreReset) return history;
+    let lastResetIdx = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i] && history[i].score === QueueInteractionScore.RESET) {
+            lastResetIdx = i;
+            break;
         }
     }
+    if (lastResetIdx === -1) return history;
+    return history.slice(lastResetIdx + 1);
 }
+
 
 function emptyStats(): PeriodStats {
     return {
@@ -296,7 +227,8 @@ function statsFromRem(
     rem: RemData,
     startMs: number,
     endMs: number,
-    cardCapMs: number
+    cardCapMs: number,
+    ignorePreReset: boolean
 ): { self: PeriodStats; hasIncReps: boolean; hasDismReps: boolean } {
     const s = emptyStats();
     let hasIncReps = false;
@@ -319,7 +251,7 @@ function statsFromRem(
     }
     for (const card of rem.cards) {
         let cardHasReps = false;
-        for (const rep of card.history || []) {
+        for (const rep of effectiveCardHistory(card.history, ignorePreReset)) {
             if (!rep || typeof rep.date !== 'number') continue;
             if (rep.date < startMs || rep.date >= endMs) continue;
             if (!isRealCardScore(rep.score)) continue;
@@ -626,6 +558,7 @@ function aggregateDocumentData(
     startMs: number,
     endMs: number,
     cardCapMs: number,
+    ignorePreReset: boolean,
     onProgress: (p: number, label: string) => void
 ): { tree: BuiltTree; summary: SummaryStats } {
     const { remDataList, remDataById, stubData, childMap, rawRootIds } = data;
@@ -637,7 +570,7 @@ function aggregateDocumentData(
         const d = remDataById[id] || null;
         const rawChildrenIds = childMap[id] || [];
 
-        const self = d ? statsFromRem(d, startMs, endMs, cardCapMs) : null;
+        const self = d ? statsFromRem(d, startMs, endMs, cardCapMs, ignorePreReset) : null;
         let aggr = self ? self.self : emptyStats();
         let aggrIncTagged = d && d.isInc ? 1 : 0;
         let aggrDismTagged = d && d.isDism ? 1 : 0;
@@ -723,7 +656,7 @@ function aggregateDocumentData(
     };
 
     for (const rd of remDataList) {
-        const { hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
+        const { hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs, ignorePreReset);
         if (rd.isInc) {
             summary.incTaggedCount += 1;
             if (hasIncReps) summary.incTaggedWithRepsCount += 1;
@@ -757,7 +690,7 @@ function aggregateDocumentData(
         for (const card of rd.cards) {
             summary.cardsCount += 1;
             let cardHasReps = false;
-            for (const rep of card.history || []) {
+            for (const rep of effectiveCardHistory(card.history, ignorePreReset)) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
                 if (!isRealCardScore(rep.score)) continue;
@@ -966,6 +899,7 @@ function aggregateGlobalData(
     startMs: number,
     endMs: number,
     cardCapMs: number,
+    ignorePreReset: boolean,
     onProgress: (p: number, label: string) => void
 ): {
     topLevels: DashboardData['topLevels'];
@@ -1027,7 +961,7 @@ function aggregateGlobalData(
         const rd = remEntries[i];
         const chain = parentChainCache.get(rd.id) || [rd.id];
         const topId = chain[chain.length - 1] || rd.id;
-        const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs);
+        const { self, hasIncReps, hasDismReps } = statsFromRem(rd, startMs, endMs, cardCapMs, ignorePreReset);
         const top = ensureTop(topId);
         top.aggr = addStats(top.aggr, self);
         if (rd.isInc) {
@@ -1072,7 +1006,7 @@ function aggregateGlobalData(
         summary.cardsCount += rd.cards.length;
         for (const card of rd.cards) {
             let cardHasReps = false;
-            for (const rep of card.history || []) {
+            for (const rep of effectiveCardHistory(card.history, ignorePreReset)) {
                 if (!rep || typeof rep.date !== 'number') continue;
                 if (rep.date < startMs || rep.date >= endMs) continue;
                 if (!isRealCardScore(rep.score)) continue;
@@ -1136,7 +1070,7 @@ function aggregateGlobalData(
             const data = remDataById.get(id) || null;
             const rawChildrenIds = Array.from(childMap.get(id) || []);
 
-            const self = data ? statsFromRem(data, startMs, endMs, cardCapMs) : null;
+            const self = data ? statsFromRem(data, startMs, endMs, cardCapMs, ignorePreReset) : null;
             let aggr = self ? self.self : emptyStats();
             let aggrIncTagged = data && data.isInc ? 1 : 0;
             let aggrDismTagged = data && data.isDism ? 1 : 0;
@@ -1228,6 +1162,62 @@ function PeriodPicker({
         </button>
     );
 
+    // Local draft state for custom date text inputs — typing does NOT trigger
+    // recomputation. Only blur or Enter commits the parsed value.
+    const [draftStart, setDraftStart] = useState(formatDateForDisplay(customStart));
+    const [draftEnd, setDraftEnd] = useState(formatDateForDisplay(customEnd));
+
+    // Sync drafts when canonical values change externally (preset selected).
+    useEffect(() => {
+        setDraftStart(formatDateForDisplay(customStart));
+    }, [customStart]);
+    useEffect(() => {
+        setDraftEnd(formatDateForDisplay(customEnd));
+    }, [customEnd]);
+
+    const commitStart = () => {
+        const parsed = parseDateInput(draftStart);
+        // Editing Start Date while in 'since' keeps the period as 'since' —
+        // for all other modes (including 'custom'), it switches to 'custom'.
+        const nextPeriod: Period = period === 'since' ? 'since' : 'custom';
+        if (parsed) {
+            setDraftStart(formatDateForDisplay(parsed));
+            if (parsed !== customStart) {
+                onCustomChange(parsed, customEnd);
+                onChange(nextPeriod);
+            }
+        } else if (draftStart === '') {
+            if (customStart !== '') {
+                onCustomChange('', customEnd);
+                onChange(nextPeriod);
+            }
+        } else {
+            setDraftStart(formatDateForDisplay(customStart));
+        }
+    };
+
+    const commitEnd = () => {
+        // 'since' has no end date — editing End Date always switches to 'custom'.
+        const parsed = parseDateInput(draftEnd);
+        if (parsed) {
+            setDraftEnd(formatDateForDisplay(parsed));
+            if (parsed !== customEnd) {
+                onCustomChange(customStart, parsed);
+                onChange('custom');
+            }
+        } else if (draftEnd === '') {
+            if (customEnd !== '') {
+                onCustomChange(customStart, '');
+                onChange('custom');
+            }
+        } else {
+            setDraftEnd(formatDateForDisplay(customEnd));
+        }
+    };
+
+    const isStartInvalid = draftStart !== '' && !parseDateInput(draftStart);
+    const isEndInvalid = draftEnd !== '' && !parseDateInput(draftEnd);
+
     return (
         <div>
             {/* 5x3 grid matching the statistics plugin */}
@@ -1251,7 +1241,7 @@ function PeriodPicker({
                 <div style={{ gridColumn: '4', gridRow: '2' }}>{renderPresetBtn('This Year', 'thisYear')}</div>
                 <div style={{ gridColumn: '4', gridRow: '3' }}>{renderPresetBtn('Last Year', 'lastYear')}</div>
 
-                <div style={{ gridColumn: '5', gridRow: '1 / 4' }}>
+                <div style={{ gridColumn: '5', gridRow: '1 / 3' }}>
                     <button
                         onClick={() => onChange('all')}
                         className="w-full h-full rounded px-2 py-1 text-xs transition-all hover:opacity-90 flex items-center justify-center font-bold"
@@ -1260,36 +1250,82 @@ function PeriodPicker({
                         All
                     </button>
                 </div>
+                <div style={{ gridColumn: '5', gridRow: '3' }}>
+                    <button
+                        onClick={() => onChange('since')}
+                        title="From this day on (start date below; end = now)"
+                        className="w-full h-full rounded px-2 py-1 text-xs transition-all hover:opacity-90 flex items-center justify-center"
+                        style={getButtonStyle(period === 'since')}
+                    >
+                        Since…
+                    </button>
+                </div>
             </div>
 
             <div className="flex flex-wrap gap-2 md:gap-4 items-end mt-3">
                 <div className="flex flex-col flex-1 min-w-[120px]">
                     <span className="text-xs opacity-70 mb-1">Start Date</span>
-                    <input
-                        type="date"
-                        value={customStart}
-                        onChange={(e) => {
-                            onCustomChange(e.target.value, customEnd);
-                            onChange('custom');
-                        }}
-                        className="border rounded px-2 py-1 text-sm w-full"
-                        style={inputStyle}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <input
+                            type="text"
+                            placeholder="DD/MM/YYYY"
+                            value={draftStart}
+                            onChange={(e) => setDraftStart(e.target.value)}
+                            onBlur={commitStart}
+                            onKeyDown={(e) => { if (e.key === 'Enter') commitStart(); }}
+                            className="border rounded px-2 py-1 text-sm w-full"
+                            style={{
+                                ...inputStyle,
+                                borderColor: isStartInvalid ? '#ef4444' : inputStyle.borderColor,
+                            }}
+                        />
+                        <input
+                            type="date"
+                            className="date-picker-icon-only"
+                            value={customStart}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setDraftStart(formatDateForDisplay(v));
+                                onCustomChange(v, customEnd);
+                                onChange('custom');
+                            }}
+                            title="Pick from calendar"
+                            tabIndex={-1}
+                        />
+                    </div>
                 </div>
                 <div className="flex flex-col flex-1 min-w-[120px]">
                     <span className="text-xs opacity-70 mb-1">End Date</span>
-                    <input
-                        type="date"
-                        value={customEnd}
-                        onChange={(e) => {
-                            onCustomChange(customStart, e.target.value);
-                            onChange('custom');
-                        }}
-                        className="border rounded px-2 py-1 text-sm w-full"
-                        style={inputStyle}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <input
+                            type="text"
+                            placeholder="DD/MM/YYYY"
+                            value={draftEnd}
+                            onChange={(e) => setDraftEnd(e.target.value)}
+                            onBlur={commitEnd}
+                            onKeyDown={(e) => { if (e.key === 'Enter') commitEnd(); }}
+                            className="border rounded px-2 py-1 text-sm w-full"
+                            style={{
+                                ...inputStyle,
+                                borderColor: isEndInvalid ? '#ef4444' : inputStyle.borderColor,
+                            }}
+                        />
+                        <input
+                            type="date"
+                            className="date-picker-icon-only"
+                            value={customEnd}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setDraftEnd(formatDateForDisplay(v));
+                                onCustomChange(customStart, v);
+                                onChange('custom');
+                            }}
+                            title="Pick from calendar"
+                            tabIndex={-1}
+                        />
+                    </div>
                 </div>
-                {period === 'custom' && (
+                {(period === 'custom' || period === 'since') && (
                     <button
                         onClick={() => onChange('today')}
                         className="text-xs hover:underline mb-2 ml-auto"
@@ -1796,6 +1832,12 @@ function StudyDashboardPopup() {
     // Default to Global: it's the most common entry point and avoids surprising
     // the user by silently scoping to whatever rem they happened to have focused.
     // The user can switch to Document at any time (still allowed only when ctxRemId is present).
+    // Mirror of the same toggle in the Card Priority × Memory Analytics widget.
+    // Default OFF → use full history (matches existing behavior). When ON, drop
+    // every rep up to and including the last RESET on each card — useful after
+    // importing documents whose foreign repetition history would otherwise
+    // skew retention, time, and CPM.
+    const [ignorePreReset, setIgnorePreReset] = useState<boolean>(false);
     const [contextMode, setContextMode] = useState<ContextMode>('global');
     const [scope, setScope] = useState<ScopeMode>('comprehensive');
     const [period, setPeriod] = useState<Period>('thisYear');
@@ -1808,9 +1850,12 @@ function StudyDashboardPopup() {
     );
 
     // Reflect the resolved range in the Start/End date inputs when a preset is picked.
-    // For 'all', leave the inputs blank (no meaningful start). 'custom' leaves them as typed.
+    // - 'custom' leaves them as typed.
+    // - 'since' is driven by customStart; we leave both inputs alone (the user
+    //   picked the start, end is implicitly "now").
+    // - 'all' clears the inputs (no meaningful start).
     useEffect(() => {
-        if (period === 'custom') return;
+        if (period === 'custom' || period === 'since') return;
         if (period === 'all') {
             if (customStart !== '') setCustomStart('');
             if (customEnd !== '') setCustomEnd('');
@@ -1830,6 +1875,50 @@ function StudyDashboardPopup() {
         if (newStart !== customStart) setCustomStart(newStart);
         if (newEnd !== customEnd) setCustomEnd(newEnd);
     }, [period, startMs, endMs]);
+
+    // Hydrate prefs (period + ignorePreReset) from device-local storage on
+    // mount, then persist whenever the user changes them. The ref gate
+    // prevents the persist effect from firing with the defaults before
+    // hydration completes.
+    const periodHydratedRef = useRef(false);
+    useEffect(() => {
+        let cancelled = false;
+        plugin.storage
+            .getLocal<{
+                period?: Period;
+                customStart?: string;
+                customEnd?: string;
+                ignorePreReset?: boolean;
+            } | null>(studyDashboardLastPeriodKey)
+            .then((saved) => {
+                if (cancelled) return;
+                if (saved?.period) setPeriod(saved.period);
+                if (saved?.customStart !== undefined) setCustomStart(saved.customStart);
+                if (saved?.customEnd !== undefined) setCustomEnd(saved.customEnd);
+                if (typeof saved?.ignorePreReset === 'boolean') {
+                    setIgnorePreReset(saved.ignorePreReset);
+                }
+            })
+            .catch(() => {})
+            .finally(() => {
+                if (!cancelled) periodHydratedRef.current = true;
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [plugin]);
+
+    useEffect(() => {
+        if (!periodHydratedRef.current) return;
+        plugin.storage
+            .setLocal(studyDashboardLastPeriodKey, {
+                period,
+                customStart,
+                customEnd,
+                ignorePreReset,
+            })
+            .catch(() => {});
+    }, [plugin, period, customStart, customEnd, ignorePreReset]);
 
     const cardCapMs = useRunAsync(async () => {
         const v = await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING);
@@ -1887,6 +1976,7 @@ function StudyDashboardPopup() {
                     startMs,
                     endMs,
                     cardCapMs,
+                    ignorePreReset,
                     (p, label) => {
                         if (runId !== runIdRef.current) return;
                         setProgress({ running: true, percent: 0.8 + 0.2 * p, label });
@@ -1911,6 +2001,7 @@ function StudyDashboardPopup() {
                     startMs,
                     endMs,
                     cardCapMs,
+                    ignorePreReset,
                     (p, label) => {
                         if (runId !== runIdRef.current) return;
                         setProgress({ running: true, percent: 0.8 + 0.2 * p, label });
@@ -1928,7 +2019,7 @@ function StudyDashboardPopup() {
                 setProgress({ running: false, percent: 1, label: '' });
             }
         }
-    }, [plugin, contextMode, ctxRemId, scope, startMs, endMs, cardCapMs]);
+    }, [plugin, contextMode, ctxRemId, scope, startMs, endMs, cardCapMs, ignorePreReset]);
 
     useEffect(() => {
         if (cardCapMs == null) return;
@@ -2151,6 +2242,29 @@ function StudyDashboardPopup() {
                                 }}
                             />
                         </div>
+                    </div>
+
+                    {/* Filter row — toggle for ignoring pre-RESET history. */}
+                    <div
+                        className="mt-3 pt-3 flex items-center gap-2 text-xs"
+                        style={{ borderTop: '1px solid var(--rn-clr-background-secondary)' }}
+                    >
+                        <label
+                            className="flex items-center gap-2 cursor-pointer"
+                            title="Useful after importing documents with foreign repetition history: only count card reps after the last RESET on each card."
+                        >
+                            <input
+                                type="checkbox"
+                                checked={ignorePreReset}
+                                onChange={(e) => setIgnorePreReset(e.target.checked)}
+                                className="form-checkbox h-3.5 w-3.5"
+                                style={{ accentColor: ACCENT_COLOR }}
+                            />
+                            <span className="opacity-80">Ignore card reps before last RESET</span>
+                        </label>
+                        <span className="opacity-50" style={{ fontSize: '10px' }}>
+                            (recomputes stats; does not modify stored history)
+                        </span>
                     </div>
                 </div>
 

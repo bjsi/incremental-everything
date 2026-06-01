@@ -21,7 +21,12 @@ import {
   currentIncrementalRemTypeKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
-import { getCardsPerRem, getSortingRandomness } from '../lib/sorting';
+import {
+  getCardsPerRem,
+  getSortingRandomness,
+  getWeightSelectionK,
+  applyPriorityWeightedLottery,
+} from '../lib/sorting';
 import { consumePendingScrollRequest } from '../lib/remHelpers';
 
 
@@ -238,12 +243,16 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           return null;
         }
 
-        const sortingRandomness = await getSortingRandomness(plugin);
-        const numRandomSwaps = sortingRandomness * filtered.length;
-        for (let i = 0; i < numRandomSwaps; i++) {
-          const idx1 = Math.floor(Math.random() * filtered.length);
-          const idx2 = Math.floor(Math.random() * filtered.length);
-          [filtered[idx1], filtered[idx2]] = [filtered[idx2], filtered[idx1]];
+        // Inject randomness via the priority-weighted lottery — the SAME weighting
+        // used by the Priority Review Document — so raising the IncRem randomness
+        // slider pulls higher-priority due IncRems toward the front far more often
+        // than low-priority ones (instead of the old flat uniform swap).
+        // Only applies when `filtered` is in priority order: in 'in-order' mode it is
+        // sorted by document position, so we leave it untouched (no randomisation).
+        if (queueInfo.mode !== 'in-order') {
+          const sortingRandomness = await getSortingRandomness(plugin);
+          const weightK = await getWeightSelectionK(plugin);
+          applyPriorityWeightedLottery(filtered, sortingRandomness, weightK);
         }
 
         // console.log('✅ Filtered has items, selecting first IncRem');

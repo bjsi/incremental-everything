@@ -1,5 +1,6 @@
 import { RNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface } from '@remnote/plugin-sdk';
-import { allIncrementalRemKey, powerupCode, nextRepDateSlotCode } from './consts';
+import { allIncrementalRemKey, allCardPriorityInfoKey, powerupCode, nextRepDateSlotCode } from './consts';
+import type { CardPriorityInfo } from './card_priority/types';
 
 /**
  * Collects PDF source IDs from a list of rems.
@@ -146,98 +147,255 @@ export async function buildDocumentScope(
   return descendantIds;
 }
 
+/** How many document roots we expand concurrently while draining the worklist. */
+const SCOPE_EXPANSION_CONCURRENCY = 12;
+
 /**
- * Builds a comprehensive scope for a given rem by gathering all related rems.
- * * This includes:
- * - The rem itself
- * - All descendants
- * - All rems in the same document or portal (CRITICAL for Tables/Portals)
- * - All folder queue rems
- * - All sources
- * - All rems referencing this rem (excluding nextRepDate slot references)
- * - PDF Extracts and their descendants
- * * @param plugin Plugin instance
+ * When true, the top-level build logs a per-mechanism card attribution breakdown
+ * (which gathering rule contributes the marginal rems/cards). Temporary instrument
+ * to decide how to tighten over-collection; flip off (or remove) once settled.
+ */
+const SCOPE_DIAGNOSTICS = false;
+
+/**
+ * Builds a comprehensive scope for a given rem, mirroring RemNote's own
+ * document-flashcard gathering rules
+ * (https://help.remnote.com/en/articles/8892109).
+ *
+ * RECURSIVE expansion (treated like nested documents — gathered via a worklist):
+ * - The rem itself, its descendants, and its document/portal context
+ * - All sources (Upload > Link / /Link Source), incl. linked PDFs whose highlights
+ *   and in-PDF notes are then picked up as descendants of the recursed PDF rem
+ * - All tagged instances (rems tagged by the document or its descendants)
+ *
+ * LEAF inclusion (the specific rem only — NOT recursive, per RemNote's rule that
+ * "referenced card gathering is not recursive"):
+ * - Rems referenced within the document (remsBeingReferenced)
+ * - Rems referencing the document or its descendants (remsReferencingThis / backrefs)
+ *
+ * The relationship calls are fanned ONLY over the document body (rem + descendants
+ * + portal/table context) — never over `allRemInFolderQueue()`, which is RemNote's
+ * own (potentially enormous) queue concept and is not part of these gathering rules.
+ * The folder queue is included once, for the top-level rem, as plain scope members.
+ *
+ * Each rem is expanded as a root at most once and fanned out at most once, so the
+ * total work is O(unique rems) regardless of how the source/tag graph overlaps.
+ *
+ * @param plugin Plugin instance
  * @param scopeRemId RemId to build scope for
  */
 export async function buildComprehensiveScope(
   plugin: RNPlugin,
-  scopeRemId: RemId,
-  _visited: Set<RemId> = new Set()
+  scopeRemId: RemId
 ): Promise<Set<RemId>> {
-  if (_visited.has(scopeRemId)) return new Set();
-  _visited.add(scopeRemId);
+  const result = new Set<RemId>();
+  const expandedRoots = new Set<RemId>(); // roots already gathered (dedupe + loop guard)
+  const fannedRems = new Set<RemId>();     // body rems already fanned out
 
-  const scopeRem = await plugin.rem.findOne(scopeRemId);
-  if (!scopeRem) return new Set();
+  // Per-mechanism membership, for the diagnostic card-attribution breakdown.
+  const fqSet = new Set<RemId>();          // allRemInFolderQueue (base truth)
+  const topBodySet = new Set<RemId>();     // top rem + its descendants + its context
+  const expansionBodySet = new Set<RemId>(); // bodies of recursed sources/tagged roots
+  const referencedSet = new Set<RemId>();  // remsBeingReferenced leaves (any root)
+  const backrefSet = new Set<RemId>();     // remsReferencingThis leaves (any root)
+  // Leaves gathered specifically from the TOP document body — i.e. the ones option
+  // (B) would KEEP. The rest of referencedSet/backrefSet come from source/tagged
+  // expansion bodies and are what (B) would DROP.
+  const refFromTopSet = new Set<RemId>();
+  const backrefFromTopSet = new Set<RemId>();
 
-  const isTopLevel = _visited.size === 1; // only scopeRemId itself added so far
+  const slot = await plugin.powerup.getPowerupSlotByCode(powerupCode, nextRepDateSlotCode);
+  const nextRepDateSlotId: RemId | null = slot?._id ?? null;
 
-  const descendants = await scopeRem.getDescendants();
-  const allRemsInContext = await scopeRem.allRemInDocumentOrPortal();
-  const folderQueueRems = await scopeRem.allRemInFolderQueue();
+  const topRem = await plugin.rem.findOne(scopeRemId);
+  if (!topRem) return result;
 
-  const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
-    powerupCode,
-    nextRepDateSlotCode
-  );
+  // The folder queue can be enormous and is not part of RemNote's document
+  // gathering rules, so include it once (for the top-level rem) as plain members
+  // and never fan relationship calls over it.
+  const folderQueueRems = await topRem.allRemInFolderQueue();
+  for (const r of folderQueueRems) {
+    result.add(r._id);
+    fqSet.add(r._id);
+  }
 
-  const referencingRems = ((await scopeRem.remsReferencingThis()) || [])
-    .map((rem) => {
-      // Filter out technical slot references
-      if (nextRepDateSlotRem && (rem.text?.[0] as any)?._id === nextRepDateSlotRem._id) {
-        return rem.parent;
-      }
-      return rem._id;
-    })
-    .filter((id): id is RemId => id !== null && id !== undefined);
+  let topDescendantCount = 0;
+  let topContextCount = 0;
 
-  // Collect PDF sources from scopeRem and all descendants
-  const { pdfSourceIds } = await collectPdfSourcesFromRems([scopeRem, ...descendants]);
-  const pdfExtractIds = await findPdfExtractIds(plugin, pdfSourceIds);
-  const pdfDescendantIds = await getPdfDescendantIds(plugin, pdfSourceIds);
+  // Expand one document root: gather its body, emit reference leaves, and return
+  // the newly discovered roots (sources + tagged instances) to expand next.
+  const expandRoot = async (rootId: RemId): Promise<RemId[]> => {
+    const rootRem = await plugin.rem.findOne(rootId);
+    if (!rootRem) return [];
 
-  // Collect sources from every rem gathered so far, then recursively expand each.
-  const allGatheredRems = [scopeRem, ...descendants, ...allRemsInContext, ...folderQueueRems];
-  const seenIds = new Set<RemId>();
-  const uniqueRems = allGatheredRems.filter(r => {
-    if (seenIds.has(r._id)) return false;
-    seenIds.add(r._id);
-    return true;
-  });
+    const [descendants, context] = await Promise.all([
+      rootRem.getDescendants(),
+      rootRem.allRemInDocumentOrPortal(),
+    ]);
 
-  const allSourceIds = new Set<RemId>();
-  await Promise.all(
-    uniqueRems.map(async rem => {
-      try {
-        const remSources = await rem.getSources();
-        for (const src of remSources) allSourceIds.add(src._id);
-      } catch {}
-    })
-  );
+    const isTopRoot = rootId === scopeRemId;
+    if (isTopRoot) {
+      topDescendantCount = descendants.length;
+      topContextCount = context.length;
+    }
 
-  const sourceScopes = await Promise.all(
-    [...allSourceIds].map(id => buildComprehensiveScope(plugin, id, _visited))
-  );
+    const bodyBucket = isTopRoot ? topBodySet : expansionBodySet;
+    result.add(rootRem._id);
+    bodyBucket.add(rootRem._id);
+    for (const r of descendants) {
+      result.add(r._id);
+      bodyBucket.add(r._id);
+    }
+    for (const r of context) {
+      result.add(r._id);
+      bodyBucket.add(r._id);
+    }
 
-  const result = new Set<RemId>([
-    scopeRem._id,
-    ...descendants.map(r => r._id),
-    ...allRemsInContext.map(r => r._id),
-    ...folderQueueRems.map(r => r._id),
-    ...sourceScopes.flatMap(s => [...s]),
-    ...referencingRems,
-    ...pdfExtractIds,
-    ...pdfDescendantIds
-  ]);
+    // Document body for relationship gathering — NOT the folder queue. Fan each
+    // rem out at most once across the entire traversal.
+    const seen = new Set<RemId>();
+    const body = [rootRem, ...descendants, ...context].filter(r => {
+      if (seen.has(r._id) || fannedRems.has(r._id)) return false;
+      seen.add(r._id);
+      return true;
+    });
 
-  if (isTopLevel) {
-    console.log(`[buildComprehensiveScope] ✓ Found ${descendants.length} descendants`);
-    console.log(`[buildComprehensiveScope] ✓ Found ${allRemsInContext.length} rems in document/portal context`);
-    console.log(`[buildComprehensiveScope] ✓ Found ${folderQueueRems.length} rems via allRemInFolderQueue`);
-    console.log(`[buildComprehensiveScope] ✓ Found ${referencingRems.length} referencing rems`);
-    console.log(`[buildComprehensiveScope] ✓ Found ${allSourceIds.size} unique source documents (expanded into ${sourceScopes.reduce((n, s) => n + s.size, 0)} rems)`);
-    console.log(`[buildComprehensiveScope] Comprehensive scope contains ${result.size} unique rems`);
+    const discovered = new Set<RemId>();
+    await Promise.all(
+      body.map(async rem => {
+        fannedRems.add(rem._id);
+        const [sources, tagged, referenced, referencing] = await Promise.all([
+          rem.getSources().catch(() => []),
+          rem.taggedRem().catch(() => []),
+          rem.remsBeingReferenced().catch(() => []),
+          rem.remsReferencingThis().catch(() => []),
+        ]);
+
+        for (const s of sources) discovered.add(s._id);
+        for (const t of tagged) discovered.add(t._id);
+        // Leaves: referenced + backreferenced rems contribute only their own id.
+        for (const r of referenced) {
+          result.add(r._id);
+          referencedSet.add(r._id);
+          if (isTopRoot) refFromTopSet.add(r._id);
+        }
+        for (const ref of referencing) {
+          if (nextRepDateSlotId && (ref.text?.[0] as any)?._id === nextRepDateSlotId) {
+            if (ref.parent) {
+              result.add(ref.parent);
+              backrefSet.add(ref.parent);
+              if (isTopRoot) backrefFromTopSet.add(ref.parent);
+            }
+          } else {
+            result.add(ref._id);
+            backrefSet.add(ref._id);
+            if (isTopRoot) backrefFromTopSet.add(ref._id);
+          }
+        }
+      })
+    );
+
+    return [...discovered];
+  };
+
+  // Bounded-concurrency drain of the root worklist.
+  const queue: RemId[] = [scopeRemId];
+  expandedRoots.add(scopeRemId);
+  const active = new Set<Promise<void>>();
+
+  const launch = (rootId: RemId) => {
+    const p = expandRoot(rootId)
+      .then(newRoots => {
+        for (const id of newRoots) {
+          if (!expandedRoots.has(id)) {
+            expandedRoots.add(id);
+            queue.push(id);
+          }
+        }
+      })
+      .catch(() => {}) // a failing root must not abort the whole scope build
+      .finally(() => {
+        active.delete(p);
+      });
+    active.add(p);
+  };
+
+  while (queue.length > 0 || active.size > 0) {
+    while (queue.length > 0 && active.size < SCOPE_EXPANSION_CONCURRENCY) {
+      launch(queue.shift()!);
+    }
+    if (active.size > 0) await Promise.race(active);
+  }
+
+  console.log(`[buildComprehensiveScope] ✓ Top-level: ${topDescendantCount} descendants, ${topContextCount} portal/table context rems`);
+  console.log(`[buildComprehensiveScope] ✓ Found ${folderQueueRems.length} rems via allRemInFolderQueue (top-level only, not fanned)`);
+  console.log(`[buildComprehensiveScope] ✓ Expanded ${expandedRoots.size} document roots (scope + sources + tagged instances)`);
+  console.log(`[buildComprehensiveScope] Comprehensive scope contains ${result.size} unique rems`);
+
+  if (SCOPE_DIAGNOSTICS) {
+    // Order matters: top-reachable ref/backref buckets are claimed BEFORE the
+    // "any root" sets, so the latter end up holding only the expansion-only
+    // remainder — exactly what option (B) would drop.
+    await logScopeAttribution(plugin, result, [
+      { name: 'allRemInFolderQueue (base truth)', ids: fqSet },
+      { name: 'top document body (rem + descendants + context)', ids: topBodySet },
+      { name: 'source/tagged expansion (their bodies)', ids: expansionBodySet },
+      { name: 'referenced — from TOP body          [(B) KEEPS]', ids: refFromTopSet },
+      { name: 'backreferenced — from TOP body      [(B) KEEPS]', ids: backrefFromTopSet },
+      { name: 'referenced — expansion-only         [(B) DROPS]', ids: referencedSet },
+      { name: 'backreferenced — expansion-only     [(B) DROPS]', ids: backrefSet },
+    ]);
   }
 
   return result;
+}
+
+/**
+ * Diagnostic: attributes the card-bearing rems in `result` to the gathering
+ * mechanism that FIRST claimed them, in the given priority order. The marginal
+ * card counts for the later buckets (referenced / backreferenced) are exactly the
+ * over-collection beyond the folder-queue base + structural expansion. Temporary —
+ * see {@link SCOPE_DIAGNOSTICS}.
+ */
+async function logScopeAttribution(
+  plugin: RNPlugin,
+  result: Set<RemId>,
+  buckets: Array<{ name: string; ids: Set<RemId> }>
+): Promise<void> {
+  const allCardInfos = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+  const cardMap = new Map<RemId, CardPriorityInfo>();
+  for (const info of allCardInfos) cardMap.set(info.remId, info);
+
+  const claimed = new Set<RemId>();
+  console.log('[buildComprehensiveScope] ── card attribution (marginal, first-touch in priority order) ──');
+  for (const { name, ids } of buckets) {
+    let rems = 0, remsWithCards = 0, cards = 0, due = 0;
+    for (const id of ids) {
+      if (claimed.has(id)) continue;
+      claimed.add(id);
+      rems++;
+      const info = cardMap.get(id);
+      if (info && info.cardCount > 0) {
+        remsWithCards++;
+        cards += info.cardCount;
+        due += info.dueCards;
+      }
+    }
+    console.log(
+      `[buildComprehensiveScope]   ${name}: +${rems} rems, +${remsWithCards} rems-with-cards, +${cards} cards (${due} due)`
+    );
+  }
+
+  let totRemsWithCards = 0, totCards = 0, totDue = 0;
+  for (const id of result) {
+    const info = cardMap.get(id);
+    if (info && info.cardCount > 0) {
+      totRemsWithCards++;
+      totCards += info.cardCount;
+      totDue += info.dueCards;
+    }
+  }
+  console.log(
+    `[buildComprehensiveScope]   TOTAL: ${totRemsWithCards} rems-with-cards, ${totCards} cards (${totDue} due)`
+  );
 }

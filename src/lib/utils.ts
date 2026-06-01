@@ -283,14 +283,17 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
   let dueCount = 0;
 
   // Cache per-item due state so we only call the predicate once per item.
-  const dueByRemId = new Map<string, boolean>();
+  // Keyed by item reference (not remId) because the per-card expansion produces
+  // multiple items per remId, each with its own nextRepetitionTime and therefore
+  // its own due state.
+  const dueByItem = new Map<T, boolean>();
 
   for (const item of validItems) {
     const p = percentileMap.get(item.remId) ?? 50;
     const weight = Math.exp(-k * p / 100);
     const bucketIdx = Math.min(Math.floor(p / 10), 9); // 0-9
     const isDue = isDuePredicate(item);
-    dueByRemId.set(item.remId, isDue);
+    dueByItem.set(item, isDue);
 
     totalWeight += weight;
     bucketData[bucketIdx].total++;
@@ -310,7 +313,7 @@ export function computeWeightedShieldBreakdown<T extends { priority: number; rem
   // Slim, ordered snapshot for the interactive subset-stats slider in the popup.
   const sortedItems = sorted.map((item) => ({
     priority: item.priority,
-    isDue: dueByRemId.get(item.remId) ?? false,
+    isDue: dueByItem.get(item) ?? false,
   }));
 
   const shieldValue = totalWeight > 0

@@ -86,7 +86,13 @@ export async function handleCreateExtract(plugin: ReactRNPlugin, remId: string) 
   // If the resolved context is the highlight itself (happens when the highlight
   // is the queue's current item), it's not a useful parent suggestion — drop it
   // so the parent selector falls through to page-range matching instead.
-  if (contextRemId === remId) contextRemId = null;
+  //
+  // We track this distinctly from "no context at all": only when the highlight is
+  // itself the review item do we want to suppress the per-PDF last destination.
+  // A plain editor trigger (no review session) leaves contextRemId null but should
+  // still restore the PDF's remembered parent.
+  const highlightIsActiveReviewItem = contextRemId === remId;
+  if (highlightIsActiveReviewItem) contextRemId = null;
 
   // createRemFromHighlight opens the parent-selector popup and returns immediately.
   // Bookmark + toast are handled inside createRemUnderParent once the user confirms
@@ -95,6 +101,7 @@ export async function handleCreateExtract(plugin: ReactRNPlugin, remId: string) 
     makeIncremental: true,
     contextRemId,
     showPriorityPopupIfNew: true,
+    highlightIsActiveReviewItem,
   });
 }
 

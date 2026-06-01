@@ -3,8 +3,20 @@ import dayjs from 'dayjs';
 import * as _ from 'remeda';
 import { calculateVolumeBasedPercentile, calculateWeightedShield } from './utils';
 import { IncrementalRem } from './incremental_rem';
-import { CardPriorityInfo } from './card_priority';
-import { dismissedPowerupCode } from './consts';
+import { CardPriorityInfo, expandCardInfosToCards } from './card_priority';
+import {
+  allCardPriorityInfoKey,
+  allIncrementalRemKey,
+  cardPriorityShieldHistoryKey,
+  currentScopeRemIdsKey,
+  currentSubQueueIdKey,
+  dismissedPowerupCode,
+  documentCardPriorityShieldHistoryKey,
+  documentPriorityShieldHistoryKey,
+  priorityShieldHistoryKey,
+  seenCardInSessionKey,
+  seenRemInSessionKey,
+} from './consts';
 
 export type ShieldHistoryEntry = {
   absolute: number | null;
@@ -435,3 +447,156 @@ export const isIncRemDue = (rem: IncrementalRem): boolean => Date.now() >= rem.n
 export const isCardDue = (card: CardPriorityInfo): boolean => card.dueCards > 0;
 /** Shield-specific: card was due before start of today (filters intraday re-scheduling noise). */
 export const isCardDueOverdue = (card: CardPriorityInfo): boolean => (card.dueCardsOverdue ?? 0) > 0;
+
+export type ItemKind = 'incRem' | 'card';
+export type ScopeKind = 'kb' | 'doc';
+
+/**
+ * Highest absolute-priority shield value reached in the last 30 days for the
+ * given scope+item-type. The shield value is a coverage cutoff (items with
+ * priority ≤ shield are protected), so a larger number = wider coverage =
+ * better. Returns null if no history is available.
+ *
+ * Mirrors the partition fallbacks used by PriorityShieldGraph: prefers a KB-keyed
+ * partition, falls back to legacy flat layout only on the primary KB.
+ */
+export async function getMonthlyBestAbsolutePriorityShield(
+  plugin: RNPlugin,
+  itemKind: ItemKind,
+  scopeKind: ScopeKind,
+  docScopeId: string | null,
+): Promise<number | null> {
+  const key = itemKind === 'card'
+    ? (scopeKind === 'kb' ? cardPriorityShieldHistoryKey : documentCardPriorityShieldHistoryKey)
+    : (scopeKind === 'kb' ? priorityShieldHistoryKey : documentPriorityShieldHistoryKey);
+
+  const raw = (await plugin.storage.getSynced(key)) as any;
+  if (!raw) return null;
+
+  const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+  const currentKbId = kbData?._id || 'global';
+
+  let history: Record<string, { absolute?: number | null }> | undefined;
+
+  if (scopeKind === 'kb') {
+    if (raw[currentKbId] && typeof raw[currentKbId] === 'object') {
+      const keys = Object.keys(raw[currentKbId]);
+      if (keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
+        history = raw[currentKbId];
+      }
+    }
+    if (!history) {
+      const keys = Object.keys(raw);
+      if (keys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
+        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+        if (isPrimary) {
+          const cleanLegacy: Record<string, any> = {};
+          for (const k of keys) {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(k)) cleanLegacy[k] = raw[k];
+          }
+          history = cleanLegacy;
+        }
+      }
+    }
+  } else {
+    if (!docScopeId) return null;
+    if (raw[currentKbId] && raw[currentKbId][docScopeId]) {
+      history = raw[currentKbId][docScopeId];
+    } else if (raw[docScopeId]) {
+      const dateKeys = Object.keys(raw[docScopeId]);
+      if (dateKeys.some(k => /^\d{4}-\d{2}-\d{2}$/.test(k))) {
+        const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+        if (isPrimary) history = raw[docScopeId];
+      }
+    }
+  }
+
+  if (!history) return null;
+
+  const cutoff = dayjs().subtract(30, 'day').startOf('day');
+  let best: number | null = null;
+  for (const [dateStr, entry] of Object.entries(history)) {
+    if (!entry || entry.absolute == null) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+    if (!dayjs(dateStr).isAfter(cutoff)) continue;
+    if (best == null || entry.absolute > best) best = entry.absolute;
+  }
+  return best;
+}
+
+export interface MonthlyShieldCatchUp {
+  /** Highest priority cutoff the shield reached in the last 30 days. */
+  monthlyBest: number;
+  /** Items currently due with priority ≤ monthlyBest, excluding items already
+   *  reviewed in the current session. */
+  dueCount: number;
+}
+
+/**
+ * For the active queue's scope, returns the historical-high cutoff and the
+ * number of currently-due items at-or-above that priority that the user would
+ * need to clear to match the last-30-day high. Returns null if no history
+ * exists for that scope/item-kind.
+ *
+ * Uses the same session caches as the in-queue tooltip — `allIncrementalRemKey`,
+ * `allCardPriorityInfoKey`, scope IDs and the seen-in-session sets — so the
+ * count drains live as cards are reviewed.
+ */
+export async function computeMonthlyShieldCatchUp(
+  plugin: RNPlugin,
+  itemKind: ItemKind,
+  scopeKind: ScopeKind,
+): Promise<MonthlyShieldCatchUp | null> {
+  const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
+  const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
+  const docScopeId = originalScopeId || subQueueId || null;
+
+  if (scopeKind === 'doc' && !docScopeId) return null;
+
+  const monthlyBest = await getMonthlyBestAbsolutePriorityShield(
+    plugin, itemKind, scopeKind, docScopeId
+  );
+  if (monthlyBest == null) return null;
+
+  const scopeIds = scopeKind === 'doc'
+    ? new Set(await plugin.storage.getSession<string[]>(currentScopeRemIdsKey) ?? [])
+    : null;
+
+  const now = Date.now();
+
+  if (itemKind === 'incRem') {
+    const [allIncRems, seenRemIds] = await Promise.all([
+      plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey).then(v => v ?? []),
+      plugin.storage.getSession<string[]>(seenRemInSessionKey).then(v => v ?? []),
+    ]);
+    const seen = new Set(seenRemIds);
+    let dueCount = 0;
+    for (const r of allIncRems) {
+      if (r.priority > monthlyBest) continue;
+      if (scopeIds && !scopeIds.has(r.remId)) continue;
+      if (r.nextRepDate > now) continue;
+      if (seen.has(r.remId)) continue;
+      dueCount++;
+    }
+    return { monthlyBest, dueCount };
+  }
+
+  const [allCardInfos, seenCardIds] = await Promise.all([
+    plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey).then(v => v ?? []),
+    plugin.storage.getSession<string[]>(seenCardInSessionKey).then(v => v ?? []),
+  ]);
+  const seen = new Set(seenCardIds);
+  const filtered = scopeIds
+    ? allCardInfos.filter(c => scopeIds.has(c.remId))
+    : allCardInfos;
+  const perCard = expandCardInfosToCards(filtered);
+  let dueCount = 0;
+  for (const item of perCard) {
+    if (item.priority > monthlyBest) continue;
+    const t = item.nextRepetitionTime;
+    if (t == null || t > now) continue;
+    if (seen.has(item.remId)) continue;
+    dueCount++;
+  }
+  return { monthlyBest, dueCount };
+}

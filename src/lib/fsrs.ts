@@ -116,7 +116,7 @@ function nextDifficulty(w: number[], d: number, rating: number): number {
     return constrainDifficulty(meanReversion(w, initDifficulty(w, RATINGS.easy), nextD));
 }
 
-function forgettingCurve(elapsedDays: number, stability: number, decay: number, factor: number): number {
+export function forgettingCurve(elapsedDays: number, stability: number, decay: number, factor: number): number {
     return Math.pow(1 + factor * elapsedDays / stability, decay);
 }
 
@@ -173,7 +173,7 @@ function nextState(currentState: CardState, rating: number): CardState {
 // ---------------------------------------------------------------------------
 // Resolve weights: accept 19 or 21 values
 // ---------------------------------------------------------------------------
-function resolveWeights(weights?: number[] | null): { w: number[]; is21w: boolean } {
+export function resolveWeights(weights?: number[] | null): { w: number[]; is21w: boolean } {
     if (!weights) return { w: FSRS_DEFAULT_WEIGHTS, is21w: true };
     if (weights.length === 21) return { w: weights, is21w: true };
     if (weights.length === 19) {

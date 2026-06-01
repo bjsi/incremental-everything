@@ -1,6 +1,17 @@
 import { usePlugin } from '@remnote/plugin-sdk';
 import React from 'react';
 import { WeightedShieldBreakdown } from '../lib/utils';
+import { currentSubQueueIdKey } from '../lib/consts';
+import { getMonthlyBestAbsolutePriorityShield } from '../lib/shield_history';
+import { CardMemoryAnalyticsView } from './CardMemoryAnalyticsView';
+import { FSRSCalibrationView } from './FSRSCalibrationView';
+
+interface MonthlyBests {
+  kbIncRem: number | null;
+  docIncRem: number | null;
+  kbCard: number | null;
+  docCard: number | null;
+}
 
 interface WeightedShieldGroup {
   title: string;
@@ -24,9 +35,11 @@ const WEIGHT_K = 2.3026;
 function SubsetStatsPanel({
   sortedItems,
   totalWeight,
+  monthlyBestAbsolute,
 }: {
   sortedItems: { priority: number; isDue: boolean }[];
   totalWeight: number;
+  monthlyBestAbsolute: number | null;
 }) {
   const N = sortedItems.length;
   const minPriority = N > 0 ? sortedItems[0].priority : 0;
@@ -37,6 +50,14 @@ function SubsetStatsPanel({
   const sliderMax = Math.max(Math.ceil(maxPriority), sliderMin + 1);
 
   const [threshold, setThreshold] = React.useState<number>(Math.round(maxPriority));
+  // Until the user actually moves the slider, mirror the async-fetched monthly
+  // best as the threshold so the panel opens at the historical-high mark.
+  const [userTouched, setUserTouched] = React.useState(false);
+  React.useEffect(() => {
+    if (userTouched || monthlyBestAbsolute == null) return;
+    const clamped = Math.max(sliderMin, Math.min(sliderMax, Math.round(monthlyBestAbsolute)));
+    setThreshold(clamped);
+  }, [monthlyBestAbsolute, userTouched, sliderMin, sliderMax]);
 
   // Prefix sums of weight and due count, indexed [0..N]: cum[i] = sum over items 0..i-1.
   const prefix = React.useMemo(() => {
@@ -80,6 +101,20 @@ function SubsetStatsPanel({
     const relPercentile = (count / N) * 100;
     return { count, due, processedPct, meanWeight, weightShare, relPercentile };
   }, [threshold, sortedItems, N, prefix, totalWeight]);
+
+  // Fixed at the historical-high mark — independent of where the user drags
+  // the slider, so the caption keeps its meaning while the slider explores.
+  const monthlyBestDue = React.useMemo(() => {
+    if (monthlyBestAbsolute == null || N === 0) return null;
+    let lo = 0;
+    let hi = N;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (sortedItems[mid].priority <= monthlyBestAbsolute) lo = mid + 1;
+      else hi = mid;
+    }
+    return prefix.cumDue[lo];
+  }, [monthlyBestAbsolute, sortedItems, N, prefix]);
 
   if (N === 0) return null;
 
@@ -125,7 +160,10 @@ function SubsetStatsPanel({
           max={sliderMax}
           step={1}
           value={threshold}
-          onChange={(e) => setThreshold(parseInt(e.target.value, 10))}
+          onChange={(e) => {
+            setThreshold(parseInt(e.target.value, 10));
+            setUserTouched(true);
+          }}
           style={{ flex: 1 }}
         />
         <span style={{
@@ -139,6 +177,27 @@ function SubsetStatsPanel({
           {threshold}
         </span>
       </div>
+
+      {monthlyBestAbsolute != null && monthlyBestDue != null && (
+        <div style={{
+          fontSize: '11px',
+          marginBottom: '6px',
+          color: 'var(--rn-clr-content-tertiary)',
+          lineHeight: '1.4',
+        }}>
+          {monthlyBestDue > 0 ? (
+            <>
+              📈 Monthly higher shield: priority ≤{' '}
+              <b style={{ color: 'var(--rn-clr-content-secondary)' }}>{Math.round(monthlyBestAbsolute)}</b>
+              {' '}→{' '}
+              <b style={{ color: '#ef4444' }}>{monthlyBestDue.toLocaleString()}</b>
+              {' '}due to catch up
+            </>
+          ) : (
+            <>✓ At monthly higher priority shield (≤ <b>{Math.round(monthlyBestAbsolute)}</b>)</>
+          )}
+        </div>
+      )}
 
       {stats && (
         <div style={{
@@ -215,10 +274,12 @@ function BreakdownSection({
   breakdown,
   scopeLabel,
   itemLabel,
+  monthlyBestAbsolute,
 }: {
   breakdown: WeightedShieldBreakdown;
   scopeLabel: string;
   itemLabel: string;
+  monthlyBestAbsolute: number | null;
 }) {
   const shieldColor = breakdown.shieldValue >= 95
     ? '#22c55e'
@@ -254,7 +315,7 @@ function BreakdownSection({
       }}>
         <div>
           <span style={{ fontWeight: 600 }}>Total: </span>
-          {breakdown.totalItems.toLocaleString()} {itemLabel.toLowerCase() === 'cards' ? 'Rems with Cards' : 'Incremental Rems'}
+          {breakdown.totalItems.toLocaleString()} {itemLabel.toLowerCase() === 'cards' ? 'Cards' : 'Incremental Rems'}
         </div>
         <div>
           <span style={{ fontWeight: 600, color: breakdown.dueItems > 0 ? '#ef4444' : 'inherit' }}>Due: </span>
@@ -347,19 +408,43 @@ function BreakdownSection({
         <SubsetStatsPanel
           sortedItems={breakdown.sortedItems}
           totalWeight={breakdown.totalWeight}
+          monthlyBestAbsolute={monthlyBestAbsolute}
         />
       )}
     </div>
   );
 }
 
+type TabId = 'shield' | 'cardMemory' | 'fsrsCalibration';
+
 export function WeightedShieldPopup() {
   const plugin = usePlugin();
 
   const [ctx, setCtx] = React.useState<WeightedShieldPopupContext | null>(null);
+  const [tab, setTab] = React.useState<TabId>('shield');
+  const [monthlyBests, setMonthlyBests] = React.useState<MonthlyBests | null>(null);
 
   React.useEffect(() => {
     plugin.widget.getWidgetContext<any>().then((c) => setCtx(c?.contextData as WeightedShieldPopupContext));
+  }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Mirrors PriorityShieldGraph's effectiveDocScopeId — Priority Review Doc
+      // sessions store originalScopeId; regular sessions only have a sub-queue id.
+      const originalScopeId = await plugin.storage.getSession<string | null>('originalScopeId');
+      const subQueueId = await plugin.storage.getSession<string | null>(currentSubQueueIdKey);
+      const docScopeId = originalScopeId || subQueueId || null;
+      const [kbIncRem, docIncRem, kbCard, docCard] = await Promise.all([
+        getMonthlyBestAbsolutePriorityShield(plugin, 'incRem', 'kb', null),
+        getMonthlyBestAbsolutePriorityShield(plugin, 'incRem', 'doc', docScopeId),
+        getMonthlyBestAbsolutePriorityShield(plugin, 'card', 'kb', null),
+        getMonthlyBestAbsolutePriorityShield(plugin, 'card', 'doc', docScopeId),
+      ]);
+      if (!cancelled) setMonthlyBests({ kbIncRem, docIncRem, kbCard, docCard });
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   if (!ctx) {
@@ -374,7 +459,24 @@ export function WeightedShieldPopup() {
   const itemLabel = ctx.itemLabel || 'items';
   const blurbSubject = hasGroups
     ? 'each prioritized item'
-    : itemLabel.toLowerCase() === 'cards' ? 'rem with cards' : 'incremental rem';
+    : itemLabel.toLowerCase() === 'cards' ? 'card' : 'incremental rem';
+
+  // The Card Priority × Memory Analytics tab is only meaningful in the wide
+  // popup (where both Incremental Rems and Cards groups are present). The
+  // narrow popup is shown when only one group exists — no tabs there.
+  const showTabs = hasGroups && ctx.groups!.length >= 2;
+
+  const tabBtnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '8px 14px',
+    fontSize: '12px',
+    fontWeight: active ? 700 : 500,
+    color: active ? 'var(--rn-clr-content-primary)' : 'var(--rn-clr-content-secondary)',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
+    cursor: 'pointer',
+    marginBottom: '-1px',
+  });
 
   return (
     <div style={{
@@ -387,35 +489,65 @@ export function WeightedShieldPopup() {
       overflowY: 'auto',
       boxSizing: 'border-box',
     }}>
-      {/* Title */}
-      <div style={{
-        fontSize: '15px',
-        fontWeight: 700,
-        marginBottom: '6px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}>
-        <span>⚖️ Weighted Shield Breakdown</span>
-      </div>
+      {showTabs && (
+        <div
+          role="tablist"
+          style={{
+            display: 'flex',
+            gap: '4px',
+            marginBottom: '10px',
+            borderBottom: '1px solid var(--rn-clr-background-tertiary)',
+          }}
+        >
+          <button type="button" role="tab" aria-selected={tab === 'shield'} style={tabBtnStyle(tab === 'shield')} onClick={() => setTab('shield')}>
+            ⚖️ Weighted Shield Breakdown
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'cardMemory'} style={tabBtnStyle(tab === 'cardMemory')} onClick={() => setTab('cardMemory')}>
+            🃏 Card Priority × Memory Analytics
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'fsrsCalibration'} style={tabBtnStyle(tab === 'fsrsCalibration')} onClick={() => setTab('fsrsCalibration')}>
+            🎯 FSRS Calibration
+          </button>
+        </div>
+      )}
 
-      {/* Explanation */}
-      <div style={{
-        fontSize: '11px',
-        color: 'var(--rn-clr-content-tertiary)',
-        marginBottom: '14px',
-        lineHeight: '1.5',
-        borderBottom: '1px solid var(--rn-clr-background-tertiary)',
-        paddingBottom: '10px',
-      }}>
-        Each {blurbSubject} is
-        weighted by priority percentile: top-priority items (0%) carry ~10× the weight of
-        bottom-priority items (100%), using W = e^(−2.3026 × p/100).
-        The shield shows what fraction of total priority weight has been processed.
-        Higher = better. Items in the current queue card count as "being processed".
-      </div>
+      {showTabs && tab === 'cardMemory' ? (
+        <CardMemoryAnalyticsView />
+      ) : showTabs && tab === 'fsrsCalibration' ? (
+        <FSRSCalibrationView />
+      ) : (
+        <>
+          {/* Title (only when tabs aren't there to label the view) */}
+          {!showTabs && (
+            <div style={{
+              fontSize: '15px',
+              fontWeight: 700,
+              marginBottom: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}>
+              <span>⚖️ Weighted Shield Breakdown</span>
+            </div>
+          )}
 
-      {hasGroups ? (
+          {/* Explanation */}
+          <div style={{
+            fontSize: '11px',
+            color: 'var(--rn-clr-content-tertiary)',
+            marginBottom: '14px',
+            lineHeight: '1.5',
+            borderBottom: '1px solid var(--rn-clr-background-tertiary)',
+            paddingBottom: '10px',
+          }}>
+            Each {blurbSubject} is
+            weighted by priority percentile: top-priority items (0%) carry ~10× the weight of
+            bottom-priority items (100%), using W = e^(−2.3026 × p/100).
+            The shield shows what fraction of total priority weight has been processed.
+            Higher = better. Items in the current queue card count as "being processed".
+          </div>
+
+          {hasGroups ? (
         (() => {
           const groups = ctx.groups!;
           // Two groups (both IncRems and Cards) lay out side by side — the
@@ -429,7 +561,11 @@ export function WeightedShieldPopup() {
             }
             return null;
           };
-          const renderGroup = (group: WeightedShieldGroup, i: number) => (
+          const renderGroup = (group: WeightedShieldGroup, i: number) => {
+            const isCard = group.itemLabel.toLowerCase() === 'cards';
+            const kbBest = isCard ? (monthlyBests?.kbCard ?? null) : (monthlyBests?.kbIncRem ?? null);
+            const docBest = isCard ? (monthlyBests?.docCard ?? null) : (monthlyBests?.docIncRem ?? null);
+            return (
             <div
               key={i}
               style={!useTwoCols && i > 0 ? {
@@ -466,6 +602,7 @@ export function WeightedShieldPopup() {
                 breakdown={group.kb}
                 scopeLabel="🌐 Knowledge Base"
                 itemLabel={group.itemLabel}
+                monthlyBestAbsolute={kbBest}
               />
               {group.doc && (
                 <div style={{ paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
@@ -473,11 +610,13 @@ export function WeightedShieldPopup() {
                     breakdown={group.doc}
                     scopeLabel="📄 Document Scope"
                     itemLabel={group.itemLabel}
+                    monthlyBestAbsolute={docBest}
                   />
                 </div>
               )}
             </div>
-          );
+            );
+          };
           return useTwoCols ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               {groups.map(renderGroup)}
@@ -487,11 +626,17 @@ export function WeightedShieldPopup() {
           );
         })()
       ) : ctx.kbBreakdown ? (
+        (() => {
+          const isCard = itemLabel.toLowerCase() === 'cards';
+          const kbBest = isCard ? (monthlyBests?.kbCard ?? null) : (monthlyBests?.kbIncRem ?? null);
+          const docBest = isCard ? (monthlyBests?.docCard ?? null) : (monthlyBests?.docIncRem ?? null);
+          return (
         <>
           <BreakdownSection
             breakdown={ctx.kbBreakdown}
             scopeLabel="🌐 Knowledge Base"
             itemLabel={itemLabel}
+            monthlyBestAbsolute={kbBest}
           />
           {ctx.docBreakdown && (
             <div style={{ paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
@@ -499,14 +644,19 @@ export function WeightedShieldPopup() {
                 breakdown={ctx.docBreakdown}
                 scopeLabel="📄 Document Scope"
                 itemLabel={itemLabel}
+                monthlyBestAbsolute={docBest}
               />
             </div>
           )}
         </>
-      ) : (
-        <div style={{ padding: '12px', color: 'var(--rn-clr-content-tertiary)', textAlign: 'center' }}>
-          No prioritized items found.
-        </div>
+          );
+        })()
+          ) : (
+            <div style={{ padding: '12px', color: 'var(--rn-clr-content-tertiary)', textAlign: 'center' }}>
+              No prioritized items found.
+            </div>
+          )}
+        </>
       )}
     </div>
   );

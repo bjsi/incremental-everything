@@ -251,10 +251,16 @@ function BatchPriority() {
               const depth = rem._id === focusedRemId ? 0 : path.length - 1;
 
               let cardStatus: 'Has Cards' | 'Inheritance only' | null = null;
+              let cardKbPercentile: number | null = null;
               if (hasValidCardPriority && Array.isArray(allCardInfos)) {
                 const cardInfo = allCardInfos.find((ci: CardPriorityInfo) => ci.remId === rem._id);
                 if (cardInfo) {
                   cardStatus = cardInfo.cardCount > 0 ? 'Has Cards' : 'Inheritance only';
+                  // Use the pre-computed kbPercentile from the cache. It's the
+                  // rem's mean-rank percentile across the per-card universe —
+                  // same value used by the Weighted Shield and elsewhere — and
+                  // avoids an O(N log N) re-sort per rem in this hot loop.
+                  cardKbPercentile = cardInfo.kbPercentile ?? null;
                 }
               }
 
@@ -279,8 +285,7 @@ function BatchPriority() {
                 isChecked: true,
                 incPercentile: Array.isArray(allIncrementalRems) ?
                   calculateRelativePercentile(allIncrementalRems, rem._id) : null,
-                cardPercentile: Array.isArray(allCardInfos) ?
-                  calculateRelativePercentile(allCardInfos, rem._id) : null,
+                cardPercentile: cardKbPercentile,
                 originalIndex: remIndexMap.get(rem._id) ?? 0
               });
             }
