@@ -284,15 +284,18 @@ export function SortingCriteria() {
         </div>
       </div>
 
-      {/* Randomness slider is unchanged */}
+      {/* Randomness sliders — priority-weighted lottery (quadratic slider scaling) */}
       <div className="flex flex-col gap-2 ">
         <div>
           <label htmlFor="randomness" className="font-semibold">
             Incremental Rem Randomness
           </label>
         </div>
+        <div className="rn-clr-content-secondary text-xs italic">
+          Higher values stay priority-safe: the randomized share favors higher-priority items.
+        </div>
         <div className="rn-clr-content-secondary">
-          {formatPercentage(sortingRandomness ?? DEFAULT_RANDOMNESS)}% of Items Swapped
+          {formatPercentage(sortingRandomness ?? DEFAULT_RANDOMNESS)}% randomized (priority-weighted)
         </div>
         <input
           className="w-full"
@@ -301,9 +304,9 @@ export function SortingCriteria() {
           max={1}
           onChange={(e) => {
             const sliderPosition = Number(e.target.value);
-            setSortingRandomness(plugin, Math.pow(sliderPosition, 3));
+            setSortingRandomness(plugin, Math.pow(sliderPosition, 2));
           }}
-          value={sortingRandomness == null ? DEFAULT_RANDOMNESS : Math.cbrt(sortingRandomness)}
+          value={Math.sqrt(sortingRandomness ?? DEFAULT_RANDOMNESS)}
           type="range"
           id="randomness"
           name="randomness"
@@ -322,7 +325,7 @@ export function SortingCriteria() {
           For Priority Review Documents (do not affect regular RemNote Queue!)
         </div>
         <div className="rn-clr-content-secondary">
-          {formatPercentage(cardRandomness ?? DEFAULT_CARD_RANDOMNESS)}% of Items Swapped
+          {formatPercentage(cardRandomness ?? DEFAULT_CARD_RANDOMNESS)}% randomized (priority-weighted)
         </div>
         <input
           className="w-full"
@@ -331,9 +334,9 @@ export function SortingCriteria() {
           max={1}
           onChange={(e) => {
             const sliderPosition = Number(e.target.value);
-            setCardRandomness(plugin, Math.pow(sliderPosition, 3));
+            setCardRandomness(plugin, Math.pow(sliderPosition, 2));
           }}
-          value={cardRandomness == null ? DEFAULT_CARD_RANDOMNESS : Math.cbrt(cardRandomness)}
+          value={Math.sqrt(cardRandomness ?? DEFAULT_CARD_RANDOMNESS)}
           type="range"
           id="card-randomness"
           name="card-randomness"
