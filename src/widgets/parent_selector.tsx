@@ -8,6 +8,7 @@ import {
   useTrackerPlugin,
   RemId,
   ReactRNPlugin,
+  BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
@@ -29,6 +30,37 @@ import {
 import { createRemUnderParent } from '../lib/highlightActions';
 import { getIncrementalPageRange } from '../lib/pdfUtils';
 import { RemTextSegments } from '../components';
+
+// ============================================================================
+// HEADING HELPERS
+// ============================================================================
+
+type HeadingLevel = 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6';
+
+/**
+ * Apply a heading level to a rem, covering the full H1–H6 range.
+ *
+ * The SDK's `setFontSize` only accepts H1–H3 (passing H4–H6 throws
+ * "Invalid input"). RemNote stores the deeper levels in the Header powerup's
+ * `Size` slot instead, which is also where `getFontSize` reads them back from.
+ * So we route H1–H3 through `setFontSize` and H4–H6 through the powerup slot.
+ *
+ * The `Size` slot holds the heading level as a plain string ("H4"/"H5"/"H6"),
+ * confirmed via the `phl` (Probe Heading Level) debug command.
+ */
+async function applyHeadingLevel(
+  rem: { setFontSize: (s: any) => Promise<void>; addPowerup: (c: any) => Promise<void>; setPowerupProperty: (c: any, s: any, v: any) => Promise<void> },
+  level: HeadingLevel
+): Promise<void> {
+  if (level === 'H1' || level === 'H2' || level === 'H3') {
+    await rem.setFontSize(level);
+    return;
+  }
+
+  // H4–H6: drive the Header powerup's `Size` slot directly.
+  await rem.addPowerup(BuiltInPowerupCodes.Header);
+  await rem.setPowerupProperty(BuiltInPowerupCodes.Header, 'Size', [level]);
+}
 
 // ============================================================================
 // STYLES
@@ -720,12 +752,38 @@ function ParentSelectorWidget() {
         await newRem.setText([childName]);
         await newRem.setParent(creatingChildForNodeId);
 
-        // Pick a heading level that respects the parent's heading hierarchy:
-        // H1 parent → H2 child; anything else → H3.
+        // Pick a heading level that respects the parent's heading hierarchy by
+        // nesting one level deeper than the ancestor. Although the SDK types only
+        // advertise H1–H3, RemNote also supports (and returns) H4–H6, so we handle
+        // the full range. If the ancestor isn't a header, fall back to H4.
         const parentRem = await plugin.rem.findOne(creatingChildForNodeId);
-        const parentFontSize = await parentRem?.getFontSize();
-        const headingLevel = parentFontSize === 'H1' ? 'H2' : 'H3';
-        await newRem.setFontSize(headingLevel);
+        const parentFontSize = (await parentRem?.getFontSize()) as
+          | 'H1'
+          | 'H2'
+          | 'H3'
+          | 'H4'
+          | 'H5'
+          | 'H6'
+          | undefined;
+        const nextHeadingLevel: Record<string, 'H2' | 'H3' | 'H4' | 'H5' | 'H6'> = {
+          H1: 'H2',
+          H2: 'H3',
+          H3: 'H4',
+          H4: 'H5',
+          H5: 'H6',
+          H6: 'H6', // already the deepest level RemNote supports
+        };
+        const headingLevel = parentFontSize ? nextHeadingLevel[parentFontSize] : 'H4';
+        try {
+          await applyHeadingLevel(newRem, headingLevel);
+        } catch (headingErr) {
+          // Never let a heading-styling failure abort child creation. Worst
+          // case the rem is created as normal text and can be styled manually.
+          console.warn(
+            `[ParentSelector:Widget] Failed to set heading level ${headingLevel}; leaving rem unstyled.`,
+            headingErr
+          );
+        }
 
         console.log(`[ParentSelector:Widget] Child rem created: ${newRem._id} (${headingLevel}, parent was ${parentFontSize ?? 'normal'})`);
 
