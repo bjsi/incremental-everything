@@ -1001,7 +1001,7 @@ function Debug() {
           ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(rogueNoCard.length/CHUNK_SIZE)})`
           : '';
 
-        const confirmed = confirm(`Found ${rogueNoCard.length} ROGUE CardPriority tag(s) on rems with NO flashcards (non-manual source). This will remove the powerup from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
+        const confirmed = confirm(`Found ${rogueNoCard.length} ROGUE CardPriority tag(s) on rems with NO flashcards (inherited/default source — manual & incremental anchors are kept). This will remove the powerup from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
 
         if (!confirmed) {
           if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
@@ -1021,11 +1021,11 @@ function Debug() {
     }
 
     if (suspicious.length > 0) {
-      const proceed = confirm(`We also found ${suspicious.length} SUSPICIOUS rem(s): no flashcards but a MANUAL CardPriority source. These may be deliberate inheritance anchors (priority set on a folder/document so descendants inherit). Review them one by one?`);
+      const proceed = confirm(`We also found ${suspicious.length} rem(s) with NO flashcards but a MANUAL or INCREMENTAL CardPriority source. These are almost always legitimate inheritance anchors (priority set on a folder/document, or left by a dismissed IncRem, so descendants keep inheriting) and are NOT removed automatically. Review them one by one anyway?`);
 
       if (proceed) {
         for (const r of suspicious) {
-          const confirmDelete = confirm(`⚠️ Suspicious CardPriority\n\nRem: "${r.name}"\nParent: "${r.parentName || '—'}"\n\nNo flashcards, manual source. Remove CardPriority from it?`);
+          const confirmDelete = confirm(`⚠️ Likely inheritance anchor\n\nRem: "${r.name}"\nParent: "${r.parentName || '—'}"\n\nNo flashcards, manual/incremental source. Remove CardPriority anyway?`);
 
           if (confirmDelete) {
             const result = await removeCardPriorityFromSpecificRems(plugin, [r.id]);
