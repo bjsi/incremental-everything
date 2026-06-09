@@ -11,7 +11,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
-import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem } from '../lib/card_priority/batch';
+import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -1053,6 +1053,17 @@ function Debug() {
     }
   };
 
+  const handleDumpStructure = async () => {
+    if (!rem) return;
+    await plugin.app.toast('Dumping slot/card structure to console...');
+    const rows = await dumpRemPriorityStructure(plugin, rem);
+    const rogue = rows.filter((r) => r.classification === 'rogue-no-card');
+    const anchors = rows.filter((r) => r.classification === 'inheritance-anchor');
+    await plugin.app.toast(
+      `Structure dumped: ${rows.length} node(s), ${rogue.length} rogue (no-card), ${anchors.length} manual anchor(s). See console (console.table).`
+    );
+  };
+
   const preStyle = { backgroundColor: 'var(--rn-clr-background-secondary)', padding: '8px', borderRadius: '4px', marginTop: '4px', fontSize: '11px', overflowX: 'auto' as 'auto' };
 
   return (
@@ -1160,6 +1171,21 @@ function Debug() {
                  title="Delete all CardPriority slots and let the plugin recreate them to fix duplicates"
                >
                  Scrub Duplicate Slots
+               </button>
+               <button
+                 onClick={handleDumpStructure}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-secondary)',
+                   color: 'var(--rn-clr-content-primary)',
+                   border: '1px solid var(--rn-clr-border)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="Walk this rem + descendants and log the full structure of every node carrying cardPriority/cards (console.table) to diagnose rogue tags"
+               >
+                 Dump Slot Structure
                </button>
              </div>
            </h2>

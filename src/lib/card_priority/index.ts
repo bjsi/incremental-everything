@@ -17,6 +17,50 @@ import {
 import * as _ from 'remeda';
 
 /**
+ * Returns true if `rem` is a structural node (powerup definition, powerup/
+ * template property or slot, powerup enum, or powerup property list item).
+ *
+ * Used only as a SECONDARY signal when classifying a card-less, cardPriority-
+ * tagged rem: such a node can never be a real flashcard, so the tag is rogue
+ * regardless of its stored source. The card APIs are NOT fooled by these nodes
+ * — a tag slot / property value genuinely has zero cards (both rem.getCards()
+ * and plugin.card.getAll() correctly report 0). What spread the rogue tags was
+ * our own blanket subtree walk in recalculateTreeInheritance, not the API.
+ *
+ * Caveat: in practice many real tag slots do NOT return true from these SDK
+ * predicates (observed: isProperty/isPowerupProperty are false for template
+ * slots like `Subtítulo`/`Autor`). So detection must NOT rely on this alone —
+ * the authoritative signal is "owns no cards". The predicates are wrapped in
+ * try/catch + optional-chaining because a few are `@alpha`/`@deprecated` and
+ * may be absent on older clients.
+ */
+export async function isStructuralNonCardRem(
+  _plugin: RNPlugin,
+  rem: PluginRem
+): Promise<boolean> {
+  const safe = async (fn?: () => Promise<boolean>): Promise<boolean> => {
+    try {
+      return fn ? !!(await fn()) : false;
+    } catch {
+      return false;
+    }
+  };
+
+  const r = rem as any;
+  const flags = await Promise.all([
+    safe(r.isPowerup?.bind(r)),
+    safe(r.isPowerupEnum?.bind(r)),
+    safe(r.isPowerupSlot?.bind(r)),
+    safe(r.isPowerupProperty?.bind(r)),
+    safe(r.isPowerupPropertyListItem?.bind(r)),
+    safe(r.isProperty?.bind(r)),
+    safe(r.isSlot?.bind(r)),
+  ]);
+
+  return flags.some(Boolean);
+}
+
+/**
  * Find the closest ancestor with priority (either Incremental or CardPriority)
  * UPDATED: Uses the shared logic from priority_inheritance to ensure
  * Manual Card Priority > Inc Rem Priority > Inherited Card Priority
@@ -466,6 +510,17 @@ export async function recalculateTreeInheritance(
   let updatedCount = 0;
   const descendants = await rootRem.getDescendants();
 
+  // Authoritative set of rems that actually own flashcards. We use the global
+  // card index instead of per-rem rem.getCards() because rem.getCards() returns
+  // [] for rems whose cards are disabled or sit inside a paused deck, whereas
+  // plugin.card.getAll() returns every card regardless of state (see wiki:
+  // Priority-Review-Document → Card-State Reference). Built once for the walk.
+  const allCards = (await plugin.card.getAll()) || [];
+  const remIdsWithCards = new Set<string>();
+  for (const c of allCards) {
+    if (c.remId) remIdsWithCards.add(c.remId);
+  }
+
   const batchSize = 50;
   for (let i = 0; i < descendants.length; i += batchSize) {
     const batch = descendants.slice(i, i + batchSize);
@@ -473,6 +528,20 @@ export async function recalculateTreeInheritance(
     await Promise.all(batch.map(async (descendant) => {
       const incInfo = await getIncrementalRemFromRem(plugin, descendant);
       if (incInfo) return;
+
+      // ROGUE-TAG GUARD (root cause fix):
+      // Only touch descendants that genuinely own flashcards. getDescendants()
+      // returns EVERYTHING in the subtree — tag slots, property values, list
+      // items, chapter headers — and the old code refreshed/created cardPriority
+      // on all of them (every one came back source 'inherited'/'default' from
+      // getCardPriority, never null). That blanket walk is exactly how the rogue
+      // tags spread (confirmed by the structure dump: dozens of card-less nodes
+      // carrying source 'inherited'). Tagless card-less descendants inherit
+      // dynamically via findClosestAncestorWithPriority() and need no physical
+      // tag; card-less tagged rems are rogue artifacts the sanitizer removes —
+      // we must not perpetuate them here.
+      const hasCards = remIdsWithCards.has(descendant._id);
+      if (!hasCards) return;
 
       const cardInfo = await getCardPriority(plugin, descendant);
       if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
