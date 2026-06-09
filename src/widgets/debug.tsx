@@ -982,10 +982,18 @@ function Debug() {
     // Same authoritative (card-index based) detection as the global command,
     // scoped to this subtree. The old getSpuriousCardPriorityTags path matched
     // only slot-definition references and never caught these rogue nodes.
-    const { rogueNoCard, suspicious } = await findRogueCardPriorityRemsInSubtree(plugin, rem);
+    const { rogueNoCard, preservedAnchors } = await findRogueCardPriorityRemsInSubtree(plugin, rem);
 
-    if (rogueNoCard.length === 0 && suspicious.length === 0) {
-      await plugin.app.toast('No rogue tags found in this rem or its descendants.');
+    if (preservedAnchors.length > 0) {
+      console.log('[Sanitize] Preserved manual/incremental anchors (not touched):', preservedAnchors);
+    }
+
+    if (rogueNoCard.length === 0) {
+      await plugin.app.toast(
+        preservedAnchors.length > 0
+          ? `No rogue tags found. (${preservedAnchors.length} manual/incremental anchor(s) preserved.)`
+          : 'No rogue tags found in this rem or its descendants.'
+      );
       return;
     }
 
@@ -1020,25 +1028,13 @@ function Debug() {
       }
     }
 
-    if (suspicious.length > 0) {
-      const proceed = confirm(`We also found ${suspicious.length} rem(s) with NO flashcards but a MANUAL or INCREMENTAL CardPriority source. These are almost always legitimate inheritance anchors (priority set on a folder/document, or left by a dismissed IncRem, so descendants keep inheriting) and are NOT removed automatically. Review them one by one anyway?`);
-
-      if (proceed) {
-        for (const r of suspicious) {
-          const confirmDelete = confirm(`⚠️ Likely inheritance anchor\n\nRem: "${r.name}"\nParent: "${r.parentName || '—'}"\n\nNo flashcards, manual/incremental source. Remove CardPriority anyway?`);
-
-          if (confirmDelete) {
-            const result = await removeCardPriorityFromSpecificRems(plugin, [r.id]);
-            if (result.success) {
-              totalCleaned += result.cleanedCount;
-              setRefreshKey(k => k + 1);
-            }
-          }
-        }
-      }
-    }
-
-    await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tag(s) total.`);
+    // Manual/incremental card-less anchors are legitimate and intentionally NOT
+    // offered for deletion here (only reported to the console above). Use the
+    // per-rem "Clear Card Priority" control to remove one deliberately.
+    const anchorNote = preservedAnchors.length > 0
+      ? ` (${preservedAnchors.length} manual/incremental anchor(s) preserved)`
+      : '';
+    await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tag(s) total${anchorNote}.`);
   };
 
   const handleScrubPowerup = async () => {

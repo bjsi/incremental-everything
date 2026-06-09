@@ -17,50 +17,6 @@ import {
 import * as _ from 'remeda';
 
 /**
- * Returns true if `rem` is a structural node (powerup definition, powerup/
- * template property or slot, powerup enum, or powerup property list item).
- *
- * Used only as a SECONDARY signal when classifying a card-less, cardPriority-
- * tagged rem: such a node can never be a real flashcard, so the tag is rogue
- * regardless of its stored source. The card APIs are NOT fooled by these nodes
- * — a tag slot / property value genuinely has zero cards (both rem.getCards()
- * and plugin.card.getAll() correctly report 0). What spread the rogue tags was
- * our own blanket subtree walk in recalculateTreeInheritance, not the API.
- *
- * Caveat: in practice many real tag slots do NOT return true from these SDK
- * predicates (observed: isProperty/isPowerupProperty are false for template
- * slots like `Subtítulo`/`Autor`). So detection must NOT rely on this alone —
- * the authoritative signal is "owns no cards". The predicates are wrapped in
- * try/catch + optional-chaining because a few are `@alpha`/`@deprecated` and
- * may be absent on older clients.
- */
-export async function isStructuralNonCardRem(
-  _plugin: RNPlugin,
-  rem: PluginRem
-): Promise<boolean> {
-  const safe = async (fn?: () => Promise<boolean>): Promise<boolean> => {
-    try {
-      return fn ? !!(await fn()) : false;
-    } catch {
-      return false;
-    }
-  };
-
-  const r = rem as any;
-  const flags = await Promise.all([
-    safe(r.isPowerup?.bind(r)),
-    safe(r.isPowerupEnum?.bind(r)),
-    safe(r.isPowerupSlot?.bind(r)),
-    safe(r.isPowerupProperty?.bind(r)),
-    safe(r.isPowerupPropertyListItem?.bind(r)),
-    safe(r.isProperty?.bind(r)),
-    safe(r.isSlot?.bind(r)),
-  ]);
-
-  return flags.some(Boolean);
-}
-
-/**
  * Find the closest ancestor with priority (either Incremental or CardPriority)
  * UPDATED: Uses the shared logic from priority_inheritance to ensure
  * Manual Card Priority > Inc Rem Priority > Inherited Card Priority

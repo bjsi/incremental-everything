@@ -6,7 +6,7 @@ import {
   seenCardInSessionKey,
 } from '../consts';
 import { CardPriorityInfo } from './types';
-import { calculateNewPriority, setCardPriority, isStructuralNonCardRem } from './index';
+import { calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
 import { safeRemTextToString } from '../pdfUtils';
 
@@ -951,13 +951,13 @@ export async function dumpRemPriorityStructure(
 }
 
 export interface KbRogueScanResult {
-  /** Tagged rems with NO cards whose source is a cascade artifact (inherited/
-   *  default/empty) or that are true structural nodes — safe to strip. */
+  /** Tagged rems with NO cards whose source is a cascade artifact
+   *  (inherited/default/empty) — safe to strip. */
   rogueNoCard: RogueTagResult[];
   /** Tagged rems with NO cards but an INTENTIONAL source (manual or incremental)
-   *  on a normal rem — legitimate inheritance anchors; preserved, only offered
-   *  for optional one-by-one review. */
-  suspicious: RogueTagResult[];
+   *  — legitimate inheritance anchors. PRESERVED: reported for transparency but
+   *  NEVER offered for deletion by the sanitizer. */
+  preservedAnchors: RogueTagResult[];
 }
 
 /**
@@ -965,7 +965,8 @@ export interface KbRogueScanResult {
  * card-less cardPriority tag a legitimate inheritance anchor (NOT rogue):
  *  - `manual`      — the user set the priority directly.
  *  - `incremental` — left behind when an IncRem was dismissed, so its
- *                    descendants keep inheriting that priority.
+ *                    descendants keep inheriting that priority. Second only to
+ *                    `manual` in importance.
  * `inherited` / `default` / empty are NOT here: on a card-less rem those are
  * cascade artifacts (descendants inherit dynamically without a physical tag).
  */
@@ -973,16 +974,15 @@ const INTENTIONAL_PRIORITY_SOURCES = new Set(['manual', 'incremental']);
 
 /**
  * Shared classification core for rogue cardPriority tags. Given candidate rems,
- * returns the rogue / suspicious buckets using the authoritative card index.
- * Candidates without the cardPriority powerup are ignored (so callers can pass
- * raw subtrees). Decision (the structure dump established that the authoritative
- * card index + source value, not node-type flags, are what discriminate — the
- * SDK structural predicates return false even for real tag slots):
+ * returns the rogue / preserved-anchor buckets using the authoritative card
+ * index. Candidates without the cardPriority powerup are ignored (so callers can
+ * pass raw subtrees). Classification is purely card-index + source based — the
+ * structure dump established that the SDK structural predicates return false even
+ * for real tag slots, so node-type flags would only add false negatives:
  *
- *  - has cards                                  → healthy, ignored
- *  - structural node (powerup slot/property)    → rogueNoCard (strip)
- *  - intentional source (manual/incremental)    → suspicious (preserve; ask)
- *  - inherited / default / empty source         → rogueNoCard (strip; cascade artifact)
+ *  - has cards                                → healthy, ignored
+ *  - 0 cards + intentional source (manual/incremental) → preservedAnchors (never deleted)
+ *  - 0 cards + inherited / default / empty source      → rogueNoCard (strip; cascade artifact)
  */
 async function scanCandidatesForRogueCardPriority(
   plugin: RNPlugin,
@@ -995,7 +995,7 @@ async function scanCandidatesForRogueCardPriority(
   }
 
   const rogueNoCard: RogueTagResult[] = [];
-  const suspicious: RogueTagResult[] = [];
+  const preservedAnchors: RogueTagResult[] = [];
 
   for (const rem of candidates) {
     if (!(await rem.hasPowerup('cardPriority'))) continue;
@@ -1007,33 +1007,28 @@ async function scanCandidatesForRogueCardPriority(
     }
     if (hasCards) continue; // legitimate card-bearing rem
 
+    const source = ((await rem.getPowerupProperty('cardPriority', 'prioritySource')) || '').toLowerCase();
+
     // safeRemTextToString now resolves rem references, so rem-reference slot
     // values like `Decks In — [Vocabulary]` show the referenced text instead of
-    // "Untitled" in the confirmation dialog.
+    // "Untitled".
     const name = await safeRemTextToString(plugin, rem.text);
     const parent = await rem.getParentRem();
     const parentName = parent ? await safeRemTextToString(plugin, parent.text) : undefined;
     const base: RogueTagResult = { id: rem._id, name: name.slice(0, 120), parentId: parent?._id, parentName };
 
-    const source = ((await rem.getPowerupProperty('cardPriority', 'prioritySource')) || '').toLowerCase();
-    const structural = await isStructuralNonCardRem(plugin, rem);
-
-    if (structural) {
-      // A true powerup/template slot or property is never a real flashcard
-      // anchor — strip regardless of source.
-      rogueNoCard.push(base);
-    } else if (INTENTIONAL_PRIORITY_SOURCES.has(source)) {
-      // manual / incremental on a normal rem = deliberate inheritance anchor
-      // (manual = user-set; incremental = left by a dismissed IncRem so its
-      // descendants keep inheriting). Preserve; only surface for optional review.
-      suspicious.push(base);
+    if (INTENTIONAL_PRIORITY_SOURCES.has(source)) {
+      // manual / incremental = deliberate inheritance anchor. Preserve — never
+      // offered for deletion (manual = user-set; incremental = left by a
+      // dismissed IncRem so descendants keep inheriting).
+      preservedAnchors.push(base);
     } else {
       // inherited / default / empty on a card-less rem = cascade artifact.
       rogueNoCard.push(base);
     }
   }
 
-  return { rogueNoCard, suspicious };
+  return { rogueNoCard, preservedAnchors };
 }
 
 export async function findAllRogueCardPriorityRems(plugin: RNPlugin): Promise<KbRogueScanResult> {
@@ -1060,14 +1055,22 @@ export async function findRogueCardPriorityRemsInSubtree(
 export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
   await plugin.app.toast('Scanning knowledge base for rogue CardPriority tags...');
 
-  const { rogueNoCard, suspicious } = await findAllRogueCardPriorityRems(plugin);
+  const { rogueNoCard, preservedAnchors } = await findAllRogueCardPriorityRems(plugin);
 
   console.log(
-    `[Sanitize] KB scan: ${rogueNoCard.length} rogue no-card rem(s), ${suspicious.length} suspicious rem(s).`
+    `[Sanitize] KB scan: ${rogueNoCard.length} rogue no-card rem(s); ` +
+    `${preservedAnchors.length} manual/incremental anchor(s) preserved (not touched).`
   );
+  if (preservedAnchors.length > 0) {
+    console.log('[Sanitize] Preserved inheritance anchors:', preservedAnchors);
+  }
 
-  if (rogueNoCard.length === 0 && suspicious.length === 0) {
-    await plugin.app.toast('No rogue tags found. Your database is clean!');
+  if (rogueNoCard.length === 0) {
+    await plugin.app.toast(
+      preservedAnchors.length > 0
+        ? `No rogue tags found. (${preservedAnchors.length} manual/incremental anchor(s) preserved.)`
+        : 'No rogue tags found. Your database is clean!'
+    );
     return;
   }
 
@@ -1106,27 +1109,13 @@ export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
     }
   }
 
-  // 2) Review anchors (manual/incremental source, no cards — legitimate inheritance anchors).
-  if (suspicious.length > 0) {
-    const proceed = confirm(
-      `We also found ${suspicious.length} rem(s) with NO flashcards but a MANUAL or INCREMENTAL ` +
-      `CardPriority source. These are almost always legitimate inheritance anchors (a priority set ` +
-      `on a folder/document, or left by a dismissed IncRem, so descendants keep inheriting it) and ` +
-      `are NOT removed automatically. Review them one by one anyway?`
-    );
-    if (proceed) {
-      for (const r of suspicious) {
-        const confirmDelete = confirm(
-          `⚠️ Likely inheritance anchor\n\nRem: "${r.name}"\nParent: "${r.parentName || '—'}"\n\n` +
-          `No flashcards, manual/incremental source. Remove CardPriority anyway?`
-        );
-        if (confirmDelete) {
-          const result = await removeCardPriorityFromSpecificRems(plugin, [r.id]);
-          if (result.success) totalCleaned += result.cleanedCount;
-        }
-      }
-    }
-  }
+  // Manual/incremental card-less anchors are legitimate (user-set, or left by a
+  // dismissed IncRem so descendants keep inheriting) and are intentionally NOT
+  // offered for deletion — they're only reported (above, to the console). To
+  // remove one deliberately, use the per-rem "Clear Card Priority" control.
 
-  await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rem(s) across your KB.`);
+  const anchorNote = preservedAnchors.length > 0
+    ? ` (${preservedAnchors.length} manual/incremental anchor(s) preserved)`
+    : '';
+  await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tag(s) across your KB${anchorNote}.`);
 }
