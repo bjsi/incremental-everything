@@ -2,6 +2,7 @@
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, allIncrementalRemKey } from './consts';
 import { IncrementalRem } from './incremental_rem/types';
+import { resolveRemTextToString } from './richTextRemRefs';
 
 export interface PageRangeContext {
   incrementalRemId: RemId | null;
@@ -49,6 +50,26 @@ export const safeRemTextToString = async (
   // Handle empty array
   if (remText.length === 0) {
     return 'Untitled';
+  }
+
+  // Resolve rem references. plugin.richText.toString() renders a rem-reference
+  // element (`{ i: 'q', _id }`) as empty, so a value whose text is just a
+  // reference (e.g. a `Decks In — [Vocabulary]` slot) would otherwise collapse
+  // to "Untitled". Only ref-bearing arrays pay the per-ref findOne cost — plain
+  // text keeps the fast normalize/toString path below. If resolution yields
+  // nothing or throws (corrupt richText), we fall through to the robust path.
+  const containsRemRef = remText.some(
+    (el) => el != null && typeof el === 'object' && (el as any).i === 'q'
+  );
+  if (containsRemRef) {
+    try {
+      const resolved = await resolveRemTextToString(plugin, remText);
+      if (resolved && resolved !== 'Untitled') {
+        return resolved;
+      }
+    } catch (refErr) {
+      console.warn('Ref resolution failed in safeRemTextToString, falling back:', refErr);
+    }
   }
 
   // Try to normalize first (this might fix malformed richText)

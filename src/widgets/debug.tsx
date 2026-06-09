@@ -11,7 +11,7 @@ import {
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
-import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure } from '../lib/card_priority/batch';
+import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -978,34 +978,37 @@ function Debug() {
 
   const handleSanitize = async () => {
     if (!rem) return;
-    await plugin.app.toast('Scanning for rogue properties...');
-    const { guaranteedRogue: allGuaranteed, suspicious: allSuspicious } = await getSpuriousCardPriorityTags(plugin, rem, true);
-    
-    if (allGuaranteed.length === 0 && allSuspicious.length === 0) {
-      await plugin.app.toast('No rogue properties found in this rem or its descendants.');
+    await plugin.app.toast('Scanning this rem + descendants for rogue CardPriority tags...');
+    // Same authoritative (card-index based) detection as the global command,
+    // scoped to this subtree. The old getSpuriousCardPriorityTags path matched
+    // only slot-definition references and never caught these rogue nodes.
+    const { rogueNoCard, suspicious } = await findRogueCardPriorityRemsInSubtree(plugin, rem);
+
+    if (rogueNoCard.length === 0 && suspicious.length === 0) {
+      await plugin.app.toast('No rogue tags found in this rem or its descendants.');
       return;
     }
-    
+
     let totalCleaned = 0;
     const CHUNK_SIZE = 20;
-    
-    if (allGuaranteed.length > 0) {
-      for (let i = 0; i < allGuaranteed.length; i += CHUNK_SIZE) {
-        const chunk = allGuaranteed.slice(i, i + CHUNK_SIZE);
+
+    if (rogueNoCard.length > 0) {
+      for (let i = 0; i < rogueNoCard.length; i += CHUNK_SIZE) {
+        const chunk = rogueNoCard.slice(i, i + CHUNK_SIZE);
         const listString = chunk.map((r: any) => `- ${r.name}`).join('\n');
-        
-        const chunkMsg = allGuaranteed.length > CHUNK_SIZE 
-          ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(allGuaranteed.length/CHUNK_SIZE)})` 
+
+        const chunkMsg = rogueNoCard.length > CHUNK_SIZE
+          ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(rogueNoCard.length/CHUNK_SIZE)})`
           : '';
-          
-        const confirmed = confirm(`Found ${allGuaranteed.length} GUARANTEED rogue properties. This will safely remove CardPriority from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
-        
+
+        const confirmed = confirm(`Found ${rogueNoCard.length} ROGUE CardPriority tag(s) on rems with NO flashcards (non-manual source). This will remove the powerup from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
+
         if (!confirmed) {
           if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
           return;
         }
-        
-        await plugin.app.toast(`Sanitizing ${chunk.length} guaranteed rogue properties...`);
+
+        await plugin.app.toast(`Stripping ${chunk.length} rogue tag(s)...`);
         const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map((r: any) => r.id));
         if (result.success) {
           totalCleaned += result.cleanedCount;
@@ -1017,13 +1020,13 @@ function Debug() {
       }
     }
 
-    if (allSuspicious.length > 0) {
-      const proceed = confirm(`We found ${allSuspicious.length} SUSPICIOUS properties.\nThese are property nodes from other plugins that have CardPriority but 0 flashcards. They might be bugs, or they might be intentional.\n\nDo you want to review them one by one?`);
-      
+    if (suspicious.length > 0) {
+      const proceed = confirm(`We also found ${suspicious.length} SUSPICIOUS rem(s): no flashcards but a MANUAL CardPriority source. These may be deliberate inheritance anchors (priority set on a folder/document so descendants inherit). Review them one by one?`);
+
       if (proceed) {
-        for (const r of allSuspicious) {
-          const confirmDelete = confirm(`⚠️ Suspicious Property Found\n\nProperty Text: "${r.name}"\nParent Rem: "${r.parentName}"\n\nThis property has no flashcards. Do you want to remove CardPriority from it?`);
-          
+        for (const r of suspicious) {
+          const confirmDelete = confirm(`⚠️ Suspicious CardPriority\n\nRem: "${r.name}"\nParent: "${r.parentName || '—'}"\n\nNo flashcards, manual source. Remove CardPriority from it?`);
+
           if (confirmDelete) {
             const result = await removeCardPriorityFromSpecificRems(plugin, [r.id]);
             if (result.success) {
@@ -1034,8 +1037,8 @@ function Debug() {
         }
       }
     }
-    
-    await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tags total.`);
+
+    await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tag(s) total.`);
   };
 
   const handleScrubPowerup = async () => {

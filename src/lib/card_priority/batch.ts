@@ -891,7 +891,9 @@ export async function dumpRemPriorityStructure(
       const textRaw = node.text;
       rows.push({
         id: node._id,
-        text: (await safeRemTextToString(plugin, textRaw) || '(untitled)').slice(0, 120),
+        // safeRemTextToString now resolves rem references, so reference values
+        // (e.g. `[Vocabulary]`) show the referenced text rather than "Untitled".
+        text: (await safeRemTextToString(plugin, textRaw)).slice(0, 120),
         depth,
         hasBackText: !!(node as any).backText,
         hasCardPriority,
@@ -962,10 +964,15 @@ export interface KbRogueScanResult {
  *  - 0 cards + manual source, non-structural→ suspicious (deliberate inheritance anchor?)
  *  - has cards                              → healthy, ignored
  */
-export async function findAllRogueCardPriorityRems(plugin: RNPlugin): Promise<KbRogueScanResult> {
-  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
-  const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
-
+/**
+ * Shared classification core. Given a set of candidate rems, returns the rogue /
+ * suspicious buckets using the authoritative card index. Candidates that don't
+ * carry the cardPriority powerup are ignored (so callers can pass raw subtrees).
+ */
+async function scanCandidatesForRogueCardPriority(
+  plugin: RNPlugin,
+  candidates: PluginRem[]
+): Promise<KbRogueScanResult> {
   const allCards = (await plugin.card.getAll()) || [];
   const remIdsWithCards = new Set<string>();
   for (const c of allCards) {
@@ -975,7 +982,9 @@ export async function findAllRogueCardPriorityRems(plugin: RNPlugin): Promise<Kb
   const rogueNoCard: RogueTagResult[] = [];
   const suspicious: RogueTagResult[] = [];
 
-  for (const rem of taggedRems) {
+  for (const rem of candidates) {
+    if (!(await rem.hasPowerup('cardPriority'))) continue;
+
     // Authoritative card check (both indexes; getCards catches a few card.getAll misses).
     let hasCards = remIdsWithCards.has(rem._id);
     if (!hasCards) {
@@ -983,7 +992,10 @@ export async function findAllRogueCardPriorityRems(plugin: RNPlugin): Promise<Kb
     }
     if (hasCards) continue; // legitimate card-bearing rem
 
-    const name = (await safeRemTextToString(plugin, rem.text)) || '(untitled)';
+    // safeRemTextToString now resolves rem references, so rem-reference slot
+    // values like `Decks In — [Vocabulary]` show the referenced text instead of
+    // "Untitled" in the confirmation dialog.
+    const name = await safeRemTextToString(plugin, rem.text);
     const parent = await rem.getParentRem();
     const parentName = parent ? await safeRemTextToString(plugin, parent.text) : undefined;
     const base: RogueTagResult = { id: rem._id, name: name.slice(0, 120), parentId: parent?._id, parentName };
@@ -1003,8 +1015,29 @@ export async function findAllRogueCardPriorityRems(plugin: RNPlugin): Promise<Kb
   return { rogueNoCard, suspicious };
 }
 
+export async function findAllRogueCardPriorityRems(plugin: RNPlugin): Promise<KbRogueScanResult> {
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+  return scanCandidatesForRogueCardPriority(plugin, taggedRems);
+}
+
+/**
+ * Subtree-scoped version of findAllRogueCardPriorityRems: scans `rootRem` and all
+ * its descendants. Used by the per-rem "Sanitize Rogue Tags" debug button so it
+ * uses the same authoritative card-based detection as the global command (the
+ * old per-rem path relied on slot-definition references, which — per the
+ * structure dump — never matched these rogue nodes, so it never cured the rem).
+ */
+export async function findRogueCardPriorityRemsInSubtree(
+  plugin: RNPlugin,
+  rootRem: PluginRem
+): Promise<KbRogueScanResult> {
+  const descendants = await rootRem.getDescendants();
+  return scanCandidatesForRogueCardPriority(plugin, [rootRem, ...descendants]);
+}
+
 export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
-  await plugin.app.toast('Scanning knowledge base for rogue & duplicated CardPriority tags...');
+  await plugin.app.toast('Scanning knowledge base for rogue CardPriority tags...');
 
   const { rogueNoCard, suspicious } = await findAllRogueCardPriorityRems(plugin);
 

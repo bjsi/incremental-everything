@@ -27,6 +27,24 @@ async function resolveRefText(plugin: RNPlugin, el: RichTextElementRemInterface)
 }
 
 /**
+ * Flatten a rem's rich text into a single plain string, resolving rem references
+ * (and pins) to the referenced rem's text. Unlike `plugin.richText.toString()`
+ * (and `safeRemTextToString`, which wraps it), this does NOT drop rem-reference
+ * elements — a rem whose text is just a reference (e.g. a `Decks In — [Vocabulary]`
+ * slot value) resolves to the referenced text instead of "Untitled". Normal refs
+ * are shown wrapped in `[ ]`; pins contribute their referenced text. Returns
+ * 'Untitled' only when genuinely empty.
+ */
+export async function resolveRemTextToString(
+  plugin: RNPlugin,
+  richText: unknown
+): Promise<string> {
+  const segments = await resolveRemTextSegments(plugin, richText);
+  const text = segments.map((s) => s.text).join('').trim();
+  return text || 'Untitled';
+}
+
+/**
  * Resolve a rem's rich text into lightweight display segments:
  *  - Plain text and normal rem references (text wrapped in `[ ]`) become `text` segments.
  *  - Pin references become `pin` segments carrying the referenced rem's text, so the
