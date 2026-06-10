@@ -237,8 +237,25 @@ export async function isPowerupPropertyChildByName(plugin: RNPlugin, rem: Plugin
   ]);
   
   try {
-    const text = (await safeRemTextToString(plugin, rem.text)).trim();
-    
+    const rawText = (await safeRemTextToString(plugin, rem.text)).trim();
+
+    // A powerup slot instance's text is a single REFERENCE to its slot
+    // DEFINITION. safeRemTextToString became reference-aware and now resolves +
+    // wraps such references in `[ ]` (e.g. "[Priority]" / "[Size]" / "[Sources]"),
+    // which broke the bare-name matching below and let known slots leak into the
+    // Parent Selector. Strip one surrounding bracket pair so the bare name matches
+    // again — but ONLY when the text is genuinely a reference, so a user note
+    // literally typed as "[Priority]" is never affected. (Brackets are not the
+    // slot-detection signal anyway: the primary tag-based check handles that, and
+    // this name fallback still requires the parent-powerup guard below.)
+    const textIsReference =
+      Array.isArray(rem.text) &&
+      rem.text.some((el: any) => el != null && typeof el === 'object' && el.i === 'q');
+    const text =
+      textIsReference && rawText.startsWith('[') && rawText.endsWith(']')
+        ? rawText.slice(1, -1).trim()
+        : rawText;
+
     // Check 1: Empty text, "Untitled", Exact Match, or "Starts With Query"
     const isNameMatch = text === '' ||
                         text === 'Untitled' ||

@@ -85,6 +85,7 @@ import {
   getEffectiveSelection,
 } from '../lib/editor_selection';
 import { createExtract } from '../lib/extract';
+import { bulletizeSelection } from '../lib/bulletize';
 
 
 export async function registerCommands(plugin: ReactRNPlugin) {
@@ -910,6 +911,21 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       createExtract(plugin);
     },
   });
+
+  // Toggle "• " at the start of each selected line within a single rem. Handy
+  // for restoring bullets that PDF highlights flatten into soft-wrapped text.
+  // opt+8 types the bullet glyph itself, so we use opt+shift+8 (mirrors the
+  // Ctrl/Cmd+Shift+8 "bulleted list" shortcut in Docs/Word).
+  plugin.app.registerCommand({
+    id: 'bulletize-inline-selection',
+    name: 'Bulletize Inline Selected Text',
+    keyboardShortcut: 'opt+shift+8',
+    quickCode: 'bul',
+    action: async () => {
+      await bulletizeSelection(plugin);
+    },
+  });
+
 
   plugin.app.registerCommand({
     id: 'debug-incremental-everything',
