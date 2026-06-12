@@ -18,6 +18,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 // ---------------------------------------------------------------------------
 
 const normalize = (s: string) => s.normalize('NFC').trim().toLowerCase();
+// Accent/diacritic-insensitive fold so "navegacao interior" matches
+// "Navegação Interior". Decompose, drop combining marks, lowercase.
+const fold = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
 interface Candidate {
   id: string;
@@ -48,6 +52,19 @@ function ReferenceFinder() {
     inputRef.current?.focus();
   }, []);
 
+  // Seed the box with selected text handed off by the command (if any), then
+  // select it so the user can immediately overwrite or refine it.
+  useEffect(() => {
+    (async () => {
+      const init = await plugin.storage.getSession<string>('reference-finder-initial-query');
+      await plugin.storage.setSession('reference-finder-initial-query', '');
+      if (typeof init === 'string' && init.trim()) {
+        setQuery(init.trim());
+        requestAnimationFrame(() => inputRef.current?.select());
+      }
+    })();
+  }, [plugin]);
+
   // Let Enter / arrow keys reach this widget instead of the editor.
   useEffect(() => {
     if (!floatingWidgetId) return;
@@ -60,6 +77,7 @@ function ReferenceFinder() {
     async (raw: string) => {
       const reqId = ++reqIdRef.current;
       const q = normalize(raw);
+      const qf = fold(raw);
       if (q.length < 2) {
         setResults([]);
         return;
@@ -67,6 +85,8 @@ function ReferenceFinder() {
       setSearching(true);
       try {
         const tokens = q.split(/\s+/).filter((t) => t.length >= 2);
+        // Folded tokens drive matching so accents/special chars are ignored.
+        const foldedTokens = qf.split(/\s+/).filter((t) => t.length >= 2);
         // Search the full query plus each token (longest first, capped to 4) so
         // a buried exact-name rem is retrieved via its most distinctive token.
         const queries = Array.from(
@@ -90,17 +110,20 @@ function ReferenceFinder() {
         for (const r of seen.values()) {
           const name = await plugin.richText.toString(r.text ?? []);
           const normName = normalize(name);
-          if (!tokens.every((t) => normName.includes(t))) continue;
+          const foldName = fold(name);
+          // Accent-insensitive: every typed token must appear in the folded name.
+          if (!foldedTokens.every((t) => foldName.includes(t))) continue;
           const type = await r.getType().catch(() => 0);
           if (conceptsOnly && type !== RemType.CONCEPT) continue;
           const times = await r.timesSelectedInSearch().catch(() => 0);
 
           // Lower score = better. Exact match → start-with → contains; then
           // concepts before other types; then by selection count and brevity.
+          // Compared on folded text so accents don't change the ranking.
           let score = 3;
-          if (normName === q) score = 0;
-          else if (normName.startsWith(q)) score = 1;
-          else if (normName.includes(q)) score = 2;
+          if (foldName === qf) score = 0;
+          else if (foldName.startsWith(qf)) score = 1;
+          else if (foldName.includes(qf)) score = 2;
           candidates.push({ id: r._id, name, normName, type, times, score });
         }
 

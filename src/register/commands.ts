@@ -955,14 +955,32 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'opt+shift+f',
     quickCode: 'fir',
     action: async () => {
-      // Open the picker right under the caret so it doesn't jump to the top.
-      let position: { top?: number; left?: number } = { top: 90, left: 320 };
+      // Seed the picker's search box with any selected text (the user can edit
+      // it in the widget). openFloatingWidget has no contextData param, so we
+      // hand it off via session storage.
+      let initialQuery = '';
       try {
-        const caret = await plugin.editor.getCaretPosition();
-        if (caret) {
-          position = { top: Math.round(caret.bottom) + 6, left: Math.round(caret.left) };
+        const sel = await plugin.editor.getSelectedText();
+        if (sel?.richText?.length) {
+          initialQuery = (await plugin.richText.toString(sel.richText)).trim();
         }
-      } catch { /* fall back to default position */ }
+      } catch { /* no selection */ }
+      await plugin.storage.setSession('reference-finder-initial-query', initialQuery);
+
+      // Open the picker at the caret. getCaretPosition can momentarily return
+      // undefined right after a shortcut fires (focus settling), and returns a
+      // valid rect for a collapsed caret too — so retry a few times.
+      let position: { top?: number; left?: number } = { top: 90, left: 320 };
+      let caret: DOMRect | undefined;
+      for (let i = 0; i < 5; i++) {
+        try { caret = await plugin.editor.getCaretPosition(); } catch { /* retry */ }
+        if (caret) break;
+        await new Promise((r) => setTimeout(r, 40));
+      }
+      console.log('[reference-finder] caret position:', caret);
+      if (caret && (caret.left !== 0 || caret.top !== 0)) {
+        position = { top: Math.round(caret.bottom) + 6, left: Math.round(caret.left) };
+      }
       await plugin.window.openFloatingWidget('reference_finder', position);
     },
   });
