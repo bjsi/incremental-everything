@@ -23,13 +23,9 @@ export const OutlineRestructureUndo = () => {
     []
   );
 
-  const [dismissed, setDismissed] = useState<number | null>(null);
   const [reverting, setReverting] = useState(false);
 
   if (!snapshot) return null;
-  // Per-snapshot dismissal: once the user X's a snapshot, hide it until a new
-  // restructure replaces it (we key dismissal on timestamp).
-  if (dismissed === snapshot.timestamp) return null;
 
   const onUndo = async () => {
     if (reverting) return;
@@ -46,7 +42,12 @@ export const OutlineRestructureUndo = () => {
     }
   };
 
-  const onDismiss = () => setDismissed(snapshot.timestamp);
+  // Deliberate close = dismiss. Clear the snapshot from session storage so the
+  // banner stays gone across widget remounts (volatile component state would
+  // reset on remount and let it reappear). The next restructure overwrites the
+  // key and brings the banner back for that new snapshot.
+  const onDismiss = () =>
+    plugin.storage.setSession(OUTLINE_SNAPSHOT_KEY, undefined);
 
   const movedCount = snapshot.ops.length;
   const when = new Date(snapshot.timestamp);
@@ -74,7 +75,7 @@ export const OutlineRestructureUndo = () => {
           onClick={onDismiss}
           className="hover:opacity-75"
           style={{ color: 'var(--rn-clr-content-tertiary)' }}
-          title="Hide this notification (does not revert)"
+          title="Dismiss this notification (does not undo the restructure)"
         >
           ✕
         </button>

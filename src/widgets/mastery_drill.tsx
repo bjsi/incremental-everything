@@ -815,7 +815,7 @@ function FinalDrill() {
       </div>
 
       <div
-        className="flex-grow relative"
+        className="flex-grow relative min-h-0 overflow-hidden"
         onMouseDown={() => {
           // After a click inside the Queue embed the iframe may steal focus.
           // Re-focus our container so the window-level keydown listener keeps working.
@@ -823,7 +823,7 @@ function FinalDrill() {
         }}
       >
         {isLoaded ? (
-          <Queue cardIds={filteredIds} width="100%" height="100%" />
+          <Queue cardIds={filteredIds} width="100%" height="auto" />
         ) : (
           <div className="h-full w-full flex items-center justify-center" style={{ color: 'var(--rn-clr-content-secondary)' }}>
             Loading…

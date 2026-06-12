@@ -71,6 +71,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Find & Insert Reference — floating (not a popup) so it doesn't hide the
+  // editor while you pick a rem to reference.
+  plugin.app.registerWidget('reference_finder', WidgetLocation.FloatingWidget, {
+    dimensions: {
+      width: 680,
+      height: 'auto',
+    },
+  });
+
   plugin.app.registerWidget('queue', WidgetLocation.Flashcard, {
     powerupFilter: powerupCode,
     dimensions: {

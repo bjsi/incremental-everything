@@ -692,11 +692,12 @@ export async function findNonFlashcardDescendantsWithCardPriority(
   console.log(`[NonFlashcardDescendants] Scanning ${descendants.length} descendants of ${rem._id}`);
 
   // Build an authoritative set of remIds that own cards by querying the global
-  // card index once. rem.getCards() is known to miss certain card types
-  // (e.g. multi-line concept/property flashcards, some cloze variants) — the
-  // existing Card API Comparison in the Debug widget exists specifically to
-  // surface this discrepancy. Using card.getAll() avoids false positives where
-  // a real flashcard-bearing Rem would be flagged for removal.
+  // card index once. rem.getCards() returns [] for rems whose cards are disabled
+  // or sit inside a paused deck (see wiki: Priority-Review-Document → Card-State
+  // Reference), whereas plugin.card.getAll() returns every card regardless of
+  // state. The Card API Comparison in the Debug widget surfaces this discrepancy.
+  // Using card.getAll() avoids false positives where a real flashcard-bearing
+  // Rem (e.g. one inside a paused deck) would be wrongly flagged for removal.
   const allCards = (await plugin.card.getAll()) || [];
   const remIdsWithCards = new Set<string>();
   for (const c of allCards) {
@@ -718,8 +719,14 @@ export async function findNonFlashcardDescendantsWithCardPriority(
     const cards = await descendant.getCards();
     if (cards && cards.length > 0) continue;
 
-    // We intentionally do NOT skip IncRems: if an IncRem has no flashcards,
-    // its cardPriority tag is still spurious (there's no card for it to apply to).
+    // Preserve legitimate inheritance anchors: a card-less tag with a manual or
+    // incremental source is intentional (user-set, or left by a dismissed
+    // IncRem so its descendants keep inheriting) and must NOT be removed. This
+    // also covers card-less IncRems, whose tag mirrors their inc priority as an
+    // anchor — only inherited/default/empty sources are cascade artifacts.
+    const source = ((await descendant.getPowerupProperty('cardPriority', 'prioritySource')) || '').toLowerCase();
+    if (INTENTIONAL_PRIORITY_SOURCES.has(source)) continue;
+
     const name = await safeRemTextToString(plugin, descendant.text);
     results.push({
       id: descendant._id,
@@ -731,47 +738,368 @@ export async function findNonFlashcardDescendantsWithCardPriority(
   return results;
 }
 
-export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
-  await plugin.app.toast('Scanning knowledge base for rogue CardPriority tags...');
-  
-  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
-  const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
-  
-  let allGuaranteed: RogueTagResult[] = [];
-  let allSuspicious: RogueTagResult[] = [];
-  
-  for (const rem of taggedRems) {
-    const { guaranteedRogue, suspicious } = await getSpuriousCardPriorityTags(plugin, rem, false);
-    allGuaranteed.push(...guaranteedRogue);
-    allSuspicious.push(...suspicious);
+/**
+ * Resolve the definition-Rem ids for the three cardPriority slots. RemNote tags
+ * each concrete slot instance on a rem with the corresponding slot DEFINITION,
+ * so these ids let us recognise (and count) cardPriority slot children.
+ */
+export async function getCardPrioritySlotDefIds(plugin: RNPlugin): Promise<{
+  priority?: string;
+  source?: string;
+  lastUpdated?: string;
+  all: Set<string>;
+}> {
+  const [prioritySlot, sourceSlot, updatedSlot] = await Promise.all([
+    plugin.powerup.getPowerupSlotByCode('cardPriority', 'priority'),
+    plugin.powerup.getPowerupSlotByCode('cardPriority', 'prioritySource'),
+    plugin.powerup.getPowerupSlotByCode('cardPriority', 'lastUpdated'),
+  ]);
+  const all = new Set<string>(
+    [prioritySlot?._id, sourceSlot?._id, updatedSlot?._id].filter(Boolean) as string[]
+  );
+  return { priority: prioritySlot?._id, source: sourceSlot?._id, lastUpdated: updatedSlot?._id, all };
+}
+
+/**
+ * Count how many children of `rem` are cardPriority `priority`-slot instances.
+ * A healthy rem has exactly one. This is purely diagnostic — surfaced in the
+ * structure dump so we can verify whether true duplicate slots ever occur.
+ * (In observed data this is always ≤1; the "multiple Priority rows" seen in the
+ * RemNote UI are separate slot-rems each carrying their own cardPriority tag,
+ * not duplicate slots on one rem.)
+ */
+async function countDuplicatePrioritySlots(
+  rem: PluginRem,
+  prioritySlotDefId: string | undefined
+): Promise<number> {
+  if (!prioritySlotDefId) return 0;
+  const children = await rem.getChildrenRem();
+  let count = 0;
+  for (const child of children) {
+    const tags = await child.getTagRems();
+    if (tags.some((t) => t._id === prioritySlotDefId)) count++;
+  }
+  return count;
+}
+
+export interface RemPriorityStructureNode {
+  id: string;
+  text: string;
+  depth: number;
+  hasBackText: boolean;
+  hasCardPriority: boolean;
+  authoritativeCardCount: number; // from plugin.card.getAll()
+  remGetCardsCount: number; // from rem.getCards()
+  duplicatePrioritySlots: number;
+  cardPrioritySource: string | null;
+  cardPriorityValue: string | null;
+  flags: {
+    isProperty: boolean;
+    isPowerupProperty: boolean;
+    isPowerupSlot: boolean;
+    isPowerup: boolean;
+    isPowerupEnum: boolean;
+    isPowerupPropertyListItem: boolean;
+    isSlot: boolean;
+    isCardItem: boolean;
+    isListItem: boolean;
+    enablePractice: boolean;
+    practiceDirection: string;
+  };
+  tags: string[];
+  classification: 'ok-card' | 'inheritance-anchor' | 'rogue-no-card';
+}
+
+/**
+ * DIAGNOSTIC: walk `rem` + all descendants and capture the full structural
+ * fingerprint of every node that either carries cardPriority or owns cards.
+ * Logs a table to the console and returns the structured rows so the debug
+ * widget can render them. This is the tool to confirm WHICH structure is being
+ * mistaken for a flashcard and which process tagged it.
+ */
+export async function dumpRemPriorityStructure(
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<RemPriorityStructureNode[]> {
+  const slotDefs = await getCardPrioritySlotDefIds(plugin);
+  const allCards = (await plugin.card.getAll()) || [];
+  const cardCountByRem = new Map<string, number>();
+  for (const c of allCards) {
+    if (c.remId) cardCountByRem.set(c.remId, (cardCountByRem.get(c.remId) || 0) + 1);
   }
 
-  if (allGuaranteed.length === 0 && allSuspicious.length === 0) {
-    await plugin.app.toast('No rogue tags found. Your database is clean!');
+  const rows: RemPriorityStructureNode[] = [];
+
+  const safeBool = async (fn?: () => Promise<boolean>): Promise<boolean> => {
+    try { return fn ? !!(await fn()) : false; } catch { return false; }
+  };
+  const safeStr = async (fn?: () => Promise<any>, fallback = ''): Promise<string> => {
+    try { return fn ? String(await fn()) : fallback; } catch { return fallback; }
+  };
+
+  const visit = async (node: PluginRem, depth: number) => {
+    const hasCardPriority = await node.hasPowerup('cardPriority');
+    const authoritativeCardCount = cardCountByRem.get(node._id) || 0;
+
+    // Only record nodes that are interesting: carry cardPriority, or own cards.
+    let remGetCardsCount = 0;
+    try { remGetCardsCount = (await node.getCards())?.length || 0; } catch { /* ignore */ }
+
+    if (hasCardPriority || authoritativeCardCount > 0 || remGetCardsCount > 0) {
+      const r = node as any;
+      const flags = {
+        isProperty: await safeBool(r.isProperty?.bind(r)),
+        isPowerupProperty: await safeBool(r.isPowerupProperty?.bind(r)),
+        isPowerupSlot: await safeBool(r.isPowerupSlot?.bind(r)),
+        isPowerup: await safeBool(r.isPowerup?.bind(r)),
+        isPowerupEnum: await safeBool(r.isPowerupEnum?.bind(r)),
+        isPowerupPropertyListItem: await safeBool(r.isPowerupPropertyListItem?.bind(r)),
+        isSlot: await safeBool(r.isSlot?.bind(r)),
+        isCardItem: await safeBool(r.isCardItem?.bind(r)),
+        isListItem: await safeBool(r.isListItem?.bind(r)),
+        enablePractice: await safeBool(r.getEnablePractice?.bind(r)),
+        practiceDirection: await safeStr(r.getPracticeDirection?.bind(r), 'none'),
+      };
+
+      const duplicatePrioritySlots = hasCardPriority
+        ? await countDuplicatePrioritySlots(node, slotDefs.priority)
+        : 0;
+
+      let cardPrioritySource: string | null = null;
+      let cardPriorityValue: string | null = null;
+      if (hasCardPriority) {
+        try { cardPrioritySource = (await node.getPowerupProperty('cardPriority', 'prioritySource')) || null; } catch { /* ignore */ }
+        try { cardPriorityValue = (await node.getPowerupProperty('cardPriority', 'priority')) || null; } catch { /* ignore */ }
+      }
+
+      const hasCards = authoritativeCardCount > 0 || remGetCardsCount > 0;
+      const structural = flags.isProperty || flags.isPowerupProperty || flags.isPowerupSlot ||
+        flags.isPowerup || flags.isPowerupEnum || flags.isPowerupPropertyListItem || flags.isSlot;
+
+      // Mirror scanCandidatesForRogueCardPriority exactly so the dump labels
+      // match what the sanitizer will actually do:
+      //   has cards / no powerup                       → ok-card (ignored)
+      //   no cards, structural node                    → rogue-no-card (strips)
+      //   no cards, intentional source (manual/incr.)  → inheritance-anchor (asks)
+      //   no cards, inherited/default/empty source     → rogue-no-card (strips)
+      const cpSource = (cardPrioritySource || '').toLowerCase();
+      let classification: RemPriorityStructureNode['classification'];
+      if (!hasCardPriority || hasCards) {
+        classification = 'ok-card';
+      } else if (structural) {
+        classification = 'rogue-no-card';
+      } else if (INTENTIONAL_PRIORITY_SOURCES.has(cpSource)) {
+        classification = 'inheritance-anchor';
+      } else {
+        classification = 'rogue-no-card';
+      }
+
+      const tags = await node.getTagRems();
+      const tagNames = await Promise.all(tags.map((t) => safeRemTextToString(plugin, t.text)));
+
+      const textRaw = node.text;
+      rows.push({
+        id: node._id,
+        // safeRemTextToString now resolves rem references, so reference values
+        // (e.g. `[Vocabulary]`) show the referenced text rather than "Untitled".
+        text: (await safeRemTextToString(plugin, textRaw)).slice(0, 120),
+        depth,
+        hasBackText: !!(node as any).backText,
+        hasCardPriority,
+        authoritativeCardCount,
+        remGetCardsCount,
+        duplicatePrioritySlots,
+        cardPrioritySource,
+        cardPriorityValue,
+        flags,
+        tags: tagNames,
+        classification,
+      });
+    }
+
+    const children = await node.getChildrenRem();
+    for (const child of children) {
+      await visit(child, depth + 1);
+    }
+  };
+
+  await visit(rem, 0);
+
+  console.log(`\n=========== CARD PRIORITY STRUCTURE DUMP: ${rem._id} ===========`);
+  console.log(`Captured ${rows.length} node(s) carrying cardPriority and/or cards.`);
+  console.table(
+    rows.map((r) => ({
+      depth: r.depth,
+      text: r.text,
+      class: r.classification,
+      cp: r.hasCardPriority,
+      dupSlots: r.duplicatePrioritySlots,
+      cardsAll: r.authoritativeCardCount,
+      cardsGet: r.remGetCardsCount,
+      backText: r.hasBackText,
+      prop: r.flags.isProperty,
+      pwProp: r.flags.isPowerupProperty,
+      pwSlot: r.flags.isPowerupSlot,
+      source: r.cardPrioritySource,
+      id: r.id,
+    }))
+  );
+  console.log(`Full rows:`, rows);
+  console.log(`================================================================\n`);
+
+  return rows;
+}
+
+export interface KbRogueScanResult {
+  /** Tagged rems with NO cards whose source is a cascade artifact
+   *  (inherited/default/empty) — safe to strip. */
+  rogueNoCard: RogueTagResult[];
+  /** Tagged rems with NO cards but an INTENTIONAL source (manual or incremental)
+   *  — legitimate inheritance anchors. PRESERVED: reported for transparency but
+   *  NEVER offered for deletion by the sanitizer. */
+  preservedAnchors: RogueTagResult[];
+}
+
+/**
+ * Sources that represent a DELIBERATE priority assignment and therefore make a
+ * card-less cardPriority tag a legitimate inheritance anchor (NOT rogue):
+ *  - `manual`      — the user set the priority directly.
+ *  - `incremental` — left behind when an IncRem was dismissed, so its
+ *                    descendants keep inheriting that priority. Second only to
+ *                    `manual` in importance.
+ * `inherited` / `default` / empty are NOT here: on a card-less rem those are
+ * cascade artifacts (descendants inherit dynamically without a physical tag).
+ */
+const INTENTIONAL_PRIORITY_SOURCES = new Set(['manual', 'incremental']);
+
+/**
+ * Shared classification core for rogue cardPriority tags. Given candidate rems,
+ * returns the rogue / preserved-anchor buckets using the authoritative card
+ * index. Candidates without the cardPriority powerup are ignored (so callers can
+ * pass raw subtrees). Classification is purely card-index + source based — the
+ * structure dump established that the SDK structural predicates return false even
+ * for real tag slots, so node-type flags would only add false negatives:
+ *
+ *  - has cards                                → healthy, ignored
+ *  - 0 cards + intentional source (manual/incremental) → preservedAnchors (never deleted)
+ *  - 0 cards + inherited / default / empty source      → rogueNoCard (strip; cascade artifact)
+ */
+async function scanCandidatesForRogueCardPriority(
+  plugin: RNPlugin,
+  candidates: PluginRem[]
+): Promise<KbRogueScanResult> {
+  const allCards = (await plugin.card.getAll()) || [];
+  const remIdsWithCards = new Set<string>();
+  for (const c of allCards) {
+    if (c.remId) remIdsWithCards.add(c.remId);
+  }
+
+  const rogueNoCard: RogueTagResult[] = [];
+  const preservedAnchors: RogueTagResult[] = [];
+
+  for (const rem of candidates) {
+    if (!(await rem.hasPowerup('cardPriority'))) continue;
+
+    // Authoritative card check (both indexes; getCards catches a few card.getAll misses).
+    let hasCards = remIdsWithCards.has(rem._id);
+    if (!hasCards) {
+      try { hasCards = ((await rem.getCards())?.length || 0) > 0; } catch { /* ignore */ }
+    }
+    if (hasCards) continue; // legitimate card-bearing rem
+
+    const source = ((await rem.getPowerupProperty('cardPriority', 'prioritySource')) || '').toLowerCase();
+
+    // safeRemTextToString now resolves rem references, so rem-reference slot
+    // values like `Decks In — [Vocabulary]` show the referenced text instead of
+    // "Untitled".
+    const name = await safeRemTextToString(plugin, rem.text);
+    const parent = await rem.getParentRem();
+    const parentName = parent ? await safeRemTextToString(plugin, parent.text) : undefined;
+    const base: RogueTagResult = { id: rem._id, name: name.slice(0, 120), parentId: parent?._id, parentName };
+
+    if (INTENTIONAL_PRIORITY_SOURCES.has(source)) {
+      // manual / incremental = deliberate inheritance anchor. Preserve — never
+      // offered for deletion (manual = user-set; incremental = left by a
+      // dismissed IncRem so descendants keep inheriting).
+      preservedAnchors.push(base);
+    } else {
+      // inherited / default / empty on a card-less rem = cascade artifact.
+      rogueNoCard.push(base);
+    }
+  }
+
+  return { rogueNoCard, preservedAnchors };
+}
+
+export async function findAllRogueCardPriorityRems(plugin: RNPlugin): Promise<KbRogueScanResult> {
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+  return scanCandidatesForRogueCardPriority(plugin, taggedRems);
+}
+
+/**
+ * Subtree-scoped version of findAllRogueCardPriorityRems: scans `rootRem` and all
+ * its descendants. Used by the per-rem "Sanitize Rogue Tags" debug button so it
+ * uses the same authoritative card-based detection as the global command (the
+ * old per-rem path relied on slot-definition references, which — per the
+ * structure dump — never matched these rogue nodes, so it never cured the rem).
+ */
+export async function findRogueCardPriorityRemsInSubtree(
+  plugin: RNPlugin,
+  rootRem: PluginRem
+): Promise<KbRogueScanResult> {
+  const descendants = await rootRem.getDescendants();
+  return scanCandidatesForRogueCardPriority(plugin, [rootRem, ...descendants]);
+}
+
+export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
+  await plugin.app.toast('Scanning knowledge base for rogue CardPriority tags...');
+
+  const { rogueNoCard, preservedAnchors } = await findAllRogueCardPriorityRems(plugin);
+
+  console.log(
+    `[Sanitize] KB scan: ${rogueNoCard.length} rogue no-card rem(s); ` +
+    `${preservedAnchors.length} manual/incremental anchor(s) preserved (not touched).`
+  );
+  if (preservedAnchors.length > 0) {
+    console.log('[Sanitize] Preserved inheritance anchors:', preservedAnchors);
+  }
+
+  if (rogueNoCard.length === 0) {
+    await plugin.app.toast(
+      preservedAnchors.length > 0
+        ? `No rogue tags found. (${preservedAnchors.length} manual/incremental anchor(s) preserved.)`
+        : 'No rogue tags found. Your database is clean!'
+    );
     return;
   }
 
   let totalCleaned = 0;
   const CHUNK_SIZE = 20;
 
-  if (allGuaranteed.length > 0) {
-    for (let i = 0; i < allGuaranteed.length; i += CHUNK_SIZE) {
-      const chunk = allGuaranteed.slice(i, i + CHUNK_SIZE);
-      const listString = chunk.map(r => `- ${r.name} (${r.id})`).join('\n');
-      
-      const chunkMsg = allGuaranteed.length > CHUNK_SIZE 
-        ? `(Batch ${Math.floor(i/CHUNK_SIZE) + 1} of ${Math.ceil(allGuaranteed.length/CHUNK_SIZE)})` 
+  // 1) Strip rogue no-card tags (cascade artifacts: tagged slots, property
+  //    values and list items that never had cards).
+  if (rogueNoCard.length > 0) {
+    for (let i = 0; i < rogueNoCard.length; i += CHUNK_SIZE) {
+      const chunk = rogueNoCard.slice(i, i + CHUNK_SIZE);
+      const listString = chunk.map((r) => `- ${r.name} (${r.id})`).join('\n');
+      const chunkMsg = rogueNoCard.length > CHUNK_SIZE
+        ? `(Batch ${Math.floor(i / CHUNK_SIZE) + 1} of ${Math.ceil(rogueNoCard.length / CHUNK_SIZE)})`
         : '';
-        
-      const confirmed = confirm(`Found ${allGuaranteed.length} GUARANTEED rogue properties. This will safely remove CardPriority from ${chunk.length} of them ${chunkMsg}:\n\n${listString}\n\nContinue?`);
-      
+
+      const confirmed = confirm(
+        `Found ${rogueNoCard.length} ROGUE CardPriority tag(s) on rems with NO flashcards ` +
+        `(inherited/default source — manual & incremental anchors are kept). This will remove ` +
+        `the powerup from ${chunk.length} of them ${chunkMsg}:\n\n` +
+        `${listString}\n\nContinue?`
+      );
       if (!confirmed) {
-        if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} rogue tags total.`);
+        if (totalCleaned > 0) await plugin.app.toast(`Sanitize aborted. Cleaned ${totalCleaned} tag(s) total.`);
         return;
       }
-      
-      await plugin.app.toast(`Sanitizing ${chunk.length} guaranteed rogue properties...`);
-      const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map(r => r.id));
+
+      await plugin.app.toast(`Stripping ${chunk.length} rogue tag(s)...`);
+      const result = await removeCardPriorityFromSpecificRems(plugin, chunk.map((r) => r.id));
       if (result.success) {
         totalCleaned += result.cleanedCount;
       } else {
@@ -781,22 +1109,13 @@ export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
     }
   }
 
-  if (allSuspicious.length > 0) {
-    const proceed = confirm(`We successfully processed the guaranteed tags.\n\nHowever, we also found ${allSuspicious.length} SUSPICIOUS properties.\nThese are property nodes from other plugins that have CardPriority but 0 flashcards. They might be bugs, or they might be intentional.\n\nDo you want to review them one by one?`);
-    
-    if (proceed) {
-      for (const rem of allSuspicious) {
-        const confirmDelete = confirm(`⚠️ Suspicious Property Found\n\nProperty Text: "${rem.name}"\nParent Rem: "${rem.parentName}"\n\nThis property has no flashcards. Do you want to remove CardPriority from it?`);
-        
-        if (confirmDelete) {
-          const result = await removeCardPriorityFromSpecificRems(plugin, [rem.id]);
-          if (result.success) {
-            totalCleaned += result.cleanedCount;
-          }
-        }
-      }
-    }
-  }
+  // Manual/incremental card-less anchors are legitimate (user-set, or left by a
+  // dismissed IncRem so descendants keep inheriting) and are intentionally NOT
+  // offered for deletion — they're only reported (above, to the console). To
+  // remove one deliberately, use the per-rem "Clear Card Priority" control.
 
-  await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tags across your KB.`);
+  const anchorNote = preservedAnchors.length > 0
+    ? ` (${preservedAnchors.length} manual/incremental anchor(s) preserved)`
+    : '';
+  await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tag(s) across your KB${anchorNote}.`);
 }

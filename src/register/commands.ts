@@ -40,7 +40,6 @@ import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsA
 import { transferToDismissed } from '../lib/dismissed';
 import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
-import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import dayjs from 'dayjs';
 import {
   getOperatingSystem,
@@ -85,6 +84,7 @@ import {
   getEffectiveSelection,
 } from '../lib/editor_selection';
 import { createExtract } from '../lib/extract';
+import { bulletizeSelection } from '../lib/bulletize';
 
 
 export async function registerCommands(plugin: ReactRNPlugin) {
@@ -911,6 +911,21 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Toggle "• " at the start of each selected line within a single rem. Handy
+  // for restoring bullets that PDF highlights flatten into soft-wrapped text.
+  // opt+8 types the bullet glyph itself, so we use opt+shift+8 (mirrors the
+  // Ctrl/Cmd+Shift+8 "bulleted list" shortcut in Docs/Word).
+  plugin.app.registerCommand({
+    id: 'bulletize-inline-selection',
+    name: 'Bulletize Inline Selected Text',
+    keyboardShortcut: 'opt+shift+8',
+    quickCode: 'bul',
+    action: async () => {
+      await bulletizeSelection(plugin);
+    },
+  });
+
+
   plugin.app.registerCommand({
     id: 'debug-incremental-everything',
     name: 'Debug Incremental Everything',
@@ -919,12 +934,56 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem) {
         return;
       }
-      if (!(await rem.hasPowerup(powerupCode)) && !(await rem.hasPowerup(CARD_PRIORITY_CODE)) && !(await rem.hasPowerup(dismissedPowerupCode))) {
-        return;
-      }
+      // NOTE: We intentionally open the debug popup for ANY focused rem, even
+      // ones without the Incremental/CardPriority/Dismissed powerups. The
+      // "Search / Linkage Diagnostics" section is useful on plain concept rems
+      // (e.g. to investigate why a rem is invisible in reference search). The
+      // powerup-specific sections inside the widget hide themselves when the
+      // corresponding powerup is absent.
       await plugin.widget.openPopup('debug', {
         remId: rem._id,
       });
+    },
+  });
+
+  // Find Rem — a re-ranking picker that surfaces rems the built-in search can't
+  // (all-common-token names like "Navegação Interior"). Enter inserts a
+  // reference; Shift+Enter / Shift+click opens the rem in a new pane (the only
+  // practical way to reach these "invisible" rems). Floating so the editor
+  // stays visible. (Command id kept stable for back-compat.)
+  plugin.app.registerCommand({
+    id: 'find-insert-reference',
+    name: 'Find Rem (insert reference / open in pane)',
+    keyboardShortcut: 'opt+shift+f',
+    quickCode: 'fir',
+    action: async () => {
+      // Seed the picker's search box with any selected text (the user can edit
+      // it in the widget). openFloatingWidget has no contextData param, so we
+      // hand it off via session storage.
+      let initialQuery = '';
+      try {
+        const sel = await plugin.editor.getSelectedText();
+        if (sel?.richText?.length) {
+          initialQuery = (await plugin.richText.toString(sel.richText)).trim();
+        }
+      } catch { /* no selection */ }
+      await plugin.storage.setSession('reference-finder-initial-query', initialQuery);
+
+      // Open the picker at the caret. getCaretPosition can momentarily return
+      // undefined right after a shortcut fires (focus settling), and returns a
+      // valid rect for a collapsed caret too — so retry a few times.
+      let position: { top?: number; left?: number } = { top: 90, left: 320 };
+      let caret: DOMRect | undefined;
+      for (let i = 0; i < 5; i++) {
+        try { caret = await plugin.editor.getCaretPosition(); } catch { /* retry */ }
+        if (caret) break;
+        await new Promise((r) => setTimeout(r, 40));
+      }
+      console.log('[reference-finder] caret position:', caret);
+      if (caret && (caret.left !== 0 || caret.top !== 0)) {
+        position = { top: Math.round(caret.bottom) + 6, left: Math.round(caret.left) };
+      }
+      await plugin.window.openFloatingWidget('reference_finder', position);
     },
   });
 

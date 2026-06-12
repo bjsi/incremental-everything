@@ -466,6 +466,17 @@ export async function recalculateTreeInheritance(
   let updatedCount = 0;
   const descendants = await rootRem.getDescendants();
 
+  // Authoritative set of rems that actually own flashcards. We use the global
+  // card index instead of per-rem rem.getCards() because rem.getCards() returns
+  // [] for rems whose cards are disabled or sit inside a paused deck, whereas
+  // plugin.card.getAll() returns every card regardless of state (see wiki:
+  // Priority-Review-Document → Card-State Reference). Built once for the walk.
+  const allCards = (await plugin.card.getAll()) || [];
+  const remIdsWithCards = new Set<string>();
+  for (const c of allCards) {
+    if (c.remId) remIdsWithCards.add(c.remId);
+  }
+
   const batchSize = 50;
   for (let i = 0; i < descendants.length; i += batchSize) {
     const batch = descendants.slice(i, i + batchSize);
@@ -473,6 +484,20 @@ export async function recalculateTreeInheritance(
     await Promise.all(batch.map(async (descendant) => {
       const incInfo = await getIncrementalRemFromRem(plugin, descendant);
       if (incInfo) return;
+
+      // ROGUE-TAG GUARD (root cause fix):
+      // Only touch descendants that genuinely own flashcards. getDescendants()
+      // returns EVERYTHING in the subtree — tag slots, property values, list
+      // items, chapter headers — and the old code refreshed/created cardPriority
+      // on all of them (every one came back source 'inherited'/'default' from
+      // getCardPriority, never null). That blanket walk is exactly how the rogue
+      // tags spread (confirmed by the structure dump: dozens of card-less nodes
+      // carrying source 'inherited'). Tagless card-less descendants inherit
+      // dynamically via findClosestAncestorWithPriority() and need no physical
+      // tag; card-less tagged rems are rogue artifacts the sanitizer removes —
+      // we must not perpetuate them here.
+      const hasCards = remIdsWithCards.has(descendant._id);
+      if (!hasCards) return;
 
       const cardInfo = await getCardPriority(plugin, descendant);
       if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
