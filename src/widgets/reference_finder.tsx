@@ -18,6 +18,48 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 // ---------------------------------------------------------------------------
 
 const normalize = (s: string) => s.normalize('NFC').trim().toLowerCase();
+
+// RemNote marks cloze membership with a `cId` key on each rich-text element
+// (including rem-reference elements). To keep an inserted reference INSIDE a
+// cloze instead of breaking it, we stamp the surrounding cloze's id onto it.
+const CLOZE_KEY = 'cId';
+
+// First cloze id found among a span of rich text (used for selected text).
+function findClozeId(rt: any): string | undefined {
+  if (!Array.isArray(rt)) return undefined;
+  for (const el of rt) {
+    if (el && typeof el === 'object' && typeof (el as any)[CLOZE_KEY] === 'string') {
+      return (el as any)[CLOZE_KEY];
+    }
+  }
+  return undefined;
+}
+
+// Editor caret-offset width of one element. Text contributes its length;
+// RemNote counts a rem reference as width 2; other inline nodes as 1.
+function elementWidth(el: any): number {
+  if (typeof el === 'string') return el.length;
+  if (el?.i === 'm' || el?.i === 'x') return (el.text ?? '').length;
+  if (el?.i === 'q') return 2;
+  return 1;
+}
+
+// Cloze id at a collapsed caret offset. A caret sitting on a boundary counts as
+// inside the cloze if either adjacent element is clozed.
+function clozeIdAtOffset(rt: any, offset: number): string | undefined {
+  if (!Array.isArray(rt)) return undefined;
+  let pos = 0;
+  let prevCId: string | undefined;
+  for (const el of rt) {
+    const w = elementWidth(el);
+    const cId = el && typeof el === 'object' ? (el as any)[CLOZE_KEY] : undefined;
+    if (offset === pos) return cId ?? prevCId;
+    if (offset > pos && offset < pos + w) return cId;
+    pos += w;
+    prevCId = cId;
+  }
+  return prevCId; // caret at the very end of the text
+}
 // Accent/diacritic-insensitive fold so "navegacao interior" matches
 // "Navegação Interior". Decompose, drop combining marks, lowercase.
 const fold = (s: string) =>
@@ -218,19 +260,37 @@ function ReferenceFinder() {
         const sel = await plugin.editor.getSelection();
         console.log('[reference-finder] active editor selection:', sel);
         if (sel) {
-          // If text is selected, replace it with the reference (mimics RemNote's
-          // [[ ]] behaviour where the selected text becomes the link).
-          if (
+          // Cloze-awareness: if the insertion point sits inside a cloze, stamp
+          // that cloze's id onto the reference so it stays INSIDE the cloze
+          // instead of breaking it. Prefer the selected span's cId; fall back
+          // to the element at the caret offset.
+          let clozeId: string | undefined;
+          const hasTextRange =
             sel.type === SelectionType.Text &&
             (sel as any).range &&
-            (sel as any).range.start !== (sel as any).range.end
-          ) {
+            (sel as any).range.start !== (sel as any).range.end;
+          try {
+            const ts = await plugin.editor.getSelectedText();
+            clozeId = findClozeId(ts?.richText);
+            if (!clozeId && sel.type === SelectionType.Text && (sel as any).remId) {
+              const rem = await plugin.rem.findOne((sel as any).remId);
+              const offset = (sel as any).range?.start ?? 0;
+              clozeId = clozeIdAtOffset(rem?.text, offset);
+            }
+          } catch { /* best-effort cloze detection */ }
+          console.log('[reference-finder] cloze id at insertion point:', clozeId);
+
+          // If text is selected, replace it with the reference (mimics RemNote's
+          // [[ ]] behaviour where the selected text becomes the link).
+          if (hasTextRange) {
             await plugin.editor.delete();
             console.log('[reference-finder] deleted selected text before inserting');
           }
-          await plugin.editor.insertRichText([{ i: 'q', _id: cand.id }]);
+          const ref: any = { i: 'q', _id: cand.id };
+          if (clozeId) ref[CLOZE_KEY] = clozeId;
+          await plugin.editor.insertRichText([ref]);
           inserted = true;
-          console.log('[reference-finder] insertRichText OK');
+          console.log('[reference-finder] insertRichText OK', clozeId ? '(inside cloze)' : '');
         } else {
           console.warn('[reference-finder] no active editor selection — will use clipboard fallback');
         }
