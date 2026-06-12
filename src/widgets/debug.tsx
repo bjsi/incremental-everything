@@ -1528,134 +1528,6 @@ function Debug() {
         <Info className="card-disabled-ancestor" label="Cards Disabled (Inherited)" data={isCardDisabledInAncestors ? <span style={{color: '#ef4444', fontWeight: 600}}>YES</span> : 'No'} />
       </div>
 
-      <div style={{ marginTop: '16px' }}>
-        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Search / Linkage Diagnostics
-          <button
-            onClick={handleSearchProbe}
-            disabled={isProbingSearch}
-            style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isProbingSearch ? 'wait' : 'pointer' }}
-          >
-            {isProbingSearch ? 'Probing…' : 'Probe Searchability'}
-          </button>
-        </h2>
-        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '8px' }}>
-          Diagnoses why this rem may be invisible in reference search. Reproduces the editor's search via
-          <code> plugin.search.search()</code>, inspects the rem's own literal text, Unicode normalization, hidden
-          characters, type/flags, aliases and ranking. Run on a working rem and a broken one to compare. Full dump in console.
-        </div>
-        {searchProbe && (
-          <div>
-            <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: searchProbe.issues.length > 0 && searchProbe.literalCharCount > 0 && !searchProbe.nfcDiffers && searchProbe.suspiciousChars.length === 0 ? 'var(--rn-clr-background-secondary)' : 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--rn-clr-border-warning)' }}>
-              <strong>Verdict:</strong>
-              <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px' }}>
-                {searchProbe.issues.map((issue, i) => (
-                  <li key={i} style={{ marginBottom: '4px' }}>{issue}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
-              <Info className="" label="Type" data={searchProbe.typeLabel} />
-              <Info className="" label="Literal chars (own text)" data={<strong style={{ color: searchProbe.literalCharCount === 0 ? '#ef4444' : 'inherit' }}>{searchProbe.literalCharCount}</strong>} />
-              <Info className="" label="timesSelectedInSearch" data={searchProbe.timesSelectedInSearch ?? '—'} />
-              <Info className="" label="Referenced by" data={searchProbe.referencedByCount} />
-              <Info className="" label="References" data={searchProbe.referencesCount} />
-            </div>
-            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
-              <Info className="" label="NFC normalized?" data={searchProbe.isNFC ? <span style={{ color: '#22c55e' }}>Yes</span> : <span style={{ color: '#ef4444', fontWeight: 600 }}>NO — accents decomposed</span>} />
-              <Info className="" label="Leading/trailing WS" data={searchProbe.hasLeadingTrailingWhitespace ? <span style={{ color: '#ef4444', fontWeight: 600 }}>YES</span> : 'No'} />
-              <Info className="" label="Hidden/zero-width chars" data={<strong style={{ color: searchProbe.suspiciousChars.length > 0 ? '#ef4444' : 'inherit' }}>{searchProbe.suspiciousChars.length}</strong>} />
-            </div>
-            <Info className="" label={`Plain string ("${searchProbe.plainString}")`} data={<code>{JSON.stringify(searchProbe.plainString)}</code>} />
-            {searchProbe.suspiciousChars.length > 0 && (
-              <Info className="" label="Suspicious characters" data={<pre style={preStyle}>{JSON.stringify(searchProbe.suspiciousChars, null, 2)}</pre>} />
-            )}
-            <Info className="" label="Active flags" data={
-              <span style={{ fontSize: '11px' }}>
-                {Object.entries(searchProbe.flags).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}
-              </span>
-            } />
-            <Info className="" label="Own-text search rank (top 50)" data={
-              <span>
-                <span style={{ color: searchProbe.ownSearchRank === -1 ? '#ef4444' : '#22c55e', fontWeight: 600 }}>
-                  {searchProbe.ownSearchRank === -1 ? `NOT FOUND (in ${searchProbe.ownSearchCount})` : `#${searchProbe.ownSearchRank + 1}`}
-                </span>
-                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '11px' }}>
-                  concepts-only: {searchProbe.conceptSearchRank === -1 ? 'NOT FOUND' : `#${searchProbe.conceptSearchRank + 1}`}
-                </span>
-              </span>
-            } />
-            <Info className="" label="Deep search rank (top 1000)" data={
-              <span>
-                <span style={{ color: searchProbe.deepSearchRank === -1 ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>
-                  {searchProbe.deepSearchRank === -1 ? `NOT FOUND (in ${searchProbe.deepSearchCount})` : `#${searchProbe.deepSearchRank + 1}`}
-                </span>
-                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '11px' }}>
-                  concepts-only: {searchProbe.deepConceptRank === -1 ? 'NOT FOUND' : `#${searchProbe.deepConceptRank + 1}`}
-                </span>
-                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '10px' }}>
-                  {searchProbe.deepSearchRank !== -1 && searchProbe.ownSearchRank === -1 ? '← indexed, just out-ranked → re-ranking picker fixes it' : ''}
-                </span>
-              </span>
-            } />
-            {searchProbe.aliasSearches.length > 0 && (
-              <Info className="" label="Found under alias?" data={
-                <span style={{ fontSize: '11px' }}>
-                  {searchProbe.aliasSearches.map((a) => (
-                    <span key={a.aliasId} style={{ marginRight: '10px', color: a.rank === -1 ? '#ef4444' : '#22c55e' }}>
-                      "{a.aliasText}": {a.rank === -1 ? 'no' : `#${a.rank + 1}`}
-                    </span>
-                  ))}
-                </span>
-              } />
-            )}
-            {searchProbe.prefixSearches.length > 0 && (
-              <Info className="" label="Found under prefix?" data={
-                <span style={{ fontSize: '11px' }}>
-                  {searchProbe.prefixSearches.map((p) => (
-                    <span key={p.query} style={{ marginRight: '10px', color: p.rank === -1 ? '#ef4444' : '#22c55e' }}>
-                      "{p.query}": {p.rank === -1 ? 'no' : `#${p.rank + 1}`}
-                    </span>
-                  ))}
-                </span>
-              } />
-            )}
-            {searchProbe.duplicates.length > 0 && (
-              <Info className="" label="⚠️ Duplicate same-name rems" data={<pre style={preStyle}>{JSON.stringify(searchProbe.duplicates, null, 2)}</pre>} />
-            )}
-            {searchProbe.suspiciousAncestorPowerups.length > 0 && (
-              <Info className="" label="⚠️ Search-excluding ancestor powerups" data={<span style={{ color: '#ef4444', fontWeight: 600 }}>{searchProbe.suspiciousAncestorPowerups.join(', ')}</span>} />
-            )}
-            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
-              <Info className="" label="Own hidden state" data={searchProbe.ownHiddenState ?? 'none'} />
-              <Info className="" label="In portals/docs" data={searchProbe.inPortalsCount} />
-            </div>
-            <details open={searchProbe.suspiciousAncestorPowerups.length > 0}>
-              <summary style={{ fontSize: '11px', cursor: 'pointer', color: searchProbe.suspiciousAncestorPowerups.length > 0 ? '#ef4444' : 'var(--rn-clr-content-secondary)' }}>
-                Ancestor chain ({searchProbe.ancestors.length}, parent → root)
-              </summary>
-              <pre style={preStyle}>{searchProbe.ancestors.map((a, i) =>
-                `${i === searchProbe.ancestors.length - 1 ? '[ROOT] ' : ''}[${a.type}]${a.isDocument ? '📄' : ''} "${a.text}" (${a.id})` +
-                `${a.powerups.length ? ` ⟨${a.powerups.join(', ')}⟩` : ''}` +
-                `${a.portalType ? ` portal:${a.portalType}` : ''}` +
-                `${a.hidden && a.hidden !== 'none' ? ` hidden:${a.hidden}` : ''}`
-              ).join('\n')}</pre>
-            </details>
-            {searchProbe.aliases.length > 0 && (
-              <Info className="" label="Aliases" data={<pre style={preStyle}>{JSON.stringify(searchProbe.aliasStructure.length ? searchProbe.aliasStructure : searchProbe.aliases, null, 2)}</pre>} />
-            )}
-            <details>
-              <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>Element breakdown ({searchProbe.elements.length})</summary>
-              <pre style={preStyle}>{searchProbe.elements.map((e) => `[${e.idx}] ${e.kind}: ${e.detail}`).join('\n')}</pre>
-            </details>
-            <details>
-              <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>Code points ({searchProbe.codePoints.length})</summary>
-              <pre style={preStyle}>{searchProbe.codePoints.map((c) => `${c.codePoint} ${JSON.stringify(c.char)}`).join('\n')}</pre>
-            </details>
-          </div>
-        )}
-      </div>
-
       {incrementalRem && (
         <div style={{ marginTop: '16px' }}>
           <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>Incremental Powerup</h2>
@@ -2056,6 +1928,134 @@ function Debug() {
                 </details>
               ))
             )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Search / Linkage Diagnostics
+          <button
+            onClick={handleSearchProbe}
+            disabled={isProbingSearch}
+            style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isProbingSearch ? 'wait' : 'pointer' }}
+          >
+            {isProbingSearch ? 'Probing…' : 'Probe Searchability'}
+          </button>
+        </h2>
+        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '8px' }}>
+          Diagnoses why this rem may be invisible in reference search. Reproduces the editor's search via
+          <code> plugin.search.search()</code>, inspects the rem's own literal text, Unicode normalization, hidden
+          characters, type/flags, aliases and ranking. Run on a working rem and a broken one to compare. Full dump in console.
+        </div>
+        {searchProbe && (
+          <div>
+            <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: searchProbe.issues.length > 0 && searchProbe.literalCharCount > 0 && !searchProbe.nfcDiffers && searchProbe.suspiciousChars.length === 0 ? 'var(--rn-clr-background-secondary)' : 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--rn-clr-border-warning)' }}>
+              <strong>Verdict:</strong>
+              <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px' }}>
+                {searchProbe.issues.map((issue, i) => (
+                  <li key={i} style={{ marginBottom: '4px' }}>{issue}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
+              <Info className="" label="Type" data={searchProbe.typeLabel} />
+              <Info className="" label="Literal chars (own text)" data={<strong style={{ color: searchProbe.literalCharCount === 0 ? '#ef4444' : 'inherit' }}>{searchProbe.literalCharCount}</strong>} />
+              <Info className="" label="timesSelectedInSearch" data={searchProbe.timesSelectedInSearch ?? '—'} />
+              <Info className="" label="Referenced by" data={searchProbe.referencedByCount} />
+              <Info className="" label="References" data={searchProbe.referencesCount} />
+            </div>
+            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
+              <Info className="" label="NFC normalized?" data={searchProbe.isNFC ? <span style={{ color: '#22c55e' }}>Yes</span> : <span style={{ color: '#ef4444', fontWeight: 600 }}>NO — accents decomposed</span>} />
+              <Info className="" label="Leading/trailing WS" data={searchProbe.hasLeadingTrailingWhitespace ? <span style={{ color: '#ef4444', fontWeight: 600 }}>YES</span> : 'No'} />
+              <Info className="" label="Hidden/zero-width chars" data={<strong style={{ color: searchProbe.suspiciousChars.length > 0 ? '#ef4444' : 'inherit' }}>{searchProbe.suspiciousChars.length}</strong>} />
+            </div>
+            <Info className="" label={`Plain string ("${searchProbe.plainString}")`} data={<code>{JSON.stringify(searchProbe.plainString)}</code>} />
+            {searchProbe.suspiciousChars.length > 0 && (
+              <Info className="" label="Suspicious characters" data={<pre style={preStyle}>{JSON.stringify(searchProbe.suspiciousChars, null, 2)}</pre>} />
+            )}
+            <Info className="" label="Active flags" data={
+              <span style={{ fontSize: '11px' }}>
+                {Object.entries(searchProbe.flags).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}
+              </span>
+            } />
+            <Info className="" label="Own-text search rank (top 50)" data={
+              <span>
+                <span style={{ color: searchProbe.ownSearchRank === -1 ? '#ef4444' : '#22c55e', fontWeight: 600 }}>
+                  {searchProbe.ownSearchRank === -1 ? `NOT FOUND (in ${searchProbe.ownSearchCount})` : `#${searchProbe.ownSearchRank + 1}`}
+                </span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '11px' }}>
+                  concepts-only: {searchProbe.conceptSearchRank === -1 ? 'NOT FOUND' : `#${searchProbe.conceptSearchRank + 1}`}
+                </span>
+              </span>
+            } />
+            <Info className="" label="Deep search rank (top 1000)" data={
+              <span>
+                <span style={{ color: searchProbe.deepSearchRank === -1 ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>
+                  {searchProbe.deepSearchRank === -1 ? `NOT FOUND (in ${searchProbe.deepSearchCount})` : `#${searchProbe.deepSearchRank + 1}`}
+                </span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '11px' }}>
+                  concepts-only: {searchProbe.deepConceptRank === -1 ? 'NOT FOUND' : `#${searchProbe.deepConceptRank + 1}`}
+                </span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '10px' }}>
+                  {searchProbe.deepSearchRank !== -1 && searchProbe.ownSearchRank === -1 ? '← indexed, just out-ranked → re-ranking picker fixes it' : ''}
+                </span>
+              </span>
+            } />
+            {searchProbe.aliasSearches.length > 0 && (
+              <Info className="" label="Found under alias?" data={
+                <span style={{ fontSize: '11px' }}>
+                  {searchProbe.aliasSearches.map((a) => (
+                    <span key={a.aliasId} style={{ marginRight: '10px', color: a.rank === -1 ? '#ef4444' : '#22c55e' }}>
+                      "{a.aliasText}": {a.rank === -1 ? 'no' : `#${a.rank + 1}`}
+                    </span>
+                  ))}
+                </span>
+              } />
+            )}
+            {searchProbe.prefixSearches.length > 0 && (
+              <Info className="" label="Found under prefix?" data={
+                <span style={{ fontSize: '11px' }}>
+                  {searchProbe.prefixSearches.map((p) => (
+                    <span key={p.query} style={{ marginRight: '10px', color: p.rank === -1 ? '#ef4444' : '#22c55e' }}>
+                      "{p.query}": {p.rank === -1 ? 'no' : `#${p.rank + 1}`}
+                    </span>
+                  ))}
+                </span>
+              } />
+            )}
+            {searchProbe.duplicates.length > 0 && (
+              <Info className="" label="⚠️ Duplicate same-name rems" data={<pre style={preStyle}>{JSON.stringify(searchProbe.duplicates, null, 2)}</pre>} />
+            )}
+            {searchProbe.suspiciousAncestorPowerups.length > 0 && (
+              <Info className="" label="⚠️ Search-excluding ancestor powerups" data={<span style={{ color: '#ef4444', fontWeight: 600 }}>{searchProbe.suspiciousAncestorPowerups.join(', ')}</span>} />
+            )}
+            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
+              <Info className="" label="Own hidden state" data={searchProbe.ownHiddenState ?? 'none'} />
+              <Info className="" label="In portals/docs" data={searchProbe.inPortalsCount} />
+            </div>
+            <details open={searchProbe.suspiciousAncestorPowerups.length > 0}>
+              <summary style={{ fontSize: '11px', cursor: 'pointer', color: searchProbe.suspiciousAncestorPowerups.length > 0 ? '#ef4444' : 'var(--rn-clr-content-secondary)' }}>
+                Ancestor chain ({searchProbe.ancestors.length}, parent → root)
+              </summary>
+              <pre style={preStyle}>{searchProbe.ancestors.map((a, i) =>
+                `${i === searchProbe.ancestors.length - 1 ? '[ROOT] ' : ''}[${a.type}]${a.isDocument ? '📄' : ''} "${a.text}" (${a.id})` +
+                `${a.powerups.length ? ` ⟨${a.powerups.join(', ')}⟩` : ''}` +
+                `${a.portalType ? ` portal:${a.portalType}` : ''}` +
+                `${a.hidden && a.hidden !== 'none' ? ` hidden:${a.hidden}` : ''}`
+              ).join('\n')}</pre>
+            </details>
+            {searchProbe.aliases.length > 0 && (
+              <Info className="" label="Aliases" data={<pre style={preStyle}>{JSON.stringify(searchProbe.aliasStructure.length ? searchProbe.aliasStructure : searchProbe.aliases, null, 2)}</pre>} />
+            )}
+            <details>
+              <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>Element breakdown ({searchProbe.elements.length})</summary>
+              <pre style={preStyle}>{searchProbe.elements.map((e) => `[${e.idx}] ${e.kind}: ${e.detail}`).join('\n')}</pre>
+            </details>
+            <details>
+              <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>Code points ({searchProbe.codePoints.length})</summary>
+              <pre style={preStyle}>{searchProbe.codePoints.map((c) => `${c.codePoint} ${JSON.stringify(c.char)}`).join('\n')}</pre>
+            </details>
           </div>
         )}
       </div>
