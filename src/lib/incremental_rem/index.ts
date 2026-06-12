@@ -280,6 +280,45 @@ export const getIncrementalRemFromRem = async (
  * @param rem PluginRem to initialize.
  * @returns Promise that resolves after the Rem is initialized or skipped if already incremental.
  */
+/**
+ * Registers a freshly-created IncRem in the known_pdf_rems_ / known_html_rems_
+ * synced indexes (PART 2 of findAllRemsFor*). Used so the parent selector and
+ * bookmark popup can discover this IncRem even before the session cache loads.
+ *
+ * Intentionally not on the critical path of initIncrementalRem — callers invoke
+ * it fire-and-forget so opening a popup right after extraction isn't blocked by
+ * getSources + per-source powerup probes.
+ */
+async function registerInKnownHostIndexes(plugin: ReactRNPlugin, rem: PluginRem) {
+  try {
+    const sources = await rem.getSources();
+    const allSources = [rem, ...sources];
+    for (const candidate of allSources) {
+      const isPdf = await candidate.hasPowerup(BuiltInPowerupCodes.UploadedFile);
+      if (isPdf) {
+        try {
+          const url = await candidate.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
+          if (typeof url === 'string' && url.toLowerCase().endsWith('.pdf')) {
+            await registerRemsAsPdfKnown(plugin as any, candidate._id, [rem._id]);
+          }
+        } catch {
+          // Skip candidates where URL can't be read
+        }
+        continue;
+      }
+      if (await isHtmlSource(candidate)) {
+        try {
+          await registerRemsAsHtmlKnown(plugin as any, candidate._id, [rem._id]);
+        } catch {
+          // Skip candidates that fail registration
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[initIncrementalRem] Error registering in known host indexes:', e);
+  }
+}
+
 export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean, explicitParentId?: string, skipInitialCascade?: boolean }) {
   const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
 
@@ -291,28 +330,33 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
 
     let triggeredCascade = false;
     try {
-      // Check for dismissed history to import (merge from previous learning sessions)
-      const dismissedHistory = await mergeHistoryFromDismissed(plugin, rem);
+      // Independent reads — run concurrently instead of serially. The dismissed-history
+      // merge and the two settings lookups don't depend on one another.
+      const [dismissedHistory, initialIntervalSetting, defaultPrioritySetting] = await Promise.all([
+        // Check for dismissed history to import (merge from previous learning sessions)
+        mergeHistoryFromDismissed(plugin, rem),
+        plugin.settings.getSetting<number>(initialIntervalId),
+        plugin.settings.getSetting<number>(defaultPriorityId),
+      ]);
       const hasExistingHistory = dismissedHistory && dismissedHistory.length > 0;
-
-      const initialInterval = (await plugin.settings.getSetting<number>(initialIntervalId)) || 0;
-
-      const defaultPrioritySetting = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 10;
-      const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting));
-
-      // Pass explicitParentId to override stale SDK cache when creating a new Rem and moving it
-      const initialPriority = await getInitialPriority(plugin, rem, defaultPriority, options?.explicitParentId);
-
-      await rem.addPowerup(powerupCode);
+      const initialInterval = initialIntervalSetting || 0;
+      const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting || 10));
 
       const nextRepDate = new Date(Date.now() + (initialInterval * 24 * 60 * 60 * 1000));
-      const dateRef = await getDailyDocReferenceForDate(plugin, nextRepDate);
+
+      // The inherited-priority ancestor walk and both daily-doc reference lookups are
+      // mutually independent — resolve them together. getInitialPriority gets
+      // explicitParentId to override stale SDK cache when creating a new Rem and moving it.
+      const [initialPriority, dateRef, todayRef] = await Promise.all([
+        getInitialPriority(plugin, rem, defaultPriority, options?.explicitParentId),
+        getDailyDocReferenceForDate(plugin, nextRepDate),
+        getDailyDocReferenceForDate(plugin, new Date()),
+      ]);
       if (!dateRef) {
         return;
       }
 
-      await rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef);
-      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]);
+      await rem.addPowerup(powerupCode);
 
       // Create 'madeIncremental' marker to indicate the start of a new learning session
       // This is used by the scheduler to count only reps since this marker
@@ -329,14 +373,22 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         madeIncrementalMarker,
       ];
 
-      await rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(historyWithMarker)]);
-
+      // Slot writes target distinct slots and are independent once the powerup is
+      // attached — batch them instead of awaiting one at a time.
+      const slotWrites: Promise<unknown>[] = [
+        rem.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateRef),
+        rem.setPowerupProperty(powerupCode, prioritySlotCode, [initialPriority.toString()]),
+        rem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(historyWithMarker)]),
+      ];
       // Set originalIncrementalDate only if no dismissed history (truly new Incremental Rem)
+      if (!hasExistingHistory && todayRef) {
+        slotWrites.push(
+          rem.setPowerupProperty(powerupCode, originalIncrementalDateSlotCode, todayRef)
+        );
+      }
+      await Promise.all(slotWrites);
+
       if (!hasExistingHistory) {
-        const todayRef = await getDailyDocReferenceForDate(plugin, new Date());
-        if (todayRef) {
-          await rem.setPowerupProperty(powerupCode, originalIncrementalDateSlotCode, todayRef);
-        }
         // Record creation event in incremental history (fire and forget)
         addCreationToIncrementalHistory(plugin, rem._id).catch(console.error);
       }
@@ -350,35 +402,13 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
 
       // Register in the known_pdf_rems_ / known_html_rems_ synced indexes so
       // the parent selector and bookmark popup can discover this IncRem
-      // instantly (PART 2 of findAllRemsFor*), even when the session cache
+      // (PART 2 of findAllRemsFor*), even when the session cache
       // (allIncrementalRemKey) is not yet loaded (e.g., WebBrowser / Light Mode).
-      try {
-        const sources = await rem.getSources();
-        const allSources = [rem, ...sources];
-        for (const candidate of allSources) {
-          const isPdf = await candidate.hasPowerup(BuiltInPowerupCodes.UploadedFile);
-          if (isPdf) {
-            try {
-              const url = await candidate.getPowerupProperty(BuiltInPowerupCodes.UploadedFile, 'URL');
-              if (typeof url === 'string' && url.toLowerCase().endsWith('.pdf')) {
-                await registerRemsAsPdfKnown(plugin as any, candidate._id, [rem._id]);
-              }
-            } catch {
-              // Skip candidates where URL can't be read
-            }
-            continue;
-          }
-          if (await isHtmlSource(candidate)) {
-            try {
-              await registerRemsAsHtmlKnown(plugin as any, candidate._id, [rem._id]);
-            } catch {
-              // Skip candidates that fail registration
-            }
-          }
-        }
-      } catch (e) {
-        console.error('[initIncrementalRem] Error registering in known host indexes:', e);
-      }
+      //
+      // This only matters for OTHER popups opened later, so it runs fire-and-forget:
+      // keeping it off the critical path lets the caller (e.g. the priority popup)
+      // open without waiting on getSources + per-source powerup probes.
+      void registerInKnownHostIndexes(plugin, rem);
 
       // The targeted updateIncrementalRemCache call above already inserts the new
       // IncRem into the in-session cache, so no global reload trigger is needed.
