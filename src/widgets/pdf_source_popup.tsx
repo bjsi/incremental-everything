@@ -117,19 +117,57 @@ export function PdfSourcePopup() {
         }}
       >
         <span style={{ fontWeight: 600, fontSize: '13px' }}>📄 Source</span>
-        <button
-          onClick={() => plugin.widget.closePopup()}
-          style={{
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            fontSize: '16px',
-            color: 'var(--rn-clr-content-secondary)',
-          }}
-          title="Close"
-        >
-          ✕
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {kind === 'highlight' && hoveredRemId && (
+            <button
+              onClick={async () => {
+                try {
+                  const hRem = await plugin.rem.findOne(hoveredRemId);
+                  if (hRem && typeof hRem.scrollToReaderHighlight === 'function') {
+                    hRem.scrollToReaderHighlight();
+                  }
+                } catch (e) {
+                  console.error('[pdf_source_popup] manual scroll error', e);
+                }
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                backgroundColor: 'transparent',
+                color: '#3b82f6',
+                border: '2px solid #3b82f6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#3b82f6';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#3b82f6';
+              }}
+              title="Scroll the reader to the highlight"
+            >
+              🔖 Scroll to Highlight
+            </button>
+          )}
+          <button
+            onClick={() => plugin.widget.closePopup()}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              fontSize: '16px',
+              color: 'var(--rn-clr-content-secondary)',
+            }}
+            title="Close"
+          >
+            ✕
+          </button>
+        </div>
       </div>
       <div style={{ flex: '1 1 auto', minHeight: 0 }}>
         <PDFWebReader
