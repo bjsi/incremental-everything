@@ -247,9 +247,9 @@ function ReferenceFinder() {
   }, [floatingWidgetId, plugin]);
 
   const pick = useCallback(
-    async (cand: Candidate | undefined) => {
+    async (cand: Candidate | undefined, asPin = false) => {
       if (!cand) return;
-      console.log('[reference-finder] pick →', cand.id, JSON.stringify(cand.name));
+      console.log('[reference-finder] pick →', cand.id, JSON.stringify(cand.name), asPin ? '(as pin)' : '');
 
       // Insert WHILE the widget is still open: RemNote keeps the underlying
       // editor as the "active editor" even though DOM focus is in this iframe.
@@ -286,11 +286,15 @@ function ReferenceFinder() {
             await plugin.editor.delete();
             console.log('[reference-finder] deleted selected text before inserting');
           }
+          // A pinned reference (`pin: true`) renders as just the link chip
+          // WITHOUT the referenced text — the same result as RemNote's manual
+          // "Edit or Add Alias → clear text" trick, but in one keystroke.
           const ref: any = { i: 'q', _id: cand.id };
+          if (asPin) ref.pin = true;
           if (clozeId) ref[CLOZE_KEY] = clozeId;
           await plugin.editor.insertRichText([ref]);
           inserted = true;
-          console.log('[reference-finder] insertRichText OK', clozeId ? '(inside cloze)' : '');
+          console.log('[reference-finder] insertRichText OK', asPin ? '(pin)' : '', clozeId ? '(inside cloze)' : '');
         } else {
           console.warn('[reference-finder] no active editor selection — will use clipboard fallback');
         }
@@ -367,9 +371,10 @@ function ReferenceFinder() {
       setSelected((s) => Math.max(s - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      // Shift+Enter opens the rem in a new pane instead of inserting a reference.
+      // Shift+Enter opens the rem in a new pane; Ctrl/Cmd+Enter inserts a PIN
+      // (reference without its text); plain Enter inserts a normal reference.
       if (e.shiftKey) open(results[selected]);
-      else pick(results[selected]);
+      else pick(results[selected], e.ctrlKey || e.metaKey);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       close();
@@ -419,7 +424,7 @@ function ReferenceFinder() {
       <div style={{ marginTop: '8px', maxHeight: '320px', overflowY: 'auto' }}>
         {query.trim().length < 2 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
-            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't. Enter inserts a reference; Shift+Enter / Shift+click opens the rem in a new pane.
+            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't. Enter inserts a reference; Ctrl/Cmd+Enter inserts a pin (no text); Shift+Enter / Shift+click opens the rem in a new pane.
           </div>
         ) : results.length === 0 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
@@ -430,8 +435,8 @@ function ReferenceFinder() {
             <div
               key={r.id}
               onMouseEnter={() => setSelected(i)}
-              title="Click to insert a reference · Shift+click to open in a new pane"
-              onClick={(e) => (e.shiftKey ? open(r) : pick(r))}
+              title="Click: insert reference · Ctrl/Cmd+click: insert pin (no text) · Shift+click: open in new pane"
+              onClick={(e) => (e.shiftKey ? open(r) : pick(r, e.ctrlKey || e.metaKey))}
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -498,7 +503,7 @@ function ReferenceFinder() {
         )}
       </div>
       <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>
-        ↑/↓ navigate · Enter insert reference · Shift+Enter / Shift+click open in new pane · Esc close
+        ↑/↓ navigate · Enter insert reference · Ctrl/Cmd+Enter insert pin (no text) · Shift+Enter open in new pane · Esc close
       </div>
     </div>
   );
