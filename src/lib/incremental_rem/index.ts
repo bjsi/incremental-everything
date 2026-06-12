@@ -393,12 +393,25 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         addCreationToIncrementalHistory(plugin, rem._id).catch(console.error);
       }
 
-      const newIncRem = await getIncrementalRemFromRem(plugin, rem);
-      if (!newIncRem) {
+      // Build the cache entry directly from the values we just wrote rather than
+      // reading them all back via getIncrementalRemFromRem (~6-8 extra serial SDK
+      // round-trips on the critical path before the priority popup can open).
+      // nextRepDate/createdAt are stored as the start-of-day timestamp to match
+      // exactly what getIncrementalRemFromRem resolves from the Daily Doc references.
+      const constructedIncRem = {
+        remId: rem._id,
+        nextRepDate: dayjs(nextRepDate).startOf('day').valueOf(),
+        priority: initialPriority,
+        history: historyWithMarker,
+        createdAt: !hasExistingHistory ? dayjs().startOf('day').valueOf() : undefined,
+      };
+      const parsedIncRem = IncrementalRem.safeParse(constructedIncRem);
+      if (!parsedIncRem.success) {
+        console.error('[initIncrementalRem] Failed to construct IncRem cache entry:', parsedIncRem.error);
         return;
       }
 
-      await updateIncrementalRemCache(plugin, newIncRem);
+      await updateIncrementalRemCache(plugin, parsedIncRem.data);
 
       // Register in the known_pdf_rems_ / known_html_rems_ synced indexes so
       // the parent selector and bookmark popup can discover this IncRem
