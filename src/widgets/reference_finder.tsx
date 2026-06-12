@@ -75,15 +75,17 @@ function ReferenceFinder() {
       .catch(() => {/* best-effort; arrows/Enter still work inside the input */});
   }, [floatingWidgetId, plugin]);
 
-  // Build a short "root / … / parent" breadcrumb so the user can tell which
-  // document a rem lives in (mirrors RemNote's reference-search breadcrumb).
+  // Build a breadcrumb so the user can tell which document a rem lives in
+  // (mirrors RemNote's reference-search breadcrumb). Shows the root plus the 3
+  // closest ancestors, collapsing any middle gap with "…".
   const buildBreadcrumb = useCallback(
     async (rem: any): Promise<string> => {
       const names: string[] = [];
       try {
         let cur = await rem.getParentRem();
         let depth = 0;
-        while (cur && depth < 8) {
+        // Walk all the way to the root (cap guards against cycles/very deep trees).
+        while (cur && depth < 20) {
           const t = (await plugin.richText.toString(cur.text ?? [])).trim();
           if (t) names.push(t.length > 24 ? t.slice(0, 24) + '…' : t);
           cur = await cur.getParentRem();
@@ -91,9 +93,12 @@ function ReferenceFinder() {
         }
       } catch { /* ignore */ }
       if (names.length === 0) return '';
-      const topDown = names.reverse(); // root … parent
-      if (topDown.length <= 2) return topDown.join(' / ');
-      return `${topDown[0]} / … / ${topDown[topDown.length - 1]}`;
+      const topDown = names.reverse(); // root … parent (closest to the rem)
+      // Up to 4 levels fit without a gap (root + 3 closest covers everything).
+      if (topDown.length <= 4) return topDown.join(' / ');
+      const root = topDown[0];
+      const closest3 = topDown.slice(-3); // great-grandparent, grandparent, parent
+      return `${root} / … / ${closest3.join(' / ')}`;
     },
     [plugin]
   );

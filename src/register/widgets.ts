@@ -75,7 +75,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // editor while you pick a rem to reference.
   plugin.app.registerWidget('reference_finder', WidgetLocation.FloatingWidget, {
     dimensions: {
-      width: 480,
+      width: 680,
       height: 'auto',
     },
   });
