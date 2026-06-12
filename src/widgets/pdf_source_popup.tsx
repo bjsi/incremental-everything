@@ -41,22 +41,45 @@ export function PdfSourcePopup() {
     init();
   }, [plugin]);
 
-  // Once the reader has mounted, scroll to the hovered highlight (highlights only).
-  // Mirrors the timing used in components/Reader.tsx.
+  // Scroll the popup's PDFWebReader to the hovered highlight (highlights only).
+  //
+  // PDF.js / the native reader takes several seconds to mount inside the iframe
+  // (worker init, fake-window setup), so a single early scroll is dropped. We
+  // mirror the proven escalating-retry timing from lib/remHelpers
+  // (consumePendingScrollRequest): fire repeatedly until it lands.
   useEffect(() => {
     if (kind !== 'highlight' || !hoveredRemId || hasScrolled.current) return;
-    const t = setTimeout(async () => {
+    hasScrolled.current = true;
+
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const attemptScroll = async () => {
       try {
         const hRem = await plugin.rem.findOne(hoveredRemId);
-        if (hRem && typeof hRem.scrollToReaderHighlight === 'function') {
-          hRem.scrollToReaderHighlight();
-          hasScrolled.current = true;
+        if (!hRem || typeof hRem.scrollToReaderHighlight !== 'function') return;
+        for (const delay of [1200, 2500, 4000, 6000]) {
+          timers.push(
+            setTimeout(() => {
+              if (cancelled) return;
+              try {
+                hRem.scrollToReaderHighlight();
+              } catch (e) {
+                console.error('[pdf_source_popup] scroll attempt threw', e);
+              }
+            }, delay)
+          );
         }
       } catch (e) {
         console.error('[pdf_source_popup] scroll error', e);
       }
-    }, 400);
-    return () => clearTimeout(t);
+    };
+    attemptScroll();
+
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
   }, [kind, hoveredRemId, plugin]);
 
   if (loading) {
