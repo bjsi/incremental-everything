@@ -101,7 +101,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'opt+shift+x',
     quickCode: 'ep',
     action: async () => {
-      const result = await createExtract(plugin);
+      // Skip the inheritance cascade during creation: the priority popup that
+      // follows fires its own cascade (via intervalBatchSave) with the user's
+      // chosen priority, so the creation-time cascade is redundant and only
+      // starves the popup's data load. Mirrors highlightActions' showPriorityPopup.
+      const result = await createExtract(plugin, { skipInitialCascade: true });
       if (!result) {
         return;
       }
