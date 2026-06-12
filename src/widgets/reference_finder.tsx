@@ -316,6 +316,48 @@ function ReferenceFinder() {
     [plugin, close]
   );
 
+  // Open a rem in a NEW pane (split to the right). This is the main way to
+  // reach the "flawed" rems that the normal search can't surface — pick them
+  // here and jump to them without leaving the current pane. Builds a mosaic
+  // tree because window.openRem only targets the current pane.
+  const open = useCallback(
+    async (cand: Candidate | undefined) => {
+      if (!cand) return;
+      console.log('[reference-finder] open in new pane →', cand.id, JSON.stringify(cand.name));
+      try {
+        const tree = await plugin.window.getCurrentWindowTree();
+        const toRemIdTree = (node: any): any =>
+          node && typeof node === 'object' && 'direction' in node
+            ? {
+                direction: node.direction,
+                first: toRemIdTree(node.first),
+                second: toRemIdTree(node.second),
+                splitPercentage: node.splitPercentage,
+              }
+            : node.remId; // PaneRem leaf → remId
+        const newTree = {
+          direction: 'row' as const,
+          first: toRemIdTree(tree),
+          second: cand.id,
+          splitPercentage: 55,
+        };
+        await plugin.window.setRemWindowTree(newTree);
+      } catch (e) {
+        // Fallback: open in the current pane.
+        console.warn('[reference-finder] split-pane open failed, opening in current pane:', e);
+        try {
+          const rem = await plugin.rem.findOne(cand.id);
+          if (rem) await plugin.window.openRem(rem);
+        } catch (e2) {
+          await plugin.app.toast('Could not open the rem. Check the console.');
+          console.error('[reference-finder] open failed:', e2);
+        }
+      }
+      await close();
+    },
+    [plugin, close]
+  );
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -325,7 +367,9 @@ function ReferenceFinder() {
       setSelected((s) => Math.max(s - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      pick(results[selected]);
+      // Shift+Enter opens the rem in a new pane instead of inserting a reference.
+      if (e.shiftKey) open(results[selected]);
+      else pick(results[selected]);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       close();
@@ -348,7 +392,7 @@ function ReferenceFinder() {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <div style={{ fontWeight: 700, fontSize: '13px' }}>Find &amp; Insert Reference</div>
+        <div style={{ fontWeight: 700, fontSize: '13px' }}>Find Rem — Reference or Open</div>
         <label style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
           <input type="checkbox" checked={conceptsOnly} onChange={(e) => setConceptsOnly(e.target.checked)} />
           Concepts only
@@ -375,7 +419,7 @@ function ReferenceFinder() {
       <div style={{ marginTop: '8px', maxHeight: '320px', overflowY: 'auto' }}>
         {query.trim().length < 2 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
-            Type at least 2 characters. Tip: this searches each word separately and floats exact-name matches up, so it finds rems the normal search can't.
+            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't. Enter inserts a reference; Shift+Enter / Shift+click opens the rem in a new pane.
           </div>
         ) : results.length === 0 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
@@ -386,7 +430,8 @@ function ReferenceFinder() {
             <div
               key={r.id}
               onMouseEnter={() => setSelected(i)}
-              onClick={() => pick(r)}
+              title="Click to insert a reference · Shift+click to open in a new pane"
+              onClick={(e) => (e.shiftKey ? open(r) : pick(r))}
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -453,7 +498,7 @@ function ReferenceFinder() {
         )}
       </div>
       <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>
-        ↑/↓ to navigate · Enter to insert · Esc to close
+        ↑/↓ navigate · Enter insert reference · Shift+Enter / Shift+click open in new pane · Esc close
       </div>
     </div>
   );

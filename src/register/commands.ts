@@ -946,12 +946,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  // Find & Insert Reference — a re-ranking reference picker that surfaces rems
-  // the built-in search can't (all-common-token names like "Navegação Interior").
-  // Opens as a floating widget so the editor stays visible.
+  // Find Rem — a re-ranking picker that surfaces rems the built-in search can't
+  // (all-common-token names like "Navegação Interior"). Enter inserts a
+  // reference; Shift+Enter / Shift+click opens the rem in a new pane (the only
+  // practical way to reach these "invisible" rems). Floating so the editor
+  // stays visible. (Command id kept stable for back-compat.)
   plugin.app.registerCommand({
     id: 'find-insert-reference',
-    name: 'Find & Insert Reference',
+    name: 'Find Rem (insert reference / open in pane)',
     keyboardShortcut: 'opt+shift+f',
     quickCode: 'fir',
     action: async () => {
