@@ -1,4 +1,4 @@
-import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -30,6 +30,8 @@ interface Candidate {
   type: number;
   times: number;
   score: number; // lower is better
+  backText: string;
+  breadcrumb: string;
 }
 
 function ReferenceFinder() {
@@ -73,6 +75,29 @@ function ReferenceFinder() {
       .catch(() => {/* best-effort; arrows/Enter still work inside the input */});
   }, [floatingWidgetId, plugin]);
 
+  // Build a short "root / … / parent" breadcrumb so the user can tell which
+  // document a rem lives in (mirrors RemNote's reference-search breadcrumb).
+  const buildBreadcrumb = useCallback(
+    async (rem: any): Promise<string> => {
+      const names: string[] = [];
+      try {
+        let cur = await rem.getParentRem();
+        let depth = 0;
+        while (cur && depth < 8) {
+          const t = (await plugin.richText.toString(cur.text ?? [])).trim();
+          if (t) names.push(t.length > 24 ? t.slice(0, 24) + '…' : t);
+          cur = await cur.getParentRem();
+          depth++;
+        }
+      } catch { /* ignore */ }
+      if (names.length === 0) return '';
+      const topDown = names.reverse(); // root … parent
+      if (topDown.length <= 2) return topDown.join(' / ');
+      return `${topDown[0]} / … / ${topDown[topDown.length - 1]}`;
+    },
+    [plugin]
+  );
+
   const runSearch = useCallback(
     async (raw: string) => {
       const reqId = ++reqIdRef.current;
@@ -105,11 +130,13 @@ function ReferenceFinder() {
         }
         if (reqId !== reqIdRef.current) return; // a newer search superseded this
 
-        // Resolve text/type/ranking, then filter to rems containing all tokens.
-        const candidates: Candidate[] = [];
+        // Phase 1 — resolve name/type/ranking, filter to rems containing all
+        // tokens, and score. (backText + breadcrumb are resolved later, only
+        // for the rems we'll actually show, to keep per-keystroke cost low.)
+        type Scored = { r: any; id: string; name: string; normName: string; type: number; times: number; score: number };
+        const scored: Scored[] = [];
         for (const r of seen.values()) {
           const name = await plugin.richText.toString(r.text ?? []);
-          const normName = normalize(name);
           const foldName = fold(name);
           // Accent-insensitive: every typed token must appear in the folded name.
           if (!foldedTokens.every((t) => foldName.includes(t))) continue;
@@ -124,10 +151,10 @@ function ReferenceFinder() {
           if (foldName === qf) score = 0;
           else if (foldName.startsWith(qf)) score = 1;
           else if (foldName.includes(qf)) score = 2;
-          candidates.push({ id: r._id, name, normName, type, times, score });
+          scored.push({ r, id: r._id, name, normName: normalize(name), type, times, score });
         }
 
-        candidates.sort((a, b) => {
+        scored.sort((a, b) => {
           if (a.score !== b.score) return a.score - b.score;
           const ac = a.type === RemType.CONCEPT ? 0 : 1;
           const bc = b.type === RemType.CONCEPT ? 0 : 1;
@@ -136,14 +163,30 @@ function ReferenceFinder() {
           return a.name.length - b.name.length;
         });
 
+        // Phase 2 — enrich the top results with backText + a shortened
+        // breadcrumb so the user can disambiguate (which document is this in?).
+        const top = scored.slice(0, 25);
+        const candidates: Candidate[] = [];
+        for (const s of top) {
+          let backText = '';
+          try {
+            if (s.r.backText?.length) backText = (await plugin.richText.toString(s.r.backText)).trim();
+          } catch { /* ignore */ }
+          const breadcrumb = await buildBreadcrumb(s.r);
+          candidates.push({
+            id: s.id, name: s.name, normName: s.normName, type: s.type,
+            times: s.times, score: s.score, backText, breadcrumb,
+          });
+        }
+
         if (reqId !== reqIdRef.current) return;
-        setResults(candidates.slice(0, 25));
+        setResults(candidates);
         setSelected(0);
       } finally {
         if (reqId === reqIdRef.current) setSearching(false);
       }
     },
-    [plugin, conceptsOnly]
+    [plugin, conceptsOnly, buildBreadcrumb]
   );
 
   // Debounce searches as the user types.
@@ -170,6 +213,16 @@ function ReferenceFinder() {
         const sel = await plugin.editor.getSelection();
         console.log('[reference-finder] active editor selection:', sel);
         if (sel) {
+          // If text is selected, replace it with the reference (mimics RemNote's
+          // [[ ]] behaviour where the selected text becomes the link).
+          if (
+            sel.type === SelectionType.Text &&
+            (sel as any).range &&
+            (sel as any).range.start !== (sel as any).range.end
+          ) {
+            await plugin.editor.delete();
+            console.log('[reference-finder] deleted selected text before inserting');
+          }
           await plugin.editor.insertRichText([{ i: 'q', _id: cand.id }]);
           inserted = true;
           console.log('[reference-finder] insertRichText OK');
@@ -271,7 +324,7 @@ function ReferenceFinder() {
               onClick={() => pick(r)}
               style={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'flex-start',
                 gap: '8px',
                 padding: '6px 8px',
                 borderRadius: '6px',
@@ -281,6 +334,8 @@ function ReferenceFinder() {
             >
               <span
                 style={{
+                  flexShrink: 0,
+                  marginTop: '2px',
                   fontSize: '9px',
                   fontWeight: 700,
                   padding: '1px 5px',
@@ -292,12 +347,42 @@ function ReferenceFinder() {
               >
                 {typeLabel(r.type)}
               </span>
-              <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                {r.name || '(empty)'}
-              </span>
-              {r.score === 0 && (
-                <span style={{ fontSize: '9px', color: '#16a34a', fontWeight: 700 }}>EXACT</span>
-              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {r.name || '(empty)'}
+                  </span>
+                  {r.score === 0 && (
+                    <span style={{ flexShrink: 0, fontSize: '9px', color: '#16a34a', fontWeight: 700 }}>EXACT</span>
+                  )}
+                </div>
+                {r.backText && (
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--rn-clr-content-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {r.backText}
+                  </div>
+                )}
+                {r.breadcrumb && (
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: 'var(--rn-clr-content-tertiary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {r.breadcrumb}
+                  </div>
+                )}
+              </div>
             </div>
           ))
         )}
