@@ -36,7 +36,8 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent } from '../lib/pdfUtils';
+import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
+import { getHoveredReference } from './events';
 import { transferToDismissed } from '../lib/dismissed';
 import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
@@ -492,6 +493,33 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Create Cloze Deletion',
     keyboardShortcut: 'opt+z',
     action: async () => { await createClozeDeletion(); },
+  });
+
+  // Open the currently-hovered PDF/HTML source reference in a centered popup
+  // (PDFWebReader) without navigating away — keeps the queue alive. Hover a pin,
+  // then press the shortcut. Plain (non-source) references are ignored.
+  plugin.app.registerCommand({
+    id: 'open-source-in-popup',
+    name: 'Open Hovered Source in Popup',
+    keyboardShortcut: 'opt+o',
+    action: async () => {
+      const hovered = getHoveredReference();
+      if (!hovered?.remId) {
+        await plugin.app.toast('Hover a PDF/HTML source reference first, then press the shortcut.');
+        return;
+      }
+      const target = await resolveSourcePopupTarget(plugin, hovered.remId);
+      if (!target) {
+        await plugin.app.toast('That reference is not a PDF/HTML source.');
+        return;
+      }
+      await plugin.widget.openPopup('pdf_source_popup', {
+        hostRemId: target.hostRemId,
+        hoveredRemId: target.hoveredRemId,
+        kind: target.kind,
+        pageIndex: target.pageIndex,
+      });
+    },
   });
 
   plugin.app.registerCommand({

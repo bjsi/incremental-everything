@@ -1215,4 +1215,35 @@ export function registerEventListeners(
   registerGlobalOpenRemListener(plugin);
   registerQueueSessionTracking(plugin);
   registerDrillCardRatingListener(plugin);
+
+  registerHoveredReferenceTracking(plugin);
+}
+
+/**
+ * Tracks which reference is currently hovered in the editor/queue.
+ *
+ * `MouseOverLink` fires repeatedly while the cursor sits on a link, so we keep
+ * this handler cheap: just record the target rem id + coords synchronously. The
+ * expensive classification (is this a PDF/HTML source?) is deferred to whoever
+ * consumes the hovered target via `getHoveredReference()`.
+ */
+let hoveredReference: { remId: RemId; clientX: number; clientY: number } | null = null;
+
+export function getHoveredReference() {
+  return hoveredReference;
+}
+
+function registerHoveredReferenceTracking(plugin: ReactRNPlugin) {
+  plugin.event.addListener(AppEvents.MouseOverLink, undefined, (e: any) => {
+    if (e?.remId) {
+      hoveredReference = { remId: e.remId, clientX: e.clientX, clientY: e.clientY };
+    }
+  });
+  plugin.event.addListener(AppEvents.MouseOutLink, undefined, (e: any) => {
+    // Only clear if we're leaving the link we currently have stored, to avoid a
+    // stale out-event wiping a fresher hover.
+    if (!e?.remId || hoveredReference?.remId === e.remId) {
+      hoveredReference = null;
+    }
+  });
 }

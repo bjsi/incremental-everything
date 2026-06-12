@@ -303,6 +303,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Source-in-popup: renders a PDF/HTML source (PDFWebReader) in a centered
+  // modal so a hovered pin reference can be opened without killing the queue.
+  plugin.app.registerWidget('pdf_source_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1000,
+      height: 800,
+    },
+  });
+
   // Outline Restructure preview popup (Before | After + per-rem preserve toggles).
   plugin.app.registerWidget('outline_restructure_preview', WidgetLocation.Popup, {
     dimensions: {
