@@ -40,7 +40,6 @@ import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsA
 import { transferToDismissed } from '../lib/dismissed';
 import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
-import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import dayjs from 'dayjs';
 import {
   getOperatingSystem,
@@ -935,12 +934,36 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!rem) {
         return;
       }
-      if (!(await rem.hasPowerup(powerupCode)) && !(await rem.hasPowerup(CARD_PRIORITY_CODE)) && !(await rem.hasPowerup(dismissedPowerupCode))) {
-        return;
-      }
+      // NOTE: We intentionally open the debug popup for ANY focused rem, even
+      // ones without the Incremental/CardPriority/Dismissed powerups. The
+      // "Search / Linkage Diagnostics" section is useful on plain concept rems
+      // (e.g. to investigate why a rem is invisible in reference search). The
+      // powerup-specific sections inside the widget hide themselves when the
+      // corresponding powerup is absent.
       await plugin.widget.openPopup('debug', {
         remId: rem._id,
       });
+    },
+  });
+
+  // Find & Insert Reference — a re-ranking reference picker that surfaces rems
+  // the built-in search can't (all-common-token names like "Navegação Interior").
+  // Opens as a floating widget so the editor stays visible.
+  plugin.app.registerCommand({
+    id: 'find-insert-reference',
+    name: 'Find & Insert Reference',
+    keyboardShortcut: 'opt+shift+f',
+    quickCode: 'fir',
+    action: async () => {
+      // Open the picker right under the caret so it doesn't jump to the top.
+      let position: { top?: number; left?: number } = { top: 90, left: 320 };
+      try {
+        const caret = await plugin.editor.getCaretPosition();
+        if (caret) {
+          position = { top: Math.round(caret.bottom) + 6, left: Math.round(caret.left) };
+        }
+      } catch { /* fall back to default position */ }
+      await plugin.window.openFloatingWidget('reference_finder', position);
     },
   });
 

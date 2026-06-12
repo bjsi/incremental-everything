@@ -8,6 +8,7 @@ import {
   BuiltInPowerupCodes,
   Card,
   RichTextElementRemInterface,
+  RemType,
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority } from '../lib/card_priority';
@@ -152,6 +153,44 @@ function Debug() {
       capped14400Count: number;
       raw: any[];
     }>;
+  }>(null);
+
+  const [isProbingSearch, setIsProbingSearch] = useState(false);
+  const [searchProbe, setSearchProbe] = useState<null | {
+    plainString: string;
+    typeLabel: string;
+    elements: Array<{ idx: number; kind: string; detail: string }>;
+    literalCharCount: number;
+    aliases: Array<{ id: string; text: string }>;
+    timesSelectedInSearch: number | null;
+    referencedByCount: number;
+    referencesCount: number;
+    flags: Record<string, boolean>;
+    // Unicode / normalization
+    isNFC: boolean;
+    nfcDiffers: boolean;
+    nfdDiffers: boolean;
+    hasLeadingTrailingWhitespace: boolean;
+    suspiciousChars: Array<{ index: number; char: string; codePoint: string; name: string }>;
+    codePoints: Array<{ char: string; codePoint: string }>;
+    // Search reproduction
+    ownSearchRank: number;
+    ownSearchCount: number;
+    conceptSearchRank: number;
+    deepSearchRank: number;
+    deepSearchCount: number;
+    deepConceptRank: number;
+    aliasSearches: Array<{ aliasText: string; aliasId: string; count: number; rank: number }>;
+    prefixSearches: Array<{ query: string; count: number; rank: number }>;
+    duplicates: Array<{ id: string; text: string; type: string }>;
+    aliasStructure: Array<{ id: string; text: string; type: string; isProperty: boolean; parentIsThis: boolean }>;
+    // Ancestry / context
+    ancestors: Array<{ id: string; text: string; type: string; powerups: string[]; portalType: string | null; hidden: string | null; isDocument: boolean }>;
+    suspiciousAncestorPowerups: string[];
+    ownHiddenState: string | null;
+    inPortalsCount: number;
+    // Verdict
+    issues: string[];
   }>(null);
 
   if (!debugData) return null;
@@ -1063,6 +1102,405 @@ function Debug() {
     );
   };
 
+  // ------------------------------------------------------------------
+  // Search / Linkage diagnostics
+  // ------------------------------------------------------------------
+  // Purpose: figure out why a rem with visible text (e.g. a "Concept ↔
+  // definition" flashcard) cannot be found when typing its name in the
+  // reference search. RemNote's reference search matches a rem's OWN literal,
+  // normalized text tokens — so a rem can be invisible for reasons that never
+  // show up in the rendered text. This probe gathers every search/linkage
+  // relevant signal AND reproduces the search programmatically via
+  // plugin.search.search(), so a sound rem and a flawed rem can be compared
+  // side by side.
+  const codePointOf = (ch: string): string =>
+    'U+' + (ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0');
+
+  const SUSPICIOUS_CHARS: Record<string, string> = {
+    ' ': 'NO-BREAK SPACE',
+    '​': 'ZERO WIDTH SPACE',
+    '‌': 'ZERO WIDTH NON-JOINER',
+    '‍': 'ZERO WIDTH JOINER',
+    '\u200E': 'LEFT-TO-RIGHT MARK',
+    '\u200F': 'RIGHT-TO-LEFT MARK',
+    '\u202A': 'LEFT-TO-RIGHT EMBEDDING',
+    '\u202B': 'RIGHT-TO-LEFT EMBEDDING',
+    '\u202C': 'POP DIRECTIONAL FORMATTING',
+    '\u202D': 'LEFT-TO-RIGHT OVERRIDE',
+    '\u202E': 'RIGHT-TO-LEFT OVERRIDE',
+    '⁠': 'WORD JOINER',
+    '﻿': 'ZERO WIDTH NO-BREAK SPACE (BOM)',
+  };
+
+  const handleSearchProbe = async () => {
+    if (!remId) return;
+    setIsProbingSearch(true);
+    try {
+      const r = await plugin.rem.findOne(remId);
+      if (!r) { await plugin.app.toast('No rem found!'); return; }
+
+      const rawText = (r.text ?? []) as any[];
+      const plainString = await plugin.richText.toString(rawText);
+
+      // --- Classify each rich-text element of the rem's OWN text ---
+      let literalCharCount = 0;
+      const elements = rawText.map((el: any, idx: number) => {
+        if (typeof el === 'string') {
+          literalCharCount += el.length;
+          return { idx, kind: 'plain-string', detail: JSON.stringify(el) };
+        }
+        const i = el?.i;
+        switch (i) {
+          case 'm': {
+            literalCharCount += (el.text ?? '').length;
+            const fmt = Object.keys(el).filter((k) => k !== 'i' && k !== 'text');
+            return { idx, kind: 'text (i:m)', detail: `"${el.text}"${fmt.length ? ` [fmt: ${fmt.join(', ')}]` : ''}` };
+          }
+          case 'q':
+            return { idx, kind: 'rem-reference (i:q)', detail: `ref→${el._id}${el.aliasId ? ` alias→${el.aliasId}` : ''}${el.content ? ' (content/portal)' : ''}` };
+          case 'x':
+            return { idx, kind: 'latex (i:x)', detail: `"${el.text}"` };
+          case 'i':
+            return { idx, kind: 'image (i:i)', detail: el.url ?? '' };
+          case 'a':
+            return { idx, kind: 'audio (i:a)', detail: el.url ?? '' };
+          case 'g':
+            return { idx, kind: 'global-name (i:g)', detail: String(el._id) };
+          default:
+            return { idx, kind: `other (i:${i ?? '?'})`, detail: JSON.stringify(el).slice(0, 120) };
+        }
+      });
+
+      // --- Unicode / normalization analysis (NFC vs NFD mismatch hides
+      //     accented rems from search even when they look identical) ---
+      const nfc = plainString.normalize('NFC');
+      const nfd = plainString.normalize('NFD');
+      const isNFC = plainString === nfc;
+      const nfcDiffers = plainString !== nfc;
+      const nfdDiffers = plainString !== nfd;
+      const hasLeadingTrailingWhitespace = plainString !== plainString.trim();
+
+      const chars = Array.from(plainString);
+      const codePoints = chars.map((ch) => ({ char: ch, codePoint: codePointOf(ch) }));
+      const suspiciousChars: Array<{ index: number; char: string; codePoint: string; name: string }> = [];
+      chars.forEach((ch, index) => {
+        const cp = ch.codePointAt(0) ?? 0;
+        if (SUSPICIOUS_CHARS[ch] || (cp < 0x20) || cp === 0x7f) {
+          suspiciousChars.push({ index, char: ch, codePoint: codePointOf(ch), name: SUSPICIOUS_CHARS[ch] ?? 'CONTROL CHARACTER' });
+        }
+      });
+
+      // --- Type + special flags that affect search eligibility ---
+      const type = await r.getType();
+      const typeLabel = `${RemType[type] ?? 'UNKNOWN'} (${type})`;
+      const flags: Record<string, boolean> = {};
+      const safe = async (label: string, fn: () => Promise<boolean>) => {
+        try { flags[label] = await fn(); } catch { flags[label] = false; }
+      };
+      await safe('isDocument', () => r.isDocument());
+      await safe('isProperty', () => r.isProperty());
+      await safe('isPowerupProperty', () => r.isPowerupProperty());
+      await safe('isPowerup', () => r.isPowerup());
+      await safe('isPowerupEnum', () => r.isPowerupEnum());
+      await safe('isSlot', () => (r as any).isSlot());
+      await safe('isCardItem', () => r.isCardItem());
+      await safe('isTodo', () => r.isTodo());
+      await safe('hasBackText', async () => Array.isArray(r.backText) && r.backText.length > 0);
+      await safe('usedAsTag', () => r.hasPowerup(BuiltInPowerupCodes.UsedAsTag));
+      await safe('superPrivate', () => r.hasPowerup(BuiltInPowerupCodes.SuperPrivate));
+      await safe('restoredFromTrash', () => r.hasPowerup(BuiltInPowerupCodes.RestoredFromTrash));
+
+      // --- Walk the ancestor chain for CONTEXT-level exclusion signals ---
+      // A brand-new rem with this same text is found in a DIFFERENT document but
+      // not here, so the cause is in the lineage. SuperPrivate / SearchPortal /
+      // ImportedDocument / Collection on any ancestor (or a hidden/portal state)
+      // can hide a whole subtree from normal search.
+      const ANCESTOR_POWERUPS: Array<[string, string]> = [
+        ['SuperPrivate', BuiltInPowerupCodes.SuperPrivate],
+        ['SearchPortal', BuiltInPowerupCodes.SearchPortal],
+        ['ImportedDocument', BuiltInPowerupCodes.ImportedDocument],
+        ['Collection', BuiltInPowerupCodes.Collection],
+        ['RestoredFromTrash', BuiltInPowerupCodes.RestoredFromTrash],
+        ['Document', BuiltInPowerupCodes.Document],
+        ['Deck', BuiltInPowerupCodes.Deck],
+        ['UsedAsTag', BuiltInPowerupCodes.UsedAsTag],
+        ['HideQueueAncestors', BuiltInPowerupCodes.HideQueueAncestors],
+      ];
+      const ancestors: Array<{ id: string; text: string; type: string; powerups: string[]; portalType: string | null; hidden: string | null; isDocument: boolean }> = [];
+      let suspiciousAncestorPowerups: string[] = [];
+      try {
+        let cur = await r.getParentRem();
+        let depth = 0;
+        while (cur && depth < 50) {
+          const ap: string[] = [];
+          for (const [label, code] of ANCESTOR_POWERUPS) {
+            try { if (await cur.hasPowerup(code)) ap.push(label); } catch { /* ignore */ }
+          }
+          let portalType: string | null = null;
+          try { const pt = await cur.getPortalType(); portalType = pt != null ? String(pt) : null; } catch { /* ignore */ }
+          let hidden: string | null = null;
+          try { const h = await cur.getHiddenExplicitlyIncludedState(); hidden = h ?? null; } catch { /* ignore */ }
+          ancestors.push({
+            id: cur._id,
+            text: (await plugin.richText.toString(cur.text ?? [])).slice(0, 60),
+            type: `${RemType[await cur.getType().catch(() => 0)] ?? '?'}`,
+            powerups: ap,
+            portalType,
+            hidden,
+            isDocument: await cur.isDocument().catch(() => false),
+          });
+          for (const p of ap) {
+            if (['SuperPrivate', 'SearchPortal', 'ImportedDocument', 'RestoredFromTrash'].includes(p) && !suspiciousAncestorPowerups.includes(p)) {
+              suspiciousAncestorPowerups.push(p);
+            }
+          }
+          cur = await cur.getParentRem();
+          depth++;
+        }
+      } catch { /* ignore */ }
+
+      let ownHiddenState: string | null = null;
+      try { const h = await r.getHiddenExplicitlyIncludedState(); ownHiddenState = h ?? null; } catch { /* ignore */ }
+      let inPortalsCount = 0;
+      try { inPortalsCount = (await r.portalsAndDocumentsIn()).length; } catch { /* ignore */ }
+
+      // --- Aliases + reference counts + search-ranking signal ---
+      let aliases: Array<{ id: string; text: string }> = [];
+      try {
+        const aliasRems = await r.getAliases();
+        aliases = await Promise.all(aliasRems.map(async (a: any) => ({ id: a._id, text: await plugin.richText.toString(a.text) })));
+      } catch { /* ignore */ }
+
+      let timesSelected: number | null = null;
+      try { timesSelected = await r.timesSelectedInSearch(); } catch { timesSelected = null; }
+
+      let referencedByCount = 0;
+      try { referencedByCount = (await r.remsReferencingThis()).length; } catch { /* ignore */ }
+      let referencesCount = 0;
+      try { referencesCount = (await r.remsBeingReferenced()).length; } catch { /* ignore */ }
+
+      // --- Reproduce the reference search programmatically ---
+      // This is the decisive test: run the SAME search the editor uses and see
+      // whether this rem appears, at what rank, and how many results outrank it.
+      const normalizeForCompare = (s: string) => s.normalize('NFC').trim().toLowerCase();
+      const ownNormalized = normalizeForCompare(plainString);
+      const runSearch = async (
+        label: string,
+        query: any[],
+        opts: { filterOnlyConcepts?: boolean; numResults?: number }
+      ): Promise<{ count: number; rank: number; results: any[] }> => {
+        try {
+          const results = await plugin.search.search(query, undefined, opts);
+          const ids = results.map((x: any) => x._id);
+          const rank = ids.indexOf(remId);
+          console.log(`[search-probe] search(${label}) → ${results.length} results; this rem rank: ${rank === -1 ? 'NOT FOUND' : `#${rank + 1}`}`);
+          const preview = await Promise.all(
+            results.slice(0, 15).map(async (x: any, i: number) => `   ${i + 1}. ${x._id === remId ? '👉 ' : ''}[${RemType[await x.getType().catch(() => 0)] ?? '?'}] "${(await plugin.richText.toString(x.text)).slice(0, 60)}" (${x._id})`)
+          );
+          console.log(preview.join('\n'));
+          return { count: results.length, rank, results };
+        } catch (e) {
+          console.warn(`[search-probe] search(${label}) threw:`, e);
+          return { count: -1, rank: -1, results: [] };
+        }
+      };
+
+      console.log(`\n========== SEARCH / LINKAGE PROBE: "${plainString}" (${remId}) ==========`);
+      console.log('Type:', typeLabel);
+      console.log('Raw text:', JSON.stringify(rawText));
+      console.log('Back text:', JSON.stringify(r.backText ?? null));
+      console.log('Plain string:', JSON.stringify(plainString), `| length: ${plainString.length} | literal chars in own text: ${literalCharCount}`);
+      console.log('Element breakdown:', elements);
+      console.log('Unicode → isNFC:', isNFC, '| NFC differs:', nfcDiffers, '| NFD differs:', nfdDiffers, '| leading/trailing ws:', hasLeadingTrailingWhitespace);
+      console.log('Code points:', codePoints);
+      if (suspiciousChars.length) console.warn('SUSPICIOUS CHARACTERS:', suspiciousChars);
+      console.log('Flags:', flags);
+      console.log('Aliases:', aliases);
+      console.log('timesSelectedInSearch:', timesSelected, '| referencedBy:', referencedByCount, '| references:', referencesCount);
+
+      const searchAll = await runSearch('own text, all types, 50', rawText, { filterOnlyConcepts: false, numResults: 50 });
+      const searchConcepts = await runSearch('own text, concepts only, 50', rawText, { filterOnlyConcepts: true, numResults: 50 });
+
+      // Deep-retrieval test: request far more results than the editor's omnibar
+      // shows. If the rem appears at a large N but not at 50, it IS in the index
+      // — just out-ranked by a flood of common-token partial matches — and a
+      // custom re-ranking picker can surface it. If it's absent even at N=1000,
+      // candidate generation itself excludes it (token saturation).
+      const searchDeep = await runSearch('own text, all types, 1000', rawText, { filterOnlyConcepts: false, numResults: 1000 });
+      const searchDeepConcepts = await runSearch('own text, concepts only, 1000', rawText, { filterOnlyConcepts: true, numResults: 1000 });
+
+      // --- Search by each ALIAS text ---
+      // If the rem is findable under an alias but NOT its primary name, its
+      // primary-name index entry is corrupt (the decisive distinction).
+      const aliasSearches: Array<{ aliasText: string; aliasId: string; count: number; rank: number }> = [];
+      for (const a of aliases) {
+        if (!a.text.trim()) continue;
+        const res = await runSearch(`alias "${a.text}"`, [a.text], { filterOnlyConcepts: false, numResults: 50 });
+        aliasSearches.push({ aliasText: a.text, aliasId: a.id, count: res.count, rank: res.rank });
+      }
+
+      // --- Search by PREFIXES of the primary name ---
+      // Narrows down whether SOME token of the name is indexed at all.
+      const words = plainString.trim().split(/\s+/);
+      const prefixSearches: Array<{ query: string; count: number; rank: number }> = [];
+      const prefixQueries = new Set<string>();
+      if (words[0]) prefixQueries.add(words[0]);
+      if (words.length > 1) prefixQueries.add(words.slice(0, Math.ceil(words.length / 2)).join(' '));
+      if (words.length > 1) prefixQueries.add(words[words.length - 1]);
+      for (const q of prefixQueries) {
+        const res = await runSearch(`prefix "${q}"`, [q], { filterOnlyConcepts: false, numResults: 50 });
+        prefixSearches.push({ query: q, count: res.count, rank: res.rank });
+      }
+
+      // --- Detect duplicate rems sharing this exact (normalized) name ---
+      // A duplicate concept could be occupying the canonical name slot in the
+      // index and crowding this rem out.
+      const dupMap = new Map<string, any>();
+      for (const x of [...searchAll.results, ...searchConcepts.results]) {
+        if (x._id === remId) continue;
+        if (dupMap.has(x._id)) continue;
+        const t = await plugin.richText.toString(x.text);
+        if (normalizeForCompare(t) === ownNormalized) dupMap.set(x._id, { id: x._id, text: t });
+      }
+      const duplicates: Array<{ id: string; text: string; type: string }> = [];
+      for (const d of dupMap.values()) {
+        let tl = '?';
+        try { const dr = await plugin.rem.findOne(d.id); if (dr) tl = `${RemType[await dr.getType()] ?? '?'}`; } catch { /* ignore */ }
+        duplicates.push({ id: d.id, text: d.text, type: tl });
+      }
+
+      // --- Inspect the alias rems' own structure ---
+      const aliasStructure: Array<{ id: string; text: string; type: string; isProperty: boolean; parentIsThis: boolean }> = [];
+      for (const a of aliases) {
+        try {
+          const ar = await plugin.rem.findOne(a.id);
+          if (!ar) continue;
+          aliasStructure.push({
+            id: a.id,
+            text: a.text,
+            type: `${RemType[await ar.getType()] ?? '?'}`,
+            isProperty: await ar.isProperty().catch(() => false),
+            parentIsThis: (ar.parent ?? null) === remId,
+          });
+        } catch { /* ignore */ }
+      }
+      console.log('Alias searches:', aliasSearches);
+      console.log('Prefix searches:', prefixSearches);
+      console.log('Duplicate same-name rems:', duplicates);
+      console.log('Alias structure:', aliasStructure);
+      console.log('Own hidden state:', ownHiddenState, '| in portals/docs:', inPortalsCount);
+      console.log('Ancestor chain (root last):', ancestors);
+      if (suspiciousAncestorPowerups.length) console.warn('SUSPICIOUS ANCESTOR POWERUPS:', suspiciousAncestorPowerups);
+
+      // --- findByName cross-check ---
+      let foundByNameGlobal: string | null = null;
+      let foundByNameUnderParent: string | null = null;
+      try {
+        const g = await plugin.rem.findByName(rawText, null);
+        foundByNameGlobal = g ? g._id : null;
+      } catch { /* ignore */ }
+      try {
+        const parent = await r.getParentRem();
+        const p = parent ? await plugin.rem.findByName(rawText, parent._id) : undefined;
+        foundByNameUnderParent = p ? p._id : null;
+      } catch { /* ignore */ }
+      console.log('findByName(global):', foundByNameGlobal, foundByNameGlobal === remId ? '(== this rem)' : '(different / none)');
+      console.log('findByName(under parent):', foundByNameUnderParent, foundByNameUnderParent === remId ? '(== this rem)' : '(different / none)');
+
+      // --- Build verdict ---
+      const issues: string[] = [];
+      if (literalCharCount === 0) {
+        issues.push('Rem has NO literal text characters of its own (text is composed only of references/media). Reference search has nothing to match — this is almost certainly why it is invisible.');
+      }
+      if (nfcDiffers) {
+        issues.push('Text is NOT in NFC normalization form (decomposed accents). Typing the precomposed form in search will not match. Re-typing/retyping the title fixes this.');
+      }
+      if (suspiciousChars.length) {
+        issues.push(`Text contains ${suspiciousChars.length} hidden/zero-width/control character(s) (${suspiciousChars.map((s) => s.codePoint).join(', ')}). These break exact matching.`);
+      }
+      if (hasLeadingTrailingWhitespace) {
+        issues.push('Text has leading/trailing whitespace.');
+      }
+      if (flags.isProperty || flags.isPowerupProperty || flags.isSlot || flags.isPowerup || flags.isPowerupEnum) {
+        issues.push('Rem is a property/slot/powerup rem — these are excluded from normal concept reference search.');
+      }
+      const foundUnderAlias = aliasSearches.some((a) => a.rank !== -1);
+      const foundUnderPrefix = prefixSearches.some((p) => p.rank !== -1);
+      const ownSearchFails = searchAll.rank === -1 && searchConcepts.rank === -1;
+      const deepRank = searchDeep.rank !== -1 ? searchDeep.rank : searchDeepConcepts.rank;
+
+      if (suspiciousAncestorPowerups.length > 0) {
+        issues.push(`CONTEXT-LEVEL EXCLUSION: an ancestor carries ${suspiciousAncestorPowerups.join(', ')}. Rems under a SuperPrivate / SearchPortal / ImportedDocument / RestoredFromTrash ancestor are hidden from normal reference search — this matches "same text works in a different document". Fix: locate the flagged ancestor in the chain below and remove/relocate that powerup (or move the rem out of that branch).`);
+      }
+      if (ownHiddenState === 'hidden') {
+        issues.push('This rem\'s own hidden-state is "hidden" — it is explicitly excluded from its context.');
+      }
+
+      if (ownSearchFails && searchAll.count > 0) {
+        if (deepRank !== -1) {
+          issues.push(`COMMON-PHRASE SATURATION: the rem is absent from the top 50 but DOES appear at rank #${deepRank + 1} when ${searchDeep.count >= 1000 || searchDeepConcepts.count >= 1000 ? '1000' : 'more'} results are requested. It is in the index — just out-ranked by a flood of rems sharing these common tokens. RemNote's omnibar caps results, so it never shows. Renaming/re-typing will NOT help; use the "Find & Insert Reference" command (opt+shift+f) — it pulls many results per-token and floats exact-name matches to the top.`);
+        } else {
+          issues.push('The rem does NOT appear even when requesting 1000 results for its own text — RemNote\'s candidate generation excludes it (its common tokens are saturated). A custom picker that searches by the rem\'s rarest token or by alias, then floats exact-name matches up, is the reliable workaround. (Searching by a distinctive alias already finds it, per the alias rows above.)');
+        }
+        if (duplicates.length > 0) {
+          issues.push(`A DUPLICATE rem with the same name exists (${duplicates.map((d) => `${d.id} [${d.type}]`).join(', ')}).`);
+        }
+        if (foundUnderAlias || foundUnderPrefix) {
+          issues.push(`Note: the rem IS reachable via alias/distinctive-prefix search (${[...aliasSearches, ...prefixSearches].filter((x: any) => x.rank !== -1).map((x: any) => `"${x.aliasText ?? x.query}" #${x.rank + 1}`).join(', ')}). So adding a distinctive alias is a usable manual workaround.`);
+        }
+      } else if (searchAll.rank === -1 && searchAll.count > 0) {
+        issues.push(`Rem does NOT appear in the top ${searchAll.count} results of its own text search (all types) but DOES under concepts-only — partial ranking issue. Check timesSelectedInSearch (${timesSelected}).`);
+      } else if (searchAll.rank > 9) {
+        issues.push(`Rem appears only at rank #${searchAll.rank + 1} in its own search — below the typical visible cutoff. Selecting it once should raise its timesSelectedInSearch and surface it.`);
+      }
+      if (issues.length === 0) {
+        issues.push('No obvious structural cause found. The rem is a normal, searchable concept. If it still cannot be found interactively, compare timesSelectedInSearch and rank against a working rem.');
+      }
+
+      console.log('VERDICT:', issues);
+      console.log('===========================================\n');
+
+      setSearchProbe({
+        plainString,
+        typeLabel,
+        elements,
+        literalCharCount,
+        aliases,
+        timesSelectedInSearch: timesSelected,
+        referencedByCount,
+        referencesCount,
+        flags,
+        isNFC,
+        nfcDiffers,
+        nfdDiffers,
+        hasLeadingTrailingWhitespace,
+        suspiciousChars,
+        codePoints,
+        aliasSearches,
+        prefixSearches,
+        duplicates,
+        aliasStructure,
+        ownSearchRank: searchAll.rank,
+        ownSearchCount: searchAll.count,
+        conceptSearchRank: searchConcepts.rank,
+        deepSearchRank: searchDeep.rank,
+        deepSearchCount: searchDeep.count,
+        deepConceptRank: searchDeepConcepts.rank,
+        ancestors,
+        suspiciousAncestorPowerups,
+        ownHiddenState,
+        inPortalsCount,
+        issues,
+      });
+      await plugin.app.toast(`Search probe complete — ${issues.length} note(s). See widget + console.`);
+    } catch (e) {
+      console.error('[search-probe] Error:', e);
+      await plugin.app.toast('Search probe failed — check console.');
+    } finally {
+      setIsProbingSearch(false);
+    }
+  };
+
   const preStyle = { backgroundColor: 'var(--rn-clr-background-secondary)', padding: '8px', borderRadius: '4px', marginTop: '4px', fontSize: '11px', overflowX: 'auto' as 'auto' };
 
   return (
@@ -1089,7 +1527,135 @@ function Debug() {
         <Info className="card-disabled" label="Cards Disabled (Locally)" data={isCardDisabledLocally ? <span style={{color: '#ef4444', fontWeight: 600}}>YES</span> : 'No'} />
         <Info className="card-disabled-ancestor" label="Cards Disabled (Inherited)" data={isCardDisabledInAncestors ? <span style={{color: '#ef4444', fontWeight: 600}}>YES</span> : 'No'} />
       </div>
-      
+
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Search / Linkage Diagnostics
+          <button
+            onClick={handleSearchProbe}
+            disabled={isProbingSearch}
+            style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isProbingSearch ? 'wait' : 'pointer' }}
+          >
+            {isProbingSearch ? 'Probing…' : 'Probe Searchability'}
+          </button>
+        </h2>
+        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '8px' }}>
+          Diagnoses why this rem may be invisible in reference search. Reproduces the editor's search via
+          <code> plugin.search.search()</code>, inspects the rem's own literal text, Unicode normalization, hidden
+          characters, type/flags, aliases and ranking. Run on a working rem and a broken one to compare. Full dump in console.
+        </div>
+        {searchProbe && (
+          <div>
+            <div style={{ marginBottom: '8px', padding: '8px', backgroundColor: searchProbe.issues.length > 0 && searchProbe.literalCharCount > 0 && !searchProbe.nfcDiffers && searchProbe.suspiciousChars.length === 0 ? 'var(--rn-clr-background-secondary)' : 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--rn-clr-border-warning)' }}>
+              <strong>Verdict:</strong>
+              <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px' }}>
+                {searchProbe.issues.map((issue, i) => (
+                  <li key={i} style={{ marginBottom: '4px' }}>{issue}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
+              <Info className="" label="Type" data={searchProbe.typeLabel} />
+              <Info className="" label="Literal chars (own text)" data={<strong style={{ color: searchProbe.literalCharCount === 0 ? '#ef4444' : 'inherit' }}>{searchProbe.literalCharCount}</strong>} />
+              <Info className="" label="timesSelectedInSearch" data={searchProbe.timesSelectedInSearch ?? '—'} />
+              <Info className="" label="Referenced by" data={searchProbe.referencedByCount} />
+              <Info className="" label="References" data={searchProbe.referencesCount} />
+            </div>
+            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
+              <Info className="" label="NFC normalized?" data={searchProbe.isNFC ? <span style={{ color: '#22c55e' }}>Yes</span> : <span style={{ color: '#ef4444', fontWeight: 600 }}>NO — accents decomposed</span>} />
+              <Info className="" label="Leading/trailing WS" data={searchProbe.hasLeadingTrailingWhitespace ? <span style={{ color: '#ef4444', fontWeight: 600 }}>YES</span> : 'No'} />
+              <Info className="" label="Hidden/zero-width chars" data={<strong style={{ color: searchProbe.suspiciousChars.length > 0 ? '#ef4444' : 'inherit' }}>{searchProbe.suspiciousChars.length}</strong>} />
+            </div>
+            <Info className="" label={`Plain string ("${searchProbe.plainString}")`} data={<code>{JSON.stringify(searchProbe.plainString)}</code>} />
+            {searchProbe.suspiciousChars.length > 0 && (
+              <Info className="" label="Suspicious characters" data={<pre style={preStyle}>{JSON.stringify(searchProbe.suspiciousChars, null, 2)}</pre>} />
+            )}
+            <Info className="" label="Active flags" data={
+              <span style={{ fontSize: '11px' }}>
+                {Object.entries(searchProbe.flags).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none'}
+              </span>
+            } />
+            <Info className="" label="Own-text search rank (top 50)" data={
+              <span>
+                <span style={{ color: searchProbe.ownSearchRank === -1 ? '#ef4444' : '#22c55e', fontWeight: 600 }}>
+                  {searchProbe.ownSearchRank === -1 ? `NOT FOUND (in ${searchProbe.ownSearchCount})` : `#${searchProbe.ownSearchRank + 1}`}
+                </span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '11px' }}>
+                  concepts-only: {searchProbe.conceptSearchRank === -1 ? 'NOT FOUND' : `#${searchProbe.conceptSearchRank + 1}`}
+                </span>
+              </span>
+            } />
+            <Info className="" label="Deep search rank (top 1000)" data={
+              <span>
+                <span style={{ color: searchProbe.deepSearchRank === -1 ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>
+                  {searchProbe.deepSearchRank === -1 ? `NOT FOUND (in ${searchProbe.deepSearchCount})` : `#${searchProbe.deepSearchRank + 1}`}
+                </span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '11px' }}>
+                  concepts-only: {searchProbe.deepConceptRank === -1 ? 'NOT FOUND' : `#${searchProbe.deepConceptRank + 1}`}
+                </span>
+                <span style={{ color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', fontSize: '10px' }}>
+                  {searchProbe.deepSearchRank !== -1 && searchProbe.ownSearchRank === -1 ? '← indexed, just out-ranked → re-ranking picker fixes it' : ''}
+                </span>
+              </span>
+            } />
+            {searchProbe.aliasSearches.length > 0 && (
+              <Info className="" label="Found under alias?" data={
+                <span style={{ fontSize: '11px' }}>
+                  {searchProbe.aliasSearches.map((a) => (
+                    <span key={a.aliasId} style={{ marginRight: '10px', color: a.rank === -1 ? '#ef4444' : '#22c55e' }}>
+                      "{a.aliasText}": {a.rank === -1 ? 'no' : `#${a.rank + 1}`}
+                    </span>
+                  ))}
+                </span>
+              } />
+            )}
+            {searchProbe.prefixSearches.length > 0 && (
+              <Info className="" label="Found under prefix?" data={
+                <span style={{ fontSize: '11px' }}>
+                  {searchProbe.prefixSearches.map((p) => (
+                    <span key={p.query} style={{ marginRight: '10px', color: p.rank === -1 ? '#ef4444' : '#22c55e' }}>
+                      "{p.query}": {p.rank === -1 ? 'no' : `#${p.rank + 1}`}
+                    </span>
+                  ))}
+                </span>
+              } />
+            )}
+            {searchProbe.duplicates.length > 0 && (
+              <Info className="" label="⚠️ Duplicate same-name rems" data={<pre style={preStyle}>{JSON.stringify(searchProbe.duplicates, null, 2)}</pre>} />
+            )}
+            {searchProbe.suspiciousAncestorPowerups.length > 0 && (
+              <Info className="" label="⚠️ Search-excluding ancestor powerups" data={<span style={{ color: '#ef4444', fontWeight: 600 }}>{searchProbe.suspiciousAncestorPowerups.join(', ')}</span>} />
+            )}
+            <div className="flex gap-4 mb-2" style={{ flexWrap: 'wrap' }}>
+              <Info className="" label="Own hidden state" data={searchProbe.ownHiddenState ?? 'none'} />
+              <Info className="" label="In portals/docs" data={searchProbe.inPortalsCount} />
+            </div>
+            <details open={searchProbe.suspiciousAncestorPowerups.length > 0}>
+              <summary style={{ fontSize: '11px', cursor: 'pointer', color: searchProbe.suspiciousAncestorPowerups.length > 0 ? '#ef4444' : 'var(--rn-clr-content-secondary)' }}>
+                Ancestor chain ({searchProbe.ancestors.length}, parent → root)
+              </summary>
+              <pre style={preStyle}>{searchProbe.ancestors.map((a, i) =>
+                `${i === searchProbe.ancestors.length - 1 ? '[ROOT] ' : ''}[${a.type}]${a.isDocument ? '📄' : ''} "${a.text}" (${a.id})` +
+                `${a.powerups.length ? ` ⟨${a.powerups.join(', ')}⟩` : ''}` +
+                `${a.portalType ? ` portal:${a.portalType}` : ''}` +
+                `${a.hidden && a.hidden !== 'none' ? ` hidden:${a.hidden}` : ''}`
+              ).join('\n')}</pre>
+            </details>
+            {searchProbe.aliases.length > 0 && (
+              <Info className="" label="Aliases" data={<pre style={preStyle}>{JSON.stringify(searchProbe.aliasStructure.length ? searchProbe.aliasStructure : searchProbe.aliases, null, 2)}</pre>} />
+            )}
+            <details>
+              <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>Element breakdown ({searchProbe.elements.length})</summary>
+              <pre style={preStyle}>{searchProbe.elements.map((e) => `[${e.idx}] ${e.kind}: ${e.detail}`).join('\n')}</pre>
+            </details>
+            <details>
+              <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>Code points ({searchProbe.codePoints.length})</summary>
+              <pre style={preStyle}>{searchProbe.codePoints.map((c) => `${c.codePoint} ${JSON.stringify(c.char)}`).join('\n')}</pre>
+            </details>
+          </div>
+        )}
+      </div>
+
       {incrementalRem && (
         <div style={{ marginTop: '16px' }}>
           <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>Incremental Powerup</h2>
