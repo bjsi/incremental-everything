@@ -19,6 +19,7 @@ import {
   incrementalQueueActiveKey,
   currentIncrementalRemTypeKey,
   displayWeightedShieldId,
+  sourceFloatingActiveIdKey,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -1244,6 +1245,19 @@ function registerHoveredReferenceTracking(plugin: ReactRNPlugin) {
     // stale out-event wiping a fresher hover.
     if (!e?.remId || hoveredReference?.remId === e.remId) {
       hoveredReference = null;
+    }
+  });
+
+  // Auto-close the floating Source window when the queue advances to a new card,
+  // so a previous card's source never lingers (stale) over the new one.
+  plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async () => {
+    const activeId = await plugin.storage.getSession<string>(sourceFloatingActiveIdKey);
+    if (!activeId) return;
+    await plugin.storage.setSession(sourceFloatingActiveIdKey, undefined);
+    try {
+      await plugin.window.closeFloatingWidget(activeId);
+    } catch {
+      /* already closed */
     }
   });
 }

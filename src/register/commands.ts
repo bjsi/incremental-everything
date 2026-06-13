@@ -27,6 +27,8 @@ import {
   seenCardInSessionKey,
   seenRemInSessionKey,
   priorityCalcScopeRemIdsKey,
+  sourceFloatingTargetKey,
+  sourceFloatingActiveIdKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown } from '../lib/utils';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
@@ -519,6 +521,49 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         kind: target.kind,
         pageIndex: target.pageIndex,
       });
+    },
+  });
+
+  // Floating (non-blocking) variant: same source viewer, but opened to the right
+  // side of the screen so the queue/editor stays visible for peeking back and
+  // forth. Auto-closes on card advance (see QueueLoadCard listener in events.ts).
+  plugin.app.registerCommand({
+    id: 'open-source-in-floating',
+    name: 'Open Hovered Source in Floating Window',
+    keyboardShortcut: 'opt+shift+o',
+    action: async () => {
+      const hovered = getHoveredReference();
+      if (!hovered?.remId) {
+        await plugin.app.toast('Hover a PDF/HTML source reference first, then press the shortcut.');
+        return;
+      }
+      const target = await resolveSourcePopupTarget(plugin, hovered.remId);
+      if (!target) {
+        await plugin.app.toast('That reference is not a PDF/HTML source.');
+        return;
+      }
+
+      // Close any existing floating source window so they don't stack.
+      const existingId = await plugin.storage.getSession<string>(sourceFloatingActiveIdKey);
+      if (existingId) {
+        try { await plugin.window.closeFloatingWidget(existingId); } catch { /* already gone */ }
+      }
+
+      // openFloatingWidget has no contextData param — hand off via session storage.
+      await plugin.storage.setSession(sourceFloatingTargetKey, {
+        hostRemId: target.hostRemId,
+        hoveredRemId: target.hoveredRemId,
+        kind: target.kind,
+        pageIndex: target.pageIndex,
+      });
+
+      // Anchor to the top-right portion of the screen (width is fixed at 720 in
+      // the widget registration). User can drag/resize from there.
+      const id = await plugin.window.openFloatingWidget('pdf_source_floating', {
+        top: 48,
+        right: 24,
+      });
+      await plugin.storage.setSession(sourceFloatingActiveIdKey, id);
     },
   });
 

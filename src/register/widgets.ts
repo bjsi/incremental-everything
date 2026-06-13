@@ -312,6 +312,23 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Floating (non-blocking) variant of the Source popup — opens to the side so
+  // the queue/editor stays visible. Positioned + auto-closed by the
+  // `open-source-in-floating` command and the QueueLoadCard listener.
+  // NOTE: RemNote floating widgets are not user-resizable, so this fixed size is
+  // the only size lever — keep it generous. Tune here if it overflows a screen.
+  plugin.app.registerWidget('pdf_source_floating', WidgetLocation.FloatingWidget, {
+    dimensions: {
+      // EXPERIMENT: width accepts a string (per WidgetOptions type), so try a
+      // viewport-relative width that adapts to screen size. If the float opens
+      // as a ~48px sliver, RemNote parsed this numerically — revert to a fixed
+      // number (e.g. 1100). Height MUST stay a fixed number (PDFWebReader needs
+      // an explicit height; the type forbids a string here anyway).
+      width: '40vw',
+      height: 1000,
+    },
+  });
+
   // Outline Restructure preview popup (Before | After + per-rem preserve toggles).
   plugin.app.registerWidget('outline_restructure_preview', WidgetLocation.Popup, {
     dimensions: {

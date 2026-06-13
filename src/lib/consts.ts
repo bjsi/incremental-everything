@@ -173,3 +173,11 @@ export const incremNotesSidebarWidgetId = 'increm_notes_sidebar';
 // re-resolving the action item type.
 export const currentHostDocumentIdKey = 'current-host-document-id';
 
+// Source Popup (floating variant) — opened by the `open-source-in-floating`
+// command. openFloatingWidget has no contextData param, so the resolved target
+// is handed off via session storage, and the live widget id is stashed so the
+// QueueLoadCard listener can auto-close it on card advance.
+export const sourceFloatingWidgetId = 'pdf_source_floating';
+export const sourceFloatingTargetKey = 'source-floating-target';
+export const sourceFloatingActiveIdKey = 'source-floating-active-id';
+
