@@ -3,8 +3,9 @@ import {
   usePlugin,
   WidgetLocation,
   ReactRNPlugin,
+  AppEvents,
 } from '@remnote/plugin-sdk';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { SourceReaderView } from '../components/SourceReaderView';
 import { sourceFloatingTargetKey, sourceFloatingActiveIdKey } from '../lib/consts';
 
@@ -49,7 +50,7 @@ export function PdfSourceFloating() {
     init();
   }, [plugin]);
 
-  const close = async () => {
+  const close = useCallback(async () => {
     try {
       await plugin.storage.setSession(sourceFloatingActiveIdKey, undefined);
       if (floatingWidgetId) {
@@ -58,7 +59,40 @@ export function PdfSourceFloating() {
     } catch (e) {
       console.error('[pdf_source_floating] close error', e);
     }
-  };
+  }, [plugin, floatingWidgetId]);
+
+  // Esc-to-close, without letting the queue swallow Esc.
+  //
+  // `stealKeys(['Escape'])` stops RemNote from acting on Esc while the float is
+  // open (so the queue doesn't close) and routes the press to us via
+  // `StealKeyEvent`; stolen keys auto-release when the widget closes. A local
+  // `keydown` listener covers the case where focus sits on the widget shell.
+  //
+  // NOTE: when focus is inside the PDF iframe, the browser traps Esc there — so
+  // neither the queue nor this handler sees it; use the ✕ button in that case.
+  useEffect(() => {
+    if (!floatingWidgetId) return;
+
+    plugin.window.stealKeys(floatingWidgetId, ['Escape']).catch(() => {});
+
+    const isEsc = (e: any): boolean => {
+      const raw = e?.key ?? e?.code ?? e?.keys ?? e?.data?.key ?? e?.data?.keys ?? '';
+      const s = Array.isArray(raw) ? raw.join(',') : String(raw);
+      return /esc/i.test(s);
+    };
+
+    const onStealKey = (e: any) => { if (isEsc(e)) close(); };
+    plugin.event.addListener(AppEvents.StealKeyEvent, undefined, onStealKey);
+
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      plugin.event.removeListener(AppEvents.StealKeyEvent, undefined, onStealKey);
+      document.removeEventListener('keydown', onKeyDown);
+      plugin.window.releaseKeys(floatingWidgetId, ['Escape']).catch(() => {});
+    };
+  }, [floatingWidgetId, plugin, close]);
 
   if (loading) {
     return <div style={{ padding: '16px' }}>Loading source…</div>;
