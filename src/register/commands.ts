@@ -557,12 +557,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         pageIndex: target.pageIndex,
       });
 
-      // Anchor to the top-right portion of the screen (width is fixed at 720 in
-      // the widget registration). User can drag/resize from there.
-      const id = await plugin.window.openFloatingWidget('pdf_source_floating', {
-        top: 48,
-        right: 24,
-      });
+      // Anchor to the top-right portion of the screen (size is set in the widget
+      // registration). The 4th arg `closeWhenClickOutside: false` is essential:
+      // PDFWebReader renders in a sandboxed iframe, so clicking inside it counts
+      // as a click "outside" the widget and would otherwise close the float —
+      // preventing highlighting / selecting / clicking highlights in the PDF.
+      // The float is closed instead via its ✕ button or the QueueLoadCard listener.
+      const id = await plugin.window.openFloatingWidget(
+        'pdf_source_floating',
+        { top: 48, right: 24 },
+        undefined,
+        false
+      );
       await plugin.storage.setSession(sourceFloatingActiveIdKey, id);
     },
   });
