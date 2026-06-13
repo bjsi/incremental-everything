@@ -81,14 +81,17 @@ export function PdfSourceFloating() {
       return /esc/i.test(s);
     };
 
+    // Per-widget `widget.*` events (like StealKeyEvent) are delivered keyed by
+    // the floating widget id — an `undefined` listener key never matches, which
+    // is why an app-focused Esc didn't reach us before.
     const onStealKey = (e: any) => { if (isEsc(e)) close(); };
-    plugin.event.addListener(AppEvents.StealKeyEvent, undefined, onStealKey);
+    plugin.event.addListener(AppEvents.StealKeyEvent, floatingWidgetId, onStealKey);
 
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKeyDown);
 
     return () => {
-      plugin.event.removeListener(AppEvents.StealKeyEvent, undefined, onStealKey);
+      plugin.event.removeListener(AppEvents.StealKeyEvent, floatingWidgetId, onStealKey);
       document.removeEventListener('keydown', onKeyDown);
       plugin.window.releaseKeys(floatingWidgetId, ['Escape']).catch(() => {});
     };
