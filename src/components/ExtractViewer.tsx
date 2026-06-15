@@ -54,9 +54,10 @@ const hintButtonStyle: React.CSSProperties = {
  * Read-only, reactive render of a Rem and its descendant subtree. Each node
  * fetches its own children via useTrackerPlugin, so editing/adding/removing any
  * descendant in the sidebar updates the preview live (RemViewer itself is
- * reactive to a rem's own text). Font size decreases gently with depth, and
- * children are indented under a guide line. Bounded by MAX_PREVIEW_CHILDREN per
- * node and MAX_PREVIEW_DEPTH; past either, a hint routes to the sidebar.
+ * reactive to a rem's own text). Depth is conveyed by indentation + a guide line
+ * (and a divider under the root) — not font size, which a FakeEmbed overlay
+ * ignores. Bounded by MAX_PREVIEW_CHILDREN per node and MAX_PREVIEW_DEPTH; past
+ * either, a hint routes to the sidebar.
  */
 function ReadOnlyRemTree({
   remId,
@@ -77,45 +78,52 @@ function ReadOnlyRemTree({
     [remId]
   ) || [];
 
-  const fontSize = depth === 0 ? 16 : Math.max(13, 15 - (depth - 1));
   const shown = childIds.slice(0, MAX_PREVIEW_CHILDREN);
   const hidden = childIds.length - shown.length;
   const atMaxDepth = depth >= MAX_PREVIEW_DEPTH;
 
+  // NOTE: we can't vary font size by depth — RemViewer is a FakeEmbed rendered
+  // as an overlay in RemNote's main window, so it ignores any font/color set on
+  // this iframe-side wrapper. Only layout (indentation + the guide line, plus a
+  // horizontal divider under the root) reaches it, so that's how depth is shown.
   return (
     <div>
-      <div style={{ fontSize, lineHeight: 1.6 }}>
-        <RemViewer remId={remId} width="100%" />
-      </div>
+      <RemViewer remId={remId} width="100%" />
       {childIds.length > 0 && (
-        <div
-          style={{
-            marginLeft: 14,
-            marginTop: 4,
-            paddingLeft: 12,
-            borderLeft: '1px solid var(--rn-clr-border-primary, #e5e7eb)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-          }}
-        >
-          {atMaxDepth ? (
-            <button onClick={onEditInSidebar} style={hintButtonStyle}>
-              … deeper items — edit in sidebar →
-            </button>
-          ) : (
-            <>
-              {shown.map((id) => (
-                <ReadOnlyRemTree key={id} remId={id} depth={depth + 1} onEditInSidebar={onEditInSidebar} />
-              ))}
-              {hidden > 0 && (
-                <button onClick={onEditInSidebar} style={hintButtonStyle}>
-                  + {hidden} more — edit in sidebar →
-                </button>
-              )}
-            </>
+        <>
+          {/* Horizontal divider separating the target rem from its descendants. */}
+          {depth === 0 && (
+            <div style={{ borderTop: '1px solid var(--rn-clr-border-primary, #e5e7eb)', margin: '10px 0' }} />
           )}
-        </div>
+          <div
+            style={{
+              marginLeft: 14,
+              marginTop: depth === 0 ? 0 : 4,
+              paddingLeft: 12,
+              borderLeft: '1px solid var(--rn-clr-border-primary, #e5e7eb)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            {atMaxDepth ? (
+              <button onClick={onEditInSidebar} style={hintButtonStyle}>
+                … deeper items — edit in sidebar →
+              </button>
+            ) : (
+              <>
+                {shown.map((id) => (
+                  <ReadOnlyRemTree key={id} remId={id} depth={depth + 1} onEditInSidebar={onEditInSidebar} />
+                ))}
+                {hidden > 0 && (
+                  <button onClick={onEditInSidebar} style={hintButtonStyle}>
+                    + {hidden} more — edit in sidebar →
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
