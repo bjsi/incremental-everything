@@ -266,6 +266,12 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
     plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
   }, [rem._id, plugin]);
 
+  // NOTE: Restoring the Practiced Queues dashboard after advancing past an
+  // IncRem is handled globally in handleNextRepetitionClick (gated by the
+  // "Auto focus Queue Dashboard" setting) rather than here — PDF/HTML items
+  // also need it (RemNote auto-focuses its own Summary pane for those), so a
+  // rem-only listener wouldn't cover them.
+
   // -----------------------------------------------------------
   // 2d. BREADCRUMB AUTO-FIT — render at the largest size that fits the width
   // -----------------------------------------------------------

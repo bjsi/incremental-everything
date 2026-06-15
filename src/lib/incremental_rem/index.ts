@@ -16,6 +16,7 @@ import {
   defaultPriorityId,
   currentIncRemKey,
   incremReviewStartTimeKey,
+  autoFocusQueueDashboardId,
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
@@ -101,6 +102,24 @@ export async function updateReviewRemData(
   return { ...nextSpacing, newHistory };
 }
 
+// After advancing past an IncRem, restore the Practiced Queues dashboard in the
+// right sidebar (gated by the "Auto focus Queue Dashboard" setting). While
+// reviewing an IncRem the sidebar may have been taken over for editing —
+// ExtractViewer auto-opens the notes sidebar for rem-type items, and RemNote
+// itself auto-focuses a different pane (e.g. Summary) for PDF/HTML — so once the
+// user moves on, bring the dashboard back. This only runs from the IncRem "Next"
+// paths, so plain flashcard ratings never touch the sidebar.
+async function refocusQueueDashboardIfEnabled(plugin: RNPlugin) {
+  try {
+    const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
+    if (autoFocus) {
+      await plugin.window.openWidgetInRightSidebar('practiced_queues');
+    }
+  } catch {
+    /* best-effort: never block advancing on a sidebar refocus */
+  }
+}
+
 export async function handleNextRepetitionClick(
   plugin: RNPlugin,
   incRem: IncrementalRem | undefined
@@ -129,6 +148,7 @@ export async function handleNextRepetitionClick(
     await sleep(150);
 
     await plugin.queue.removeCurrentCardFromQueue();
+    await refocusQueueDashboardIfEnabled(plugin);
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
   }
@@ -174,6 +194,7 @@ export async function handleNextRepetitionManualOffset(
     await updateIncrementalRemCache(plugin as any, updatedIncRem);
 
     await plugin.queue.removeCurrentCardFromQueue();
+    await refocusQueueDashboardIfEnabled(plugin);
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
   }
