@@ -21,8 +21,12 @@ import {
 } from '../lib/consts';
 import { findAllRemsForPDF, findAllRemsForHTML, isHtmlSource } from '../lib/pdfUtils';
 
-// Types where showing the document notes sidebar makes sense
-const DOCUMENT_TYPES = new Set(['pdf', 'html', 'pdf-highlight', 'html-highlight']);
+// Types where showing the document notes sidebar makes sense.
+// 'rem' is included so plain Incremental-Rem extracts get an EDITABLE notes
+// surface here: the in-queue ExtractViewer is read-only because an editable
+// DocumentViewer can't hold focus inside the queue (Flashcard) pane, so all
+// rem editing is routed to this sidebar pane (which holds focus correctly).
+const DOCUMENT_TYPES = new Set(['pdf', 'html', 'pdf-highlight', 'html-highlight', 'rem']);
 const HIGHLIGHT_TYPES = new Set(['pdf-highlight', 'html-highlight']);
 
 interface DiscoveredIncRem {

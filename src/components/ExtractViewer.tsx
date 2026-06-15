@@ -2,8 +2,8 @@
 // UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PluginRem, RNPlugin, DocumentViewer, RichText, BuiltInPowerupCodes, RemId, RichTextElementRemInterface } from '@remnote/plugin-sdk';
-import { powerupCode, allCardPriorityInfoKey } from '../lib/consts';
+import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
+import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import {
   getChildrenExcludingSlots,
@@ -34,6 +34,11 @@ interface Metadata {
 const BATCH_SIZE = 50;
 const BATCH_DELAY_MS = 10;
 
+// How many immediate children to render in the read-only in-queue preview before
+// collapsing into a "+N more — edit in sidebar" hint. Each RemViewer is a
+// (read-only) FakeEmbed overlay, so we cap to avoid spawning too many at once.
+const MAX_PREVIEW_CHILDREN = 25;
+
 export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   if (!rem) return null;
 
@@ -44,6 +49,9 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
   const [hoveredAncestorId, setHoveredAncestorId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+
+  // --- STATE 3: IMMEDIATE CHILDREN for the read-only preview ---
+  const [childRemIds, setChildRemIds] = useState<RemId[]>([]);
 
   // -----------------------------------------------------------
   // 1. EFFECT FOR DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status)
@@ -218,6 +226,41 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
 
 
   // -----------------------------------------------------------
+  // 2b. LOAD IMMEDIATE CHILDREN for the read-only preview
+  // -----------------------------------------------------------
+  // The in-queue view is intentionally READ-ONLY: an editable DocumentViewer
+  // (FakeEmbed) cannot hold focus inside the queue's Flashcard pane — it loses a
+  // focus tug-of-war with the queue (diagnosed via oscillating FocusedRemChange),
+  // which collapses selections, drops keystrokes, and even rates the card. So we
+  // render the rem + its children with read-only RemViewers (which don't take
+  // focus) and route all editing to the sidebar pane (which holds focus).
+  useEffect(() => {
+    let cancelled = false;
+    setChildRemIds([]);
+    (async () => {
+      try {
+        const children = await getChildrenExcludingSlots(plugin, rem);
+        if (cancelled) return;
+        setChildRemIds(children.slice(0, MAX_PREVIEW_CHILDREN).map((c) => c._id));
+      } catch (e) {
+        console.error('[ExtractViewer] failed to load children for preview', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [rem._id, plugin]);
+
+  // -----------------------------------------------------------
+  // 2c. AUTO-OPEN the notes sidebar when a rem-extract loads
+  // -----------------------------------------------------------
+  // Editing happens in increm_notes_sidebar (RightSidebar pane), so surface it
+  // automatically — mirrors the 📝 button Reader.tsx uses for PDF/HTML. The
+  // sidebar reads currentIncRemKey itself, so we only need to open the tab.
+  useEffect(() => {
+    plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
+  }, [rem._id, plugin]);
+
+
+  // -----------------------------------------------------------
   // 3. MAIN RENDER LOGIC
   // -----------------------------------------------------------
 
@@ -248,24 +291,18 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
     [plugin]
   );
 
+  const openNotesSidebar = useCallback(() => {
+    plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
+  }, [plugin]);
+
+  const renderedChildren = childRemIds.length;
+  const hiddenChildren =
+    typeof childrenCount === 'number' ? Math.max(0, childrenCount - renderedChildren) : 0;
+
   return (
     <div
       className="extract-viewer"
       style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}
-      onClick={(e) => {
-        // When clicking non-interactive areas (metadata bar, empty space),
-        // redirect focus into the DocumentViewer's editable area.
-        // This prevents a "no-man's-land" focus state where neither the
-        // RemNote editor nor the parent window handles keyboard events properly.
-        const target = e.target as HTMLElement;
-        if (!target.closest('.document-viewer-section, a, button, [role="button"], input, select, textarea, [contenteditable]')) {
-          const docViewerSection = (e.currentTarget as HTMLElement).querySelector('.document-viewer-section');
-          const editable = docViewerSection?.querySelector('[contenteditable="true"]') as HTMLElement | null;
-          if (editable) {
-            editable.focus();
-          }
-        }
-      }}
     >
       {/* Breadcrumb Section (Hidden/Placeholder while loading context) */}
       <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center overflow-x-auto ${isContextLoading ? 'opacity-0' : ''}`}>
@@ -290,9 +327,83 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
         )}
       </div>
 
-      {/* DocumentViewer Section (Renders immediately using rem._id) */}
-      <div className="document-viewer-section overflow-hidden">
-        <DocumentViewer width={'100%'} height={'100%'} documentId={rem._id} />
+      {/* Read-only content preview + "edit in sidebar" affordance.
+          NOTE: this is deliberately read-only (RemViewer doesn't take focus).
+          An editable DocumentViewer here can't hold focus inside the queue pane;
+          editing is routed to the notes sidebar (auto-opened on load). */}
+      <div className="document-viewer-section overflow-auto" style={{ position: 'relative' }}>
+        {/* Edit affordance — sticky so it stays visible while scrolling */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 5,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: '8px 12px',
+            background: 'linear-gradient(to bottom, var(--rn-clr-background-primary, #fff) 70%, transparent)',
+          }}
+        >
+          <button
+            onClick={openNotesSidebar}
+            title="Open this Rem in the notes sidebar to edit (the in-queue view is read-only)"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              border: '1px solid var(--rn-clr-blue, #3b82f6)',
+              backgroundColor: 'var(--rn-clr-background-primary, #ffffff)',
+              color: 'var(--rn-clr-blue, #3b82f6)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 600,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            }}
+          >
+            ✎ Edit in sidebar →
+          </button>
+        </div>
+
+        {/* The Rem itself (rich, read-only) */}
+        <div style={{ padding: '0 16px 4px 16px', fontSize: '16px', lineHeight: 1.7 }}>
+          <RemViewer remId={rem._id} width="100%" />
+        </div>
+
+        {/* Immediate children (read-only) */}
+        {renderedChildren > 0 && (
+          <div
+            style={{
+              padding: '8px 16px 16px 28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              borderTop: '1px solid var(--rn-clr-border-primary, #e5e7eb)',
+              marginTop: '8px',
+            }}
+          >
+            {childRemIds.map((id) => (
+              <RemViewer key={id} remId={id} width="100%" />
+            ))}
+            {hiddenChildren > 0 && (
+              <button
+                onClick={openNotesSidebar}
+                style={{
+                  alignSelf: 'flex-start',
+                  marginTop: '4px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--rn-clr-content-tertiary, #94a3b8)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                }}
+              >
+                + {hiddenChildren} more — edit in sidebar →
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Metadata Section (Updates when metadata is ready) */}
