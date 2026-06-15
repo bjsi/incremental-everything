@@ -1,7 +1,7 @@
 // components/ExtractViewer.tsx
 // UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
 import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -39,11 +39,6 @@ const BATCH_DELAY_MS = 10;
 // (read-only) FakeEmbed overlay, so we cap to avoid spawning too many at once.
 const MAX_PREVIEW_CHILDREN = 25;
 
-// Breadcrumb auto-sizes between these bounds: it renders at MAX and only shrinks
-// toward MIN when the full path doesn't fit the available width (then scrolls).
-const BREADCRUMB_FONT_MAX = 16;
-const BREADCRUMB_FONT_MIN = 12;
-
 export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   if (!rem) return null;
 
@@ -55,14 +50,6 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
 
   // --- STATE 3: IMMEDIATE CHILDREN for the read-only preview ---
   const [childRemIds, setChildRemIds] = useState<RemId[]>([]);
-
-  // --- Breadcrumb responsive sizing (use available width; shrink only if needed) ---
-  // Two-phase fit: first shrink the font (MAX→MIN) to fit the full path; if it
-  // still overflows at MIN, truncate each ancestor name with an ellipsis. Never
-  // a horizontal scrollbar.
-  const breadcrumbRef = useRef<HTMLDivElement>(null);
-  const [breadcrumbFontPx, setBreadcrumbFontPx] = useState(BREADCRUMB_FONT_MAX);
-  const [breadcrumbTruncate, setBreadcrumbTruncate] = useState(false);
 
   // -----------------------------------------------------------
   // 1. EFFECT FOR DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status)
@@ -288,42 +275,6 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   // also need it (RemNote auto-focuses its own Summary pane for those), so a
   // rem-only listener wouldn't cover them.
 
-  // -----------------------------------------------------------
-  // 2d. BREADCRUMB AUTO-FIT — render at the largest size that fits the width
-  // -----------------------------------------------------------
-  // Reset to the max size (and no truncation) whenever the item or path changes,
-  // so it can grow back up / show full names before re-measuring.
-  useLayoutEffect(() => {
-    setBreadcrumbFontPx(BREADCRUMB_FONT_MAX);
-    setBreadcrumbTruncate(false);
-  }, [rem._id, criticalContext?.ancestors?.length]);
-
-  // Converge one step per render: while the path overflows, first shrink the
-  // font (MAX→MIN); once at MIN and still overflowing, switch on per-ancestor
-  // truncation (which then makes the names ellipsize to fit, so it stops).
-  useLayoutEffect(() => {
-    const el = breadcrumbRef.current;
-    if (!el) return;
-    if (el.scrollWidth <= el.clientWidth + 1) return;
-    if (breadcrumbFontPx > BREADCRUMB_FONT_MIN) {
-      setBreadcrumbFontPx((f) => f - 1);
-    } else if (!breadcrumbTruncate) {
-      setBreadcrumbTruncate(true);
-    }
-  });
-
-  // Re-fit from scratch when the queue pane is resized.
-  useEffect(() => {
-    const el = breadcrumbRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => {
-      setBreadcrumbFontPx(BREADCRUMB_FONT_MAX);
-      setBreadcrumbTruncate(false);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [criticalContext]);
-
 
   // -----------------------------------------------------------
   // 3. MAIN RENDER LOGIC
@@ -370,161 +321,151 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
       style={{
         height: '100vh',
         width: '100%',
-        display: 'grid',
-        gridTemplateRows: 'auto 1fr auto',
-        // Cap the single column to the container width. Without minmax(0, …) a
-        // grid item defaults to min-width:auto, so a long breadcrumb would widen
-        // the whole card and push the "Edit in sidebar" button off-screen.
-        gridTemplateColumns: 'minmax(0, 1fr)',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        // Top padding keeps the card below the queue's absolute "Back to isolated
+        // view" button (top:12), so it can never sit under the breadcrumb.
+        padding: '48px 16px 16px',
         overflow: 'hidden',
       }}
     >
-      {/* Breadcrumb Section (Hidden/Placeholder while loading context).
-          Auto-fits: renders the full path at the largest font that fits the
-          available width, shrinking only when needed; if it still doesn't fit at
-          the min font, each ancestor name truncates with an ellipsis (no scroll). */}
-      <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center min-w-0 overflow-hidden ${isContextLoading ? 'opacity-0' : ''}`}>
-        {!isContextLoading && ancestors.length > 0 && (
-          <div
-            ref={breadcrumbRef}
-            className="text-gray-600 dark:text-gray-400 flex flex-nowrap items-center w-full min-w-0 overflow-hidden"
-            style={{ fontSize: `${breadcrumbFontPx}px`, whiteSpace: 'nowrap' }}
-          >
-            {ancestors.map((ancestor, index) => (
-              <div
-                key={ancestor.id}
-                className="flex items-center"
-                style={{ minWidth: 0, flexShrink: breadcrumbTruncate ? 1 : 0 }}
-              >
-                <span
-                  onClick={() => handleAncestorClick(ancestor.id)}
-                  className="hover:underline cursor-pointer"
-                  title={ancestor.fullText}
-                  style={{
-                    whiteSpace: 'nowrap',
-                    minWidth: 0,
-                    overflow: breadcrumbTruncate ? 'hidden' : 'visible',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {ancestor.fullText}
-                </span>
-                {index < ancestors.length - 1 && <span className="mx-1" style={{ flexShrink: 0 }}>›</span>}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Read-only content preview + "edit in sidebar" affordance.
-          NOTE: this is deliberately read-only (RemViewer doesn't take focus).
-          An editable DocumentViewer here can't hold focus inside the queue pane;
-          editing is routed to the notes sidebar (auto-opened on load). */}
-      <div className="document-viewer-section overflow-auto" style={{ position: 'relative' }}>
-        {/* Edit affordance — sticky so it stays visible while scrolling */}
+      {/* Card frame (modelled on IsolatedCardViewer): header (wrapping
+          breadcrumb), scrollable read-only content, and a footer with stats +
+          the "Edit in sidebar" button. */}
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 1000,
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: 'var(--rn-clr-background-secondary, #ffffff)',
+          border: '1px solid var(--rn-clr-border-primary, #e2e8f0)',
+          borderRadius: 12,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header — breadcrumb wraps onto multiple lines instead of scrolling. */}
         <div
           style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 5,
-            display: 'flex',
-            justifyContent: 'flex-end',
-            padding: '8px 12px',
-            background: 'linear-gradient(to bottom, var(--rn-clr-background-primary, #fff) 70%, transparent)',
+            flexShrink: 0,
+            padding: '10px 16px',
+            borderBottom: '1px solid var(--rn-clr-border-primary, #e2e8f0)',
+            opacity: isContextLoading ? 0 : 1,
           }}
         >
+          {!isContextLoading && ancestors.length > 0 && (
+            <div style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--rn-clr-content-tertiary, #64748b)', wordBreak: 'break-word' }}>
+              {ancestors.map((ancestor, index) => (
+                <span key={ancestor.id}>
+                  <span
+                    onClick={() => handleAncestorClick(ancestor.id)}
+                    className="hover:underline"
+                    title={ancestor.fullText}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {ancestor.fullText}
+                  </span>
+                  {index < ancestors.length - 1 && <span style={{ margin: '0 4px' }}>›</span>}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Content — read-only Rem + children (RemViewer never captures focus,
+            so editing is routed to the auto-opened notes sidebar). */}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px' }}>
+          <div style={{ fontSize: 16, lineHeight: 1.7 }}>
+            <RemViewer remId={rem._id} width="100%" />
+          </div>
+
+          {renderedChildren > 0 && (
+            <div
+              style={{
+                marginTop: 10,
+                paddingTop: 10,
+                paddingLeft: 12,
+                borderTop: '1px solid var(--rn-clr-border-primary, #e5e7eb)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              {childRemIds.map((id) => (
+                <RemViewer key={id} remId={id} width="100%" />
+              ))}
+              {hiddenChildren > 0 && (
+                <button
+                  onClick={openNotesSidebar}
+                  style={{
+                    alignSelf: 'flex-start',
+                    marginTop: 4,
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--rn-clr-content-tertiary, #94a3b8)',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                  }}
+                >
+                  + {hiddenChildren} more — edit in sidebar →
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer — status + statistics, and the Edit-in-sidebar action. */}
+        <div
+          style={{
+            flexShrink: 0,
+            borderTop: '1px solid var(--rn-clr-border-primary, #e2e8f0)',
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            backgroundColor: 'var(--rn-clr-background-secondary, #f8fafc)',
+            opacity: isMetadataLoading ? 0.7 : 1,
+          }}
+        >
+          <div style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary, #64748b)', display: 'flex', flexWrap: 'wrap', gap: 12, minWidth: 0 }}>
+            <span>{isContextLoading ? 'Loading…' : (hasDocumentPowerup ? 'Document' : 'Extract')} • Incremental Rem</span>
+            {isMetadataLoading ? (
+              <span>Calculating statistics…</span>
+            ) : (
+              <>
+                <span>{childrenCount} direct {childrenCount === 1 ? 'child' : 'children'} ({incrementalChildrenCount} incremental)</span>
+                <span>{descendantsCount} {descendantsCount === 1 ? 'descendant' : 'descendants'} ({incrementalDescendantsCount} incremental)</span>
+                <span>{flashcardCount} {flashcardCount === 1 ? 'flashcard' : 'flashcards'}</span>
+              </>
+            )}
+          </div>
           <button
             onClick={openNotesSidebar}
             title="Open this Rem in the notes sidebar to edit (the in-queue view is read-only)"
             style={{
+              flexShrink: 0,
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: 6,
               padding: '6px 12px',
-              borderRadius: '6px',
+              borderRadius: 6,
               border: '1px solid var(--rn-clr-blue, #3b82f6)',
               backgroundColor: 'var(--rn-clr-background-primary, #ffffff)',
               color: 'var(--rn-clr-blue, #3b82f6)',
               cursor: 'pointer',
-              fontSize: '12px',
+              fontSize: 12,
               fontWeight: 600,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              whiteSpace: 'nowrap',
             }}
           >
             ✎ Edit in sidebar →
           </button>
-        </div>
-
-        {/* The Rem itself (rich, read-only) */}
-        <div style={{ padding: '0 16px 4px 16px', fontSize: '16px', lineHeight: 1.7 }}>
-          <RemViewer remId={rem._id} width="100%" />
-        </div>
-
-        {/* Immediate children (read-only) */}
-        {renderedChildren > 0 && (
-          <div
-            style={{
-              padding: '8px 16px 16px 28px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              borderTop: '1px solid var(--rn-clr-border-primary, #e5e7eb)',
-              marginTop: '8px',
-            }}
-          >
-            {childRemIds.map((id) => (
-              <RemViewer key={id} remId={id} width="100%" />
-            ))}
-            {hiddenChildren > 0 && (
-              <button
-                onClick={openNotesSidebar}
-                style={{
-                  alignSelf: 'flex-start',
-                  marginTop: '4px',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--rn-clr-content-tertiary, #94a3b8)',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
-              >
-                + {hiddenChildren} more — edit in sidebar →
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Metadata Section (Updates when metadata is ready) */}
-      <div className={`metadata-section px-4 py-3 border-t flex-shrink-0 ${isMetadataLoading ? 'opacity-50' : ''}`}
-        style={{
-          borderColor: '#e5e7eb',
-          backgroundColor: isMetadataLoading ? 'rgba(0,0,0,0.05)' : 'transparent',
-        }}
-      >
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          <div className="flex items-center justify-between">
-            <span>
-              {isContextLoading ? 'Loading...' : (hasDocumentPowerup ? 'Document' : 'Extract')} • Incremental Rem
-            </span>
-            <div className="flex items-center gap-4">
-              {isMetadataLoading ? (
-                <span>Calculating statistics...</span>
-              ) : (
-                <>
-                  <span>
-                    {childrenCount} direct {childrenCount === 1 ? 'child' : 'children'} ({incrementalChildrenCount} incremental)
-                  </span>
-                  <span>
-                    {descendantsCount} {descendantsCount === 1 ? 'descendant' : 'descendants'} ({incrementalDescendantsCount} incremental)
-                  </span>
-                  <span>
-                    {flashcardCount} {flashcardCount === 1 ? 'flashcard' : 'flashcards'}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>
