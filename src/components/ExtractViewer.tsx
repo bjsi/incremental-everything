@@ -2,7 +2,7 @@
 // UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
+import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId, useTrackerPlugin } from '@remnote/plugin-sdk';
 import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import {
@@ -34,10 +34,92 @@ interface Metadata {
 const BATCH_SIZE = 50;
 const BATCH_DELAY_MS = 10;
 
-// How many immediate children to render in the read-only in-queue preview before
-// collapsing into a "+N more — edit in sidebar" hint. Each RemViewer is a
-// (read-only) FakeEmbed overlay, so we cap to avoid spawning too many at once.
+// Read-only preview caps. Each RemViewer is a (read-only) FakeEmbed overlay, so
+// we bound how many we spawn: children per node, and how deep we recurse. Beyond
+// either cap we show a "edit in sidebar" hint instead.
 const MAX_PREVIEW_CHILDREN = 25;
+const MAX_PREVIEW_DEPTH = 6;
+
+const hintButtonStyle: React.CSSProperties = {
+  alignSelf: 'flex-start',
+  marginTop: 2,
+  background: 'none',
+  border: 'none',
+  color: 'var(--rn-clr-content-tertiary, #94a3b8)',
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+/**
+ * Read-only, reactive render of a Rem and its descendant subtree. Each node
+ * fetches its own children via useTrackerPlugin, so editing/adding/removing any
+ * descendant in the sidebar updates the preview live (RemViewer itself is
+ * reactive to a rem's own text). Font size decreases gently with depth, and
+ * children are indented under a guide line. Bounded by MAX_PREVIEW_CHILDREN per
+ * node and MAX_PREVIEW_DEPTH; past either, a hint routes to the sidebar.
+ */
+function ReadOnlyRemTree({
+  remId,
+  depth,
+  onEditInSidebar,
+}: {
+  remId: RemId;
+  depth: number;
+  onEditInSidebar: () => void;
+}) {
+  const childIds = useTrackerPlugin(
+    async (rp) => {
+      const r = await rp.rem.findOne(remId);
+      if (!r) return [] as RemId[];
+      const children = await getChildrenExcludingSlots(rp as unknown as RNPlugin, r);
+      return children.map((c) => c._id);
+    },
+    [remId]
+  ) || [];
+
+  const fontSize = depth === 0 ? 16 : Math.max(13, 15 - (depth - 1));
+  const shown = childIds.slice(0, MAX_PREVIEW_CHILDREN);
+  const hidden = childIds.length - shown.length;
+  const atMaxDepth = depth >= MAX_PREVIEW_DEPTH;
+
+  return (
+    <div>
+      <div style={{ fontSize, lineHeight: 1.6 }}>
+        <RemViewer remId={remId} width="100%" />
+      </div>
+      {childIds.length > 0 && (
+        <div
+          style={{
+            marginLeft: 14,
+            marginTop: 4,
+            paddingLeft: 12,
+            borderLeft: '1px solid var(--rn-clr-border-primary, #e5e7eb)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          {atMaxDepth ? (
+            <button onClick={onEditInSidebar} style={hintButtonStyle}>
+              … deeper items — edit in sidebar →
+            </button>
+          ) : (
+            <>
+              {shown.map((id) => (
+                <ReadOnlyRemTree key={id} remId={id} depth={depth + 1} onEditInSidebar={onEditInSidebar} />
+              ))}
+              {hidden > 0 && (
+                <button onClick={onEditInSidebar} style={hintButtonStyle}>
+                  + {hidden} more — edit in sidebar →
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   if (!rem) return null;
@@ -47,9 +129,6 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
 
   // --- STATE 2: DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status) ---
   const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
-
-  // --- STATE 3: IMMEDIATE CHILDREN for the read-only preview ---
-  const [childRemIds, setChildRemIds] = useState<RemId[]>([]);
 
   // -----------------------------------------------------------
   // 1. EFFECT FOR DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status)
@@ -223,29 +302,12 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   }, [rem._id, plugin]);
 
 
-  // -----------------------------------------------------------
-  // 2b. LOAD IMMEDIATE CHILDREN for the read-only preview
-  // -----------------------------------------------------------
-  // The in-queue view is intentionally READ-ONLY: an editable DocumentViewer
-  // (FakeEmbed) cannot hold focus inside the queue's Flashcard pane — it loses a
-  // focus tug-of-war with the queue (diagnosed via oscillating FocusedRemChange),
-  // which collapses selections, drops keystrokes, and even rates the card. So we
-  // render the rem + its children with read-only RemViewers (which don't take
-  // focus) and route all editing to the sidebar pane (which holds focus).
-  useEffect(() => {
-    let cancelled = false;
-    setChildRemIds([]);
-    (async () => {
-      try {
-        const children = await getChildrenExcludingSlots(plugin, rem);
-        if (cancelled) return;
-        setChildRemIds(children.slice(0, MAX_PREVIEW_CHILDREN).map((c) => c._id));
-      } catch (e) {
-        console.error('[ExtractViewer] failed to load children for preview', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [rem._id, plugin]);
+  // NOTE: The read-only content (the rem + its descendant subtree) is rendered
+  // by <ReadOnlyRemTree>, which fetches each node's children reactively — so it
+  // stays in sync as descendants are edited/added/removed in the sidebar. The
+  // in-queue view is intentionally READ-ONLY because an editable DocumentViewer
+  // (FakeEmbed) can't hold focus inside the queue's Flashcard pane (it loses a
+  // focus tug-of-war that collapses selections and can even rate the card).
 
   // -----------------------------------------------------------
   // 2c. AUTO-OPEN the notes sidebar (and tell it WHICH rem to edit)
@@ -311,10 +373,6 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
     plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
   }, [plugin]);
 
-  const renderedChildren = childRemIds.length;
-  const hiddenChildren =
-    typeof childrenCount === 'number' ? Math.max(0, childrenCount - renderedChildren) : 0;
-
   return (
     <div
       className="extract-viewer"
@@ -377,48 +435,12 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
           )}
         </div>
 
-        {/* Content — read-only Rem + children (RemViewer never captures focus,
-            so editing is routed to the auto-opened notes sidebar). Uses the
-            primary background so only the frame (header/footer) is grey, like
-            IsolatedCardViewer. */}
+        {/* Content — read-only Rem + its descendant subtree (reactive; never
+            captures focus, so editing is routed to the auto-opened notes
+            sidebar). Uses the primary background so only the frame
+            (header/footer) is grey, like IsolatedCardViewer. */}
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px', backgroundColor: 'var(--rn-clr-background-primary, #ffffff)' }}>
-          <div style={{ fontSize: 16, lineHeight: 1.7 }}>
-            <RemViewer remId={rem._id} width="100%" />
-          </div>
-
-          {renderedChildren > 0 && (
-            <div
-              style={{
-                marginTop: 10,
-                paddingTop: 10,
-                paddingLeft: 12,
-                borderTop: '1px solid var(--rn-clr-border-primary, #e5e7eb)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-              }}
-            >
-              {childRemIds.map((id) => (
-                <RemViewer key={id} remId={id} width="100%" />
-              ))}
-              {hiddenChildren > 0 && (
-                <button
-                  onClick={openNotesSidebar}
-                  style={{
-                    alignSelf: 'flex-start',
-                    marginTop: 4,
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--rn-clr-content-tertiary, #94a3b8)',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                  }}
-                >
-                  + {hiddenChildren} more — edit in sidebar →
-                </button>
-              )}
-            </div>
-          )}
+          <ReadOnlyRemTree remId={rem._id} depth={0} onEditInSidebar={openNotesSidebar} />
         </div>
 
         {/* Footer — status + statistics, and the Edit-in-sidebar action. */}
