@@ -907,12 +907,15 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                 // Calculate the new interval in days
                 const intervalDays = Math.round((currentIncRem.nextRepDate - Date.now()) / (1000 * 60 * 60 * 24));
 
-                // Add manualDateReset event to history
+                // Add manualDateReset event to history. Stamp nextRepMs with the user's
+                // new date so the read-time fallback stays in sync if they ever edit the
+                // chip to a date whose daily doc doesn't round-trip its 'Date' property.
                 const newHistoryEntry: IncrementalRep = {
                   date: Date.now(),
                   scheduled: oldNextRepDate,
                   interval: Math.max(0, intervalDays),
                   eventType: 'manualDateReset' as const,
+                  nextRepMs: currentIncRem.nextRepDate,
                 };
 
                 const updatedHistory: IncrementalRep[] = [

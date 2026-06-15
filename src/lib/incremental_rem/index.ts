@@ -226,29 +226,42 @@ export const getIncrementalRemFromRem = async (
   if (!r) {
     return null;
   }
-  const nextRepDateRichText = (await r.getPowerupPropertyAsRichText(
-    powerupCode,
-    nextRepDateSlotCode
-  )) as RichTextElementRemInterface[];
-  if (!nextRepDateRichText || nextRepDateRichText.length === 0 || !nextRepDateRichText[0]?._id) {
+
+  // A rem is incremental iff it carries the Incremental powerup. Resolution failures
+  // of the next-rep Daily Doc reference below must NOT make an incremental rem vanish
+  // from the cache/list — that is exactly what made interval-0 (today-referenced)
+  // rems disappear. We gate on the powerup and fall back to "due now" instead of
+  // returning null; null is reserved for rems that genuinely aren't incremental.
+  if (!(await r.hasPowerup(powerupCode))) {
     return null;
   }
 
-  const nextRepDateDoc = await plugin.rem.findOne(nextRepDateRichText[0]._id);
-  if (!nextRepDateDoc) {
-    return null;
-  }
+  // Resolves a Daily Document reference stored in a DATE slot back to a timestamp,
+  // or undefined when the slot is empty or the reference can't be resolved.
+  const resolveDailyDocSlot = async (slotCode: string): Promise<number | undefined> => {
+    const richText = (await r.getPowerupPropertyAsRichText(
+      powerupCode,
+      slotCode
+    )) as RichTextElementRemInterface[];
+    const refId = richText?.[0]?._id;
+    if (!refId) {
+      return undefined;
+    }
+    const refDoc = await plugin.rem.findOne(refId);
+    if (!refDoc) {
+      return undefined;
+    }
+    const yyyymmdd = await refDoc.getPowerupProperty<BuiltInPowerupCodes.DailyDocument>(
+      BuiltInPowerupCodes.DailyDocument,
+      'Date'
+    );
+    if (!yyyymmdd) {
+      return undefined;
+    }
+    return dayjs(yyyymmdd, 'YYYY-MM-DD').valueOf();
+  };
 
-  const yyyymmdd = await nextRepDateDoc.getPowerupProperty<BuiltInPowerupCodes.DailyDocument>(
-    BuiltInPowerupCodes.DailyDocument,
-    'Date'
-  );
-
-  if (!yyyymmdd) {
-    return null;
-  }
-
-  const date = dayjs(yyyymmdd, 'YYYY-MM-DD');
+  const resolvedNextRepDate = await resolveDailyDocSlot(nextRepDateSlotCode);
 
   const priorityRichText = await r.getPowerupPropertyAsRichText(powerupCode, prioritySlotCode);
   let priority = 10;
@@ -261,29 +274,52 @@ export const getIncrementalRemFromRem = async (
   }
 
   // Read the original incremental date slot (Daily Document reference)
-  let createdAt: number | undefined;
-  const createdAtRichText = (await r.getPowerupPropertyAsRichText(
-    powerupCode,
-    originalIncrementalDateSlotCode
-  )) as RichTextElementRemInterface[];
-  if (createdAtRichText && createdAtRichText.length > 0 && createdAtRichText[0]?._id) {
-    const createdAtDoc = await plugin.rem.findOne(createdAtRichText[0]._id);
-    if (createdAtDoc) {
-      const createdAtYYYYMMDD = await createdAtDoc.getPowerupProperty<BuiltInPowerupCodes.DailyDocument>(
-        BuiltInPowerupCodes.DailyDocument,
-        'Date'
-      );
-      if (createdAtYYYYMMDD) {
-        createdAt = dayjs(createdAtYYYYMMDD, 'YYYY-MM-DD').valueOf();
-      }
+  let createdAt = await resolveDailyDocSlot(originalIncrementalDateSlotCode);
+
+  const history = tryParseJson(await r.getPowerupProperty(powerupCode, repHistorySlotCode));
+
+  // Fallback: derive createdAt from the 'madeIncremental' history marker when the
+  // originalIncDate slot is empty/unresolvable. This repairs rems whose Daily Doc
+  // reference failed to write (e.g. the concurrent getDailyDoc race in
+  // initIncrementalRem) or resolve, and legacy rems created before the slot existed.
+  // The marker's `date` is exactly when the rem was first made incremental, and we
+  // store it as start-of-day to match the Daily-Doc-derived value.
+  if (createdAt === undefined && Array.isArray(history)) {
+    const madeMarker = history.find((h: any) => h?.eventType === 'madeIncremental');
+    const fallbackDate =
+      typeof madeMarker?.date === 'number'
+        ? madeMarker.date
+        : typeof history[0]?.date === 'number'
+        ? history[0].date
+        : undefined;
+    if (fallbackDate !== undefined) {
+      createdAt = dayjs(fallbackDate).startOf('day').valueOf();
     }
+  }
+
+  // Next-rep date resolution order:
+  //  1. The Daily Doc reference — authoritative, so a manual edit of the date chip
+  //     always wins (it only updates this reference, not the history stamp below).
+  //  2. The nextRepMs stamped on the most-recent history entry — a reliable fallback
+  //     for daily-doc rems whose 'Date' property doesn't round-trip (e.g. an interval-0
+  //     reference to today's doc, the bug this resolves).
+  //  3. Due now — legacy rems with neither, so the rem still surfaces instead of vanishing.
+  let nextRepDate = resolvedNextRepDate;
+  if (nextRepDate === undefined && Array.isArray(history) && history.length > 0) {
+    const lastNextRepMs = history[history.length - 1]?.nextRepMs;
+    if (typeof lastNextRepMs === 'number') {
+      nextRepDate = lastNextRepMs;
+    }
+  }
+  if (nextRepDate === undefined) {
+    nextRepDate = dayjs().startOf('day').valueOf();
   }
 
   const rawData = {
     remId: r._id,
-    nextRepDate: date.valueOf(),
+    nextRepDate,
     priority: priority,
-    history: tryParseJson(await r.getPowerupProperty(powerupCode, repHistorySlotCode)),
+    history,
     createdAt,
   };
 
@@ -372,17 +408,25 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
 
       const nextRepDate = new Date(Date.now() + (initialInterval * 24 * 60 * 60 * 1000));
 
-      // The inherited-priority ancestor walk and both daily-doc reference lookups are
-      // mutually independent — resolve them together. getInitialPriority gets
-      // explicitParentId to override stale SDK cache when creating a new Rem and moving it.
-      const [initialPriority, dateRef, todayRef] = await Promise.all([
+      // The inherited-priority walk runs in parallel with the next-rep daily-doc
+      // lookup. The "today" reference, however, must NOT share a Promise.all with
+      // the next-rep lookup: plugin.date.getDailyDoc auto-creates missing daily
+      // docs, and firing two getDailyDoc calls concurrently can make one lose the
+      // race and resolve to undefined (which silently skipped the originalIncDate
+      // write, leaving createdAt unset). When the next-rep date is today
+      // (initialInterval === 0) both references are identical, so we reuse dateRef
+      // instead of doing a redundant — and racy — second lookup.
+      // getInitialPriority gets explicitParentId to override stale SDK cache when
+      // creating a new Rem and moving it.
+      const [initialPriority, dateRef] = await Promise.all([
         getInitialPriority(plugin, rem, defaultPriority, options?.explicitParentId),
         getDailyDocReferenceForDate(plugin, nextRepDate),
-        getDailyDocReferenceForDate(plugin, new Date()),
       ]);
       if (!dateRef) {
         return;
       }
+      const todayRef =
+        initialInterval === 0 ? dateRef : await getDailyDocReferenceForDate(plugin, new Date());
 
       await rem.addPowerup(powerupCode);
 
@@ -393,6 +437,10 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         scheduled: Date.now(),
         eventType: 'madeIncremental' as const,
         priority: Number(initialPriority), // Record priority at time of creation
+        // Reliable fallback for the next-rep date when this rem's Daily Doc reference
+        // can't be resolved on read (covers rems made incremental without a reschedule,
+        // e.g. the plain "make incremental" command, especially with initialInterval 0).
+        nextRepMs: nextRepDate.getTime(),
       };
 
       // Build history: dismissed history (if any) + madeIncremental marker

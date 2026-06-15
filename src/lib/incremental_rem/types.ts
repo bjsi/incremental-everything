@@ -91,6 +91,15 @@ export const IncrementalRep = z.object({
    * The absolute priority (0-100) at the time of this repetition
    */
   priority: z.number().min(0).max(100).optional(),
+  /**
+   * The next-repetition timestamp (ms) scheduled at this point. Stamped on the
+   * most-recent entry at every scheduling write. Used as a reliable read-time
+   * fallback for the next-rep date when the Daily Doc reference in nextRepDateSlotCode
+   * can't be resolved (some daily-doc rems expose an empty 'Date' property). The Daily
+   * Doc reference stays authoritative on read so manual date edits still win — this is
+   * only consulted when that reference fails to round-trip.
+   */
+  nextRepMs: z.number().optional(),
 });
 
 export type IncrementalRep = z.infer<typeof IncrementalRep>;

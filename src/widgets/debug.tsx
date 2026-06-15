@@ -22,7 +22,7 @@ import {
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
-import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode } from '../lib/consts';
+import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
@@ -57,6 +57,50 @@ function Debug() {
       if (!rem) return null;
 
       const incrementalRem = await getIncrementalRemFromRem(rp, rem);
+
+      // Lightweight diagnostic probe of the Incremental DATE slots. Reports whether each
+      // slot's Daily Doc reference round-trips back to a date — some daily-doc rems carry
+      // the DailyDocument powerup but an empty 'Date' property, which is why interval-0
+      // (today-referenced) rems don't resolve from the reference and rely on the
+      // history `nextRepMs` fallback instead.
+      const probeDateSlot = async (slotCode: string) => {
+        try {
+          const richText = (await rem.getPowerupPropertyAsRichText(
+            powerupCode,
+            slotCode
+          )) as RichTextElementRemInterface[];
+          const firstId = richText?.[0]?._id;
+          let dailyDocDate: string | null = null;
+          let refRemText: string | null = null;
+          if (firstId) {
+            const refRem = await rp.rem.findOne(firstId);
+            if (refRem) {
+              dailyDocDate =
+                (await refRem.getPowerupProperty<BuiltInPowerupCodes.DailyDocument>(
+                  BuiltInPowerupCodes.DailyDocument,
+                  'Date'
+                )) || null;
+              refRemText = await safeRemTextToString(rp, refRem.text);
+            }
+          }
+          return {
+            refId: firstId ?? null,
+            refRemText,
+            dailyDocDate,
+            resolvedFromReference: dailyDocDate !== null,
+          };
+        } catch (e) {
+          return { error: String(e) };
+        }
+      };
+
+      const rawSlotProbe = (await rem.hasPowerup(powerupCode))
+        ? {
+            nextRepDate: await probeDateSlot(nextRepDateSlotCode),
+            originalIncDate: await probeDateSlot(originalIncrementalDateSlotCode),
+          }
+        : null;
+
       const cardPriority = await getCardPriority(rp, rem);
       const dismissed = await getDismissedHistoryFromRem(rp, rem);
       
@@ -77,6 +121,7 @@ function Debug() {
 
       return {
         incrementalRem,
+        rawSlotProbe,
         cardPriority,
         dismissed,
         isCardDisabledLocally,
@@ -195,7 +240,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, rem } = debugData;
+  const { incrementalRem, rawSlotProbe, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, rem } = debugData;
 
   const handleCardCompare = async () => {
     if (!remId) return;
@@ -1556,6 +1601,24 @@ function Debug() {
             className="history"
             label="History"
             data={<pre style={preStyle}>{incrementalRem?.history ? JSON.stringify(incrementalRem.history, null, 2) : '[]'}</pre>}
+          />
+        </div>
+      )}
+
+      {rawSlotProbe && (
+        <div style={{ marginTop: '16px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+            Incremental Raw Slots (diagnostic)
+          </h2>
+          <Info
+            className="probe-next-rep"
+            label="Next Rep reference"
+            data={<pre style={preStyle}>{JSON.stringify(rawSlotProbe.nextRepDate, null, 2)}</pre>}
+          />
+          <Info
+            className="probe-created"
+            label="Created reference"
+            data={<pre style={preStyle}>{JSON.stringify(rawSlotProbe.originalIncDate, null, 2)}</pre>}
           />
         </div>
       )}
