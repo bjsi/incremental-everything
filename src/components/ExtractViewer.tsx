@@ -1,7 +1,7 @@
 // components/ExtractViewer.tsx
 // UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
 import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -39,6 +39,11 @@ const BATCH_DELAY_MS = 10;
 // (read-only) FakeEmbed overlay, so we cap to avoid spawning too many at once.
 const MAX_PREVIEW_CHILDREN = 25;
 
+// Breadcrumb auto-sizes between these bounds: it renders at MAX and only shrinks
+// toward MIN when the full path doesn't fit the available width (then scrolls).
+const BREADCRUMB_FONT_MAX = 16;
+const BREADCRUMB_FONT_MIN = 12;
+
 export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   if (!rem) return null;
 
@@ -47,11 +52,13 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
 
   // --- STATE 2: DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status) ---
   const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
-  const [hoveredAncestorId, setHoveredAncestorId] = useState<string | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
 
   // --- STATE 3: IMMEDIATE CHILDREN for the read-only preview ---
   const [childRemIds, setChildRemIds] = useState<RemId[]>([]);
+
+  // --- Breadcrumb responsive font sizing (use available width; shrink only if needed) ---
+  const breadcrumbRef = useRef<HTMLDivElement>(null);
+  const [breadcrumbFontPx, setBreadcrumbFontPx] = useState(BREADCRUMB_FONT_MAX);
 
   // -----------------------------------------------------------
   // 1. EFFECT FOR DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status)
@@ -259,6 +266,35 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
     plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
   }, [rem._id, plugin]);
 
+  // -----------------------------------------------------------
+  // 2d. BREADCRUMB AUTO-FIT — render at the largest size that fits the width
+  // -----------------------------------------------------------
+  // Reset to the max size whenever the item or path changes, so it can grow
+  // back up before re-measuring.
+  useLayoutEffect(() => {
+    setBreadcrumbFontPx(BREADCRUMB_FONT_MAX);
+  }, [rem._id, criticalContext?.ancestors?.length]);
+
+  // Shrink one step per render until the path fits the available width (or we
+  // hit the min size, after which it scrolls). Only setStates while shrinking,
+  // so it converges and then stops.
+  useLayoutEffect(() => {
+    const el = breadcrumbRef.current;
+    if (!el) return;
+    if (el.scrollWidth > el.clientWidth + 1 && breadcrumbFontPx > BREADCRUMB_FONT_MIN) {
+      setBreadcrumbFontPx((f) => f - 1);
+    }
+  });
+
+  // Re-fit when the queue pane is resized.
+  useEffect(() => {
+    const el = breadcrumbRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setBreadcrumbFontPx(BREADCRUMB_FONT_MAX));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [criticalContext]);
+
 
   // -----------------------------------------------------------
   // 3. MAIN RENDER LOGIC
@@ -304,10 +340,16 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
       className="extract-viewer"
       style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}
     >
-      {/* Breadcrumb Section (Hidden/Placeholder while loading context) */}
-      <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center overflow-x-auto ${isContextLoading ? 'opacity-0' : ''}`}>
+      {/* Breadcrumb Section (Hidden/Placeholder while loading context).
+          Auto-fits: renders the full path at the largest font that fits the
+          available width, shrinking only when needed (then scrolling). */}
+      <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center ${isContextLoading ? 'opacity-0' : ''}`}>
         {!isContextLoading && ancestors.length > 0 && (
-          <div className="text-sm text-gray-600 dark:text-gray-400 flex flex-nowrap items-center w-full">
+          <div
+            ref={breadcrumbRef}
+            className="text-gray-600 dark:text-gray-400 flex flex-nowrap items-center w-full min-w-0 overflow-x-auto"
+            style={{ fontSize: `${breadcrumbFontPx}px`, whiteSpace: 'nowrap' }}
+          >
             {ancestors.map((ancestor, index) => (
               <div
                 key={ancestor.id}
@@ -315,10 +357,10 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
               >
                 <span
                   onClick={() => handleAncestorClick(ancestor.id)}
-                  className="hover:underline cursor-pointer max-w-[150px] truncate inline-block"
+                  className="hover:underline cursor-pointer"
                   title={ancestor.fullText}
                 >
-                  {ancestor.text}
+                  {ancestor.fullText}
                 </span>
                 {index < ancestors.length - 1 && <span className="mx-1">›</span>}
               </div>
