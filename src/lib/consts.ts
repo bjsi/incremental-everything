@@ -172,6 +172,12 @@ export const videoExtractStartSlotCode = 'startTime';
 export const videoExtractEndSlotCode = 'endTime';
 
 // IncRem Notes Sidebar (right sidebar widget)
+// Stable rem id published by ExtractViewer while a Rem-type IncRem is shown in
+// the queue, so the notes sidebar can edit it without depending on
+// currentIncrementalRemTypeKey — which the queue clears on every effect-cleanup
+// and so races with the sidebar auto-open. Cleared by ExtractViewer on unmount
+// and (defensively) by the QueueLoadCard listener in register/events.
+export const incremNotesSidebarRemIdKey = 'increm-notes-sidebar-rem-id';
 // Opened programmatically by the Reader 📝 button; reads currentIncRemKey directly.
 export const incremNotesSidebarWidgetId = 'increm_notes_sidebar';
 // Host document ID for highlight IncRems (PDF/HTML source Rem).

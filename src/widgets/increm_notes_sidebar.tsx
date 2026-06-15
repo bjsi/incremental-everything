@@ -18,6 +18,7 @@ import {
   incrementalQueueActiveKey,
   currentIncrementalRemTypeKey,
   currentHostDocumentIdKey,
+  incremNotesSidebarRemIdKey,
 } from '../lib/consts';
 import { findAllRemsForPDF, findAllRemsForHTML, isHtmlSource } from '../lib/pdfUtils';
 
@@ -58,12 +59,24 @@ function IncremNotesSidebar() {
     []
   );
 
+  // Rem-type extracts publish their id here (see ExtractViewer). We rely on this
+  // rather than `remType` for the rem case because the queue clears
+  // currentIncrementalRemTypeKey in its effect-cleanup, racing the sidebar's
+  // auto-open. We only honor it when it matches the current IncRem id, so a
+  // stale value (e.g. an unmount-clear skipped during sandbox teardown) is
+  // ignored instead of mis-showing the previous rem over a non-rem item.
+  const remExtractId = useTrackerPlugin(
+    (rp) => rp.storage.getSession<string>(incremNotesSidebarRemIdKey),
+    []
+  );
+
   // State for highlight IncRem discovery & selector
   const [discoveredRems, setDiscoveredRems] = useState<DiscoveredIncRem[]>([]);
   const [selectedRemId, setSelectedRemId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const isDocumentType = remType != null && DOCUMENT_TYPES.has(remType);
+  const isRemExtract = !!remExtractId && remExtractId === currentIncRemId;
+  const isDocumentType = isRemExtract || (remType != null && DOCUMENT_TYPES.has(remType));
   const isHighlightType = remType != null && HIGHLIGHT_TYPES.has(remType);
 
   // Whether we have a valid document review happening.

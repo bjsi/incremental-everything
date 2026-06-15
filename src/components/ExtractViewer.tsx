@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId } from '@remnote/plugin-sdk';
-import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId } from '../lib/consts';
+import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import {
   getChildrenExcludingSlots,
@@ -56,9 +56,13 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   // --- STATE 3: IMMEDIATE CHILDREN for the read-only preview ---
   const [childRemIds, setChildRemIds] = useState<RemId[]>([]);
 
-  // --- Breadcrumb responsive font sizing (use available width; shrink only if needed) ---
+  // --- Breadcrumb responsive sizing (use available width; shrink only if needed) ---
+  // Two-phase fit: first shrink the font (MAX→MIN) to fit the full path; if it
+  // still overflows at MIN, truncate each ancestor name with an ellipsis. Never
+  // a horizontal scrollbar.
   const breadcrumbRef = useRef<HTMLDivElement>(null);
   const [breadcrumbFontPx, setBreadcrumbFontPx] = useState(BREADCRUMB_FONT_MAX);
+  const [breadcrumbTruncate, setBreadcrumbTruncate] = useState(false);
 
   // -----------------------------------------------------------
   // 1. EFFECT FOR DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status)
@@ -257,13 +261,25 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   }, [rem._id, plugin]);
 
   // -----------------------------------------------------------
-  // 2c. AUTO-OPEN the notes sidebar when a rem-extract loads
+  // 2c. AUTO-OPEN the notes sidebar (and tell it WHICH rem to edit)
   // -----------------------------------------------------------
   // Editing happens in increm_notes_sidebar (RightSidebar pane), so surface it
-  // automatically — mirrors the 📝 button Reader.tsx uses for PDF/HTML. The
-  // sidebar reads currentIncRemKey itself, so we only need to open the tab.
+  // automatically — mirrors the 📝 button Reader.tsx uses for PDF/HTML.
+  //
+  // We publish the rem id to a dedicated session key rather than letting the
+  // sidebar infer it from currentIncrementalRemTypeKey: the queue clears that
+  // type key in its own effect-cleanup, so it races with this auto-open and the
+  // sidebar would intermittently see `undefined` and show its empty state. This
+  // key is set by the widget that definitively knows a Rem extract is on screen,
+  // and cleared on unmount. The sidebar additionally only honors it when it
+  // matches the current IncRem id, so a stale value (if an unmount-clear is
+  // skipped during sandbox teardown) is ignored rather than mis-shown.
   useEffect(() => {
+    plugin.storage.setSession(incremNotesSidebarRemIdKey, rem._id);
     plugin.window.openWidgetInRightSidebar(incremNotesSidebarWidgetId).catch(() => {});
+    return () => {
+      plugin.storage.setSession(incremNotesSidebarRemIdKey, undefined);
+    };
   }, [rem._id, plugin]);
 
   // NOTE: Restoring the Practiced Queues dashboard after advancing past an
@@ -275,28 +291,35 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   // -----------------------------------------------------------
   // 2d. BREADCRUMB AUTO-FIT — render at the largest size that fits the width
   // -----------------------------------------------------------
-  // Reset to the max size whenever the item or path changes, so it can grow
-  // back up before re-measuring.
+  // Reset to the max size (and no truncation) whenever the item or path changes,
+  // so it can grow back up / show full names before re-measuring.
   useLayoutEffect(() => {
     setBreadcrumbFontPx(BREADCRUMB_FONT_MAX);
+    setBreadcrumbTruncate(false);
   }, [rem._id, criticalContext?.ancestors?.length]);
 
-  // Shrink one step per render until the path fits the available width (or we
-  // hit the min size, after which it scrolls). Only setStates while shrinking,
-  // so it converges and then stops.
+  // Converge one step per render: while the path overflows, first shrink the
+  // font (MAX→MIN); once at MIN and still overflowing, switch on per-ancestor
+  // truncation (which then makes the names ellipsize to fit, so it stops).
   useLayoutEffect(() => {
     const el = breadcrumbRef.current;
     if (!el) return;
-    if (el.scrollWidth > el.clientWidth + 1 && breadcrumbFontPx > BREADCRUMB_FONT_MIN) {
+    if (el.scrollWidth <= el.clientWidth + 1) return;
+    if (breadcrumbFontPx > BREADCRUMB_FONT_MIN) {
       setBreadcrumbFontPx((f) => f - 1);
+    } else if (!breadcrumbTruncate) {
+      setBreadcrumbTruncate(true);
     }
   });
 
-  // Re-fit when the queue pane is resized.
+  // Re-fit from scratch when the queue pane is resized.
   useEffect(() => {
     const el = breadcrumbRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => setBreadcrumbFontPx(BREADCRUMB_FONT_MAX));
+    const ro = new ResizeObserver(() => {
+      setBreadcrumbFontPx(BREADCRUMB_FONT_MAX);
+      setBreadcrumbTruncate(false);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [criticalContext]);
@@ -344,31 +367,49 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
   return (
     <div
       className="extract-viewer"
-      style={{ height: '100vh', display: 'grid', gridTemplateRows: 'auto 1fr auto' }}
+      style={{
+        height: '100vh',
+        width: '100%',
+        display: 'grid',
+        gridTemplateRows: 'auto 1fr auto',
+        // Cap the single column to the container width. Without minmax(0, …) a
+        // grid item defaults to min-width:auto, so a long breadcrumb would widen
+        // the whole card and push the "Edit in sidebar" button off-screen.
+        gridTemplateColumns: 'minmax(0, 1fr)',
+        overflow: 'hidden',
+      }}
     >
       {/* Breadcrumb Section (Hidden/Placeholder while loading context).
           Auto-fits: renders the full path at the largest font that fits the
-          available width, shrinking only when needed (then scrolling). */}
-      <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center ${isContextLoading ? 'opacity-0' : ''}`}>
+          available width, shrinking only when needed; if it still doesn't fit at
+          the min font, each ancestor name truncates with an ellipsis (no scroll). */}
+      <div className={`breadcrumb-section px-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 h-10 flex items-center min-w-0 overflow-hidden ${isContextLoading ? 'opacity-0' : ''}`}>
         {!isContextLoading && ancestors.length > 0 && (
           <div
             ref={breadcrumbRef}
-            className="text-gray-600 dark:text-gray-400 flex flex-nowrap items-center w-full min-w-0 overflow-x-auto"
+            className="text-gray-600 dark:text-gray-400 flex flex-nowrap items-center w-full min-w-0 overflow-hidden"
             style={{ fontSize: `${breadcrumbFontPx}px`, whiteSpace: 'nowrap' }}
           >
             {ancestors.map((ancestor, index) => (
               <div
                 key={ancestor.id}
-                className="flex items-center flex-shrink-0"
+                className="flex items-center"
+                style={{ minWidth: 0, flexShrink: breadcrumbTruncate ? 1 : 0 }}
               >
                 <span
                   onClick={() => handleAncestorClick(ancestor.id)}
                   className="hover:underline cursor-pointer"
                   title={ancestor.fullText}
+                  style={{
+                    whiteSpace: 'nowrap',
+                    minWidth: 0,
+                    overflow: breadcrumbTruncate ? 'hidden' : 'visible',
+                    textOverflow: 'ellipsis',
+                  }}
                 >
                   {ancestor.fullText}
                 </span>
-                {index < ancestors.length - 1 && <span className="mx-1">›</span>}
+                {index < ancestors.length - 1 && <span className="mx-1" style={{ flexShrink: 0 }}>›</span>}
               </div>
             ))}
           </div>
