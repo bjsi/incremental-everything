@@ -378,8 +378,10 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
         </div>
 
         {/* Content — read-only Rem + children (RemViewer never captures focus,
-            so editing is routed to the auto-opened notes sidebar). */}
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px' }}>
+            so editing is routed to the auto-opened notes sidebar). Uses the
+            primary background so only the frame (header/footer) is grey, like
+            IsolatedCardViewer. */}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px', backgroundColor: 'var(--rn-clr-background-primary, #ffffff)' }}>
           <div style={{ fontSize: 16, lineHeight: 1.7 }}>
             <RemViewer remId={rem._id} width="100%" />
           </div>
