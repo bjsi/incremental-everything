@@ -16,7 +16,7 @@ import {
   defaultPriorityId,
   currentIncRemKey,
   incremReviewStartTimeKey,
-  autoFocusQueueDashboardId,
+  pendingQueueDashboardRefocusKey,
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem } from './types';
@@ -102,21 +102,25 @@ export async function updateReviewRemData(
   return { ...nextSpacing, newHistory };
 }
 
-// After advancing past an IncRem, restore the Practiced Queues dashboard in the
-// right sidebar (gated by the "Auto focus Queue Dashboard" setting). While
-// reviewing an IncRem the sidebar may have been taken over for editing —
-// ExtractViewer auto-opens the notes sidebar for rem-type items, and RemNote
-// itself auto-focuses a different pane (e.g. Summary) for PDF/HTML — so once the
-// user moves on, bring the dashboard back. This only runs from the IncRem "Next"
-// paths, so plain flashcard ratings never touch the sidebar.
-async function refocusQueueDashboardIfEnabled(plugin: RNPlugin) {
+// Request that the Practiced Queues dashboard be restored in the right sidebar
+// after we advance past this IncRem (the sidebar may have been taken over for
+// editing — ExtractViewer auto-opens notes for rem items, and RemNote auto-
+// focuses its own Summary pane for PDF/HTML).
+//
+// IMPORTANT: we must NOT call plugin.window.openWidgetInRightSidebar here. This
+// runs in a widget sandbox (e.g. the answer buttons) that is destroyed the
+// instant `removeCurrentCardFromQueue` advances the queue, so any window call
+// after that hangs (observed: a 40s stall) or never runs. Instead we drop a
+// short-lived timestamp flag *before* advancing (a fast session write that
+// completes while the sandbox is alive); a persistent QueueLoadCard listener in
+// register/events.ts consumes it and performs the actual refocus once the next
+// card has loaded. This only runs from the IncRem "Next" paths, so plain
+// flashcard ratings never touch the sidebar.
+async function requestQueueDashboardRefocus(plugin: RNPlugin, source: string) {
   try {
-    const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
-    if (autoFocus) {
-      await plugin.window.openWidgetInRightSidebar('practiced_queues');
-    }
-  } catch {
-    /* best-effort: never block advancing on a sidebar refocus */
+    await plugin.storage.setSession(pendingQueueDashboardRefocusKey, Date.now());
+  } catch (e) {
+    console.warn(`[QDASH] failed to set refocus flag from "${source}":`, e);
   }
 }
 
@@ -147,8 +151,11 @@ export async function handleNextRepetitionClick(
     // Keep the sleep to be safe
     await sleep(150);
 
+    // Flag the refocus BEFORE advancing — removeCurrentCardFromQueue tears down
+    // this widget sandbox, so the actual refocus is done by the persistent
+    // QueueLoadCard listener in register/events.ts.
+    await requestQueueDashboardRefocus(plugin, 'handleNextRepetitionClick');
     await plugin.queue.removeCurrentCardFromQueue();
-    await refocusQueueDashboardIfEnabled(plugin);
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
   }
@@ -193,8 +200,8 @@ export async function handleNextRepetitionManualOffset(
 
     await updateIncrementalRemCache(plugin as any, updatedIncRem);
 
+    await requestQueueDashboardRefocus(plugin, 'handleNextRepetitionManualOffset');
     await plugin.queue.removeCurrentCardFromQueue();
-    await refocusQueueDashboardIfEnabled(plugin);
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
   }

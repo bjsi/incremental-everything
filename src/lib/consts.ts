@@ -81,6 +81,12 @@ export const seenCardInSessionKey = 'seen-card-in-session-key';
 export const displayPriorityShieldId = 'display-priority-shield';
 export const displayQueueToolbarPriorityId = 'display-queue-toolbar-priority';
 export const autoFocusQueueDashboardId = 'auto-focus-queue-dashboard';
+// Timestamp flag set by the IncRem "Next" paths just before they advance the
+// queue (while their widget sandbox is still alive). A persistent QueueLoadCard
+// listener consumes it to restore the Practiced Queues dashboard — the refocus
+// can't run after removeCurrentCardFromQueue in the widget, which by then has
+// been torn down. See refocus flow in lib/incremental_rem + register/events.
+export const pendingQueueDashboardRefocusKey = 'pending-queue-dashboard-refocus-at';
 export const priorityShieldHistoryKey = 'priority-shield-history-key';
 export const priorityShieldHistoryMenuItemId = 'priority-shield-history-menu-item-id';
 export const documentPriorityShieldHistoryKey = 'document-priority-shield-history-key';
