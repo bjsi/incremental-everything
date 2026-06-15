@@ -147,9 +147,11 @@ Al leer un PDF grande (como un libro) como un Rem incremental regular, el comple
 
 ➡️ **[Vota la Solicitud de Función en el Sitio de Comentarios de RemNote](https://feedback.remnote.com/p/feature-request-programmatic-control-over-pdf-scroll-position-for-plugins?b=Plugin-Requests)**
 
-### Conflicto de Atajos de Teclado:
+### Edición de un Rem Incremental de tipo Rem en la Cola
 
-Al ver una tarjeta Rem regular en la cola, el editor aparece correctamente. Sin embargo, los atajos de teclado nativos de la cola tendrán prioridad sobre escribir en el editor. Esto parece deberse a una limitación en la API actual del complemento que impide que un complemento capture completamente la entrada del teclado dentro del entorno de la cola. El botón "Presiona 'P' para Editar" se ha añadido como una solución alternativa. También puedes usar el botón recién creado "Revisar en Editor".
+Versiones anteriores incrustaban un editor **editable** para las tarjetas Rem normales directamente en la cola, pero los atajos de teclado nativos de la cola tenían prioridad sobre la escritura en él — un complemento no puede capturar completamente la entrada del teclado dentro del panel de la cola (Flashcard), ya que el editor es un "fake embed" renderizado en la ventana principal de RemNote mientras el complemento se ejecuta en un marco aislado (sandbox).
+
+  * **La Solución**: La tarjeta de la cola para un Rem Incremental de tipo Rem ahora es una **vista previa de solo lectura** (que muestra el Rem y el subárbol de sus descendientes), por lo que no hay conflicto de teclado ni riesgo de que teclas accidentales califiquen/avancen la tarjeta. La edición se dirige a la **barra lateral de Notas del Documento**, que se abre automáticamente cuando se carga el elemento (un panel separado que mantiene el foco correctamente) — o haz clic en el botón **"✎ Editar en la barra lateral →"** de la tarjeta. El previsualizador **"Presiona 'P' para Editar"** y el botón **"Revisar en Editor"** siguen disponibles como alternativas.
 
 
 ## Detalles de Desarrollo
