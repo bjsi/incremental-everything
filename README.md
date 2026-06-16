@@ -166,9 +166,11 @@ Previously, reading positions for large PDFs were easily lost.
 
 ➡️ **[Upvote the Feature Request on the RemNote Feedback Site](https://feedback.remnote.com/p/feature-request-programmatic-control-over-pdf-scroll-position-for-plugins?b=Plugin-Requests)**
 
-### Keyboard Shortcut Conflict:
+### Editing a Rem-type Incremental Rem in the Queue
 
-When viewing a regular Rem card in the queue, the editor correctly appears. However, native queue keyboard shortcuts will take precedence over typing in the editor. This appears to be due to a limitation in the current plugin API that prevents a plugin from fully capturing keyboard input within the queue environment. The "Press 'P' to Edit" button has been added as a workaround. You can also use the newly created button "Review in Editor".
+Earlier versions embedded an **editable** editor for regular Rem cards directly in the queue, but native queue keyboard shortcuts took precedence over typing in it — a plugin can't fully capture keyboard input inside the queue (Flashcard) pane, since the editor is a "fake embed" rendered in RemNote's main window while the plugin runs in a sandboxed frame.
+
+  * **The Solution**: The in-queue card for a Rem-type Incremental Rem is now a **read-only preview** (showing the Rem and its descendant subtree), so there is no keyboard conflict and no risk of stray keys rating/advancing the card. Editing is routed to the **Document Notes sidebar**, which opens automatically when the item loads (a separate pane that holds focus correctly) — or click the **"✎ Edit in sidebar →"** button on the card. The **"Press 'P' to Edit"** previewer and the **"Review in Editor"** button remain available as alternatives.
 
 
 ## Development Details

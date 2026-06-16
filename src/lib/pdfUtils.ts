@@ -1455,3 +1455,50 @@ export const getPdfInfoFromHighlight = async (
 
   return { pdfRemId: hostRemId, pageIndex };
 };
+
+export interface SourcePopupTarget {
+  /** The host document rem id to feed into PDFWebReader. */
+  hostRemId: string;
+  /** 1-indexed page to scroll to, or null for non-paginated (HTML / text) sources. */
+  pageIndex: number | null;
+  /** The original hovered rem (the highlight itself, or the source doc). */
+  hoveredRemId: string;
+  kind: 'highlight' | 'pdf-source' | 'html-source';
+}
+
+/**
+ * Given an arbitrary rem id (e.g. the target of a hovered reference), decide
+ * whether it points at a Reader source we can open in a popup, and resolve the
+ * host document.
+ *
+ * Returns `null` for plain rems that have no PDF/HTML source — callers should
+ * fall through to default behavior in that case and NOT open the popup.
+ */
+export const resolveSourcePopupTarget = async (
+  plugin: RNPlugin,
+  remId: string
+): Promise<SourcePopupTarget | null> => {
+  const rem = await plugin.rem.findOne(remId);
+  if (!rem) return null;
+
+  // 1. A PDF or HTML highlight → resolve its host document (+ page when paginated).
+  if (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) {
+    const { pdfRemId, pageIndex } = await getPdfInfoFromHighlight(plugin, rem);
+    return pdfRemId
+      ? { hostRemId: pdfRemId, pageIndex, hoveredRemId: remId, kind: 'highlight' }
+      : null;
+  }
+
+  // 2. The rem is itself a PDF source document (uploaded file).
+  if (await rem.hasPowerup(BuiltInPowerupCodes.UploadedFile)) {
+    return { hostRemId: remId, pageIndex: null, hoveredRemId: remId, kind: 'pdf-source' };
+  }
+
+  // 3. The rem is itself an HTML article source (non-YouTube Link).
+  if (await isHtmlSource(rem)) {
+    return { hostRemId: remId, pageIndex: null, hoveredRemId: remId, kind: 'html-source' };
+  }
+
+  // Plain rem — not a Reader source. Do nothing.
+  return null;
+};

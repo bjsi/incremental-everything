@@ -303,6 +303,32 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Source-in-popup: renders a PDF/HTML source (PDFWebReader) in a centered
+  // modal so a hovered pin reference can be opened without killing the queue.
+  plugin.app.registerWidget('pdf_source_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1000,
+      height: 800,
+    },
+  });
+
+  // Floating (non-blocking) variant of the Source popup — opens to the side so
+  // the queue/editor stays visible. Positioned + auto-closed by the
+  // `open-source-in-floating` command and the QueueLoadCard listener.
+  // NOTE: RemNote floating widgets are not user-resizable, so this fixed size is
+  // the only size lever — keep it generous. Tune here if it overflows a screen.
+  plugin.app.registerWidget('pdf_source_floating', WidgetLocation.FloatingWidget, {
+    dimensions: {
+      // EXPERIMENT: width accepts a string (per WidgetOptions type), so try a
+      // viewport-relative width that adapts to screen size. If the float opens
+      // as a ~48px sliver, RemNote parsed this numerically — revert to a fixed
+      // number (e.g. 1100). Height MUST stay a fixed number (PDFWebReader needs
+      // an explicit height; the type forbids a string here anyway).
+      width: '40vw',
+      height: 1000,
+    },
+  });
+
   // Outline Restructure preview popup (Before | After + per-rem preserve toggles).
   plugin.app.registerWidget('outline_restructure_preview', WidgetLocation.Popup, {
     dimensions: {
@@ -323,6 +349,25 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
       },
     }
   );
+
+  // Heading Levels (Table of Contents / shift) preview popup — Before | After
+  // with level badges and Top/Deepest level selectors.
+  plugin.app.registerWidget('heading_assign_preview', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1100,
+      height: 800,
+    },
+  });
+
+  // Heading Levels undo banner — appears in the sidebar after an apply, stays
+  // until the user clicks Undo or dismisses it. Separate snapshot slot from the
+  // outline restructure banner.
+  plugin.app.registerWidget('heading_assign_undo', WidgetLocation.SidebarEnd, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
 
   // Mastery Drill widgets are gated behind the 'skip_mastery_drill' setting.
   if (!skipMasteryDrill) {

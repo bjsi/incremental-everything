@@ -45,6 +45,28 @@ export async function resolveRemTextToString(
 }
 
 /**
+ * Resolve a rem's rich text into a compact single-line string for breadcrumbs /
+ * ancestor labels. Builds on {@link resolveRemTextSegments}, so it shares the
+ * reference-vs-pin distinction: normal rem references are shown as their text
+ * wrapped in `[ ]`, but a *reference pin* is collapsed to a small 📌 marker
+ * instead of being expanded into the (often huge) referenced rem's text. This is
+ * what keeps an extract whose title carries a pin (e.g. "Agulhas magnéticas 📌")
+ * from dumping the entire referenced rem into the breadcrumb. Returns 'Untitled'
+ * only when genuinely empty.
+ */
+export async function resolveRemTextForBreadcrumb(
+  plugin: RNPlugin,
+  richText: unknown
+): Promise<string> {
+  const segments = await resolveRemTextSegments(plugin, richText);
+  const text = segments
+    .map((s) => (s.kind === 'pin' ? '📌' : s.text))
+    .join('')
+    .trim();
+  return text || 'Untitled';
+}
+
+/**
  * Resolve a rem's rich text into lightweight display segments:
  *  - Plain text and normal rem references (text wrapped in `[ ]`) become `text` segments.
  *  - Pin references become `pin` segments carrying the referenced rem's text, so the

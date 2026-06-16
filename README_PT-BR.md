@@ -147,9 +147,11 @@ Ao ler um PDF grande (como um livro) como um Rem incremental regular, o plugin p
 
 ➡️ **[Vote na Solicitação de Recurso no Site de Feedback do RemNote](https://feedback.remnote.com/p/feature-request-programmatic-control-over-pdf-scroll-position-for-plugins?b=Plugin-Requests)**
 
-### Conflito de Atalhos de Teclado:
+### Editando um Rem Incremental do tipo Rem na Fila
 
-Ao visualizar um cartão Rem regular na fila, o editor aparece corretamente. No entanto, os atalhos de teclado nativos da fila terão precedência sobre a digitação no editor. Isso parece ser devido a uma limitação na API atual do plugin que impede que um plugin capture completamente a entrada do teclado dentro do ambiente da fila. O botão "Pressione 'P' para Editar" foi adicionado como uma solução alternativa. Você também pode usar o botão recém-criado "Revisar no Editor".
+Versões anteriores embutiam um editor **editável** para cartões Rem comuns diretamente na fila, mas os atalhos de teclado nativos da fila tinham precedência sobre a digitação nele — um plugin não consegue capturar totalmente a entrada do teclado dentro do painel da fila (Flashcard), já que o editor é um "fake embed" renderizado na janela principal do RemNote enquanto o plugin roda em um frame isolado (sandbox).
+
+  * **A Solução**: O cartão da fila para um Rem Incremental do tipo Rem agora é uma **prévia somente leitura** (mostrando o Rem e a sub-árvore de seus descendentes), então não há conflito de teclado nem risco de teclas acidentais avaliarem/avançarem o cartão. A edição é direcionada para a **barra lateral de Notas do Documento**, que abre automaticamente quando o item é carregado (um painel separado que mantém o foco corretamente) — ou clique no botão **"✎ Editar na barra lateral →"** do cartão. O previsualizador **"Pressione 'P' para Editar"** e o botão **"Revisar no Editor"** continuam disponíveis como alternativas.
 
 
 ## Detalhes de Desenvolvimento

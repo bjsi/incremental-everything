@@ -19,6 +19,9 @@ import {
   incrementalQueueActiveKey,
   currentIncrementalRemTypeKey,
   displayWeightedShieldId,
+  sourceFloatingActiveIdKey,
+  autoFocusQueueDashboardId,
+  pendingQueueDashboardRefocusKey,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -904,12 +907,15 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                 // Calculate the new interval in days
                 const intervalDays = Math.round((currentIncRem.nextRepDate - Date.now()) / (1000 * 60 * 60 * 24));
 
-                // Add manualDateReset event to history
+                // Add manualDateReset event to history. Stamp nextRepMs with the user's
+                // new date so the read-time fallback stays in sync if they ever edit the
+                // chip to a date whose daily doc doesn't round-trip its 'Date' property.
                 const newHistoryEntry: IncrementalRep = {
                   date: Date.now(),
                   scheduled: oldNextRepDate,
                   interval: Math.max(0, intervalDays),
                   eventType: 'manualDateReset' as const,
+                  nextRepMs: currentIncRem.nextRepDate,
                 };
 
                 const updatedHistory: IncrementalRep[] = [
@@ -1215,4 +1221,76 @@ export function registerEventListeners(
   registerGlobalOpenRemListener(plugin);
   registerQueueSessionTracking(plugin);
   registerDrillCardRatingListener(plugin);
+
+  registerHoveredReferenceTracking(plugin);
+  registerQueueDashboardRefocusListener(plugin);
+}
+
+/**
+ * Restores the Practiced Queues dashboard after the user advances past an
+ * IncRem. The IncRem "Next" paths (lib/incremental_rem) drop a short-lived
+ * timestamp flag just before they advance the queue; we consume it here, in the
+ * plugin's persistent context, once the next card has loaded — because the
+ * widget that pressed Next has been torn down by then and can't make the call
+ * itself (its window call would hang). Gated by the "Auto focus Queue Dashboard"
+ * setting. Filter the console with [QDASH] to trace this.
+ */
+function registerQueueDashboardRefocusListener(plugin: ReactRNPlugin) {
+  const STALE_MS = 5000;
+  plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async () => {
+    const requestedAt = await plugin.storage.getSession<number>(pendingQueueDashboardRefocusKey);
+    if (!requestedAt) return;
+    // Always clear, even if stale/disabled, so it can't fire on a later card.
+    await plugin.storage.setSession(pendingQueueDashboardRefocusKey, undefined);
+    if (Date.now() - requestedAt > STALE_MS) return;
+    const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
+    if (!autoFocus) return;
+    try {
+      await plugin.window.openWidgetInRightSidebar('practiced_queues');
+    } catch (e) {
+      console.warn(`[QDASH] dashboard refocus FAILED:`, e);
+    }
+  });
+}
+
+/**
+ * Tracks which reference is currently hovered in the editor/queue.
+ *
+ * `MouseOverLink` fires repeatedly while the cursor sits on a link, so we keep
+ * this handler cheap: just record the target rem id + coords synchronously. The
+ * expensive classification (is this a PDF/HTML source?) is deferred to whoever
+ * consumes the hovered target via `getHoveredReference()`.
+ */
+let hoveredReference: { remId: RemId; clientX: number; clientY: number } | null = null;
+
+export function getHoveredReference() {
+  return hoveredReference;
+}
+
+function registerHoveredReferenceTracking(plugin: ReactRNPlugin) {
+  plugin.event.addListener(AppEvents.MouseOverLink, undefined, (e: any) => {
+    if (e?.remId) {
+      hoveredReference = { remId: e.remId, clientX: e.clientX, clientY: e.clientY };
+    }
+  });
+  plugin.event.addListener(AppEvents.MouseOutLink, undefined, (e: any) => {
+    // Only clear if we're leaving the link we currently have stored, to avoid a
+    // stale out-event wiping a fresher hover.
+    if (!e?.remId || hoveredReference?.remId === e.remId) {
+      hoveredReference = null;
+    }
+  });
+
+  // Auto-close the floating Source window when the queue advances to a new card,
+  // so a previous card's source never lingers (stale) over the new one.
+  plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async () => {
+    const activeId = await plugin.storage.getSession<string>(sourceFloatingActiveIdKey);
+    if (!activeId) return;
+    await plugin.storage.setSession(sourceFloatingActiveIdKey, undefined);
+    try {
+      await plugin.window.closeFloatingWidget(activeId);
+    } catch {
+      /* already closed */
+    }
+  });
 }

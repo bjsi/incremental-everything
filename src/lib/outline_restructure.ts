@@ -4,7 +4,7 @@
 // Detects H1..H6 in a flat candidate list and re-nests paragraphs and lower
 // headings under their preceding higher-level heading.
 
-import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
+import { RNPlugin, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from './pdfUtils';
 
 export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
@@ -43,6 +43,52 @@ export async function getHeadingLevel(rem: PluginRem): Promise<HeadingLevel | nu
     return null;
   } catch {
     return null;
+  }
+}
+
+// Apply a heading level to a rem, covering the full H1–H6 range.
+//
+// The SDK's `setFontSize` only accepts H1–H3 (passing H4–H6 throws
+// "Invalid input"). RemNote stores the deeper levels in the Header powerup's
+// `Size` slot instead, which is also where `getFontSize` (and getHeadingLevel
+// above) read them back from. So we route H1–H3 through `setFontSize` and
+// H4–H6 through the powerup slot. The `Size` slot holds the level as a plain
+// string ("H4"/"H5"/"H6"), confirmed via the `phl` (Probe Heading Level)
+// debug command.
+export async function applyHeadingLevel(
+  rem: PluginRem,
+  level: HeadingLevel
+): Promise<void> {
+  const tag = `H${level}` as 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6';
+  if (level <= 3) {
+    // SDK types setFontSize as H1|H2|H3 only; the `level <= 3` guard keeps us
+    // in range, so the cast is safe.
+    await rem.setFontSize(tag as 'H1' | 'H2' | 'H3');
+    return;
+  }
+  // H4–H6: drive the Header powerup's `Size` slot directly.
+  await rem.addPowerup(BuiltInPowerupCodes.Header);
+  await rem.setPowerupProperty(BuiltInPowerupCodes.Header, 'Size', [tag]);
+}
+
+// Revert a rem to a plain paragraph (no heading), across the full H1–H6 range.
+//
+// All headings are the built-in Header powerup — `setFontSize` for H1–H3 is
+// just a convenience that writes the same powerup's `Size` slot — so removing
+// the powerup clears any level. We also call `setFontSize(undefined)` as a
+// belt-and-suspenders in case a RemNote version tracks the H1–H3 font size
+// separately from the powerup. Both calls are best-effort: a rem that has no
+// heading simply no-ops.
+export async function clearHeading(rem: PluginRem): Promise<void> {
+  try {
+    await rem.removePowerup(BuiltInPowerupCodes.Header);
+  } catch {
+    /* not a header / already cleared */
+  }
+  try {
+    await rem.setFontSize(undefined);
+  } catch {
+    /* ignore */
   }
 }
 

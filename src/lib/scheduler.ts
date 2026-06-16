@@ -219,11 +219,21 @@ export async function updateSRSDataForRem(
     return;
   }
 
+  // Stamp the authoritative scheduling date onto the most-recent history entry. The
+  // Daily Doc reference above stays the source of truth on read (so manual date edits
+  // win), but some daily-doc rems expose an empty 'Date' property and don't round-trip;
+  // this gives the read a reliable fallback without adding a user-visible slot.
+  const stampedHistory = newHistory.length > 0
+    ? newHistory.map((entry, i) =>
+        i === newHistory.length - 1 ? { ...entry, nextRepMs: newNextRepDate } : entry
+      )
+    : newHistory;
+
   // Set flag to indicate plugin is making the update (prevents manual date reset detection)
   await plugin.storage.setSession('plugin_updating_srs_data', true);
 
   await rem?.setPowerupProperty(powerupCode, nextRepDateSlotCode, dateReference);
-  await rem?.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(newHistory)]);
+  await rem?.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(stampedHistory)]);
 
   // Clear flag after a delay longer than the GlobalRemChanged debounce (1000ms)
   // to prevent false-positive manual date reset detection

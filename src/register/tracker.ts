@@ -347,9 +347,14 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         await plugin.storage.setSession(allIncrementalRemKey, merged);
       }
 
-      // 4. Trigger inheritance cascade for the last rem (cascade walks the whole subtree)
+      // 4. Trigger inheritance cascade for ALL saved rems (each cascade walks its
+      // own subtree). The cascade watcher accepts an array and drains them in
+      // sequence. Passing all of them matters for the extract-with-priority flow,
+      // which skips the creation-time cascade and relies entirely on this save —
+      // a single-rem (last only) trigger would leave the other batch rems
+      // un-cascaded.
       if (job.remIds.length > 0) {
-        await plugin.storage.setSession('pendingInheritanceCascade', job.remIds[job.remIds.length - 1]);
+        await plugin.storage.setSession('pendingInheritanceCascade', job.remIds);
       }
 
       console.log('[Tracker] intervalBatchSave complete');

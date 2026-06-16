@@ -22,7 +22,8 @@ import {
 import { getEffectiveSelection } from './editor_selection';
 
 export const createExtract = async (
-  plugin: ReactRNPlugin
+  plugin: ReactRNPlugin,
+  options?: { skipInitialCascade?: boolean }
 ): Promise<PluginRem | PluginRem[] | undefined> => {
   let selection = await getEffectiveSelection(plugin);
   const url = await plugin.window.getURL();
@@ -191,7 +192,10 @@ export const createExtract = async (
     // Make Incremental
     // Pass the explicit parent since the SDK cache may not yet reflect
     // `extractRem.setParent(rem)`
-    await initIncrementalRem(plugin, extractRem, { explicitParentId: rem._id });
+    await initIncrementalRem(plugin, extractRem, {
+      explicitParentId: rem._id,
+      skipInitialCascade: options?.skipInitialCascade,
+    });
     // 4. Locate and Modify
     const r_start = Math.min(selection.range.start, selection.range.end);
 
@@ -313,14 +317,21 @@ export const createExtract = async (
     await plugin.storage.setSession('plugin_operation_active', true);
     try {
       for (const rem of rems) {
-        await initIncrementalRem(plugin, rem, { skipFlagManagement: true });
+        await initIncrementalRem(plugin, rem, {
+          skipFlagManagement: true,
+          skipInitialCascade: options?.skipInitialCascade,
+        });
       }
     } finally {
-      // Don't clear the flag — each initIncrementalRem fires
-      // pendingInheritanceCascade, and the cascade tracker will clear the flag
-      // when the cascade completes. Only clear defensively if no rems were
-      // processed (e.g., empty selection).
-      if (rems.length === 0) {
+      // Normally we DON'T clear the flag here — each initIncrementalRem fires
+      // pendingInheritanceCascade, and the cascade tracker clears the flag when
+      // the cascade completes.
+      //
+      // But when skipInitialCascade is set (priority popup will follow and its
+      // intervalBatchSave fires the real cascade), no cascade runs to clear the
+      // flag — so we must clear it here ourselves. Also clear defensively if no
+      // rems were processed (e.g., empty selection).
+      if (rems.length === 0 || options?.skipInitialCascade) {
         await plugin.storage.setSession('plugin_operation_active', false);
       }
     }
@@ -334,7 +345,9 @@ export const createExtract = async (
     if (!highlight) {
       return;
     }
-    await initIncrementalRem(plugin, highlight);
+    await initIncrementalRem(plugin, highlight, {
+      skipInitialCascade: options?.skipInitialCascade,
+    });
     return highlight;
   }
 };

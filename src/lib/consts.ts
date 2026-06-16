@@ -81,6 +81,12 @@ export const seenCardInSessionKey = 'seen-card-in-session-key';
 export const displayPriorityShieldId = 'display-priority-shield';
 export const displayQueueToolbarPriorityId = 'display-queue-toolbar-priority';
 export const autoFocusQueueDashboardId = 'auto-focus-queue-dashboard';
+// Timestamp flag set by the IncRem "Next" paths just before they advance the
+// queue (while their widget sandbox is still alive). A persistent QueueLoadCard
+// listener consumes it to restore the Practiced Queues dashboard — the refocus
+// can't run after removeCurrentCardFromQueue in the widget, which by then has
+// been torn down. See refocus flow in lib/incremental_rem + register/events.
+export const pendingQueueDashboardRefocusKey = 'pending-queue-dashboard-refocus-at';
 export const priorityShieldHistoryKey = 'priority-shield-history-key';
 export const priorityShieldHistoryMenuItemId = 'priority-shield-history-menu-item-id';
 export const documentPriorityShieldHistoryKey = 'document-priority-shield-history-key';
@@ -166,10 +172,24 @@ export const videoExtractStartSlotCode = 'startTime';
 export const videoExtractEndSlotCode = 'endTime';
 
 // IncRem Notes Sidebar (right sidebar widget)
+// Stable rem id published by ExtractViewer while a Rem-type IncRem is shown in
+// the queue, so the notes sidebar can edit it without depending on
+// currentIncrementalRemTypeKey — which the queue clears on every effect-cleanup
+// and so races with the sidebar auto-open. Cleared by ExtractViewer on unmount
+// and (defensively) by the QueueLoadCard listener in register/events.
+export const incremNotesSidebarRemIdKey = 'increm-notes-sidebar-rem-id';
 // Opened programmatically by the Reader 📝 button; reads currentIncRemKey directly.
 export const incremNotesSidebarWidgetId = 'increm_notes_sidebar';
 // Host document ID for highlight IncRems (PDF/HTML source Rem).
 // Set by queue.tsx so the sidebar can discover related IncRems without
 // re-resolving the action item type.
 export const currentHostDocumentIdKey = 'current-host-document-id';
+
+// Source Popup (floating variant) — opened by the `open-source-in-floating`
+// command. openFloatingWidget has no contextData param, so the resolved target
+// is handed off via session storage, and the live widget id is stashed so the
+// QueueLoadCard listener can auto-close it on card advance.
+export const sourceFloatingWidgetId = 'pdf_source_floating';
+export const sourceFloatingTargetKey = 'source-floating-target';
+export const sourceFloatingActiveIdKey = 'source-floating-active-id';
 

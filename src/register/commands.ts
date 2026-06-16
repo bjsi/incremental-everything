@@ -27,6 +27,8 @@ import {
   seenCardInSessionKey,
   seenRemInSessionKey,
   priorityCalcScopeRemIdsKey,
+  sourceFloatingTargetKey,
+  sourceFloatingActiveIdKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown } from '../lib/utils';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
@@ -36,7 +38,8 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent } from '../lib/pdfUtils';
+import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
+import { getHoveredReference } from './events';
 import { transferToDismissed } from '../lib/dismissed';
 import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
@@ -78,7 +81,15 @@ import {
   OutlineSnapshot,
   revertSnapshot,
   isMetaRem,
+  getHeadingLevel,
+  applyHeadingLevel,
+  HeadingLevel,
 } from '../lib/outline_restructure';
+import {
+  HEADING_SNAPSHOT_KEY,
+  HeadingSnapshot,
+  revertHeadingSnapshot,
+} from '../lib/heading_assign';
 import {
   registerSelectionTracker,
   getEffectiveSelection,
@@ -101,7 +112,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'opt+shift+x',
     quickCode: 'ep',
     action: async () => {
-      const result = await createExtract(plugin);
+      // Skip the inheritance cascade during creation: the priority popup that
+      // follows fires its own cascade (via intervalBatchSave) with the user's
+      // chosen priority, so the creation-time cascade is redundant and only
+      // starves the popup's data load. Mirrors highlightActions' showPriorityPopup.
+      const result = await createExtract(plugin, { skipInitialCascade: true });
       if (!result) {
         return;
       }
@@ -488,6 +503,82 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Create Cloze Deletion',
     keyboardShortcut: 'opt+z',
     action: async () => { await createClozeDeletion(); },
+  });
+
+  // Open the currently-hovered PDF/HTML source reference in a centered popup
+  // (PDFWebReader) without navigating away — keeps the queue alive. Hover a pin,
+  // then press the shortcut. Plain (non-source) references are ignored.
+  plugin.app.registerCommand({
+    id: 'open-source-in-popup',
+    name: 'Open Hovered Source in Popup',
+    keyboardShortcut: 'opt+o',
+    action: async () => {
+      const hovered = getHoveredReference();
+      if (!hovered?.remId) {
+        await plugin.app.toast('Hover a PDF/HTML source reference first, then press the shortcut.');
+        return;
+      }
+      const target = await resolveSourcePopupTarget(plugin, hovered.remId);
+      if (!target) {
+        await plugin.app.toast('That reference is not a PDF/HTML source.');
+        return;
+      }
+      await plugin.widget.openPopup('pdf_source_popup', {
+        hostRemId: target.hostRemId,
+        hoveredRemId: target.hoveredRemId,
+        kind: target.kind,
+        pageIndex: target.pageIndex,
+      });
+    },
+  });
+
+  // Floating (non-blocking) variant: same source viewer, but opened to the right
+  // side of the screen so the queue/editor stays visible for peeking back and
+  // forth. Auto-closes on card advance (see QueueLoadCard listener in events.ts).
+  plugin.app.registerCommand({
+    id: 'open-source-in-floating',
+    name: 'Open Hovered Source in Floating Window',
+    keyboardShortcut: 'opt+shift+o',
+    action: async () => {
+      const hovered = getHoveredReference();
+      if (!hovered?.remId) {
+        await plugin.app.toast('Hover a PDF/HTML source reference first, then press the shortcut.');
+        return;
+      }
+      const target = await resolveSourcePopupTarget(plugin, hovered.remId);
+      if (!target) {
+        await plugin.app.toast('That reference is not a PDF/HTML source.');
+        return;
+      }
+
+      // Close any existing floating source window so they don't stack.
+      const existingId = await plugin.storage.getSession<string>(sourceFloatingActiveIdKey);
+      if (existingId) {
+        try { await plugin.window.closeFloatingWidget(existingId); } catch { /* already gone */ }
+      }
+
+      // openFloatingWidget has no contextData param — hand off via session storage.
+      await plugin.storage.setSession(sourceFloatingTargetKey, {
+        hostRemId: target.hostRemId,
+        hoveredRemId: target.hoveredRemId,
+        kind: target.kind,
+        pageIndex: target.pageIndex,
+      });
+
+      // Anchor to the top-right portion of the screen (size is set in the widget
+      // registration). The 4th arg `closeWhenClickOutside: false` is essential:
+      // PDFWebReader renders in a sandboxed iframe, so clicking inside it counts
+      // as a click "outside" the widget and would otherwise close the float —
+      // preventing highlighting / selecting / clicking highlights in the PDF.
+      // The float is closed instead via its ✕ button or the QueueLoadCard listener.
+      const id = await plugin.window.openFloatingWidget(
+        'pdf_source_floating',
+        { top: 48, right: 24 },
+        undefined,
+        false
+      );
+      await plugin.storage.setSession(sourceFloatingActiveIdKey, id);
+    },
   });
 
   plugin.app.registerCommand({
@@ -2221,85 +2312,238 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  // TEMP PROBE — remove after H4-H6 detection is figured out.
-  // Run this command with the cursor inside an H1/H2/H3/H4/H5/H6 rem to see
-  // exactly what the SDK exposes for each heading level (typed getFontSize,
-  // the Header powerup's Size slot, raw object fields, and DOM classes).
+  // ─── Heading Levels: shared selection resolution ──────────────────────────
+  //
+  // Returns the rem ids the heading commands should act on. Whole-rem selection
+  // → those rems; text selection → the single rem; otherwise the focused rem.
+  // Uses getEffectiveSelection so Cmd+/ Omnibar invocations keep their selection
+  // (see lib/editor_selection.ts).
+  const resolveHeadingTargets = async (): Promise<string[]> => {
+    const selection = await getEffectiveSelection(plugin);
+    if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+      return selection.remIds;
+    }
+    if (selection?.type === SelectionType.Text && selection.remId) {
+      return [selection.remId];
+    }
+    const focused = await plugin.focus.getFocusedRem();
+    return focused?._id ? [focused._id] : [];
+  };
+
+  // ─── Apply Heading Levels by Hierarchy (Table of Contents) ────────────────
+  //
+  // Maps the selected outline's tree depth onto a heading-level range (e.g.
+  // H1–H3): the topmost selected rems get the start level and each level deeper
+  // adds one, clamped at the end level; rems deeper than the range are left
+  // unchanged. Opens a Before | After preview (with Top/Deepest level pickers)
+  // before applying; the change is undoable from the sidebar banner.
   plugin.app.registerCommand({
-    id: 'debug_probe_heading_level',
-    name: 'Debug: Probe Heading Level of Focused Rem',
-    quickCode: 'phl',
+    id: 'apply-toc-headings',
+    name: 'Apply Heading Levels by Hierarchy (Table of Contents)',
+    quickCode: 'htoc',
     action: async () => {
-      const focused = await plugin.focus.getFocusedRem();
-      if (!focused) {
-        await plugin.app.toast('No focused rem.');
-        console.log('[heading-probe] no focused rem');
+      const remIds = await resolveHeadingTargets();
+      if (remIds.length === 0) {
+        await plugin.app.toast('No rem selected or focused.');
+        return;
+      }
+      // scopeRootId is used only for the undo banner's label. The parent of the
+      // first target (the container) reads best; fall back to the rem itself.
+      const first = await plugin.rem.findOne(remIds[0]);
+      const parent = await first?.getParentRem();
+      const scopeRootId = parent?._id ?? remIds[0];
+
+      await plugin.widget.openPopup('heading_assign_preview', {
+        mode: 'toc',
+        scopeRootId,
+        inputRemIds: remIds,
+      });
+    },
+  });
+
+  // ─── Demote / Promote Heading Level (one step) ────────────────────────────
+  //
+  // Shift the SELECTED rems' existing headings by one level (descendants are not
+  // touched). Demote = deeper / bigger H number (H2→H3); Promote = shallower /
+  // smaller (H2→H1). Both open the same preview and are undoable.
+  const openShiftPreview = async (delta: number) => {
+    const remIds = await resolveHeadingTargets();
+    if (remIds.length === 0) {
+      await plugin.app.toast('No rem selected or focused.');
+      return;
+    }
+    await plugin.widget.openPopup('heading_assign_preview', {
+      mode: 'shift',
+      remIds,
+      delta,
+    });
+  };
+
+  plugin.app.registerCommand({
+    id: 'demote-heading-level',
+    name: 'Demote Heading Level (one level deeper)',
+    quickCode: 'hdmt',
+    action: async () => openShiftPreview(1),
+  });
+
+  plugin.app.registerCommand({
+    id: 'promote-heading-level',
+    name: 'Promote Heading Level (one level shallower)',
+    quickCode: 'hpmt',
+    action: async () => openShiftPreview(-1),
+  });
+
+  // Reverts the most recent heading-level change (ToC or shift) in this session.
+  // Same action as the Undo button on the sidebar banner.
+  plugin.app.registerCommand({
+    id: 'revert-last-heading-assign',
+    name: 'Revert Last Heading Level Change',
+    quickCode: 'rlh',
+    action: async () => {
+      const snapshot = await plugin.storage.getSession<HeadingSnapshot>(
+        HEADING_SNAPSHOT_KEY
+      );
+      if (!snapshot) {
+        await plugin.app.toast('No recent heading-level change to revert.');
+        return;
+      }
+      try {
+        await revertHeadingSnapshot(plugin, snapshot);
+        await plugin.storage.setSession(HEADING_SNAPSHOT_KEY, undefined);
+        await plugin.app.toast('Heading levels reverted.');
+      } catch (e) {
+        console.error('[heading-assign] revert failed:', e);
+        await plugin.app.toast(`Revert failed: ${(e as any)?.message ?? e}`);
+      }
+    },
+  });
+
+  // ─── Set Next Heading Level ───────────────────────────────────────────────
+  //
+  // Styles the selected rem(s) as one heading level deeper than their parent.
+  //   - Parent is a heading Hn → set the rem to H(n+1) (clamped at H6).
+  //   - Parent is NOT a heading but the grandparent is Hn → confirm, then set
+  //     the parent to H(n+1) and the rem to H(n+2). (E.g. grandparent H2 →
+  //     parent H3, selected rem H4.)
+  //   - Neither parent nor grandparent is a heading → nothing to do.
+  // Supports multi-rem outline selections (and Cmd+/ Omnibar invocation) via
+  // getEffectiveSelection, mirroring "Restructure Outline by Headings".
+  plugin.app.registerCommand({
+    id: 'set-next-heading-level',
+    name: 'Set Next Heading Level',
+    quickCode: 'hn',
+    action: async () => {
+      const selection = await getEffectiveSelection(plugin);
+      const focusedRem = selection ? undefined : await plugin.focus.getFocusedRem();
+
+      // Resolve the set of target rems from the selection (whole-rem or text)
+      // or, failing that, the focused rem.
+      let targetIds: string[] = [];
+      if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+        targetIds = selection.remIds;
+      } else if (selection?.type === SelectionType.Text && selection.remId) {
+        targetIds = [selection.remId];
+      } else if (focusedRem?._id) {
+        targetIds = [focusedRem._id];
+      }
+
+      if (targetIds.length === 0) {
+        await plugin.app.toast('No rem selected or focused.');
         return;
       }
 
-      // 1. Typed SDK call (documented as H1|H2|H3|undefined).
-      let fontSizeViaApi: any = undefined;
-      try { fontSizeViaApi = await (focused as any).getFontSize?.(); }
-      catch (e) { fontSizeViaApi = `THREW: ${(e as any)?.message}`; }
+      const clamp = (n: number): HeadingLevel => Math.min(n, 6) as HeadingLevel;
 
-      // 2. Header powerup membership + its `Size` slot (the likely storage
-      //    location for H4/H5/H6 since the SDK type for getFontSize lags).
-      let hasHeaderPowerup: any = undefined;
-      let headerSizeAsString: any = undefined;
-      let headerSizeAsRichText: any = undefined;
-      let headerSizeAsRem: any = undefined;
-      try {
-        hasHeaderPowerup = await focused.hasPowerup(BuiltInPowerupCodes.Header);
-      } catch (e) { hasHeaderPowerup = `THREW: ${(e as any)?.message}`; }
-      try {
-        headerSizeAsString = await (focused as any).getPowerupProperty?.(
-          BuiltInPowerupCodes.Header, 'Size'
-        );
-      } catch (e) { headerSizeAsString = `THREW: ${(e as any)?.message}`; }
-      try {
-        headerSizeAsRichText = await (focused as any).getPowerupPropertyAsRichText?.(
-          BuiltInPowerupCodes.Header, 'Size'
-        );
-      } catch (e) { headerSizeAsRichText = `THREW: ${(e as any)?.message}`; }
-      try {
-        headerSizeAsRem = await (focused as any).getPowerupPropertyAsRem?.(
-          BuiltInPowerupCodes.Header, 'Size'
-        );
-      } catch (e) { headerSizeAsRem = `THREW: ${(e as any)?.message}`; }
+      type DirectAction = { rem: PluginRem; level: HeadingLevel };
+      type FallbackAction = {
+        rem: PluginRem;
+        parent: PluginRem;
+        parentLevel: HeadingLevel;
+        remLevel: HeadingLevel;
+      };
 
-      // 3. Dump every enumerable, non-function property of the rem object —
-      //    catches any hidden field RemNote sets that the typed SDK omits.
-      const rawKeys = Object.keys(focused as any);
-      const rawSnapshot: Record<string, any> = {};
-      for (const k of rawKeys) {
-        try {
-          const v = (focused as any)[k];
-          if (typeof v !== 'function') rawSnapshot[k] = v;
-        } catch { /* skip */ }
+      const direct: DirectAction[] = [];
+      const fallback: FallbackAction[] = [];
+      let skipped = 0;
+
+      for (const id of targetIds) {
+        const rem = await plugin.rem.findOne(id);
+        if (!rem) {
+          skipped++;
+          continue;
+        }
+        const parent = await rem.getParentRem();
+        if (!parent) {
+          // Top-level rem — no ancestor heading to derive a level from.
+          skipped++;
+          continue;
+        }
+        const parentLevel = await getHeadingLevel(parent);
+        if (parentLevel) {
+          direct.push({ rem, level: clamp(parentLevel + 1) });
+          continue;
+        }
+        // Parent isn't a heading — look one level up at the grandparent.
+        const grandparent = await parent.getParentRem();
+        const grandparentLevel = grandparent ? await getHeadingLevel(grandparent) : null;
+        if (grandparentLevel) {
+          fallback.push({
+            rem,
+            parent,
+            parentLevel: clamp(grandparentLevel + 1),
+            remLevel: clamp(grandparentLevel + 2),
+          });
+        } else {
+          skipped++;
+        }
       }
 
-      // 4. DOM classes — last-resort signal (h4/h5/h6 styling lives here even
-      //    if no API exposes the level).
-      const domClassesByRemId: string[] = [];
-      try {
-        const els = document.querySelectorAll(`[data-rem-id="${focused._id}"]`);
-        els.forEach((el) => domClassesByRemId.push(el.className));
-      } catch { /* not in main document */ }
+      if (direct.length === 0 && fallback.length === 0) {
+        await plugin.app.toast(
+          'No heading found on the parent or grandparent of the selected rem(s).'
+        );
+        return;
+      }
 
-      console.log('[heading-probe] focused rem _id:', focused._id);
-      console.log('[heading-probe] getFontSize() →', fontSizeViaApi);
-      console.log('[heading-probe] hasPowerup(Header):', hasHeaderPowerup);
-      console.log('[heading-probe] Header.Size (string):', headerSizeAsString);
-      console.log('[heading-probe] Header.Size (rich text):', headerSizeAsRichText);
-      console.log('[heading-probe] Header.Size (as rem):', headerSizeAsRem);
-      console.log('[heading-probe] rem keys:', rawKeys);
-      console.log('[heading-probe] rem snapshot:', rawSnapshot);
-      console.log('[heading-probe] DOM classes for this remId:', domClassesByRemId);
-      console.log('[heading-probe] full rem object (inspectable):', focused);
+      // Apply the straightforward cases first (parent is already a heading).
+      for (const { rem, level } of direct) {
+        await applyHeadingLevel(rem, level);
+      }
 
-      await plugin.app.toast(
-        `Heading probe logged. getFontSize=${JSON.stringify(fontSizeViaApi)} | Header.Size=${JSON.stringify(headerSizeAsString)}`
-      );
+      // Grandparent-fallback cases mutate the parent too, so ask first. A single
+      // confirmation covers the whole batch; dedupe parents that several
+      // selected siblings share so each parent is styled only once.
+      let fallbackApplied = 0;
+      if (fallback.length > 0) {
+        const sample = fallback[0];
+        const confirmed = window.confirm(
+          `The parent of ${fallback.length === 1 ? 'the selected rem' : `${fallback.length} selected rem(s)`} ` +
+          `is not a heading, but the grandparent is.\n\n` +
+          `Click "OK" to apply headings to BOTH the parent and the selected rem ` +
+          `(e.g. parent → H${sample.parentLevel}, selected rem → H${sample.remLevel}), ` +
+          `or "Cancel" to leave them unchanged.`
+        );
+        if (confirmed) {
+          const styledParents = new Set<string>();
+          for (const { rem, parent, parentLevel, remLevel } of fallback) {
+            if (!styledParents.has(parent._id)) {
+              await applyHeadingLevel(parent, parentLevel);
+              styledParents.add(parent._id);
+            }
+            await applyHeadingLevel(rem, remLevel);
+            fallbackApplied++;
+          }
+        }
+      }
+
+      const styledCount = direct.length + fallbackApplied;
+      if (styledCount === 0) {
+        // Only fallback cases existed and the user cancelled.
+        return;
+      }
+      const parts = [`Set heading on ${styledCount} rem(s).`];
+      if (skipped > 0) parts.push(`${skipped} skipped (no ancestor heading).`);
+      await plugin.app.toast(parts.join(' '));
     },
   });
 

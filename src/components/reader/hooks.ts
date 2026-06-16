@@ -5,6 +5,7 @@ import { BuiltInPowerupCodes, ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
 import { useEffect, useState } from 'react';
 import { powerupCode, allCardPriorityInfoKey } from '../../lib/consts';
 import { findIncrementalRemForPDF, safeRemTextToString } from '../../lib/pdfUtils';
+import { resolveRemTextForBreadcrumb } from '../../lib/richTextRemRefs';
 import { 
   getChildrenExcludingSlots, 
   getDescendantsExcludingSlots,
@@ -83,7 +84,9 @@ export function useCriticalContext(
           const parentRem = await plugin.rem.findOne(currentParent);
           if (!parentRem || !parentRem.text) break;
 
-          const parentText = await safeRemTextToString(plugin, parentRem.text);
+          // Pin-aware: reference *pins* in an ancestor's title collapse to a 📌
+          // marker rather than expanding into the full referenced rem's text.
+          const parentText = await resolveRemTextForBreadcrumb(plugin, parentRem.text);
 
           ancestorList.unshift({
             text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),

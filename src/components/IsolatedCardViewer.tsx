@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PluginRem, RNPlugin, RemId, ReactRNPlugin } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { createRemFromHighlight } from '../lib/highlightActions';
 import { ActionItemType } from '../lib/incremental_rem/types';
 import { TypeBadge } from './TypeBadge';
@@ -85,7 +86,9 @@ export function IsolatedCardViewer({
           const parentRem = await plugin.rem.findOne(currentParent);
           if (!parentRem || !parentRem.text) break;
 
-          const parentText = await safeRemTextToString(plugin, parentRem.text);
+          // Pin-aware: reference *pins* in an ancestor's title collapse to a 📌
+          // marker rather than expanding into the full referenced rem's text.
+          const parentText = await resolveRemTextForBreadcrumb(plugin, parentRem.text);
 
           ancestorList.unshift({
             text: parentText,
