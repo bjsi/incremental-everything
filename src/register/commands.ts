@@ -81,6 +81,9 @@ import {
   OutlineSnapshot,
   revertSnapshot,
   isMetaRem,
+  getHeadingLevel,
+  applyHeadingLevel,
+  HeadingLevel,
 } from '../lib/outline_restructure';
 import {
   registerSelectionTracker,
@@ -2301,6 +2304,135 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         console.error('[outline-restructure] revert failed:', e);
         await plugin.app.toast(`Revert failed: ${(e as any)?.message ?? e}`);
       }
+    },
+  });
+
+  // ─── Set Next Heading Level ───────────────────────────────────────────────
+  //
+  // Styles the selected rem(s) as one heading level deeper than their parent.
+  //   - Parent is a heading Hn → set the rem to H(n+1) (clamped at H6).
+  //   - Parent is NOT a heading but the grandparent is Hn → confirm, then set
+  //     the parent to H(n+1) and the rem to H(n+2). (E.g. grandparent H2 →
+  //     parent H3, selected rem H4.)
+  //   - Neither parent nor grandparent is a heading → nothing to do.
+  // Supports multi-rem outline selections (and Cmd+/ Omnibar invocation) via
+  // getEffectiveSelection, mirroring "Restructure Outline by Headings".
+  plugin.app.registerCommand({
+    id: 'set-next-heading-level',
+    name: 'Set Next Heading Level',
+    quickCode: 'hn',
+    action: async () => {
+      const selection = await getEffectiveSelection(plugin);
+      const focusedRem = selection ? undefined : await plugin.focus.getFocusedRem();
+
+      // Resolve the set of target rems from the selection (whole-rem or text)
+      // or, failing that, the focused rem.
+      let targetIds: string[] = [];
+      if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+        targetIds = selection.remIds;
+      } else if (selection?.type === SelectionType.Text && selection.remId) {
+        targetIds = [selection.remId];
+      } else if (focusedRem?._id) {
+        targetIds = [focusedRem._id];
+      }
+
+      if (targetIds.length === 0) {
+        await plugin.app.toast('No rem selected or focused.');
+        return;
+      }
+
+      const clamp = (n: number): HeadingLevel => Math.min(n, 6) as HeadingLevel;
+
+      type DirectAction = { rem: PluginRem; level: HeadingLevel };
+      type FallbackAction = {
+        rem: PluginRem;
+        parent: PluginRem;
+        parentLevel: HeadingLevel;
+        remLevel: HeadingLevel;
+      };
+
+      const direct: DirectAction[] = [];
+      const fallback: FallbackAction[] = [];
+      let skipped = 0;
+
+      for (const id of targetIds) {
+        const rem = await plugin.rem.findOne(id);
+        if (!rem) {
+          skipped++;
+          continue;
+        }
+        const parent = await rem.getParentRem();
+        if (!parent) {
+          // Top-level rem — no ancestor heading to derive a level from.
+          skipped++;
+          continue;
+        }
+        const parentLevel = await getHeadingLevel(parent);
+        if (parentLevel) {
+          direct.push({ rem, level: clamp(parentLevel + 1) });
+          continue;
+        }
+        // Parent isn't a heading — look one level up at the grandparent.
+        const grandparent = await parent.getParentRem();
+        const grandparentLevel = grandparent ? await getHeadingLevel(grandparent) : null;
+        if (grandparentLevel) {
+          fallback.push({
+            rem,
+            parent,
+            parentLevel: clamp(grandparentLevel + 1),
+            remLevel: clamp(grandparentLevel + 2),
+          });
+        } else {
+          skipped++;
+        }
+      }
+
+      if (direct.length === 0 && fallback.length === 0) {
+        await plugin.app.toast(
+          'No heading found on the parent or grandparent of the selected rem(s).'
+        );
+        return;
+      }
+
+      // Apply the straightforward cases first (parent is already a heading).
+      for (const { rem, level } of direct) {
+        await applyHeadingLevel(rem, level);
+      }
+
+      // Grandparent-fallback cases mutate the parent too, so ask first. A single
+      // confirmation covers the whole batch; dedupe parents that several
+      // selected siblings share so each parent is styled only once.
+      let fallbackApplied = 0;
+      if (fallback.length > 0) {
+        const sample = fallback[0];
+        const confirmed = window.confirm(
+          `The parent of ${fallback.length === 1 ? 'the selected rem' : `${fallback.length} selected rem(s)`} ` +
+          `is not a heading, but the grandparent is.\n\n` +
+          `Click "OK" to apply headings to BOTH the parent and the selected rem ` +
+          `(e.g. parent → H${sample.parentLevel}, selected rem → H${sample.remLevel}), ` +
+          `or "Cancel" to leave them unchanged.`
+        );
+        if (confirmed) {
+          const styledParents = new Set<string>();
+          for (const { rem, parent, parentLevel, remLevel } of fallback) {
+            if (!styledParents.has(parent._id)) {
+              await applyHeadingLevel(parent, parentLevel);
+              styledParents.add(parent._id);
+            }
+            await applyHeadingLevel(rem, remLevel);
+            fallbackApplied++;
+          }
+        }
+      }
+
+      const styledCount = direct.length + fallbackApplied;
+      if (styledCount === 0) {
+        // Only fallback cases existed and the user cancelled.
+        return;
+      }
+      const parts = [`Set heading on ${styledCount} rem(s).`];
+      if (skipped > 0) parts.push(`${skipped} skipped (no ancestor heading).`);
+      await plugin.app.toast(parts.join(' '));
     },
   });
 

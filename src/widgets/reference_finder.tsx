@@ -409,7 +409,7 @@ function ReferenceFinder() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Type a rem name (e.g. Navegação Interior)…"
+        placeholder="Type a rem name"
         style={{
           width: '100%',
           padding: '8px 10px',
