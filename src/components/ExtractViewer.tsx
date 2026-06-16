@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId, useTrackerPlugin } from '@remnote/plugin-sdk';
 import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import {
   getChildrenExcludingSlots,
   getDescendantsExcludingSlots
@@ -165,7 +165,10 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
           const parentRem = await plugin.rem.findOne(currentParent);
           if (!parentRem) break;
 
-          const parentText = await safeRemTextToString(plugin, parentRem.text || []);
+          // Use the pin-aware breadcrumb resolver: reference *pins* collapse to a
+          // 📌 marker instead of expanding into the full referenced rem's text,
+          // so an ancestor whose title carries a pin doesn't bloat the breadcrumb.
+          const parentText = await resolveRemTextForBreadcrumb(plugin, parentRem.text || []);
 
           ancestorList.unshift({
             text: parentText.slice(0, 30) + (parentText.length > 30 ? '...' : ''),

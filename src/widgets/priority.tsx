@@ -39,6 +39,7 @@ import {
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { getRemCardContent, safeRemTextToString } from '../lib/pdfUtils';
+import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { PriorityBadge, PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import * as _ from 'remeda';
@@ -522,7 +523,7 @@ function Priority() {
     }
     const hierarchy: Scope[] = [{ remId: null, name: 'All KB' }];
     for (const ancestor of ancestors.reverse()) {
-      hierarchy.push({ remId: ancestor._id, name: await safeRemTextToString(plugin, ancestor.text) });
+      hierarchy.push({ remId: ancestor._id, name: await resolveRemTextForBreadcrumb(plugin, ancestor.text) });
     }
     setScopeHierarchy(hierarchy);
   }, [rem?._id, performanceMode]); // 🔌 Add performanceMode
@@ -559,7 +560,7 @@ function Priority() {
       if (scopeRem) {
         setScope({
           remId: scopeRem._id,
-          name: await safeRemTextToString(plugin, scopeRem.text)
+          name: await resolveRemTextForBreadcrumb(plugin, scopeRem.text)
         });
         setScopeMode('document');
       }
