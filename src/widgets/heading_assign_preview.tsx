@@ -4,7 +4,7 @@ import {
   useRunAsync,
   WidgetLocation,
 } from '@remnote/plugin-sdk';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
 import { HeadingLevel } from '../lib/outline_restructure';
@@ -102,6 +102,11 @@ const HeadingAssignPreview = () => {
   const [endLevel, setEndLevel] = useState<HeadingLevel>(3);
   const [busy, setBusy] = useState(false);
 
+  // Keyboard-driven footer: Left/Right cycle the highlighted button, Enter
+  // activates it. Defaults to Apply so Enter accepts straight away.
+  const [focusedButton, setFocusedButton] = useState<'cancel' | 'apply'>('apply');
+  const rootRef = useRef<HTMLDivElement>(null);
+
   const plan: HeadingPlan | undefined = useRunAsync(async () => {
     if (!ctx) return undefined;
 
@@ -126,6 +131,31 @@ const HeadingAssignPreview = () => {
     const tree = await collectTocForest(plugin, rems);
     return computeShiftPlan(tree, { delta: ctx.delta, scopeText });
   }, [ctx, startLevel, endLevel]);
+
+  // Grab keyboard focus once the real container has rendered (the rootRef div
+  // only exists after `plan` resolves — before that the "Analyzing…" branch is
+  // shown). Focus the iframe window first, then the div, and retry a few times
+  // to win against RemNote settling focus after the popup opens.
+  useEffect(() => {
+    if (!plan) return;
+    let cancelled = false;
+    const tryFocus = (attemptsLeft: number) => {
+      if (cancelled) return;
+      try {
+        window.focus();
+      } catch {
+        /* ignore */
+      }
+      rootRef.current?.focus();
+      if (document.activeElement !== rootRef.current && attemptsLeft > 0) {
+        setTimeout(() => tryFocus(attemptsLeft - 1), 50);
+      }
+    };
+    tryFocus(8);
+    return () => {
+      cancelled = true;
+    };
+  }, [plan]);
 
   const counts = useMemo(() => {
     if (!plan) return { total: 0, changed: 0 };
@@ -177,6 +207,25 @@ const HeadingAssignPreview = () => {
 
   const onCancel = () => plugin.widget.closePopup();
 
+  const applyDisabled = busy || counts.changed === 0;
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (busy) return;
+    // Let the Top/Deepest level dropdowns keep their own arrow-key behavior.
+    const onSelect = (e.target as HTMLElement)?.tagName === 'SELECT';
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (onSelect) return;
+      e.preventDefault();
+      setFocusedButton((b) => (b === 'apply' ? 'cancel' : 'apply'));
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (focusedButton === 'cancel') onCancel();
+      else if (!applyDisabled) onApply();
+    }
+  };
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   if (!ctx) {
@@ -212,12 +261,16 @@ const HeadingAssignPreview = () => {
 
   return (
     <div
+      ref={rootRef}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
       style={{
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
         background: 'var(--rn-clr-background-primary)',
         color: 'var(--rn-clr-content-primary)',
+        outline: 'none',
       }}
     >
       <div
@@ -346,6 +399,7 @@ const HeadingAssignPreview = () => {
       >
         <button
           onClick={onCancel}
+          onMouseEnter={() => setFocusedButton('cancel')}
           disabled={busy}
           style={{
             padding: '6px 14px',
@@ -355,22 +409,31 @@ const HeadingAssignPreview = () => {
             borderRadius: 4,
             cursor: 'pointer',
             fontSize: 13,
+            boxShadow:
+              focusedButton === 'cancel'
+                ? '0 0 0 2px var(--rn-clr-background-primary), 0 0 0 4px #3b82f6'
+                : 'none',
           }}
         >
           Cancel
         </button>
         <button
           onClick={onApply}
-          disabled={busy || counts.changed === 0}
+          onMouseEnter={() => setFocusedButton('apply')}
+          disabled={applyDisabled}
           style={{
             padding: '6px 14px',
             border: '1px solid transparent',
-            background: busy || counts.changed === 0 ? '#94a3b8' : '#2563eb',
+            background: applyDisabled ? '#94a3b8' : '#2563eb',
             color: 'white',
             borderRadius: 4,
-            cursor: busy || counts.changed === 0 ? 'not-allowed' : 'pointer',
+            cursor: applyDisabled ? 'not-allowed' : 'pointer',
             fontSize: 13,
             fontWeight: 600,
+            boxShadow:
+              focusedButton === 'apply'
+                ? '0 0 0 2px var(--rn-clr-background-primary), 0 0 0 4px #3b82f6'
+                : 'none',
           }}
         >
           {busy ? 'Applying…' : 'Apply'}
