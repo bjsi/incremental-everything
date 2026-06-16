@@ -350,6 +350,25 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     }
   );
 
+  // Heading Levels (Table of Contents / shift) preview popup — Before | After
+  // with level badges and Top/Deepest level selectors.
+  plugin.app.registerWidget('heading_assign_preview', WidgetLocation.Popup, {
+    dimensions: {
+      width: 1100,
+      height: 800,
+    },
+  });
+
+  // Heading Levels undo banner — appears in the sidebar after an apply, stays
+  // until the user clicks Undo or dismisses it. Separate snapshot slot from the
+  // outline restructure banner.
+  plugin.app.registerWidget('heading_assign_undo', WidgetLocation.SidebarEnd, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
+
   // Mastery Drill widgets are gated behind the 'skip_mastery_drill' setting.
   if (!skipMasteryDrill) {
     // Mastery Drill popup

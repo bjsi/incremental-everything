@@ -86,6 +86,11 @@ import {
   HeadingLevel,
 } from '../lib/outline_restructure';
 import {
+  HEADING_SNAPSHOT_KEY,
+  HeadingSnapshot,
+  revertHeadingSnapshot,
+} from '../lib/heading_assign';
+import {
   registerSelectionTracker,
   getEffectiveSelection,
 } from '../lib/editor_selection';
@@ -2302,6 +2307,112 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         await plugin.app.toast('Outline restructure reverted.');
       } catch (e) {
         console.error('[outline-restructure] revert failed:', e);
+        await plugin.app.toast(`Revert failed: ${(e as any)?.message ?? e}`);
+      }
+    },
+  });
+
+  // ─── Heading Levels: shared selection resolution ──────────────────────────
+  //
+  // Returns the rem ids the heading commands should act on. Whole-rem selection
+  // → those rems; text selection → the single rem; otherwise the focused rem.
+  // Uses getEffectiveSelection so Cmd+/ Omnibar invocations keep their selection
+  // (see lib/editor_selection.ts).
+  const resolveHeadingTargets = async (): Promise<string[]> => {
+    const selection = await getEffectiveSelection(plugin);
+    if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+      return selection.remIds;
+    }
+    if (selection?.type === SelectionType.Text && selection.remId) {
+      return [selection.remId];
+    }
+    const focused = await plugin.focus.getFocusedRem();
+    return focused?._id ? [focused._id] : [];
+  };
+
+  // ─── Apply Heading Levels by Hierarchy (Table of Contents) ────────────────
+  //
+  // Maps the selected outline's tree depth onto a heading-level range (e.g.
+  // H1–H3): the topmost selected rems get the start level and each level deeper
+  // adds one, clamped at the end level; rems deeper than the range are left
+  // unchanged. Opens a Before | After preview (with Top/Deepest level pickers)
+  // before applying; the change is undoable from the sidebar banner.
+  plugin.app.registerCommand({
+    id: 'apply-toc-headings',
+    name: 'Apply Heading Levels by Hierarchy (Table of Contents)',
+    quickCode: 'htoc',
+    action: async () => {
+      const remIds = await resolveHeadingTargets();
+      if (remIds.length === 0) {
+        await plugin.app.toast('No rem selected or focused.');
+        return;
+      }
+      // scopeRootId is used only for the undo banner's label. The parent of the
+      // first target (the container) reads best; fall back to the rem itself.
+      const first = await plugin.rem.findOne(remIds[0]);
+      const parent = await first?.getParentRem();
+      const scopeRootId = parent?._id ?? remIds[0];
+
+      await plugin.widget.openPopup('heading_assign_preview', {
+        mode: 'toc',
+        scopeRootId,
+        inputRemIds: remIds,
+      });
+    },
+  });
+
+  // ─── Demote / Promote Heading Level (one step) ────────────────────────────
+  //
+  // Shift the SELECTED rems' existing headings by one level (descendants are not
+  // touched). Demote = deeper / bigger H number (H2→H3); Promote = shallower /
+  // smaller (H2→H1). Both open the same preview and are undoable.
+  const openShiftPreview = async (delta: number) => {
+    const remIds = await resolveHeadingTargets();
+    if (remIds.length === 0) {
+      await plugin.app.toast('No rem selected or focused.');
+      return;
+    }
+    await plugin.widget.openPopup('heading_assign_preview', {
+      mode: 'shift',
+      remIds,
+      delta,
+    });
+  };
+
+  plugin.app.registerCommand({
+    id: 'demote-heading-level',
+    name: 'Demote Heading Level (one level deeper)',
+    quickCode: 'hdmt',
+    action: async () => openShiftPreview(1),
+  });
+
+  plugin.app.registerCommand({
+    id: 'promote-heading-level',
+    name: 'Promote Heading Level (one level shallower)',
+    quickCode: 'hpmt',
+    action: async () => openShiftPreview(-1),
+  });
+
+  // Reverts the most recent heading-level change (ToC or shift) in this session.
+  // Same action as the Undo button on the sidebar banner.
+  plugin.app.registerCommand({
+    id: 'revert-last-heading-assign',
+    name: 'Revert Last Heading Level Change',
+    quickCode: 'rlh',
+    action: async () => {
+      const snapshot = await plugin.storage.getSession<HeadingSnapshot>(
+        HEADING_SNAPSHOT_KEY
+      );
+      if (!snapshot) {
+        await plugin.app.toast('No recent heading-level change to revert.');
+        return;
+      }
+      try {
+        await revertHeadingSnapshot(plugin, snapshot);
+        await plugin.storage.setSession(HEADING_SNAPSHOT_KEY, undefined);
+        await plugin.app.toast('Heading levels reverted.');
+      } catch (e) {
+        console.error('[heading-assign] revert failed:', e);
         await plugin.app.toast(`Revert failed: ${(e as any)?.message ?? e}`);
       }
     },

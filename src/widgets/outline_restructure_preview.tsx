@@ -19,6 +19,7 @@ import {
   OUTLINE_SNAPSHOT_KEY,
 } from '../lib/outline_restructure';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { HeadingBadge } from '../components/HeadingBadge';
 
 // ─── Tree-row rendering helpers ─────────────────────────────────────────────
 
@@ -58,52 +59,6 @@ async function buildBeforeTree(
   return out;
 }
 
-const HEADING_COLORS: Record<number, string> = {
-  1: '#1e3a8a', // blue-900
-  2: '#1d4ed8', // blue-700
-  3: '#0369a1', // sky-700
-  4: '#0d9488', // teal-600
-  5: '#65a30d', // lime-600
-  6: '#a16207', // yellow-700
-};
-
-function badgeFor(level: HeadingLevel | null) {
-  if (level === null) {
-    return (
-      <span
-        style={{
-          display: 'inline-block',
-          minWidth: 22,
-          textAlign: 'center',
-          color: 'var(--rn-clr-content-tertiary)',
-          fontSize: 10,
-          fontFamily: 'monospace',
-        }}
-      >
-        ¶
-      </span>
-    );
-  }
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        minWidth: 22,
-        textAlign: 'center',
-        background: HEADING_COLORS[level],
-        color: 'white',
-        fontSize: 10,
-        fontWeight: 700,
-        padding: '1px 4px',
-        borderRadius: 3,
-        fontFamily: 'monospace',
-      }}
-    >
-      H{level}
-    </span>
-  );
-}
-
 // One row in either Before or After tree. `changed` highlights rows whose
 // parent in the proposed plan differs from the current parent.
 function Row(props: {
@@ -130,7 +85,7 @@ function Row(props: {
         background: changed ? 'rgba(245, 158, 11, 0.08)' : 'transparent',
       }}
     >
-      {badgeFor(level)}
+      <HeadingBadge level={level} />
       <span
         style={{
           flex: 1,

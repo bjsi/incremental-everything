@@ -71,6 +71,27 @@ export async function applyHeadingLevel(
   await rem.setPowerupProperty(BuiltInPowerupCodes.Header, 'Size', [tag]);
 }
 
+// Revert a rem to a plain paragraph (no heading), across the full H1–H6 range.
+//
+// All headings are the built-in Header powerup — `setFontSize` for H1–H3 is
+// just a convenience that writes the same powerup's `Size` slot — so removing
+// the powerup clears any level. We also call `setFontSize(undefined)` as a
+// belt-and-suspenders in case a RemNote version tracks the H1–H3 font size
+// separately from the powerup. Both calls are best-effort: a rem that has no
+// heading simply no-ops.
+export async function clearHeading(rem: PluginRem): Promise<void> {
+  try {
+    await rem.removePowerup(BuiltInPowerupCodes.Header);
+  } catch {
+    /* not a header / already cleared */
+  }
+  try {
+    await rem.setFontSize(undefined);
+  } catch {
+    /* ignore */
+  }
+}
+
 export type OutlineCandidate = {
   remId: string;
   level: HeadingLevel | null; // null = paragraph
