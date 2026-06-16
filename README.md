@@ -38,6 +38,16 @@ A full suite of history and practice tools now built into the right sidebar:
 - **Light Mode (Default for Mobile/Web)**: Fast, stable, and essential features only. Prevents crashes on phones and tablets.
 - **Full Mode (Desktop Power User)**: Complete feature set with heavy statistical calculations for detailed analytics.
 
+### 🧰 More than Incremental Reading: a Toolset for Your KB
+Beyond the core learning loop, Incremental Everything ships **dozens of standalone utilities** that make day-to-day note-taking and knowledge-base organization faster — useful even when you're not reviewing. A few examples:
+
+- **Outline & heading tools**: [Restructure Outline by Headings](https://github.com/bjsi/incremental-everything/wiki/Utilities#restructure-outline-by-headings) (re-nest a flat or mis-pasted document under its headings), [Apply Heading Levels by Hierarchy (Table of Contents)](https://github.com/bjsi/incremental-everything/wiki/Utilities#apply-heading-levels-by-hierarchy-table-of-contents), and [Set Next Heading Level](https://github.com/bjsi/incremental-everything/wiki/Utilities#set-next-heading-level) — all with side-by-side previews and one-click undo.
+- **Queue display control**: [Hide / Remove Parent & Grandparent and more](https://github.com/bjsi/incremental-everything/wiki/Utilities#queue-display-utilities) to clean up how ancestor Rems appear on your flashcards.
+- **Editing helpers**: [Text Case Converter](https://github.com/bjsi/incremental-everything/wiki/Utilities#text-case-converter) (Shift+F3 cycling, with English/Portuguese title-case rules) and [Bulletize Inline Selected Text](https://github.com/bjsi/incremental-everything/wiki/Utilities#bulletize-inline-selected-text) for restoring bullets that PDF highlights flatten.
+- **Navigation & sources**: [Find Rem](https://github.com/bjsi/incremental-everything/wiki/Utilities#find-rem--reference-or-open) (surfaces Rems RemNote's `[[` search can't) and [Open Source in Popup / Floating Window](https://github.com/bjsi/incremental-everything/wiki/Utilities#open-source-in-popup) to peek at a PDF/web source without leaving the queue.
+
+👉 See the **[Utilities](https://github.com/bjsi/incremental-everything/wiki/Utilities)** page for the full list, and the **[Plugin Commands Reference](https://github.com/bjsi/incremental-everything/wiki/Plugin-Commands-Reference)** for every command.
+
 ## Installation
 
 - Open the [RemNote plugin store](https://www.remnote.com/plugins), search for "Incremental Everything" and install the plugin.
