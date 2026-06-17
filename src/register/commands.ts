@@ -35,7 +35,7 @@ import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/t
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { initIncrementalRem } from './powerups';
-import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
@@ -1851,6 +1851,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // removePowerup destroys the widget sandbox on the next microtask,
         // so both IPC messages must be sent in the same tick if targeting queue.
         if (isTargetingQueueContext) {
+          // Like "Next", dismissing the queue card means we've left the rem —
+          // restore the dashboard. Flag BEFORE the destructive call (consumed by
+          // the persistent QueueLoadCard listener once the next card loads).
+          await requestQueueDashboardRefocus(plugin, 'dismiss-command');
           await Promise.allSettled([
             rem.removePowerup(powerupCode),
             plugin.queue.removeCurrentCardFromQueue(true),

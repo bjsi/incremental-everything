@@ -28,7 +28,7 @@ import {
   priorityCalcScopeRemIdsKey,
   incremReviewStartTimeKey,
 } from '../lib/consts';
-import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetitionManualOffset, updateReviewRemData } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetitionManualOffset, updateReviewRemData, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, calculateWeightedShield, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
@@ -462,6 +462,11 @@ export function AnswerButtons() {
 
             // Remove from session cache
             await removeIncrementalRemCache(plugin, rem._id);
+
+            // Like "Next", leaving the rem should restore the queue dashboard.
+            // Set the flag BEFORE the destructive call below (the persistent
+            // QueueLoadCard listener consumes it once the next card loads).
+            await requestQueueDashboardRefocus(plugin, 'dismiss-button');
 
             // CRITICAL: Both removePowerup and removeCurrentCardFromQueue must be
             // fired simultaneously. removePowerup destroys the widget sandbox
