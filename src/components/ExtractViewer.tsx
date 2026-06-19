@@ -112,13 +112,30 @@ function ReadOnlyRemTree({
 
   // NOTE: we can't vary font size by depth — RemViewer is a FakeEmbed rendered
   // as an overlay in RemNote's main window, so it ignores any font/color set on
-  // this iframe-side wrapper. Only layout (indentation + the guide line, plus a
-  // horizontal divider under the root) reaches it, so that's how depth is shown.
-  // Left-border emphasis, mirroring the editor's CSS: read point (blue box +
-  // badge) takes precedence; otherwise green for Incremental, amber for
-  // Dismissed (matching SHOW_LEFT_BORDER_CSS / SHOW_DISMISSED_INDICATOR_CSS).
+  // this iframe-side wrapper. Only layout (indentation, the guide line, the
+  // divider under the root, and the emphasis boxes below) reaches it.
+  //
+  // Emphasis boxes (left border + background tint + radius + padding — the box
+  // style aligns to the embed better than a bare border). Precedence:
+  //   • root (depth 0) → the Target Incremental Rem: strongest box + badge.
+  //   • read point → blue box + badge.
+  //   • Incremental descendant → green box (mirrors SHOW_LEFT_BORDER_CSS).
+  //   • Dismissed descendant → amber box (mirrors SHOW_DISMISSED_INDICATOR_CSS).
+  // The generic Incremental box is intentionally NOT applied to the root, which
+  // gets the stronger target treatment instead.
+  const isRoot = depth === 0;
   let wrapperStyle: React.CSSProperties | undefined;
-  if (isReadPoint) {
+  let badge: { text: string; color: string } | null = null;
+  if (isRoot) {
+    wrapperStyle = {
+      borderLeft: '5px solid #15803d',
+      background: 'rgba(34,197,94,0.18)',
+      borderRadius: 8,
+      padding: '6px 10px',
+      margin: '2px 0',
+    };
+    badge = { text: '🎯 Target Incremental Rem', color: '#15803d' };
+  } else if (isReadPoint) {
     wrapperStyle = {
       borderLeft: '3px solid var(--rn-clr-blue, #3b82f6)',
       background: 'var(--rn-clr-blue-light, rgba(59,130,246,0.10))',
@@ -126,18 +143,31 @@ function ReadOnlyRemTree({
       padding: '4px 8px',
       margin: '2px 0',
     };
+    badge = { text: '🔖 Read point', color: 'var(--rn-clr-blue, #3b82f6)' };
   } else if (isIncremental) {
-    wrapperStyle = { borderLeft: '3px solid green', paddingLeft: 5 };
+    wrapperStyle = {
+      borderLeft: '3px solid green',
+      background: 'rgba(34,197,94,0.10)',
+      borderRadius: 6,
+      padding: '4px 8px',
+      margin: '2px 0',
+    };
   } else if (isDismissed) {
-    wrapperStyle = { borderLeft: '3px solid #f59e0b', paddingLeft: 5 };
+    wrapperStyle = {
+      borderLeft: '3px solid #f59e0b',
+      background: 'rgba(245,158,11,0.10)',
+      borderRadius: 6,
+      padding: '4px 8px',
+      margin: '2px 0',
+    };
   }
 
   return (
     <div>
       <div ref={nodeRef} style={wrapperStyle}>
-        {isReadPoint && (
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--rn-clr-blue, #3b82f6)', marginBottom: 2 }}>
-            🔖 Read point
+        {badge && (
+          <div style={{ fontSize: 11, fontWeight: 700, color: badge.color, marginBottom: 2 }}>
+            {badge.text}
           </div>
         )}
         <RemViewer remId={remId} width="100%" />
