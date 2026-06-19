@@ -2,6 +2,9 @@ import { renderWidget, usePlugin, WidgetLocation, ReactRNPlugin } from '@remnote
 import React, { useState, useEffect } from 'react';
 import { getPdfInfoFromHighlight, findAllRemsForPDF, findAllRemsForHTML, findPDFinRem, findHTMLinRem, isHtmlSource, addPageToHistory, getPageHistory, PageHistoryEntry, PageRangeContext, setIncrementalReadingPosition, getIncrementalPageRange, safeRemTextToString } from '../lib/pdfUtils';
 import { incrementalQueueActiveKey, currentIncRemKey, editorReviewTimerRemIdKey } from '../lib/consts';
+import { getRemReadPointHistory } from '../lib/remReadPoint';
+import { openAndFocusRem } from '../lib/remHelpers';
+import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 
 export function PdfBookmarkPopup() {
   const plugin = usePlugin() as ReactRNPlugin;
@@ -19,6 +22,15 @@ export function PdfBookmarkPopup() {
 
   const [loading, setLoading] = useState(true);
   const [highlightTexts, setHighlightTexts] = useState<Record<string, string>>({});
+
+  // Rem-mode: read points for rem-type IncRems (outline headers). Opened with
+  // contextData { mode: 'rem', incRemId }. No PDF/HTML host is involved — the
+  // IncRem reads from its own descendants, so history is keyed (incRemId,
+  // incRemId) and each entry's highlightId is the bookmarked descendant rem.
+  const [remMode, setRemMode] = useState(false);
+  const [remReadHistory, setRemReadHistory] = useState<PageHistoryEntry[]>([]);
+  // Name of the IncRem that owns the read points — shown under the title.
+  const [incRemName, setIncRemName] = useState<string>('');
 
   // Helper to batch-resolve highlight rem texts into a lookup map
   const resolveHighlightTexts = async (entries: PageHistoryEntry[]): Promise<Record<string, string>> => {
@@ -40,6 +52,25 @@ export function PdfBookmarkPopup() {
     const init = async () => {
       try {
         const popupContext = await plugin.widget.getWidgetContext<WidgetLocation.Popup>();
+
+        // Rem-mode: read points for a rem-type IncRem. Skip all PDF/HTML
+        // resolution and render the read-point history directly.
+        if (popupContext?.contextData?.mode === 'rem') {
+          const incRemId = popupContext.contextData.incRemId as string;
+          if (!incRemId) {
+            setLoading(false);
+            return;
+          }
+          setRemMode(true);
+          const incRem = await plugin.rem.findOne(incRemId);
+          if (incRem?.text) setIncRemName(await resolveRemTextForBreadcrumb(plugin, incRem.text));
+          const history = await getRemReadPointHistory(plugin, incRemId);
+          setRemReadHistory(history);
+          resolveHighlightTexts(history).then(setHighlightTexts);
+          setLoading(false);
+          return;
+        }
+
         const remId = popupContext?.contextData?.remId as string;
 
         if (!remId) {
@@ -102,8 +133,9 @@ export function PdfBookmarkPopup() {
             const activeRem = await plugin.rem.findOne(activeRemId);
             let remName = '';
             if (activeRem?.text) {
-              remName = await safeRemTextToString(plugin, activeRem.text);
+              remName = await resolveRemTextForBreadcrumb(plugin, activeRem.text);
               setActiveQueueRemName(remName);
+              setIncRemName(remName);
             }
             setActiveContextSource(activeSource);
             setActiveQueueContext({
@@ -234,6 +266,70 @@ export function PdfBookmarkPopup() {
     return <div style={{ padding: '8px', fontSize: '13px' }}>Loading...</div>;
   }
 
+  if (remMode) {
+    return (
+      <div style={{
+        padding: '12px', minWidth: '270px', maxWidth: '350px',
+        maxHeight: '800px', overflowY: 'auto',
+        backgroundColor: 'var(--rn-clr-background-primary)',
+        borderRadius: '8px', color: 'var(--rn-clr-content-primary)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--rn-clr-border-primary)' }}>
+          <div style={{ fontWeight: 600 }}>🔖 Read Points</div>
+          {incRemName && (
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={incRemName}>
+              {incRemName}
+            </div>
+          )}
+        </div>
+        {remReadHistory.length === 0 ? (
+          <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-secondary)' }}>
+            No read points yet. Focus a rem inside this outline and run “Set Read Point (Bookmark)”.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {remReadHistory.map((entry, idx) => (
+              <button
+                key={`${entry.timestamp}-${idx}`}
+                style={{
+                  textAlign: 'left', padding: '6px 10px', borderRadius: '6px',
+                  border: '1px solid var(--rn-clr-border-primary)', backgroundColor: 'var(--rn-clr-background-secondary)',
+                  color: 'var(--rn-clr-blue, #3b82f6)', cursor: 'pointer', fontSize: '12px',
+                  display: 'flex', flexDirection: 'column', gap: '2px',
+                  fontWeight: 500, transition: 'background-color 0.15s ease', width: '100%'
+                }}
+                onClick={async () => {
+                  if (entry.highlightId) await openAndFocusRem(plugin, entry.highlightId);
+                  plugin.widget.closePopup();
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-modifier-hover)'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-secondary)'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{idx === 0 ? '🔖 Current read point' : '🔖 Read point'}</span>
+                  <span style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px', fontWeight: 400 }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
+                </div>
+                {entry.highlightId && highlightTexts[entry.highlightId] && (
+                  <div style={{
+                    fontSize: '10px', fontWeight: 400,
+                    color: 'var(--rn-clr-content-secondary)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    maxWidth: '100%', fontStyle: 'italic'
+                  }}>
+                    {highlightTexts[entry.highlightId].length > 90
+                      ? highlightTexts[entry.highlightId].substring(0, 90) + '…'
+                      : highlightTexts[entry.highlightId]}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (!pdfRemId) {
     return <div style={{ padding: '8px', fontSize: '13px', color: 'var(--rn-clr-content-secondary)' }}>No reader context found.</div>;
   }
@@ -246,10 +342,17 @@ export function PdfBookmarkPopup() {
       borderRadius: '8px', color: 'var(--rn-clr-content-primary)',
       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
     }}>
-      <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--rn-clr-border-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span>🔖 Bookmark Position</span>
-        {pageIndex !== null && (
-          <span style={{ fontSize: '12px', color: 'var(--rn-clr-content-secondary)' }}>Page {pageIndex}</span>
+      <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--rn-clr-border-primary)' }}>
+        <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>🔖 Bookmark Position</span>
+          {pageIndex !== null && (
+            <span style={{ fontSize: '12px', color: 'var(--rn-clr-content-secondary)' }}>Page {pageIndex}</span>
+          )}
+        </div>
+        {incRemName && (
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={incRemName}>
+            {incRemName}
+          </div>
         )}
       </div>
 

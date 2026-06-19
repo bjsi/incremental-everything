@@ -14,7 +14,8 @@ import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
 import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, resolveSessionBookmarkCarry, safeRemTextToString } from '../lib/pdfUtils';
-import { openAndScrollToHighlight } from '../lib/remHelpers';
+import { openAndScrollToHighlight, openAndFocusRem } from '../lib/remHelpers';
+import { getRemReadPoint } from '../lib/remReadPoint';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import { startIncRemEngagement, endIncRemEngagement, forceSaveSession } from '../lib/queue_session';
@@ -218,6 +219,28 @@ function EditorReviewTimer() {
 
   const bookmarkHighlightId = bookmarkInfo?.highlightId ?? null;
   const bookmarkHostRemId = bookmarkInfo?.hostRemId ?? hostRemId;
+
+  // Read point for rem-type IncRems (outline headers). These have no PDF/HTML
+  // reading source — the IncRem reads from its own descendants — so the read
+  // point is a descendant rem rather than a reader highlight. Resolve the host
+  // kind inside the tracker (same reasoning as bookmarkInfo) and only surface a
+  // read point when there is genuinely no PDF/HTML source to avoid double UI.
+  const remReadPoint = useTrackerPlugin(
+    async (rp) => {
+      if (!timerData?.remId) return null;
+      const rem = await rp.rem.findOne(timerData.remId);
+      if (!rem) return null;
+      const pdfRem = await getActivePdfForIncRem(rp as any, rem);
+      if (pdfRem) return null;
+      const htmlRem = await findHTMLinRem(rp as any, rem);
+      if (htmlRem) return null;
+      const entry = await getRemReadPoint(rp as any, timerData.remId);
+      return entry?.highlightId
+        ? { targetRemId: entry.highlightId, timestamp: entry.timestamp }
+        : null;
+    },
+    [timerData?.remId]
+  ) ?? null;
 
   const isPaused = !!(timerData?.pausedAt);
 
@@ -694,7 +717,7 @@ function EditorReviewTimer() {
         </div>
       </div>
 
-      {(isPdfNote || (hostRemId && bookmarkHighlightId)) && (
+      {(isPdfNote || (hostRemId && bookmarkHighlightId) || remReadPoint) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px', paddingRight: '12px', borderRight: '1px solid #93c5fd' }}>
           {/* PDF switcher — only when the IncRem has >1 PDF source. */}
           {pdfOptions.length > 1 && pdfRemId && (
@@ -782,6 +805,42 @@ function EditorReviewTimer() {
                 : 'Open PDF and scroll to your last bookmark position'}
             >
               🔖 Scroll
+            </button>
+          )}
+          {remReadPoint && (
+            <button
+              onClick={async () => {
+                // Re-read at click time to catch a read point set mid-session
+                // after the tracker last ran.
+                let targetRemId = remReadPoint.targetRemId;
+                if (timerData?.remId) {
+                  const fresh = await getRemReadPoint(plugin, timerData.remId);
+                  if (fresh?.highlightId) targetRemId = fresh.highlightId;
+                }
+                await openAndFocusRem(plugin, targetRemId);
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                backgroundColor: 'transparent',
+                color: '#3b82f6',
+                border: '2px solid #3b82f6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#3b82f6';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#3b82f6';
+              }}
+              title="Jump to your read point (the bookmarked rem inside this outline)"
+            >
+              🔖 Go to Read Point
             </button>
           )}
         </div>

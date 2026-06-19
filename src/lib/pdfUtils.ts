@@ -2,7 +2,7 @@
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
 import { powerupCode, allIncrementalRemKey } from './consts';
 import { IncrementalRem } from './incremental_rem/types';
-import { resolveRemTextToString } from './richTextRemRefs';
+import { resolveRemTextToString, resolveRemTextForBreadcrumb } from './richTextRemRefs';
 
 export interface PageRangeContext {
   incrementalRemId: RemId | null;
@@ -1393,9 +1393,12 @@ export async function getRemCardContent(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<{ front: string; back: string }> {
-  const front = await safeRemTextToString(plugin, rem.text);
+  // resolveRemTextForBreadcrumb (not safeRemTextToString) so rem references show
+  // as their text and reference *pins* collapse to a 📌 marker instead of dumping
+  // the entire referenced rem into the card name shown in priority/interval popups.
+  const front = await resolveRemTextForBreadcrumb(plugin, rem.text);
   // rem.backText is available for Concept/Descriptor/Question rems with a back side
-  const back = rem.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+  const back = rem.backText ? await resolveRemTextForBreadcrumb(plugin, rem.backText) : '';
 
   return { front, back };
 }

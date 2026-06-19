@@ -113,6 +113,25 @@ export const waitForPaneOpen = async (
  * `register/callbacks.ts`, because the widget's iframe is destroyed by the
  * pane layout reorganization and any setTimeouts/awaits in it are killed.
  */
+/**
+ * Navigate the current pane to a rem and focus it. Used to jump to a rem-type
+ * IncRem's read point (a descendant of the outline). Unlike
+ * `openAndScrollToHighlight`, there is no reader to boot and no highlight to
+ * anchor — `plugin.window.openRem` navigates + focuses the rem directly, which
+ * is the right behavior for jumping within an outline.
+ */
+export const openAndFocusRem = async (
+  plugin: RNPlugin,
+  descendantRemId: string
+): Promise<void> => {
+  const rem = await plugin.rem.findOne(descendantRemId);
+  if (!rem) {
+    await plugin.app.toast('Read point rem not found (it may have been deleted).');
+    return;
+  }
+  await plugin.window.openRem(rem);
+};
+
 export const openAndScrollToHighlight = async (
   plugin: RNPlugin,
   hostRemId: string,

@@ -12,6 +12,7 @@ import {
 import {
   powerupCode,
   currentIncRemKey,
+  editorReviewTimerRemIdKey,
   pageRangeWidgetId,
   noIncRemTimerKey,
   alwaysUseLightModeOnMobileId,
@@ -70,6 +71,12 @@ import {
 } from './queue_display_powerups';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
+import {
+  setRemReadPoint,
+  isDescendantOf,
+  findNearestAncestorIncRem,
+  resolveReadPointIncRem,
+} from '../lib/remReadPoint';
 import {
   detectCase,
   nextCase,
@@ -1190,6 +1197,76 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           remId: focusedRem._id,
         });
       }
+    },
+  });
+
+  // Set Read Point (Bookmark) for rem-type IncRems. Associates the focused rem
+  // (a descendant of an Incremental outline) as the IncRem's current reading
+  // position — the rem-type analogue of a PDF/HTML highlight bookmark.
+  plugin.app.registerCommand({
+    id: 'set-read-point',
+    name: 'Set Read Point (Bookmark)',
+    keyboardShortcut: 'ctrl+F7',
+    quickCode: 'srp',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      if (!focused) {
+        await plugin.app.toast('No Rem focused — place your cursor in the rem you want to bookmark.');
+        return;
+      }
+
+      // Resolve the IncRem this read point belongs to. Prefer an active review
+      // session (editor-review timer → queue) whose IncRem actually contains
+      // the focused rem; otherwise fall back to the nearest ancestor IncRem.
+      // The focused rem must be a strict descendant — you can't bookmark the
+      // outline header against itself.
+      const sessionIncRemId =
+        (await plugin.storage.getSession<string>(editorReviewTimerRemIdKey)) ||
+        (await plugin.storage.getSession<string>(currentIncRemKey)) ||
+        null;
+
+      let incRemId: string | null = null;
+      if (
+        sessionIncRemId &&
+        sessionIncRemId !== focused._id &&
+        (await isDescendantOf(plugin, focused, sessionIncRemId))
+      ) {
+        incRemId = sessionIncRemId;
+      } else {
+        incRemId = await findNearestAncestorIncRem(plugin, focused);
+      }
+
+      if (!incRemId) {
+        await plugin.app.toast(
+          'No ancestor Incremental Rem found. Read points apply to a rem inside an Incremental outline.'
+        );
+        return;
+      }
+
+      await setRemReadPoint(plugin, incRemId, focused._id);
+      const text = await safeRemTextToString(plugin, focused.text);
+      const short = text.length > 50 ? text.slice(0, 50) + '…' : text;
+      await plugin.app.toast(`🔖 Read point set: "${short}"`);
+    },
+  });
+
+  // View the read-point history for a rem-type IncRem. Reuses the bookmark
+  // popup in "rem" mode (resolved from the focused rem or active session).
+  plugin.app.registerCommand({
+    id: 'view-read-points',
+    name: 'View Read Points (History)',
+    keyboardShortcut: 'ctrl+shift+F7',
+    quickCode: 'vrp',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      const incRemId = await resolveReadPointIncRem(plugin, focused);
+      if (!incRemId) {
+        await plugin.app.toast(
+          'No Incremental Rem found. Focus a rem inside an Incremental outline (or review one) first.'
+        );
+        return;
+      }
+      await plugin.widget.openPopup('pdf_bookmark_popup', { mode: 'rem', incRemId });
     },
   });
 
