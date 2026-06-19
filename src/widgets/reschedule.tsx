@@ -15,6 +15,7 @@ import dayjs from 'dayjs';
 import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { PrioritySlider, PrioritySliderRef } from '../components';
+import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 
 async function handleRescheduleAndPriorityUpdate(
   plugin: RNPlugin,
@@ -318,6 +319,15 @@ export function Reschedule() {
   const remId = ctx?.contextData?.remId;
   const context = (ctx?.contextData?.context as 'queue' | 'editor') || 'queue';
 
+  // Resolve the IncRem's name for the subtitle under the title. Uses
+  // resolveRemTextForBreadcrumb so reference pins collapse to 📌 (consistent
+  // with the priority/interval/bookmark popups).
+  const remName = useRunAsync(async () => {
+    if (!remId) return '';
+    const rem = await plugin.rem.findOne(remId);
+    return rem?.text ? await resolveRemTextForBreadcrumb(plugin, rem.text) : '';
+  }, [remId]);
+
   if (!remId) {
     return null;
   }
@@ -338,19 +348,29 @@ export function Reschedule() {
       }}
     >
       {/* Header with icon and close button */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
-          <img
-            src={plugin.rootURL + 'reschedule-icon.png'}
-            alt="Reschedule"
-            style={{ width: '24px', height: '24px' }}
-          />
-          <h3 className="text-lg font-bold">Reschedule</h3>
+      <div className="flex flex-col mb-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img
+              src={plugin.rootURL + 'reschedule-icon.png'}
+              alt="Reschedule"
+              style={{ width: '24px', height: '24px' }}
+            />
+            <h3 className="text-lg font-bold">Reschedule</h3>
+          </div>
+          <button
+            className="text-xs opacity-50 hover:opacity-100 px-2 transition-opacity"
+            onClick={() => plugin.widget.closePopup()}
+          >✕</button>
         </div>
-        <button
-          className="text-xs opacity-50 hover:opacity-100 px-2 transition-opacity"
-          onClick={() => plugin.widget.closePopup()}
-        >✕</button>
+        {remName && (
+          <div
+            className="text-xs opacity-60 mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
+            title={remName}
+          >
+            {remName}
+          </div>
+        )}
       </div>
       <RescheduleInput plugin={plugin} remId={remId} context={context} />
     </div>
