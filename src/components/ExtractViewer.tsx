@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId, useTrackerPlugin } from '@remnote/plugin-sdk';
-import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
+import { powerupCode, dismissedPowerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import {
@@ -38,7 +38,7 @@ const BATCH_DELAY_MS = 10;
 // Read-only preview caps. Each RemViewer is a (read-only) FakeEmbed overlay, so
 // we bound how many we spawn: children per node, and how deep we recurse. Beyond
 // either cap we show a "edit in sidebar" hint instead.
-const MAX_PREVIEW_CHILDREN = 25;
+const MAX_PREVIEW_CHILDREN = 100;
 const MAX_PREVIEW_DEPTH = 6;
 
 const hintButtonStyle: React.CSSProperties = {
@@ -73,15 +73,23 @@ function ReadOnlyRemTree({
   readPointRemId: RemId | null;
   scrollTrigger: number;
 }) {
-  const childIds = useTrackerPlugin(
+  const nodeData = useTrackerPlugin(
     async (rp) => {
       const r = await rp.rem.findOne(remId);
-      if (!r) return [] as RemId[];
+      if (!r) return { childIds: [] as RemId[], isIncremental: false, isDismissed: false };
       const children = await getChildrenExcludingSlots(rp as unknown as RNPlugin, r);
-      return children.map((c) => c._id);
+      // Powerup status for left-border emphasis (mirrors the editor's
+      // incremental/dismissed left borders, since RemViewer overlays ignore
+      // any text styling we set here).
+      const isIncremental = await r.hasPowerup(powerupCode);
+      const isDismissed = await r.hasPowerup(dismissedPowerupCode);
+      return { childIds: children.map((c) => c._id), isIncremental, isDismissed };
     },
     [remId]
-  ) || [];
+  );
+  const childIds = nodeData?.childIds ?? [];
+  const isIncremental = nodeData?.isIncremental ?? false;
+  const isDismissed = nodeData?.isDismissed ?? false;
 
   const shown = childIds.slice(0, MAX_PREVIEW_CHILDREN);
   const hidden = childIds.length - shown.length;
@@ -106,22 +114,27 @@ function ReadOnlyRemTree({
   // as an overlay in RemNote's main window, so it ignores any font/color set on
   // this iframe-side wrapper. Only layout (indentation + the guide line, plus a
   // horizontal divider under the root) reaches it, so that's how depth is shown.
+  // Left-border emphasis, mirroring the editor's CSS: read point (blue box +
+  // badge) takes precedence; otherwise green for Incremental, amber for
+  // Dismissed (matching SHOW_LEFT_BORDER_CSS / SHOW_DISMISSED_INDICATOR_CSS).
+  let wrapperStyle: React.CSSProperties | undefined;
+  if (isReadPoint) {
+    wrapperStyle = {
+      borderLeft: '3px solid var(--rn-clr-blue, #3b82f6)',
+      background: 'var(--rn-clr-blue-light, rgba(59,130,246,0.10))',
+      borderRadius: 6,
+      padding: '4px 8px',
+      margin: '2px 0',
+    };
+  } else if (isIncremental) {
+    wrapperStyle = { borderLeft: '3px solid green', paddingLeft: 5 };
+  } else if (isDismissed) {
+    wrapperStyle = { borderLeft: '3px solid #f59e0b', paddingLeft: 5 };
+  }
+
   return (
     <div>
-      <div
-        ref={nodeRef}
-        style={
-          isReadPoint
-            ? {
-                borderLeft: '3px solid var(--rn-clr-blue, #3b82f6)',
-                background: 'var(--rn-clr-blue-light, rgba(59,130,246,0.10))',
-                borderRadius: 6,
-                padding: '4px 8px',
-                margin: '2px 0',
-              }
-            : undefined
-        }
-      >
+      <div ref={nodeRef} style={wrapperStyle}>
         {isReadPoint && (
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--rn-clr-blue, #3b82f6)', marginBottom: 2 }}>
             🔖 Read point
@@ -521,7 +534,7 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
               flexShrink: 0,
               padding: '8px 16px',
               borderBottom: '1px solid var(--rn-clr-border-primary, #e2e8f0)',
-              backgroundColor: 'var(--rn-clr-blue-light, rgba(59,130,246,0.10))',
+              backgroundColor: 'var(--rn-clr-blue-light, #dbeafe)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
