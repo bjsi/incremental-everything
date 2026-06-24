@@ -1,10 +1,10 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 
-// 10% by default. Now that randomness is priority-weighted (see
-// applyPriorityWeightedLottery), a modest default is safe: it dedicates a small
-// slice of every session to surfacing lower-priority "golden nuggets" while the
-// queue stays strongly biased toward high-priority items.
-export const DEFAULT_RANDOMNESS = 0.1;
+// 20% by default. Now that randomness is priority-weighted (see
+// applyPriorityWeightedLottery), a modest default is safe: it dedicates a slice
+// of every session to surfacing lower-priority "golden nuggets" while the queue
+// stays strongly biased toward high-priority items.
+export const DEFAULT_RANDOMNESS = 0.2;
 // Default is now the number of cards, e.g., 6 cards per incremental rem.
 export const DEFAULT_CARDS_PER_REM = 6; 
 
