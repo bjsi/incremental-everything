@@ -1380,16 +1380,28 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   plugin.app.registerCommand({
     id: 'toggle-ignore-tag',
     name: 'Toggle Ignore Tag',
-    description: 'Tag/untag the focused Rem with #ignore — marks already-read snippets that were left for archive/consultation only.',
+    description: 'Tag/untag the focused Rem (or a multi-rem selection) with #ignore — marks already-read snippets that were left for archive/consultation only.',
     keyboardShortcut: 'ctrl+shift+i',
     quickCode: 'ign',
     action: async () => {
-      const rem = await plugin.focus.getFocusedRem();
-      if (!rem) {
-        await plugin.app.toast('No focused Rem.');
+      // Resolve target rems: a multi-rem outline selection (Omnibar-resilient,
+      // via getEffectiveSelection) takes precedence; otherwise the single
+      // focused rem. Mirrors the multi-rem pattern used by Text Case Converter.
+      const selection = await getEffectiveSelection(plugin);
+      let rems: PluginRem[] = [];
+      if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+        rems = (await plugin.rem.findMany(selection.remIds)) || [];
+      } else {
+        const focused = await plugin.focus.getFocusedRem();
+        if (focused) rems = [focused];
+      }
+
+      if (rems.length === 0) {
+        await plugin.app.toast('No focused or selected Rem.');
         return;
       }
 
+      // Resolve/create the #ignore tag once for the whole batch.
       let ignoreTagRem = await plugin.rem.findByName(['ignore'], null);
       if (!ignoreTagRem) {
         ignoreTagRem = await plugin.rem.createRem();
@@ -1399,16 +1411,43 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         }
         await ignoreTagRem.setText(['ignore']);
       }
+      const tagId = ignoreTagRem._id;
 
-      const tags = await rem.getTagRems();
-      const alreadyTagged = tags.some((t) => t._id === ignoreTagRem!._id);
+      // Single-rem: plain toggle (unchanged behavior).
+      if (rems.length === 1) {
+        const rem = rems[0];
+        const alreadyTagged = (await rem.getTagRems()).some((t) => t._id === tagId);
+        if (alreadyTagged) {
+          await rem.removeTag(tagId);
+          await plugin.app.toast('Removed #ignore.');
+        } else {
+          await rem.addTag(tagId);
+          await plugin.app.toast('Tagged with #ignore.');
+        }
+        return;
+      }
 
-      if (alreadyTagged) {
-        await rem.removeTag(ignoreTagRem._id);
-        await plugin.app.toast('Removed #ignore.');
+      // Multi-rem: decide one action for the whole batch. If every selected rem
+      // is already tagged, remove from all; otherwise add to those that lack it
+      // (so a mixed selection becomes uniformly tagged) — mirrors the Bulletize
+      // toggle semantics.
+      const taggedFlags = await Promise.all(
+        rems.map(async (r) => (await r.getTagRems()).some((t) => t._id === tagId))
+      );
+      const allTagged = taggedFlags.every(Boolean);
+
+      if (allTagged) {
+        for (const r of rems) await r.removeTag(tagId);
+        await plugin.app.toast(`Removed #ignore from ${rems.length} rems.`);
       } else {
-        await rem.addTag(ignoreTagRem._id);
-        await plugin.app.toast('Tagged with #ignore.');
+        let added = 0;
+        for (let i = 0; i < rems.length; i++) {
+          if (!taggedFlags[i]) {
+            await rems[i].addTag(tagId);
+            added++;
+          }
+        }
+        await plugin.app.toast(`Tagged ${added} rem${added === 1 ? '' : 's'} with #ignore.`);
       }
     },
   });
