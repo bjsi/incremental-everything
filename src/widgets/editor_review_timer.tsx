@@ -220,20 +220,18 @@ function EditorReviewTimer() {
   const bookmarkHighlightId = bookmarkInfo?.highlightId ?? null;
   const bookmarkHostRemId = bookmarkInfo?.hostRemId ?? hostRemId;
 
-  // Read point for rem-type IncRems (outline headers). These have no PDF/HTML
-  // reading source — the IncRem reads from its own descendants — so the read
-  // point is a descendant rem rather than a reader highlight. Resolve the host
-  // kind inside the tracker (same reasoning as bookmarkInfo) and only surface a
-  // read point when there is genuinely no PDF/HTML source to avoid double UI.
+  // Read point for the IncRem's own outline (a bookmarked descendant rem). This
+  // is stored under its OWN history key (host = incRemId), independent of any
+  // PDF/HTML bookmark — so a "hybrid" IncRem (a PDF/HTML source AND its own
+  // descendant content) can carry both. We therefore DON'T bail when a PDF/HTML
+  // source exists: a read point and a reader bookmark target different places
+  // (a node in the outline vs. a spot in the document) and jump differently, so
+  // both buttons can legitimately appear.
   const remReadPoint = useTrackerPlugin(
     async (rp) => {
       if (!timerData?.remId) return null;
       const rem = await rp.rem.findOne(timerData.remId);
       if (!rem) return null;
-      const pdfRem = await getActivePdfForIncRem(rp as any, rem);
-      if (pdfRem) return null;
-      const htmlRem = await findHTMLinRem(rp as any, rem);
-      if (htmlRem) return null;
       const entry = await getRemReadPoint(rp as any, timerData.remId);
       return entry?.highlightId
         ? { targetRemId: entry.highlightId, timestamp: entry.timestamp }
@@ -241,6 +239,27 @@ function EditorReviewTimer() {
     },
     [timerData?.remId]
   ) ?? null;
+
+  // When both a reader bookmark and a read point exist, mark whichever was saved
+  // most recently as "latest" so the user knows which reflects their last action.
+  const bothBookmarksExist = !!bookmarkHighlightId && !!remReadPoint;
+  const readPointIsLatest =
+    bothBookmarksExist && (remReadPoint!.timestamp ?? 0) > (bookmarkInfo?.timestamp ?? 0);
+  const readerBookmarkIsLatest = bothBookmarksExist && !readPointIsLatest;
+
+  // Small "latest" pill appended to whichever bookmark button is the most recent.
+  const latestBadgeStyle: React.CSSProperties = {
+    marginLeft: 5,
+    fontSize: 9,
+    fontWeight: 700,
+    padding: '1px 4px',
+    borderRadius: 6,
+    backgroundColor: '#10b981',
+    color: 'white',
+    verticalAlign: 'middle',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  };
 
   const isPaused = !!(timerData?.pausedAt);
 
@@ -800,11 +819,15 @@ function EditorReviewTimer() {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.color = '#3b82f6';
               }}
-              title={hostKind === 'html'
+              title={(hostKind === 'html'
                 ? 'Open the article and scroll to your last bookmark position'
-                : 'Open PDF and scroll to your last bookmark position'}
+                : 'Open PDF and scroll to your last bookmark position')
+                + (readerBookmarkIsLatest ? ' (most recent reading position)' : '')}
             >
               🔖 Scroll
+              {readerBookmarkIsLatest && (
+                <span style={latestBadgeStyle}>latest</span>
+              )}
             </button>
           )}
           {remReadPoint && (
@@ -838,9 +861,13 @@ function EditorReviewTimer() {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.color = '#3b82f6';
               }}
-              title="Jump to your read point (the bookmarked rem inside this outline)"
+              title={'Jump to your read point (the bookmarked rem inside this outline)'
+                + (readPointIsLatest ? ' (most recent reading position)' : '')}
             >
               🔖 Go to Read Point
+              {readPointIsLatest && (
+                <span style={latestBadgeStyle}>latest</span>
+              )}
             </button>
           )}
         </div>
