@@ -12,6 +12,7 @@ import {
 import {
   powerupCode,
   currentIncRemKey,
+  editorReviewTimerRemIdKey,
   pageRangeWidgetId,
   noIncRemTimerKey,
   alwaysUseLightModeOnMobileId,
@@ -35,7 +36,7 @@ import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/t
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { initIncrementalRem } from './powerups';
-import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
@@ -70,6 +71,12 @@ import {
 } from './queue_display_powerups';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
+import {
+  setRemReadPoint,
+  isDescendantOf,
+  findNearestAncestorIncRem,
+  resolveReadPointIncRem,
+} from '../lib/remReadPoint';
 import {
   detectCase,
   nextCase,
@@ -1004,12 +1011,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
   // Toggle "• " at the start of each selected line within a single rem. Handy
   // for restoring bullets that PDF highlights flatten into soft-wrapped text.
-  // opt+8 types the bullet glyph itself, so we use opt+shift+8 (mirrors the
-  // Ctrl/Cmd+Shift+8 "bulleted list" shortcut in Docs/Word).
+  // opt+8 types the bullet glyph and opt+shift+8 the degree symbol (°) on macOS,
+  // so we use ctrl+opt+shift+8 to avoid both (mirrors the Ctrl/Cmd+Shift+8
+  // "bulleted list" shortcut in Docs/Word).
   plugin.app.registerCommand({
     id: 'bulletize-inline-selection',
     name: 'Bulletize Inline Selected Text',
-    keyboardShortcut: 'opt+shift+8',
+    keyboardShortcut: 'ctrl+opt+shift+8',
     quickCode: 'bul',
     action: async () => {
       await bulletizeSelection(plugin);
@@ -1193,6 +1201,76 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Set Read Point (Bookmark) for rem-type IncRems. Associates the focused rem
+  // (a descendant of an Incremental outline) as the IncRem's current reading
+  // position — the rem-type analogue of a PDF/HTML highlight bookmark.
+  plugin.app.registerCommand({
+    id: 'set-read-point',
+    name: 'Set Read Point (Bookmark)',
+    keyboardShortcut: 'ctrl+F7',
+    quickCode: 'srp',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      if (!focused) {
+        await plugin.app.toast('No Rem focused — place your cursor in the rem you want to bookmark.');
+        return;
+      }
+
+      // Resolve the IncRem this read point belongs to. Prefer an active review
+      // session (editor-review timer → queue) whose IncRem actually contains
+      // the focused rem; otherwise fall back to the nearest ancestor IncRem.
+      // The focused rem must be a strict descendant — you can't bookmark the
+      // outline header against itself.
+      const sessionIncRemId =
+        (await plugin.storage.getSession<string>(editorReviewTimerRemIdKey)) ||
+        (await plugin.storage.getSession<string>(currentIncRemKey)) ||
+        null;
+
+      let incRemId: string | null = null;
+      if (
+        sessionIncRemId &&
+        sessionIncRemId !== focused._id &&
+        (await isDescendantOf(plugin, focused, sessionIncRemId))
+      ) {
+        incRemId = sessionIncRemId;
+      } else {
+        incRemId = await findNearestAncestorIncRem(plugin, focused);
+      }
+
+      if (!incRemId) {
+        await plugin.app.toast(
+          'No ancestor Incremental Rem found. Read points apply to a rem inside an Incremental outline.'
+        );
+        return;
+      }
+
+      await setRemReadPoint(plugin, incRemId, focused._id);
+      const text = await safeRemTextToString(plugin, focused.text);
+      const short = text.length > 50 ? text.slice(0, 50) + '…' : text;
+      await plugin.app.toast(`🔖 Read point set: "${short}"`);
+    },
+  });
+
+  // View the read-point history for a rem-type IncRem. Reuses the bookmark
+  // popup in "rem" mode (resolved from the focused rem or active session).
+  plugin.app.registerCommand({
+    id: 'view-read-points',
+    name: 'View Read Points (History)',
+    keyboardShortcut: 'ctrl+shift+F7',
+    quickCode: 'vrp',
+    action: async () => {
+      const focused = await plugin.focus.getFocusedRem();
+      const incRemId = await resolveReadPointIncRem(plugin, focused);
+      if (!incRemId) {
+        await plugin.app.toast(
+          'No Incremental Rem found. Focus a rem inside an Incremental outline (or review one) first.'
+        );
+        return;
+      }
+      await plugin.widget.openPopup('pdf_bookmark_popup', { mode: 'rem', incRemId });
+    },
+  });
+
   plugin.app.registerCommand({
     id: 'debug-video',
     name: 'Debug Video Detection',
@@ -1302,16 +1380,28 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   plugin.app.registerCommand({
     id: 'toggle-ignore-tag',
     name: 'Toggle Ignore Tag',
-    description: 'Tag/untag the focused Rem with #ignore — marks already-read snippets that were left for archive/consultation only.',
+    description: 'Tag/untag the focused Rem (or a multi-rem selection) with #ignore — marks already-read snippets that were left for archive/consultation only.',
     keyboardShortcut: 'ctrl+shift+i',
     quickCode: 'ign',
     action: async () => {
-      const rem = await plugin.focus.getFocusedRem();
-      if (!rem) {
-        await plugin.app.toast('No focused Rem.');
+      // Resolve target rems: a multi-rem outline selection (Omnibar-resilient,
+      // via getEffectiveSelection) takes precedence; otherwise the single
+      // focused rem. Mirrors the multi-rem pattern used by Text Case Converter.
+      const selection = await getEffectiveSelection(plugin);
+      let rems: PluginRem[] = [];
+      if (selection?.type === SelectionType.Rem && selection.remIds?.length) {
+        rems = (await plugin.rem.findMany(selection.remIds)) || [];
+      } else {
+        const focused = await plugin.focus.getFocusedRem();
+        if (focused) rems = [focused];
+      }
+
+      if (rems.length === 0) {
+        await plugin.app.toast('No focused or selected Rem.');
         return;
       }
 
+      // Resolve/create the #ignore tag once for the whole batch.
       let ignoreTagRem = await plugin.rem.findByName(['ignore'], null);
       if (!ignoreTagRem) {
         ignoreTagRem = await plugin.rem.createRem();
@@ -1321,16 +1411,43 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         }
         await ignoreTagRem.setText(['ignore']);
       }
+      const tagId = ignoreTagRem._id;
 
-      const tags = await rem.getTagRems();
-      const alreadyTagged = tags.some((t) => t._id === ignoreTagRem!._id);
+      // Single-rem: plain toggle (unchanged behavior).
+      if (rems.length === 1) {
+        const rem = rems[0];
+        const alreadyTagged = (await rem.getTagRems()).some((t) => t._id === tagId);
+        if (alreadyTagged) {
+          await rem.removeTag(tagId);
+          await plugin.app.toast('Removed #ignore.');
+        } else {
+          await rem.addTag(tagId);
+          await plugin.app.toast('Tagged with #ignore.');
+        }
+        return;
+      }
 
-      if (alreadyTagged) {
-        await rem.removeTag(ignoreTagRem._id);
-        await plugin.app.toast('Removed #ignore.');
+      // Multi-rem: decide one action for the whole batch. If every selected rem
+      // is already tagged, remove from all; otherwise add to those that lack it
+      // (so a mixed selection becomes uniformly tagged) — mirrors the Bulletize
+      // toggle semantics.
+      const taggedFlags = await Promise.all(
+        rems.map(async (r) => (await r.getTagRems()).some((t) => t._id === tagId))
+      );
+      const allTagged = taggedFlags.every(Boolean);
+
+      if (allTagged) {
+        for (const r of rems) await r.removeTag(tagId);
+        await plugin.app.toast(`Removed #ignore from ${rems.length} rems.`);
       } else {
-        await rem.addTag(ignoreTagRem._id);
-        await plugin.app.toast('Tagged with #ignore.');
+        let added = 0;
+        for (let i = 0; i < rems.length; i++) {
+          if (!taggedFlags[i]) {
+            await rems[i].addTag(tagId);
+            added++;
+          }
+        }
+        await plugin.app.toast(`Tagged ${added} rem${added === 1 ? '' : 's'} with #ignore.`);
       }
     },
   });
@@ -1851,6 +1968,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // removePowerup destroys the widget sandbox on the next microtask,
         // so both IPC messages must be sent in the same tick if targeting queue.
         if (isTargetingQueueContext) {
+          // Like "Next", dismissing the queue card means we've left the rem —
+          // restore the dashboard. Flag BEFORE the destructive call (consumed by
+          // the persistent QueueLoadCard listener once the next card loads).
+          await requestQueueDashboardRefocus(plugin, 'dismiss-command');
           await Promise.allSettled([
             rem.removePowerup(powerupCode),
             plugin.queue.removeCurrentCardFromQueue(true),

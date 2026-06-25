@@ -2,7 +2,7 @@ import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { powerupCode } from './consts';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from './card_priority/types';
 import { getIncrementalRemFromRem } from './incremental_rem';
-import { safeRemTextToString } from './pdfUtils';
+import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
 
 export interface AncestorPriorityInfo {
   priority: number;
@@ -41,7 +41,7 @@ export async function findClosestIncrementalAncestor(
 
         if (incRemInfo && incRemInfo.priority !== undefined) {
           // Get the name/text of the ancestor for display
-          const ancestorText = await safeRemTextToString(plugin, currentRem.text);
+          const ancestorText = await resolveRemTextForBreadcrumb(plugin, currentRem.text);
           const ancestorName = ancestorText.slice(0, 50) + (ancestorText.length > 50 ? '...' : '');
 
           return {
@@ -146,7 +146,7 @@ export async function findClosestAncestorWithAnyPriority(
     const hasIncRemPriority = !!parentIncInfo;
 
     const getFormattedName = async () => {
-      const parentName = await safeRemTextToString(plugin, parent.text);
+      const parentName = await resolveRemTextForBreadcrumb(plugin, parent.text);
       return parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
     };
 
@@ -218,7 +218,7 @@ export async function findClosestAncestorWithAnyPriority(
 
   // No manual priority or IncRem found, but we have an orphaned inherited priority
   if (highestInheritedAncestor) {
-    const parentName = await safeRemTextToString(plugin, highestInheritedAncestor.parent.text);
+    const parentName = await resolveRemTextForBreadcrumb(plugin, highestInheritedAncestor.parent.text);
     const truncatedName = parentName.slice(0, 50) + (parentName.length > 50 ? '...' : '');
 
     return {

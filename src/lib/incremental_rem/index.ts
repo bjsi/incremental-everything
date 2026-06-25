@@ -116,7 +116,7 @@ export async function updateReviewRemData(
 // register/events.ts consumes it and performs the actual refocus once the next
 // card has loaded. This only runs from the IncRem "Next" paths, so plain
 // flashcard ratings never touch the sidebar.
-async function requestQueueDashboardRefocus(plugin: RNPlugin, source: string) {
+export async function requestQueueDashboardRefocus(plugin: RNPlugin, source: string) {
   try {
     await plugin.storage.setSession(pendingQueueDashboardRefocusKey, Date.now());
   } catch (e) {

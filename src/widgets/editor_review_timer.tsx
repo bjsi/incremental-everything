@@ -14,7 +14,8 @@ import { addToIncrementalHistory } from '../lib/history_utils';
 import { IncrementalRep } from '../lib/incremental_rem';
 import { determineIncRemType } from '../lib/incRemHelpers';
 import { getActivePdfForIncRem, setActivePdfForIncRem, getAllPDFsInRem, findHTMLinRem, clearIncrementalPDFData, PageRangeContext, addPageToHistory, getPageHistory, resolveSessionBookmarkCarry, safeRemTextToString } from '../lib/pdfUtils';
-import { openAndScrollToHighlight } from '../lib/remHelpers';
+import { openAndScrollToHighlight, openAndFocusRem } from '../lib/remHelpers';
+import { getRemReadPoint } from '../lib/remReadPoint';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import { startIncRemEngagement, endIncRemEngagement, forceSaveSession } from '../lib/queue_session';
@@ -218,6 +219,47 @@ function EditorReviewTimer() {
 
   const bookmarkHighlightId = bookmarkInfo?.highlightId ?? null;
   const bookmarkHostRemId = bookmarkInfo?.hostRemId ?? hostRemId;
+
+  // Read point for the IncRem's own outline (a bookmarked descendant rem). This
+  // is stored under its OWN history key (host = incRemId), independent of any
+  // PDF/HTML bookmark — so a "hybrid" IncRem (a PDF/HTML source AND its own
+  // descendant content) can carry both. We therefore DON'T bail when a PDF/HTML
+  // source exists: a read point and a reader bookmark target different places
+  // (a node in the outline vs. a spot in the document) and jump differently, so
+  // both buttons can legitimately appear.
+  const remReadPoint = useTrackerPlugin(
+    async (rp) => {
+      if (!timerData?.remId) return null;
+      const rem = await rp.rem.findOne(timerData.remId);
+      if (!rem) return null;
+      const entry = await getRemReadPoint(rp as any, timerData.remId);
+      return entry?.highlightId
+        ? { targetRemId: entry.highlightId, timestamp: entry.timestamp }
+        : null;
+    },
+    [timerData?.remId]
+  ) ?? null;
+
+  // When both a reader bookmark and a read point exist, mark whichever was saved
+  // most recently as "latest" so the user knows which reflects their last action.
+  const bothBookmarksExist = !!bookmarkHighlightId && !!remReadPoint;
+  const readPointIsLatest =
+    bothBookmarksExist && (remReadPoint!.timestamp ?? 0) > (bookmarkInfo?.timestamp ?? 0);
+  const readerBookmarkIsLatest = bothBookmarksExist && !readPointIsLatest;
+
+  // Small "latest" pill appended to whichever bookmark button is the most recent.
+  const latestBadgeStyle: React.CSSProperties = {
+    marginLeft: 5,
+    fontSize: 9,
+    fontWeight: 700,
+    padding: '1px 4px',
+    borderRadius: 6,
+    backgroundColor: '#10b981',
+    color: 'white',
+    verticalAlign: 'middle',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  };
 
   const isPaused = !!(timerData?.pausedAt);
 
@@ -694,7 +736,7 @@ function EditorReviewTimer() {
         </div>
       </div>
 
-      {(isPdfNote || (hostRemId && bookmarkHighlightId)) && (
+      {(isPdfNote || (hostRemId && bookmarkHighlightId) || remReadPoint) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px', paddingRight: '12px', borderRight: '1px solid #93c5fd' }}>
           {/* PDF switcher — only when the IncRem has >1 PDF source. */}
           {pdfOptions.length > 1 && pdfRemId && (
@@ -777,11 +819,55 @@ function EditorReviewTimer() {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.color = '#3b82f6';
               }}
-              title={hostKind === 'html'
+              title={(hostKind === 'html'
                 ? 'Open the article and scroll to your last bookmark position'
-                : 'Open PDF and scroll to your last bookmark position'}
+                : 'Open PDF and scroll to your last bookmark position')
+                + (readerBookmarkIsLatest ? ' (most recent reading position)' : '')}
             >
               🔖 Scroll
+              {readerBookmarkIsLatest && (
+                <span style={latestBadgeStyle}>latest</span>
+              )}
+            </button>
+          )}
+          {remReadPoint && (
+            <button
+              onClick={async () => {
+                // Re-read at click time to catch a read point set mid-session
+                // after the tracker last ran.
+                let targetRemId = remReadPoint.targetRemId;
+                if (timerData?.remId) {
+                  const fresh = await getRemReadPoint(plugin, timerData.remId);
+                  if (fresh?.highlightId) targetRemId = fresh.highlightId;
+                }
+                await openAndFocusRem(plugin, targetRemId);
+              }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                backgroundColor: 'transparent',
+                color: '#3b82f6',
+                border: '2px solid #3b82f6',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#3b82f6';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#3b82f6';
+              }}
+              title={'Jump to your read point (the bookmarked rem inside this outline)'
+                + (readPointIsLatest ? ' (most recent reading position)' : '')}
+            >
+              🔖 Go to Read Point
+              {readPointIsLatest && (
+                <span style={latestBadgeStyle}>latest</span>
+              )}
             </button>
           )}
         </div>

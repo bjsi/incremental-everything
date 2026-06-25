@@ -1,10 +1,11 @@
 // components/ExtractViewer.tsx
 // UPDATED: Added filtering for powerup slots (Incremental and CardPriority)
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PluginRem, RNPlugin, RemViewer, BuiltInPowerupCodes, RemId, useTrackerPlugin } from '@remnote/plugin-sdk';
-import { powerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
+import { powerupCode, dismissedPowerupCode, allCardPriorityInfoKey, incremNotesSidebarWidgetId, incremNotesSidebarRemIdKey } from '../lib/consts';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
+import { getRemReadPoint } from '../lib/remReadPoint';
 import {
   getChildrenExcludingSlots,
   getDescendantsExcludingSlots
@@ -37,7 +38,7 @@ const BATCH_DELAY_MS = 10;
 // Read-only preview caps. Each RemViewer is a (read-only) FakeEmbed overlay, so
 // we bound how many we spawn: children per node, and how deep we recurse. Beyond
 // either cap we show a "edit in sidebar" hint instead.
-const MAX_PREVIEW_CHILDREN = 25;
+const MAX_PREVIEW_CHILDREN = 100;
 const MAX_PREVIEW_DEPTH = 6;
 
 const hintButtonStyle: React.CSSProperties = {
@@ -63,32 +64,114 @@ function ReadOnlyRemTree({
   remId,
   depth,
   onEditInSidebar,
+  readPointRemId,
+  scrollTrigger,
 }: {
   remId: RemId;
   depth: number;
   onEditInSidebar: () => void;
+  readPointRemId: RemId | null;
+  scrollTrigger: number;
 }) {
-  const childIds = useTrackerPlugin(
+  const nodeData = useTrackerPlugin(
     async (rp) => {
       const r = await rp.rem.findOne(remId);
-      if (!r) return [] as RemId[];
+      if (!r) return { childIds: [] as RemId[], isIncremental: false, isDismissed: false };
       const children = await getChildrenExcludingSlots(rp as unknown as RNPlugin, r);
-      return children.map((c) => c._id);
+      // Powerup status for left-border emphasis (mirrors the editor's
+      // incremental/dismissed left borders, since RemViewer overlays ignore
+      // any text styling we set here).
+      const isIncremental = await r.hasPowerup(powerupCode);
+      const isDismissed = await r.hasPowerup(dismissedPowerupCode);
+      return { childIds: children.map((c) => c._id), isIncremental, isDismissed };
     },
     [remId]
-  ) || [];
+  );
+  const childIds = nodeData?.childIds ?? [];
+  const isIncremental = nodeData?.isIncremental ?? false;
+  const isDismissed = nodeData?.isDismissed ?? false;
 
   const shown = childIds.slice(0, MAX_PREVIEW_CHILDREN);
   const hidden = childIds.length - shown.length;
   const atMaxDepth = depth >= MAX_PREVIEW_DEPTH;
 
+  // Read-point emphasis. RemViewer is a FakeEmbed overlay that ignores any
+  // font/color we set here, so emphasis is layout-only (accent left border +
+  // background box) plus our own badge DOM element above the embed. The wrapper
+  // ref lets us center the node in the scroll container on load / on demand.
+  const isReadPoint = readPointRemId != null && readPointRemId === remId;
+  const nodeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isReadPoint || !nodeRef.current) return;
+    // Defer to let the overlay position itself before we scroll.
+    const t = setTimeout(() => {
+      nodeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [isReadPoint, scrollTrigger]);
+
   // NOTE: we can't vary font size by depth — RemViewer is a FakeEmbed rendered
   // as an overlay in RemNote's main window, so it ignores any font/color set on
-  // this iframe-side wrapper. Only layout (indentation + the guide line, plus a
-  // horizontal divider under the root) reaches it, so that's how depth is shown.
+  // this iframe-side wrapper. Only layout (indentation, the guide line, the
+  // divider under the root, and the emphasis boxes below) reaches it.
+  //
+  // Emphasis boxes (left border + background tint + radius + padding — the box
+  // style aligns to the embed better than a bare border). Precedence:
+  //   • root (depth 0) → the Target Incremental Rem: strongest box + badge.
+  //   • read point → blue box + badge.
+  //   • Incremental descendant → green box (mirrors SHOW_LEFT_BORDER_CSS).
+  //   • Dismissed descendant → amber box (mirrors SHOW_DISMISSED_INDICATOR_CSS).
+  // The generic Incremental box is intentionally NOT applied to the root, which
+  // gets the stronger target treatment instead.
+  const isRoot = depth === 0;
+  let wrapperStyle: React.CSSProperties | undefined;
+  let badge: { text: string; color: string } | null = null;
+  if (isRoot) {
+    wrapperStyle = {
+      borderLeft: '5px solid #15803d',
+      background: 'rgba(34,197,94,0.18)',
+      borderRadius: 8,
+      padding: '6px 10px',
+      margin: '2px 0',
+    };
+    badge = { text: '🎯 Target Incremental Rem', color: '#15803d' };
+  } else if (isReadPoint) {
+    wrapperStyle = {
+      borderLeft: '3px solid var(--rn-clr-blue, #3b82f6)',
+      background: 'var(--rn-clr-blue-light, rgba(59,130,246,0.10))',
+      borderRadius: 6,
+      padding: '4px 8px',
+      margin: '2px 0',
+    };
+    badge = { text: '🔖 Read point', color: 'var(--rn-clr-blue, #3b82f6)' };
+  } else if (isIncremental) {
+    wrapperStyle = {
+      borderLeft: '3px solid green',
+      background: 'rgba(34,197,94,0.10)',
+      borderRadius: 6,
+      padding: '4px 8px',
+      margin: '2px 0',
+    };
+  } else if (isDismissed) {
+    wrapperStyle = {
+      borderLeft: '3px solid #f59e0b',
+      background: 'rgba(245,158,11,0.10)',
+      borderRadius: 6,
+      padding: '4px 8px',
+      margin: '2px 0',
+    };
+  }
+
   return (
     <div>
-      <RemViewer remId={remId} width="100%" />
+      <div ref={nodeRef} style={wrapperStyle}>
+        {badge && (
+          <div style={{ fontSize: 11, fontWeight: 700, color: badge.color, marginBottom: 2 }}>
+            {badge.text}
+          </div>
+        )}
+        <RemViewer remId={remId} width="100%" />
+      </div>
       {childIds.length > 0 && (
         <>
           {/* Horizontal divider separating the target rem from its descendants. */}
@@ -113,7 +196,14 @@ function ReadOnlyRemTree({
             ) : (
               <>
                 {shown.map((id) => (
-                  <ReadOnlyRemTree key={id} remId={id} depth={depth + 1} onEditInSidebar={onEditInSidebar} />
+                  <ReadOnlyRemTree
+                    key={id}
+                    remId={id}
+                    depth={depth + 1}
+                    onEditInSidebar={onEditInSidebar}
+                    readPointRemId={readPointRemId}
+                    scrollTrigger={scrollTrigger}
+                  />
                 ))}
                 {hidden > 0 && (
                   <button onClick={onEditInSidebar} style={hintButtonStyle}>
@@ -137,6 +227,24 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
 
   // --- STATE 2: DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status) ---
   const [criticalContext, setCriticalContext] = useState<CriticalContext | null>(null);
+
+  // --- READ POINT (rem-type bookmark) ---
+  // Reactive so setting/changing the read point while reviewing updates the
+  // viewer live. Resolves the bookmarked descendant's id + display text.
+  // Bumping scrollTrigger re-centers the node (used by the banner button).
+  const [scrollTrigger, setScrollTrigger] = useState(0);
+  const readPoint = useTrackerPlugin(
+    async (rp) => {
+      const entry = await getRemReadPoint(rp as unknown as RNPlugin, rem._id);
+      if (!entry?.highlightId) return null;
+      const targetRem = await rp.rem.findOne(entry.highlightId);
+      if (!targetRem) return null;
+      const text = await resolveRemTextForBreadcrumb(rp as unknown as RNPlugin, targetRem.text || []);
+      return { remId: entry.highlightId, text };
+    },
+    [rem._id]
+  ) ?? null;
+  const readPointRemId = readPoint?.remId ?? null;
 
   // -----------------------------------------------------------
   // 1. EFFECT FOR DEFERRED CRITICAL CONTEXT (Breadcrumbs & Status)
@@ -446,12 +554,62 @@ export function ExtractViewer({ rem, plugin }: ExtractViewerProps) {
           )}
         </div>
 
+        {/* Read-point banner — shown when a read point is set. Surfaces the
+            bookmarked rem's text and a button to re-center it; also the graceful
+            fallback when the read point sits deeper than the preview caps (and so
+            isn't rendered/emphasized in the tree below). */}
+        {readPoint && (
+          <div
+            style={{
+              flexShrink: 0,
+              padding: '8px 16px',
+              borderBottom: '1px solid var(--rn-clr-border-primary, #e2e8f0)',
+              backgroundColor: 'var(--rn-clr-blue-light, #dbeafe)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div
+              style={{ fontSize: 12, color: 'var(--rn-clr-blue, #2563eb)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              title={readPoint.text}
+            >
+              🔖 Read point: <span style={{ fontWeight: 600 }}>{readPoint.text}</span>
+            </div>
+            <button
+              onClick={() => setScrollTrigger((n) => n + 1)}
+              title="Scroll to the read point in the preview below"
+              style={{
+                flexShrink: 0,
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--rn-clr-blue, #3b82f6)',
+                backgroundColor: 'var(--rn-clr-background-primary, #ffffff)',
+                color: 'var(--rn-clr-blue, #3b82f6)',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🔖 Scroll to it
+            </button>
+          </div>
+        )}
+
         {/* Content — read-only Rem + its descendant subtree (reactive; never
             captures focus, so editing is routed to the auto-opened notes
             sidebar). Uses the primary background so only the frame
             (header/footer) is grey, like IsolatedCardViewer. */}
         <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px', backgroundColor: 'var(--rn-clr-background-primary, #ffffff)' }}>
-          <ReadOnlyRemTree remId={rem._id} depth={0} onEditInSidebar={openNotesSidebar} />
+          <ReadOnlyRemTree
+            remId={rem._id}
+            depth={0}
+            onEditInSidebar={openNotesSidebar}
+            readPointRemId={readPointRemId}
+            scrollTrigger={scrollTrigger}
+          />
         </div>
 
         {/* Footer — status + statistics, and the Edit-in-sidebar action. */}
