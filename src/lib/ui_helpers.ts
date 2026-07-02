@@ -133,14 +133,14 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
     .rn-editor [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] {
       background-color: #8ad0f3 !important;
       border-bottom: none !important;
-      border-left: none !important;
+      border-right: none !important;
       padding-left: 0 !important;
     }
     .rn-editor [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"],
     .rn-editor [data-rem-tags~="html-highlight"][data-rem-tags~="incremental"] {
       background-color: #75f8b2 !important;
       border-bottom: none !important;
-      border-left: none !important;
+      border-right: none !important;
       padding-left: 0 !important;
     }
 
