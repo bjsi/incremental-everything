@@ -21,6 +21,7 @@ import {
   currentSubQueueIdKey,
   dismissIncRemCommandId,
   nextInQueueCommandId,
+  togglePdfHighlightBordersCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
   allCardPriorityInfoKey,
@@ -32,6 +33,7 @@ import {
   sourceFloatingActiveIdKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown } from '../lib/utils';
+import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
@@ -110,7 +112,20 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // multi-rem selections after Cmd+/ Omnibar steals focus. See lib/editor_selection.ts.
   registerSelectionTracker(plugin);
 
-
+  // "Peek" toggle: show/hide the pdfextract & incremental marker borders over
+  // PDF-viewer highlights, so a cluttered page can be read cleanly on demand.
+  // Mirrors the highlight-toolbar button; both share the same local flag.
+  await plugin.app.registerCommand({
+    id: togglePdfHighlightBordersCommandId,
+    name: 'Toggle PDF Highlight Marker Borders',
+    quickCode: 'tb',
+    action: async () => {
+      const enabled = await togglePdfHighlightBorders(plugin);
+      await plugin.app.toast(
+        enabled ? 'Highlight marker borders shown' : 'Highlight marker borders hidden (peek)'
+      );
+    },
+  });
 
 
   await plugin.app.registerCommand({

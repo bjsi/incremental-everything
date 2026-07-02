@@ -4,7 +4,31 @@ import {
   scrollToHighlightId,
   // collapseTopBarId, // Disabled: feature not working
   hideIncEverythingId,
+  pdfHighlightBordersEnabledKey,
+  pdfHighlightBordersReloadKey,
 } from './consts';
+
+/**
+ * Whether the pdfextract/incremental marker borders are currently drawn over
+ * PDF-viewer highlights. Backed by a per-device local flag; defaults to ON.
+ */
+export async function getPdfHighlightBordersEnabled(plugin: ReactRNPlugin): Promise<boolean> {
+  const stored = await plugin.storage.getLocal<boolean>(pdfHighlightBordersEnabledKey);
+  return stored ?? true;
+}
+
+/**
+ * "Peek" toggle: flip the marker-border flag. Persists the value in local storage
+ * and bumps a session key so the index widget's plugin.track re-registers the CSS
+ * (registerCSS is index-only, and this may run in the highlight-toolbar iframe).
+ * Returns the new enabled state. Shared by the toggle command and toolbar button.
+ */
+export async function togglePdfHighlightBorders(plugin: ReactRNPlugin): Promise<boolean> {
+  const next = !(await getPdfHighlightBordersEnabled(plugin));
+  await plugin.storage.setLocal(pdfHighlightBordersEnabledKey, next);
+  await plugin.storage.setSession(pdfHighlightBordersReloadKey, Date.now());
+  return next;
+}
 
 /**
  * Registers CSS to display the incremental rem counter next to the flashcard counter.
@@ -82,6 +106,17 @@ export async function registerPluginHidingCSS(plugin: ReactRNPlugin) {
 // Register CSS for PDF Highlight coloring based on tags
 // This replaces the old manual color setting logic
 export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
+  // "Peek" toggle: when disabled, the PDF-viewer marker borders are omitted so the
+  // highlights read cleanly (original background only). Editor styling is unaffected.
+  const bordersEnabled = await getPdfHighlightBordersEnabled(plugin);
+  const pdfextractMarkers = bordersEnabled
+    ? `border-bottom: 1.5px dashed #1565a8 !important;
+      border-right: 3px solid #73a5cd !important;`
+    : '';
+  const incrementalMarkers = bordersEnabled
+    ? `border-bottom: 1.5px dashed #15803d !important;
+      border-right: 3px solid #4baf70 !important;`
+    : '';
   const css = `
     /* PDF viewer: keep the highlight's ORIGINAL background and distinguish the tag
        with (a) a dashed underline and (b) a thin left bar. The underline gets
@@ -90,11 +125,11 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
        — with box-decoration-break: clone it draws on every wrapped line, forming a
        vertical rule down the left edge regardless of what follows the extract.
        This base (unscoped) rule reaches both the PDF viewer and the editor; the
-       editor is overridden below to keep its coloured background (no bar/underline). */
+       editor is overridden below to keep its coloured background (no bar/underline).
+       The border declarations are gated by the "peek" toggle (bordersEnabled). */
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"],
     [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] {
-      border-bottom: 1.5px dashed #1565a8 !important;
-      border-right: 3px solid #73a5cd !important;
+      ${pdfextractMarkers}
       padding-bottom: 2.7px;
       padding-left: 4px;
       box-decoration-break: clone;
@@ -110,8 +145,7 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
     }
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"],
     [data-rem-tags~="html-highlight"][data-rem-tags~="incremental"] {
-      border-bottom: 1.5px dashed #15803d !important;
-      border-right: 3px solid #4baf70 !important;
+      ${incrementalMarkers}
       padding-bottom: 2.7px;
       padding-left: 4px;
       box-decoration-break: clone;
