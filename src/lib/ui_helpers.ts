@@ -93,7 +93,7 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
        editor is overridden below to keep its coloured background (no bar/underline). */
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"],
     [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] {
-      border-bottom: 2px dashed #1565a8 !important;
+      border-bottom: 1.5px dashed #1565a8 !important;
       border-right: 3px solid #73a5cd !important;
       padding-bottom: 2.7px;
       padding-left: 4px;
@@ -110,7 +110,7 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
     }
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"],
     [data-rem-tags~="html-highlight"][data-rem-tags~="incremental"] {
-      border-bottom: 2px dashed #15803d !important;
+      border-bottom: 1.5px dashed #15803d !important;
       border-right: 3px solid #4baf70 !important;
       padding-bottom: 2.7px;
       padding-left: 4px;
