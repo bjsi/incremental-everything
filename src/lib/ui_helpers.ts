@@ -83,15 +83,22 @@ export async function registerPluginHidingCSS(plugin: ReactRNPlugin) {
 // This replaces the old manual color setting logic
 export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
   const css = `
+    /* PDF viewer: keep the highlight's ORIGINAL background and distinguish the tag
+       with (a) a dashed underline and (b) a thin left bar. The underline gets
+       covered by the next line's background between lines, so it's only a reliable
+       marker at a block's bottom edge; the left bar is the dependable block marker
+       — with box-decoration-break: clone it draws on every wrapped line, forming a
+       vertical rule down the left edge regardless of what follows the extract.
+       This base (unscoped) rule reaches both the PDF viewer and the editor; the
+       editor is overridden below to keep its coloured background (no bar/underline). */
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"],
     [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] {
-      /* Periwinkle/cornflower blue: stays in the blue family (pdfextract's color)
-         but is more saturated and indigo-leaning than RemNote's cyan-ish sky-blue
-         highlight, so the two read apart by hue alone. Avoids inline borders, which
-         CSS draws on every sliced fragment (superscripts, italics, line wraps) and
-         which overlap the first glyph of each fragment. */
-      background-color: #8ad0f3 !important;
+      border-bottom: 2px dashed #1565a8 !important;
+      border-right: 3px solid #73a5cd !important;
       padding-bottom: 2.7px;
+      padding-left: 4px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
     }
     /* High-contrast text selection inside pdfextract highlights */
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"] ::selection,
@@ -103,8 +110,12 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
     }
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"],
     [data-rem-tags~="html-highlight"][data-rem-tags~="incremental"] {
-      background-color: #75f8b2 !important;
+      border-bottom: 2px dashed #15803d !important;
+      border-right: 3px solid #4baf70 !important;
       padding-bottom: 2.7px;
+      padding-left: 4px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
     }
     /* High-contrast text selection inside incremental highlights */
     [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"] ::selection,
@@ -115,11 +126,28 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
       color: #ffffff !important;
     }
 
+    /* Editor: keep the coloured-background look (no underline). Overrides the
+       dashed-underline base rules above. The dark-mode editor rules below only
+       swap the background, so this border-bottom:none carries into dark mode too. */
+    .rn-editor [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"],
+    .rn-editor [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] {
+      background-color: #8ad0f3 !important;
+      border-bottom: none !important;
+      border-left: none !important;
+      padding-left: 0 !important;
+    }
+    .rn-editor [data-rem-tags~="pdf-highlight"][data-rem-tags~="incremental"],
+    .rn-editor [data-rem-tags~="html-highlight"][data-rem-tags~="incremental"] {
+      background-color: #75f8b2 !important;
+      border-bottom: none !important;
+      border-left: none !important;
+      padding-left: 0 !important;
+    }
+
     /* Dark mode: darken highlight backgrounds so light text stays readable.
-       Scoped to .rn-editor only. In the PDF viewer the highlight is a translucent
-       overlay blended over the page (whose text does NOT flip to light), so a dark
-       background muddies it — there we deliberately keep the light-mode backgrounds
-       above, which read well over the page just like RemNote's native highlight. */
+       Scoped to .rn-editor only. In the PDF viewer the highlight keeps its original
+       background (see the base rules above) and is distinguished by the dashed
+       underline instead, so no dark-mode background handling is needed there. */
     .dark .rn-editor [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"],
     .dark .rn-editor [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"] {
       background-color: #1e496b !important;
