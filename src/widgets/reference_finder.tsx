@@ -1,5 +1,6 @@
 import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { safeRemTextToString } from '../lib/pdfUtils';
 
 // ---------------------------------------------------------------------------
 // Find & Insert Reference
@@ -150,7 +151,8 @@ function ReferenceFinder() {
         let depth = 0;
         // Walk all the way to the root (cap guards against cycles/very deep trees).
         while (cur && depth < 20) {
-          const t = (await plugin.richText.toString(cur.text ?? [])).trim();
+          const raw = (await safeRemTextToString(plugin, cur.text)).trim();
+          const t = raw === 'Untitled' ? '' : raw; // treat empty ancestors as skippable
           if (t) names.push(t.length > 24 ? t.slice(0, 24) + '…' : t);
           cur = await cur.getParentRem();
           depth++;
@@ -210,7 +212,11 @@ function ReferenceFinder() {
         };
         const scored: Scored[] = [];
         for (const r of seen.values()) {
-          const name = await plugin.richText.toString(r.text ?? []);
+          // safeRemTextToString never throws on malformed `.text` (some rems in
+          // a large KB carry rich text the SDK's validator rejects, which used
+          // to reject the whole search promise) and repairs it via normalize.
+          const nameRaw = await safeRemTextToString(plugin, r.text);
+          const name = nameRaw === 'Untitled' ? '' : nameRaw;
           const foldName = fold(name);
           const type = await r.getType().catch(() => 0);
           if (conceptsOnly && type !== RemType.CONCEPT) continue;
@@ -228,7 +234,8 @@ function ReferenceFinder() {
             let matched: { id: string; text: string; fold: string } | undefined;
             try {
               for (const a of await r.getAliases()) {
-                const at = (await plugin.richText.toString(a.text ?? [])).trim();
+                const atRaw = (await safeRemTextToString(plugin, a.text)).trim();
+                const at = atRaw === 'Untitled' ? '' : atRaw;
                 const fa = fold(at);
                 if (at && foldedTokens.every((t) => fa.includes(t))) {
                   matched = { id: a._id, text: at, fold: fa };
@@ -270,7 +277,10 @@ function ReferenceFinder() {
         for (const s of top) {
           let backText = '';
           try {
-            if (s.r.backText?.length) backText = (await plugin.richText.toString(s.r.backText)).trim();
+            if (s.r.backText?.length) {
+              const bt = (await safeRemTextToString(plugin, s.r.backText)).trim();
+              backText = bt === 'Untitled' ? '' : bt; // don't show the empty-sentinel
+            }
           } catch { /* ignore */ }
           const breadcrumb = await buildBreadcrumb(s.r);
           candidates.push({
