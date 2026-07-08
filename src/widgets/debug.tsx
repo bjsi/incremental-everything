@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import {
   renderWidget,
   usePlugin,
@@ -11,6 +11,8 @@ import {
   RemType,
 } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { IncrementalRep } from '../lib/incremental_rem/types';
 import { getCardPriority } from '../lib/card_priority';
 import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
@@ -22,10 +24,40 @@ import {
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
-import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode } from '../lib/consts';
+import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode } from '../lib/consts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
+
+// Synced-storage key holding a restore point of a rem's Incremental history,
+// captured before a hand-edit so a bad edit can be rolled back.
+const historyBackupKey = (remId: string) => `debug_history_backup_${remId}`;
+
+interface HistoryBackup {
+  savedAt: number;
+  raw: string;
+}
+
+// Validate the raw JSON string stored in the Incremental `repHist` slot against
+// the authoritative IncrementalRep schema. Returns a human-readable error, or
+// null if the slot is empty or a well-formed history array.
+function validateHistorySlot(raw: string | null | undefined): string | null {
+  if (raw == null || raw === '') return null; // empty slot is legitimate
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    return `Not valid JSON: ${String(e)}`;
+  }
+  if (!Array.isArray(parsed)) return 'Stored value is not a JSON array.';
+  const result = IncrementalRep.array().safeParse(parsed);
+  if (!result.success) {
+    const first = result.error.issues[0];
+    const where = first?.path?.length ? ` at [${first.path.join('.')}]` : '';
+    return `Invalid history entry${where}: ${first?.message ?? 'schema mismatch'}`;
+  }
+  return null;
+}
 
 interface InfoProps {
   className: string;
@@ -50,6 +82,10 @@ function Debug() {
   );
   const remId = ctx?.contextData?.remId;
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isEditingHistory, setIsEditingHistory] = useState(false);
+  const [historyDraft, setHistoryDraft] = useState('');
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isSavingHistory, setIsSavingHistory] = useState(false);
   
   const debugData = useTrackerPlugin(
     async (rp) => {
@@ -119,6 +155,17 @@ function Debug() {
       const { guaranteedRogue, suspicious } = await getSpuriousCardPriorityTags(rp, rem, false);
       const hasSpuriousTags = guaranteedRogue.length > 0 || suspicious.length > 0;
 
+      // Validate the raw Incremental history slot and report whether a restore
+      // point exists, so the UI can alert on corruption and offer a rollback.
+      let historySlotError: string | null = null;
+      let historyBackupExists = false;
+      if (await rem.hasPowerup(powerupCode)) {
+        const rawHistorySlot = await rem.getPowerupProperty(powerupCode, repHistorySlotCode);
+        historySlotError = validateHistorySlot(rawHistorySlot);
+        const backup = await rp.storage.getSynced<HistoryBackup>(historyBackupKey(rem._id));
+        historyBackupExists = !!backup?.raw;
+      }
+
       return {
         incrementalRem,
         rawSlotProbe,
@@ -129,6 +176,8 @@ function Debug() {
         hasSpuriousTags,
         guaranteedRogue,
         suspicious,
+        historySlotError,
+        historyBackupExists,
         rem
       };
     },
@@ -240,7 +289,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, rawSlotProbe, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, rem } = debugData;
+  const { incrementalRem, rawSlotProbe, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
 
   const handleCardCompare = async () => {
     if (!remId) return;
@@ -392,6 +441,147 @@ function Debug() {
 
     console.log(`===========================================\n`);
     await plugin.app.toast('Slot API probe done — open DevTools console to read results.');
+  };
+
+  const handleEditHistory = async () => {
+    // Snapshot a restore point of the current (pre-edit) slot — but only when it
+    // is currently valid, so the backup always holds a known-good history and a
+    // bad edit can be rolled back. If the slot is already corrupt, we keep any
+    // existing (older, good) backup rather than overwriting it.
+    if (remId) {
+      try {
+        const targetRem = await plugin.rem.findOne(remId);
+        const currentRaw = targetRem
+          ? await targetRem.getPowerupProperty(powerupCode, repHistorySlotCode)
+          : null;
+        if (currentRaw && validateHistorySlot(currentRaw) === null) {
+          const backup: HistoryBackup = { savedAt: Date.now(), raw: currentRaw };
+          await plugin.storage.setSynced(historyBackupKey(remId), backup);
+        }
+      } catch {
+        /* backup is best-effort */
+      }
+    }
+    setHistoryDraft(incrementalRem?.history ? JSON.stringify(incrementalRem.history, null, 2) : '[]');
+    setHistoryError(null);
+    setIsEditingHistory(true);
+  };
+
+  const handleCancelEditHistory = () => {
+    setIsEditingHistory(false);
+    setHistoryError(null);
+  };
+
+  // Roll the Incremental history slot back to the last snapshot taken before an
+  // edit. Offered when the stored slot fails validation.
+  const handleRestoreHistory = async () => {
+    if (!remId) return;
+    const backup = await plugin.storage.getSynced<HistoryBackup>(historyBackupKey(remId));
+    if (!backup?.raw) {
+      await plugin.app.toast('No restore point is available for this rem.');
+      return;
+    }
+    const confirmed = confirm(
+      `Restore the history captured before your last edit ` +
+      `(${dayjs(backup.savedAt).format('MMM D, YYYY HH:mm')}, ${dayjs(backup.savedAt).fromNow()})?\n\n` +
+      `This overwrites the current repHist slot.`
+    );
+    if (!confirmed) return;
+
+    setIsSavingHistory(true);
+    try {
+      const targetRem = await plugin.rem.findOne(remId);
+      if (!targetRem) {
+        await plugin.app.toast('No rem found!');
+        return;
+      }
+      await plugin.storage.setSession('plugin_updating_srs_data', true);
+      try {
+        await targetRem.setPowerupProperty(powerupCode, repHistorySlotCode, [backup.raw]);
+      } finally {
+        setTimeout(async () => {
+          await plugin.storage.setSession('plugin_updating_srs_data', false);
+        }, 3000);
+      }
+
+      const freshIncRem = await getIncrementalRemFromRem(plugin, targetRem);
+      if (freshIncRem) {
+        await updateIncrementalRemCache(plugin, freshIncRem);
+      }
+
+      await plugin.app.toast('Restored history from the last restore point.');
+      setIsEditingHistory(false);
+      setHistoryError(null);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      console.error('[EditHistory] Restore error:', e);
+      await plugin.app.toast('Restore failed — check console.');
+    } finally {
+      setIsSavingHistory(false);
+    }
+  };
+
+  // Persist a hand-edited Incremental history. Writes the edited JSON verbatim to
+  // the `repHist` slot (debug-editor semantics: what you type is what is stored),
+  // so you can fix reviewTimeSeconds, add/delete entries, etc. It intentionally
+  // does NOT touch the Next Rep date.
+  const handleSaveHistory = async () => {
+    if (!remId) return;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(historyDraft);
+    } catch (e) {
+      setHistoryError(`Invalid JSON: ${String(e)}`);
+      return;
+    }
+    if (!Array.isArray(parsed)) {
+      setHistoryError('History must be a JSON array of entries, e.g. [ { "date": 123, "scheduled": 123 } ].');
+      return;
+    }
+    for (let i = 0; i < parsed.length; i++) {
+      const entry = parsed[i];
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        setHistoryError(`Entry ${i} is not an object.`);
+        return;
+      }
+    }
+
+    setIsSavingHistory(true);
+    try {
+      const targetRem = await plugin.rem.findOne(remId);
+      if (!targetRem) {
+        await plugin.app.toast('No rem found!');
+        return;
+      }
+
+      // Suppress the GlobalRemChanged manual-date-reset detection while we rewrite
+      // the history slot (same flag + delayed-clear pattern as updateSRSDataForRem).
+      await plugin.storage.setSession('plugin_updating_srs_data', true);
+      try {
+        await targetRem.setPowerupProperty(powerupCode, repHistorySlotCode, [JSON.stringify(parsed)]);
+      } finally {
+        setTimeout(async () => {
+          await plugin.storage.setSession('plugin_updating_srs_data', false);
+        }, 3000);
+      }
+
+      // Keep the session queue cache consistent with the edited history.
+      const freshIncRem = await getIncrementalRemFromRem(plugin, targetRem);
+      if (freshIncRem) {
+        await updateIncrementalRemCache(plugin, freshIncRem);
+      }
+
+      await plugin.app.toast(`Saved history — ${parsed.length} entr${parsed.length === 1 ? 'y' : 'ies'}.`);
+      setIsEditingHistory(false);
+      setHistoryError(null);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      console.error('[EditHistory] Save error:', e);
+      setHistoryError(`Save failed: ${String(e)}`);
+    } finally {
+      setIsSavingHistory(false);
+    }
   };
 
   const handleDebugPDF = async () => {
@@ -1600,6 +1790,7 @@ function Debug() {
   };
 
   const preStyle = { backgroundColor: 'var(--rn-clr-background-secondary)', padding: '8px', borderRadius: '4px', marginTop: '4px', fontSize: '11px', overflowX: 'auto' as 'auto' };
+  const smallBtnStyle: CSSProperties = { fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: 'pointer' };
 
   return (
     <div className="incremental-everything-debug p-4 max-h-[80vh] overflow-y-auto" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box' }}>
@@ -1664,11 +1855,85 @@ function Debug() {
               ? `${dayjs(incrementalRem.createdAt).format('MMMM D, YYYY')} (${dayjs(incrementalRem.createdAt).fromNow()})`
               : <span style={{ color: 'var(--rn-clr-content-tertiary)', fontStyle: 'italic' }}>Not set (dismissed or legacy rem)</span>}
           />
-          <Info
-            className="history"
-            label="History"
-            data={<pre style={preStyle}>{incrementalRem?.history ? JSON.stringify(incrementalRem.history, null, 2) : '[]'}</pre>}
-          />
+          <div className="history flex flex-col mb-2">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="font-semibold text-xs text-[var(--rn-clr-content-tertiary)] uppercase tracking-wider">History</div>
+              {!isEditingHistory ? (
+                <button onClick={handleEditHistory} style={smallBtnStyle}>Edit</button>
+              ) : (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={handleSaveHistory}
+                    disabled={isSavingHistory}
+                    style={{ ...smallBtnStyle, cursor: isSavingHistory ? 'wait' : 'pointer', fontWeight: 600 }}
+                  >
+                    {isSavingHistory ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={handleCancelEditHistory} disabled={isSavingHistory} style={smallBtnStyle}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+            {historySlotError && (
+              <div style={{ marginTop: '4px', padding: '8px', borderRadius: '4px', border: '1px solid #ef4444', backgroundColor: 'rgba(239, 68, 68, 0.08)' }}>
+                <div style={{ color: '#ef4444', fontSize: '11px', fontWeight: 600 }}>
+                  ⚠ Stored history is invalid — the queue reads it as empty.
+                </div>
+                <div style={{ color: 'var(--rn-clr-content-primary)', fontSize: '11px', marginTop: '2px', whiteSpace: 'pre-wrap' }}>
+                  {historySlotError}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                  <button
+                    onClick={handleRestoreHistory}
+                    disabled={!historyBackupExists || isSavingHistory}
+                    style={{ ...smallBtnStyle, cursor: (!historyBackupExists || isSavingHistory) ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: historyBackupExists ? 1 : 0.5 }}
+                  >
+                    Restore original
+                  </button>
+                  <span style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                    {historyBackupExists
+                      ? 'Rolls back to the snapshot taken before your last edit.'
+                      : 'No restore point available (no prior edit was captured for this rem).'}
+                  </span>
+                </div>
+              </div>
+            )}
+            {!isEditingHistory ? (
+              <pre style={preStyle}>{incrementalRem?.history ? JSON.stringify(incrementalRem.history, null, 2) : '[]'}</pre>
+            ) : (
+              <>
+                <textarea
+                  value={historyDraft}
+                  onChange={(e) => setHistoryDraft(e.target.value)}
+                  spellCheck={false}
+                  style={{
+                    marginTop: '4px',
+                    width: '100%',
+                    minHeight: '240px',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    lineHeight: '1.4',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    border: `1px solid ${historyError ? '#ef4444' : 'var(--rn-clr-border)'}`,
+                    backgroundColor: 'var(--rn-clr-background-secondary)',
+                    color: 'var(--rn-clr-content-primary)',
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                  }}
+                />
+                {historyError && (
+                  <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px', whiteSpace: 'pre-wrap' }}>
+                    {historyError}
+                  </div>
+                )}
+                <div style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px', marginTop: '4px' }}>
+                  Writes directly to the Incremental <code>repHist</code> slot. Must be a JSON array. Does not change the Next Rep date.
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
