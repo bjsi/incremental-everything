@@ -128,6 +128,49 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
 
+  // Isolation probe for the RemNote runtime deprecation of
+  // plugin.powerup.getPowerupSlotByCode. Runs as a command (not a widget) so it
+  // executes even though the Debug widget can no longer mount — its data-load
+  // path itself calls the deprecated method and throws before render.
+  // Confirms (a) getPowerupSlotByCode throws "is deprecated" from the app side,
+  // and (b) the sibling getPowerupByCode still works — isolating the regression.
+  await plugin.app.registerCommand({
+    id: 'probe-slot-api',
+    name: 'Probe Slot API (deprecation check)',
+    quickCode: 'probeslot',
+    action: async () => {
+      console.log(`\n========== POWERUP SLOT API PROBE ==========`);
+
+      // getPowerupByCode — control: expected to still work.
+      for (const code of [powerupCode, 'cardPriority', BuiltInPowerupCodes.DailyDocument]) {
+        try {
+          const pu = await plugin.powerup.getPowerupByCode(code);
+          console.log(`getPowerupByCode('${code}') → OK, _id=${pu?._id ?? '(undefined)'}`);
+        } catch (e) {
+          console.log(`getPowerupByCode('${code}') → THREW: ${String(e)}`);
+        }
+      }
+
+      // getPowerupSlotByCode — the suspected-deprecated method.
+      const slotCases: Array<[string, string]> = [
+        [powerupCode, 'nextRepDate'],                 // plugin powerup (Incremental)
+        ['cardPriority', 'priority'],                 // plugin powerup (CardPriority)
+        [BuiltInPowerupCodes.PDFHighlight, 'Data'],   // built-in powerup
+      ];
+      for (const [pu, slot] of slotCases) {
+        try {
+          const slotRem = await plugin.powerup.getPowerupSlotByCode(pu, slot);
+          console.log(`getPowerupSlotByCode('${pu}', '${slot}') → OK, _id=${slotRem?._id ?? '(undefined)'}`);
+        } catch (e) {
+          console.log(`getPowerupSlotByCode('${pu}', '${slot}') → THREW: ${String(e)}`);
+        }
+      }
+
+      console.log(`===========================================\n`);
+      await plugin.app.toast('Slot API probe done — open DevTools console to read results.');
+    },
+  });
+
   await plugin.app.registerCommand({
     id: 'extract-with-priority',
     name: 'Extract with Priority',

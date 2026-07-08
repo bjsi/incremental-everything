@@ -357,6 +357,43 @@ function Debug() {
     await plugin.app.toast('Deep log printed to console! Please check Developer Tools.');
   };
 
+  // Isolation probe for the RemNote runtime deprecation of
+  // plugin.powerup.getPowerupSlotByCode. Confirms (a) the slot-by-code method
+  // now throws "getPowerupSlotByCode is deprecated" from the app side, and
+  // (b) the sibling getPowerupByCode on the same namespace still works —
+  // proving the regression is isolated to getPowerupSlotByCode.
+  const handleProbeSlotApi = async () => {
+    console.log(`\n========== POWERUP SLOT API PROBE ==========`);
+
+    // getPowerupByCode — control: expected to still work.
+    for (const code of [powerupCode, 'cardPriority', BuiltInPowerupCodes.DailyDocument]) {
+      try {
+        const pu = await plugin.powerup.getPowerupByCode(code);
+        console.log(`getPowerupByCode('${code}') → OK, _id=${pu?._id ?? '(undefined)'}`);
+      } catch (e) {
+        console.log(`getPowerupByCode('${code}') → THREW: ${String(e)}`);
+      }
+    }
+
+    // getPowerupSlotByCode — the suspected-deprecated method.
+    const slotCases: Array<[string, string]> = [
+      [powerupCode, nextRepDateSlotCode],       // plugin powerup (Incremental)
+      ['cardPriority', 'priority'],             // plugin powerup (CardPriority)
+      [BuiltInPowerupCodes.PDFHighlight, 'Data'], // built-in powerup
+    ];
+    for (const [pu, slot] of slotCases) {
+      try {
+        const slotRem = await plugin.powerup.getPowerupSlotByCode(pu, slot);
+        console.log(`getPowerupSlotByCode('${pu}', '${slot}') → OK, _id=${slotRem?._id ?? '(undefined)'}`);
+      } catch (e) {
+        console.log(`getPowerupSlotByCode('${pu}', '${slot}') → THREW: ${String(e)}`);
+      }
+    }
+
+    console.log(`===========================================\n`);
+    await plugin.app.toast('Slot API probe done — open DevTools console to read results.');
+  };
+
   const handleDebugPDF = async () => {
     if (!remId) return;
     setIsPdfDebugging(true);
@@ -1581,6 +1618,20 @@ function Debug() {
            }}
          >
            Deep Log Structure
+         </button>
+         <button
+           onClick={handleProbeSlotApi}
+           style={{
+             fontSize: '11px',
+             padding: '2px 8px',
+             backgroundColor: 'var(--rn-clr-background-secondary)',
+             color: 'var(--rn-clr-content-primary)',
+             border: '1px solid var(--rn-clr-border)',
+             borderRadius: '4px',
+             cursor: 'pointer'
+           }}
+         >
+           Probe Slot API
          </button>
       </h2>
       <Info className="rem-id" label="Rem ID" data={<code>{remId}</code>} />
