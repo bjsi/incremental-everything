@@ -7,6 +7,7 @@ import {
   RemId,
 } from '@remnote/plugin-sdk';
 import { shouldUseLightMode } from '../lib/mobileUtils';
+import { getPowerupSlotByCodeSafe } from '../lib/powerup_slot_compat';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemFromRem, initIncrementalRem, IncrementalRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -362,7 +363,8 @@ function Priority() {
         const folderQueueRems = await scopeRem.allRemInFolderQueue();
         const sources = await scopeRem.getSources();
 
-        const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+        const nextRepDateSlotRem = await getPowerupSlotByCodeSafe(
+          plugin,
           powerupCode,
           nextRepDateSlotCode
         );

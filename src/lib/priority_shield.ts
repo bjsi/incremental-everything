@@ -6,6 +6,7 @@ import {
   powerupCode,
   nextRepDateSlotCode,
 } from './consts';
+import { getPowerupSlotByCodeSafe } from './powerup_slot_compat';
 import { IncrementalRem } from './incremental_rem';
 import { calculateVolumeBasedPercentile } from './utils';
 import * as _ from 'remeda';
@@ -70,7 +71,8 @@ export async function calculatePriorityShield(
       const folderQueueRems = await scopeRem.allRemInFolderQueue();
       const sources = await scopeRem.getSources();
 
-      const nextRepDateSlotRem = await plugin.powerup.getPowerupSlotByCode(
+      const nextRepDateSlotRem = await getPowerupSlotByCodeSafe(
+        plugin,
         powerupCode,
         nextRepDateSlotCode
       );

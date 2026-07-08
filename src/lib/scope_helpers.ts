@@ -1,5 +1,6 @@
 import { RNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface } from '@remnote/plugin-sdk';
 import { allIncrementalRemKey, allCardPriorityInfoKey, powerupCode, nextRepDateSlotCode } from './consts';
+import { getPowerupSlotByCodeSafe } from './powerup_slot_compat';
 import type { CardPriorityInfo } from './card_priority/types';
 
 /**
@@ -204,7 +205,7 @@ export async function buildComprehensiveScope(
   const refFromTopSet = new Set<RemId>();
   const backrefFromTopSet = new Set<RemId>();
 
-  const slot = await plugin.powerup.getPowerupSlotByCode(powerupCode, nextRepDateSlotCode);
+  const slot = await getPowerupSlotByCodeSafe(plugin, powerupCode, nextRepDateSlotCode);
   const nextRepDateSlotId: RemId | null = slot?._id ?? null;
 
   const topRem = await plugin.rem.findOne(scopeRemId);

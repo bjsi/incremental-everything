@@ -5,6 +5,7 @@ import {
   documentCardPriorityShieldHistoryKey,
   seenCardInSessionKey,
 } from '../consts';
+import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { CardPriorityInfo } from './types';
 import { calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
@@ -475,9 +476,9 @@ export async function removeCardPriorityFromRem(plugin: RNPlugin, rem: PluginRem
     const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
     const cpPowerupId = cardPriorityPowerup?._id;
 
-    const prioritySlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'priority');
-    const sourceSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'prioritySource');
-    const updatedSlot = await plugin.powerup.getPowerupSlotByCode('cardPriority', 'lastUpdated');
+    const prioritySlot = await getPowerupSlotByCodeSafe(plugin, 'cardPriority', 'priority');
+    const sourceSlot = await getPowerupSlotByCodeSafe(plugin, 'cardPriority', 'prioritySource');
+    const updatedSlot = await getPowerupSlotByCodeSafe(plugin, 'cardPriority', 'lastUpdated');
 
     const slotIds = new Set(
       [prioritySlot?._id, sourceSlot?._id, updatedSlot?._id].filter(Boolean)
@@ -594,7 +595,7 @@ export async function getSpuriousCardPriorityTags(plugin: RNPlugin, rem: PluginR
 
   const ownSlotDefinitionIds = new Set<string>();
   for (const { powerup, slot } of slotDefs) {
-    const defRem = await plugin.powerup.getPowerupSlotByCode(powerup, slot);
+    const defRem = await getPowerupSlotByCodeSafe(plugin, powerup, slot);
     if (defRem) {
       ownSlotDefinitionIds.add(defRem._id);
     }
@@ -750,9 +751,9 @@ export async function getCardPrioritySlotDefIds(plugin: RNPlugin): Promise<{
   all: Set<string>;
 }> {
   const [prioritySlot, sourceSlot, updatedSlot] = await Promise.all([
-    plugin.powerup.getPowerupSlotByCode('cardPriority', 'priority'),
-    plugin.powerup.getPowerupSlotByCode('cardPriority', 'prioritySource'),
-    plugin.powerup.getPowerupSlotByCode('cardPriority', 'lastUpdated'),
+    getPowerupSlotByCodeSafe(plugin, 'cardPriority', 'priority'),
+    getPowerupSlotByCodeSafe(plugin, 'cardPriority', 'prioritySource'),
+    getPowerupSlotByCodeSafe(plugin, 'cardPriority', 'lastUpdated'),
   ]);
   const all = new Set<string>(
     [prioritySlot?._id, sourceSlot?._id, updatedSlot?._id].filter(Boolean) as string[]
