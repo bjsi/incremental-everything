@@ -2015,35 +2015,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'ctrl+d',
     quickCode: 'dis',
     action: async () => {
-     try {
       const url = await plugin.window.getURL();
       const isQueue = url && url.includes('/flashcards');
-      console.log(`[Dismiss] === Ctrl+D triggered === isQueue=${isQueue} url=${url}`);
-
-      // Robustly remove the Incremental powerup. On recent RemNote builds a single
-      // removePowerup() can return without actually detaching the powerup tag (it
-      // clears the slot values but hasPowerup() stays true) — a silent regression
-      // from the storage/sync update. Re-fetch a fresh handle and retry with
-      // backoff; log each attempt so a persistent failure is unambiguous.
-      const removeIncrementalVerified = async (targetRemId: string, label: string): Promise<boolean> => {
-        for (let attempt = 1; attempt <= 4; attempt++) {
-          const fresh = await plugin.rem.findOne(targetRemId);
-          if (!fresh) return true; // rem gone entirely
-          if (!(await fresh.hasPowerup(powerupCode))) {
-            if (attempt > 1) console.log(`[Dismiss][${label}] incremental powerup gone (before attempt ${attempt})`);
-            return true;
-          }
-          await fresh.removePowerup(powerupCode);
-          const recheck = await plugin.rem.findOne(targetRemId);
-          const still = recheck ? await recheck.hasPowerup(powerupCode) : false;
-          console.log(`[Dismiss][${label}] removePowerup attempt ${attempt}: hasIncremental=${still}`);
-          if (!still) return true;
-          if (attempt < 4) await new Promise((res) => setTimeout(res, 250 * attempt));
-        }
-        console.error(`[Dismiss][${label}] removePowerup FAILED after 4 attempts — the incremental powerup persists. Your reps are safe in the Dismissed powerup; this is a RemNote removePowerup regression.`);
-        await plugin.app.toast('Dismiss incomplete: the Incremental powerup could not be removed (RemNote API issue). Your history is safe under the Dismissed powerup.');
-        return false;
-      };
 
       let rem;
       let incRemInfo;
@@ -2114,18 +2087,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
-        console.log(`[Dismiss][queue] rem=${rem._id} targetingQueueContext=${isTargetingQueueContext} history.len=${incRemInfo.history?.length ?? 0}`);
-
         // Replicate the Dismiss button logic from answer_buttons.tsx
         // 1. Handle card priority inheritance
-        console.log('[Dismiss][queue] step 1: handleCardPriorityInheritance…');
         await handleCardPriorityInheritance(plugin, rem, incRemInfo);
-        console.log('[Dismiss][queue] step 1 done');
 
         // 2. Calculate review time
         const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
         const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
-        console.log(`[Dismiss][queue] step 2 done: reviewTimeSeconds=${reviewTimeSeconds}`);
 
         // 3. Build the current rep history entry
         const currentRep: IncrementalRep = {
@@ -2137,44 +2105,31 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         };
 
         const updatedHistory = [...(incRemInfo.history || []), currentRep];
-        console.log(`[Dismiss][queue] step 3 done: updatedHistory.len=${updatedHistory.length}`);
 
         // 4. Transfer history to dismissed powerup
-        console.log('[Dismiss][queue] step 4: transferToDismissed…');
         await transferToDismissed(plugin, rem, updatedHistory);
-        console.log(`[Dismiss][queue] step 4 done: hasDismissed=${await rem.hasPowerup(dismissedPowerupCode)}`);
 
         // 4b. Record the dismissal in the Incremental History widget
-        console.log('[Dismiss][queue] step 4b: addToIncrementalHistory…');
         await addToIncrementalHistory(plugin, rem._id, { dismissed: true });
-        console.log('[Dismiss][queue] step 4b done');
 
         // 5. Remove from session cache
-        console.log('[Dismiss][queue] step 5: removeIncrementalRemCache…');
         await removeIncrementalRemCache(plugin, rem._id);
-        console.log('[Dismiss][queue] step 5 done');
 
         // 6. Remove incremental powerup AND conditionally advance queue simultaneously.
         // removePowerup destroys the widget sandbox on the next microtask,
         // so both IPC messages must be sent in the same tick if targeting queue.
-        console.log('[Dismiss][queue] step 6: removePowerup(incremental)…');
         if (isTargetingQueueContext) {
           // Like "Next", dismissing the queue card means we've left the rem —
           // restore the dashboard. Flag BEFORE the destructive call (consumed by
           // the persistent QueueLoadCard listener once the next card loads).
           await requestQueueDashboardRefocus(plugin, 'dismiss-command');
-          const results = await Promise.allSettled([
+          await Promise.allSettled([
             rem.removePowerup(powerupCode),
             plugin.queue.removeCurrentCardFromQueue(true),
           ]);
-          console.log('[Dismiss][queue] step 6 (allSettled) results:', results.map(r => r.status), results);
-          // Verify the removal actually took (see removeIncrementalVerified); the
-          // queue has already advanced, so re-removing here is safe.
-          await removeIncrementalVerified(rem._id, 'queue');
         } else {
-          await removeIncrementalVerified(rem._id, 'queue');
+          await rem.removePowerup(powerupCode);
         }
-        console.log(`[Dismiss][queue] step 6 done: hasIncremental=${await rem.hasPowerup(powerupCode)}`);
 
       } else {
         // Editor context: dismiss focused Incremental Rem(s)
@@ -2211,31 +2166,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
-        console.log(`[Dismiss][editor] dismissing ${remsToDissmiss.length} rem(s)`);
         for (const r of remsToDissmiss) {
-          console.log(`[Dismiss][editor] --- rem=${r._id} ---`);
           incRemInfo = await getIncrementalRemFromRem(plugin, r);
-          console.log(`[Dismiss][editor] step 1 done: incRemInfo=${!!incRemInfo} history.len=${incRemInfo?.history?.length ?? 0}`);
           if (incRemInfo) {
             // Transfer existing history to dismissed (no new rep entry needed)
-            console.log('[Dismiss][editor] step 2: transferToDismissed…');
             await transferToDismissed(plugin, r, incRemInfo.history || []);
-            console.log(`[Dismiss][editor] step 2 done: hasDismissed=${await r.hasPowerup(dismissedPowerupCode)}`);
-          } else {
-            console.warn('[Dismiss][editor] step 2 SKIPPED: getIncrementalRemFromRem returned null — transferToDismissed not called, history NOT transferred.');
           }
           // Log a standalone dismissal in the Incremental History widget
-          console.log('[Dismiss][editor] step 3: addDismissalToIncrementalHistory…');
           await addDismissalToIncrementalHistory(plugin, r._id);
-          console.log('[Dismiss][editor] step 3 done');
           // Remove from session cache
-          console.log('[Dismiss][editor] step 4: removeIncrementalRemCache…');
           await removeIncrementalRemCache(plugin, r._id);
-          console.log('[Dismiss][editor] step 4 done');
-          // Remove incremental powerup (verified — see removeIncrementalVerified)
-          console.log('[Dismiss][editor] step 5: removePowerup(incremental)…');
-          const removedEditor = await removeIncrementalVerified(r._id, 'editor');
-          console.log(`[Dismiss][editor] step 5 done: removed=${removedEditor}`);
+          // Remove incremental powerup
+          await r.removePowerup(powerupCode);
         }
 
         const count = remsToDissmiss.length;
@@ -2245,11 +2187,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             : `${count} Incremental Rems dismissed.`
         );
       }
-      console.log('[Dismiss] === Ctrl+D completed without throwing ===');
-     } catch (e) {
-      console.error('[Dismiss] !!! FAILED — the step logged just above is where it died:', e);
-      await plugin.app.toast('Dismiss failed — see the developer console ([Dismiss] logs) for the failing step.');
-     }
     },
   });
 
