@@ -13,6 +13,7 @@ import {
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
+import { isPowerupPropertySafe } from '../lib/powerupSlotFilter';
 import { getCardPriority } from '../lib/card_priority';
 import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
@@ -386,7 +387,7 @@ function Debug() {
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
       const isProp = await child.isProperty();
-      const isPowerupProp = await child.isPowerupProperty();
+      const isPowerupProp = await isPowerupPropertySafe(plugin, child);
       const childTags = await child.getTagRems();
       const textRaw = child.text;
       const textString = textRaw ? await plugin.richText.toString(textRaw) : '';

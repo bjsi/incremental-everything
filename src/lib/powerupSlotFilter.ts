@@ -196,6 +196,27 @@ export async function isPowerupPropertyChild(plugin: RNPlugin, rem: PluginRem): 
 }
 
 /**
+ * Compatibility wrapper for `rem.isPowerupProperty()`.
+ *
+ * Recent RemNote desktop builds deprecated `isPowerupProperty` at runtime (it now
+ * throws "Internal API Error: isPowerupProperty is deprecated"), just like
+ * `getPowerupSlotByCode`. This tries the native method first (so it self-heals if
+ * RemNote restores it) and, on failure, falls back to the tag-based detection
+ * ({@link isPowerupPropertyChild}), which identifies a powerup slot instance by
+ * whether it is tagged with one of our cached slot-definition ids — no deprecated
+ * primitive involved. The fallback is conservative (returns false for anything it
+ * cannot positively identify), which is the safe direction for the callers that
+ * use it to decide whether a rem is a deletable slot node.
+ */
+export async function isPowerupPropertySafe(plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
+  try {
+    return await rem.isPowerupProperty();
+  } catch {
+    return await isPowerupPropertyChild(plugin, rem);
+  }
+}
+
+/**
  * Alternative check using rem text matching
  * This is a fallback if the tag-based check doesn't work
  */
