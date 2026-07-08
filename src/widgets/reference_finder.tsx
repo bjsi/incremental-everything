@@ -1,5 +1,6 @@
 import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { safeRemTextToString } from '../lib/pdfUtils';
 
 // ---------------------------------------------------------------------------
 // Find & Insert Reference
@@ -15,6 +16,13 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 // distinctive token reliably returns the rem), unions the results, keeps only
 // rems whose name contains all tokens, and floats exact-name matches to the
 // top. Then it inserts a reference at the cursor via editor.insertRichText.
+//
+// Aliases: RemNote's built-in `[[` search also matches a rem by its aliases
+// (the Aliases built-in powerup). We do too — when a result's primary name
+// doesn't contain every typed token, we consult `rem.getAliases()` and match
+// against each alias. A match is surfaced with the alias text, and picking it
+// inserts a reference whose `aliasId` points at the matched alias, so the
+// reference renders the alias text (exactly like RemNote's own behaviour).
 // ---------------------------------------------------------------------------
 
 const normalize = (s: string) => s.normalize('NFC').trim().toLowerCase();
@@ -74,6 +82,11 @@ interface Candidate {
   score: number; // lower is better
   backText: string;
   breadcrumb: string;
+  // Set when the rem matched via one of its aliases rather than its primary
+  // name. `aliasText` is what we display and insert; `aliasId` stamps the
+  // reference so it renders the alias text and links back to this rem.
+  aliasId?: string;
+  aliasText?: string;
 }
 
 function ReferenceFinder() {
@@ -91,10 +104,20 @@ function ReferenceFinder() {
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const reqIdRef = useRef(0);
+  // The rem the picker was triggered from, captured by the command before focus
+  // moved into this widget. Excluded from results (a rem can't reference itself).
+  const sourceRemIdRef = useRef<string>('');
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      const src = await plugin.storage.getSession<string>('reference-finder-source-rem');
+      sourceRemIdRef.current = typeof src === 'string' ? src : '';
+    })();
+  }, [plugin]);
 
   // Seed the box with selected text handed off by the command (if any), then
   // select it so the user can immediately overwrite or refine it.
@@ -128,7 +151,8 @@ function ReferenceFinder() {
         let depth = 0;
         // Walk all the way to the root (cap guards against cycles/very deep trees).
         while (cur && depth < 20) {
-          const t = (await plugin.richText.toString(cur.text ?? [])).trim();
+          const raw = (await safeRemTextToString(plugin, cur.text)).trim();
+          const t = raw === 'Untitled' ? '' : raw; // treat empty ancestors as skippable
           if (t) names.push(t.length > 24 ? t.slice(0, 24) + '…' : t);
           cur = await cur.getParentRem();
           depth++;
@@ -172,6 +196,7 @@ function ReferenceFinder() {
             numResults: 50,
           });
           for (const r of res) {
+            if (r._id === sourceRemIdRef.current) continue; // never suggest the rem itself
             if (!seen.has(r._id)) seen.set(r._id, r);
           }
         }
@@ -180,25 +205,60 @@ function ReferenceFinder() {
         // Phase 1 — resolve name/type/ranking, filter to rems containing all
         // tokens, and score. (backText + breadcrumb are resolved later, only
         // for the rems we'll actually show, to keep per-keystroke cost low.)
-        type Scored = { r: any; id: string; name: string; normName: string; type: number; times: number; score: number };
+        type Scored = {
+          r: any; id: string; name: string; normName: string; type: number; times: number;
+          score: number; aliasId?: string; aliasText?: string;
+          matchFold: string; // folded text the match was made on (alias or name)
+        };
         const scored: Scored[] = [];
         for (const r of seen.values()) {
-          const name = await plugin.richText.toString(r.text ?? []);
+          // safeRemTextToString never throws on malformed `.text` (some rems in
+          // a large KB carry rich text the SDK's validator rejects, which used
+          // to reject the whole search promise) and repairs it via normalize.
+          const nameRaw = await safeRemTextToString(plugin, r.text);
+          const name = nameRaw === 'Untitled' ? '' : nameRaw;
           const foldName = fold(name);
-          // Accent-insensitive: every typed token must appear in the folded name.
-          if (!foldedTokens.every((t) => foldName.includes(t))) continue;
           const type = await r.getType().catch(() => 0);
           if (conceptsOnly && type !== RemType.CONCEPT) continue;
+
+          // Accent-insensitive: every typed token must appear in the folded name…
+          let aliasId: string | undefined;
+          let aliasText: string | undefined;
+          let matchFold = foldName;
+          if (!foldedTokens.every((t) => foldName.includes(t))) {
+            // …or in one of the rem's aliases. RemNote indexes aliases into the
+            // owning rem, so an alias-text search returns THIS rem (with a
+            // non-matching primary name); consult its aliases to confirm and
+            // capture which alias to reference. Only the non-matching results
+            // pay this extra lookup, so per-keystroke cost stays low.
+            let matched: { id: string; text: string; fold: string } | undefined;
+            try {
+              for (const a of await r.getAliases()) {
+                const atRaw = (await safeRemTextToString(plugin, a.text)).trim();
+                const at = atRaw === 'Untitled' ? '' : atRaw;
+                const fa = fold(at);
+                if (at && foldedTokens.every((t) => fa.includes(t))) {
+                  matched = { id: a._id, text: at, fold: fa };
+                  break;
+                }
+              }
+            } catch { /* ignore */ }
+            if (!matched) continue;
+            aliasId = matched.id;
+            aliasText = matched.text;
+            matchFold = matched.fold;
+          }
           const times = await r.timesSelectedInSearch().catch(() => 0);
 
           // Lower score = better. Exact match → start-with → contains; then
           // concepts before other types; then by selection count and brevity.
-          // Compared on folded text so accents don't change the ranking.
+          // Scored on the matched folded text (alias or name) so an exact alias
+          // ranks like an exact name, and accents don't change the ranking.
           let score = 3;
-          if (foldName === qf) score = 0;
-          else if (foldName.startsWith(qf)) score = 1;
-          else if (foldName.includes(qf)) score = 2;
-          scored.push({ r, id: r._id, name, normName: normalize(name), type, times, score });
+          if (matchFold === qf) score = 0;
+          else if (matchFold.startsWith(qf)) score = 1;
+          else if (matchFold.includes(qf)) score = 2;
+          scored.push({ r, id: r._id, name, normName: normalize(name), type, times, score, aliasId, aliasText, matchFold });
         }
 
         scored.sort((a, b) => {
@@ -207,7 +267,7 @@ function ReferenceFinder() {
           const bc = b.type === RemType.CONCEPT ? 0 : 1;
           if (ac !== bc) return ac - bc;
           if (a.times !== b.times) return b.times - a.times;
-          return a.name.length - b.name.length;
+          return a.matchFold.length - b.matchFold.length;
         });
 
         // Phase 2 — enrich the top results with backText + a shortened
@@ -217,12 +277,16 @@ function ReferenceFinder() {
         for (const s of top) {
           let backText = '';
           try {
-            if (s.r.backText?.length) backText = (await plugin.richText.toString(s.r.backText)).trim();
+            if (s.r.backText?.length) {
+              const bt = (await safeRemTextToString(plugin, s.r.backText)).trim();
+              backText = bt === 'Untitled' ? '' : bt; // don't show the empty-sentinel
+            }
           } catch { /* ignore */ }
           const breadcrumb = await buildBreadcrumb(s.r);
           candidates.push({
             id: s.id, name: s.name, normName: s.normName, type: s.type,
             times: s.times, score: s.score, backText, breadcrumb,
+            aliasId: s.aliasId, aliasText: s.aliasText,
           });
         }
 
@@ -290,11 +354,14 @@ function ReferenceFinder() {
           // WITHOUT the referenced text — the same result as RemNote's manual
           // "Edit or Add Alias → clear text" trick, but in one keystroke.
           const ref: any = { i: 'q', _id: cand.id };
+          // Matched via an alias → reference the owning rem but render the alias
+          // text (RemNote's own alias-reference shape: _id + aliasId).
+          if (cand.aliasId) ref.aliasId = cand.aliasId;
           if (asPin) ref.pin = true;
           if (clozeId) ref[CLOZE_KEY] = clozeId;
           await plugin.editor.insertRichText([ref]);
           inserted = true;
-          console.log('[reference-finder] insertRichText OK', asPin ? '(pin)' : '', clozeId ? '(inside cloze)' : '');
+          console.log('[reference-finder] insertRichText OK', cand.aliasId ? '(alias)' : '', asPin ? '(pin)' : '', clozeId ? '(inside cloze)' : '');
         } else {
           console.warn('[reference-finder] no active editor selection — will use clipboard fallback');
         }
@@ -424,7 +491,7 @@ function ReferenceFinder() {
       <div style={{ marginTop: '8px', maxHeight: '320px', overflowY: 'auto' }}>
         {query.trim().length < 2 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
-            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't. Enter inserts a reference; Ctrl/Cmd+Enter inserts a pin (no text); Shift+Enter / Shift+click opens the rem in a new pane.
+            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't — including matches by a rem's alias (shown with an ALIAS tag; the inserted reference renders the alias text). Enter inserts a reference; Ctrl/Cmd+Enter inserts a pin (no text); Shift+Enter / Shift+click opens the rem in a new pane.
           </div>
         ) : results.length === 0 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
@@ -465,12 +532,28 @@ function ReferenceFinder() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                    {r.name || '(empty)'}
+                    {(r.aliasText || r.name) || '(empty)'}
                   </span>
+                  {r.aliasText && (
+                    <span style={{ flexShrink: 0, fontSize: '9px', color: '#2563eb', fontWeight: 700 }}>ALIAS</span>
+                  )}
                   {r.score === 0 && (
                     <span style={{ flexShrink: 0, fontSize: '9px', color: '#16a34a', fontWeight: 700 }}>EXACT</span>
                   )}
                 </div>
+                {r.aliasText && (
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--rn-clr-content-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ↳ {r.name || '(empty)'}
+                  </div>
+                )}
                 {r.backText && (
                   <div
                     style={{

@@ -19,6 +19,7 @@ import {
   incrementalQueueActiveKey,
   incRemDisabledDeviceKey,
   currentIncrementalRemTypeKey,
+  incremNotesSidebarRemIdKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import {
@@ -104,6 +105,13 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       const clearStaleIncRemSignals = () => {
         plugin.storage.setSession(incrementalQueueActiveKey, false);
         plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
+        // Also clear the rem-extract id the notes sidebar keys off. ExtractViewer's
+        // unmount cleanup that clears this is unreliable during sandbox teardown,
+        // and its sidebar guard (remExtractId === currentIncRemId) can't catch a
+        // stale value here because currentIncRemKey is also stale on a flashcard
+        // turn — both end up equal to the previous rem, so the sidebar would keep
+        // showing it. Clearing here (main process) guarantees the empty state.
+        plugin.storage.setSession(incremNotesSidebarRemIdKey, undefined);
       };
 
       const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);

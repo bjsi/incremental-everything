@@ -34,11 +34,23 @@ const SHOW_LEFT_BORDER_CSS = `
     border-left: 3px solid green;
     padding-left: 5px;
   }
+  /* Same indicator on the document title. There is no .rem wrapper here; the
+     document's tags live in data-document-tags on the .rn-document element. */
+  .rn-document[data-document-tags~="incremental"] .rn-doc-title {
+    border-left: 3px solid green;
+    padding-left: 5px;
+  }
 `;
 
 const showDismissedIndicatorId = 'show-dismissed-indicator';
 const SHOW_DISMISSED_INDICATOR_CSS = `
   .rem[data-rem-tags~="dismissed"]:not([data-rem-tags~="incremental"]) {
+    border-left: 3px solid #f59e0b;
+    padding-left: 5px;
+  }
+  /* Same indicator on the document title; suppressed when also incremental so
+     the green border wins, matching the outline behaviour above. */
+  .rn-document[data-document-tags~="dismissed"]:not([data-document-tags~="incremental"]) .rn-doc-title {
     border-left: 3px solid #f59e0b;
     padding-left: 5px;
   }

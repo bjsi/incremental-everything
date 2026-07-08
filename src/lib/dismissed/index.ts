@@ -59,6 +59,7 @@ export async function transferToDismissed(
     history: IncrementalRep[]
 ): Promise<void> {
     if (!history || history.length === 0) {
+        console.warn(`[transferToDismissed] rem=${rem._id} EARLY RETURN: empty history — Dismissed powerup NOT added, nothing transferred.`);
         return;
     }
 
@@ -74,24 +75,34 @@ export async function transferToDismissed(
 
     // Check if already has dismissed powerup (avoid duplicates)
     const alreadyDismissed = await rem.hasPowerup(dismissedPowerupCode);
+    console.log(`[transferToDismissed] rem=${rem._id} incoming.len=${history.length} alreadyDismissed=${alreadyDismissed}`);
 
     if (alreadyDismissed) {
         // Merge histories: existing dismissed + new history with marker
         const existing = await getDismissedHistoryFromRem(plugin, rem);
         const mergedHistory = [...(existing?.history || []), ...historyWithMarker];
+        console.log(`[transferToDismissed] merging into existing dismissed (existing.len=${existing?.history?.length ?? 0} → merged.len=${mergedHistory.length})`);
         await rem.setPowerupProperty(dismissedPowerupCode, dismissedHistorySlotCode, [JSON.stringify(mergedHistory)]);
+        console.log('[transferToDismissed] merged history written');
     } else {
         // Add dismissed powerup with history
+        console.log('[transferToDismissed] a: addPowerup(dismissed)…');
         await rem.addPowerup(dismissedPowerupCode);
+        console.log('[transferToDismissed] b: writing dismissed history slot…');
         await rem.setPowerupProperty(dismissedPowerupCode, dismissedHistorySlotCode, [JSON.stringify(historyWithMarker)]);
+        console.log(`[transferToDismissed] c: history slot written (len=${historyWithMarker.length}); resolving daily-doc date ref…`);
 
         // Set dismissed date using daily doc reference
         const now = new Date();
         const dateRef = await getDailyDocReferenceForDate(plugin, now);
         if (dateRef) {
             await rem.setPowerupProperty(dismissedPowerupCode, dismissedDateSlotCode, dateRef);
+            console.log('[transferToDismissed] d: dismissed date ref written');
+        } else {
+            console.warn('[transferToDismissed] d: getDailyDocReferenceForDate returned null — dismissed date not set');
         }
     }
+    console.log('[transferToDismissed] done');
 }
 
 /**

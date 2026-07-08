@@ -65,6 +65,20 @@ export const shouldHideIncEverythingKey = 'shouldHideIncEverything';
 // commands
 export const dismissIncRemCommandId = 'dismiss-inc-rem';
 export const nextInQueueCommandId = 'next-in-queue';
+export const togglePdfHighlightBordersCommandId = 'toggle-pdf-highlight-borders';
+
+// Local (per-device) flag controlling whether the pdfextract/incremental marker
+// borders are drawn over PDF-viewer highlights. Default ON (undefined => true).
+// The "peek" toggle (command + highlight-toolbar button) flips this and the CSS
+// is re-registered to match. See registerPdfHighlightCSS in lib/ui_helpers.ts.
+export const pdfHighlightBordersEnabledKey = 'pdf-highlight-borders-enabled';
+
+// Session key bumped whenever the borders flag is toggled. registerCSS can only be
+// called from the index widget, so the toggle (which may run in the highlight-toolbar
+// iframe) can't re-register the CSS itself. Instead it bumps this key; a plugin.track
+// in the index widget subscribes to it and re-registers. Session storage is the
+// codebase's cross-iframe reactive channel (plugin.track only tracks getSession/getSynced).
+export const pdfHighlightBordersReloadKey = 'pdf-highlight-borders-reload';
 
 // --- Keys for our successful fixes ---
 export const queueLayoutFixId = 'incremental-everything-queue-layout-fix';

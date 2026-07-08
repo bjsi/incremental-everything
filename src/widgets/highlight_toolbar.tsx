@@ -1,16 +1,27 @@
-import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useTrackerPlugin, WidgetLocation } from '@remnote/plugin-sdk';
 import React, { useState, useEffect } from 'react';
-import { powerupCode } from '../lib/consts';
+import { powerupCode, pdfHighlightBordersEnabledKey, pdfHighlightBordersReloadKey } from '../lib/consts';
 import {
   handleCreateExtract,
   handleToggleIncremental,
   handleOpenBookmarkPopup,
 } from '../lib/highlightToolbarActions';
+import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 
 export function HighlightToolbar() {
   const plugin = usePlugin();
   const [remId, setRemId] = useState<string | null>(null);
   const [isIncremental, setIsIncremental] = useState<boolean | null>(null);
+
+  // Reactive so the button stays in sync when the flag is flipped elsewhere
+  // (e.g. the "Toggle PDF Highlight Marker Borders" command). Defaults to ON.
+  const bordersEnabled =
+    useTrackerPlugin(async (rp) => {
+      // Subscribe to the session reload key (reactive) so this re-runs when the flag
+      // is flipped anywhere — the button or the command — then read the persisted value.
+      await rp.storage.getSession(pdfHighlightBordersReloadKey);
+      return (await rp.storage.getLocal<boolean>(pdfHighlightBordersEnabledKey)) ?? true;
+    }, []) ?? true;
 
   useEffect(() => {
     const init = async () => {
@@ -51,6 +62,11 @@ export function HighlightToolbar() {
     if (id) await handleOpenBookmarkPopup(plugin as any, id);
   };
 
+  // Global "peek" toggle — independent of the selected highlight.
+  const onTogglePeek = async () => {
+    await togglePdfHighlightBorders(plugin as any);
+  };
+
   const toggleTooltip = isIncremental
     ? 'Remove Incremental tag from this highlight'
     : 'Tag this highlight as an Incremental Rem (auto-bookmarks position)';
@@ -64,6 +80,7 @@ export function HighlightToolbar() {
         isIncremental={isIncremental}
         title={toggleTooltip}
       />
+      <PeekButton onClick={onTogglePeek} bordersEnabled={bordersEnabled} />
     </div>
   );
 }
@@ -94,6 +111,49 @@ function BookmarkButton({ onClick }: { onClick: () => void }) {
       title="Bookmark Position — save & jump to your reading position"
     >
       🔖
+    </div>
+  );
+}
+
+function PeekButton({
+  onClick,
+  bordersEnabled,
+}: {
+  onClick: () => void;
+  bordersEnabled: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  // "Peek" is active when borders are hidden — give it a subtle amber tint so the
+  // temporary state is visible at a glance; the icon flips eye / eye-with-slash.
+  const peekActive = !bordersEnabled;
+  return (
+    <div
+      style={{
+        padding: '2px 6px',
+        cursor: 'pointer',
+        fontSize: '15px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '4px',
+        color: 'var(--rn-clr-content-primary)',
+        transition: 'box-shadow 0.15s ease, background-color 0.15s ease, transform 0.1s ease',
+        boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.18)' : 'none',
+        backgroundColor: peekActive
+          ? hovered ? 'rgba(245,158,11,0.28)' : 'rgba(245,158,11,0.15)'
+          : hovered ? 'var(--rn-clr-background-secondary, rgba(0,0,0,0.06))' : 'transparent',
+        transform: hovered ? 'translateY(-1px)' : 'none',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
+      title={
+        bordersEnabled
+          ? 'Hide extract/incremental marker borders to read the page cleanly (peek)'
+          : 'Show extract/incremental marker borders'
+      }
+    >
+      {bordersEnabled ? '👁️' : '🙈'}
     </div>
   );
 }

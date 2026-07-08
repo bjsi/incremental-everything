@@ -6,7 +6,7 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef } from 'react';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, incremReviewStartTimeKey } from '../lib/consts';
@@ -87,6 +87,11 @@ async function handleRescheduleAndPriorityUpdate(
     // Clear the start time (only relevant for queue context)
     if (context === 'queue') {
       await plugin.storage.setSession(incremReviewStartTimeKey, null);
+      // Flag the Practiced Queues refocus BEFORE advancing — same mechanism as
+      // Next/Dismiss. removeCurrentCardFromQueue tears down this popup sandbox,
+      // so the actual refocus is performed by the QueueLoadCard listener in
+      // register/events.ts once the next card loads.
+      await requestQueueDashboardRefocus(plugin, 'reschedule');
       await plugin.queue.removeCurrentCardFromQueue();
     }
 

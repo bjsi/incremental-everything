@@ -21,7 +21,7 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
-import { enableHideInQueueIntegrationId } from '../lib/consts';
+import { enableHideInQueueIntegrationId, pdfHighlightBordersReloadKey } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { registerJumpToRemHelper } from '../register/window';
@@ -71,7 +71,16 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerWidgets(plugin);
 
   // Register CSS rules
-  await registerPdfHighlightCSS(plugin);
+  // PDF highlight CSS is (re)registered reactively: the "peek" toggle (command +
+  // highlight-toolbar button) can't call registerCSS from its iframe, so it bumps
+  // pdfHighlightBordersReloadKey (session) instead. This track subscribes to that
+  // key and re-registers here in the index widget. It also runs once on activation
+  // (key undefined) to do the initial registration. registerPdfHighlightCSS reads
+  // the persisted local flag itself to decide whether to draw the marker borders.
+  plugin.track(async (rp) => {
+    await rp.storage.getSession(pdfHighlightBordersReloadKey); // reactive trigger
+    await registerPdfHighlightCSS(plugin);
+  });
   await registerPluginHidingCSS(plugin);
   await registerClozeExtractCSS(plugin);
   await registerTagBadgeCSS(plugin);

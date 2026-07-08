@@ -21,6 +21,7 @@ import {
   currentSubQueueIdKey,
   dismissIncRemCommandId,
   nextInQueueCommandId,
+  togglePdfHighlightBordersCommandId,
   currentIncrementalRemTypeKey,
   incremReviewStartTimeKey,
   allCardPriorityInfoKey,
@@ -32,6 +33,8 @@ import {
   sourceFloatingActiveIdKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown } from '../lib/utils';
+import { resolvePowerupSlotDiagnostic } from '../lib/powerup_slot_compat';
+import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
@@ -110,8 +113,74 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // multi-rem selections after Cmd+/ Omnibar steals focus. See lib/editor_selection.ts.
   registerSelectionTracker(plugin);
 
+  // "Peek" toggle: show/hide the pdfextract & incremental marker borders over
+  // PDF-viewer highlights, so a cluttered page can be read cleanly on demand.
+  // Mirrors the highlight-toolbar button; both share the same local flag.
+  await plugin.app.registerCommand({
+    id: togglePdfHighlightBordersCommandId,
+    name: 'Toggle PDF Highlight Marker Borders',
+    quickCode: 'tb',
+    action: async () => {
+      const enabled = await togglePdfHighlightBorders(plugin);
+      await plugin.app.toast(
+        enabled ? 'Highlight marker borders shown' : 'Highlight marker borders hidden (peek)'
+      );
+    },
+  });
 
 
+  // Isolation probe for the RemNote runtime deprecation of
+  // plugin.powerup.getPowerupSlotByCode. Runs as a command (not a widget) so it
+  // executes even though the Debug widget can no longer mount — its data-load
+  // path itself calls the deprecated method and throws before render.
+  // Confirms (a) getPowerupSlotByCode throws "is deprecated" from the app side,
+  // and (b) the sibling getPowerupByCode still works — isolating the regression.
+  await plugin.app.registerCommand({
+    id: 'probe-slot-api',
+    name: 'Probe Slot API (deprecation check)',
+    quickCode: 'probeslot',
+    action: async () => {
+      console.log(`\n========== POWERUP SLOT API PROBE ==========`);
+
+      // getPowerupByCode — control: expected to still work.
+      for (const code of [powerupCode, 'cardPriority', BuiltInPowerupCodes.DailyDocument]) {
+        try {
+          const pu = await plugin.powerup.getPowerupByCode(code);
+          console.log(`getPowerupByCode('${code}') → OK, _id=${pu?._id ?? '(undefined)'}`);
+        } catch (e) {
+          console.log(`getPowerupByCode('${code}') → THREW: ${String(e)}`);
+        }
+      }
+
+      // getPowerupSlotByCode — the suspected-deprecated method.
+      const slotCases: Array<[string, string]> = [
+        [powerupCode, 'nextRepDate'],                 // plugin powerup (Incremental)
+        ['cardPriority', 'priority'],                 // plugin powerup (CardPriority)
+        [BuiltInPowerupCodes.PDFHighlight, 'Data'],   // built-in powerup
+      ];
+      for (const [pu, slot] of slotCases) {
+        try {
+          const slotRem = await plugin.powerup.getPowerupSlotByCode(pu, slot);
+          console.log(`getPowerupSlotByCode('${pu}', '${slot}') → OK, _id=${slotRem?._id ?? '(undefined)'}`);
+        } catch (e) {
+          console.log(`getPowerupSlotByCode('${pu}', '${slot}') → THREW: ${String(e)}`);
+        }
+      }
+
+      // getPowerupSlotByCodeSafe — the workaround shim. Reports which path
+      // resolved each slot: 'native' (method still works), 'fallback' (native
+      // failed, children-walk resolved it), or 'unresolved'.
+      console.log(`\n--- workaround shim (getPowerupSlotByCodeSafe) ---`);
+      for (const [pu, slot] of slotCases) {
+        const { slot: rem, path, nativeError } = await resolvePowerupSlotDiagnostic(plugin, pu, slot);
+        const errNote = nativeError ? `  (native threw: ${nativeError.replace(/^Error:\s*/, '')})` : '';
+        console.log(`getPowerupSlotByCodeSafe('${pu}', '${slot}') → path=${path}, _id=${rem?._id ?? '(undefined)'}${errNote}`);
+      }
+
+      console.log(`===========================================\n`);
+      await plugin.app.toast('Slot API probe done — open DevTools console to read results.');
+    },
+  });
 
   await plugin.app.registerCommand({
     id: 'extract-with-priority',
@@ -234,6 +303,46 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const combinedRichText = [...frontText, ...backText];
       const plainStart = toCorrectedPlainStart(combinedRichText, r_start);
 
+      // --- Rem-reference selection support ---------------------------------------
+      // A selection can contain rem-reference nodes ({ i: 'q' }). References are
+      // zero-width in plain-string space, which defeats the text matching in two ways:
+      //  - a reference-only selection has selStr '' (selLen 0) → nothing to search for;
+      //  - a reference at the edge of a mixed (text + reference) selection lands exactly
+      //    on the sect_r_start/sect_r_end boundary and is skipped by the strict range
+      //    test in processSection (`currIdx > localStart && currIdx < localEnd`).
+      //
+      // RemNote clozes a reference by setting the CLOZE (cId) property directly on the
+      // { i: 'q' } node (see RichTextElementRemInterface). We collect the reference _ids
+      // in the selection here; the specific node objects are resolved by identity once
+      // the section and range are known (see selectedRefNodes below), and applied in
+      // processSection / processParentSection.
+      const selectedRefIds = new Set<string>(
+        (selection.richText as any[])
+          .filter((it) => it && typeof it !== 'string' && it.i === 'q')
+          .map((it) => it._id)
+      );
+      // Reference-only selection (no text): there is no string to search for, so reuse
+      // the text occurrence machinery by matching the reference _id instead. Each
+      // candidate's section-relative plain offset feeds allFrontOffsets/allBackOffsets,
+      // letting the existing bestFront/bestBack → isBack → sect_r_start logic pick the
+      // section and disambiguate duplicates identically to text (same back-text handling).
+      const selRef = selLen === 0
+        ? (selection.richText as any[]).find((it) => it && typeof it !== 'string' && it.i === 'q')
+        : undefined;
+      const refCandOffsets = (section: RichTextInterface): number[] => {
+        const out: number[] = [];
+        if (!selRef) return out;
+        let plain = 0;
+        for (const item of section) {
+          const isStr = typeof item === 'string';
+          const node = isStr ? { i: 'm' as const, text: item as string } : (item as any);
+          if (!isStr && node.i === 'q' && node._id === selRef._id) out.push(plain);
+          // Plain-string offsets: only text nodes advance the position (references = 0).
+          plain += node.i === 'm' ? (node.text?.length || 0) : 0;
+        }
+        return out;
+      };
+
       // Among all occurrences of the selected text, pick the one whose plain-string
       // start position is closest to the corrected plain-string offset.
       // This correctly handles duplicate phrases — indexOf always returned the first one,
@@ -245,8 +354,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         , offsets[0]);
       };
 
-      const allFrontOffsets = findAllOccurrences(frontStr, selStr);
-      const allBackOffsets  = hasBackText ? findAllOccurrences(backStr, selStr) : [];
+      // For a reference-only selection, use the reference's section-relative offsets;
+      // otherwise fall back to text matching. Either way the section/disambiguation
+      // logic below is identical.
+      const allFrontOffsets = selRef ? refCandOffsets(frontText) : findAllOccurrences(frontStr, selStr);
+      const allBackOffsets  = selRef ? refCandOffsets(backText)
+                                     : (hasBackText ? findAllOccurrences(backStr, selStr) : []);
 
       let isBack = false;
       let sect_r_start = 0;
@@ -280,6 +393,28 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       const sect_r_end = sect_r_start + selLen;
+
+      // Now that the section (isBack) and range are resolved, collect the actual
+      // reference node objects the user selected: those in the chosen section whose
+      // _id is in the selection and whose zero-width plain position falls within
+      // [sect_r_start, sect_r_end] (inclusive, so an edge reference isn't skipped by
+      // the strict range test). processSection / processParentSection then apply the
+      // cloze / highlight to these nodes by identity. Guarded by _id so a reference
+      // merely adjacent to the selection isn't caught.
+      const selectedRefNodes = new Set<any>();
+      if (selectedRefIds.size > 0) {
+        const section = isBack ? backText : frontText;
+        let plain = 0;
+        for (const item of section) {
+          const isStr = typeof item === 'string';
+          const node = isStr ? { i: 'm' as const, text: item as string } : (item as any);
+          if (!isStr && node.i === 'q' && selectedRefIds.has(node._id)
+              && plain >= sect_r_start && plain <= sect_r_end) {
+            selectedRefNodes.add(item);
+          }
+          plain += node.i === 'm' ? (node.text?.length || 0) : 0;
+        }
+      }
 
       const clozeId = Math.random().toString(36).substring(2, 10);
 
@@ -371,7 +506,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             const hadCloze = RICH_TEXT_FORMATTING.CLOZE in baseNode;
             delete baseNode[RICH_TEXT_FORMATTING.CLOZE];
             stripInheritedHintProps(baseNode);
-            if (inSel) {
+            // Selected references (selectedRefNodes) are clozed here — they're
+            // zero-width, so `inSel` (positional) may not flag them (edge/only case).
+            if (inSel || selectedRefNodes.has(item)) {
               arr.push({ ...baseNode, [RICH_TEXT_FORMATTING.CLOZE]: clozeId });
             } else if (hadCloze) {
               arr.push({ ...baseNode, [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 });
@@ -454,7 +591,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             const nodeLen = node.i === 'm' ? (node.text?.length || 0) : 0;
 
             if (nodeLen === 0) {
-              arr.push(item);
+              // Selected reference nodes get the same yellow-highlight + red-font
+              // mark as clozed text, so the parent shows they became a cloze extract.
+              arr.push(selectedRefNodes.has(item)
+                ? { ...(node as any), [RICH_TEXT_FORMATTING.HIGHLIGHT]: 3, [RICH_TEXT_FORMATTING.TEXT_COLOR]: 1 }
+                : item);
             } else {
               const nodeStart = currIdx;
               const nodeEnd   = currIdx + nodeLen;
@@ -1067,6 +1208,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         }
       } catch { /* no selection */ }
       await plugin.storage.setSession('reference-finder-initial-query', initialQuery);
+
+      // Capture the rem the picker was triggered from (focus is still in the
+      // editor here) so the widget can exclude it from results — referencing a
+      // rem to itself is never useful and it often ranked first.
+      let sourceRemId = '';
+      try {
+        const focused = await plugin.focus.getFocusedRem();
+        if (focused?._id) sourceRemId = focused._id;
+      } catch { /* no focused rem */ }
+      await plugin.storage.setSession('reference-finder-source-rem', sourceRemId);
 
       // Open the picker at the caret. getCaretPosition can momentarily return
       // undefined right after a shortcut fires (focus settling), and returns a
@@ -1864,8 +2015,35 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     keyboardShortcut: 'ctrl+d',
     quickCode: 'dis',
     action: async () => {
+     try {
       const url = await plugin.window.getURL();
       const isQueue = url && url.includes('/flashcards');
+      console.log(`[Dismiss] === Ctrl+D triggered === isQueue=${isQueue} url=${url}`);
+
+      // Robustly remove the Incremental powerup. On recent RemNote builds a single
+      // removePowerup() can return without actually detaching the powerup tag (it
+      // clears the slot values but hasPowerup() stays true) — a silent regression
+      // from the storage/sync update. Re-fetch a fresh handle and retry with
+      // backoff; log each attempt so a persistent failure is unambiguous.
+      const removeIncrementalVerified = async (targetRemId: string, label: string): Promise<boolean> => {
+        for (let attempt = 1; attempt <= 4; attempt++) {
+          const fresh = await plugin.rem.findOne(targetRemId);
+          if (!fresh) return true; // rem gone entirely
+          if (!(await fresh.hasPowerup(powerupCode))) {
+            if (attempt > 1) console.log(`[Dismiss][${label}] incremental powerup gone (before attempt ${attempt})`);
+            return true;
+          }
+          await fresh.removePowerup(powerupCode);
+          const recheck = await plugin.rem.findOne(targetRemId);
+          const still = recheck ? await recheck.hasPowerup(powerupCode) : false;
+          console.log(`[Dismiss][${label}] removePowerup attempt ${attempt}: hasIncremental=${still}`);
+          if (!still) return true;
+          if (attempt < 4) await new Promise((res) => setTimeout(res, 250 * attempt));
+        }
+        console.error(`[Dismiss][${label}] removePowerup FAILED after 4 attempts — the incremental powerup persists. Your reps are safe in the Dismissed powerup; this is a RemNote removePowerup regression.`);
+        await plugin.app.toast('Dismiss incomplete: the Incremental powerup could not be removed (RemNote API issue). Your history is safe under the Dismissed powerup.');
+        return false;
+      };
 
       let rem;
       let incRemInfo;
@@ -1936,13 +2114,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
+        console.log(`[Dismiss][queue] rem=${rem._id} targetingQueueContext=${isTargetingQueueContext} history.len=${incRemInfo.history?.length ?? 0}`);
+
         // Replicate the Dismiss button logic from answer_buttons.tsx
         // 1. Handle card priority inheritance
+        console.log('[Dismiss][queue] step 1: handleCardPriorityInheritance…');
         await handleCardPriorityInheritance(plugin, rem, incRemInfo);
+        console.log('[Dismiss][queue] step 1 done');
 
         // 2. Calculate review time
         const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
         const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
+        console.log(`[Dismiss][queue] step 2 done: reviewTimeSeconds=${reviewTimeSeconds}`);
 
         // 3. Build the current rep history entry
         const currentRep: IncrementalRep = {
@@ -1954,31 +2137,44 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         };
 
         const updatedHistory = [...(incRemInfo.history || []), currentRep];
+        console.log(`[Dismiss][queue] step 3 done: updatedHistory.len=${updatedHistory.length}`);
 
         // 4. Transfer history to dismissed powerup
+        console.log('[Dismiss][queue] step 4: transferToDismissed…');
         await transferToDismissed(plugin, rem, updatedHistory);
+        console.log(`[Dismiss][queue] step 4 done: hasDismissed=${await rem.hasPowerup(dismissedPowerupCode)}`);
 
         // 4b. Record the dismissal in the Incremental History widget
+        console.log('[Dismiss][queue] step 4b: addToIncrementalHistory…');
         await addToIncrementalHistory(plugin, rem._id, { dismissed: true });
+        console.log('[Dismiss][queue] step 4b done');
 
         // 5. Remove from session cache
+        console.log('[Dismiss][queue] step 5: removeIncrementalRemCache…');
         await removeIncrementalRemCache(plugin, rem._id);
+        console.log('[Dismiss][queue] step 5 done');
 
         // 6. Remove incremental powerup AND conditionally advance queue simultaneously.
         // removePowerup destroys the widget sandbox on the next microtask,
         // so both IPC messages must be sent in the same tick if targeting queue.
+        console.log('[Dismiss][queue] step 6: removePowerup(incremental)…');
         if (isTargetingQueueContext) {
           // Like "Next", dismissing the queue card means we've left the rem —
           // restore the dashboard. Flag BEFORE the destructive call (consumed by
           // the persistent QueueLoadCard listener once the next card loads).
           await requestQueueDashboardRefocus(plugin, 'dismiss-command');
-          await Promise.allSettled([
+          const results = await Promise.allSettled([
             rem.removePowerup(powerupCode),
             plugin.queue.removeCurrentCardFromQueue(true),
           ]);
+          console.log('[Dismiss][queue] step 6 (allSettled) results:', results.map(r => r.status), results);
+          // Verify the removal actually took (see removeIncrementalVerified); the
+          // queue has already advanced, so re-removing here is safe.
+          await removeIncrementalVerified(rem._id, 'queue');
         } else {
-          await rem.removePowerup(powerupCode);
+          await removeIncrementalVerified(rem._id, 'queue');
         }
+        console.log(`[Dismiss][queue] step 6 done: hasIncremental=${await rem.hasPowerup(powerupCode)}`);
 
       } else {
         // Editor context: dismiss focused Incremental Rem(s)
@@ -2015,18 +2211,31 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
+        console.log(`[Dismiss][editor] dismissing ${remsToDissmiss.length} rem(s)`);
         for (const r of remsToDissmiss) {
+          console.log(`[Dismiss][editor] --- rem=${r._id} ---`);
           incRemInfo = await getIncrementalRemFromRem(plugin, r);
+          console.log(`[Dismiss][editor] step 1 done: incRemInfo=${!!incRemInfo} history.len=${incRemInfo?.history?.length ?? 0}`);
           if (incRemInfo) {
             // Transfer existing history to dismissed (no new rep entry needed)
+            console.log('[Dismiss][editor] step 2: transferToDismissed…');
             await transferToDismissed(plugin, r, incRemInfo.history || []);
+            console.log(`[Dismiss][editor] step 2 done: hasDismissed=${await r.hasPowerup(dismissedPowerupCode)}`);
+          } else {
+            console.warn('[Dismiss][editor] step 2 SKIPPED: getIncrementalRemFromRem returned null — transferToDismissed not called, history NOT transferred.');
           }
           // Log a standalone dismissal in the Incremental History widget
+          console.log('[Dismiss][editor] step 3: addDismissalToIncrementalHistory…');
           await addDismissalToIncrementalHistory(plugin, r._id);
+          console.log('[Dismiss][editor] step 3 done');
           // Remove from session cache
+          console.log('[Dismiss][editor] step 4: removeIncrementalRemCache…');
           await removeIncrementalRemCache(plugin, r._id);
-          // Remove incremental powerup
-          await r.removePowerup(powerupCode);
+          console.log('[Dismiss][editor] step 4 done');
+          // Remove incremental powerup (verified — see removeIncrementalVerified)
+          console.log('[Dismiss][editor] step 5: removePowerup(incremental)…');
+          const removedEditor = await removeIncrementalVerified(r._id, 'editor');
+          console.log(`[Dismiss][editor] step 5 done: removed=${removedEditor}`);
         }
 
         const count = remsToDissmiss.length;
@@ -2036,6 +2245,11 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             : `${count} Incremental Rems dismissed.`
         );
       }
+      console.log('[Dismiss] === Ctrl+D completed without throwing ===');
+     } catch (e) {
+      console.error('[Dismiss] !!! FAILED — the step logged just above is where it died:', e);
+      await plugin.app.toast('Dismiss failed — see the developer console ([Dismiss] logs) for the failing step.');
+     }
     },
   });
 

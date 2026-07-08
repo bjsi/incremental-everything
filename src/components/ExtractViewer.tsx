@@ -76,20 +76,33 @@ function ReadOnlyRemTree({
   const nodeData = useTrackerPlugin(
     async (rp) => {
       const r = await rp.rem.findOne(remId);
-      if (!r) return { childIds: [] as RemId[], isIncremental: false, isDismissed: false };
+      if (!r) return { childIds: [] as RemId[], isIncremental: false, isDismissed: false, isClozeExtract: false, isIgnored: false };
       const children = await getChildrenExcludingSlots(rp as unknown as RNPlugin, r);
       // Powerup status for left-border emphasis (mirrors the editor's
       // incremental/dismissed left borders, since RemViewer overlays ignore
       // any text styling we set here).
       const isIncremental = await r.hasPowerup(powerupCode);
       const isDismissed = await r.hasPowerup(dismissedPowerupCode);
-      return { childIds: children.map((c) => c._id), isIncremental, isDismissed };
+      // cloze-extract and ignore are named tags (not powerups). Detect them so we
+      // can badge these child rems here too — mirrors the queue's violet ↑ cloze
+      // identifier and the editor's #ignore de-emphasis, both of which the
+      // RemViewer overlay ignores (it renders outside this iframe's CSS).
+      const tagRems = await r.getTagRems();
+      const clozeExtractTag = await rp.rem.findByName(['cloze-extract'], null);
+      const isClozeExtract = clozeExtractTag
+        ? tagRems.some((t) => t._id === clozeExtractTag._id)
+        : false;
+      const ignoreTag = await rp.rem.findByName(['ignore'], null);
+      const isIgnored = ignoreTag ? tagRems.some((t) => t._id === ignoreTag._id) : false;
+      return { childIds: children.map((c) => c._id), isIncremental, isDismissed, isClozeExtract, isIgnored };
     },
     [remId]
   );
   const childIds = nodeData?.childIds ?? [];
   const isIncremental = nodeData?.isIncremental ?? false;
   const isDismissed = nodeData?.isDismissed ?? false;
+  const isClozeExtract = nodeData?.isClozeExtract ?? false;
+  const isIgnored = nodeData?.isIgnored ?? false;
 
   const shown = childIds.slice(0, MAX_PREVIEW_CHILDREN);
   const hidden = childIds.length - shown.length;
@@ -160,6 +173,18 @@ function ReadOnlyRemTree({
       padding: '4px 8px',
       margin: '2px 0',
     };
+  } else if (isIgnored) {
+    // Deliberately understated — no colored fill, a thin *dashed* grey rule and a
+    // faint neutral tint. Reads as a muted/archived snippet, differentiating the
+    // rem without the emphasis the incremental/dismissed boxes carry. (We can't
+    // dim the rendered text itself — that's a RemViewer overlay outside our CSS.)
+    wrapperStyle = {
+      borderLeft: '2px dashed var(--rn-clr-border-primary, #cbd5e1)',
+      background: 'rgba(148,163,184,0.06)',
+      borderRadius: 6,
+      padding: '4px 8px',
+      margin: '2px 0',
+    };
   }
 
   return (
@@ -168,6 +193,22 @@ function ReadOnlyRemTree({
         {badge && (
           <div style={{ fontSize: 11, fontWeight: 700, color: badge.color, marginBottom: 2 }}>
             {badge.text}
+          </div>
+        )}
+        {isClozeExtract && (
+          <div
+            title="Cloze child — created from a parent rem via Create Cloze Deletion"
+            style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 2 }}
+          >
+            ⬆️ Cloze extract
+          </div>
+        )}
+        {isIgnored && (
+          <div
+            title="Tagged #ignore — a low-importance snippet"
+            style={{ fontSize: 11, fontWeight: 400, color: 'var(--rn-clr-content-tertiary, #94a3b8)', fontStyle: 'italic', marginBottom: 2 }}
+          >
+            🚫 Ignored
           </div>
         )}
         <RemViewer remId={remId} width="100%" />
