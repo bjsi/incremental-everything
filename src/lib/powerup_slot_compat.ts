@@ -132,3 +132,35 @@ export async function getPowerupSlotByCodeSafe(
   if (resolved) slotRemCache.set(cacheKey, resolved);
   return resolved;
 }
+
+export type SlotResolutionPath = 'native' | 'fallback' | 'unresolved';
+
+export interface SlotResolution {
+  slot: SlotRem;
+  path: SlotResolutionPath;
+  /** Present when the native method threw (i.e. it is deprecated on this build). */
+  nativeError?: string;
+}
+
+/**
+ * Diagnostic variant of {@link getPowerupSlotByCodeSafe}: resolves the slot and
+ * reports which path produced it — `native` (the SDK method still works),
+ * `fallback` (native failed, the children-walk resolved it), or `unresolved`.
+ * Bypasses the memo cache so it always exercises both paths. For probes only.
+ */
+export async function resolvePowerupSlotDiagnostic(
+  plugin: RNPlugin,
+  powerupCodeArg: string,
+  slotCode: string
+): Promise<SlotResolution> {
+  try {
+    const slot = await plugin.powerup.getPowerupSlotByCode(powerupCodeArg, slotCode);
+    if (slot) return { slot, path: 'native' };
+  } catch (e) {
+    const resolved = await resolveViaChildren(plugin, powerupCodeArg, slotCode);
+    return { slot: resolved, path: resolved ? 'fallback' : 'unresolved', nativeError: String(e) };
+  }
+  // Native returned undefined without throwing — try the fallback anyway.
+  const resolved = await resolveViaChildren(plugin, powerupCodeArg, slotCode);
+  return { slot: resolved, path: resolved ? 'fallback' : 'unresolved' };
+}

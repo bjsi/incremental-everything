@@ -33,6 +33,7 @@ import {
   sourceFloatingActiveIdKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown } from '../lib/utils';
+import { resolvePowerupSlotDiagnostic } from '../lib/powerup_slot_compat';
 import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
@@ -164,6 +165,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         } catch (e) {
           console.log(`getPowerupSlotByCode('${pu}', '${slot}') → THREW: ${String(e)}`);
         }
+      }
+
+      // getPowerupSlotByCodeSafe — the workaround shim. Reports which path
+      // resolved each slot: 'native' (method still works), 'fallback' (native
+      // failed, children-walk resolved it), or 'unresolved'.
+      console.log(`\n--- workaround shim (getPowerupSlotByCodeSafe) ---`);
+      for (const [pu, slot] of slotCases) {
+        const { slot: rem, path, nativeError } = await resolvePowerupSlotDiagnostic(plugin, pu, slot);
+        const errNote = nativeError ? `  (native threw: ${nativeError.replace(/^Error:\s*/, '')})` : '';
+        console.log(`getPowerupSlotByCodeSafe('${pu}', '${slot}') → path=${path}, _id=${rem?._id ?? '(undefined)'}${errNote}`);
       }
 
       console.log(`===========================================\n`);
