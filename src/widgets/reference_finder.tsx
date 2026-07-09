@@ -119,16 +119,25 @@ function ReferenceFinder() {
   // moved into this widget. Excluded from results (a rem can't reference itself).
   const sourceRemIdRef = useRef<string>('');
 
-  // Make the widget iframe's own document transparent and gapless. RemNote's
-  // floating-widget host fills the iframe rectangle (square corners) behind us;
-  // without this, our rounded panel reveals that filled square at the corners
-  // ("squared outside, rounded inside"). Transparent html/body lets the corners
-  // show the page instead, so the rounded outer edge reads cleanly.
+  // Round outer edge / kill the filled square behind our corners. renderWidget
+  // mounts us inside the iframe on a container that carries RemNote's default
+  // (square, themed) background — our rounded panel then reveals that fill at the
+  // corners ("squared outside, rounded inside"; a light square even in dark mode
+  // is the un-themed canvas showing through). Make the document AND every
+  // wrapper element transparent, excluding our own panel (marked data-rf-panel)
+  // and its descendants so they keep their backgrounds.
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
-      html, body { background: transparent !important; margin: 0 !important; padding: 0 !important; }
-      body > * { border-radius: 10px; }
+      html, body {
+        background: transparent !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color-scheme: light dark;
+      }
+      body *:not([data-rf-panel]):not([data-rf-panel] *) {
+        background-color: transparent !important;
+      }
     `;
     document.head.appendChild(style);
     return () => { style.remove(); };
@@ -679,6 +688,7 @@ function ReferenceFinder() {
 
   return (
     <div
+      data-rf-panel
       style={{
         fontFamily: 'system-ui, -apple-system, sans-serif',
         color: 'var(--rn-clr-content-primary)',
@@ -686,11 +696,12 @@ function ReferenceFinder() {
         // Conspicuous border: a solid 2px frame in RemNote's opaque border color
         // (with a concrete grey fallback so it stays visible even if the variable
         // is missing — an undefined var with no fallback drops the whole
-        // declaration), reinforced by a 1px ring (box-shadow, so it follows the
-        // rounded corners) and a deeper drop shadow to lift the panel off the page.
+        // declaration), plus a soft drop shadow to lift the panel off the page.
+        // (No box-shadow "ring": on a light background it doubled the corner edge
+        // and read as a faint halo just outside the rounded border.)
         border: '2px solid var(--rn-clr-border-opaque, #9ca3af)',
         borderRadius: '10px',
-        boxShadow: '0 0 0 1px var(--rn-clr-border-opaque, #9ca3af), 0 14px 44px rgba(0,0,0,0.4)',
+        boxShadow: '0 10px 32px rgba(0,0,0,0.28)',
         padding: '12px',
         boxSizing: 'border-box',
         // Hidden (but fully laid out, so getDimensions still measures our real
