@@ -242,6 +242,9 @@ function Debug() {
     inTaggedRemCount: number;
     powerupNotInTaggedRem: number;
     slotButNoPowerup: number;
+    canonicalDefId: string | null;
+    distinctDefs: Array<{ defId: string; count: number; isCanonical: boolean }>;
+    unknownDefCount: number;
     verdict: string;
     sampleDivergent: string[];
   }>(null);
@@ -1424,11 +1427,33 @@ function Debug() {
       const cardRemIds = Array.from(new Set(allCards.map((c: Card) => c.remId).filter(Boolean))) as string[];
       console.log(`card.getAll() → ${allCards.length} cards across ${cardRemIds.length} rems. Probing hasPowerup directly…`);
 
+      const canonicalDefId = powerup?._id ?? null;
+
       let hasPowerupCount = 0;
       let inTaggedRemCount = 0;
       let powerupNotInTaggedRem = 0;
       let slotButNoPowerup = 0;
       const sampleDivergent: string[] = [];
+
+      // Which cardPriority powerup-DEFINITION rem each tagged rem points to.
+      // Duplicate definitions (e.g. imported cross-KB) show up as >1 distinct id.
+      const defIdCounts = new Map<string, number>();
+      let unknownDefCount = 0;
+      const bumpDef = (id: string) => defIdCounts.set(id, (defIdCounts.get(id) || 0) + 1);
+
+      // Resolve the cardPriority definition rem a given rem is tagged with, by
+      // scanning its tags for the one named "CardPriority". Returns null if none
+      // is found on the tags.
+      const resolveCardPriorityDefId = async (r: any): Promise<string | null> => {
+        try {
+          const tags = await r.getTagRems();
+          for (const t of tags) {
+            const nm = (await safeRemTextToString(plugin, t.text))?.trim();
+            if (nm === 'CardPriority') return t._id;
+          }
+        } catch { /* ignore */ }
+        return null;
+      };
 
       const batchSize = 50;
       for (let i = 0; i < cardRemIds.length; i += batchSize) {
@@ -1444,11 +1469,17 @@ function Debug() {
             const hasSlotValue = slotVal != null && String(slotVal).trim() !== '';
 
             if (has) hasPowerupCount++;
-            if (inTagged) inTaggedRemCount++;
+            if (inTagged) {
+              inTaggedRemCount++;
+              // Tagged rems are, by definition, tagged to the canonical def.
+              if (canonicalDefId) bumpDef(canonicalDefId);
+            }
             if (has && !inTagged) {
               powerupNotInTaggedRem++;
+              const defId = await resolveCardPriorityDefId(r);
+              if (defId) bumpDef(defId); else unknownDefCount++;
               if (sampleDivergent.length < 20)
-                sampleDivergent.push(`${rid}: hasPowerup=true, taggedRem=MISSING, prioritySlot=${hasSlotValue ? String(slotVal) : '∅'}`);
+                sampleDivergent.push(`${rid}: hasPowerup=true, taggedRem=MISSING, def=${defId ?? 'unknown'}, prioritySlot=${hasSlotValue ? String(slotVal) : '∅'}`);
             }
             if (!has && hasSlotValue) {
               slotButNoPowerup++;
@@ -1462,12 +1493,18 @@ function Debug() {
         }
       }
 
+      const distinctDefs = Array.from(defIdCounts.entries())
+        .map(([defId, count]) => ({ defId, count, isCanonical: defId === canonicalDefId }))
+        .sort((a, b) => b.count - a.count);
+
       // Verdict
       let verdict: string;
-      if (powerupNotInTaggedRem > 0 && hasPowerupCount > taggedRems.length) {
-        verdict = `READ-SIDE regression: ${powerupNotInTaggedRem} rems have the cardPriority powerup but taggedRem() omits them → taggedRem() is under-returning.`;
+      if (distinctDefs.length > 1) {
+        verdict = `DUPLICATE DEFINITIONS: ${distinctDefs.length} distinct cardPriority powerup-definition rems tag these rems (getPowerupByCode returns only the canonical one, so taggedRem() misses those tagged to the other[s]). Typical cause: a document imported from another KB brought its own copy of the powerup.`;
+      } else if (powerupNotInTaggedRem > 0 && hasPowerupCount > taggedRems.length) {
+        verdict = `READ-SIDE: ${powerupNotInTaggedRem} rems have the cardPriority powerup but taggedRem() omits them, yet only ONE definition rem was found — points to a stale per-KB taggedRem index rather than duplicate definitions.`;
       } else if (slotButNoPowerup > 0) {
-        verdict = `WRITE-SIDE regression: ${slotButNoPowerup} rems carry a priority slot value with NO cardPriority powerup tag → addPowerup did not persist the tag.`;
+        verdict = `WRITE-SIDE: ${slotButNoPowerup} rems carry a priority slot value with NO cardPriority powerup tag → addPowerup did not persist the tag.`;
       } else if (hasPowerupCount === inTaggedRemCount) {
         verdict = 'CONSISTENT: taggedRem() matches direct hasPowerup over all card rems — no divergence.';
       } else {
@@ -1481,11 +1518,17 @@ function Debug() {
         inTaggedRemCount,
         powerupNotInTaggedRem,
         slotButNoPowerup,
+        canonicalDefId,
+        distinctDefs,
+        unknownDefCount,
         verdict,
         sampleDivergent,
       };
 
       console.log('Summary:', result);
+      console.log(`Distinct cardPriority definition rems (${distinctDefs.length}):`);
+      distinctDefs.forEach((d) => console.log(`  • ${d.defId}${d.isCanonical ? ' (canonical, from getPowerupByCode)' : ' (DUPLICATE)'} — ${d.count} rems`));
+      if (unknownDefCount > 0) console.log(`  • unresolved def on ${unknownDefCount} rem(s)`);
       console.log('Sample divergent rems:');
       sampleDivergent.forEach((s) => console.log('  •', s));
       console.log('VERDICT:', verdict);
@@ -1964,6 +2007,17 @@ function Debug() {
             <div>direct <code>hasPowerup</code>=true: <strong>{tagAudit.hasPowerupCount}</strong> (of which in taggedRem: {tagAudit.inTaggedRemCount})</div>
             <div>hasPowerup=true but <em>missing</em> from taggedRem: <strong style={{ color: tagAudit.powerupNotInTaggedRem > 0 ? '#ef4444' : 'inherit' }}>{tagAudit.powerupNotInTaggedRem}</strong></div>
             <div>priority slot present but <em>no</em> powerup tag: <strong style={{ color: tagAudit.slotButNoPowerup > 0 ? '#ef4444' : 'inherit' }}>{tagAudit.slotButNoPowerup}</strong></div>
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '11px' }}>
+            <div>distinct cardPriority definition rems: <strong style={{ color: tagAudit.distinctDefs.length > 1 ? '#ef4444' : 'inherit' }}>{tagAudit.distinctDefs.length}</strong></div>
+            {tagAudit.distinctDefs.map((d) => (
+              <div key={d.defId} style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-secondary)' }}>
+                • <code>{d.defId}</code> {d.isCanonical ? '(canonical)' : '(DUPLICATE)'} — {d.count} rems
+              </div>
+            ))}
+            {tagAudit.unknownDefCount > 0 && (
+              <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-secondary)' }}>• unresolved def on {tagAudit.unknownDefCount} rem(s)</div>
+            )}
           </div>
           <div style={{ marginTop: '6px', fontSize: '11px', fontWeight: 600 }}>{tagAudit.verdict}</div>
           <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>Full breakdown + sample rems in the developer console.</div>
