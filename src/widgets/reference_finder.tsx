@@ -1,4 +1,4 @@
-import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType, RICH_TEXT_FORMATTING } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
 
@@ -242,10 +242,6 @@ function ReferenceFinder() {
           if (!cancelled) setListMaxHeight(listMax);
         }
 
-        console.log('[reference-finder] flip:', {
-          anchorLeft, width, viewportWidth, chosenLeft: Math.round(left), flippedH: left !== anchorLeft,
-          caretBottom, viewportHeight, spaceBelow, spaceAbove, flipUp, vertical,
-        });
         await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { left: Math.round(left), ...vertical });
       } catch (e) {
         // Something failed after we may have pinned to the right edge — restore
@@ -441,9 +437,9 @@ function ReferenceFinder() {
   }, [floatingWidgetId, plugin]);
 
   const pick = useCallback(
-    async (cand: Candidate | undefined, asPin = false) => {
+    async (cand: Candidate | undefined, mode: 'ref' | 'pin' | 'textPin' = 'ref') => {
       if (!cand) return;
-      console.log('[reference-finder] pick →', cand.id, JSON.stringify(cand.name), asPin ? '(as pin)' : '');
+      console.log('[reference-finder] pick →', cand.id, JSON.stringify(cand.name), `(${mode})`);
 
       // Insert WHILE the widget is still open: RemNote keeps the underlying
       // editor as the "active editor" even though DOM focus is in this iframe.
@@ -480,18 +476,96 @@ function ReferenceFinder() {
             await plugin.editor.delete();
             console.log('[reference-finder] deleted selected text before inserting');
           }
-          // A pinned reference (`pin: true`) renders as just the link chip
-          // WITHOUT the referenced text — the same result as RemNote's manual
-          // "Edit or Add Alias → clear text" trick, but in one keystroke.
-          const ref: any = { i: 'q', _id: cand.id };
-          // Matched via an alias → reference the owning rem but render the alias
-          // text (RemNote's own alias-reference shape: _id + aliasId).
-          if (cand.aliasId) ref.aliasId = cand.aliasId;
-          if (asPin) ref.pin = true;
-          if (clozeId) ref[CLOZE_KEY] = clozeId;
-          await plugin.editor.insertRichText([ref]);
+          // Build the rich text to insert:
+          //  • 'ref'     — a normal reference (renders the referenced text).
+          //  • 'pin'     — a pinned reference: just the link chip, WITHOUT the
+          //                text (RemNote's "Edit or Add Alias → clear text" trick).
+          //  • 'textPin' — the rem's text spelled out, then a pin chip after it
+          //                (mirrors RemNote's paste option "Text with Pin").
+          const makeRef = (pin: boolean): any => {
+            const r: any = { i: 'q', _id: cand.id };
+            // Matched via an alias → reference the owning rem but render the alias
+            // text (RemNote's own alias-reference shape: _id + aliasId).
+            if (cand.aliasId) r.aliasId = cand.aliasId;
+            if (pin) r.pin = true;
+            if (clozeId) r[CLOZE_KEY] = clozeId;
+            return r;
+          };
+          let toInsert: any[];
+          if (mode === 'textPin') {
+            // "Text with Pin" (mirrors RemNote's paste option): splice in the
+            // SOURCE rem's own rich text — keeping formatting, images, etc. —
+            // then a pin chip. Two twists that match the plugin's Opt+Z cloze
+            // workflow:
+            //  • the source's cloze spans are NOT re-clozed (that would make
+            //    "clozes out of clozes"); instead they're MARKED like Opt+Z —
+            //    yellow highlight (h:3) + reference font colour (tc:1) — so they
+            //    still read as clozes without being functional ones.
+            //  • if the source is a front/back card, the back is brought along
+            //    too, joined with a practice-direction arrow instead of RemNote's
+            //    card delimiter.
+            const HL = RICH_TEXT_FORMATTING.HIGHLIGHT;
+            const TC = RICH_TEXT_FORMATTING.TEXT_COLOR;
+            const stripHints = (n: any) => {
+              delete n[RICH_TEXT_FORMATTING.CLOZE_HINT];
+              delete n[RICH_TEXT_FORMATTING.CARD_HINT_FRONT];
+              delete n[RICH_TEXT_FORMATTING.CARD_HINT_BACK];
+              delete n[RICH_TEXT_FORMATTING.MULTILINE_CARD_HINT];
+              delete n[RICH_TEXT_FORMATTING.HIDDEN_CLOZE];
+              delete n[RICH_TEXT_FORMATTING.REVEALED_CLOZE];
+            };
+            let srcRem: any;
+            try { srcRem = await plugin.rem.findOne(cand.aliasId || cand.id); } catch { /* ignore */ }
+            const frontRt: any[] = Array.isArray(srcRem?.text) ? srcRem.text : [];
+            const backRt: any[] = Array.isArray(srcRem?.backText) ? srcRem.backText : [];
+            // Arrow reflects the card's practice direction, like the Opt+Z command.
+            let arrowChar = '⇔';
+            try {
+              if (backRt.length && srcRem) {
+                const dir = await srcRem.getPracticeDirection();
+                arrowChar = dir === 'forward' ? '⇒' : dir === 'backward' ? '⇐' : '⇔';
+              }
+            } catch { /* keep default */ }
+            // Convert a section's rich text: cloze spans → marked (not clozed);
+            // card-delimiter nodes ('s') → the arrow; everything else preserved.
+            const processSection = (rt: any[]): any[] => {
+              const out: any[] = [];
+              for (const item of rt) {
+                const isStr = typeof item === 'string';
+                if (!isStr && (item as any)?.i === 's') {
+                  out.push({ i: 'm', text: ' ' + arrowChar + ' ' });
+                  continue;
+                }
+                const node: any = isStr ? { i: 'm', text: item } : { ...(item as any) };
+                const hadCloze = CLOZE_KEY in node;
+                delete node[CLOZE_KEY];
+                stripHints(node);
+                if (hadCloze) { node[HL] = 3; node[TC] = 1; out.push(node); }
+                else out.push(isStr ? (item as string) : node);
+              }
+              return out;
+            };
+            const parts: any[] = [...processSection(frontRt)];
+            if (backRt.length) {
+              // Only add a separator arrow if the front didn't already carry a
+              // card delimiter (which processSection just turned into one).
+              const hasDelim = frontRt.some((it: any) => it && typeof it !== 'string' && it.i === 's');
+              if (!hasDelim) parts.push({ i: 'm', text: ' ' + arrowChar + ' ' });
+              parts.push(...processSection(backRt));
+            }
+            if (!parts.length) {
+              const displayText = (cand.aliasText || cand.name || '').trim();
+              if (displayText) parts.push(displayText);
+            }
+            parts.push(' ');
+            parts.push(makeRef(true));
+            toInsert = parts;
+          } else {
+            toInsert = [makeRef(mode === 'pin')];
+          }
+          await plugin.editor.insertRichText(toInsert);
           inserted = true;
-          console.log('[reference-finder] insertRichText OK', cand.aliasId ? '(alias)' : '', asPin ? '(pin)' : '', clozeId ? '(inside cloze)' : '');
+          console.log('[reference-finder] insertRichText OK', `(${mode})`, cand.aliasId ? '(alias)' : '', clozeId ? '(inside cloze)' : '');
         } else {
           console.warn('[reference-finder] no active editor selection — will use clipboard fallback');
         }
@@ -569,9 +643,11 @@ function ReferenceFinder() {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       // Shift+Enter opens the rem in a new pane; Ctrl/Cmd+Enter inserts a PIN
-      // (reference without its text); plain Enter inserts a normal reference.
+      // (reference without its text); Opt/Alt+Enter inserts the text followed by
+      // a pin ("Text with Pin"); plain Enter inserts a normal reference.
       if (e.shiftKey) open(results[selected]);
-      else pick(results[selected], e.ctrlKey || e.metaKey);
+      else if (e.altKey) pick(results[selected], 'textPin');
+      else pick(results[selected], e.ctrlKey || e.metaKey ? 'pin' : 'ref');
     } else if (e.key === 'Escape') {
       e.preventDefault();
       close();
@@ -624,7 +700,7 @@ function ReferenceFinder() {
       <div style={{ marginTop: '8px', maxHeight: `${listMaxHeight}px`, overflowY: 'auto' }}>
         {query.trim().length < 2 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
-            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't — including matches by a rem's alias (shown with an ALIAS tag; the inserted reference renders the alias text). Enter inserts a reference; Ctrl/Cmd+Enter inserts a pin (no text); Shift+Enter / Shift+click opens the rem in a new pane.
+            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't — including matches by a rem's alias (shown with an ALIAS tag; the inserted reference renders the alias text). Enter inserts a reference; Ctrl/Cmd+Enter inserts a pin (no text); Opt/Alt+Enter inserts the text then a pin; Shift+Enter / Shift+click opens the rem in a new pane.
           </div>
         ) : results.length === 0 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
@@ -635,8 +711,10 @@ function ReferenceFinder() {
             <div
               key={r.id}
               onMouseEnter={() => setSelected(i)}
-              title="Click: insert reference · Ctrl/Cmd+click: insert pin (no text) · Shift+click: open in new pane"
-              onClick={(e) => (e.shiftKey ? open(r) : pick(r, e.ctrlKey || e.metaKey))}
+              title="Click: insert reference · Ctrl/Cmd+click: insert pin (no text) · Opt/Alt+click: text then pin · Shift+click: open in new pane"
+              onClick={(e) =>
+                e.shiftKey ? open(r) : e.altKey ? pick(r, 'textPin') : pick(r, e.ctrlKey || e.metaKey ? 'pin' : 'ref')
+              }
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -718,8 +796,33 @@ function ReferenceFinder() {
           ))
         )}
       </div>
-      <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>
-        ↑/↓ navigate · Enter insert reference · Ctrl/Cmd+Enter insert pin (no text) · Shift+Enter open in new pane · Esc close
+      <div
+        style={{
+          marginTop: '8px',
+          paddingTop: '6px',
+          borderTop: '1px solid var(--rn-clr-border)',
+          fontSize: '10px',
+          color: 'var(--rn-clr-content-tertiary)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          columnGap: '12px',
+          rowGap: '3px',
+        }}
+      >
+        {[
+          { keys: '↑/↓', label: 'navigate' },
+          { keys: 'Enter', label: 'reference' },
+          { keys: 'Ctrl/Cmd+Enter', label: 'pin (no text)' },
+          { keys: 'Opt/Alt+Enter', label: 'text + pin' },
+          { keys: 'Shift+Enter', label: 'open in new pane' },
+          { keys: 'Esc', label: 'close' },
+        ].map((s) => (
+          <span key={s.keys} style={{ whiteSpace: 'nowrap' }}>
+            <strong style={{ color: 'var(--rn-clr-content-secondary)', fontWeight: 600 }}>{s.keys}</strong>{' '}
+            {s.label}
+          </span>
+        ))}
       </div>
     </div>
   );
