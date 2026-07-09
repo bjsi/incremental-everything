@@ -1153,12 +1153,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   // Toggle "• " at the start of each selected line within a single rem. Handy
   // for restoring bullets that PDF highlights flatten into soft-wrapped text.
   // opt+8 types the bullet glyph and opt+shift+8 the degree symbol (°) on macOS,
-  // so we use ctrl+opt+shift+8 to avoid both (mirrors the Ctrl/Cmd+Shift+8
-  // "bulleted list" shortcut in Docs/Word).
+  // ctrl+opt+shift+8 is used to apply blue highlight to inline text in Remnote,
+  // so we use Shift+F8.
   plugin.app.registerCommand({
     id: 'bulletize-inline-selection',
     name: 'Bulletize Inline Selected Text',
-    keyboardShortcut: 'ctrl+opt+shift+8',
+    keyboardShortcut: 'shift+F8',
     quickCode: 'bul',
     action: async () => {
       await bulletizeSelection(plugin);
