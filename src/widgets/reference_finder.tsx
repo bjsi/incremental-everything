@@ -96,6 +96,17 @@ function ReferenceFinder() {
     []
   );
   const floatingWidgetId = ctx?.floatingWidgetId;
+  const widgetInstanceId = (ctx as any)?.widgetInstanceId as string | undefined;
+
+  // The picker starts hidden while we measure the viewport and (if needed) flip
+  // to the left of the caret, so the user never sees it jump. Revealed once
+  // positioning settles — or immediately if measurement can't run.
+  const [positioned, setPositioned] = useState(false);
+  const positionedRef = useRef(false);
+  // Max height for the results list, capped to the space available on whichever
+  // side (below/above the caret) we open on, so a long list scrolls instead of
+  // spilling off-screen. Set during positioning; 320 is the default cap.
+  const [listMaxHeight, setListMaxHeight] = useState(320);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Candidate[]>([]);
@@ -108,9 +119,16 @@ function ReferenceFinder() {
   // moved into this widget. Excluded from results (a rem can't reference itself).
   const sourceRemIdRef = useRef<string>('');
 
+  // Focus once we're actually visible — a visibility:hidden input can't take
+  // focus, so focusing before the position settles would be a no-op. Select any
+  // seeded query text so it can be overwritten immediately.
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (!positioned) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    if (el.value) el.select();
+  }, [positioned]);
 
   useEffect(() => {
     (async () => {
@@ -139,6 +157,118 @@ function ReferenceFinder() {
       .stealKeys(floatingWidgetId, ['Enter', 'ArrowUp', 'ArrowDown', 'Escape'])
       .catch(() => {/* best-effort; arrows/Enter still work inside the input */});
   }, [floatingWidgetId, plugin]);
+
+  // Keep the picker on-screen. The command opens us with our LEFT edge at the
+  // caret and our top just below it; near the right or bottom edge of the window
+  // that pushes our panel off-screen and RemNote doesn't clamp it. Neither the
+  // command sandbox nor this widget iframe can read the host window size from the
+  // DOM (innerWidth is the iframe's own size and cross-origin reads throw). The
+  // one host-coordinate signal we DO get is plugin.widget.getDimensions, so we
+  // measure geometrically:
+  //   1. read where we were placed (left edge = the caret).
+  //   2. briefly anchor our RIGHT + BOTTOM edges to the viewport and read back —
+  //      rect.right / rect.bottom are then the true viewport width / height.
+  //   3. flip LEFT of the caret if we'd overflow the right edge; flip ABOVE the
+  //      caret if the fully-expanded panel wouldn't fit below (mirrors RemNote's
+  //      selection search, which opens upward once the anchor passes mid-screen).
+  // All of this runs while the panel is hidden, so there's no visible jump.
+  useEffect(() => {
+    if (!floatingWidgetId || !widgetInstanceId || positionedRef.current) return;
+    let cancelled = false;
+    const reveal = () => {
+      if (cancelled || positionedRef.current) return;
+      positionedRef.current = true;
+      setPositioned(true);
+    };
+    (async () => {
+      const MARGIN = 8;
+      const GAP = 6; // matches the caret offset the command opens us with
+      // Non-list chrome (header + input + footer + paddings/gaps). Subtracted
+      // from the space on the chosen side to size the scrollable results list.
+      const CHROME = 130;
+      const LIST_CAP = 320; // never grow the list beyond this even with room
+      // getDimensions is typed for a number but getWidgetContext hands back a
+      // string id; coerce, and fall back to the raw value if it isn't numeric.
+      const numId = Number(widgetInstanceId);
+      const instId: any = Number.isFinite(numId) ? numId : widgetInstanceId;
+      // The caret rect handed over by the command (host coordinates) — lets us
+      // flip above precisely. Falls back to values derived from our placement.
+      let caret: { top: number; bottom: number; left: number; right: number } | null = null;
+      try { caret = (await plugin.storage.getSession('reference-finder-caret')) ?? null; } catch { /* ignore */ }
+      // Original placement; captured up front so we can restore it if a later
+      // step throws mid-measurement.
+      let orig: { top: number; left: number } | undefined;
+      try {
+        const placed = await plugin.widget.getDimensions(instId);
+        if (cancelled) return;
+        const anchorLeft = placed.left;
+        const width = placed.width || 680;
+        // The command opened us at top = caret.bottom + GAP.
+        const caretBottom = caret?.bottom ?? (placed.top - GAP);
+        const caretTop = caret?.top ?? (caretBottom - 24);
+        orig = { top: Math.round(placed.top), left: Math.round(anchorLeft) };
+
+        // Measure the viewport by pinning our right+bottom edges to it, then
+        // reading back: rect.right / rect.bottom equal the true viewport size.
+        await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { right: 0, bottom: 0 });
+        await new Promise((r) => setTimeout(r, 16)); // let the host relayout
+        const pinned = await plugin.widget.getDimensions(instId);
+        if (cancelled) return;
+        const viewportWidth = pinned.right;
+        const viewportHeight = pinned.bottom;
+
+        // Horizontal: flip to the left of the caret if we'd overflow the right.
+        let left = anchorLeft;
+        if (viewportWidth > 0 && anchorLeft + width > viewportWidth - MARGIN) {
+          left = Math.max(MARGIN, Math.min(anchorLeft - width, viewportWidth - width - MARGIN));
+        }
+
+        // Vertical: open below the caret, but flip above once the caret passes
+        // the vertical midpoint (more room above than below) — mirrors RemNote's
+        // selection search, which opens upward even just below mid-screen. When
+        // flipping we anchor our BOTTOM just above the caret so the list grows up.
+        const spaceBelow = viewportHeight - caretBottom;
+        const spaceAbove = caretTop;
+        const flipUp = viewportHeight > 0 && spaceAbove > spaceBelow;
+        const vertical = flipUp
+          ? { bottom: Math.max(MARGIN, Math.round(viewportHeight - caretTop + GAP)) }
+          : { top: Math.round(caretBottom) + GAP };
+
+        // Cap the results list to the room available on the chosen side so a long
+        // list scrolls instead of running off-screen.
+        if (viewportHeight > 0) {
+          const sideSpace = flipUp ? spaceAbove : spaceBelow;
+          const listMax = Math.max(120, Math.min(LIST_CAP, Math.round(sideSpace - CHROME - MARGIN - GAP)));
+          if (!cancelled) setListMaxHeight(listMax);
+        }
+
+        console.log('[reference-finder] flip:', {
+          anchorLeft, width, viewportWidth, chosenLeft: Math.round(left), flippedH: left !== anchorLeft,
+          caretBottom, viewportHeight, spaceBelow, spaceAbove, flipUp, vertical,
+        });
+        await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { left: Math.round(left), ...vertical });
+      } catch (e) {
+        // Something failed after we may have pinned to the right edge — restore
+        // the original placement so we never reveal stuck off to the side.
+        console.warn('[reference-finder] viewport measurement failed:', e);
+        if (!cancelled && orig) {
+          try { await plugin.window.setFloatingWidgetPosition(floatingWidgetId, orig); }
+          catch { /* best-effort */ }
+        }
+      } finally {
+        reveal();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [floatingWidgetId, widgetInstanceId, plugin]);
+
+  // Safety net: never leave the picker invisible if measurement stalls.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!positionedRef.current) { positionedRef.current = true; setPositioned(true); }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Build a breadcrumb so the user can tell which document a rem lives in
   // (mirrors RemNote's reference-search breadcrumb). Shows the root plus the 3
@@ -461,6 +591,9 @@ function ReferenceFinder() {
         boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
         padding: '12px',
         boxSizing: 'border-box',
+        // Hidden (but fully laid out, so getDimensions still measures our real
+        // width) until the viewport-flip logic settles our position.
+        visibility: positioned ? 'visible' : 'hidden',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -488,7 +621,7 @@ function ReferenceFinder() {
           color: 'var(--rn-clr-content-primary)',
         }}
       />
-      <div style={{ marginTop: '8px', maxHeight: '320px', overflowY: 'auto' }}>
+      <div style={{ marginTop: '8px', maxHeight: `${listMaxHeight}px`, overflowY: 'auto' }}>
         {query.trim().length < 2 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
             Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't — including matches by a rem's alias (shown with an ALIAS tag; the inserted reference renders the alias text). Enter inserts a reference; Ctrl/Cmd+Enter inserts a pin (no text); Shift+Enter / Shift+click opens the rem in a new pane.

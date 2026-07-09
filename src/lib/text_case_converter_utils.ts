@@ -24,7 +24,7 @@ const MINOR_WORDS = new Set([
     // Portuguese — contractions (em + article)
     'no', 'na', 'nos', 'nas',
     // Portuguese — contractions (a + artigo)
-    'ao', 'aos',
+    'ao', 'aos', 'à', 'às',
     // Portuguese — contractions (por + article)
     'pelo', 'pela', 'pelos', 'pelas',
     // Portuguese — prepositions

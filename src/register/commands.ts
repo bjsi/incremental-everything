@@ -1219,9 +1219,14 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       } catch { /* no focused rem */ }
       await plugin.storage.setSession('reference-finder-source-rem', sourceRemId);
 
-      // Open the picker at the caret. getCaretPosition can momentarily return
-      // undefined right after a shortcut fires (focus settling), and returns a
-      // valid rect for a collapsed caret too — so retry a few times.
+      // Open the picker with its LEFT edge at the caret. getCaretPosition can
+      // momentarily return undefined right after a shortcut fires (focus
+      // settling), and returns a valid rect for a collapsed caret too — so retry
+      // a few times. If the caret sits near the right edge the widget would spill
+      // off-screen; the widget itself measures the viewport and flips to the left
+      // (the plugin sandbox here can't read the host window width — innerWidth is
+      // 0 and cross-origin reads throw — so the correction has to live widget-side
+      // via plugin.widget.getDimensions).
       let position: { top?: number; left?: number } = { top: 90, left: 320 };
       let caret: DOMRect | undefined;
       for (let i = 0; i < 5; i++) {
@@ -1229,10 +1234,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         if (caret) break;
         await new Promise((r) => setTimeout(r, 40));
       }
-      console.log('[reference-finder] caret position:', caret);
+      // Hand the caret rect to the widget so it can also flip ABOVE the caret
+      // when there isn't room below (DOMRect getters aren't JSON-serializable, so
+      // copy the fields onto a plain object).
+      let caretRect: { top: number; bottom: number; left: number; right: number } | null = null;
       if (caret && (caret.left !== 0 || caret.top !== 0)) {
         position = { top: Math.round(caret.bottom) + 6, left: Math.round(caret.left) };
+        caretRect = { top: caret.top, bottom: caret.bottom, left: caret.left, right: caret.right };
       }
+      await plugin.storage.setSession('reference-finder-caret', caretRect);
       await plugin.window.openFloatingWidget('reference_finder', position);
     },
   });
