@@ -234,6 +234,17 @@ function Debug() {
       patched: any[];
     }>;
   }>(null);
+  const [isAuditingTags, setIsAuditingTags] = useState(false);
+  const [tagAudit, setTagAudit] = useState<null | {
+    taggedRemCount: number;
+    cardRemCount: number;
+    hasPowerupCount: number;
+    inTaggedRemCount: number;
+    powerupNotInTaggedRem: number;
+    slotButNoPowerup: number;
+    verdict: string;
+    sampleDivergent: string[];
+  }>(null);
   const [pageHistoryDump, setPageHistoryDump] = useState<null | {
     perPdf: Array<{
       pdfRemId: string;
@@ -1391,6 +1402,107 @@ function Debug() {
     );
   };
 
+  // KB-wide audit that answers: does `getPowerupByCode('cardPriority').taggedRem()`
+  // match reality? "Remove All CardPriority Tags" and the cache both enumerate via
+  // taggedRem(), yet it can return far fewer rems than are actually tagged. This
+  // cross-checks taggedRem() against a DIRECT hasPowerup('cardPriority') probe over
+  // every card-bearing rem, and also flags rems that carry a priority slot value
+  // but no powerup tag (the write-side / slot-vs-tag decoupling signature).
+  const handleTagAudit = async () => {
+    setIsAuditingTags(true);
+    try {
+      console.log('\n========== CARDPRIORITY TAG AUDIT ==========');
+
+      // A — taggedRem()
+      const powerup = await plugin.powerup.getPowerupByCode('cardPriority');
+      const taggedRems = (await powerup?.taggedRem()) || [];
+      const taggedIds = new Set(taggedRems.map((r: any) => r._id));
+      console.log(`taggedRem() → ${taggedRems.length} rems (powerup _id=${powerup?._id ?? '(none)'})`);
+
+      // B — every unique card-bearing rem, probed directly
+      const allCards = (await plugin.card.getAll()) || [];
+      const cardRemIds = Array.from(new Set(allCards.map((c: Card) => c.remId).filter(Boolean))) as string[];
+      console.log(`card.getAll() → ${allCards.length} cards across ${cardRemIds.length} rems. Probing hasPowerup directly…`);
+
+      let hasPowerupCount = 0;
+      let inTaggedRemCount = 0;
+      let powerupNotInTaggedRem = 0;
+      let slotButNoPowerup = 0;
+      const sampleDivergent: string[] = [];
+
+      const batchSize = 50;
+      for (let i = 0; i < cardRemIds.length; i += batchSize) {
+        const batch = cardRemIds.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (rid) => {
+            const r = await plugin.rem.findOne(rid);
+            if (!r) return;
+            const has = await r.hasPowerup('cardPriority');
+            const inTagged = taggedIds.has(rid);
+            let slotVal: any = null;
+            try { slotVal = await r.getPowerupProperty('cardPriority', 'priority'); } catch { /* ignore */ }
+            const hasSlotValue = slotVal != null && String(slotVal).trim() !== '';
+
+            if (has) hasPowerupCount++;
+            if (inTagged) inTaggedRemCount++;
+            if (has && !inTagged) {
+              powerupNotInTaggedRem++;
+              if (sampleDivergent.length < 20)
+                sampleDivergent.push(`${rid}: hasPowerup=true, taggedRem=MISSING, prioritySlot=${hasSlotValue ? String(slotVal) : '∅'}`);
+            }
+            if (!has && hasSlotValue) {
+              slotButNoPowerup++;
+              if (sampleDivergent.length < 20)
+                sampleDivergent.push(`${rid}: hasPowerup=FALSE but prioritySlot=${String(slotVal)} ← slot without tag`);
+            }
+          })
+        );
+        if (i % (batchSize * 10) === 0) {
+          console.log(`  …audited ${Math.min(i + batchSize, cardRemIds.length)}/${cardRemIds.length}`);
+        }
+      }
+
+      // Verdict
+      let verdict: string;
+      if (powerupNotInTaggedRem > 0 && hasPowerupCount > taggedRems.length) {
+        verdict = `READ-SIDE regression: ${powerupNotInTaggedRem} rems have the cardPriority powerup but taggedRem() omits them → taggedRem() is under-returning.`;
+      } else if (slotButNoPowerup > 0) {
+        verdict = `WRITE-SIDE regression: ${slotButNoPowerup} rems carry a priority slot value with NO cardPriority powerup tag → addPowerup did not persist the tag.`;
+      } else if (hasPowerupCount === inTaggedRemCount) {
+        verdict = 'CONSISTENT: taggedRem() matches direct hasPowerup over all card rems — no divergence.';
+      } else {
+        verdict = 'MIXED / inconclusive — inspect the counts and sample below.';
+      }
+
+      const result = {
+        taggedRemCount: taggedRems.length,
+        cardRemCount: cardRemIds.length,
+        hasPowerupCount,
+        inTaggedRemCount,
+        powerupNotInTaggedRem,
+        slotButNoPowerup,
+        verdict,
+        sampleDivergent,
+      };
+
+      console.log('Summary:', result);
+      console.log('Sample divergent rems:');
+      sampleDivergent.forEach((s) => console.log('  •', s));
+      console.log('VERDICT:', verdict);
+      console.log('===========================================\n');
+
+      setTagAudit(result);
+      await plugin.app.toast(
+        `Tag audit: taggedRem=${taggedRems.length}, hasPowerup=${hasPowerupCount}/${cardRemIds.length}. See console + panel for the verdict.`
+      );
+    } catch (e) {
+      console.error('[TagAudit] Error:', e);
+      await plugin.app.toast('Tag audit failed — check console.');
+    } finally {
+      setIsAuditingTags(false);
+    }
+  };
+
   // ------------------------------------------------------------------
   // Search / Linkage diagnostics
   // ------------------------------------------------------------------
@@ -1825,8 +1937,38 @@ function Debug() {
          >
            Probe Slot API
          </button>
+         <button
+           onClick={handleTagAudit}
+           disabled={isAuditingTags}
+           style={{
+             fontSize: '11px',
+             padding: '2px 8px',
+             backgroundColor: 'var(--rn-clr-background-secondary)',
+             color: 'var(--rn-clr-content-primary)',
+             border: '1px solid var(--rn-clr-border)',
+             borderRadius: '4px',
+             cursor: isAuditingTags ? 'wait' : 'pointer'
+           }}
+           title="KB-wide: cross-check getPowerupByCode('cardPriority').taggedRem() against a direct hasPowerup probe over every card-bearing rem"
+         >
+           {isAuditingTags ? 'Auditing…' : 'CardPriority Tag Audit'}
+         </button>
       </h2>
       <Info className="rem-id" label="Rem ID" data={<code>{remId}</code>} />
+      {tagAudit && (
+        <div style={{ marginTop: '8px', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)' }}>
+          <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}>CardPriority Tag Audit (KB-wide)</div>
+          <div style={{ fontSize: '11px', lineHeight: 1.6 }}>
+            <div><code>taggedRem()</code>: <strong>{tagAudit.taggedRemCount}</strong> rems</div>
+            <div>card-bearing rems: <strong>{tagAudit.cardRemCount}</strong></div>
+            <div>direct <code>hasPowerup</code>=true: <strong>{tagAudit.hasPowerupCount}</strong> (of which in taggedRem: {tagAudit.inTaggedRemCount})</div>
+            <div>hasPowerup=true but <em>missing</em> from taggedRem: <strong style={{ color: tagAudit.powerupNotInTaggedRem > 0 ? '#ef4444' : 'inherit' }}>{tagAudit.powerupNotInTaggedRem}</strong></div>
+            <div>priority slot present but <em>no</em> powerup tag: <strong style={{ color: tagAudit.slotButNoPowerup > 0 ? '#ef4444' : 'inherit' }}>{tagAudit.slotButNoPowerup}</strong></div>
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '11px', fontWeight: 600 }}>{tagAudit.verdict}</div>
+          <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>Full breakdown + sample rems in the developer console.</div>
+        </div>
+      )}
       <div className="flex gap-4">
         <Info className="card-disabled" label="Cards Disabled (Locally)" data={isCardDisabledLocally ? <span style={{color: '#ef4444', fontWeight: 600}}>YES</span> : 'No'} />
         <Info className="card-disabled-ancestor" label="Cards Disabled (Inherited)" data={isCardDisabledInAncestors ? <span style={{color: '#ef4444', fontWeight: 600}}>YES</span> : 'No'} />
