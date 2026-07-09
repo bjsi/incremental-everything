@@ -119,6 +119,21 @@ function ReferenceFinder() {
   // moved into this widget. Excluded from results (a rem can't reference itself).
   const sourceRemIdRef = useRef<string>('');
 
+  // Make the widget iframe's own document transparent and gapless. RemNote's
+  // floating-widget host fills the iframe rectangle (square corners) behind us;
+  // without this, our rounded panel reveals that filled square at the corners
+  // ("squared outside, rounded inside"). Transparent html/body lets the corners
+  // show the page instead, so the rounded outer edge reads cleanly.
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      html, body { background: transparent !important; margin: 0 !important; padding: 0 !important; }
+      body > * { border-radius: 10px; }
+    `;
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, []);
+
   // Focus once we're actually visible — a visibility:hidden input can't take
   // focus, so focusing before the position settles would be a no-op. Select any
   // seeded query text so it can be overwritten immediately.
@@ -668,9 +683,14 @@ function ReferenceFinder() {
         fontFamily: 'system-ui, -apple-system, sans-serif',
         color: 'var(--rn-clr-content-primary)',
         backgroundColor: 'var(--rn-clr-background-primary)',
-        border: '1px solid var(--rn-clr-border)',
-        borderRadius: '8px',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+        // Conspicuous border: a solid 2px frame in RemNote's opaque border color
+        // (with a concrete grey fallback so it stays visible even if the variable
+        // is missing — an undefined var with no fallback drops the whole
+        // declaration), reinforced by a 1px ring (box-shadow, so it follows the
+        // rounded corners) and a deeper drop shadow to lift the panel off the page.
+        border: '2px solid var(--rn-clr-border-opaque, #9ca3af)',
+        borderRadius: '10px',
+        boxShadow: '0 0 0 1px var(--rn-clr-border-opaque, #9ca3af), 0 14px 44px rgba(0,0,0,0.4)',
         padding: '12px',
         boxSizing: 'border-box',
         // Hidden (but fully laid out, so getDimensions still measures our real
