@@ -312,6 +312,16 @@ function RepetitionHistoryPopup() {
     const { history, remName, nextRepDate, isDismissed, dismissedDate, pdfPageInfo } = data as typeof data & { pdfPageInfo?: PdfPageInfo | null };
     const totalTime = getTotalTime(history);
     const age = calculateAge(history);
+
+    // Estimated remaining reading time: extrapolate the time already spent to
+    // the portion of the range still unread. Only meaningful when we have a
+    // finite degree of processing strictly between 0% and 100% and some time
+    // recorded — otherwise there is no rate to project from.
+    const estRemainingSeconds =
+        pdfPageInfo && pdfPageInfo.percentRead !== null &&
+        pdfPageInfo.percentRead > 0 && pdfPageInfo.percentRead < 100 && totalTime > 0
+            ? Math.round((totalTime * (100 - pdfPageInfo.percentRead)) / pdfPageInfo.percentRead)
+            : null;
     // Count only events that represent actual reviews (same as scheduler logic)
     const repCount = history?.filter(h =>
         h.eventType === undefined ||
@@ -590,6 +600,11 @@ function RepetitionHistoryPopup() {
                         {pdfPageInfo.percentRead !== null && (
                             <span>
                                 <strong>{pdfPageInfo.percentRead}%</strong> read
+                            </span>
+                        )}
+                        {estRemainingSeconds !== null && (
+                            <span title="Estimated from time spent so far and the degree of processing achieved">
+                                Est. remaining: <strong>~{formatDuration(estRemainingSeconds)}</strong>
                             </span>
                         )}
                     </div>
