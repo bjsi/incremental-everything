@@ -4,8 +4,59 @@ import { IncrementalRep } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import dayjs from 'dayjs';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import {
+    safeRemTextToString,
+    getActivePdfForIncRem,
+    getIncrementalPageRange,
+    getIncrementalReadingPosition,
+} from '../lib/pdfUtils';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
+
+interface PdfPageInfo {
+    pdfName: string;
+    start: number;
+    end: number; // 0 = unbounded (∞)
+    currentPage: number;
+    percentRead: number | null; // null when the range has no finite end
+}
+
+/**
+ * Resolve the active PDF source for a rem and, when an explicit page range is
+ * set, compute the reading position and degree of processing. Works for both
+ * active IncRems and dismissed rems — the page range / current page are stored
+ * under synced keys that survive dismissal.
+ */
+async function loadPdfPageInfo(plugin: any, rem: any, remId: string): Promise<PdfPageInfo | null> {
+    try {
+        const pdfRem = await getActivePdfForIncRem(plugin, rem);
+        if (!pdfRem) return null;
+
+        const range = await getIncrementalPageRange(plugin, remId, pdfRem._id);
+        // Only surface this when an explicit range is set (mirrors PageControls'
+        // "active range" test: start > 1 or a finite end).
+        if (!range || (range.start <= 1 && !(range.end > 0))) return null;
+
+        const start = range.start || 1;
+        const end = range.end || 0; // 0 = to the end of the document (∞)
+        const savedPage = await getIncrementalReadingPosition(plugin, remId, pdfRem._id);
+        const currentPage = savedPage && savedPage > 0 ? savedPage : start;
+
+        // Degree of processing: 0% at the range start, 100% at the range end.
+        // Unbounded ranges (end === 0) have no denominator, so percent is null.
+        let percentRead: number | null = null;
+        if (end > start) {
+            percentRead = Math.max(0, Math.min(100, Math.round(((currentPage - start) / (end - start)) * 100)));
+        } else if (end === start) {
+            percentRead = 100;
+        }
+
+        const pdfName = await safeRemTextToString(plugin, pdfRem.text);
+        return { pdfName, start, end, currentPage, percentRead };
+    } catch (e) {
+        console.error('[RepetitionHistoryPopup] Error loading PDF page info:', e);
+        return null;
+    }
+}
 
 /**
  * Formats the early/late status into a human-readable string.
@@ -72,6 +123,10 @@ function RepetitionHistoryPopup() {
             // Get rem name
             const remName = await safeRemTextToString(plugin, rem.text);
 
+            // PDF page-range / reading-progress info (shown for both active
+            // IncRems and dismissed rems that read from a PDF with a range set).
+            const pdfPageInfo = await loadPdfPageInfo(plugin, rem, remId);
+
             // First try to get incremental rem info
             const incRemInfo = await getIncrementalRemFromRem(plugin, rem);
 
@@ -83,6 +138,7 @@ function RepetitionHistoryPopup() {
                     nextRepDate: incRemInfo.nextRepDate || null,
                     isDismissed: false,
                     dismissedDate: null,
+                    pdfPageInfo,
                     error: null
                 };
             }
@@ -98,6 +154,7 @@ function RepetitionHistoryPopup() {
                     nextRepDate: null,
                     isDismissed: true,
                     dismissedDate: dismissedInfo.dismissedDate,
+                    pdfPageInfo,
                     error: null
                 };
             }
@@ -109,6 +166,7 @@ function RepetitionHistoryPopup() {
                 nextRepDate: null,
                 isDismissed: false,
                 dismissedDate: null,
+                pdfPageInfo,
                 error: null
             };
         } catch (error) {
@@ -251,7 +309,7 @@ function RepetitionHistoryPopup() {
         );
     }
 
-    const { history, remName, nextRepDate, isDismissed, dismissedDate } = data;
+    const { history, remName, nextRepDate, isDismissed, dismissedDate, pdfPageInfo } = data as typeof data & { pdfPageInfo?: PdfPageInfo | null };
     const totalTime = getTotalTime(history);
     const age = calculateAge(history);
     // Count only events that represent actual reviews (same as scheduler logic)
@@ -281,6 +339,17 @@ function RepetitionHistoryPopup() {
         borderBottom: '1px solid var(--rn-clr-border-primary)',
         fontSize: '11px',
         color: 'var(--rn-clr-content-tertiary)',
+    };
+
+    const pdfFooterStyle: React.CSSProperties = {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '6px',
+        padding: '10px 16px',
+        borderTop: '1px solid rgba(128, 128, 128, 0.25)',
+        backgroundColor: 'var(--rn-clr-background-secondary)',
+        fontSize: '11px',
+        color: 'var(--rn-clr-content-secondary)',
     };
 
     return (
@@ -492,6 +561,58 @@ function RepetitionHistoryPopup() {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {pdfPageInfo && (
+                <div style={pdfFooterStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>📄</span>
+                        <span
+                            title={pdfPageInfo.pdfName}
+                            style={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                fontWeight: 600,
+                            }}
+                        >
+                            {pdfPageInfo.pdfName}
+                        </span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px' }}>
+                        <span>
+                            Range: <strong>{pdfPageInfo.start}–{pdfPageInfo.end || '∞'}</strong>
+                        </span>
+                        <span>
+                            Current page: <strong>{pdfPageInfo.currentPage}</strong>
+                        </span>
+                        {pdfPageInfo.percentRead !== null && (
+                            <span>
+                                <strong>{pdfPageInfo.percentRead}%</strong> read
+                            </span>
+                        )}
+                    </div>
+                    {pdfPageInfo.percentRead !== null && (
+                        <div
+                            style={{
+                                height: '6px',
+                                borderRadius: '3px',
+                                backgroundColor: 'rgba(128, 128, 128, 0.25)',
+                                overflow: 'hidden',
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: `${pdfPageInfo.percentRead}%`,
+                                    height: '100%',
+                                    backgroundColor: '#3b82f6',
+                                    borderRadius: '3px',
+                                    transition: 'width 0.2s ease',
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
         </div>
