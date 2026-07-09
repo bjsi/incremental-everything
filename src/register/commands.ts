@@ -1228,20 +1228,49 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       // 0 and cross-origin reads throw — so the correction has to live widget-side
       // via plugin.widget.getDimensions).
       let position: { top?: number; left?: number } = { top: 90, left: 320 };
-      let caret: DOMRect | undefined;
-      for (let i = 0; i < 5; i++) {
-        try { caret = await plugin.editor.getCaretPosition(); } catch { /* retry */ }
-        if (caret) break;
-        await new Promise((r) => setTimeout(r, 40));
+      const readCaret = async (attempts: number, delayMs: number): Promise<DOMRect | undefined> => {
+        let c: DOMRect | undefined;
+        for (let i = 0; i < attempts; i++) {
+          try { c = await plugin.editor.getCaretPosition(); } catch { c = undefined; }
+          // A zero-rect (0,0,0,0) means the caret isn't reported yet (focus still
+          // settling) — keep retrying rather than accepting it and falling back.
+          if (c && (c.left !== 0 || c.top !== 0)) return c;
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+        return undefined;
+      };
+      let caret = await readCaret(8, 40);
+
+      // Empty rems (e.g. a Rem you just created with Enter) have NO caret rect —
+      // a collapsed selection in an empty element has no bounding box, so
+      // getCaretPosition returns undefined no matter how long we wait. Probe it:
+      // drop a zero-width space to give the caret something to measure against,
+      // read the position, then remove it (always cleaned up in `finally`).
+      if (!caret) {
+        let probed = false;
+        try {
+          await plugin.editor.insertPlainText('\u200B');
+          probed = true;
+          caret = await readCaret(5, 30);
+        } catch (e) {
+          console.warn('[reference-finder] caret probe failed:', e);
+        } finally {
+          if (probed) {
+            try { await plugin.editor.deleteCharacters(1, -1); }
+            catch (e) { console.warn('[reference-finder] caret probe cleanup failed:', e); }
+          }
+        }
       }
+      console.log('[reference-finder] caret position (final):', caret);
       // Hand the caret rect to the widget so it can also flip ABOVE the caret
       // when there isn't room below (DOMRect getters aren't JSON-serializable, so
       // copy the fields onto a plain object).
       let caretRect: { top: number; bottom: number; left: number; right: number } | null = null;
-      if (caret && (caret.left !== 0 || caret.top !== 0)) {
+      if (caret) {
         position = { top: Math.round(caret.bottom) + 6, left: Math.round(caret.left) };
         caretRect = { top: caret.top, bottom: caret.bottom, left: caret.left, right: caret.right };
       }
+      console.log('[reference-finder] opening at position:', position, 'caretRect:', caretRect);
       await plugin.storage.setSession('reference-finder-caret', caretRect);
       await plugin.window.openFloatingWidget('reference_finder', position);
     },

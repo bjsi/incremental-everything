@@ -242,6 +242,12 @@ function ReferenceFinder() {
           if (!cancelled) setListMaxHeight(listMax);
         }
 
+        console.log('[reference-finder] measure:', {
+          placedTop: placed.top, placedLeft: placed.left, width,
+          caretFromSession: caret, caretTop, caretBottom,
+          viewportWidth, viewportHeight, spaceAbove, spaceBelow,
+          chosenLeft: Math.round(left), flipUp, vertical,
+        });
         await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { left: Math.round(left), ...vertical });
       } catch (e) {
         // Something failed after we may have pinned to the right edge — restore
