@@ -4,6 +4,8 @@ import {
   cardPriorityShieldHistoryKey,
   documentCardPriorityShieldHistoryKey,
   seenCardInSessionKey,
+  cardShieldCleanupBackupPrefix,
+  cardShieldCleanupBackupIndexKey,
 } from '../consts';
 import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { isPowerupPropertySafe } from '../powerupSlotFilter';
@@ -15,8 +17,10 @@ import { safeRemTextToString } from '../pdfUtils';
 export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   const confirmed = confirm(
     '⚠️ Remove All CardPriority Data\n\n' +
-    'This will permanently remove ALL cardPriority tags and their data from your entire knowledge base.\n\n' +
-    'This action cannot be undone.\n\n' +
+    'This will permanently remove ALL cardPriority tags and their priority data from THIS knowledge base.\n\n' +
+    'It will also clear THIS knowledge base\'s Card Priority Shield history (both KB-level and ' +
+    'document-level). Other knowledge bases are not affected. A dated backup of this KB\'s shield ' +
+    'history is saved first (restorable from the debug tools), but the tags/priorities cannot be undone.\n\n' +
     'Are you sure you want to proceed?'
   );
 
@@ -79,9 +83,64 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
     await plugin.storage.setSession(allCardPriorityInfoKey, []);
     await plugin.storage.setSession(seenCardInSessionKey, []);
 
-    console.log('Clearing synced storage...');
-    await plugin.storage.setSynced(cardPriorityShieldHistoryKey, {});
-    await plugin.storage.setSynced(documentCardPriorityShieldHistoryKey, {});
+    // Clear ONLY the current KB's shield-history partition. These synced keys are
+    // shared across all of the user's KBs and stored KB-partitioned as
+    // `{ [kbId]: {...} }`; a blanket `setSynced(key, {})` (the previous behaviour)
+    // wiped EVERY KB's card shield history, not just this one — silently destroying
+    // history for unrelated knowledge bases. Read-modify-write the current KB out
+    // instead, mirroring the per-KB save path in shield_history.ts.
+    console.log('Clearing this KB\'s card shield-history partition...');
+    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+    const currentKbId = kbData?._id || 'global';
+    const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+
+    // Remove ONLY the current KB's slice (partition + any legacy root date-keys that
+    // belong to the Primary KB), returning what was removed so it can be backed up.
+    const removedByKey: Record<string, any> = {};
+    const clearCurrentKbPartition = async (storageKey: string) => {
+      const raw = (await plugin.storage.getSynced<Record<string, any>>(storageKey)) || {};
+      const removed: Record<string, any> = {};
+      if (currentKbId in raw) {
+        removed[currentKbId] = raw[currentKbId];
+        delete raw[currentKbId];
+      }
+      // Legacy flat layout (date keys at the root) belongs to the Primary KB.
+      if (isPrimary) {
+        for (const key of Object.keys(raw)) {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+            removed[key] = raw[key];
+            delete raw[key];
+          }
+        }
+      }
+      removedByKey[storageKey] = removed;
+      await plugin.storage.setSynced(storageKey, raw);
+    };
+    await clearCurrentKbPartition(cardPriorityShieldHistoryKey);
+    await clearCurrentKbPartition(documentCardPriorityShieldHistoryKey);
+
+    // Save a dated backup of exactly what was removed so the cleared history can be
+    // restored later (e.g. from the debug tools) if the cleanup was a mistake.
+    try {
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupKey = `${cardShieldCleanupBackupPrefix}${currentKbId}-${ts}`;
+      await plugin.storage.setSynced(backupKey, {
+        backedUpAt: Date.now(),
+        kbId: currentKbId,
+        isPrimary,
+        removed: removedByKey,
+      });
+      // Maintain a discoverable index so the debug "Restore" tool can list backups
+      // (plugin synced storage has no key-enumeration API).
+      const index = (await plugin.storage.getSynced<string[]>(cardShieldCleanupBackupIndexKey)) || [];
+      if (!index.includes(backupKey)) {
+        index.push(backupKey);
+        await plugin.storage.setSynced(cardShieldCleanupBackupIndexKey, index);
+      }
+      console.log(`[Cleanup] Backed up cleared card shield history to "${backupKey}".`);
+    } catch (e) {
+      console.warn('[Cleanup] Could not save shield-history backup:', e);
+    }
 
     await plugin.app.toast(`✅ Cleanup complete! Removed ${removed} CardPriority tags.`);
     console.log(`CardPriority cleanup finished. Successfully removed ${removed} tags from knowledge base.`);
