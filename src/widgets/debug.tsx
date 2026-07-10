@@ -28,7 +28,7 @@ import { formatDuration } from '../lib/utils';
 import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode,
   priorityShieldHistoryKey, documentPriorityShieldHistoryKey,
   cardPriorityShieldHistoryKey, documentCardPriorityShieldHistoryKey,
-  cardShieldCleanupBackupIndexKey,
+  cardShieldCleanupBackupIndexKey, cardShieldCleanupBackupPrefix,
   allCardPriorityInfoKey, allIncrementalRemKey,
   seenCardInSessionKey, seenRemInSessionKey } from '../lib/consts';
 import { CardPriorityInfo } from '../lib/card_priority';
@@ -531,6 +531,9 @@ function Debug() {
     ancestorTexts: string[];
     childCount: number;
   }>(null);
+
+  // On-screen copyable export text (mobile fallback when file/clipboard fail).
+  const [shieldExport, setShieldExport] = useState<{ full: string; cardOnly: string } | null>(null);
 
   // Restore of shield history from a cleanup backup or a pasted export/backup JSON.
   const [restoreJsonInput, setRestoreJsonInput] = useState('');
@@ -1913,6 +1916,19 @@ function Debug() {
       };
       const json = JSON.stringify(exportObj, null, 2);
 
+      // Compact card-only export — enough to restore the lost card history, and small
+      // enough to copy manually on mobile where file download / clipboard API fail.
+      const cardOnlyJson = JSON.stringify({
+        exportedAt: exportObj.exportedAt,
+        currentKbId,
+        isPrimary,
+        raw: {
+          [cardPriorityShieldHistoryKey]: rawByKey[cardPriorityShieldHistoryKey] ?? null,
+          [documentCardPriorityShieldHistoryKey]: rawByKey[documentCardPriorityShieldHistoryKey] ?? null,
+        },
+      });
+      setShieldExport({ full: json, cardOnly: cardOnlyJson });
+
       let copied = false;
       try {
         await navigator.clipboard.writeText(json);
@@ -2154,6 +2170,71 @@ function Debug() {
       return;
     }
     await applyRestore(sourceMap, 'pasted JSON');
+  };
+
+  // Saves the current card shield history to a NEW synced backup key (+ index) so
+  // it can be recovered without file/clipboard. Because it's a fresh key the server
+  // has never seen, it pushes up cleanly when an offline device reconnects — even if
+  // the incoming empty state wipes the live card keys — and then appears under
+  // Restore → "Load backups" on any synced device.
+  const handleSnapshotToSyncedBackup = async () => {
+    try {
+      const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+      const kbId = kbData?._id || 'global';
+      const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+      const cardKb = await plugin.storage.getSynced<any>(cardPriorityShieldHistoryKey);
+      const cardDoc = await plugin.storage.getSynced<any>(documentCardPriorityShieldHistoryKey);
+      const entries = countDatesDeep(cardKb) + countDatesDeep(cardDoc);
+      if (entries === 0) {
+        await plugin.app.toast('No card history present on this device to snapshot.');
+        return;
+      }
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const key = `${cardShieldCleanupBackupPrefix}${kbId}-manual-${ts}`;
+      await plugin.storage.setSynced(key, {
+        backedUpAt: Date.now(),
+        kbId,
+        isPrimary,
+        removed: {
+          [cardPriorityShieldHistoryKey]: cardKb ?? {},
+          [documentCardPriorityShieldHistoryKey]: cardDoc ?? {},
+        },
+      });
+      const index = (await plugin.storage.getSynced<string[]>(cardShieldCleanupBackupIndexKey)) || [];
+      if (!index.includes(key)) {
+        index.push(key);
+        await plugin.storage.setSynced(cardShieldCleanupBackupIndexKey, index);
+      }
+      console.log(`[Snapshot] Saved ${entries} card entries to synced backup "${key}".`);
+      await plugin.app.toast(`Snapshot saved (${entries} entries). Reconnect this device to sync it, then on another device use Restore → "Load backups".`);
+    } catch (e) {
+      console.error('[Snapshot] Failed:', e);
+      await plugin.app.toast('Snapshot failed — check console.');
+    }
+  };
+
+  // Reliable copy for mobile: navigator.clipboard is frequently blocked inside the
+  // plugin iframe on Android, so try the legacy execCommand path (temporary
+  // textarea) first, then fall back to the async API.
+  const copyTextFallback = async (text: string) => {
+    let ok = false;
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.left = '0';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { ok = document.execCommand('copy'); } catch { ok = false; }
+      document.body.removeChild(ta);
+    } catch { ok = false; }
+    if (!ok) {
+      try { await navigator.clipboard.writeText(text); ok = true; } catch { /* ignore */ }
+    }
+    await plugin.app.toast(ok ? 'Copied to clipboard.' : 'Copy failed — long-press the box and Select All → Copy.');
   };
 
   const handleSearchProbe = async () => {
@@ -2644,6 +2725,43 @@ function Debug() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Mobile-safe export: on Android the file download and clipboard API silently
+            fail, so render the JSON on-screen to select/copy manually. */}
+        {shieldExport && (
+          <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              Copyable export (for mobile / when the file didn't save)
+              <button onClick={handleSnapshotToSyncedBackup} style={smallBtnStyle} title="Save this device's card history to a synced backup key that syncs up on reconnect and appears under Restore → Load backups elsewhere">
+                Snapshot → synced backup
+              </button>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+              Tap a box to select all, or use its Copy button, then paste into the Restore box on another device.
+              The <strong>card-only</strong> export is smaller and is all you need to recover the lost card history.
+              Or use <strong>Snapshot → synced backup</strong>: it saves this device's card history under a new synced
+              key that pushes up when you reconnect (no copy/paste), then restore it elsewhere via "Load backups".
+            </div>
+            {([
+              { label: 'Card-only export', text: shieldExport.cardOnly },
+              { label: 'Full export', text: shieldExport.full },
+            ] as const).map(({ label, text }) => (
+              <div key={label} style={{ marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600 }}>{label} <span style={{ color: 'var(--rn-clr-content-tertiary)', fontWeight: 400 }}>({(text.length / 1024).toFixed(1)} KB)</span></span>
+                  <button onClick={() => copyTextFallback(text)} style={smallBtnStyle}>Copy</button>
+                </div>
+                <textarea
+                  readOnly
+                  value={text}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onClick={(e) => e.currentTarget.select()}
+                  style={{ width: '100%', minHeight: '54px', fontSize: '9px', fontFamily: 'monospace', padding: '6px', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box', whiteSpace: 'pre', overflowWrap: 'normal' }}
+                />
+              </div>
+            ))}
           </div>
         )}
 
