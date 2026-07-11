@@ -600,6 +600,9 @@ function RepetitionHistoryPopup() {
                         {pdfPageInfo.percentRead !== null && (
                             <span>
                                 <strong>{pdfPageInfo.percentRead}%</strong> read
+                                {pdfPageInfo.end > pdfPageInfo.start && (
+                                    <> ({pdfPageInfo.currentPage - pdfPageInfo.start}/{pdfPageInfo.end - pdfPageInfo.start}p)</>
+                                )}
                             </span>
                         )}
                         {estRemainingSeconds !== null && (
