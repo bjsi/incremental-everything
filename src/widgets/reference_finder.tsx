@@ -1,6 +1,7 @@
 import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType, RICH_TEXT_FORMATTING } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
+import { sanitizeRichTextForSetText } from '../lib/richTextSanitize';
 
 // ---------------------------------------------------------------------------
 // Find & Insert Reference
@@ -476,10 +477,13 @@ function ReferenceFinder() {
       // insertRichText silently no-ops if there is no active editor, so we
       // first check getSelection() to decide between insert and clipboard.
       let inserted = false;
+      let sawSelection = false;
+      let insertErr: any = null;
       try {
         const sel = await plugin.editor.getSelection();
         console.log('[reference-finder] active editor selection:', sel);
         if (sel) {
+          sawSelection = true;
           // Cloze-awareness: if the insertion point sits inside a cloze, stamp
           // that cloze's id onto the reference so it stays INSIDE the cloze
           // instead of breaking it. Prefer the selected span's cId; fall back
@@ -575,32 +579,59 @@ function ReferenceFinder() {
               }
               return out;
             };
-            const parts: any[] = [...processSection(frontRt)];
+            const sourceParts: any[] = [...processSection(frontRt)];
             if (backRt.length) {
               // Only add a separator arrow if the front didn't already carry a
               // card delimiter (which processSection just turned into one).
               const hasDelim = frontRt.some((it: any) => it && typeof it !== 'string' && it.i === 's');
-              if (!hasDelim) parts.push({ i: 'm', text: ' ' + arrowChar + ' ' });
-              parts.push(...processSection(backRt));
+              if (!hasDelim) sourceParts.push({ i: 'm', text: ' ' + arrowChar + ' ' });
+              sourceParts.push(...processSection(backRt));
             }
-            if (!parts.length) {
+            if (!sourceParts.length) {
               const displayText = (cand.aliasText || cand.name || '').trim();
-              if (displayText) parts.push(displayText);
+              if (displayText) sourceParts.push(displayText);
             }
-            parts.push(' ');
-            parts.push(makeRef(true));
-            toInsert = parts;
+            // Normalize the source nodes so insertRichText's cross-sandbox
+            // validator accepts them — most importantly images, whose out-of-range
+            // `percent` (e.g. 68.08) otherwise makes the whole insert throw. Same
+            // sanitization setText needs. The pin is appended AFTER, so its cloze
+            // id isn't touched by the sanitizer.
+            const sanitizedSource = sanitizeRichTextForSetText(sourceParts as any);
+            toInsert = [...(sanitizedSource as any[]), ' ', makeRef(true)];
           } else {
             toInsert = [makeRef(mode === 'pin')];
           }
-          await plugin.editor.insertRichText(toInsert);
-          inserted = true;
+          const nodeKinds = toInsert.map((n) => (typeof n === 'string' ? 'str' : n?.i ?? '?'));
+          console.log('[reference-finder] inserting', toInsert.length, 'nodes', nodeKinds, toInsert);
+          try {
+            await plugin.editor.insertRichText(toInsert);
+            inserted = true;
+          } catch (insErr) {
+            // insertRichText can reject some node types inline (images/audio/latex
+            // etc.). For text+pin, don't lose everything — retry with only text and
+            // rem-reference nodes so the user still gets the text and the pin.
+            console.error('[reference-finder] insertRichText threw on full payload:', insErr);
+            if (mode === 'textPin') {
+              const INSERTABLE = new Set(['m', 'q']);
+              const filtered = toInsert.filter((n) => typeof n === 'string' || INSERTABLE.has(n?.i));
+              const dropped = toInsert.length - filtered.length;
+              console.warn(`[reference-finder] text+pin retry without ${dropped} non-insertable node(s)`, filtered);
+              await plugin.editor.insertRichText(filtered);
+              inserted = true;
+              if (dropped > 0) {
+                await plugin.app.toast(`Inserted text + pin — but ${dropped} embedded element(s) (e.g. image) can't be inserted inline; open the rem to view them.`);
+              }
+            } else {
+              throw insErr;
+            }
+          }
           console.log('[reference-finder] insertRichText OK', `(${mode})`, cand.aliasId ? '(alias)' : '', clozeId ? '(inside cloze)' : '');
         } else {
           console.warn('[reference-finder] no active editor selection — will use clipboard fallback');
         }
       } catch (e) {
-        console.error('[reference-finder] insertRichText threw:', e);
+        insertErr = e;
+        console.error('[reference-finder] pick insertion failed:', e);
       }
 
       if (!inserted) {
@@ -608,8 +639,11 @@ function ReferenceFinder() {
         try {
           const rem = await plugin.rem.findOne(cand.id);
           await rem?.copyReferenceToClipboard();
-          await plugin.app.toast('No editor caret found — reference copied to clipboard. Paste it (⌘/Ctrl+V).');
-          console.log('[reference-finder] copied reference to clipboard as fallback');
+          const reason = !sawSelection
+            ? 'No editor caret found'
+            : `Couldn't insert (${insertErr?.message ?? insertErr ?? 'unknown error'})`;
+          await plugin.app.toast(`${reason} — reference copied to clipboard. Paste it (⌘/Ctrl+V).`);
+          console.log('[reference-finder] copied reference to clipboard as fallback; reason:', reason);
         } catch (e2) {
           await plugin.app.toast('Could not insert or copy the reference. Check the console.');
           console.error('[reference-finder] clipboard fallback failed:', e2);
