@@ -555,7 +555,14 @@ function RepetitionHistoryPopup() {
                         // Regular rep entry (includes rescheduledInQueue and executeRepetition with indicators)
                         return (
                             <div key={index} style={gridRowStyle}>
-                                <span>{getEventIndicator()}{dayjs(rep.date).format('MMM D, YYYY')}</span>
+                                <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                                    <span>{getEventIndicator()}{dayjs(rep.date).format('MMM D, YYYY')}</span>
+                                    {/* Local wall-clock time of the review (24h) — disambiguates
+                                        multiple reviews on the same day. */}
+                                    <span style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>
+                                        {dayjs(rep.date).format('HH:mm')}
+                                    </span>
+                                </span>
                                 <span>{formatDuration(rep.reviewTimeSeconds || 0) || '—'}</span>
                                 <span>{rep.interval !== undefined ? `${rep.interval}d` : '—'}</span>
                                 <span>{rep.priority !== undefined ? rep.priority : '—'}</span>
