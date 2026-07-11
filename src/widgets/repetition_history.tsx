@@ -605,6 +605,11 @@ function RepetitionHistoryPopup() {
                                 )}
                             </span>
                         )}
+                        {pdfPageInfo.currentPage > pdfPageInfo.start && totalTime > 0 && (
+                            <span title="Average reading speed: pages read ÷ total time spent">
+                                <strong>{((pdfPageInfo.currentPage - pdfPageInfo.start) * 3600 / totalTime).toFixed(1)}</strong> pages/h
+                            </span>
+                        )}
                         {estRemainingSeconds !== null && (
                             <span title="Estimated from time spent so far and the degree of processing achieved">
                                 Est. remaining: <strong>~{formatDuration(estRemainingSeconds)}</strong>
