@@ -105,7 +105,7 @@ export async function resolveRemTextSegments(
     }
     const anyEl = el as any;
     if (anyEl?.text) pushText(anyEl.text);
-    else if (anyEl?.i === 'i') pushText('🏞️');
+    else if (anyEl?.i === 'i') pushText('🖼️');
     else if (anyEl?.url) pushText('🔗');
   }
   return segments;
