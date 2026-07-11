@@ -1261,7 +1261,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           }
         }
       }
-      console.log('[reference-finder] caret position (final):', caret);
       // Hand the caret rect to the widget so it can also flip ABOVE the caret
       // when there isn't room below (DOMRect getters aren't JSON-serializable, so
       // copy the fields onto a plain object).
@@ -1270,7 +1269,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         position = { top: Math.round(caret.bottom) + 6, left: Math.round(caret.left) };
         caretRect = { top: caret.top, bottom: caret.bottom, left: caret.left, right: caret.right };
       }
-      console.log('[reference-finder] opening at position:', position, 'caretRect:', caretRect);
       await plugin.storage.setSession('reference-finder-caret', caretRect);
       await plugin.window.openFloatingWidget('reference_finder', position);
     },

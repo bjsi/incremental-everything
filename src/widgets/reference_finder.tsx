@@ -267,12 +267,6 @@ function ReferenceFinder() {
           if (!cancelled) setListMaxHeight(listMax);
         }
 
-        console.log('[reference-finder] measure:', {
-          placedTop: placed.top, placedLeft: placed.left, width,
-          caretFromSession: caret, caretTop, caretBottom,
-          viewportWidth, viewportHeight, spaceAbove, spaceBelow,
-          chosenLeft: Math.round(left), flipUp, vertical,
-        });
         await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { left: Math.round(left), ...vertical });
       } catch (e) {
         // Something failed after we may have pinned to the right edge — restore
@@ -470,7 +464,6 @@ function ReferenceFinder() {
   const pick = useCallback(
     async (cand: Candidate | undefined, mode: 'ref' | 'pin' | 'textPin' = 'ref') => {
       if (!cand) return;
-      console.log('[reference-finder] pick →', cand.id, JSON.stringify(cand.name), `(${mode})`);
 
       // Insert WHILE the widget is still open: RemNote keeps the underlying
       // editor as the "active editor" even though DOM focus is in this iframe.
@@ -481,7 +474,6 @@ function ReferenceFinder() {
       let insertErr: any = null;
       try {
         const sel = await plugin.editor.getSelection();
-        console.log('[reference-finder] active editor selection:', sel);
         if (sel) {
           sawSelection = true;
           // Cloze-awareness: if the insertion point sits inside a cloze, stamp
@@ -502,13 +494,11 @@ function ReferenceFinder() {
               clozeId = clozeIdAtOffset(rem?.text, offset);
             }
           } catch { /* best-effort cloze detection */ }
-          console.log('[reference-finder] cloze id at insertion point:', clozeId);
 
           // If text is selected, replace it with the reference (mimics RemNote's
           // [[ ]] behaviour where the selected text becomes the link).
           if (hasTextRange) {
             await plugin.editor.delete();
-            console.log('[reference-finder] deleted selected text before inserting');
           }
           // Build the rich text to insert:
           //  • 'ref'     — a normal reference (renders the referenced text).
@@ -601,8 +591,6 @@ function ReferenceFinder() {
           } else {
             toInsert = [makeRef(mode === 'pin')];
           }
-          const nodeKinds = toInsert.map((n) => (typeof n === 'string' ? 'str' : n?.i ?? '?'));
-          console.log('[reference-finder] inserting', toInsert.length, 'nodes', nodeKinds, toInsert);
           try {
             await plugin.editor.insertRichText(toInsert);
             inserted = true;
@@ -625,7 +613,6 @@ function ReferenceFinder() {
               throw insErr;
             }
           }
-          console.log('[reference-finder] insertRichText OK', `(${mode})`, cand.aliasId ? '(alias)' : '', clozeId ? '(inside cloze)' : '');
         } else {
           console.warn('[reference-finder] no active editor selection — will use clipboard fallback');
         }
@@ -643,7 +630,6 @@ function ReferenceFinder() {
             ? 'No editor caret found'
             : `Couldn't insert (${insertErr?.message ?? insertErr ?? 'unknown error'})`;
           await plugin.app.toast(`${reason} — reference copied to clipboard. Paste it (⌘/Ctrl+V).`);
-          console.log('[reference-finder] copied reference to clipboard as fallback; reason:', reason);
         } catch (e2) {
           await plugin.app.toast('Could not insert or copy the reference. Check the console.');
           console.error('[reference-finder] clipboard fallback failed:', e2);
@@ -662,7 +648,6 @@ function ReferenceFinder() {
   const open = useCallback(
     async (cand: Candidate | undefined) => {
       if (!cand) return;
-      console.log('[reference-finder] open in new pane →', cand.id, JSON.stringify(cand.name));
       try {
         const tree = await plugin.window.getCurrentWindowTree();
         const toRemIdTree = (node: any): any =>
