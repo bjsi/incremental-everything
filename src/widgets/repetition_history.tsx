@@ -607,6 +607,11 @@ function RepetitionHistoryPopup() {
                                 Est. remaining: <strong>~{formatDuration(estRemainingSeconds)}</strong>
                             </span>
                         )}
+                        {estRemainingSeconds !== null && (
+                            <span title="Estimated total = time already spent + estimated remaining">
+                                Est. total: <strong>~{formatDuration(totalTime + estRemainingSeconds)}</strong>
+                            </span>
+                        )}
                     </div>
                     {pdfPageInfo.percentRead !== null && (
                         <div
