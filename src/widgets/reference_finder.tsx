@@ -1,4 +1,4 @@
-import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType } from '@remnote/plugin-sdk';
+import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType, RICH_TEXT_FORMATTING } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
 
@@ -96,6 +96,17 @@ function ReferenceFinder() {
     []
   );
   const floatingWidgetId = ctx?.floatingWidgetId;
+  const widgetInstanceId = (ctx as any)?.widgetInstanceId as string | undefined;
+
+  // The picker starts hidden while we measure the viewport and (if needed) flip
+  // to the left of the caret, so the user never sees it jump. Revealed once
+  // positioning settles — or immediately if measurement can't run.
+  const [positioned, setPositioned] = useState(false);
+  const positionedRef = useRef(false);
+  // Max height for the results list, capped to the space available on whichever
+  // side (below/above the caret) we open on, so a long list scrolls instead of
+  // spilling off-screen. Set during positioning; 320 is the default cap.
+  const [listMaxHeight, setListMaxHeight] = useState(320);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Candidate[]>([]);
@@ -108,9 +119,40 @@ function ReferenceFinder() {
   // moved into this widget. Excluded from results (a rem can't reference itself).
   const sourceRemIdRef = useRef<string>('');
 
+  // Round outer edge / kill the filled square behind our corners. renderWidget
+  // mounts us inside the iframe on a container that carries RemNote's default
+  // (square, themed) background — our rounded panel then reveals that fill at the
+  // corners ("squared outside, rounded inside"; a light square even in dark mode
+  // is the un-themed canvas showing through). Make the document AND every
+  // wrapper element transparent, excluding our own panel (marked data-rf-panel)
+  // and its descendants so they keep their backgrounds.
   useEffect(() => {
-    inputRef.current?.focus();
+    const style = document.createElement('style');
+    style.textContent = `
+      html, body {
+        background: transparent !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color-scheme: light dark;
+      }
+      body *:not([data-rf-panel]):not([data-rf-panel] *) {
+        background-color: transparent !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => { style.remove(); };
   }, []);
+
+  // Focus once we're actually visible — a visibility:hidden input can't take
+  // focus, so focusing before the position settles would be a no-op. Select any
+  // seeded query text so it can be overwritten immediately.
+  useEffect(() => {
+    if (!positioned) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    if (el.value) el.select();
+  }, [positioned]);
 
   useEffect(() => {
     (async () => {
@@ -139,6 +181,120 @@ function ReferenceFinder() {
       .stealKeys(floatingWidgetId, ['Enter', 'ArrowUp', 'ArrowDown', 'Escape'])
       .catch(() => {/* best-effort; arrows/Enter still work inside the input */});
   }, [floatingWidgetId, plugin]);
+
+  // Keep the picker on-screen. The command opens us with our LEFT edge at the
+  // caret and our top just below it; near the right or bottom edge of the window
+  // that pushes our panel off-screen and RemNote doesn't clamp it. Neither the
+  // command sandbox nor this widget iframe can read the host window size from the
+  // DOM (innerWidth is the iframe's own size and cross-origin reads throw). The
+  // one host-coordinate signal we DO get is plugin.widget.getDimensions, so we
+  // measure geometrically:
+  //   1. read where we were placed (left edge = the caret).
+  //   2. briefly anchor our RIGHT + BOTTOM edges to the viewport and read back —
+  //      rect.right / rect.bottom are then the true viewport width / height.
+  //   3. flip LEFT of the caret if we'd overflow the right edge; flip ABOVE the
+  //      caret if the fully-expanded panel wouldn't fit below (mirrors RemNote's
+  //      selection search, which opens upward once the anchor passes mid-screen).
+  // All of this runs while the panel is hidden, so there's no visible jump.
+  useEffect(() => {
+    if (!floatingWidgetId || !widgetInstanceId || positionedRef.current) return;
+    let cancelled = false;
+    const reveal = () => {
+      if (cancelled || positionedRef.current) return;
+      positionedRef.current = true;
+      setPositioned(true);
+    };
+    (async () => {
+      const MARGIN = 8;
+      const GAP = 6; // matches the caret offset the command opens us with
+      // Non-list chrome (header + input + footer + paddings/gaps). Subtracted
+      // from the space on the chosen side to size the scrollable results list.
+      const CHROME = 130;
+      const LIST_CAP = 320; // never grow the list beyond this even with room
+      // getDimensions is typed for a number but getWidgetContext hands back a
+      // string id; coerce, and fall back to the raw value if it isn't numeric.
+      const numId = Number(widgetInstanceId);
+      const instId: any = Number.isFinite(numId) ? numId : widgetInstanceId;
+      // The caret rect handed over by the command (host coordinates) — lets us
+      // flip above precisely. Falls back to values derived from our placement.
+      let caret: { top: number; bottom: number; left: number; right: number } | null = null;
+      try { caret = (await plugin.storage.getSession('reference-finder-caret')) ?? null; } catch { /* ignore */ }
+      // Original placement; captured up front so we can restore it if a later
+      // step throws mid-measurement.
+      let orig: { top: number; left: number } | undefined;
+      try {
+        const placed = await plugin.widget.getDimensions(instId);
+        if (cancelled) return;
+        const anchorLeft = placed.left;
+        const width = placed.width || 680;
+        // The command opened us at top = caret.bottom + GAP.
+        const caretBottom = caret?.bottom ?? (placed.top - GAP);
+        const caretTop = caret?.top ?? (caretBottom - 24);
+        orig = { top: Math.round(placed.top), left: Math.round(anchorLeft) };
+
+        // Measure the viewport by pinning our right+bottom edges to it, then
+        // reading back: rect.right / rect.bottom equal the true viewport size.
+        await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { right: 0, bottom: 0 });
+        await new Promise((r) => setTimeout(r, 16)); // let the host relayout
+        const pinned = await plugin.widget.getDimensions(instId);
+        if (cancelled) return;
+        const viewportWidth = pinned.right;
+        const viewportHeight = pinned.bottom;
+
+        // Horizontal: flip to the left of the caret if we'd overflow the right.
+        let left = anchorLeft;
+        if (viewportWidth > 0 && anchorLeft + width > viewportWidth - MARGIN) {
+          left = Math.max(MARGIN, Math.min(anchorLeft - width, viewportWidth - width - MARGIN));
+        }
+
+        // Vertical: open below the caret, but flip above once the caret passes
+        // the vertical midpoint (more room above than below) — mirrors RemNote's
+        // selection search, which opens upward even just below mid-screen. When
+        // flipping we anchor our BOTTOM just above the caret so the list grows up.
+        const spaceBelow = viewportHeight - caretBottom;
+        const spaceAbove = caretTop;
+        const flipUp = viewportHeight > 0 && spaceAbove > spaceBelow;
+        const vertical = flipUp
+          ? { bottom: Math.max(MARGIN, Math.round(viewportHeight - caretTop + GAP)) }
+          : { top: Math.round(caretBottom) + GAP };
+
+        // Cap the results list to the room available on the chosen side so a long
+        // list scrolls instead of running off-screen.
+        if (viewportHeight > 0) {
+          const sideSpace = flipUp ? spaceAbove : spaceBelow;
+          const listMax = Math.max(120, Math.min(LIST_CAP, Math.round(sideSpace - CHROME - MARGIN - GAP)));
+          if (!cancelled) setListMaxHeight(listMax);
+        }
+
+        console.log('[reference-finder] measure:', {
+          placedTop: placed.top, placedLeft: placed.left, width,
+          caretFromSession: caret, caretTop, caretBottom,
+          viewportWidth, viewportHeight, spaceAbove, spaceBelow,
+          chosenLeft: Math.round(left), flipUp, vertical,
+        });
+        await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { left: Math.round(left), ...vertical });
+      } catch (e) {
+        // Something failed after we may have pinned to the right edge — restore
+        // the original placement so we never reveal stuck off to the side.
+        console.warn('[reference-finder] viewport measurement failed:', e);
+        if (!cancelled && orig) {
+          try { await plugin.window.setFloatingWidgetPosition(floatingWidgetId, orig); }
+          catch { /* best-effort */ }
+        }
+      } finally {
+        reveal();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [floatingWidgetId, widgetInstanceId, plugin]);
+
+  // Safety net: never leave the picker invisible if measurement stalls.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!positionedRef.current) { positionedRef.current = true; setPositioned(true); }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Build a breadcrumb so the user can tell which document a rem lives in
   // (mirrors RemNote's reference-search breadcrumb). Shows the root plus the 3
@@ -311,9 +467,9 @@ function ReferenceFinder() {
   }, [floatingWidgetId, plugin]);
 
   const pick = useCallback(
-    async (cand: Candidate | undefined, asPin = false) => {
+    async (cand: Candidate | undefined, mode: 'ref' | 'pin' | 'textPin' = 'ref') => {
       if (!cand) return;
-      console.log('[reference-finder] pick →', cand.id, JSON.stringify(cand.name), asPin ? '(as pin)' : '');
+      console.log('[reference-finder] pick →', cand.id, JSON.stringify(cand.name), `(${mode})`);
 
       // Insert WHILE the widget is still open: RemNote keeps the underlying
       // editor as the "active editor" even though DOM focus is in this iframe.
@@ -350,18 +506,96 @@ function ReferenceFinder() {
             await plugin.editor.delete();
             console.log('[reference-finder] deleted selected text before inserting');
           }
-          // A pinned reference (`pin: true`) renders as just the link chip
-          // WITHOUT the referenced text — the same result as RemNote's manual
-          // "Edit or Add Alias → clear text" trick, but in one keystroke.
-          const ref: any = { i: 'q', _id: cand.id };
-          // Matched via an alias → reference the owning rem but render the alias
-          // text (RemNote's own alias-reference shape: _id + aliasId).
-          if (cand.aliasId) ref.aliasId = cand.aliasId;
-          if (asPin) ref.pin = true;
-          if (clozeId) ref[CLOZE_KEY] = clozeId;
-          await plugin.editor.insertRichText([ref]);
+          // Build the rich text to insert:
+          //  • 'ref'     — a normal reference (renders the referenced text).
+          //  • 'pin'     — a pinned reference: just the link chip, WITHOUT the
+          //                text (RemNote's "Edit or Add Alias → clear text" trick).
+          //  • 'textPin' — the rem's text spelled out, then a pin chip after it
+          //                (mirrors RemNote's paste option "Text with Pin").
+          const makeRef = (pin: boolean): any => {
+            const r: any = { i: 'q', _id: cand.id };
+            // Matched via an alias → reference the owning rem but render the alias
+            // text (RemNote's own alias-reference shape: _id + aliasId).
+            if (cand.aliasId) r.aliasId = cand.aliasId;
+            if (pin) r.pin = true;
+            if (clozeId) r[CLOZE_KEY] = clozeId;
+            return r;
+          };
+          let toInsert: any[];
+          if (mode === 'textPin') {
+            // "Text with Pin" (mirrors RemNote's paste option): splice in the
+            // SOURCE rem's own rich text — keeping formatting, images, etc. —
+            // then a pin chip. Two twists that match the plugin's Opt+Z cloze
+            // workflow:
+            //  • the source's cloze spans are NOT re-clozed (that would make
+            //    "clozes out of clozes"); instead they're MARKED like Opt+Z —
+            //    yellow highlight (h:3) + reference font colour (tc:1) — so they
+            //    still read as clozes without being functional ones.
+            //  • if the source is a front/back card, the back is brought along
+            //    too, joined with a practice-direction arrow instead of RemNote's
+            //    card delimiter.
+            const HL = RICH_TEXT_FORMATTING.HIGHLIGHT;
+            const TC = RICH_TEXT_FORMATTING.TEXT_COLOR;
+            const stripHints = (n: any) => {
+              delete n[RICH_TEXT_FORMATTING.CLOZE_HINT];
+              delete n[RICH_TEXT_FORMATTING.CARD_HINT_FRONT];
+              delete n[RICH_TEXT_FORMATTING.CARD_HINT_BACK];
+              delete n[RICH_TEXT_FORMATTING.MULTILINE_CARD_HINT];
+              delete n[RICH_TEXT_FORMATTING.HIDDEN_CLOZE];
+              delete n[RICH_TEXT_FORMATTING.REVEALED_CLOZE];
+            };
+            let srcRem: any;
+            try { srcRem = await plugin.rem.findOne(cand.aliasId || cand.id); } catch { /* ignore */ }
+            const frontRt: any[] = Array.isArray(srcRem?.text) ? srcRem.text : [];
+            const backRt: any[] = Array.isArray(srcRem?.backText) ? srcRem.backText : [];
+            // Arrow reflects the card's practice direction, like the Opt+Z command.
+            let arrowChar = '⇔';
+            try {
+              if (backRt.length && srcRem) {
+                const dir = await srcRem.getPracticeDirection();
+                arrowChar = dir === 'forward' ? '⇒' : dir === 'backward' ? '⇐' : '⇔';
+              }
+            } catch { /* keep default */ }
+            // Convert a section's rich text: cloze spans → marked (not clozed);
+            // card-delimiter nodes ('s') → the arrow; everything else preserved.
+            const processSection = (rt: any[]): any[] => {
+              const out: any[] = [];
+              for (const item of rt) {
+                const isStr = typeof item === 'string';
+                if (!isStr && (item as any)?.i === 's') {
+                  out.push({ i: 'm', text: ' ' + arrowChar + ' ' });
+                  continue;
+                }
+                const node: any = isStr ? { i: 'm', text: item } : { ...(item as any) };
+                const hadCloze = CLOZE_KEY in node;
+                delete node[CLOZE_KEY];
+                stripHints(node);
+                if (hadCloze) { node[HL] = 3; node[TC] = 1; out.push(node); }
+                else out.push(isStr ? (item as string) : node);
+              }
+              return out;
+            };
+            const parts: any[] = [...processSection(frontRt)];
+            if (backRt.length) {
+              // Only add a separator arrow if the front didn't already carry a
+              // card delimiter (which processSection just turned into one).
+              const hasDelim = frontRt.some((it: any) => it && typeof it !== 'string' && it.i === 's');
+              if (!hasDelim) parts.push({ i: 'm', text: ' ' + arrowChar + ' ' });
+              parts.push(...processSection(backRt));
+            }
+            if (!parts.length) {
+              const displayText = (cand.aliasText || cand.name || '').trim();
+              if (displayText) parts.push(displayText);
+            }
+            parts.push(' ');
+            parts.push(makeRef(true));
+            toInsert = parts;
+          } else {
+            toInsert = [makeRef(mode === 'pin')];
+          }
+          await plugin.editor.insertRichText(toInsert);
           inserted = true;
-          console.log('[reference-finder] insertRichText OK', cand.aliasId ? '(alias)' : '', asPin ? '(pin)' : '', clozeId ? '(inside cloze)' : '');
+          console.log('[reference-finder] insertRichText OK', `(${mode})`, cand.aliasId ? '(alias)' : '', clozeId ? '(inside cloze)' : '');
         } else {
           console.warn('[reference-finder] no active editor selection — will use clipboard fallback');
         }
@@ -439,9 +673,11 @@ function ReferenceFinder() {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       // Shift+Enter opens the rem in a new pane; Ctrl/Cmd+Enter inserts a PIN
-      // (reference without its text); plain Enter inserts a normal reference.
+      // (reference without its text); Opt/Alt+Enter inserts the text followed by
+      // a pin ("Text with Pin"); plain Enter inserts a normal reference.
       if (e.shiftKey) open(results[selected]);
-      else pick(results[selected], e.ctrlKey || e.metaKey);
+      else if (e.altKey) pick(results[selected], 'textPin');
+      else pick(results[selected], e.ctrlKey || e.metaKey ? 'pin' : 'ref');
     } else if (e.key === 'Escape') {
       e.preventDefault();
       close();
@@ -452,15 +688,25 @@ function ReferenceFinder() {
 
   return (
     <div
+      data-rf-panel
       style={{
         fontFamily: 'system-ui, -apple-system, sans-serif',
         color: 'var(--rn-clr-content-primary)',
         backgroundColor: 'var(--rn-clr-background-primary)',
-        border: '1px solid var(--rn-clr-border)',
-        borderRadius: '8px',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+        // Conspicuous border: a solid 2px frame in RemNote's opaque border color
+        // (with a concrete grey fallback so it stays visible even if the variable
+        // is missing — an undefined var with no fallback drops the whole
+        // declaration), plus a soft drop shadow to lift the panel off the page.
+        // (No box-shadow "ring": on a light background it doubled the corner edge
+        // and read as a faint halo just outside the rounded border.)
+        border: '2px solid var(--rn-clr-border-opaque, #9ca3af)',
+        borderRadius: '10px',
+        boxShadow: '0 10px 32px rgba(0,0,0,0.28)',
         padding: '12px',
         boxSizing: 'border-box',
+        // Hidden (but fully laid out, so getDimensions still measures our real
+        // width) until the viewport-flip logic settles our position.
+        visibility: positioned ? 'visible' : 'hidden',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -488,10 +734,10 @@ function ReferenceFinder() {
           color: 'var(--rn-clr-content-primary)',
         }}
       />
-      <div style={{ marginTop: '8px', maxHeight: '320px', overflowY: 'auto' }}>
+      <div style={{ marginTop: '8px', maxHeight: `${listMaxHeight}px`, overflowY: 'auto' }}>
         {query.trim().length < 2 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
-            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't — including matches by a rem's alias (shown with an ALIAS tag; the inserted reference renders the alias text). Enter inserts a reference; Ctrl/Cmd+Enter inserts a pin (no text); Shift+Enter / Shift+click opens the rem in a new pane.
+            Type at least 2 characters. Searches each word separately and floats exact-name matches up, so it finds rems the normal search can't — including matches by a rem's alias (shown with an ALIAS tag; the inserted reference renders the alias text). Enter inserts a reference; Ctrl/Cmd+Enter inserts a pin (no text); Opt/Alt+Enter inserts the text then a pin; Shift+Enter / Shift+click opens the rem in a new pane.
           </div>
         ) : results.length === 0 ? (
           <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', padding: '6px 2px' }}>
@@ -502,8 +748,10 @@ function ReferenceFinder() {
             <div
               key={r.id}
               onMouseEnter={() => setSelected(i)}
-              title="Click: insert reference · Ctrl/Cmd+click: insert pin (no text) · Shift+click: open in new pane"
-              onClick={(e) => (e.shiftKey ? open(r) : pick(r, e.ctrlKey || e.metaKey))}
+              title="Click: insert reference · Ctrl/Cmd+click: insert pin (no text) · Opt/Alt+click: text then pin · Shift+click: open in new pane"
+              onClick={(e) =>
+                e.shiftKey ? open(r) : e.altKey ? pick(r, 'textPin') : pick(r, e.ctrlKey || e.metaKey ? 'pin' : 'ref')
+              }
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -585,8 +833,33 @@ function ReferenceFinder() {
           ))
         )}
       </div>
-      <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>
-        ↑/↓ navigate · Enter insert reference · Ctrl/Cmd+Enter insert pin (no text) · Shift+Enter open in new pane · Esc close
+      <div
+        style={{
+          marginTop: '8px',
+          paddingTop: '6px',
+          borderTop: '1px solid var(--rn-clr-border)',
+          fontSize: '10px',
+          color: 'var(--rn-clr-content-tertiary)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          columnGap: '12px',
+          rowGap: '3px',
+        }}
+      >
+        {[
+          { keys: '↑/↓', label: 'navigate' },
+          { keys: 'Enter', label: 'reference' },
+          { keys: 'Ctrl/Cmd+Enter', label: 'pin (no text)' },
+          { keys: 'Opt/Alt+Enter', label: 'text + pin' },
+          { keys: 'Shift+Enter', label: 'open in new pane' },
+          { keys: 'Esc', label: 'close' },
+        ].map((s) => (
+          <span key={s.keys} style={{ whiteSpace: 'nowrap' }}>
+            <strong style={{ color: 'var(--rn-clr-content-secondary)', fontWeight: 600 }}>{s.keys}</strong>{' '}
+            {s.label}
+          </span>
+        ))}
       </div>
     </div>
   );

@@ -69,7 +69,11 @@ export function SourceReaderView({ hostRemId, hoveredRemId, kind, onClose }: Sou
         flexDirection: 'column',
         height: '100%',
         width: '100%',
+        // border-box so the 2px border is drawn INSIDE the 100% width/height —
+        // otherwise it adds 4px total, overflowing the host and showing scrollbars.
+        boxSizing: 'border-box',
         backgroundColor: 'var(--rn-clr-background-primary)',
+        border: '2px solid var(--rn-clr-content-tertiary, #6b7280)',
         borderRadius: '8px',
         overflow: 'hidden',
       }}
@@ -80,7 +84,9 @@ export function SourceReaderView({ hostRemId, hoveredRemId, kind, onClose }: Sou
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 12px',
-          borderBottom: '1px solid var(--rn-clr-border-primary)',
+          // Conspicuous separator: --rn-clr-content-tertiary is a real, clearly
+          // visible theme-aware grey (the faint border vars barely showed).
+          borderBottom: '2px solid var(--rn-clr-content-tertiary, #6b7280)',
           flex: '0 0 auto',
         }}
       >

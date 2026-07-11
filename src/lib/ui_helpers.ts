@@ -239,12 +239,41 @@ export async function registerIgnoreTagCSS(plugin: ReactRNPlugin) {
 
 export async function registerTagBadgeCSS(plugin: ReactRNPlugin) {
   const css = `
-    [data-rem-tags~="incremental"] .hierarchy-editor__tag-bar__tag {
+    /* Replace the "Incremental" powerup label with a 🔍 badge in the editor.
+
+       A RemNote change made an applied powerup render in TWO places that both
+       carry the .hierarchy-editor__tag-bar__tag class the old rule keyed on:
+         1. the "Applied Powerup Pill" (a sibling of the Tag Bar), and
+         2. a legacy pill inside [data-test="Tag Bar"] (shown when the rem has a
+            single tag).
+       The old broad selector matched both — and, because its only qualifier was
+       "any rem tagged incremental", it also matched the pills of OTHER powerups
+       (e.g. CardPriority) on the same rem. So the badge appeared twice and
+       leaked onto unrelated powerups.
+
+       Fix: badge only the Incremental Applied Powerup Pill (matched by its stable
+       data-test), and hide the redundant Tag-Bar duplicate below. The extra
+       .hierarchy-editor__tag-bar__tag qualifier keeps this off the document
+       header's Applied Powerups Menu button, which reuses the same data-test but
+       is a <button> whose inline font-size our reset can't override. */
+    [data-test="Applied Powerup Pill Incremental"].hierarchy-editor__tag-bar__tag {
       font-size: 0px;
     }
-    [data-rem-tags~="incremental"] .hierarchy-editor__tag-bar__tag:before {
+    [data-test="Applied Powerup Pill Incremental"].hierarchy-editor__tag-bar__tag:before {
       font-size: 12px;
       content: '🔍';
+    }
+
+    /* Hide the powerup pill RemNote now duplicates inside the editor Tag Bar
+       (only visible for single-tag rems); the Applied Powerup Pill above is the
+       canonical representation. Scoped to our powerups via the rem's own
+       data-rem-tags so we never hide an unrelated tag, and gated on
+       .rem-powerup-icon (the ⚡) which marks a powerup pill, never a plain user
+       tag. */
+    [data-rem-tags~="incremental" i] [data-test="Tag Bar"] .hierarchy-editor__tag-bar__tag:has(.rem-powerup-icon),
+    [data-rem-tags~="cardpriority" i] [data-test="Tag Bar"] .hierarchy-editor__tag-bar__tag:has(.rem-powerup-icon),
+    [data-rem-tags~="dismissed" i] [data-test="Tag Bar"] .hierarchy-editor__tag-bar__tag:has(.rem-powerup-icon) {
+      display: none;
     }
   `;
   await plugin.app.registerCSS('tag-badge-styling', css);

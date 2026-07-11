@@ -8,9 +8,9 @@
   "projectUrl": "https://github.com/bjsi/incremental-everything/wiki",
   "changeLogUrl": "https://github.com/bjsi/incremental-everything/wiki/Changelog",
   "version": {
-    "major": 0,
-    "minor": 2,
-    "patch": 297
+    "major": 1,
+    "minor": 0,
+    "patch": 8
   },
   "unlisted": false,
   "theme": [],

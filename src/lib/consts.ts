@@ -107,13 +107,17 @@ export const documentPriorityShieldHistoryKey = 'document-priority-shield-histor
 export const currentSubQueueIdKey = 'current-sub-queue-id-key';
 export const cardPriorityShieldHistoryKey = 'card-priority-shield-history-key';
 export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shield-history-key';
+// Dated backups written by the "Remove All CardPriority Tags" cleanup before it
+// clears this KB's shield partition, plus an index listing them for restore.
+export const cardShieldCleanupBackupPrefix = 'card-shield-cleanup-backup-';
+export const cardShieldCleanupBackupIndexKey = 'card-shield-cleanup-backup-index';
 
 // --- Keys for the Weighted Priority Shield ---
+// NOTE: the weighted-shield value is stored INLINE on each main shield-history
+// entry (the `weightedShield` field), and the graph reads it from there. The
+// dedicated *-weighted-shield-history-key stores were never written or read, so
+// they were removed as dead code.
 export const displayWeightedShieldId = 'display-weighted-shield';
-export const weightedShieldHistoryKey = 'weighted-shield-history-key';
-export const documentWeightedShieldHistoryKey = 'document-weighted-shield-history-key';
-export const cardWeightedShieldHistoryKey = 'card-weighted-shield-history-key';
-export const documentCardWeightedShieldHistoryKey = 'document-card-weighted-shield-history-key';
 
 // --- Keys for Open Editor in a new tab/window (PDFs) ---
 export const remnoteEnvironmentId = 'remnote-environment';
