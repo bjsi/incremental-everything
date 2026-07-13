@@ -30,7 +30,7 @@ import { BULLET_PREFIX, rtPlainStr } from './bulletize';
 // Detection (pure, string-only — unit-testable without the SDK)
 // ---------------------------------------------------------------------------
 
-export type ListKind = 'decimal' | 'lettered' | 'roman';
+export type ListKind = 'decimal' | 'lettered' | 'roman' | 'bullet';
 
 export interface DetectedList {
   kind: ListKind;
@@ -148,25 +148,80 @@ const chainFrom = (S: string, kind: ListKind, startValue: number): MarkerMatch[]
   return markers;
 };
 
-// Detect a flattened enumerated list. Returns the winning chain (the longest
-// across kinds) or null when nothing forms a chain of >= 2 items. v1 requires
-// the chain to start at 1 / a / i — a highlight beginning mid-list is out of
-// scope (and much riskier to detect).
+// Bullet-list markers, in priority order: unambiguous glyphs first, then "*",
+// then dashes (which also appear in prose, so they lose to anything safer).
+const BULLET_MARKERS = ['•', '▪', '◦', '‣', '·', '*', '-', '–', '—'];
+const DASH_MARKERS = new Set(['-', '–', '—']);
+
+// A bullet marker at `pos` is a real list marker only if it stands alone —
+// preceded by a separator (or start) and followed by whitespace + a letter
+// (the item text). This rejects "bem-vindo", "10-20", "A*B", etc.
+const matchBulletAt = (S: string, pos: number, ch: string): boolean =>
+  S[pos] === ch && isSep(S[pos - 1]) && /^\s+\p{L}/u.test(S.slice(pos + 1));
+
+// A dash is a *list* marker (vs. a parenthetical "word – clause – word") only
+// when it opens after a clause boundary: skipping spaces back, the preceding
+// char is ":", ";" or "." (or it's the start of the text).
+const dashOpensList = (S: string, pos: number): boolean => {
+  let p = pos - 1;
+  while (p >= 0 && /\s/.test(S[p])) p--;
+  return p < 0 || /[:;.]/.test(S[p]);
+};
+
+// Detect an already-delimited bullet/dash list (no enumeration). Uses ONE
+// consistent marker char — the first char in priority order with >= 2 valid
+// occurrences wins, so a couple of real "•" bullets beat stray prose dashes.
+// For dash markers the *first* item must open after a clause boundary; later
+// items may be dash-separated freely.
+const detectBulletList = (S: string): number[] | null => {
+  for (const ch of BULLET_MARKERS) {
+    let offs: number[] = [];
+    for (let p = 0; p < S.length; p++) {
+      if (matchBulletAt(S, p, ch)) offs.push(p);
+    }
+    if (DASH_MARKERS.has(ch)) {
+      const firstList = offs.findIndex((o) => dashOpensList(S, o));
+      offs = firstList === -1 ? [] : offs.slice(firstList);
+    }
+    if (offs.length >= 2) return offs;
+  }
+  return null;
+};
+
+// Detect a flattened list — either an ascending ENUMERATED chain (decimal /
+// lettered / roman) or an already-delimited BULLET/dash list. Returns the
+// candidate with the most items (enumerated wins ties), or null when nothing
+// forms a list of >= 2 items. Enumerated chains must start at 1 / a / i — a
+// highlight beginning mid-list is out of scope (and much riskier to detect).
 export const detectInlineList = (S: string): DetectedList | null => {
-  const kinds: ListKind[] = ['decimal', 'lettered', 'roman'];
-  let best: { kind: ListKind; markers: MarkerMatch[] } | null = null;
-  for (const kind of kinds) {
+  const candidates: DetectedList[] = [];
+
+  for (const kind of ['decimal', 'lettered', 'roman'] as ListKind[]) {
     const markers = chainFrom(S, kind, 1);
-    if (markers.length >= 2 && (!best || markers.length > best.markers.length)) {
-      best = { kind, markers };
+    if (markers.length >= 2) {
+      candidates.push({
+        kind,
+        titleEnd: markers[0].pos,
+        markerOffsets: markers.map((m) => m.pos),
+      });
     }
   }
-  if (!best) return null;
-  return {
-    kind: best.kind,
-    titleEnd: best.markers[0].pos,
-    markerOffsets: best.markers.map((m) => m.pos),
-  };
+
+  const bulletOffs = detectBulletList(S);
+  if (bulletOffs) {
+    candidates.push({
+      kind: 'bullet',
+      titleEnd: bulletOffs[0],
+      markerOffsets: bulletOffs,
+    });
+  }
+
+  if (candidates.length === 0) return null;
+  // Prefer the longest; enumerated kinds are pushed first, so a tie keeps them
+  // ahead of the bullet candidate.
+  return candidates.reduce((a, b) =>
+    b.markerOffsets.length > a.markerOffsets.length ? b : a
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -281,6 +336,10 @@ const stripLeadingPrefix = (
 
 // Build the "\n• " insertions (collapsing the whitespace run before each marker)
 // and return the rewritten rich text, or null if no list is detected.
+//
+// Enumerated lists keep their marker (e.g. "• 1 Aumentar"); bullet/dash lists
+// have their original marker replaced by a normalized "• " (e.g. "- x" and
+// "* x" both become "• x").
 export const inlinizeListInText = (
   richText: RichTextInterface
 ): RichTextInterface | null => {
@@ -288,6 +347,7 @@ export const inlinizeListInText = (
   const detected = detectInlineList(S);
   if (!detected) return null;
 
+  const isBullet = detected.kind === 'bullet';
   const hasTitle = S.slice(0, detected.titleEnd).trim().length > 0;
   const inserts = new Map<number, string>();
   const dropChars = new Set<number>();
@@ -298,6 +358,16 @@ export const inlinizeListInText = (
     while (ws > 0 && /\s/.test(S[ws - 1])) {
       ws--;
       dropChars.add(ws);
+    }
+    if (isBullet) {
+      // Drop the original marker glyph and the whitespace after it — the
+      // inserted "• " prefix supplies the normalized bullet and its space.
+      dropChars.add(off);
+      let after = off + 1;
+      while (after < S.length && /\s/.test(S[after])) {
+        dropChars.add(after);
+        after++;
+      }
     }
     // First marker gets a leading newline only if there is a caput to break off.
     const prefix = i === 0 && !hasTitle ? BULLET_PREFIX : `\n${BULLET_PREFIX}`;
@@ -317,7 +387,9 @@ export const inlinizeListSelection = async (
   }
   const updated = inlinizeListInText(rem.text || []);
   if (!updated) {
-    await plugin.app.toast('No enumerated list (1, 2, 3… / a) b) / i. ii.) detected.');
+    await plugin.app.toast(
+      'No list detected (1, 2, 3… / a) b) / i. ii. / • - *).'
+    );
     return;
   }
   await rem.setText(updated);
