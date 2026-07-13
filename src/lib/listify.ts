@@ -30,7 +30,7 @@ import { BULLET_PREFIX, rtPlainStr } from './bulletize';
 // Detection (pure, string-only — unit-testable without the SDK)
 // ---------------------------------------------------------------------------
 
-export type ListKind = 'decimal' | 'lettered' | 'roman' | 'bullet';
+export type ListKind = 'decimal' | 'lettered' | 'roman' | 'compound' | 'bullet';
 
 export interface DetectedList {
   kind: ListKind;
@@ -87,6 +87,9 @@ const matchMarkerAt = (
   kind: ListKind
 ): MarkerMatch | null => {
   if (!isSep(S[pos - 1])) return null;
+  // Reject a token that is the tail of a dotted path (e.g. the "1" in "1.1" or
+  // the "a" in "1.a"): those are handled by the compound detector, not here.
+  if (S[pos - 1] === '.' && /[\da-zA-Z]/.test(S[pos - 2] || '')) return null;
   const rest = S.slice(pos);
 
   if (kind === 'decimal') {
@@ -148,6 +151,95 @@ const chainFrom = (S: string, kind: ListKind, startValue: number): MarkerMatch[]
   return markers;
 };
 
+// ---- Compound / depth markers: "1.1", "1.2" … and mixed "1.a", "1.b" … ----
+//
+// A compound marker is a dotted path of >= 2 components (each a number or a
+// single letter), where a fixed PREFIX identifies the group and the LAST
+// component ascends: "1.1 1.2 1.3" (prefix "1", last 1→2→3) or "1.a 1.b 1.c"
+// (prefix "1", last a→b→c). Items stay flat siblings; the full label is kept.
+
+interface CompoundMarker {
+  pos: number;
+  itemStart: number;
+  prefix: string; // the fixed leading path, e.g. "1" or "2.3"
+  lastKind: 'num' | 'alpha';
+  lastValue: number; // 1-based (a→1); the ascending component
+}
+
+// Parse a compound marker at `pos`, or null. Components are numbers or single
+// letters joined by ".", followed by an optional delimiter + whitespace + a
+// letter (the item text). Requires >= 2 components so it never overlaps the
+// single-token decimal/lettered/roman matchers.
+const parseCompoundAt = (S: string, pos: number): CompoundMarker | null => {
+  if (!isSep(S[pos - 1])) return null;
+  if (S[pos - 1] === '.' && /[\da-zA-Z]/.test(S[pos - 2] || '')) return null;
+
+  const comps: { kind: 'num' | 'alpha'; value: number; raw: string }[] = [];
+  let i = pos;
+  for (;;) {
+    const num = /^\d+/.exec(S.slice(i));
+    if (num) {
+      comps.push({ kind: 'num', value: parseInt(num[0], 10), raw: num[0] });
+      i += num[0].length;
+    } else if (/[a-zA-Z]/.test(S[i] || '')) {
+      comps.push({ kind: 'alpha', value: S[i].toLowerCase().charCodeAt(0) - 96, raw: S[i] });
+      i += 1;
+    } else {
+      break;
+    }
+    // Continue only if a "." separates this component from another one.
+    if (S[i] === '.' && /[\da-zA-Z]/.test(S[i + 1] || '')) {
+      i += 1;
+      continue;
+    }
+    break;
+  }
+
+  if (comps.length < 2) return null;
+  const tail = /^([.\-)–]?)\s+(\p{L})/u.exec(S.slice(i));
+  if (!tail) return null;
+
+  const last = comps[comps.length - 1];
+  return {
+    pos,
+    itemStart: i + tail[0].length - 1,
+    prefix: comps.slice(0, -1).map((c) => c.raw).join('.'),
+    lastKind: last.kind,
+    lastValue: last.value,
+  };
+};
+
+// Detect a flat compound list: a strongly-delimited first item whose last
+// component is 1 / a, then same-prefix markers whose last component ascends.
+// The strong-delimiter requirement on the first item keeps inline version
+// numbers / ratios ("conforme 5.2 e 5.3 do manual") from reading as a list.
+const chainCompound = (S: string): CompoundMarker[] => {
+  const all: CompoundMarker[] = [];
+  for (let p = 0; p < S.length; p++) {
+    const m = parseCompoundAt(S, p);
+    if (m) all.push(m);
+  }
+  for (let s = 0; s < all.length; s++) {
+    const start = all[s];
+    if (start.lastValue !== 1 || !isStronglyDelimited(S, start.pos)) continue;
+    const chain = [start];
+    let expected = 2;
+    for (let j = s + 1; j < all.length; j++) {
+      const m = all[j];
+      if (
+        m.prefix === start.prefix &&
+        m.lastKind === start.lastKind &&
+        m.lastValue === expected
+      ) {
+        chain.push(m);
+        expected += 1;
+      }
+    }
+    if (chain.length >= 2) return chain;
+  }
+  return [];
+};
+
 // Bullet-list markers, in priority order: unambiguous glyphs first, then "*",
 // then dashes (which also appear in prose, so they lose to anything safer).
 const BULLET_MARKERS = ['•', '▪', '◦', '‣', '·', '*', '-', '–', '—'];
@@ -205,6 +297,15 @@ export const detectInlineList = (S: string): DetectedList | null => {
         markerOffsets: markers.map((m) => m.pos),
       });
     }
+  }
+
+  const compound = chainCompound(S);
+  if (compound.length >= 2) {
+    candidates.push({
+      kind: 'compound',
+      titleEnd: compound[0].pos,
+      markerOffsets: compound.map((m) => m.pos),
+    });
   }
 
   const bulletOffs = detectBulletList(S);
