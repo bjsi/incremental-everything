@@ -2,6 +2,12 @@ import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
+// Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
+// webpack chunk whose loader runtime references import.meta, which the RemNote index
+// sandbox evals as a classic script → "Cannot use 'import.meta' outside a module" +
+// ChunkLoadError, silently killing the tail. highlightActions is already statically
+// bundled into widget entries without issue, so bundling it here is safe and acyclic.
+import { runIncRemCreateTail, IncRemCreateTailJob } from '../lib/highlightActions';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
 // IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
@@ -376,9 +382,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   // don't trigger the reactive cascade/priority-recompute storm.
   let incRemCreateTailRunning = false;
   plugin.track(async (rp) => {
-    const job = await rp.storage.getSession<import('../lib/highlightActions').IncRemCreateTailJob>(
-      pendingIncRemCreateTailKey
-    );
+    const job = await rp.storage.getSession<IncRemCreateTailJob>(pendingIncRemCreateTailKey);
     if (!job || incRemCreateTailRunning) return;
 
     incRemCreateTailRunning = true;
@@ -389,7 +393,6 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
     console.log('[Tracker] incRemCreateTail picked up for newRemId:', job.newRemId);
     try {
-      const { runIncRemCreateTail } = await import('../lib/highlightActions');
       await runIncRemCreateTail(plugin, job);
       console.log('[Tracker] incRemCreateTail complete for newRemId:', job.newRemId);
     } catch (err) {

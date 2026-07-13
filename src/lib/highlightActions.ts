@@ -235,14 +235,16 @@ export const createRemUnderParent = async (
 
     if (deferTail) {
       // Hand the tail to the tracker and open the popup immediately.
-      await plugin.storage.setSession(pendingIncRemCreateTailKey, {
+      const tailJob = {
         newRemId: newRem._id,
         highlightRemId: highlightRem._id,
         parentId,
         pdfRemId,
         contextRemId,
         parentName: parentName ?? null,
-      });
+      };
+      await plugin.storage.setSession(pendingIncRemCreateTailKey, tailJob);
+      console.log('[IncRemTail] job WRITTEN to session storage:', tailJob);
       t.mark('write tail job');
       await showPriorityPopupForRem(plugin, newRem._id);
       t.mark('showPriorityPopupForRem');
@@ -353,6 +355,7 @@ export const runIncRemCreateTail = async (
   job: IncRemCreateTailJob
 ): Promise<void> => {
   const { newRemId, highlightRemId, parentId, pdfRemId, contextRemId, parentName } = job;
+  console.log('[IncRemTail] runIncRemCreateTail START', { newRemId, highlightRemId });
 
   // 1. Re-add the new IncRem to the in-session cache (initIncrementalRem skipped this
   //    on the deferred path). Reads the rem's current priority — if the user has since
@@ -360,30 +363,44 @@ export const runIncRemCreateTail = async (
   //    either ordering converges to the correct value.
   try {
     const newRem = await plugin.rem.findOne(newRemId);
+    console.log('[IncRemTail] step 1 cache: newRem found?', !!newRem);
     if (newRem) {
       const incRem = await getIncrementalRemFromRem(plugin, newRem);
-      if (incRem) await updateIncrementalRemCache(plugin, incRem);
+      console.log('[IncRemTail] step 1 cache: getIncrementalRemFromRem =>', incRem ? { remId: incRem.remId, priority: incRem.priority } : null);
+      if (incRem) {
+        await updateIncrementalRemCache(plugin, incRem);
+        const cacheAfter = await plugin.storage.getSession<any[]>(allIncrementalRemKey);
+        console.log('[IncRemTail] step 1 cache: updated. cache size =', cacheAfter?.length, '| contains newRem?', !!cacheAfter?.find((r) => r.remId === newRemId));
+      }
     }
   } catch (e) {
-    console.error('[IncRemTail] cache update failed:', e);
+    console.error('[IncRemTail] step 1 cache update FAILED:', e);
   }
 
   const highlightRem = await plugin.rem.findOne(highlightRemId);
-  if (!highlightRem) return;
+  if (!highlightRem) {
+    console.warn('[IncRemTail] highlightRem NOT FOUND — aborting tag/bookmark/cleanup', highlightRemId);
+    return;
+  }
 
   // 2. Tag the original highlight as a pdfextract (drives CSS styling).
   try {
     const pdfExtractTag = await ensurePdfExtractTag(plugin);
-    if (pdfExtractTag) await highlightRem.addTag(pdfExtractTag._id);
+    console.log('[IncRemTail] step 2 tag: pdfExtractTag id =', pdfExtractTag?._id);
+    if (pdfExtractTag) {
+      await highlightRem.addTag(pdfExtractTag._id);
+      console.log('[IncRemTail] step 2 tag: addTag done for highlight', highlightRem._id);
+    }
   } catch (err) {
-    console.error('[IncRemTail] pdfextract tag failed:', err);
+    console.error('[IncRemTail] step 2 pdfextract tag FAILED:', err);
   }
 
   // 3. Remember this parent as the last destination for this PDF/context.
   try {
     await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
+    console.log('[IncRemTail] step 3 saveLastSelectedDestination done');
   } catch (e) {
-    console.error('[IncRemTail] saveLastSelectedDestination failed:', e);
+    console.error('[IncRemTail] step 3 saveLastSelectedDestination FAILED:', e);
   }
 
   // 4. Reading-position bookmark for the active IncRem context.
@@ -406,8 +423,9 @@ export const runIncRemCreateTail = async (
         }
       }
     }
+    console.log('[IncRemTail] step 4 bookmark done');
   } catch (e) {
-    console.error('[IncRemTail] bookmark failed:', e);
+    console.error('[IncRemTail] step 4 bookmark FAILED:', e);
   }
 
   // 5. Highlight cleanup: evict from IncRem cache + remove the powerup. If the
@@ -428,13 +446,15 @@ export const runIncRemCreateTail = async (
     } else {
       await highlightRem.removePowerup(powerupCode);
     }
+    console.log('[IncRemTail] step 5 highlight cleanup done (isQueueItem=', highlightIsCurrentQueueItem, ')');
   } catch (e) {
-    console.error('[IncRemTail] highlight cleanup failed:', e);
+    console.error('[IncRemTail] step 5 highlight cleanup FAILED:', e);
   }
 
   // 6. Confirmation toast (deferred so it doesn't block the popup).
   const parentSuffix = parentName ? ` under "${parentName.slice(0, 30)}..."` : ' under source';
   await plugin.app.toast(`Created incremental rem${parentSuffix}`);
+  console.log('[IncRemTail] runIncRemCreateTail COMPLETE', { newRemId });
 };
 
 /**
