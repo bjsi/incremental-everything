@@ -25,7 +25,6 @@ import { getInitialPriority } from '../priority_inheritance';
 import { updateIncrementalRemCache } from './cache';
 import { mergeHistoryFromDismissed } from '../dismissed';
 import { registerRemsAsPdfKnown, registerRemsAsHtmlKnown, isHtmlSource } from '../pdfUtils';
-import { PerfTimer } from '../perfLog';
 
 type ReviewOverrideOptions = {
   /**
@@ -385,9 +384,7 @@ async function registerInKnownHostIndexes(plugin: ReactRNPlugin, rem: PluginRem)
 }
 
 export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean, explicitParentId?: string, skipInitialCascade?: boolean, deferCacheUpdate?: boolean }) {
-  const t = new PerfTimer('initIncrementalRem');
   const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
-  t.mark('hasPowerup');
 
   if (!isAlreadyIncremental) {
     // Suppress GlobalRemChanged (skip if caller already holds the flag)
@@ -405,7 +402,6 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         plugin.settings.getSetting<number>(initialIntervalId),
         plugin.settings.getSetting<number>(defaultPriorityId),
       ]);
-      t.mark('Promise.all[mergeHistoryFromDismissed, 2×getSetting]');
       const hasExistingHistory = dismissedHistory && dismissedHistory.length > 0;
       const initialInterval = initialIntervalSetting || 0;
       const defaultPriority = Math.min(100, Math.max(0, defaultPrioritySetting || 10));
@@ -426,16 +422,13 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         getInitialPriority(plugin, rem, defaultPriority, options?.explicitParentId),
         getDailyDocReferenceForDate(plugin, nextRepDate),
       ]);
-      t.mark('Promise.all[getInitialPriority (ancestor walk), getDailyDoc]');
       if (!dateRef) {
         return;
       }
       const todayRef =
         initialInterval === 0 ? dateRef : await getDailyDocReferenceForDate(plugin, new Date());
-      t.mark('todayRef');
 
       await rem.addPowerup(powerupCode);
-      t.mark('addPowerup');
 
       // Create 'madeIncremental' marker to indicate the start of a new learning session
       // This is used by the scheduler to count only reps since this marker
@@ -470,7 +463,6 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         );
       }
       await Promise.all(slotWrites);
-      t.mark('Promise.all[slot writes]');
 
       if (!hasExistingHistory) {
         // Record creation event in incremental history (fire and forget)
@@ -502,7 +494,6 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
       if (!options?.deferCacheUpdate) {
         await updateIncrementalRemCache(plugin, parsedIncRem.data);
       }
-      t.mark('updateIncrementalRemCache');
 
       // Register in the known_pdf_rems_ / known_html_rems_ synced indexes so
       // the parent selector and bookmark popup can discover this IncRem
@@ -527,7 +518,6 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
       if (!options?.skipFlagManagement && !triggeredCascade) {
         await plugin.storage.setSession('plugin_operation_active', false);
       }
-      t.total('initIncrementalRem');
     }
   }
 }

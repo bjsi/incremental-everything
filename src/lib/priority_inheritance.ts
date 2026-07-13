@@ -3,7 +3,6 @@ import { powerupCode, prioritySlotCode } from './consts';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from './card_priority/types';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
-import { PerfTimer } from './perfLog';
 
 /**
  * Lightweight read of an incremental rem's priority.
@@ -144,7 +143,6 @@ export async function findClosestAncestorWithAnyPriority(
   // We use explicitParentId as an override if provided. When creating a Rem and moving it,
   // the RemNote SDK's local cache for `rem.parent` might be stale for a few milliseconds
   // (especially on Web/Mobile). Passing explicitParentId bypasses this race condition.
-  const tWalk = new PerfTimer('ancestorWalk');
   let currentParentId = explicitParentId || rem.parent;
   let currentLevel = 0; // Track how many levels we've gone up
   let highestInheritedAncestor: {
@@ -163,7 +161,6 @@ export async function findClosestAncestorWithAnyPriority(
     const parentCardPriorityValue = await parent.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
     const parentCardSource = await parent.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
     const parentIncPriority = await getIncrementalPriorityOnly(parent);
-    tWalk.mark(`ancestor level ${currentLevel} probed (findOne + 2×cardProp + priorityRead)`);
 
     const hasCardPriority = parentCardPriorityValue && (parentCardSource === 'manual' || parentCardSource === 'incremental');
     const hasIncRemPriority = parentIncPriority !== null;
@@ -273,12 +270,10 @@ export async function getInitialPriority(
   defaultPriority: number,
   explicitParentId?: string
 ): Promise<number> {
-  const t = new PerfTimer('getInitialPriority');
   // 1. Check own cardPriority slot first — same guard used in getCardPriority() and
   //    handleCardPriorityInheritance(), so the precedence logic is unified across all paths.
   const ownPriorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
   const ownSource = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-  t.mark('own cardPriority read (2 calls)');
   if (
     ownPriorityValue &&
     (ownSource === 'manual' || ownSource === 'incremental')
@@ -286,7 +281,6 @@ export async function getInitialPriority(
     const parsed = parseInt(ownPriorityValue as string);
     if (!isNaN(parsed)) {
       console.log(`[getInitialPriority] Using own cardPriority (source=${ownSource}): ${parsed}`);
-      t.total('getInitialPriority (own slot hit)');
       return parsed;
     }
   }
@@ -294,8 +288,6 @@ export async function getInitialPriority(
   // 2 & 3. Walk ancestors — prefers IncRem priority, falls back to explicit Card priority.
   // We pass explicitParentId down to bypass initial SDK cache delays after rem structure changes
   const ancestorInfo = await findClosestAncestorWithAnyPriority(plugin, rem, 'IncRem', explicitParentId);
-  t.mark('findClosestAncestorWithAnyPriority (ancestor walk)');
-  t.total('getInitialPriority');
   if (ancestorInfo) {
     console.log(`[getInitialPriority] Inheriting ${ancestorInfo.priority} from ${ancestorInfo.sourceType} ancestor: ${ancestorInfo.ancestorName}`);
     return ancestorInfo.priority;
