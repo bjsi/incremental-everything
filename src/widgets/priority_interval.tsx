@@ -15,10 +15,25 @@ import {
 } from '../lib/consts';
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
+import { PRIORITY_POPUP_REQUESTED_AT_KEY } from '../lib/perfLog';
 import dayjs from 'dayjs';
 
 function PriorityInterval() {
     const plugin = usePlugin();
+
+    // ⏱️ Perf: measure the cross-iframe gap from popup-request → this widget mounting,
+    // and → its DB data resolving. Captures openPopup IPC + widget boot + data-load
+    // latency, which the caller-side timers cannot see.
+    const perfRequestedAt = useRef<number | null>(null);
+    useEffect(() => {
+        (async () => {
+            const requestedAt = await plugin.storage.getSession<number>(PRIORITY_POPUP_REQUESTED_AT_KEY);
+            if (requestedAt) {
+                perfRequestedAt.current = requestedAt;
+                console.log(`⏱️ [priority_interval] request→widget mount: ${Date.now() - requestedAt}ms`);
+            }
+        })();
+    }, []);
 
     // Refs
     const prioritySliderRef = useRef<PrioritySliderRef>(null);
@@ -77,6 +92,14 @@ function PriorityInterval() {
     const [priorityVal, setPriorityVal] = useState<number | null>(null);
     const [intervalVal, setIntervalVal] = useState<string | null>(null);
     const [futureDate, setFutureDate] = useState('');
+
+    // ⏱️ Perf: log when the widget's DB data first resolves (priority slot read back etc.)
+    useEffect(() => {
+        if (data && perfRequestedAt.current !== null) {
+            console.log(`⏱️ [priority_interval] request→data resolved (RENDER READY): ${Date.now() - perfRequestedAt.current}ms`);
+            perfRequestedAt.current = null; // log once
+        }
+    }, [data]);
 
     // Sync state from data (only once)
     useEffect(() => {

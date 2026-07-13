@@ -28,6 +28,7 @@ import {
 } from '../lib/hierarchical_parent_selector/treeHelpers';
 import { createRemUnderParent } from '../lib/highlightActions';
 import { getIncrementalPageRange } from '../lib/pdfUtils';
+import { PerfTimer } from '../lib/perfLog';
 import { RemTextSegments } from '../components';
 import { applyHeadingLevel, getHeadingLevel } from '../lib/outline_restructure';
 
@@ -820,6 +821,7 @@ function ParentSelectorWidget() {
     async (node: ParentTreeNode) => {
       if (!contextData || isCreating || creatingChildForNodeId) return;
 
+      const tSelect = new PerfTimer('handleSelect (parent picked → popup)');
       setIsCreating(true);
 
       try {
@@ -837,6 +839,7 @@ function ParentSelectorWidget() {
           setIsCreating(false);
           return;
         }
+        tSelect.mark('findOne(highlight)');
 
         await createRemUnderParent(
           plugin as ReactRNPlugin,
@@ -848,6 +851,8 @@ function ParentSelectorWidget() {
           node.name,
           showPriorityPopup // Pass this flag to handle priority popup logic inside the function
         );
+        tSelect.mark('createRemUnderParent');
+        tSelect.total('handleSelect');
 
         // If NOT showing popup, we need to manually close the current parent_selector popup
         // createRemUnderParent handles OPENING the priority popup if needed (which replaces this one)

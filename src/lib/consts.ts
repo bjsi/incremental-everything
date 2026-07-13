@@ -138,6 +138,14 @@ export const pendingCardPriorityRemovalKey = 'pendingCardPriorityRemoval';
 // picked up by tracker.ts in the persistent index widget. Contains all remIds + the chosen
 // priority and interval so the popup can close instantly and let the tracker do all DB writes.
 export const pendingIntervalBatchSaveKey = 'pendingIntervalBatchSave';
+// Deferred "create IncRem" tail job: written by createRemUnderParent (parent-selector
+// popup) right before it opens the priority popup, picked up by tracker.ts in the
+// persistent index widget. Contains everything the priority popup does NOT need
+// (cache update, pdfextract tag, last-destination memory, bookmark, highlight cleanup)
+// so the popup can appear immediately instead of waiting ~3s for these writes. Running
+// in the index widget also means the writes survive popup teardown and can be wrapped
+// in the plugin_operation_active / incRemBatchActive suppression flags.
+export const pendingIncRemCreateTailKey = 'pendingIncRemCreateTail';
 // Delta queue for quick increase/decrease priority commands.
 // Each keypress APPENDS a delta entry here; the tracker drains them all atomically.
 // This prevents the last-write-wins race that plagued the single-slot pendingPrioritySaveKey approach.

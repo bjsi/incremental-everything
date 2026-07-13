@@ -14,10 +14,11 @@ import {
   allIncrementalRemKey,
   incrementalQueueActiveKey,
   currentIncRemKey,
+  pendingIncRemCreateTailKey,
 } from './consts';
-import { initIncrementalRem } from './incremental_rem';
+import { initIncrementalRem, getIncrementalRemFromRem } from './incremental_rem';
 import { IncrementalRem } from './incremental_rem';
-import { removeIncrementalRemCache } from './incremental_rem/cache';
+import { removeIncrementalRemCache, updateIncrementalRemCache } from './incremental_rem/cache';
 
 import {
   ParentTreeNode,
@@ -31,6 +32,7 @@ import {
   saveLastSelectedDestination,
 } from './hierarchical_parent_selector/treeHelpers';
 import { isHtmlSource, getPdfInfoFromHighlight, addPageToHistory, setIncrementalReadingPosition } from './pdfUtils';
+import { PerfTimer, PRIORITY_POPUP_REQUESTED_AT_KEY } from './perfLog';
 
 type CreateRemFromHighlightOptions = {
   makeIncremental: boolean;
@@ -147,8 +149,15 @@ export const showPriorityPopupForRem = async (
   plugin: ReactRNPlugin,
   remId: RemId
 ): Promise<void> => {
+  const t = new PerfTimer('showPriorityPopupForRem');
   await plugin.storage.setSession('priorityPopupTargetRemId', remId);
+  t.mark('setSession(targetRemId)');
+  // Stash wall-clock request time so the priority widget can measure request→render.
+  await plugin.storage.setSession(PRIORITY_POPUP_REQUESTED_AT_KEY, Date.now());
+  t.mark('setSession(requestedAt)');
   await plugin.widget.openPopup('priority_interval');
+  t.mark('openPopup(priority_interval) IPC returned');
+  t.total('showPriorityPopupForRem');
 };
 
 /**
@@ -183,7 +192,9 @@ export const createRemUnderParent = async (
   parentName?: string,
   showPriorityPopup: boolean = false
 ): Promise<RemId | null> => {
+  const t = new PerfTimer('createRemUnderParent');
   const newRem = await plugin.rem.createRem();
+  t.mark('createRem');
   if (!newRem) {
     await plugin.app.toast('Failed to create rem');
     return null;
@@ -194,17 +205,50 @@ export const createRemUnderParent = async (
   const contentWithReference = [...sanitizedHighlightText, ' ', sourceLink];
 
   await newRem.setText(contentWithReference);
+  t.mark('setText');
   await newRem.setParent(parentId);
+  t.mark('setParent');
+
+  // When a priority popup will follow a new IncRem, defer everything the popup
+  // doesn't need (cache update, tag, last-destination memory, bookmark, highlight
+  // cleanup) to the tracker in the persistent index widget. That work costs ~3s of
+  // serial SDK writes here and must survive this popup's teardown when the priority
+  // popup opens — both solved by handing it to tracker.ts (which also wraps it in the
+  // plugin_operation_active / incRemBatchActive suppression flags).
+  const deferTail = showPriorityPopup && makeIncremental;
 
   if (makeIncremental) {
     // Reload to ensure parent is set in the SDK cache before initIncrementalRem
     // walks ancestors for priority inheritance. Without this, the new rem can
     // appear parentless and inherit the default priority instead.
     const reloadedRem = await plugin.rem.findOne(newRem._id);
+    t.mark('findOne(reload)');
 
     // When the priority popup will follow, skip the cascade — the popup's
-    // intervalBatchSave will fire one with the user's actual priority.
-    await initIncrementalRem(plugin, reloadedRem || newRem, { skipInitialCascade: showPriorityPopup });
+    // intervalBatchSave will fire one with the user's actual priority. When deferring,
+    // also skip the ~750ms cache write — the deferred tail re-adds it in the tracker.
+    await initIncrementalRem(plugin, reloadedRem || newRem, {
+      skipInitialCascade: showPriorityPopup,
+      deferCacheUpdate: deferTail,
+    });
+    t.mark('initIncrementalRem');
+
+    if (deferTail) {
+      // Hand the tail to the tracker and open the popup immediately.
+      await plugin.storage.setSession(pendingIncRemCreateTailKey, {
+        newRemId: newRem._id,
+        highlightRemId: highlightRem._id,
+        parentId,
+        pdfRemId,
+        contextRemId,
+        parentName: parentName ?? null,
+      });
+      t.mark('write tail job');
+      await showPriorityPopupForRem(plugin, newRem._id);
+      t.mark('showPriorityPopupForRem');
+      t.total('createRemUnderParent (tail deferred)');
+      return newRem._id;
+    }
 
     try {
       const pdfExtractTag = await ensurePdfExtractTag(plugin);
@@ -214,9 +258,11 @@ export const createRemUnderParent = async (
     } catch (err) {
       console.error('[ParentSelector:HighlightActions] Error adding pdfextract tag:', err);
     }
+    t.mark('ensurePdfExtractTag + addTag');
   }
 
   await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
+  t.mark('saveLastSelectedDestination');
 
   // Save reading position/bookmark for the active IncRem context.
   // pageIndex is null for HTML / PDF Text Reader highlights — we still record
@@ -277,15 +323,118 @@ export const createRemUnderParent = async (
   const parentSuffix = parentName ? ` under "${parentName.slice(0, 30)}..."` : ' under source';
   await plugin.app.toast(`Created ${actionText}${parentSuffix}`);
 
-  // Show priority popup if requested (for new incremental rems)
-  if (showPriorityPopup && makeIncremental) {
-    // Small delay to let the toast show first
-    setTimeout(async () => {
-      await showPriorityPopupForRem(plugin, newRem._id);
-    }, 300);
+  // Non-deferred path: this is only reached when NOT (showPriorityPopup &&
+  // makeIncremental), so no priority popup is opened here.
+  t.total('createRemUnderParent');
+  return newRem._id;
+};
+
+/**
+ * Payload for the deferred "create IncRem" tail (see pendingIncRemCreateTailKey).
+ */
+export interface IncRemCreateTailJob {
+  newRemId: RemId;
+  highlightRemId: RemId;
+  parentId: RemId;
+  pdfRemId: RemId;
+  contextRemId: RemId | null;
+  parentName: string | null;
+}
+
+/**
+ * Runs the deferred tail of a Create-IncRem: the work the priority popup doesn't
+ * need. Called by tracker.ts in the persistent index widget (NOT from the popup),
+ * where it survives popup teardown and is wrapped in the plugin_operation_active /
+ * incRemBatchActive suppression flags by the caller. Each step is independently
+ * guarded so one failure doesn't abort the rest.
+ */
+export const runIncRemCreateTail = async (
+  plugin: ReactRNPlugin,
+  job: IncRemCreateTailJob
+): Promise<void> => {
+  const { newRemId, highlightRemId, parentId, pdfRemId, contextRemId, parentName } = job;
+
+  // 1. Re-add the new IncRem to the in-session cache (initIncrementalRem skipped this
+  //    on the deferred path). Reads the rem's current priority — if the user has since
+  //    saved the popup, intervalBatchSave will have patched it and re-updated the cache;
+  //    either ordering converges to the correct value.
+  try {
+    const newRem = await plugin.rem.findOne(newRemId);
+    if (newRem) {
+      const incRem = await getIncrementalRemFromRem(plugin, newRem);
+      if (incRem) await updateIncrementalRemCache(plugin, incRem);
+    }
+  } catch (e) {
+    console.error('[IncRemTail] cache update failed:', e);
   }
 
-  return newRem._id;
+  const highlightRem = await plugin.rem.findOne(highlightRemId);
+  if (!highlightRem) return;
+
+  // 2. Tag the original highlight as a pdfextract (drives CSS styling).
+  try {
+    const pdfExtractTag = await ensurePdfExtractTag(plugin);
+    if (pdfExtractTag) await highlightRem.addTag(pdfExtractTag._id);
+  } catch (err) {
+    console.error('[IncRemTail] pdfextract tag failed:', err);
+  }
+
+  // 3. Remember this parent as the last destination for this PDF/context.
+  try {
+    await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
+  } catch (e) {
+    console.error('[IncRemTail] saveLastSelectedDestination failed:', e);
+  }
+
+  // 4. Reading-position bookmark for the active IncRem context.
+  try {
+    const { pdfRemId: actualPdf, pageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
+    if (actualPdf) {
+      let bookmarkRemId: RemId | null = null;
+      if (contextRemId) {
+        bookmarkRemId = contextRemId;
+      } else {
+        const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
+        if (queueCtx && queueCtx.pdfRemId === actualPdf && queueCtx.incrementalRemId) {
+          bookmarkRemId = queueCtx.incrementalRemId;
+        }
+      }
+      if (bookmarkRemId) {
+        await addPageToHistory(plugin, bookmarkRemId, actualPdf, pageIndex, undefined, highlightRem._id);
+        if (pageIndex !== null) {
+          await setIncrementalReadingPosition(plugin, bookmarkRemId, actualPdf, pageIndex);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[IncRemTail] bookmark failed:', e);
+  }
+
+  // 5. Highlight cleanup: evict from IncRem cache + remove the powerup. If the
+  //    highlight was the current queue item, advance the queue too — safe here because
+  //    the tracker's index widget is never torn down (unlike the popup that queued us).
+  try {
+    await removeIncrementalRemCache(plugin, highlightRem._id);
+    const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
+    const currentQueueRemId = isQueueActive
+      ? await plugin.storage.getSession<string>(currentIncRemKey)
+      : undefined;
+    const highlightIsCurrentQueueItem = !!isQueueActive && currentQueueRemId === highlightRem._id;
+    if (highlightIsCurrentQueueItem) {
+      await Promise.allSettled([
+        highlightRem.removePowerup(powerupCode),
+        plugin.queue.removeCurrentCardFromQueue(true),
+      ]);
+    } else {
+      await highlightRem.removePowerup(powerupCode);
+    }
+  } catch (e) {
+    console.error('[IncRemTail] highlight cleanup failed:', e);
+  }
+
+  // 6. Confirmation toast (deferred so it doesn't block the popup).
+  const parentSuffix = parentName ? ` under "${parentName.slice(0, 30)}..."` : ' under source';
+  await plugin.app.toast(`Created incremental rem${parentSuffix}`);
 };
 
 /**
