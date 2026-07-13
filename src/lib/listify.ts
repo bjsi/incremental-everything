@@ -23,7 +23,12 @@
 // preferring candidates that sit after sentence punctuation. That is what keeps
 // "reduzir para 2 nós" inside an item from being mistaken for marker "2".
 
-import { ReactRNPlugin, RichTextInterface, PluginRem } from '@remnote/plugin-sdk';
+import {
+  ReactRNPlugin,
+  RichTextInterface,
+  PluginRem,
+  BuiltInPowerupCodes,
+} from '@remnote/plugin-sdk';
 import { BULLET_PREFIX, rtPlainStr } from './bulletize';
 
 // ---------------------------------------------------------------------------
@@ -507,6 +512,55 @@ interface ListBreakSnapshot {
 
 const snapshotKey = (remId: string) => `listBreakSnapshot:${remId}`;
 
+// Split a rich text into any PDF-highlight pin references it contains and the
+// remaining nodes. A pin is a reference node (`i: 'q'`) whose target rem is a
+// PDF Highlight. The #pdfextract tag also qualifies but is NOT required — a
+// highlight pasted straight into notes (text + pin) has no such tag, yet its
+// target still carries the PDFHighlight powerup, so it's covered too. Pins are
+// zero-width in the plain-char projection, so removing them here doesn't
+// disturb any line/offset math.
+const partitionPdfHighlightPins = async (
+  plugin: ReactRNPlugin,
+  richText: RichTextInterface
+): Promise<{ pins: any[]; rest: RichTextInterface }> => {
+  let pdfExtractTagRem: PluginRem | undefined;
+  try {
+    pdfExtractTagRem =
+      (await plugin.rem.findByName(['pdfextract'], null)) || undefined;
+  } catch (e) {
+    // ignore — tag rem may not exist
+  }
+
+  const pins: any[] = [];
+  const rest: any[] = [];
+  for (const item of richText) {
+    if (
+      typeof item === 'object' &&
+      item !== null &&
+      (item as any).i === 'q' &&
+      (item as any)._id
+    ) {
+      const ref = await plugin.rem.findOne((item as any)._id);
+      if (ref) {
+        const isPdfHighlight = await ref.hasPowerup(
+          BuiltInPowerupCodes.PDFHighlight
+        );
+        let hasTag = false;
+        if (pdfExtractTagRem) {
+          const tags = await ref.getTagRems();
+          hasTag = tags.some((t) => t._id === pdfExtractTagRem!._id);
+        }
+        if (isPdfHighlight || hasTag) {
+          pins.push({ ...(item as any), pin: true });
+          continue;
+        }
+      }
+    }
+    rest.push(item);
+  }
+  return { pins, rest };
+};
+
 export const breakInlineListToChildren = async (
   plugin: ReactRNPlugin
 ): Promise<void> => {
@@ -526,11 +580,22 @@ export const breakInlineListToChildren = async (
   }
 
   const originalText = rem.text || [];
-  const segments = splitOnNewlines(originalText);
+
+  // Lift any PDF-highlight pin off the text before splitting. In the IR flow the
+  // list rem is an IncRem made from a highlight, so it carries a pin to that
+  // highlight at the very end — which would otherwise ride along with the LAST
+  // item. Move it onto the caput (parent) instead, where it belongs.
+  const { pins, rest } = await partitionPdfHighlightPins(plugin, originalText);
+  const workingText = pins.length > 0 ? rest : originalText;
+  const segments = splitOnNewlines(workingText);
 
   // First segment is the caput/title; the rest are items. Drop empty segments
   // and the "• " prefix from each item.
-  const title = segments.length > 0 ? segments[0] : [];
+  const title: any[] = segments.length > 0 ? [...segments[0]] : [];
+  if (pins.length > 0) {
+    if (rtPlainStr(title).trim().length > 0) title.push(' ');
+    title.push(...pins);
+  }
   const items = segments
     .slice(1)
     .map((seg) => stripLeadingPrefix(seg, BULLET_PREFIX))
