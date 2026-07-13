@@ -8,6 +8,7 @@ import { withQueueMutex } from '../lib/mutex';
 // ChunkLoadError, silently killing the tail. highlightActions is already statically
 // bundled into widget entries without issue, so bundling it here is safe and acyclic.
 import { runIncRemCreateTail, IncRemCreateTailJob } from '../lib/highlightActions';
+import { shouldUseLightMode } from '../lib/mobileUtils';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
 // IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
@@ -251,7 +252,6 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
       // 3. Trigger inheritance cascade if requested (handled by existing cascade watcher)
       if (job.triggerCascade) {
-        const { shouldUseLightMode } = await import('../lib/mobileUtils');
         const isLight = await shouldUseLightMode(plugin as any);
         if (!isLight) {
           // Set pendingInheritanceCascade BEFORE clearing incRemBatchActive/plugin_operation_active,
@@ -359,7 +359,13 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       // which skips the creation-time cascade and relies entirely on this save —
       // a single-rem (last only) trigger would leave the other batch rems
       // un-cascaded.
-      if (job.remIds.length > 0) {
+      //
+      // Gate on light mode, consistent with pendingPrioritySave / deltaQueue: the
+      // card-priority system (and its cache) is disabled in light mode, so the
+      // cascade would be pure wasted work — it was costing ~29s per save on large
+      // libraries because recalculateTreeInheritance loads the entire card DB.
+      const isLight = await shouldUseLightMode(plugin as any);
+      if (!isLight && job.remIds.length > 0) {
         await plugin.storage.setSession('pendingInheritanceCascade', job.remIds);
       }
 
@@ -516,7 +522,6 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
       const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
       const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
-      const { shouldUseLightMode } = await import('../lib/mobileUtils');
       const isLight = await shouldUseLightMode(plugin as any);
 
       for (const [remId, agg] of byRem) {
