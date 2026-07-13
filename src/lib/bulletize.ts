@@ -28,7 +28,7 @@ export const BULLET_PREFIX = '• ';
 // contribute their characters; every other node (references, images, latex…)
 // contributes nothing. This gives stable "plain-char" offsets that we use for
 // all line math, matching the approach in lib/extract.ts.
-const rtPlainStr = (rt: RichTextInterface): string =>
+export const rtPlainStr = (rt: RichTextInterface): string =>
   rt
     .map((item: any) =>
       typeof item === 'string' ? item : item?.i === 'm' ? item.text || '' : ''

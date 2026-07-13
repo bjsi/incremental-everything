@@ -106,6 +106,11 @@ import {
 } from '../lib/editor_selection';
 import { createExtract } from '../lib/extract';
 import { bulletizeSelection } from '../lib/bulletize';
+import {
+  inlinizeListSelection,
+  breakInlineListToChildren,
+  restoreListRem,
+} from '../lib/listify';
 
 
 export async function registerCommands(plugin: ReactRNPlugin) {
@@ -1162,6 +1167,40 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'bul',
     action: async () => {
       await bulletizeSelection(plugin);
+    },
+  });
+
+  // List tools — operate on the whole FOCUSED rem (no text selection needed),
+  // unlike bulletize which works line-by-line on a selection. See lib/listify.ts.
+  //
+  // Two-step, reviewable flow for turning a flattened PDF-highlight list into a
+  // proper outline: (1) inlinize inserts "\n• " before each detected enumerator
+  // so you can eyeball the split; (2) break-to-children turns each "• " line
+  // into a child rem after snapshotting the original for restore.
+  plugin.app.registerCommand({
+    id: 'inlinize-detected-list',
+    name: 'Inlinize Detected List',
+    quickCode: 'inl',
+    action: async () => {
+      await inlinizeListSelection(plugin);
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'break-inline-list-to-children',
+    name: 'Break Inline List Into Children',
+    quickCode: 'brl',
+    action: async () => {
+      await breakInlineListToChildren(plugin);
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'restore-list-rem',
+    name: 'Restore List Rem (undo break)',
+    quickCode: 'rlr',
+    action: async () => {
+      await restoreListRem(plugin);
     },
   });
 
