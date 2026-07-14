@@ -538,12 +538,6 @@ export async function saveLastSelectedDestination(
   // console.log('[ParentSelector:TreeHelpers] Generated storage key:', key);
 
   await plugin.storage.setSynced(key, destinationRemId);
-
-  // Verify it was saved
-  const verification = await plugin.storage.getSynced<RemId | null>(key);
-  // console.log('[ParentSelector:TreeHelpers] Verification - stored value:', verification);
-  // console.log('[ParentSelector:TreeHelpers] Save successful:', verification === destinationRemId);
-  // console.log('[ParentSelector:TreeHelpers] ===========================================');
 }
 
 /**

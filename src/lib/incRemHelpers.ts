@@ -15,8 +15,8 @@ export function extractText(text: unknown): string {
       if (typeof item === 'string') return item;
       if (item?.text) return item.text;
       if (item?.i === 'q') return '[Quote]';
-      if (item?.i === 'i') return '[Image]';
-      if (item?.url) return '[Link]';
+      if (item?.i === 'i') return '🖼️';
+      if (item?.url) return '🔗';
       return '';
     })
     .filter(Boolean)

@@ -99,7 +99,53 @@ export function calculateCardRemPercentilesFromCards(
     const meanRank = sum / count;
     out[remId] = Math.round((meanRank / N) * 1000) / 10; // 1 decimal
   }
+
+  // Inheritance-only rems (cardCount === 0) own no cards, so they never appear
+  // in the per-card universe above and receive no mean-rank. They still carry a
+  // priority and need a representative percentile for their badge color (and any
+  // other kbPercentile consumer). Place each at the rank a hypothetical card at
+  // its priority would occupy — the midpoint of the equal-priority band in the
+  // sorted per-card list — so the value stays inside the SAME per-card universe
+  // as every rem that does own cards. Without this they fell through to a `?? 0`
+  // default at the cache layer and rendered as top-priority (red), disagreeing
+  // with the Priority popup's relative percentile. We intentionally do NOT emit
+  // fake cards for them (that would corrupt shields / counts) — this is a pure
+  // read-out of where their priority slots into the existing card population.
+  const sortedPriorities = sorted.map((s) => s.priority);
+  for (const info of infos) {
+    if (!info || info.cardCount !== 0) continue;
+    if (out[info.remId] !== undefined) continue; // defensive: already ranked
+    const lo = lowerBoundIdx(sortedPriorities, info.priority); // # cards with priority < p
+    const hi = upperBoundIdx(sortedPriorities, info.priority); // # cards with priority <= p
+    const representativeRank = (lo + hi + 1) / 2; // 1-based midpoint of the insertion band
+    out[info.remId] = Math.round((representativeRank / N) * 1000) / 10;
+  }
+
   return out;
+}
+
+// Count of elements strictly less than `target` in an ascending-sorted array.
+function lowerBoundIdx(arr: number[], target: number): number {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+// Count of elements less than or equal to `target` in an ascending-sorted array.
+function upperBoundIdx(arr: number[], target: number): number {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 export function expandCardInfosToCards(infos: CardPriorityInfo[]): PerCardShieldItem[] {

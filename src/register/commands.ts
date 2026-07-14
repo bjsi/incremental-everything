@@ -106,6 +106,11 @@ import {
 } from '../lib/editor_selection';
 import { createExtract } from '../lib/extract';
 import { bulletizeSelection } from '../lib/bulletize';
+import {
+  inlinizeListSelection,
+  breakInlineListToChildren,
+  restoreListRem,
+} from '../lib/listify';
 
 
 export async function registerCommands(plugin: ReactRNPlugin) {
@@ -1165,6 +1170,40 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // List tools — operate on the whole FOCUSED rem (no text selection needed),
+  // unlike bulletize which works line-by-line on a selection. See lib/listify.ts.
+  //
+  // Two-step, reviewable flow for turning a flattened PDF-highlight list into a
+  // proper outline: (1) inlinize inserts "\n• " before each detected enumerator
+  // so you can eyeball the split; (2) break-to-children turns each "• " line
+  // into a child rem after snapshotting the original for restore.
+  plugin.app.registerCommand({
+    id: 'inlinize-detected-list',
+    name: 'Inlinize Detected List',
+    quickCode: 'inl',
+    action: async () => {
+      await inlinizeListSelection(plugin);
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'break-inline-list-to-children',
+    name: 'Break Inline List Into Children',
+    quickCode: 'brl',
+    action: async () => {
+      await breakInlineListToChildren(plugin);
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'restore-list-rem',
+    name: 'Restore List Rem (undo break)',
+    quickCode: 'rlr',
+    action: async () => {
+      await restoreListRem(plugin);
+    },
+  });
+
 
   plugin.app.registerCommand({
     id: 'debug-incremental-everything',
@@ -1261,7 +1300,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           }
         }
       }
-      console.log('[reference-finder] caret position (final):', caret);
       // Hand the caret rect to the widget so it can also flip ABOVE the caret
       // when there isn't room below (DOMRect getters aren't JSON-serializable, so
       // copy the fields onto a plain object).
@@ -1270,7 +1308,6 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         position = { top: Math.round(caret.bottom) + 6, left: Math.round(caret.left) };
         caretRect = { top: caret.top, bottom: caret.bottom, left: caret.left, right: caret.right };
       }
-      console.log('[reference-finder] opening at position:', position, 'caretRect:', caretRect);
       await plugin.storage.setSession('reference-finder-caret', caretRect);
       await plugin.window.openFloatingWidget('reference_finder', position);
     },

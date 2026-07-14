@@ -466,6 +466,14 @@ export async function recalculateTreeInheritance(
   let updatedCount = 0;
   const descendants = await rootRem.getDescendants();
 
+  // Fast path: a rem with no descendants (e.g. a freshly-created leaf extract) has
+  // nothing to cascade into. Return before the expensive plugin.card.getAll() below,
+  // which loads the ENTIRE card database — a ~seconds-long cost on large libraries
+  // that was being paid on every new-IncRem save for zero benefit.
+  if (descendants.length === 0) {
+    return 0;
+  }
+
   // Authoritative set of rems that actually own flashcards. We use the global
   // card index instead of per-rem rem.getCards() because rem.getCards() returns
   // [] for rems whose cards are disabled or sit inside a paused deck, whereas

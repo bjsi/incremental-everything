@@ -1,7 +1,14 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
+// Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
+// webpack chunk whose loader runtime references import.meta, which the RemNote index
+// sandbox evals as a classic script → "Cannot use 'import.meta' outside a module" +
+// ChunkLoadError, silently killing the tail. highlightActions is already statically
+// bundled into widget entries without issue, so bundling it here is safe and acyclic.
+import { runIncRemCreateTail, IncRemCreateTailJob } from '../lib/highlightActions';
+import { shouldUseLightMode } from '../lib/mobileUtils';
 
 // Module-level flag to suppress IncRem cache reloads during batch writes.
 // IMPORTANT: This is intentionally a plain JS variable, NOT session storage.
@@ -245,7 +252,6 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
       // 3. Trigger inheritance cascade if requested (handled by existing cascade watcher)
       if (job.triggerCascade) {
-        const { shouldUseLightMode } = await import('../lib/mobileUtils');
         const isLight = await shouldUseLightMode(plugin as any);
         if (!isLight) {
           // Set pendingInheritanceCascade BEFORE clearing incRemBatchActive/plugin_operation_active,
@@ -353,7 +359,13 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       // which skips the creation-time cascade and relies entirely on this save —
       // a single-rem (last only) trigger would leave the other batch rems
       // un-cascaded.
-      if (job.remIds.length > 0) {
+      //
+      // Gate on light mode, consistent with pendingPrioritySave / deltaQueue: the
+      // card-priority system (and its cache) is disabled in light mode, so the
+      // cascade would be pure wasted work — it was costing ~29s per save on large
+      // libraries because recalculateTreeInheritance loads the entire card DB.
+      const isLight = await shouldUseLightMode(plugin as any);
+      if (!isLight && job.remIds.length > 0) {
         await plugin.storage.setSession('pendingInheritanceCascade', job.remIds);
       }
 
@@ -362,6 +374,37 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       console.error('[Tracker] intervalBatchSave failed:', err);
     } finally {
       intervalBatchSaveRunning = false;
+      incRemBatchActive = false;
+      await plugin.storage.setSession('plugin_operation_active', false);
+    }
+  });
+
+  // Deferred "create IncRem" tail watcher.
+  // createRemUnderParent (parent-selector popup) writes a job here right before opening
+  // the priority popup. The ~3s of non-essential writes (IncRem cache re-add, pdfextract
+  // tag, last-destination memory, reading bookmark, highlight cleanup) then run HERE in
+  // the persistent index widget — off the popup's critical path, surviving popup
+  // teardown, and suppressed via plugin_operation_active + incRemBatchActive so they
+  // don't trigger the reactive cascade/priority-recompute storm.
+  let incRemCreateTailRunning = false;
+  plugin.track(async (rp) => {
+    const job = await rp.storage.getSession<IncRemCreateTailJob>(pendingIncRemCreateTailKey);
+    if (!job || incRemCreateTailRunning) return;
+
+    incRemCreateTailRunning = true;
+    // Clear immediately so we don't re-trigger on the next track() tick.
+    await plugin.storage.setSession(pendingIncRemCreateTailKey, null);
+    incRemBatchActive = true;
+    await plugin.storage.setSession('plugin_operation_active', true);
+
+    console.log('[Tracker] incRemCreateTail picked up for newRemId:', job.newRemId);
+    try {
+      await runIncRemCreateTail(plugin, job);
+      console.log('[Tracker] incRemCreateTail complete for newRemId:', job.newRemId);
+    } catch (err) {
+      console.error('[Tracker] incRemCreateTail failed:', err);
+    } finally {
+      incRemCreateTailRunning = false;
       incRemBatchActive = false;
       await plugin.storage.setSession('plugin_operation_active', false);
     }
@@ -479,7 +522,6 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
       const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
       const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
-      const { shouldUseLightMode } = await import('../lib/mobileUtils');
       const isLight = await shouldUseLightMode(plugin as any);
 
       for (const [remId, agg] of byRem) {

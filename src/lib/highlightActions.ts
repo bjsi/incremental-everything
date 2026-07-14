@@ -6,122 +6,19 @@ import {
   RICH_TEXT_FORMATTING,
   RichTextElementRemInterface,
   RichTextInterface,
-  RichTextElementInterface,
 } from '@remnote/plugin-sdk';
+import { sanitizeRichTextForSetText } from './richTextSanitize';
 import {
   parentSelectorWidgetId,
   powerupCode,
-  allIncrementalRemKey,
   incrementalQueueActiveKey,
   currentIncRemKey,
+  pendingIncRemCreateTailKey,
 } from './consts';
-import { initIncrementalRem } from './incremental_rem';
+import { initIncrementalRem, getIncrementalRemFromRem } from './incremental_rem';
 import { IncrementalRem } from './incremental_rem';
-import { removeIncrementalRemCache } from './incremental_rem/cache';
+import { removeIncrementalRemCache, updateIncrementalRemCache } from './incremental_rem/cache';
 
-/**
- * Sanitize a RichTextInterface array so that every element conforms strictly to
- * the shapes accepted by `rem.setText()`.
- *
- * When reading `highlightRem.text` from a PDF highlight that contains images,
- * the internal representation may carry extra/internal properties that RemNote's
- * cross-sandbox `setText` validator rejects with "Invalid input". This function
- * strips each element down to only the keys defined in the plugin SDK types.
- */
-const sanitizeRichTextForSetText = (richText: RichTextInterface): RichTextInterface => {
-  return richText.map((element): RichTextElementInterface => {
-    // Plain strings pass through as-is
-    if (typeof element === 'string') return element;
-
-    const el = element as any;
-    switch (el.i) {
-      case 'm': {
-        // RichTextElementTextInterface
-        const clean: any = { i: 'm', text: el.text ?? '' };
-        // Drive the formatting allowlist from the SDK enum so new formatting
-        // types (sup/sub/str/clozes/links/code-language/hints/…) don't get
-        // silently stripped during highlight → IncRem inheritance.
-        const textKeys = [
-          'workInProgressTag', 'workInProgressRem', 'workInProgressPortal',
-          'block', 'title',
-          ...Object.values(RICH_TEXT_FORMATTING),
-        ];
-        for (const k of textKeys) {
-          if (k in el) clean[k] = el[k];
-        }
-        return clean;
-      }
-
-      case 'q': {
-        // RichTextElementRemInterface
-        const clean: any = { i: 'q', _id: el._id };
-        if (el.aliasId !== undefined) clean.aliasId = el.aliasId;
-        if (el.pin !== undefined) clean.pin = el.pin;
-        if (el.content !== undefined) clean.content = el.content;
-        if (el.textOfDeletedRem !== undefined) {
-          clean.textOfDeletedRem = sanitizeRichTextForSetText(el.textOfDeletedRem);
-        }
-        if ('cloze' in el) clean.cloze = el.cloze;
-        return clean;
-      }
-
-      case 'i': {
-        // RichTextImageInterface — this is the key culprit for PDF highlights with images.
-        //
-        // Passthrough (denylist), NOT allowlist: we shallow-copy EVERY property on the
-        // source image element and then only fix the handful that the cross-sandbox
-        // `setText` validator actually rejects. An earlier allowlist rebuilt the element
-        // from a fixed set of known keys, which silently dropped any field the public SDK
-        // types don't model — most importantly RemNote's image *crop* data, which lives in
-        // `drawingData.bounds.crop` ({ x, y, width, height } in full-image coordinates).
-        // That crop rect is what defines the visible region's aspect ratio; dropping it
-        // while keeping the top-level width/height makes RemNote squeeze the full uncropped
-        // image into that box, distorting the aspect ratio. Preserving unknown fields keeps
-        // the copied image pixel-identical to the source.
-        const clean: any = { ...el, i: 'i', url: el.url };
-        // width/height are passed through untouched. RemNote itself persists these as
-        // floats (e.g. 385.576) and keeps top-level width/height exactly equal to
-        // drawingData.bounds.width/height; rounding only the top-level values would break
-        // that invariant and nudge the display box off the crop. Floats are proven valid
-        // (they round-trip through the same setText validator inside drawingData), so we
-        // keep them verbatim for pixel-perfect fidelity.
-        // percent: SDK only allows 5 | 25 | 50 | 100. The PDF engine sometimes stores
-        // the highlight's area percentage (e.g. 68.08…) which the validator rejects.
-        // Drop it entirely when out of range rather than passing the bad value through.
-        const VALID_PERCENTS = new Set([5, 25, 50, 100]);
-        if (el.percent !== undefined && !VALID_PERCENTS.has(el.percent)) {
-          delete clean.percent;
-        }
-        // Recursively sanitize nested rich text so it, too, conforms to setText's shapes.
-        if (el.label !== undefined) clean.label = sanitizeRichTextForSetText(el.label);
-        if (el.frontLabel !== undefined) clean.frontLabel = sanitizeRichTextForSetText(el.frontLabel);
-        return clean;
-      }
-
-      case 'a': {
-        // RichTextAudioInterface
-        const clean: any = { i: 'a', url: el.url };
-        if (el.onlyAudio !== undefined) clean.onlyAudio = el.onlyAudio;
-        if (el.width !== undefined) clean.width = el.width;
-        if (el.height !== undefined) clean.height = el.height;
-        if (el.percent !== undefined) clean.percent = el.percent;
-        return clean;
-      }
-
-      case 'p': {
-        // RichTextPluginInterface
-        const clean: any = { i: 'p', url: el.url };
-        if (el.pluginName !== undefined) clean.pluginName = el.pluginName;
-        return clean;
-      }
-
-      default:
-        // For any other element types (latex 'x', card delimiter 's', annotations, etc.)
-        // pass through as-is — they rarely appear in PDF highlights.
-        return el;
-    }
-  });
-};
 import {
   ParentTreeNode,
   ParentSelectorContext,
@@ -299,6 +196,14 @@ export const createRemUnderParent = async (
   await newRem.setText(contentWithReference);
   await newRem.setParent(parentId);
 
+  // When a priority popup will follow a new IncRem, defer everything the popup
+  // doesn't need (cache update, tag, last-destination memory, bookmark, highlight
+  // cleanup) to the tracker in the persistent index widget. That work costs ~3s of
+  // serial SDK writes here and must survive this popup's teardown when the priority
+  // popup opens — both solved by handing it to tracker.ts (which also wraps it in the
+  // plugin_operation_active / incRemBatchActive suppression flags).
+  const deferTail = showPriorityPopup && makeIncremental;
+
   if (makeIncremental) {
     // Reload to ensure parent is set in the SDK cache before initIncrementalRem
     // walks ancestors for priority inheritance. Without this, the new rem can
@@ -306,8 +211,27 @@ export const createRemUnderParent = async (
     const reloadedRem = await plugin.rem.findOne(newRem._id);
 
     // When the priority popup will follow, skip the cascade — the popup's
-    // intervalBatchSave will fire one with the user's actual priority.
-    await initIncrementalRem(plugin, reloadedRem || newRem, { skipInitialCascade: showPriorityPopup });
+    // intervalBatchSave will fire one with the user's actual priority. When deferring,
+    // also skip the ~750ms cache write — the deferred tail re-adds it in the tracker.
+    await initIncrementalRem(plugin, reloadedRem || newRem, {
+      skipInitialCascade: showPriorityPopup,
+      deferCacheUpdate: deferTail,
+    });
+
+    if (deferTail) {
+      // Hand the tail to the tracker and open the popup immediately.
+      const tailJob = {
+        newRemId: newRem._id,
+        highlightRemId: highlightRem._id,
+        parentId,
+        pdfRemId,
+        contextRemId,
+        parentName: parentName ?? null,
+      };
+      await plugin.storage.setSession(pendingIncRemCreateTailKey, tailJob);
+      await showPriorityPopupForRem(plugin, newRem._id);
+      return newRem._id;
+    }
 
     try {
       const pdfExtractTag = await ensurePdfExtractTag(plugin);
@@ -380,15 +304,117 @@ export const createRemUnderParent = async (
   const parentSuffix = parentName ? ` under "${parentName.slice(0, 30)}..."` : ' under source';
   await plugin.app.toast(`Created ${actionText}${parentSuffix}`);
 
-  // Show priority popup if requested (for new incremental rems)
-  if (showPriorityPopup && makeIncremental) {
-    // Small delay to let the toast show first
-    setTimeout(async () => {
-      await showPriorityPopupForRem(plugin, newRem._id);
-    }, 300);
+  // Non-deferred path: this is only reached when NOT (showPriorityPopup &&
+  // makeIncremental), so no priority popup is opened here.
+  return newRem._id;
+};
+
+/**
+ * Payload for the deferred "create IncRem" tail (see pendingIncRemCreateTailKey).
+ */
+export interface IncRemCreateTailJob {
+  newRemId: RemId;
+  highlightRemId: RemId;
+  parentId: RemId;
+  pdfRemId: RemId;
+  contextRemId: RemId | null;
+  parentName: string | null;
+}
+
+/**
+ * Runs the deferred tail of a Create-IncRem: the work the priority popup doesn't
+ * need. Called by tracker.ts in the persistent index widget (NOT from the popup),
+ * where it survives popup teardown and is wrapped in the plugin_operation_active /
+ * incRemBatchActive suppression flags by the caller. Each step is independently
+ * guarded so one failure doesn't abort the rest.
+ */
+export const runIncRemCreateTail = async (
+  plugin: ReactRNPlugin,
+  job: IncRemCreateTailJob
+): Promise<void> => {
+  const { newRemId, highlightRemId, parentId, pdfRemId, contextRemId, parentName } = job;
+
+  // 1. Re-add the new IncRem to the in-session cache (initIncrementalRem skipped this
+  //    on the deferred path). Reads the rem's current priority — if the user has since
+  //    saved the popup, intervalBatchSave will have patched it and re-updated the cache;
+  //    either ordering converges to the correct value.
+  try {
+    const newRem = await plugin.rem.findOne(newRemId);
+    if (newRem) {
+      const incRem = await getIncrementalRemFromRem(plugin, newRem);
+      if (incRem) await updateIncrementalRemCache(plugin, incRem);
+    }
+  } catch (e) {
+    console.error('[IncRemTail] cache update failed:', e);
   }
 
-  return newRem._id;
+  const highlightRem = await plugin.rem.findOne(highlightRemId);
+  if (!highlightRem) return;
+
+  // 2. Tag the original highlight as a pdfextract (drives CSS styling).
+  try {
+    const pdfExtractTag = await ensurePdfExtractTag(plugin);
+    if (pdfExtractTag) await highlightRem.addTag(pdfExtractTag._id);
+  } catch (err) {
+    console.error('[IncRemTail] pdfextract tag failed:', err);
+  }
+
+  // 3. Remember this parent as the last destination for this PDF/context.
+  try {
+    await saveLastSelectedDestination(plugin, pdfRemId, contextRemId, parentId);
+  } catch (e) {
+    console.error('[IncRemTail] saveLastSelectedDestination failed:', e);
+  }
+
+  // 4. Reading-position bookmark for the active IncRem context.
+  try {
+    const { pdfRemId: actualPdf, pageIndex } = await getPdfInfoFromHighlight(plugin, highlightRem);
+    if (actualPdf) {
+      let bookmarkRemId: RemId | null = null;
+      if (contextRemId) {
+        bookmarkRemId = contextRemId;
+      } else {
+        const queueCtx = await plugin.storage.getSession<any>('pageRangeContext');
+        if (queueCtx && queueCtx.pdfRemId === actualPdf && queueCtx.incrementalRemId) {
+          bookmarkRemId = queueCtx.incrementalRemId;
+        }
+      }
+      if (bookmarkRemId) {
+        await addPageToHistory(plugin, bookmarkRemId, actualPdf, pageIndex, undefined, highlightRem._id);
+        if (pageIndex !== null) {
+          await setIncrementalReadingPosition(plugin, bookmarkRemId, actualPdf, pageIndex);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[IncRemTail] bookmark failed:', e);
+  }
+
+  // 5. Highlight cleanup: evict from IncRem cache + remove the powerup. If the
+  //    highlight was the current queue item, advance the queue too — safe here because
+  //    the tracker's index widget is never torn down (unlike the popup that queued us).
+  try {
+    await removeIncrementalRemCache(plugin, highlightRem._id);
+    const isQueueActive = await plugin.storage.getSession<boolean>(incrementalQueueActiveKey);
+    const currentQueueRemId = isQueueActive
+      ? await plugin.storage.getSession<string>(currentIncRemKey)
+      : undefined;
+    const highlightIsCurrentQueueItem = !!isQueueActive && currentQueueRemId === highlightRem._id;
+    if (highlightIsCurrentQueueItem) {
+      await Promise.allSettled([
+        highlightRem.removePowerup(powerupCode),
+        plugin.queue.removeCurrentCardFromQueue(true),
+      ]);
+    } else {
+      await highlightRem.removePowerup(powerupCode);
+    }
+  } catch (e) {
+    console.error('[IncRemTail] highlight cleanup failed:', e);
+  }
+
+  // 6. Confirmation toast (deferred so it doesn't block the popup).
+  const parentSuffix = parentName ? ` under "${parentName.slice(0, 30)}..."` : ' under source';
+  await plugin.app.toast(`Created incremental rem${parentSuffix}`);
 };
 
 /**

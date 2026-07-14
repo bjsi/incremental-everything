@@ -1,8 +1,28 @@
 import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
-import { powerupCode } from './consts';
+import { powerupCode, prioritySlotCode } from './consts';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from './card_priority/types';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
+
+/**
+ * Lightweight read of an incremental rem's priority.
+ *
+ * The ancestor walk only needs each ancestor's IncRem priority, but
+ * getIncrementalRemFromRem resolves the next-rep + original-inc Daily-Doc
+ * references and parses history (~8-10 SDK round-trips) to build the full object,
+ * all discarded except `.priority`. This reads just the priority slot (2 calls),
+ * preserving getIncrementalRemFromRem's semantics: returns null only when the rem
+ * lacks the Incremental powerup, and defaults to 10 when the powerup is present but
+ * the priority slot is empty/unparseable.
+ */
+async function getIncrementalPriorityOnly(
+  rem: PluginRem
+): Promise<number | null> {
+  if (!(await rem.hasPowerup(powerupCode))) return null;
+  const raw = await rem.getPowerupProperty(powerupCode, prioritySlotCode);
+  const parsed = parseInt(raw as string, 10);
+  return isNaN(parsed) ? 10 : parsed;
+}
 
 export interface AncestorPriorityInfo {
   priority: number;
@@ -140,10 +160,10 @@ export async function findClosestAncestorWithAnyPriority(
     // Fetch Card Priority details
     const parentCardPriorityValue = await parent.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
     const parentCardSource = await parent.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-    const parentIncInfo = await getIncrementalRemFromRem(plugin, parent);
+    const parentIncPriority = await getIncrementalPriorityOnly(parent);
 
     const hasCardPriority = parentCardPriorityValue && (parentCardSource === 'manual' || parentCardSource === 'incremental');
-    const hasIncRemPriority = !!parentIncInfo;
+    const hasIncRemPriority = parentIncPriority !== null;
 
     const getFormattedName = async () => {
       const parentName = await resolveRemTextForBreadcrumb(plugin, parent.text);
@@ -154,7 +174,7 @@ export async function findClosestAncestorWithAnyPriority(
       // 1. Prefer IncRem Priority
       if (hasIncRemPriority) {
         return {
-          priority: parentIncInfo.priority,
+          priority: parentIncPriority!,
           ancestorName: await getFormattedName(),
           sourceType: 'IncRem',
           level: currentLevel,
@@ -191,7 +211,7 @@ export async function findClosestAncestorWithAnyPriority(
       // 2. Fallback to IncRem Priority
       if (hasIncRemPriority) {
         return {
-          priority: parentIncInfo.priority,
+          priority: parentIncPriority!,
           ancestorName: await getFormattedName(),
           sourceType: 'IncRem',
           level: currentLevel,

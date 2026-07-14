@@ -1,6 +1,7 @@
 import { renderWidget, usePlugin, useRunAsync, WidgetLocation, RemType, SelectionType, RICH_TEXT_FORMATTING } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { safeRemTextToString } from '../lib/pdfUtils';
+import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
+import { sanitizeRichTextForSetText } from '../lib/richTextSanitize';
 
 // ---------------------------------------------------------------------------
 // Find & Insert Reference
@@ -266,12 +267,6 @@ function ReferenceFinder() {
           if (!cancelled) setListMaxHeight(listMax);
         }
 
-        console.log('[reference-finder] measure:', {
-          placedTop: placed.top, placedLeft: placed.left, width,
-          caretFromSession: caret, caretTop, caretBottom,
-          viewportWidth, viewportHeight, spaceAbove, spaceBelow,
-          chosenLeft: Math.round(left), flipUp, vertical,
-        });
         await plugin.window.setFloatingWidgetPosition(floatingWidgetId, { left: Math.round(left), ...vertical });
       } catch (e) {
         // Something failed after we may have pinned to the right edge — restore
@@ -307,7 +302,7 @@ function ReferenceFinder() {
         let depth = 0;
         // Walk all the way to the root (cap guards against cycles/very deep trees).
         while (cur && depth < 20) {
-          const raw = (await safeRemTextToString(plugin, cur.text)).trim();
+          const raw = (await resolveRemTextForBreadcrumb(plugin, cur.text)).trim();
           const t = raw === 'Untitled' ? '' : raw; // treat empty ancestors as skippable
           if (t) names.push(t.length > 24 ? t.slice(0, 24) + '…' : t);
           cur = await cur.getParentRem();
@@ -368,10 +363,12 @@ function ReferenceFinder() {
         };
         const scored: Scored[] = [];
         for (const r of seen.values()) {
-          // safeRemTextToString never throws on malformed `.text` (some rems in
-          // a large KB carry rich text the SDK's validator rejects, which used
-          // to reject the whole search promise) and repairs it via normalize.
-          const nameRaw = await safeRemTextToString(plugin, r.text);
+          // resolveRemTextForBreadcrumb never throws on malformed `.text` (it
+          // reads nodes directly, so a rem whose rich text the SDK's validator
+          // rejects can't reject the whole search promise). It also collapses a
+          // pin reference to a compact 📌 instead of expanding the (often long)
+          // referenced rem's text — so pin text doesn't pollute the match/name.
+          const nameRaw = await resolveRemTextForBreadcrumb(plugin, r.text);
           const name = nameRaw === 'Untitled' ? '' : nameRaw;
           const foldName = fold(name);
           const type = await r.getType().catch(() => 0);
@@ -390,7 +387,7 @@ function ReferenceFinder() {
             let matched: { id: string; text: string; fold: string } | undefined;
             try {
               for (const a of await r.getAliases()) {
-                const atRaw = (await safeRemTextToString(plugin, a.text)).trim();
+                const atRaw = (await resolveRemTextForBreadcrumb(plugin, a.text)).trim();
                 const at = atRaw === 'Untitled' ? '' : atRaw;
                 const fa = fold(at);
                 if (at && foldedTokens.every((t) => fa.includes(t))) {
@@ -434,7 +431,7 @@ function ReferenceFinder() {
           let backText = '';
           try {
             if (s.r.backText?.length) {
-              const bt = (await safeRemTextToString(plugin, s.r.backText)).trim();
+              const bt = (await resolveRemTextForBreadcrumb(plugin, s.r.backText)).trim();
               backText = bt === 'Untitled' ? '' : bt; // don't show the empty-sentinel
             }
           } catch { /* ignore */ }
@@ -469,17 +466,18 @@ function ReferenceFinder() {
   const pick = useCallback(
     async (cand: Candidate | undefined, mode: 'ref' | 'pin' | 'textPin' = 'ref') => {
       if (!cand) return;
-      console.log('[reference-finder] pick →', cand.id, JSON.stringify(cand.name), `(${mode})`);
 
       // Insert WHILE the widget is still open: RemNote keeps the underlying
       // editor as the "active editor" even though DOM focus is in this iframe.
       // insertRichText silently no-ops if there is no active editor, so we
       // first check getSelection() to decide between insert and clipboard.
       let inserted = false;
+      let sawSelection = false;
+      let insertErr: any = null;
       try {
         const sel = await plugin.editor.getSelection();
-        console.log('[reference-finder] active editor selection:', sel);
         if (sel) {
+          sawSelection = true;
           // Cloze-awareness: if the insertion point sits inside a cloze, stamp
           // that cloze's id onto the reference so it stays INSIDE the cloze
           // instead of breaking it. Prefer the selected span's cId; fall back
@@ -498,13 +496,11 @@ function ReferenceFinder() {
               clozeId = clozeIdAtOffset(rem?.text, offset);
             }
           } catch { /* best-effort cloze detection */ }
-          console.log('[reference-finder] cloze id at insertion point:', clozeId);
 
           // If text is selected, replace it with the reference (mimics RemNote's
           // [[ ]] behaviour where the selected text becomes the link).
           if (hasTextRange) {
             await plugin.editor.delete();
-            console.log('[reference-finder] deleted selected text before inserting');
           }
           // Build the rich text to insert:
           //  • 'ref'     — a normal reference (renders the referenced text).
@@ -575,32 +571,56 @@ function ReferenceFinder() {
               }
               return out;
             };
-            const parts: any[] = [...processSection(frontRt)];
+            const sourceParts: any[] = [...processSection(frontRt)];
             if (backRt.length) {
               // Only add a separator arrow if the front didn't already carry a
               // card delimiter (which processSection just turned into one).
               const hasDelim = frontRt.some((it: any) => it && typeof it !== 'string' && it.i === 's');
-              if (!hasDelim) parts.push({ i: 'm', text: ' ' + arrowChar + ' ' });
-              parts.push(...processSection(backRt));
+              if (!hasDelim) sourceParts.push({ i: 'm', text: ' ' + arrowChar + ' ' });
+              sourceParts.push(...processSection(backRt));
             }
-            if (!parts.length) {
+            if (!sourceParts.length) {
               const displayText = (cand.aliasText || cand.name || '').trim();
-              if (displayText) parts.push(displayText);
+              if (displayText) sourceParts.push(displayText);
             }
-            parts.push(' ');
-            parts.push(makeRef(true));
-            toInsert = parts;
+            // Normalize the source nodes so insertRichText's cross-sandbox
+            // validator accepts them — most importantly images, whose out-of-range
+            // `percent` (e.g. 68.08) otherwise makes the whole insert throw. Same
+            // sanitization setText needs. The pin is appended AFTER, so its cloze
+            // id isn't touched by the sanitizer.
+            const sanitizedSource = sanitizeRichTextForSetText(sourceParts as any);
+            toInsert = [...(sanitizedSource as any[]), ' ', makeRef(true)];
           } else {
             toInsert = [makeRef(mode === 'pin')];
           }
-          await plugin.editor.insertRichText(toInsert);
-          inserted = true;
-          console.log('[reference-finder] insertRichText OK', `(${mode})`, cand.aliasId ? '(alias)' : '', clozeId ? '(inside cloze)' : '');
+          try {
+            await plugin.editor.insertRichText(toInsert);
+            inserted = true;
+          } catch (insErr) {
+            // insertRichText can reject some node types inline (images/audio/latex
+            // etc.). For text+pin, don't lose everything — retry with only text and
+            // rem-reference nodes so the user still gets the text and the pin.
+            console.error('[reference-finder] insertRichText threw on full payload:', insErr);
+            if (mode === 'textPin') {
+              const INSERTABLE = new Set(['m', 'q']);
+              const filtered = toInsert.filter((n) => typeof n === 'string' || INSERTABLE.has(n?.i));
+              const dropped = toInsert.length - filtered.length;
+              console.warn(`[reference-finder] text+pin retry without ${dropped} non-insertable node(s)`, filtered);
+              await plugin.editor.insertRichText(filtered);
+              inserted = true;
+              if (dropped > 0) {
+                await plugin.app.toast(`Inserted text + pin — but ${dropped} embedded element(s) (e.g. image) can't be inserted inline; open the rem to view them.`);
+              }
+            } else {
+              throw insErr;
+            }
+          }
         } else {
           console.warn('[reference-finder] no active editor selection — will use clipboard fallback');
         }
       } catch (e) {
-        console.error('[reference-finder] insertRichText threw:', e);
+        insertErr = e;
+        console.error('[reference-finder] pick insertion failed:', e);
       }
 
       if (!inserted) {
@@ -608,8 +628,10 @@ function ReferenceFinder() {
         try {
           const rem = await plugin.rem.findOne(cand.id);
           await rem?.copyReferenceToClipboard();
-          await plugin.app.toast('No editor caret found — reference copied to clipboard. Paste it (⌘/Ctrl+V).');
-          console.log('[reference-finder] copied reference to clipboard as fallback');
+          const reason = !sawSelection
+            ? 'No editor caret found'
+            : `Couldn't insert (${insertErr?.message ?? insertErr ?? 'unknown error'})`;
+          await plugin.app.toast(`${reason} — reference copied to clipboard. Paste it (⌘/Ctrl+V).`);
         } catch (e2) {
           await plugin.app.toast('Could not insert or copy the reference. Check the console.');
           console.error('[reference-finder] clipboard fallback failed:', e2);
@@ -628,7 +650,6 @@ function ReferenceFinder() {
   const open = useCallback(
     async (cand: Candidate | undefined) => {
       if (!cand) return;
-      console.log('[reference-finder] open in new pane →', cand.id, JSON.stringify(cand.name));
       try {
         const tree = await plugin.window.getCurrentWindowTree();
         const toRemIdTree = (node: any): any =>

@@ -383,7 +383,7 @@ async function registerInKnownHostIndexes(plugin: ReactRNPlugin, rem: PluginRem)
   }
 }
 
-export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean, explicitParentId?: string, skipInitialCascade?: boolean }) {
+export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, options?: { skipFlagManagement?: boolean, explicitParentId?: string, skipInitialCascade?: boolean, deferCacheUpdate?: boolean }) {
   const isAlreadyIncremental = await rem.hasPowerup(powerupCode);
 
   if (!isAlreadyIncremental) {
@@ -487,7 +487,13 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         return;
       }
 
-      await updateIncrementalRemCache(plugin, parsedIncRem.data);
+      // The in-session IncRem cache write can cost ~750ms (serializing the whole
+      // collection). When the caller defers its tail to the tracker (Create-IncRem →
+      // priority popup flow), skip it here — the deferred tail re-adds this rem to the
+      // cache in the persistent index widget, off the popup's critical path.
+      if (!options?.deferCacheUpdate) {
+        await updateIncrementalRemCache(plugin, parsedIncRem.data);
+      }
 
       // Register in the known_pdf_rems_ / known_html_rems_ synced indexes so
       // the parent selector and bookmark popup can discover this IncRem
