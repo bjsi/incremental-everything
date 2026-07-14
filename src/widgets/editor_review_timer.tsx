@@ -96,6 +96,35 @@ function EditorReviewTimer() {
     };
   }, [timerData?.remId, plugin]);
 
+  // Auto-scroll to the last bookmark when a timer session starts from the
+  // editor popup ("Timer" button). The popup that started the session sets a
+  // pending-scroll flag and then closes itself immediately — killing any
+  // scroll it might have fired (the warm path's inline setTimeout dies with
+  // the popup iframe, and closing the popup bounces focus off the reader).
+  // This widget is persistent, so it can drive openAndScrollToHighlight
+  // reliably. Gated by remId + a 30s staleness guard, and cleared on consume
+  // so it fires exactly once per session start.
+  useEffect(() => {
+    if (!timerData?.remId) return;
+    (async () => {
+      const pending = await plugin.storage.getSession<{
+        hostRemId: string;
+        highlightId: string;
+        remId: string;
+        requestedAt: number;
+      }>('editor-review-timer-pending-scroll');
+      if (!pending || pending.remId !== timerData.remId) return;
+      if (Date.now() - (pending.requestedAt ?? 0) > 30_000) {
+        await plugin.storage.setSession('editor-review-timer-pending-scroll', undefined);
+        return;
+      }
+      // Clear right before firing so it runs exactly once (even under a
+      // StrictMode double-mount, the second pass sees no flag and no-ops).
+      await plugin.storage.setSession('editor-review-timer-pending-scroll', undefined);
+      await openAndScrollToHighlight(plugin, pending.hostRemId, pending.highlightId);
+    })();
+  }, [timerData?.remId, plugin]);
+
   const pdfControls = usePdfPageControls(plugin, timerData?.remId, pdfRemId, 0);
 
   // Load host (PDF or HTML article) info if the rem reads from one. PDFs
