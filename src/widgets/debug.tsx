@@ -859,21 +859,13 @@ function Debug() {
         }
       }
 
+      // Probe EVERY built-in powerup (not a curated subset) so the dump reveals any
+      // powerup that might still mark the canonical "Highlights" container — e.g.
+      // Slot / Collection / List — even though isPowerupProperty() is deprecated.
+      // BuiltInPowerupCodes is a runtime TS enum, so Object.entries yields
+      // [name, code] pairs; append the plugin's own Incremental powerup.
       const POWERUP_LABELS: [string, string][] = [
-        ['PDFHighlight', BuiltInPowerupCodes.PDFHighlight],
-        ['PDFPageNumber', BuiltInPowerupCodes.PDFPageNumber],
-        ['Highlight', BuiltInPowerupCodes.Highlight],
-        ['HTMLHighlight', BuiltInPowerupCodes.HTMLHighlight],
-        ['WebHighlight', BuiltInPowerupCodes.WebHighlight],
-        ['UploadedFile', BuiltInPowerupCodes.UploadedFile],
-        ['Document', BuiltInPowerupCodes.Document],
-        ['Deck', BuiltInPowerupCodes.Deck],
-        ['Header', BuiltInPowerupCodes.Header],
-        ['Link', BuiltInPowerupCodes.Link],
-        ['Sources', BuiltInPowerupCodes.Sources],
-        ['ImportedDocument', BuiltInPowerupCodes.ImportedDocument],
-        ['DisableCards', BuiltInPowerupCodes.DisableCards],
-        ['UsedAsTag', BuiltInPowerupCodes.UsedAsTag],
+        ...Object.entries(BuiltInPowerupCodes).map(([name, code]) => [name, code] as [string, string]),
         ['Incremental', powerupCode],
       ];
 
@@ -898,7 +890,9 @@ function Debug() {
 
         const activePowerups: string[] = [];
         for (const [label, code] of POWERUP_LABELS) {
-          if (await currentRem.hasPowerup(code)) activePowerups.push(label);
+          try {
+            if (await currentRem.hasPowerup(code)) activePowerups.push(label);
+          } catch { /* some codes may not be queryable — skip */ }
         }
 
         const tagRems = await currentRem.getTagRems();
@@ -977,11 +971,15 @@ function Debug() {
       const children: any[] = await pdfRem.getChildrenRem();
 
       // --- Classify direct children ---
-      // canonicalContainer  = "Highlights" with "PDF Highlight Section" tag (RemNote-managed, correct)
-      // brokenContainers    = "Highlights"-named containers that lack the Section tag (our earlier repairs)
-      // orphanedPages       = PDFPageNumber rems sitting directly under the PDF root
-      let canonicalContainer: any = null;
-      const brokenContainers: any[] = [];
+      // Post-overhaul detection: RemNote's managed "Highlights" container can only
+      // be identified by name + position (a direct child of the PDF/UploadedFile
+      // rem). Tags, isProperty, isPowerupProperty and AutoSort no longer
+      // distinguish it — the genuine container carries AutoSort exactly like the
+      // PDF root does, so the old "PDF Highlight Section" tag / AutoSort heuristic
+      // misfiled the real container as "broken".
+      //   highlightsContainers = direct children literally named "Highlights"
+      //   orphanedPages        = PDFPageNumber rems sitting directly under the PDF root
+      const highlightsContainers: any[] = [];
       const orphanedPages: any[] = [];
 
       for (const child of children) {
@@ -990,26 +988,38 @@ function Debug() {
           continue;
         }
         const childName = await safeRemTextToString(plugin, child.text);
-        if (childName !== 'Highlights') continue;
-        const tags: any[] = await child.getTagRems();
-        const tagNames: string[] = await Promise.all(tags.map((t: any) => safeRemTextToString(plugin, t.text)));
-        if (tagNames.includes('PDF Highlight Section')) {
-          canonicalContainer = child;
-        } else if (await child.hasPowerup(BuiltInPowerupCodes.AutoSort)) {
-          brokenContainers.push(child);
+        if (childName === 'Highlights') highlightsContainers.push(child);
+      }
+
+      // Choose the container holding the most page nodes as canonical. Any extra
+      // "Highlights" containers are stale duplicates whose pages we fold in.
+      let canonicalContainer: any = null;
+      const duplicateContainers: any[] = [];
+      if (highlightsContainers.length > 0) {
+        const withCounts = await Promise.all(
+          highlightsContainers.map(async (c) => {
+            const kids: any[] = await c.getChildrenRem();
+            let pageCount = 0;
+            for (const k of kids) {
+              if (await k.hasPowerup(BuiltInPowerupCodes.PDFPageNumber)) pageCount++;
+            }
+            return { container: c, pageCount };
+          })
+        );
+        withCounts.sort((a, b) => b.pageCount - a.pageCount);
+        canonicalContainer = withCounts[0].container;
+        for (let i = 1; i < withCounts.length; i++) duplicateContainers.push(withCounts[i].container);
+      }
+
+      // Pages sitting inside stale duplicate containers also need folding in.
+      for (const dc of duplicateContainers) {
+        const dcChildren: any[] = await dc.getChildrenRem();
+        for (const c of dcChildren) {
+          if (await c.hasPowerup(BuiltInPowerupCodes.PDFPageNumber)) orphanedPages.push(c);
         }
       }
 
-      // Collect pages sitting inside broken containers
-      const misplacedPages: any[] = [];
-      for (const bc of brokenContainers) {
-        const bcChildren: any[] = await bc.getChildrenRem();
-        for (const c of bcChildren) {
-          if (await c.hasPowerup(BuiltInPowerupCodes.PDFPageNumber)) misplacedPages.push(c);
-        }
-      }
-
-      const allPagesToMove = [...orphanedPages, ...misplacedPages];
+      const allPagesToMove = orphanedPages;
 
       // --- PdfId diagnosis ---
       const allDescendants: any[] = await pdfRem.getDescendants();
@@ -1043,7 +1053,7 @@ function Debug() {
       }
 
       if (allPagesToMove.length > 0) {
-        fixes.push(`• Move ${allPagesToMove.length} page node(s) into the canonical "Highlights" container`);
+        fixes.push(`• Merge/move ${allPagesToMove.length} page node(s) into the canonical "Highlights" container (same-numbered pages are merged, emptied orphans deleted)`);
       }
       if (needsDocumentPowerup) {
         fixes.push('• Add Document powerup to PDF root');
@@ -1063,19 +1073,63 @@ function Debug() {
       );
       if (!confirmed) return;
 
-      // --- Execute: move pages to canonical container ---
+      // --- Execute: merge/move pages into the canonical container ---
+      // Index the pages already inside the canonical container by normalized name
+      // ("Page 05"). An orphan whose page number matches an existing page gets its
+      // highlight children folded into that page and is then deleted; the rest are
+      // re-parented whole.
+      const normalizePageName = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+      const existingPages = new Map<string, any>();
+      for (const existing of await canonicalContainer.getChildrenRem()) {
+        if (await existing.hasPowerup(BuiltInPowerupCodes.PDFPageNumber)) {
+          existingPages.set(normalizePageName(await safeRemTextToString(plugin, existing.text)), existing);
+        }
+      }
+
+      let pagesReparented = 0;
+      let pagesMerged = 0;
+      let highlightsMoved = 0;
       for (const page of allPagesToMove) {
-        await page.setParent(canonicalContainer._id);
-        console.log(`[RepairPDF] Moved page "${await safeRemTextToString(plugin, page.text)}" → canonical container`);
+        if (page._id === canonicalContainer._id) continue; // never re-parent the container into itself
+        const key = normalizePageName(await safeRemTextToString(plugin, page.text));
+        const target = existingPages.get(key);
+        if (target && target._id !== page._id) {
+          // Merge: move this orphan's children into the existing page, delete orphan.
+          const kids: any[] = await page.getChildrenRem();
+          for (const kid of kids) {
+            await kid.setParent(target._id);
+            highlightsMoved++;
+          }
+          await page.remove();
+          pagesMerged++;
+          console.log(`[RepairPDF] Merged orphan "${key}" (${kids.length} child(ren)) into ${target._id}, deleted orphan ${page._id}`);
+        } else {
+          await page.setParent(canonicalContainer._id);
+          existingPages.set(key, page); // subsequent same-numbered orphans merge into this one
+          pagesReparented++;
+          console.log(`[RepairPDF] Re-parented page "${key}" → canonical container`);
+        }
+      }
+
+      // Remove any now-empty stale duplicate "Highlights" containers.
+      let duplicatesRemoved = 0;
+      for (const dc of duplicateContainers) {
+        const remaining: any[] = await dc.getChildrenRem();
+        let stillHasPages = false;
+        for (const c of remaining) {
+          if (await c.hasPowerup(BuiltInPowerupCodes.PDFPageNumber)) { stillHasPages = true; break; }
+        }
+        if (!stillHasPages) {
+          try { await dc.remove(); duplicatesRemoved++; } catch { /* leave it if removal fails */ }
+        }
       }
 
       // Add Document powerup to PDF root if missing
       if (needsDocumentPowerup) {
         await pdfRem.addPowerup(BuiltInPowerupCodes.Document);
       }
-
-      // Best-effort: remove stray AutoSort from PDF root
-      try { await pdfRem.removePowerup(BuiltInPowerupCodes.AutoSort); } catch { /* not critical */ }
+      // NOTE: AutoSort is RemNote's normal state on a PDF root (and on the
+      // Highlights container) after the storage/sync overhaul — do NOT strip it.
 
       // --- Execute: fix PdfId slots ---
       let pdfIdFixed = 0;
@@ -1100,7 +1154,9 @@ function Debug() {
       }
 
       const parts: string[] = [];
-      if (allPagesToMove.length > 0) parts.push(`moved ${allPagesToMove.length} page(s) to canonical container`);
+      if (pagesReparented > 0) parts.push(`re-parented ${pagesReparented} page(s)`);
+      if (pagesMerged > 0) parts.push(`merged ${pagesMerged} duplicate page(s) (${highlightsMoved} highlight(s) folded in)`);
+      if (duplicatesRemoved > 0) parts.push(`removed ${duplicatesRemoved} empty duplicate container(s)`);
       if (needsDocumentPowerup) parts.push('added Document powerup');
       parts.push(`fixed ${pdfIdFixed} PdfId(s) (${pdfIdAlreadyCorrect} already correct)`);
 
