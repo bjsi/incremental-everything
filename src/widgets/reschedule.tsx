@@ -16,13 +16,15 @@ import { findClosestIncrementalAncestor } from '../lib/priority_inheritance';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
+import { stampNoteAndContext, MAX_NOTE_LENGTH } from '../lib/history_notes';
 
 async function handleRescheduleAndPriorityUpdate(
   plugin: RNPlugin,
   remId: string,
   intervalDays: number,
   newPriority: number,
-  context: 'queue' | 'editor' = 'queue'
+  context: 'queue' | 'editor' = 'queue',
+  note?: string
 ) {
   // Suppress GlobalRemChanged
   await plugin.storage.setSession('plugin_operation_active', true);
@@ -56,19 +58,21 @@ async function handleRescheduleAndPriorityUpdate(
     // Determine event type based on context
     const eventType = context === 'queue' ? 'rescheduledInQueue' : 'rescheduledInEditor';
 
-    const newHistory: IncrementalRep[] = [
-      ...(incRem.history || []),
-      {
-        date: actualDate,
-        scheduled: scheduledDate,
-        interval: intervalDays,
-        wasEarly: wasEarly,
-        daysEarlyOrLate: daysEarlyOrLate,
-        reviewTimeSeconds: reviewTimeSeconds,
-        priority: newPriority, // Record the NEW priority set during reschedule
-        eventType: eventType as 'rescheduledInQueue' | 'rescheduledInEditor',
-      },
-    ];
+    const rescheduleEntry: IncrementalRep = {
+      date: actualDate,
+      scheduled: scheduledDate,
+      interval: intervalDays,
+      wasEarly: wasEarly,
+      daysEarlyOrLate: daysEarlyOrLate,
+      reviewTimeSeconds: reviewTimeSeconds,
+      priority: newPriority, // Record the NEW priority set during reschedule
+      eventType: eventType as 'rescheduledInQueue' | 'rescheduledInEditor',
+    };
+
+    // Attach the user's reason (if typed) + a reading-state snapshot to the entry.
+    await stampNoteAndContext(plugin, rem, rescheduleEntry, note);
+
+    const newHistory: IncrementalRep[] = [...(incRem.history || []), rescheduleEntry];
 
     await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
 
@@ -113,6 +117,7 @@ async function handleRescheduleAndPriorityUpdate(
 const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'queue' | 'editor' }> = ({ plugin, remId, context }) => {
   const [days, setDays] = useState<string | null>(null);
   const [priority, setPriority] = useState<number | null>(null);
+  const [note, setNote] = useState('');
   const [futureDate, setFutureDate] = useState('');
   const [ancestorInfo, setAncestorInfo] = useState<any>(null);
   const intervalInputRef = useRef<HTMLInputElement>(null);
@@ -196,7 +201,7 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
     e.preventDefault();
     const numDays = parseInt(days || '');
     if (!isNaN(numDays) && priority !== null) {
-      await handleRescheduleAndPriorityUpdate(plugin, remId, numDays, priority, context);
+      await handleRescheduleAndPriorityUpdate(plugin, remId, numDays, priority, context, note);
     }
   };
 
@@ -279,6 +284,35 @@ const RescheduleInput: React.FC<{ plugin: RNPlugin; remId: string; context: 'que
             } else {
               priorityKeyboard.handleKeyDown(e);
             }
+          }}
+        />
+      </div>
+      {/* Optional note — stored on this reschedule's history entry ("why postponed") */}
+      <div className="flex flex-col gap-1" data-section="note">
+        <div className="flex justify-between text-xs font-semibold mb-1">
+          <span className="flex items-center gap-1">
+            <span>📝</span> Note
+            <span className="text-[10px] font-normal opacity-70 italic">(optional — saved in repetition history)</span>
+          </span>
+        </div>
+        <input
+          type="text"
+          value={note}
+          maxLength={MAX_NOTE_LENGTH}
+          placeholder="Why reschedule? e.g. waiting for prerequisite…"
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSubmit(e);
+            }
+            // Swallow other keys so form-level accelerators don't fire while typing.
+            e.stopPropagation();
+          }}
+          className="text-xs px-2 py-1 rounded border outline-none"
+          style={{
+            backgroundColor: 'var(--rn-clr-background-secondary)',
+            color: 'var(--rn-clr-content-primary)',
+            borderColor: 'var(--rn-clr-border-primary, rgba(128,128,128,0.35))',
           }}
         />
       </div>

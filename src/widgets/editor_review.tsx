@@ -20,6 +20,7 @@ import { openRemInNewPane } from '../lib/remHelpers';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import { recordIncRemRep } from '../lib/queue_session';
+import { setPendingReviewNote, stampNoteAndContext, MAX_NOTE_LENGTH } from '../lib/history_notes';
 import { PrioritySlider, PriorityBadge } from '../components';
 
 // ─── Core Review Handler ────────────────────────────────────────────────────
@@ -31,7 +32,9 @@ async function handleEditorReview(
   newPriority: number,
   reviewTimeMinutes: number,
   /** When set, the handler writes this timestamp as nextRepDate instead of the computed one. */
-  overrideNextRepDate?: number
+  overrideNextRepDate?: number,
+  /** Optional user note stored on this repetition's history entry. */
+  note?: string
 ) {
   const rem = await plugin.rem.findOne(remId);
   if (!rem) return null;
@@ -69,19 +72,21 @@ async function handleEditorReview(
     await addPageToHistory(plugin, remId, pdfRem._id, activePage || 1, reviewTimeSeconds);
   }
 
-  const newHistory: IncrementalRep[] = [
-    ...(incRem.history || []),
-    {
-      date: actualDate,
-      scheduled: scheduledDate,
-      interval: effectiveIntervalDays,
-      wasEarly: wasEarly,
-      daysEarlyOrLate: daysEarlyOrLate,
-      reviewTimeSeconds: reviewTimeSeconds,
-      priority: incRem.priority, // Record priority at time of rep
-      eventType: 'executeRepetition' as const,
-    },
-  ];
+  const repEntry: IncrementalRep = {
+    date: actualDate,
+    scheduled: scheduledDate,
+    interval: effectiveIntervalDays,
+    wasEarly: wasEarly,
+    daysEarlyOrLate: daysEarlyOrLate,
+    reviewTimeSeconds: reviewTimeSeconds,
+    priority: incRem.priority, // Record priority at time of rep
+    eventType: 'executeRepetition' as const,
+  };
+
+  // Attach the user's note (if typed) + a reading-state snapshot to the entry.
+  await stampNoteAndContext(plugin, rem, repEntry, note);
+
+  const newHistory: IncrementalRep[] = [...(incRem.history || []), repEntry];
 
   await updateSRSDataForRem(plugin, remId, newNextRepDate, newHistory);
   await addToIncrementalHistory(plugin, remId);
@@ -112,6 +117,7 @@ interface RegressionInfo {
 const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plugin, remId }) => {
   const [days, setDays] = useState<string>('1');
   const [priority, setPriority] = useState<number>(10);
+  const [note, setNote] = useState<string>('');
   const [reviewTimeMinutes, setReviewTimeMinutes] = useState<string>('');
   const [futureDate, setFutureDate] = useState('');
   const [ancestorInfo, setAncestorInfo] = useState<any>(null);
@@ -267,7 +273,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
       const numMinutes = parseFloat(reviewTimeMinutes) || 0;
 
       if (!isNaN(numDays)) {
-        const result = await handleEditorReview(plugin, remId, numDays, priority, numMinutes, dateOverride);
+        const result = await handleEditorReview(plugin, remId, numDays, priority, numMinutes, dateOverride, note);
         if (result) {
           await recordIncRemRep(plugin, remId, Math.round(numMinutes * 60 * 1000));
           const dateStr = dayjs(result.newNextRepDate).format('MMMM D, YYYY');
@@ -276,7 +282,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
         }
       }
     },
-    [days, reviewTimeMinutes, plugin, remId, priority, remName]
+    [days, reviewTimeMinutes, plugin, remId, priority, remName, note]
   );
 
   const executeStartTimer = useCallback(
@@ -325,6 +331,12 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
         console.error('[executeStartTimer] host/bookmark resolution failed', e);
       }
 
+      // Park the typed note so the timer's end-of-review write picks it up
+      // (the rep entry doesn't exist yet — the timer creates it on End/Next).
+      if (note.trim()) {
+        await setPendingReviewNote(plugin, remId, note);
+      }
+
       // Store timer info in session (writing rem-id mounts the timer widget).
       await plugin.storage.setSession('editor-review-timer-rem-id', remId);
       await plugin.storage.setSession('editor-review-timer-start', Date.now());
@@ -363,7 +375,7 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
 
       await plugin.widget.closePopup();
     },
-    [days, plugin, remId, priority, remName]
+    [days, plugin, remId, priority, remName, note]
   );
 
   // ─── User-facing Handlers (with regression gate) ────────────────────────
@@ -742,6 +754,36 @@ const EditorReviewInput: React.FC<{ plugin: RNPlugin; remId: string }> = ({ plug
             <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
               Leave empty if you'll use the timer below
             </div>
+          </div>
+
+          {/* ─── Note Section ─── */}
+          <div
+            className="p-3 rounded-lg flex flex-col gap-2"
+            style={{
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              border: '1px solid var(--rn-clr-border-primary)',
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm">📝</span>
+              <label htmlFor="review-note" className="text-sm font-semibold" style={{ color: 'var(--rn-clr-content-primary)' }}>
+                Note
+              </label>
+            </div>
+            <input
+              id="review-note"
+              type="text"
+              value={note}
+              maxLength={MAX_NOTE_LENGTH}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional observation — saved in this repetition's history"
+              className="w-full px-3 py-1.5 rounded text-sm"
+              style={{
+                border: '1px solid var(--rn-clr-border-primary)',
+                backgroundColor: 'var(--rn-clr-background-primary)',
+                color: 'var(--rn-clr-content-primary)',
+              }}
+            />
           </div>
 
           {/* ─── Priority Section ─── */}

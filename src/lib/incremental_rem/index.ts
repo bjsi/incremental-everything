@@ -19,9 +19,10 @@ import {
   pendingQueueDashboardRefocusKey,
 } from '../consts';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
-import { IncrementalRem } from './types';
+import { IncrementalRem, IncrementalRep } from './types';
 import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
+import { stampNoteAndContext } from '../history_notes';
 import { updateIncrementalRemCache } from './cache';
 import { mergeHistoryFromDismissed } from '../dismissed';
 import { registerRemsAsPdfKnown, registerRemsAsHtmlKnown, isHtmlSource } from '../pdfUtils';
@@ -86,6 +87,16 @@ export async function updateReviewRemData(
   const lastEntry = newHistory[newHistory.length - 1];
   if (lastEntry && reviewTimeSeconds !== undefined) {
     lastEntry.reviewTimeSeconds = reviewTimeSeconds;
+  }
+
+  // Stamp any pending user note (parked by the review-note inputs) and a
+  // machine context snapshot (page/range/bookmark) onto the entry this review
+  // just created — same pattern as the reviewTimeSeconds annotation above.
+  if (lastEntry) {
+    const rem = await plugin.rem.findOne(incRem.remId);
+    if (rem) {
+      await stampNoteAndContext(plugin, rem, lastEntry);
+    }
   }
 
   // Apply manual overrides when provided (used by drag-to-next/today UX)
@@ -180,14 +191,18 @@ export async function handleNextRepetitionManualOffset(
 
     const targetDay = dayjs().startOf('day').add(Math.max(offsetDays, 0), 'day').valueOf();
 
-    const newHistory = [
-      ...(incRem.history || []),
-      {
-        date: Date.now(),
-        scheduled: targetDay,
-        interval: Math.max(offsetDays, 0),
-      },
-    ];
+    const manualEntry: IncrementalRep = {
+      date: Date.now(),
+      scheduled: targetDay,
+      interval: Math.max(offsetDays, 0),
+    };
+    // Same note/context stamping as the regular review funnel.
+    const remForStamp = await plugin.rem.findOne(incRem.remId);
+    if (remForStamp) {
+      await stampNoteAndContext(plugin, remForStamp, manualEntry);
+    }
+
+    const newHistory = [...(incRem.history || []), manualEntry];
 
     await updateSRSDataForRem(plugin, incRem.remId, targetDay, newHistory);
 

@@ -7,7 +7,7 @@ import {
   PluginRem,
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
-import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
+import React, { useMemo, useRef, useState, useLayoutEffect, useEffect } from 'react';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import { IncrementalRep } from '../lib/incremental_rem/types';
@@ -40,6 +40,7 @@ import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
+import { setPendingReviewNote, getPendingReviewNote, MAX_NOTE_LENGTH } from '../lib/history_notes';
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
@@ -313,6 +314,26 @@ export function AnswerButtons() {
     setStatsSepVisible(sameRow);
   }); // No deps — runs after every render so it catches the first render where refs are populated
 
+  // Review note (📝): parked per-rem in session storage on every keystroke and
+  // attached to the history entry written by whichever action ends this review
+  // (Next / Reschedule / Dismiss) — see stampNoteAndContext in lib/history_notes.
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const currentRemId = baseData?.rem?._id;
+  useEffect(() => {
+    // New card: reset the input, then prefill from a previously parked note
+    // (e.g. typed earlier this session but not yet consumed).
+    setNoteOpen(false);
+    setNoteText('');
+    if (!currentRemId) return;
+    getPendingReviewNote(plugin, currentRemId).then((parked) => {
+      if (parked) {
+        setNoteText(parked);
+        setNoteOpen(true);
+      }
+    });
+  }, [currentRemId]);
+
   // ✅ NOW we can do early returns AFTER all hooks are called
   if (!coreData) {
     return (
@@ -438,9 +459,11 @@ export function AnswerButtons() {
           e.preventDefault();
         }
       }}
-      onClick={() => {
+      onClick={(e) => {
         // After any click, return focus to the parent window so native
-        // RemNote shortcuts work immediately.
+        // RemNote shortcuts work immediately. EXCEPT for text inputs (the
+        // review-note field) — blurring those would make typing impossible.
+        if ((e.target as HTMLElement).closest('input, textarea')) return;
         try {
           if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
@@ -546,6 +569,14 @@ export function AnswerButtons() {
         >
           <div style={buttonStyles.label}>Review</div>
           <div style={buttonStyles.label}>in Editor</div>
+        </Button>
+
+        <Button
+          onClick={() => setNoteOpen((o) => !o)}
+          title="Review note: attach an observation to this repetition's history entry (saved when you press Next / Reschedule / Dismiss)"
+        >
+          <div style={buttonStyles.label}>📝</div>
+          <div style={buttonStyles.label}>Note</div>
         </Button>
 
         <Button
@@ -841,6 +872,42 @@ export function AnswerButtons() {
           ℹ️
         </span>
       </div>
+
+      {/* Review-note input — parked in session storage on every keystroke and
+          attached to this repetition's history entry by Next/Reschedule/Dismiss. */}
+      {noteOpen && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px' }}>📝</span>
+          <input
+            type="text"
+            autoFocus
+            value={noteText}
+            maxLength={MAX_NOTE_LENGTH}
+            placeholder="Observation for this repetition (saved with Next / Reschedule / Dismiss)…"
+            onChange={(e) => {
+              setNoteText(e.target.value);
+              setPendingReviewNote(plugin, rem._id, e.target.value).catch(console.error);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setNoteOpen(false);
+              }
+              // Keep queue shortcuts from firing while typing.
+              e.stopPropagation();
+            }}
+            style={{
+              flex: 1,
+              fontSize: '12px',
+              padding: '6px 10px',
+              borderRadius: '8px',
+              border: '1px solid var(--rn-clr-border-primary)',
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              color: 'var(--rn-clr-content-primary)',
+              outline: 'none',
+            }}
+          />
+        </div>
+      )}
 
       {/* Priority and Shield Info Bar */}
       {(incRemInfo || (shouldDisplayShield && shieldStatusAsync)) && (

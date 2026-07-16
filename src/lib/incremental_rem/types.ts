@@ -100,6 +100,36 @@ export const IncrementalRep = z.object({
    * only consulted when that reference fails to round-trip.
    */
   nextRepMs: z.number().optional(),
+  /**
+   * Free-form USER-authored notes/observations attached to this history entry
+   * (e.g. why the rem was rescheduled or dismissed, context for the review).
+   * Machine-generated metadata goes in `context`, never here.
+   * Persisted in both the Incremental 'History' slot and the Dismissed 'History' slot.
+   */
+  notes: z.string().optional(),
+  /**
+   * MACHINE-generated snapshot of the reading-session state at the time of this
+   * history entry. Unlike the live synced-storage keys (current page, page range,
+   * bookmarks — see lib/pdfUtils.ts), this is stored inside the rem's powerup slot,
+   * so it survives synced-storage loss and records the historical trajectory
+   * (what page the user was on at EACH rep, not just now). All fields optional;
+   * omit the whole object when there is nothing meaningful to snapshot.
+   */
+  context: z
+    .object({
+      /** Current page at the time of this entry (PDF reader). */
+      page: z.number().optional(),
+      /** Active page range at the time of this entry. end 0/undefined = unbounded. */
+      rangeStart: z.number().optional(),
+      rangeEnd: z.number().optional(),
+      /** Name of the active PDF source (ranges/pages are per-PDF). */
+      pdfName: z.string().optional(),
+      /** Text of the last bookmark/highlight rem from this session, if any. */
+      bookmark: z.string().optional(),
+      /** Playback position in seconds (YouTube / video extracts). */
+      videoTime: z.number().optional(),
+    })
+    .optional(),
 });
 
 export type IncrementalRep = z.infer<typeof IncrementalRep>;

@@ -6,6 +6,7 @@ import {
 } from '../consts';
 import { IncrementalRep } from '../incremental_rem/types';
 import { tryParseJson, getDailyDocReferenceForDate } from '../utils';
+import { stampNoteAndContext } from '../history_notes';
 
 /**
  * Check if a Rem has the dismissed powerup.
@@ -52,11 +53,13 @@ export async function getDismissedHistoryFromRem(
  * @param plugin RNPlugin instance
  * @param rem The Rem to add dismissed powerup to
  * @param history The history array to store
+ * @param note Optional user-supplied reason for the dismissal, stored on the marker
  */
 export async function transferToDismissed(
     plugin: RNPlugin,
     rem: PluginRem,
-    history: IncrementalRep[]
+    history: IncrementalRep[],
+    note?: string
 ): Promise<void> {
     if (!history || history.length === 0) {
         return;
@@ -68,6 +71,11 @@ export async function transferToDismissed(
         scheduled: Date.now(),
         eventType: 'dismissed',
     };
+
+    // Attach the dismissal reason (explicit param, or a parked pending note) plus a
+    // reading-state snapshot (page/range/bookmark) — records how far the user got
+    // before dropping this rem, and survives even if the synced-storage keys are lost.
+    await stampNoteAndContext(plugin, rem, dismissedMarker, note);
 
     // Add the dismissed marker to the history
     const historyWithMarker = [...history, dismissedMarker];
