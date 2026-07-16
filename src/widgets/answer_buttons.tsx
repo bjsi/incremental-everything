@@ -572,14 +572,6 @@ export function AnswerButtons() {
         </Button>
 
         <Button
-          onClick={() => setNoteOpen((o) => !o)}
-          title="Review note: attach an observation to this repetition's history entry (saved when you press Next / Reschedule / Dismiss)"
-        >
-          <div style={buttonStyles.label}>📝</div>
-          <div style={buttonStyles.label}>Note</div>
-        </Button>
-
-        <Button
           onClick={async () => {
             try {
               const environment = await plugin.settings.getSetting<string>(remnoteEnvironmentId) || 'beta';
@@ -607,6 +599,36 @@ export function AnswerButtons() {
           <div style={buttonStyles.label}>Open Editor</div>
           <div style={buttonStyles.sublabel}>New Tab</div>
         </Button>
+
+        {/* Review-note toggle — compact icon (styled like the ℹ️ help icon).
+            Tinted while the input is open or a note is pending. */}
+        <span
+          role="button"
+          onClick={() => setNoteOpen((o) => !o)}
+          style={{
+            cursor: 'pointer',
+            fontSize: '18px',
+            opacity: noteOpen || noteText ? 1 : 0.7,
+            padding: '4px',
+            borderRadius: '6px',
+            transition: 'opacity 0.2s, background-color 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: noteOpen || noteText ? 'var(--rn-clr-background-tertiary)' : 'transparent',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '1';
+            e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = noteOpen || noteText ? '1' : '0.7';
+            e.currentTarget.style.backgroundColor = noteOpen || noteText ? 'var(--rn-clr-background-tertiary)' : 'transparent';
+          }}
+          title="Review note: attach an observation to this repetition's history entry (saved when you press Next / Reschedule / Dismiss)"
+        >
+          📝
+        </span>
 
         {activeHighlightId && (
           <>
