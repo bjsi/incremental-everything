@@ -337,9 +337,14 @@ export const detectInlineList = (S: string): DetectedList | null => {
 const isTextNode = (item: any): boolean =>
   typeof item === 'string' || item?.i === 'm';
 
-// Return the rich text covering plain-char range [start, end). Text nodes are
-// substringed; zero-width nodes (references, images…) are kept when their
-// position falls strictly inside the range. Formatting is preserved.
+// Return the rich text covering plain-char range [start, end] for zero-width
+// nodes, [start, end) for text. Text nodes are substringed; zero-width nodes
+// (references, images…) are kept when their position falls inside the range
+// INCLUDING the end boundary: a node at the end of a line projects to exactly
+// `end`, and with a strict `<` it would fall into the crack between adjacent
+// segments and vanish. No double-claim is possible — adjacent segments from
+// splitOnNewlines are separated by the "\n" char, so one's end is always the
+// next one's start minus 1. Formatting is preserved.
 const sliceRichText = (
   richText: RichTextInterface,
   start: number,
@@ -349,7 +354,7 @@ const sliceRichText = (
   let idx = 0;
   for (const item of richText) {
     if (!isTextNode(item)) {
-      if (idx >= start && idx < end) result.push(item);
+      if (idx >= start && idx <= end) result.push(item);
       continue;
     }
     const isString = typeof item === 'string';
@@ -561,6 +566,41 @@ const partitionPdfHighlightPins = async (
   return { pins, rest };
 };
 
+// Peel off the trailing run of zero-width nodes (images, non-PDF references…)
+// dangling after the last non-whitespace text character — in the IR flow an
+// extracted highlight often ends with a soft "\n" followed by an image and pin
+// references. Whitespace-only text nodes inside the run (the soft break) are
+// dropped; the zero-width nodes are bucketed into images vs. everything else
+// so the caller can route them (images → own child items, rest → caput).
+const peelTrailingNonText = (
+  richText: RichTextInterface
+): { body: RichTextInterface; trailingImages: any[]; trailingRest: any[] } => {
+  let cut = richText.length;
+  for (let k = richText.length - 1; k >= 0; k--) {
+    const item: any = richText[k];
+    if (!isTextNode(item)) {
+      cut = k;
+      continue;
+    }
+    const text: string = typeof item === 'string' ? item : item.text || '';
+    if (text.trim().length === 0) {
+      // Whitespace-only (e.g. the soft line break before the image) — part of
+      // the trailing run, keep scanning backwards.
+      cut = k;
+      continue;
+    }
+    break;
+  }
+  const trailingImages: any[] = [];
+  const trailingRest: any[] = [];
+  for (const item of richText.slice(cut)) {
+    if (isTextNode(item)) continue; // whitespace-only separators — drop
+    if ((item as any).i === 'i') trailingImages.push(item);
+    else trailingRest.push(item);
+  }
+  return { body: richText.slice(0, cut), trailingImages, trailingRest };
+};
+
 export const breakInlineListToChildren = async (
   plugin: ReactRNPlugin
 ): Promise<void> => {
@@ -584,22 +624,30 @@ export const breakInlineListToChildren = async (
   // Lift any PDF-highlight pin off the text before splitting. In the IR flow the
   // list rem is an IncRem made from a highlight, so it carries a pin to that
   // highlight at the very end — which would otherwise ride along with the LAST
-  // item. Move it onto the caput (parent) instead, where it belongs.
+  // item. Move it onto the caput (parent) instead, where it belongs. Then peel
+  // the remaining trailing zero-width run: other references also join the
+  // caput; trailing images become their own child items appended after the
+  // list (see below).
   const { pins, rest } = await partitionPdfHighlightPins(plugin, originalText);
-  const workingText = pins.length > 0 ? rest : originalText;
-  const segments = splitOnNewlines(workingText);
+  const { body, trailingImages, trailingRest } = peelTrailingNonText(rest);
+  const segments = splitOnNewlines(body);
 
   // First segment is the caput/title; the rest are items. Drop empty segments
-  // and the "• " prefix from each item.
+  // (but keep any holding a zero-width node, e.g. a mid-text image on its own
+  // line) and the "• " prefix from each item.
   const title: any[] = segments.length > 0 ? [...segments[0]] : [];
-  if (pins.length > 0) {
+  const caputExtras = [...pins, ...trailingRest];
+  if (caputExtras.length > 0) {
     if (rtPlainStr(title).trim().length > 0) title.push(' ');
-    title.push(...pins);
+    title.push(...caputExtras);
   }
   const items = segments
     .slice(1)
     .map((seg) => stripLeadingPrefix(seg, BULLET_PREFIX))
-    .filter((seg) => rtPlainStr(seg).trim().length > 0);
+    .filter(
+      (seg) =>
+        rtPlainStr(seg).trim().length > 0 || seg.some((it) => !isTextNode(it))
+    );
 
   if (items.length === 0) {
     await plugin.app.toast(
@@ -607,6 +655,9 @@ export const breakInlineListToChildren = async (
     );
     return;
   }
+
+  // Trailing images become their own child items, appended after the list.
+  for (const img of trailingImages) items.push([img]);
 
   // Create the children (in order), collecting ids for the restore snapshot.
   const childIds: string[] = [];
