@@ -461,11 +461,18 @@ export function ImportIncremHistory() {
           <div className="text-sm">
             Importing… {progress.done} / {progress.total}
           </div>
-          <div className="w-full bg-gray-300 rounded h-2">
+          <div
+            className="w-full bg-gray-300 rounded h-2"
+            style={{ backgroundColor: '#d1d5db', height: 8, borderRadius: 6 }}
+          >
             <div
               className="bg-blue-600 h-2 rounded"
-              style={{ backgroundColor: '#2563eb', height: 8, borderRadius: 6 }}
-              style={{ width: `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%` }}
+              style={{
+                backgroundColor: '#2563eb',
+                height: 8,
+                borderRadius: 6,
+                width: `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%`,
+              }}
             />
           </div>
           <div className="text-xs opacity-70 truncate">{progress.current}</div>
