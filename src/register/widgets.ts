@@ -178,6 +178,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     dimensions: { height: 800, width: 1000 },
   });
 
+  // Import Incremental Rems (with full rep history) from a JSON payload
+  plugin.app.registerWidget('import_increm_history', WidgetLocation.Popup, {
+    dimensions: { height: 'auto', width: 620 },
+  });
+
   // Register parent selector popup for creating rems under incremental rems
   plugin.app.registerWidget(parentSelectorWidgetId, WidgetLocation.Popup, {
     dimensions: { height: 850, width: 400 },
