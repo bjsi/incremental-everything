@@ -247,7 +247,7 @@ const chainCompound = (S: string): CompoundMarker[] => {
 
 // Bullet-list markers, in priority order: unambiguous glyphs first, then "*",
 // then dashes (which also appear in prose, so they lose to anything safer).
-const BULLET_MARKERS = ['•', '▪', '◦', '‣', '·', '*', '-', '–', '—'];
+const BULLET_MARKERS = ['•', '▪', '◦', '‣', '·', '*', '-', '–', '—', '⚫'];
 const DASH_MARKERS = new Set(['-', '–', '—']);
 
 // A bullet marker at `pos` is a real list marker only if it stands alone —
