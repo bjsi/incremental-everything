@@ -456,9 +456,50 @@ function ParentSelectorWidget() {
   const hasInitiallyScrolled = useRef(false);
   const listContainerRef = useRef<HTMLDivElement>(null);
 
+  // --- Hover arming -------------------------------------------------------
+  // The popup opens under the cursor and then scrolls the suggested row into
+  // view, which drags rows *underneath a stationary mouse* and fires
+  // mouseenter — silently throwing away the suggestion before the user has
+  // done anything. So hover only takes over once the pointer has genuinely
+  // moved (beyond jitter) and the popup has settled. Keyboard navigation
+  // disarms it again, so arrow keys can't be undone by a resting cursor.
+  const HOVER_GRACE_MS = 400;
+  const HOVER_MOVE_THRESHOLD_PX = 5;
+  const hoverArmedRef = useRef(false);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const mountedAtRef = useRef(Date.now());
+
+  const disarmHover = useCallback(() => {
+    hoverArmedRef.current = false;
+    // Re-baseline: the next move must clear the threshold from here.
+    lastMousePosRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      const prev = lastMousePosRef.current;
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+      if (!prev) return;
+      if (Date.now() - mountedAtRef.current < HOVER_GRACE_MS) return;
+      const moved = Math.abs(e.clientX - prev.x) + Math.abs(e.clientY - prev.y);
+      if (moved >= HOVER_MOVE_THRESHOLD_PX) hoverArmedRef.current = true;
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    return () => window.removeEventListener('mousemove', onMouseMove);
+  }, []);
+
+
   // NEW: State for inline child creation
   const [creatingChildForNodeId, setCreatingChildForNodeId] = useState<RemId | null>(null);
   const [isCreatingChild, setIsCreatingChild] = useState(false);
+
+  const handleRowHover = useCallback(
+    (index: number) => {
+      if (!hoverArmedRef.current || creatingChildForNodeId) return;
+      setSelectedIndex(index);
+    },
+    [creatingChildForNodeId]
+  );
 
   // Per-device display settings for expanded branches (see consts).
   // `settingsLoaded` gates initialization so the first selected index is
@@ -757,6 +798,15 @@ function ParentSelectorWidget() {
     // the re-locate effect.
   }, [contextData, allIncrementalRems, plugin, isInitialized, settingsLoaded]);
 
+  // Loading the tree can outlast the grace period, and any mouse jitter while
+  // the user waits would leave hover armed for the moment the list appears and
+  // scrolls. So restart the guard from when there is actually a list to hover.
+  useEffect(() => {
+    if (!isInitialized) return;
+    mountedAtRef.current = Date.now();
+    disarmHover();
+  }, [isInitialized, disarmHover]);
+
   // ---------------------------------------------------------------------------
   // HANDLERS
   // ---------------------------------------------------------------------------
@@ -950,6 +1000,10 @@ function ParentSelectorWidget() {
   const handleSelect = useCallback(
     async (node: ParentTreeNode) => {
       if (!contextData || isCreating || creatingChildForNodeId) return;
+      // The popup opens under the cursor that just clicked the toolbar button,
+      // so a quick second click would land on whatever row happens to be there
+      // and create the rem for real. Ignore clicks until the popup settles.
+      if (Date.now() - mountedAtRef.current < HOVER_GRACE_MS) return;
 
       setIsCreating(true);
 
@@ -1000,6 +1054,69 @@ function ParentSelectorWidget() {
     plugin.widget.closePopup();
   }, [plugin]);
 
+  // The rem the popup opened on: the remembered destination if there is one,
+  // otherwise whatever we suggested. This is what "restore" jumps back to.
+  const recoverTarget = useMemo(() => {
+    if (contextData?.lastSelectedDestination) {
+      return { remId: contextData.lastSelectedDestination, label: 'Last destination' };
+    }
+    if (suggestedRemId) {
+      return { remId: suggestedRemId, label: 'Suggested' };
+    }
+    return null;
+  }, [contextData, suggestedRemId]);
+
+  const handleRecoverSelection = useCallback(async () => {
+    if (!recoverTarget || isCreating || creatingChildForNodeId) return;
+    const { remId } = recoverTarget;
+
+    // Restoring is a keyboard action, so stop a resting cursor from immediately
+    // undoing it the next time a row slides under the pointer.
+    disarmHover();
+    selectedRemIdRef.current = remId;
+
+    const idx = displayList.findIndex((n) => n.remId === remId);
+    if (idx >= 0) {
+      setSelectedIndex(idx);
+      return;
+    }
+
+    // Not visible — the user collapsed the path since. Re-expand to it.
+    try {
+      const { tree: expandedTree } = await expandToLastDestination(
+        plugin,
+        tree,
+        remId,
+        allIncrementalRems || []
+      );
+      let nextTree = expandedTree;
+      if (headingsOnly) {
+        nextTree = await annotateHeadingDescendants(plugin, nextTree, { recurse: true });
+      }
+      setTree(nextTree);
+
+      const foundIndex = flattenTreeForDisplay(nextTree, {
+        ...displayOptions,
+        alwaysShowRemIds: new Set([...pinnedRemIds, remId]),
+      }).findIndex((n) => n.remId === remId);
+      if (foundIndex >= 0) setSelectedIndex(foundIndex);
+    } catch (error) {
+      console.error('[ParentSelector:Widget] Error restoring selection:', error);
+    }
+  }, [
+    recoverTarget,
+    isCreating,
+    creatingChildForNodeId,
+    displayList,
+    tree,
+    plugin,
+    allIncrementalRems,
+    headingsOnly,
+    displayOptions,
+    pinnedRemIds,
+    disarmHover,
+  ]);
+
   // ---------------------------------------------------------------------------
   // KEYBOARD NAVIGATION
   // ---------------------------------------------------------------------------
@@ -1013,11 +1130,13 @@ function ParentSelectorWidget() {
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
+          disarmHover();
           setSelectedIndex((prev) => Math.min(prev + 1, displayList.length - 1));
           break;
 
         case 'ArrowUp':
           e.preventDefault();
+          disarmHover();
           setSelectedIndex((prev) => Math.max(prev - 1, 0));
           break;
 
@@ -1055,6 +1174,13 @@ function ParentSelectorWidget() {
           handleClose();
           break;
 
+        // 'l' (last) jumps back to the remembered/suggested destination.
+        case 'l':
+        case 'L':
+          e.preventDefault();
+          handleRecoverSelection();
+          break;
+
         // NEW: '+' or 'n' to add a child to the selected node
         case '+':
         case '=': // Handle both + and = (without shift)
@@ -1078,6 +1204,8 @@ function ParentSelectorWidget() {
     handleSelect,
     handleClose,
     handleStartAddChild,
+    handleRecoverSelection,
+    disarmHover,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -1160,7 +1288,7 @@ function ParentSelectorWidget() {
           isLoadingChildren={loadingNodeId === node.remId}
           onSelect={() => handleSelect(node)}
           onToggleExpand={() => handleToggleExpand(node.remId)}
-          onMouseEnter={() => !creatingChildForNodeId && setSelectedIndex(index)}
+          onMouseEnter={() => handleRowHover(index)}
           onAddChild={() => {
             setSelectedIndex(index);
             setCreatingChildForNodeId(node.remId);
@@ -1269,20 +1397,51 @@ function ParentSelectorWidget() {
             Select Parent Rem
           </span>
         </div>
-        <button
-          onClick={handleClose}
-          style={{
-            border: 'none',
-            background: 'transparent',
-            fontSize: '18px',
-            cursor: 'pointer',
-            color: 'var(--rn-clr-content-secondary)',
-            padding: '4px',
-            borderRadius: '4px',
-          }}
-        >
-          ×
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Jump back to where the popup opened, for when the selection got
+              knocked off by a stray hover. Hidden once it's already selected. */}
+          {recoverTarget && selectedNode?.remId !== recoverTarget.remId && (
+            <button
+              onClick={handleRecoverSelection}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                fontSize: '11px',
+                fontWeight: 500,
+                borderRadius: '4px',
+                border: '1px solid var(--rn-clr-border-primary)',
+                background: 'transparent',
+                color: 'var(--rn-clr-content-secondary)',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              title={`Reselect ${recoverTarget.label.toLowerCase()} (press L)`}
+            >
+              ↩ {recoverTarget.label}
+            </button>
+          )}
+          <button
+            onClick={handleClose}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              fontSize: '18px',
+              cursor: 'pointer',
+              color: 'var(--rn-clr-content-secondary)',
+              padding: '4px',
+              borderRadius: '4px',
+            }}
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       {/* Instructions */}
@@ -1309,6 +1468,11 @@ function ParentSelectorWidget() {
           <kbd style={kbdStyle}>→</kbd> to expand, <kbd style={kbdStyle}>←</kbd> to collapse,{' '}
           <kbd style={kbdStyle}>Enter</kbd> to select,{' '}
           <kbd style={kbdStyle}>+</kbd>/<kbd style={kbdStyle}>n</kbd> to add child
+          {recoverTarget && (
+            <>
+              , <kbd style={kbdStyle}>L</kbd> to reselect {recoverTarget.label.toLowerCase()}
+            </>
+          )}
         </p>
 
         {/* Both options apply only to expanded branches — the IncRem candidates
