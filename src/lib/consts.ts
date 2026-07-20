@@ -73,6 +73,18 @@ export const togglePdfHighlightBordersCommandId = 'toggle-pdf-highlight-borders'
 // is re-registered to match. See registerPdfHighlightCSS in lib/ui_helpers.ts.
 export const pdfHighlightBordersEnabledKey = 'pdf-highlight-borders-enabled';
 
+// Local (per-device) flag for the parent selector's "Filter only headers"
+// checkbox. When on, expanded branches show only rems carrying a heading
+// (H1–H6); the initial IncRem root candidates are never filtered.
+// Default OFF (undefined => false).
+export const parentSelectorHeadingsOnlyKey = 'parent-selector-headings-only';
+
+// Local (per-device) flag for the parent selector's "List headings first"
+// checkbox. When on, heading children are hoisted above the rest of a branch,
+// shallowest level first; when off, children keep their editor order.
+// Default ON (undefined => true).
+export const parentSelectorHeadingsFirstKey = 'parent-selector-headings-first';
+
 // Session key bumped whenever the borders flag is toggled. registerCSS can only be
 // called from the index widget, so the toggle (which may run in the highlight-toolbar
 // iframe) can't re-register the CSS itself. Instead it bumps this key; a plugin.track

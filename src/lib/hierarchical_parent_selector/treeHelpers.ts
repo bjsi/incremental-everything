@@ -18,6 +18,7 @@ import {
   filterOutPowerupSlots,
   getChildrenExcludingSlots
 } from '../powerupSlotFilter';
+import { getHeadingLevel } from '../outline_restructure';
 
 // ============================================================================
 // SESSION CACHE FOR ROOT CANDIDATES
@@ -67,6 +68,7 @@ export async function createTreeNode(
   const remText = await safeRemTextToString(plugin, rem.text);
   const nameSegments = await resolveRemTextSegments(plugin, rem.text);
   const isIncremental = await rem.hasPowerup(powerupCode);
+  const headingLevel = await getHeadingLevel(rem);
 
   // Check if has children (for expand indicator)
   // UPDATED: Filter out powerup slots from children count
@@ -94,6 +96,7 @@ export async function createTreeNode(
     priority,
     percentile,
     isIncremental,
+    headingLevel,
     hasChildren,
     isExpanded: false,
     children: [],
@@ -104,16 +107,141 @@ export async function createTreeNode(
 }
 
 /**
+ * Orders a sibling list so headings come first, shallowest level first
+ * (H1 before H2 before … H6), and everything else follows in its original
+ * editor order. Within the same heading level, editor order is preserved.
+ *
+ * Rationale: a branch's headings are its table of contents — they're what you
+ * usually want to file a highlight under, so they shouldn't be buried among
+ * the branch's paragraph/extract children.
+ */
+export function sortNodesByHeading(nodes: ParentTreeNode[]): ParentTreeNode[] {
+  return nodes
+    .map((node, index) => ({ node, index }))
+    .sort((a, b) => {
+      const aLevel = a.node.headingLevel ?? null;
+      const bLevel = b.node.headingLevel ?? null;
+      if (aLevel !== bLevel) {
+        // Non-headings sort after every heading level.
+        return (aLevel ?? 7) - (bLevel ?? 7);
+      }
+      return a.index - b.index; // stable: keep editor order as tie-breaker
+    })
+    .map(({ node }) => node);
+}
+
+// Bounds for the "does this branch contain a heading?" probe. Each visited rem
+// costs a getFontSize (and each level a getChildrenRem) over the plugin IPC
+// bridge, so an unbounded walk on a big chapter would stall the popup. When a
+// branch exceeds the budget we return `null` ("don't know") and the caller
+// keeps the branch visible — over-showing beats hiding a reachable heading.
+const HEADING_PROBE_MAX_DEPTH = 4;
+const HEADING_PROBE_MAX_VISITS = 120;
+
+/**
+ * Depth-first search for any heading (H1–H6) beneath `rem`.
+ * Returns true/false, or null when the budget ran out before deciding.
+ */
+async function subtreeHasHeading(
+  plugin: RNPlugin,
+  rem: PluginRem,
+  budget: { visits: number },
+  depth: number = 0
+): Promise<boolean | null> {
+  if (depth >= HEADING_PROBE_MAX_DEPTH) return null;
+
+  let children: PluginRem[];
+  try {
+    children = await getChildrenExcludingSlots(plugin, rem);
+  } catch {
+    return null;
+  }
+
+  let exhausted = false;
+
+  for (const child of children) {
+    if (budget.visits <= 0) return null;
+    budget.visits--;
+
+    if ((await getHeadingLevel(child)) != null) return true;
+
+    const deeper = await subtreeHasHeading(plugin, child, budget, depth + 1);
+    if (deeper === true) return true;
+    // A "don't know" anywhere below means we can't claim the branch is empty.
+    if (deeper === null) exhausted = true;
+  }
+
+  return exhausted ? null : false;
+}
+
+/**
+ * Fills in `hasHeadingDescendant` for non-heading nodes, which is what lets the
+ * "Filter only headers" view keep a plain rem that is the only path to headings
+ * below it.
+ *
+ * Only called when that filter is actually on — the probe costs IPC round-trips
+ * per branch, and there's no reason to pay for it otherwise. Nodes already
+ * probed are left alone, so this is safe (and cheap) to re-run.
+ */
+export async function annotateHeadingDescendants(
+  plugin: RNPlugin,
+  nodes: ParentTreeNode[],
+  opts: { recurse?: boolean } = {}
+): Promise<ParentTreeNode[]> {
+  const out: ParentTreeNode[] = [];
+
+  for (const node of nodes) {
+    let updated = node;
+
+    const needsProbe =
+      node.headingLevel == null &&
+      node.hasHeadingDescendant === undefined &&
+      node.hasChildren;
+
+    if (needsProbe) {
+      const rem = await plugin.rem.findOne(node.remId);
+      if (rem) {
+        const result = await subtreeHasHeading(plugin, rem, {
+          visits: HEADING_PROBE_MAX_VISITS,
+        });
+        // `null` stays undefined: unprobed reads as "keep" downstream.
+        if (result !== null) updated = { ...updated, hasHeadingDescendant: result };
+      }
+    } else if (node.headingLevel == null && !node.hasChildren) {
+      // Leaf: nothing below it, so the answer is known without any IPC.
+      updated = { ...updated, hasHeadingDescendant: false };
+    }
+
+    if (opts.recurse && updated.children.length > 0) {
+      updated = {
+        ...updated,
+        children: await annotateHeadingDescendants(plugin, updated.children, opts),
+      };
+    }
+
+    out.push(updated);
+  }
+
+  return out;
+}
+
+/**
  * Loads children for a specific node.
  * Returns the children as ParentTreeNode array, preserving editor order.
- * 
+ * Heading-first ordering is applied at display time (see
+ * flattenTreeForDisplay) so the user can toggle it without reloading.
+ *
+ * `detectHeadingDescendants` (set when "Filter only headers" is on) additionally
+ * works out which non-heading children lead to headings further down.
+ *
  * UPDATED: Now filters out powerup slots (Incremental, CardPriority)
  */
 export async function loadChildrenForNode(
   plugin: RNPlugin,
   parentRemId: RemId,
   allIncrementalRems: IncrementalRem[],
-  parentDepth: number
+  parentDepth: number,
+  opts: { detectHeadingDescendants?: boolean } = {}
 ): Promise<ParentTreeNode[]> {
   const parentRem = await plugin.rem.findOne(parentRemId);
   if (!parentRem) return [];
@@ -134,7 +262,9 @@ export async function loadChildrenForNode(
     childNodes.push(node);
   }
 
-  return childNodes;
+  return opts.detectHeadingDescendants
+    ? annotateHeadingDescendants(plugin, childNodes)
+    : childNodes;
 }
 
 /**
@@ -742,20 +872,93 @@ export async function expandToLastDestination(
 }
 
 /**
- * Helper to flatten tree for display
+ * Options controlling how a branch's children are presented.
+ * Both are per-device user settings; see parentSelectorHeadingsOnlyKey /
+ * parentSelectorHeadingsFirstKey.
  */
-export function flattenTreeForDisplay(nodes: ParentTreeNode[]): ParentTreeNode[] {
-  const result: ParentTreeNode[] = [];
+export interface TreeDisplayOptions {
+  /** Show only heading (H1–H6) children inside expanded branches. */
+  headingsOnly?: boolean;
+  /** Hoist heading children above the rest, shallowest level first. */
+  headingsFirst?: boolean;
+  /**
+   * Rems that must stay visible regardless of `headingsOnly` — the remembered
+   * destination and the suggested rem, which are frequently plain (non-heading)
+   * rems and would otherwise be filtered out of the very list that offers them.
+   * Their ancestors are kept too, so the row is actually reachable.
+   */
+  alwaysShowRemIds?: Set<RemId>;
+}
 
-  const traverse = (nodeList: ParentTreeNode[]) => {
-    for (const node of nodeList) {
+/**
+ * Expands a set of "must stay visible" rem ids into that set plus every
+ * ancestor of those rems within the loaded tree.
+ */
+function collectPinnedWithAncestors(
+  nodes: ParentTreeNode[],
+  pinned: Set<RemId>
+): Set<RemId> {
+  const result = new Set<RemId>();
+
+  const walk = (list: ParentTreeNode[], ancestors: RemId[]) => {
+    for (const node of list) {
+      const path = [...ancestors, node.remId];
+      if (pinned.has(node.remId)) {
+        for (const id of path) result.add(id);
+      }
+      if (node.children.length > 0) walk(node.children, path);
+    }
+  };
+
+  walk(nodes, []);
+  return result;
+}
+
+/**
+ * Helper to flatten tree for display.
+ *
+ * Root candidates (depth 0) are always kept and always keep their incoming
+ * order — both options are about navigating a rem's own tree, not about
+ * narrowing or reshuffling the IncRem candidate list.
+ */
+export function flattenTreeForDisplay(
+  nodes: ParentTreeNode[],
+  opts: TreeDisplayOptions = {}
+): ParentTreeNode[] {
+  const result: ParentTreeNode[] = [];
+  const pinned =
+    opts.headingsOnly && opts.alwaysShowRemIds?.size
+      ? collectPinnedWithAncestors(nodes, opts.alwaysShowRemIds)
+      : null;
+
+  const traverse = (nodeList: ParentTreeNode[], depth: number) => {
+    let list = nodeList;
+    if (depth > 0) {
+      if (opts.headingsOnly) {
+        // Keep headings, plus any non-heading that leads to headings below it
+        // (so a plain wrapper rem never makes its headings unreachable).
+        // `hasHeadingDescendant === undefined` means "not probed" — keep it,
+        // since hiding a branch we haven't inspected could strand content.
+        list = list.filter(
+          (node) =>
+            node.headingLevel != null ||
+            node.hasHeadingDescendant !== false ||
+            pinned?.has(node.remId)
+        );
+      }
+      if (opts.headingsFirst) {
+        list = sortNodesByHeading(list);
+      }
+    }
+
+    for (const node of list) {
       result.push(node);
       if (node.isExpanded && node.children.length > 0) {
-        traverse(node.children);
+        traverse(node.children, depth + 1);
       }
     }
   };
 
-  traverse(nodes);
+  traverse(nodes, 0);
   return result;
 }

@@ -1,5 +1,6 @@
 import { RemId, RichTextInterface } from '@remnote/plugin-sdk';
 import { RemTextSegment } from '../richTextRemRefs';
+import { HeadingLevel } from '../outline_restructure';
 
 /**
  * Represents a node in the hierarchical parent selector tree.
@@ -12,6 +13,14 @@ export interface ParentTreeNode {
   priority: number | null;
   percentile: number | null;
   isIncremental: boolean;
+  // Heading level (H1–H6) if the rem carries the built-in Header powerup, else null.
+  // Optional because nodes cached by older versions predate this field.
+  headingLevel?: HeadingLevel | null;
+  // Whether a heading lives somewhere below this (non-heading) rem, so the
+  // "Filter only headers" view can keep the branch as a path to it.
+  // Tri-state: undefined = not probed yet (treated as "keep", since we can't
+  // prove the branch is heading-free). See annotateHeadingDescendants.
+  hasHeadingDescendant?: boolean;
   hasChildren: boolean;        // Indicates if this node has children (shows expand indicator)
   isExpanded: boolean;         // Whether the node is currently expanded
   children: ParentTreeNode[];  // Loaded children (empty until expanded)
