@@ -133,7 +133,7 @@ async function maybeAdoptScopeFromRem(plugin: RNPlugin, remId: string) {
 // registerQueueSessionTracking (which runs in the main process) polls and
 // drains that log into the real `currentSession`.
 //
-// Pattern mirrors the existing card_priority_display → cluster-sibling poll.
+// Pattern mirrors the existing card_info_bar → cluster-sibling poll.
 
 const INC_REM_EVENT_LOG_KEY = 'ieIncRemEventLog';
 
@@ -372,7 +372,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
   }, 2500);
 
   // Cluster sibling-transition poll: inside a cluster, QueueLoadCard does NOT fire per
-  // sibling — only card_priority_display.tsx sees each sibling via getWidgetContext().
+  // sibling — only card_info_bar.tsx sees each sibling via getWidgetContext().
   // The widget broadcasts `clusterVisibleCardId`; we poll for changes and advance the
   // per-card panel state (currentCardId/prevCardId + lifetime stats) so the UI tracks
   // the sibling actually on screen rather than being stuck on the cluster anchor.
@@ -657,7 +657,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
 
       // Cluster-aware: RemNote keeps the FlashcardUnder widget mounted across cluster
       // siblings and only getWidgetContext().cardId advances; QueueLoadCard + the event's
-      // cardId both stick to the anchor. card_priority_display.tsx broadcasts the actually
+      // cardId both stick to the anchor. card_info_bar.tsx broadcasts the actually
       // visible sibling id + load time so we can still record count and time per sibling.
       const clusterCardId = cardId
         ? await plugin.storage.getSession<string>('clusterVisibleCardId')

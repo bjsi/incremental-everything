@@ -417,7 +417,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: displayFsrsDsrId,
     title: 'Display FSRS DSR Stats (Flashcards)',
     description:
-      'If enabled, shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card priority display widget. Requires FSRS v6 scheduler.',
+      'If enabled, shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card info bar widget. Requires FSRS v6 scheduler.',
     defaultValue: true,
   });
 

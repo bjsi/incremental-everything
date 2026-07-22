@@ -140,7 +140,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerWidget('card_priority_display', WidgetLocation.FlashcardUnder, {
+  plugin.app.registerWidget('card_info_bar', WidgetLocation.FlashcardUnder, {
     powerupFilter: 'cardPriority',
     dimensions: {
       width: '100%',
