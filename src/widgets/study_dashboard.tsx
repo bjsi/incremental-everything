@@ -9,7 +9,7 @@ import {
     useRunAsync,
     WidgetLocation,
 } from '@remnote/plugin-sdk';
-import { IncrementalRep } from '../lib/incremental_rem/types';
+import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import {
     dismissedHistorySlotCode,
     dismissedPowerupCode,
@@ -159,13 +159,10 @@ interface ProgressState {
 const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
 const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
 
+// Stats predicate (Study Dashboard) — delegates to the shared source of truth so
+// it can't drift. INCLUDES 'importedRep' (reviews imported from removed flashcards).
 function isRealIncRep(et: IncrementalRep['eventType']): boolean {
-    return (
-        et === undefined ||
-        et === 'rep' ||
-        et === 'executeRepetition' ||
-        et === 'rescheduledInQueue'
-    );
+    return repCountsForStats(et);
 }
 
 /**

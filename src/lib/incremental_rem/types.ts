@@ -75,7 +75,12 @@ export const IncrementalRep = z.object({
    * - 'executeRepetition': Execute Repetition command in editor - counts for interval
    * - 'madeIncremental': Marker for when the Rem was made Incremental
    * - 'dismissed': Marker for when the Rem was dismissed
-   * 
+   * - 'importedRep': A review imported from a flashcard whose rem was removed by
+   *   'Preserve history & remove'. COUNTS for study-time/rep statistics (the
+   *   Study Dashboard) but is intentionally IGNORED by the scheduler for
+   *   next-interval computation, since it never belonged to this rem's own
+   *   incremental schedule. See context.flashcardName / context.flashcardScore.
+   *
    * The scheduler uses this to count only review events since the last 'madeIncremental' event.
    */
   eventType: z.enum([
@@ -85,7 +90,8 @@ export const IncrementalRep = z.object({
     'manualDateReset',
     'executeRepetition',
     'madeIncremental',
-    'dismissed'
+    'dismissed',
+    'importedRep'
   ]).optional(),
   /**
    * The absolute priority (0-100) at the time of this repetition
@@ -128,11 +134,55 @@ export const IncrementalRep = z.object({
       bookmark: z.string().optional(),
       /** Playback position in seconds (YouTube / video extracts). */
       videoTime: z.number().optional(),
+      /**
+       * Name of the source flashcard, when this rep was imported from a card
+       * removed by 'Preserve history & remove' (eventType 'importedRep').
+       */
+      flashcardName: z.string().optional(),
+      /**
+       * The flashcard review's QueueInteractionScore (AGAIN/HARD/GOOD/EASY…),
+       * preserved so the imported rep can show how the card was graded.
+       */
+      flashcardScore: z.number().optional(),
     })
     .optional(),
 });
 
 export type IncrementalRep = z.infer<typeof IncrementalRep>;
+
+/**
+ * Whether a history entry counts as a real review for STATISTICS — the Study
+ * Dashboard's time/rep totals. Includes imported flashcard reps ('importedRep').
+ * Excludes slot-edit events ('rescheduledInEditor', 'manualDateReset') and
+ * lifecycle markers ('madeIncremental', 'dismissed').
+ *
+ * Single source of truth: authoritative_aggregates and the history-transfer
+ * collector both use this so the definition can't drift.
+ */
+export function repCountsForStats(eventType: IncrementalRep['eventType']): boolean {
+  return (
+    eventType === undefined ||
+    eventType === 'rep' ||
+    eventType === 'executeRepetition' ||
+    eventType === 'rescheduledInQueue' ||
+    eventType === 'importedRep'
+  );
+}
+
+/**
+ * Whether a history entry counts for the SCHEDULER's next-interval computation.
+ * Identical to {@link repCountsForStats} MINUS 'importedRep': imported flashcard
+ * reps never belonged to this rem's own incremental schedule, so they must never
+ * influence its intervals (even if the rem is later re-incrementalized).
+ */
+export function repCountsForScheduling(eventType: IncrementalRep['eventType']): boolean {
+  return (
+    eventType === undefined ||
+    eventType === 'rep' ||
+    eventType === 'executeRepetition' ||
+    eventType === 'rescheduledInQueue'
+  );
+}
 
 export const IncrementalRem = z.object({
   remId: z.string(),

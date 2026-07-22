@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { renderWidget, usePlugin, WidgetLocation, useRunAsync, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { IncrementalRep } from '../lib/incremental_rem/types';
+import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
@@ -42,12 +42,7 @@ function getTotalTime(history: IncrementalRep[]): number {
 }
 
 function getRepCount(history: IncrementalRep[]): number {
-    return history?.filter(h =>
-        h.eventType === undefined ||
-        h.eventType === 'rep' ||
-        h.eventType === 'rescheduledInQueue' ||
-        h.eventType === 'executeRepetition'
-    ).length || 0;
+    return history?.filter(h => repCountsForStats(h.eventType)).length || 0;
 }
 
 /**

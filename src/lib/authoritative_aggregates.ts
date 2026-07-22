@@ -14,6 +14,7 @@ import {
 } from './queue_aggregates';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
 import type { IncrementalRep } from './incremental_rem/types';
+import { repCountsForStats } from './incremental_rem/types';
 
 export const AUTHORITATIVE_AGGREGATES_KEY = 'authoritativeDailyAggregates';
 export const AUTHORITATIVE_LAST_COMPUTED_KEY = 'authoritativeAggregatesLastComputed';
@@ -28,8 +29,8 @@ export const AUTHORITATIVE_LAST_COMPUTED_KEY = 'authoritativeAggregatesLastCompu
 // has always been the source of truth.
 export const INCREM_AUTHORITATIVE_CUTOFF_DATE = '2026-01-30';
 
-const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
-const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
+export const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
+export const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
 const HISTORY_FETCH_CHUNK = 50;
 
 export interface ProgressUpdate {
@@ -79,20 +80,12 @@ function isRealCardScore(score: number | undefined): boolean {
   );
 }
 
+// Real-review predicate for stats. Delegates to the shared repCountsForStats so
+// the Study Dashboard, the scheduler (via repCountsForScheduling) and the
+// history-transfer collector can't drift. Note this INCLUDES 'importedRep'
+// (reviews imported from removed flashcards count for time/rep totals).
 function isRealIncRemRep(eventType: IncrementalRep['eventType']): boolean {
-  // Counts as a real review:
-  //   - undefined / 'rep' (default review)
-  //   - 'executeRepetition' (editor-triggered review)
-  //   - 'rescheduledInQueue' (counts per IncrementalRep type comment)
-  // Excluded:
-  //   - 'rescheduledInEditor', 'manualDateReset' (slot edits, not reviews)
-  //   - 'madeIncremental', 'dismissed' (lifecycle markers)
-  return (
-    eventType === undefined ||
-    eventType === 'rep' ||
-    eventType === 'executeRepetition' ||
-    eventType === 'rescheduledInQueue'
-  );
+  return repCountsForStats(eventType);
 }
 
 async function processHistorySlots(

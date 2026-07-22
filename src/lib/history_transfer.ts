@@ -1,0 +1,224 @@
+import { RNPlugin, PluginRem, Card, RepetitionStatusInterface } from '@remnote/plugin-sdk';
+import { IncrementalRep, repCountsForStats } from './incremental_rem/types';
+import {
+  powerupCode,
+  dismissedPowerupCode,
+  dismissedHistorySlotCode,
+  dismissedDateSlotCode,
+  preservedHistoryPowerupCode,
+} from './consts';
+import {
+  FLASHCARD_RESPONSE_TIME_LIMIT_SETTING,
+  DEFAULT_RESPONSE_TIME_LIMIT_SEC,
+} from './authoritative_aggregates';
+import { getIncrementalRemFromRem } from './incremental_rem';
+import { getDismissedHistoryFromRem } from './dismissed';
+import { safeRemTextToString } from './pdfUtils';
+import { getDailyDocReferenceForDate } from './utils';
+
+const TOMBSTONE_TEXT = '🪦 Preserved history — content removed';
+
+/**
+ * A pre-computed plan for 'Preserve history & remove'. Built by
+ * {@link planPreserveHistoryAndRemove} (read-only) so the command can show an
+ * accurate confirmation BEFORE any destructive action, then executed by
+ * {@link executePreserveHistoryAndRemove}.
+ */
+export interface PreserveHistoryPlan {
+  target: PluginRem;
+  /** Every descendant of the target (the whole subtree below it). */
+  descendantCount: number;
+  /** Cards in the subtree (target + descendants) that will be removed. */
+  cards: Card[];
+  /** All preservable reps across the subtree, chronological. Empty ⇒ hard delete. */
+  merged: IncrementalRep[];
+  /** Sum of reviewTimeSeconds across `merged`. */
+  totalReviewSeconds: number;
+  /** Count of rems OUTSIDE the subtree that reference something inside it. */
+  externalRefCount: number;
+}
+
+/**
+ * Convert one flashcard repetition into an IncrementalRep tagged 'importedRep'.
+ * Returns null for reps with no meaningful response time (absent/zero) — those
+ * are TOO_EARLY / viewed events that don't represent study time and would only
+ * add noise. reviewTime is capped the same way the Study Dashboard caps flashcard
+ * time, so preserved totals match what the card would have contributed live.
+ */
+function convertCardRep(
+  rep: RepetitionStatusInterface,
+  capMs: number,
+  flashcardName: string
+): IncrementalRep | null {
+  if (!rep.responseTime) return null;
+  const cappedMs = Math.min(rep.responseTime, capMs);
+  return {
+    date: rep.date,
+    scheduled: rep.scheduled ?? rep.date,
+    reviewTimeSeconds: cappedMs / 1000,
+    eventType: 'importedRep',
+    context: {
+      flashcardName,
+      flashcardScore: rep.score,
+    },
+  };
+}
+
+/**
+ * Read-only: gather everything the command needs to (a) preview and (b) execute,
+ * without mutating anything. Collects preservable history from flashcards,
+ * Incremental powerups and Dismissed powerups across the target's whole subtree.
+ */
+export async function planPreserveHistoryAndRemove(
+  plugin: RNPlugin,
+  target: PluginRem
+): Promise<PreserveHistoryPlan> {
+  const descendants = await target.getDescendants();
+  const subtree = [target, ...descendants];
+  const subtreeIds = new Set(subtree.map((r) => r._id));
+
+  // Cards in the subtree (single getAll, filtered by rem id — same pattern as the cache).
+  const allCards = (await plugin.card.getAll()) || [];
+  const cards = allCards.filter((c) => subtreeIds.has(c.remId));
+
+  const capMs =
+    ((await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING)) ||
+      DEFAULT_RESPONSE_TIME_LIMIT_SEC) * 1000;
+
+  const merged: IncrementalRep[] = [];
+
+  // 1. Flashcard reps → importedRep. Resolve each card-owning rem's name once.
+  const cardRemIds = new Set(cards.map((c) => c.remId));
+  const nameByRemId = new Map<string, string>();
+  for (const r of subtree) {
+    if (cardRemIds.has(r._id)) {
+      nameByRemId.set(r._id, await safeRemTextToString(plugin, r.text));
+    }
+  }
+  for (const c of cards) {
+    const name = nameByRemId.get(c.remId) || 'flashcard';
+    for (const rep of c.repetitionHistory || []) {
+      const conv = convertCardRep(rep, capMs, name);
+      if (conv) merged.push(conv);
+    }
+  }
+
+  // 2. Incremental + Dismissed histories across the subtree (real reps only —
+  //    skip lifecycle markers so we don't duplicate them; one fresh marker is
+  //    stamped at write time).
+  for (const r of subtree) {
+    const inc = await getIncrementalRemFromRem(plugin, r);
+    for (const rep of inc?.history || []) {
+      if (repCountsForStats(rep.eventType)) merged.push(rep);
+    }
+    const dis = await getDismissedHistoryFromRem(plugin, r);
+    for (const rep of dis?.history || []) {
+      if (repCountsForStats(rep.eventType)) merged.push(rep);
+    }
+  }
+
+  merged.sort((a, b) => a.date - b.date);
+
+  const totalReviewSeconds = merged.reduce((s, r) => s + (r.reviewTimeSeconds || 0), 0);
+
+  // External references: rems outside the subtree that reference something inside
+  // it. Internal→internal refs vanish with the deletion, so they don't "break".
+  const externalReferrers = new Set<string>();
+  for (const r of subtree) {
+    const refs = (await r.remsReferencingThis()) || [];
+    for (const ref of refs) {
+      if (!subtreeIds.has(ref._id)) externalReferrers.add(ref._id);
+    }
+  }
+
+  return {
+    target,
+    descendantCount: descendants.length,
+    cards,
+    merged,
+    totalReviewSeconds,
+    externalRefCount: externalReferrers.size,
+  };
+}
+
+/**
+ * Destructive: execute a plan produced by {@link planPreserveHistoryAndRemove}.
+ *
+ * - If there is no preservable history, the target and its whole subtree are
+ *   fully deleted (native Cmd+Opt+Shift+Backspace behaviour).
+ * - Otherwise: the consolidated history is written onto the target's Dismissed
+ *   powerup, the target's own cards + all descendants are removed, the target's
+ *   content is scrubbed to a tombstone, and it is tagged with the Preserved
+ *   History powerup (which the always-on CSS hides in editor and queue).
+ */
+export async function executePreserveHistoryAndRemove(
+  plugin: RNPlugin,
+  plan: PreserveHistoryPlan
+): Promise<void> {
+  const { target, cards, merged } = plan;
+
+  await plugin.storage.setSession('plugin_operation_active', true);
+  try {
+    const originalName = await safeRemTextToString(plugin, target.text);
+
+    // No preservable history → behave exactly like a native delete.
+    if (merged.length === 0) {
+      await target.remove();
+      return;
+    }
+
+    // Overwrite the Dismissed history slot with the full consolidated set plus a
+    // fresh 'dismissed' marker (merged already contains the target's own prior
+    // dismissed reps, so we must overwrite rather than append-merge).
+    const dismissedMarker: IncrementalRep = {
+      date: Date.now(),
+      scheduled: Date.now(),
+      eventType: 'dismissed',
+      notes: `Preserved from removed content: ${originalName}`,
+    };
+    const finalHistory = [...merged, dismissedMarker];
+
+    if (!(await target.hasPowerup(dismissedPowerupCode))) {
+      await target.addPowerup(dismissedPowerupCode);
+      const dateRef = await getDailyDocReferenceForDate(plugin, new Date());
+      if (dateRef) {
+        await target.setPowerupProperty(dismissedPowerupCode, dismissedDateSlotCode, dateRef);
+      }
+    }
+    await target.setPowerupProperty(dismissedPowerupCode, dismissedHistorySlotCode, [
+      JSON.stringify(finalHistory),
+    ]);
+
+    // No longer part of the incremental schedule.
+    if (await target.hasPowerup(powerupCode)) {
+      await target.removePowerup(powerupCode);
+    }
+
+    // Remove the subtree's flashcards (the target's own cards must go explicitly;
+    // descendants' cards would vanish with their rems, but removing here is cheap
+    // and keeps the count exact).
+    for (const c of cards) {
+      try {
+        await c.remove();
+      } catch (e) {
+        console.error(`[PreserveHistory] Failed to remove card ${c._id}:`, e);
+      }
+    }
+
+    // Delete descendants (re-fetch: removing a rem cascades to its own subtree).
+    for (const d of await target.getDescendants()) {
+      try {
+        await d.remove();
+      } catch (e) {
+        console.error(`[PreserveHistory] Failed to remove descendant ${d._id}:`, e);
+      }
+    }
+
+    // Scrub content + mark as a hidden tombstone.
+    await target.setText([TOMBSTONE_TEXT]);
+    await target.setBackText(undefined);
+    await target.addPowerup(preservedHistoryPowerupCode);
+  } finally {
+    await plugin.storage.setSession('plugin_operation_active', false);
+  }
+}

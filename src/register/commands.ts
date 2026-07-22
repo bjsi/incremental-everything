@@ -31,8 +31,13 @@ import {
   priorityCalcScopeRemIdsKey,
   sourceFloatingTargetKey,
   sourceFloatingActiveIdKey,
+  preservedHistoryPowerupCode,
 } from '../lib/consts';
-import { computeWeightedShieldBreakdown } from '../lib/utils';
+import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
+import {
+  planPreserveHistoryAndRemove,
+  executePreserveHistoryAndRemove,
+} from '../lib/history_transfer';
 import { resolvePowerupSlotDiagnostic } from '../lib/powerup_slot_compat';
 import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
@@ -130,6 +135,66 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await plugin.app.toast(
         enabled ? 'Highlight marker borders shown' : 'Highlight marker borders hidden (peek)'
       );
+    },
+  });
+
+  // Preserve history & remove: delete a rem's content (and its whole subtree)
+  // the way native delete does, but first consolidate all repetition history in
+  // the subtree — flashcards, Incremental and Dismissed powerups — onto the
+  // target's Dismissed powerup so the Study Dashboard keeps the study time.
+  await plugin.app.registerCommand({
+    id: 'preserve-history-and-remove',
+    name: 'Preserve history & remove',
+    quickCode: 'phr',
+    action: async () => {
+      const target = await plugin.focus.getFocusedRem();
+      if (!target) {
+        await plugin.app.toast('No focused rem — place your cursor in a rem first.');
+        return;
+      }
+      if (await target.hasPowerup(preservedHistoryPowerupCode)) {
+        await plugin.app.toast('This rem is already a preserved-history tombstone.');
+        return;
+      }
+
+      await plugin.app.toast('🔍 Scanning subtree…');
+      const plan = await planPreserveHistoryAndRemove(plugin, target);
+
+      const repCount = plan.merged.length;
+      const timeStr = formatDuration(Math.round(plan.totalReviewSeconds)) || '0s';
+      const historyLine =
+        repCount > 0
+          ? `• ${repCount} review(s) (≈ ${timeStr}) will be preserved on this rem`
+          : `• No review history found — this will FULLY delete the rem`;
+
+      const ok = confirm(
+        `🪦 Preserve history & remove\n\n` +
+          (plan.descendantCount > 0
+            ? `• ${plan.descendantCount} descendant rem(s) will be permanently deleted\n`
+            : '') +
+          (plan.cards.length > 0 ? `• ${plan.cards.length} flashcard(s) will be removed\n` : '') +
+          `${historyLine}\n` +
+          (plan.externalRefCount > 0
+            ? `• ${plan.externalRefCount} reference(s) from elsewhere will break\n`
+            : '') +
+          `\n⚠️ This cannot be undone.\n\nContinue?`
+      );
+      if (!ok) {
+        await plugin.app.toast('Cancelled.');
+        return;
+      }
+
+      try {
+        await executePreserveHistoryAndRemove(plugin, plan);
+        await plugin.app.toast(
+          repCount > 0
+            ? `✅ Content removed. ${repCount} review(s) (${timeStr}) preserved.`
+            : `✅ Rem fully deleted (no history to preserve).`
+        );
+      } catch (e) {
+        console.error('[PreserveHistory] Error:', e);
+        await plugin.app.toast('❌ Error during Preserve history & remove — see console.');
+      }
     },
   });
 

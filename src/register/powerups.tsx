@@ -13,6 +13,7 @@ import {
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
+  preservedHistoryPowerupCode,
   videoExtractPowerupCode,
   videoExtractUrlSlotCode,
   videoExtractStartSlotCode,
@@ -125,6 +126,18 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
         },
       ],
     },
+  });
+
+  // Preserved History Powerup - marks a "tombstone" rem whose content was
+  // removed by 'Preserve history & remove' but whose review history was preserved
+  // on its Dismissed powerup. No slots — it exists purely as a CSS hook
+  // (data-rem-tags~="preservedhistory") to hide the tombstone in editor and queue.
+  await plugin.app.registerPowerup({
+    name: 'Preserved History',
+    code: preservedHistoryPowerupCode,
+    description:
+      'Marks a rem whose content was removed but whose review history was preserved. Hidden from the editor and queue.',
+    options: { slots: [] },
   });
 
   // Video Extract Powerup - stores start/end times for YouTube video segments

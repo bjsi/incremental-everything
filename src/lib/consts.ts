@@ -10,6 +10,12 @@ export const dismissedPowerupCode = 'dismissed';
 export const dismissedHistorySlotCode = 'dismissedHistory';
 export const dismissedDateSlotCode = 'dismissedDate';
 
+// Marks a "tombstone" rem whose content was removed by the
+// 'Preserve history & remove' command but whose review history was preserved on
+// its Dismissed powerup. Used purely as a CSS hook (data-rem-tags~="preservedhistory")
+// to hide the tombstone in the editor and queue.
+export const preservedHistoryPowerupCode = 'preservedHistory';
+
 // settings
 export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';

@@ -10,7 +10,7 @@ import {
 import React, { useMemo, useRef, useState, useLayoutEffect, useEffect } from 'react';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
-import { IncrementalRep } from '../lib/incremental_rem/types';
+import { IncrementalRep, repCountsForScheduling } from '../lib/incremental_rem/types';
 import { NextRepTime } from '../components/NextRepTime';
 import { DraggableButton } from '../components/buttons/DraggableButton';
 import { Button } from '../components/buttons/Button';
@@ -277,15 +277,10 @@ export function AnswerButtons() {
     if (!coreData?.incRemInfo?.history || coreData.incRemInfo.history.length === 0) {
       return { reps: 0, totalMinutes: 0 };
     }
-    // Only count real repetitions (events that count for interval calculation)
-    // Includes: undefined, 'rep', 'rescheduledInQueue', 'executeRepetition'
-    // Excludes: 'madeIncremental', 'dismissed', 'rescheduledInEditor', 'manualDateReset'
-    const realReps = coreData.incRemInfo.history.filter(
-      h => h.eventType === undefined ||
-        h.eventType === 'rep' ||
-        h.eventType === 'rescheduledInQueue' ||
-        h.eventType === 'executeRepetition'
-    );
+    // Only count real repetitions (events that count for interval calculation).
+    // Uses the shared scheduling predicate — excludes markers, slot edits, and
+    // 'importedRep' (imported flashcard reviews never belong to a rem's schedule).
+    const realReps = coreData.incRemInfo.history.filter(h => repCountsForScheduling(h.eventType));
     const reps = realReps.length;
     const totalSeconds = realReps.reduce((total, rep) => total + (rep.reviewTimeSeconds || 0), 0);
     const totalMinutes = Math.round(totalSeconds / 6) / 10; // Round to 1 decimal
