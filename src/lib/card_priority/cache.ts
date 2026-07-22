@@ -1,5 +1,5 @@
 import { Card, RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../consts';
+import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey, orphanRemIdsKey } from '../consts';
 import { CardPriorityInfo, PrioritySource, calculateCardRemPercentilesFromCards } from './types';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
@@ -445,6 +445,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
 
   let processed = 0;
   let errorCount = 0;
+  const notFoundRemIds: string[] = [];
   const batchSize = 30;
   const delayBetweenBatches = 100;
 
@@ -459,7 +460,11 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
           try {
             const rem = await plugin.rem.findOne(remId);
             if (!rem) {
-              errorCount++;
+              // The card store reports this rem, but the rem itself is gone —
+              // i.e. an orphan card. Collect the IDs and log them once as a
+              // group below (a per-rem warn here spams the console with an
+              // async stack trace for every orphan).
+              notFoundRemIds.push(remId);
               return;
             }
 
@@ -473,7 +478,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
 
             processed++;
           } catch (error) {
-            console.error(`DEFERRED: Error processing rem ${remId}:`, error);
+            console.error(`[Card Priority Cache] DEFERRED: Error processing rem ${remId}:`, error);
             errorCount++;
           }
         })
@@ -508,11 +513,31 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
     }
 
     const totalTime = Math.round((Date.now() - startTime) / 1000);
+    const notFoundCount = notFoundRemIds.length;
     console.log(
       `[Card Priority Cache] Phase 2 complete. ` +
       `Processed ${processed} cards in ${totalTime}s ` +
-      `(${errorCount} errors)`
+      `(${notFoundCount} orphan rems skipped, ${errorCount} errors)`
     );
+
+    // Persist orphan rem IDs so the 'Update all inherited Card Priorities'
+    // cleanup can reuse them without re-scanning, and surface a non-destructive
+    // suggestion. We deliberately do NOT auto-delete here: cache build runs at
+    // startup before sync may have fully hydrated, so a transient null must not
+    // trigger irreversible card removal.
+    if (notFoundCount > 0) {
+      console.log(`[Card Priority Cache] ${notFoundCount} orphan rem(s) (cards exist but rem not found):`);
+      console.log(notFoundRemIds.join('\n'));
+      await plugin.storage.setSession(orphanRemIdsKey, notFoundRemIds);
+      setTimeout(() => {
+        plugin.app.toast(
+          `⚠️ ${notFoundCount} orphan card${notFoundCount === 1 ? '' : 's'} detected (their rem was deleted). ` +
+          `Run 'Update all inherited Card Priorities' command to review and clean them up.`
+        );
+      }, 2500);
+    } else {
+      await plugin.storage.setSession(orphanRemIdsKey, []);
+    }
 
     await plugin.app.toast(`✅ Background processing complete! All ${processed} card priorities are now cached (${totalTime}s).`);
     await plugin.storage.setSession('card_priority_cache_fully_loaded', true);

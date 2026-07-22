@@ -6,6 +6,7 @@ import {
   seenCardInSessionKey,
   cardShieldCleanupBackupPrefix,
   cardShieldCleanupBackupIndexKey,
+  orphanRemIdsKey,
 } from '../consts';
 import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { isPowerupPropertySafe } from '../powerupSlotFilter';
@@ -367,9 +368,15 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
     await plugin.app.toast('✅ Card Priorities Update complete! See console for details.');
     alert(message);
 
-    // Offer to clean up orphan cards whose parent Rem no longer exists
-    if (notFoundRemIds.length > 0) {
-      await removeOrphanCards(plugin, notFoundRemIds);
+    // Offer to clean up orphan cards whose parent Rem no longer exists.
+    // Union this run's not-found rems with any flagged by the last cache build
+    // (Phase 2 stashes them under orphanRemIdsKey), then clear the stash so the
+    // startup nag doesn't persist after the user has acted on it.
+    const stashedOrphanIds = (await plugin.storage.getSession<string[]>(orphanRemIdsKey)) || [];
+    const orphanIdsToCheck = Array.from(new Set([...notFoundRemIds, ...stashedOrphanIds]));
+    if (orphanIdsToCheck.length > 0) {
+      await removeOrphanCards(plugin, orphanIdsToCheck);
+      await plugin.storage.setSession(orphanRemIdsKey, []);
     }
   } catch (error) {
     console.error('Error during Card Priorities Update:', error);
@@ -428,9 +435,66 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
     return;
   }
 
-  // Group confirmed orphan cards by remId for a readable summary
+  // ── Segregate by review history ──────────────────────────────────────
+  // A card's repetitionHistory holds its review & time-spent records, which
+  // still surface in some RemNote statistics even after the parent rem is
+  // gone. Let the user preserve those cards while cleaning the rest.
+  const hasHistory = (card: (typeof confirmedOrphanCards)[number]) =>
+    Array.isArray(card.repetitionHistory) && card.repetitionHistory.length > 0;
+  const withHistory = confirmedOrphanCards.filter(hasHistory);
+  const withoutHistory = confirmedOrphanCards.filter((c) => !hasHistory(c));
+
+  console.log(
+    `Orphan cards: ${confirmedOrphanCards.length} total — ` +
+    `${withHistory.length} with review history, ${withoutHistory.length} without.`
+  );
+
+  // Decide which set to remove. If none have history, there is nothing to
+  // preserve, so skip the choice and remove them all as before.
+  let cardsToRemove = confirmedOrphanCards;
+  if (withHistory.length > 0) {
+    // OK      → preserve history: remove only the history-less cards.
+    // Cancel  → fall through to a second confirm for deleting everything.
+    const preserveHistory = confirm(
+      `🗑️ Remove Orphan Cards\n\n` +
+      `Found ${confirmedOrphanCards.length} orphan card(s):\n` +
+      `  • ${withHistory.length} have review history (reviews & time-spent stats)\n` +
+      `  • ${withoutHistory.length} have no review history\n\n` +
+      `Deleting cards with review history permanently removes those records from RemNote statistics.\n\n` +
+      `➡️ OK = delete only the ${withoutHistory.length} card(s) WITHOUT history (keep the ${withHistory.length} with history)\n` +
+      `➡️ Cancel = choose to delete ALL, including those with history`
+    );
+
+    if (preserveHistory) {
+      cardsToRemove = withoutHistory;
+    } else {
+      const deleteAll = confirm(
+        `⚠️ Delete ALL orphan cards?\n\n` +
+        `This permanently removes all ${confirmedOrphanCards.length} orphan card(s), including the ` +
+        `${withHistory.length} with review history — their review/time-spent records will be lost.\n\n` +
+        `OK = delete all ${confirmedOrphanCards.length}\n` +
+        `Cancel = abort (delete nothing)`
+      );
+      if (!deleteAll) {
+        console.log('Orphan card removal cancelled by user (history choice).');
+        await plugin.app.toast('Orphan card removal cancelled.');
+        return;
+      }
+      cardsToRemove = confirmedOrphanCards;
+    }
+  }
+
+  if (cardsToRemove.length === 0) {
+    console.log('No orphan cards to remove after history filter (all had review history).');
+    await plugin.app.toast('ℹ️ Nothing to remove — all orphan cards have review history.');
+    return;
+  }
+
+  const preservedCount = confirmedOrphanCards.length - cardsToRemove.length;
+
+  // Group the cards we will remove by remId for a readable summary
   const byRemId: Record<string, number> = {};
-  for (const card of confirmedOrphanCards) {
+  for (const card of cardsToRemove) {
     byRemId[card.remId] = (byRemId[card.remId] || 0) + 1;
   }
 
@@ -444,7 +508,8 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   // First: a summary dialog so the user knows the total scope
   const overviewOk = confirm(
     `🗑️ Remove Orphan Cards\n\n` +
-    `Found ${confirmedOrphanCards.length} card(s) across ${entries.length} missing Rem(s).\n\n` +
+    `About to remove ${cardsToRemove.length} card(s) across ${entries.length} missing Rem(s).\n\n` +
+    `${preservedCount > 0 ? `Preserving ${preservedCount} card(s) with review history.\n\n` : ''}` +
     `These cards are no longer reviewable and take up space in your queue.\n\n` +
     `⚠️ This action cannot be undone.\n\n` +
     `You will be shown the list ${totalPages > 1 ? `in ${totalPages} pages of ${confirmPageSize}` : 'now'} to confirm.\n\n` +
@@ -490,8 +555,8 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   const batchSize = 25;
 
   try {
-    for (let i = 0; i < confirmedOrphanCards.length; i += batchSize) {
-      const batch = confirmedOrphanCards.slice(i, i + batchSize);
+    for (let i = 0; i < cardsToRemove.length; i += batchSize) {
+      const batch = cardsToRemove.slice(i, i + batchSize);
       await Promise.all(
         batch.map(async (card) => {
           try {
@@ -505,8 +570,8 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
         })
       );
 
-      const progress = Math.round(((i + batch.length) / confirmedOrphanCards.length) * 100);
-      await plugin.app.toast(`Removing orphan cards: ${progress}% (${i + batch.length}/${confirmedOrphanCards.length})`);
+      const progress = Math.round(((i + batch.length) / cardsToRemove.length) * 100);
+      await plugin.app.toast(`Removing orphan cards: ${progress}% (${i + batch.length}/${cardsToRemove.length})`);
     }
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
@@ -515,6 +580,7 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   const resultMessage =
     `🗑️ Orphan Card Cleanup Complete\n\n` +
     `• Removed: ${removed} card(s)\n` +
+    `${preservedCount > 0 ? `• Preserved (with review history): ${preservedCount} card(s)\n` : ''}` +
     `${removalErrors > 0 ? `• Failed: ${removalErrors} card(s) — check console\n` : ''}` +
     `\nThese cards belonged to Rems that no longer exist in your knowledge base.`;
 

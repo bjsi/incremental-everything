@@ -140,6 +140,11 @@ export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 export const incRemDisabledDeviceKey = 'inc-rem-disabled-device';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
+// Rem IDs whose cards exist but whose parent rem could not be found during the
+// last cache build (orphan-card candidates). Written by Phase 2 of
+// loadCardPriorityCache, read by the 'Update all inherited Card Priorities'
+// cleanup so it can skip re-scanning to find them.
+export const orphanRemIdsKey = 'orphan-rem-ids-key';
 // Pending priority save job: written by priority_light popup before closing,
 // picked up and executed by tracker.ts in the persistent index widget.
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
