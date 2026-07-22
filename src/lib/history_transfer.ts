@@ -55,7 +55,10 @@ function convertCardRep(
   return {
     date: rep.date,
     scheduled: rep.scheduled ?? rep.date,
-    reviewTimeSeconds: cappedMs / 1000,
+    // Whole seconds, matching every other reviewTimeSeconds in the system
+    // (IncRem reps use dayjs.diff(..., 'second')). Fractional seconds here leaked
+    // into the Study Dashboard totals as e.g. "2m 14.7729999…s".
+    reviewTimeSeconds: Math.round(cappedMs / 1000),
     eventType: 'importedRep',
     context: {
       flashcardName,
@@ -214,9 +217,19 @@ export async function executePreserveHistoryAndRemove(
       }
     }
 
-    // Scrub content + mark as a hidden tombstone.
+    // Scrub content + mark as a hidden tombstone. Only clear the back side when
+    // one actually exists — a cloze / plain rem has no back text, and setBackText
+    // rejects `undefined`/empty at runtime ("backText parameter: Required"). Guard
+    // on the existing backText and keep it best-effort so it never stops the
+    // powerup from landing.
     await target.setText([TOMBSTONE_TEXT]);
-    await target.setBackText(undefined);
+    if (target.backText && target.backText.length > 0) {
+      try {
+        await target.setBackText([]);
+      } catch (e) {
+        console.warn('[PreserveHistory] Could not clear back text:', e);
+      }
+    }
     await target.addPowerup(preservedHistoryPowerupCode);
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);

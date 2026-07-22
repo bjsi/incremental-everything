@@ -386,6 +386,11 @@ export function formatCountdown(ms: number): string {
 export function formatDuration(seconds: number): string {
   if (!seconds || seconds === 0) return '';
 
+  // Times are conceptually whole seconds; round defensively so a fractional
+  // input can never render as e.g. "2m 14.7729999…s".
+  seconds = Math.round(seconds);
+  if (seconds === 0) return '';
+
   if (seconds < 60) {
     return `${seconds}s`;
   } else if (seconds < 3600) {
