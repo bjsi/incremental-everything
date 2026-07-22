@@ -62,6 +62,14 @@ export interface FSRSState {
     nextD: { again: number; hard: number; good: number; easy: number };
     /** Stability Increase ratio (nextS / currentS) for each recall grade */
     sInc: { hard: number; good: number; easy: number };
+    /**
+     * U-Factor (Used-Interval Increase) ratio for each recall grade:
+     * nextInterval / usedInterval, where usedInterval is the actual elapsed
+     * time since the last review and nextInterval is the interval that grade
+     * would schedule (= new stability in days, since interval@90% ≡ stability).
+     * 0 when there is no usable elapsed interval (e.g. reviewed just now).
+     */
+    uFactor: { hard: number; good: number; easy: number };
     daysSinceLastReview: number;
 }
 
@@ -251,18 +259,26 @@ export function computeFSRSState(
         return null;
     }
 
-    const daysSinceLastReview = (Date.now() - lastReviewDate) / (1000 * 60 * 60 * 24);
+    // Capture the guarded values into non-null `const`s. The closures below
+    // (computeSInc / computeUFactor) capture these bindings, and TS keeps the
+    // narrowing for `const` — unlike the `let`-declared d/s, which it widens
+    // back to `number | null` inside a closure.
+    const finalD = d;
+    const finalS = s;
+    const finalLastReviewDate = lastReviewDate;
+
+    const daysSinceLastReview = (Date.now() - finalLastReviewDate) / (1000 * 60 * 60 * 24);
     const DECAY_VAL = -w[20];
     const FACTOR_VAL = Math.pow(0.9, 1 / DECAY_VAL) - 1;
-    const r = forgettingCurve(daysSinceLastReview, s, DECAY_VAL, FACTOR_VAL);
+    const r = forgettingCurve(daysSinceLastReview, finalS, DECAY_VAL, FACTOR_VAL);
 
     // Compute SInc (Stability Increase) for each recall grade
     const computeSInc = (rating: number): number => {
         if (state === 'learning' || state === 'relearning') {
-            return nextShortTermStability(w, s, rating, is21w) / s;
+            return nextShortTermStability(w, finalS, rating, is21w) / finalS;
         }
         // review state: use recall stability
-        return nextRecallStability(w, d, s, r, rating) / s;
+        return nextRecallStability(w, finalD, finalS, r, rating) / finalS;
     };
 
     const sInc = {
@@ -271,14 +287,26 @@ export function computeFSRSState(
         easy: computeSInc(RATINGS.easy),
     };
 
-    const nextD = {
-        again: nextDifficulty(w, d, RATINGS.again),
-        hard: nextDifficulty(w, d, RATINGS.hard),
-        good: nextDifficulty(w, d, RATINGS.good),
-        easy: nextDifficulty(w, d, RATINGS.easy),
+    // U-Factor (Used-Interval Increase): how much the interval that grade would
+    // schedule (= new stability in days, since interval@90% ≡ stability) grows
+    // relative to the interval actually used since the last review.
+    const usedInterval = daysSinceLastReview;
+    const computeUFactor = (sIncValue: number): number =>
+        usedInterval > 0 ? (finalS * sIncValue) / usedInterval : 0;
+    const uFactor = {
+        hard: computeUFactor(sInc.hard),
+        good: computeUFactor(sInc.good),
+        easy: computeUFactor(sInc.easy),
     };
 
-    return { d, s, r, reviewCount, sInc, daysSinceLastReview, nextD };
+    const nextD = {
+        again: nextDifficulty(w, finalD, RATINGS.again),
+        hard: nextDifficulty(w, finalD, RATINGS.hard),
+        good: nextDifficulty(w, finalD, RATINGS.good),
+        easy: nextDifficulty(w, finalD, RATINGS.easy),
+    };
+
+    return { d: finalD, s: finalS, r, reviewCount, sInc, uFactor, daysSinceLastReview, nextD };
 }
 
 // ---------------------------------------------------------------------------

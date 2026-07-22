@@ -673,6 +673,16 @@ export function CardPriorityDisplay() {
                   >
                     SInc: <strong>{fsrsState.sInc.good.toFixed(2)}×</strong>
                   </span>
+                  {fsrsState.uFactor.good > 0 && (
+                    <>
+                      {' · '}
+                      <span title={`U-Factor (Used-Interval Increase) — how much the new interval grows compared to the interval you actually used (time since last review: ${formatStabilityDays(fsrsState.daysSinceLastReview)}).\n\nHard: ×${fsrsState.uFactor.hard.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.hard)}\nGood: ×${fsrsState.uFactor.good.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.good)}\nEasy: ×${fsrsState.uFactor.easy.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.easy)}\n\nHigher = a bigger jump in scheduling. A value of 1.0 means the new interval equals the interval you just used.`}
+                        style={{ cursor: 'help' }}
+                      >
+                        U-Factor: <strong>{fsrsState.uFactor.good.toFixed(2)}×</strong>
+                      </span>
+                    </>
+                  )}
                 </>
               )}
 
