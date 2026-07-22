@@ -96,11 +96,11 @@ const CORE_CSS = `
    RemNote-side slugification differences. */
 .rem[data-rem-tags~="preservedhistory"],
 .rem[data-rem-tags~="preserved-history"] {
-  display: none;
+  display: none !important;
 }
 .rn-queue__content [data-queue-rem-container-tags~="preservedhistory"]:not(.rn-question-rem),
 .rn-queue__content [data-queue-rem-container-tags~="preserved-history"]:not(.rn-question-rem) {
-  display: none;
+  display: none !important;
 }
 `;
 
