@@ -147,15 +147,41 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Preserve history & remove',
     quickCode: 'phr',
     action: async () => {
-      const target = await plugin.focus.getFocusedRem();
+      // Resolve the target rem in BOTH contexts — the focused rem in the editor,
+      // or the current rem in the queue (the active card's rem, or the active
+      // IncRem via session storage). Mirrors 'Review in Editor (Execute Repetition)'.
+      let target: PluginRem | undefined;
+      const url = await plugin.window.getURL();
+      const isQueue = !!(url && url.includes('/flashcards'));
+      if (isQueue) {
+        const currentQueueItem = await plugin.queue.getCurrentCard();
+        let remId = currentQueueItem?.remId;
+        if (!remId) {
+          remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+        }
+        target = remId ? (await plugin.rem.findOne(remId)) || undefined : undefined;
+      } else {
+        target = await plugin.focus.getFocusedRem();
+      }
+
       if (!target) {
-        await plugin.app.toast('No focused rem — place your cursor in a rem first.');
+        await plugin.app.toast(
+          isQueue
+            ? 'No active card or Incremental Rem in the queue.'
+            : 'No focused rem — place your cursor in a rem first.'
+        );
         return;
       }
       if (await target.hasPowerup(preservedHistoryPowerupCode)) {
         await plugin.app.toast('This rem is already a preserved-history tombstone.');
         return;
       }
+
+      // Resolve the name up-front so the confirmation can name the exact rem —
+      // critical in the queue, where the previewer/sidebar can hold a different
+      // rem than the one you think is selected.
+      const rawName = await safeRemTextToString(plugin, target.text);
+      const remName = rawName.length > 80 ? rawName.slice(0, 80) + '…' : rawName;
 
       await plugin.app.toast('🔍 Scanning subtree…');
       const plan = await planPreserveHistoryAndRemove(plugin, target);
@@ -169,6 +195,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       const ok = confirm(
         `🪦 Preserve history & remove\n\n` +
+          `Rem: "${remName}"\n\n` +
           (plan.descendantCount > 0
             ? `• ${plan.descendantCount} descendant rem(s) will be permanently deleted\n`
             : '') +
@@ -182,6 +209,20 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (!ok) {
         await plugin.app.toast('Cancelled.');
         return;
+      }
+
+      // In the queue, advance off the current card BEFORE deleting it. Otherwise
+      // the queue keeps trying to render a rem/card we just removed and crashes
+      // ("Something went wrong"). removeCurrentCardFromQueue advances without
+      // recording a review (unlike rateCurrentCard). addToBackStack=false since
+      // the card is about to be deleted. Best-effort — it may not apply to an
+      // IncRem-type queue item.
+      if (isQueue) {
+        try {
+          await plugin.queue.removeCurrentCardFromQueue(false);
+        } catch (e) {
+          console.warn('[PreserveHistory] Could not advance the queue before deletion:', e);
+        }
       }
 
       try {
