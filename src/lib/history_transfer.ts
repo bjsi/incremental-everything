@@ -67,6 +67,46 @@ function convertCardRep(
   };
 }
 
+/** The cloze id of a cloze card, or undefined for forward/backward cards. */
+function getCardClozeId(card: Card): string | undefined {
+  const t = card.type as unknown;
+  return t && typeof t === 'object' && 'clozeId' in t
+    ? (t as { clozeId: string }).clozeId
+    : undefined;
+}
+
+/**
+ * Render a card's owning-rem text for display as `context.flashcardName`. For a
+ * cloze card, the clozed span (rich-text elements whose `cId` matches this card's
+ * cloze id) is wrapped in `{{…}}` so multiple clozes on the same rem are
+ * distinguishable — e.g. "flashcard {{inside}} that rem" vs "flashcard inside
+ * that {{rem}}". Forward/backward cards (no cloze id) render as plain text.
+ *
+ * `segments` is the rem's rich text pre-rendered once per element (text + cId),
+ * so this stays cheap when a rem owns several cards.
+ */
+function renderCardName(
+  segments: { text: string; cId?: string }[],
+  clozeId: string | undefined
+): string {
+  if (!clozeId) return segments.map((s) => s.text).join('');
+  let out = '';
+  let inCloze = false;
+  for (const s of segments) {
+    const match = s.cId === clozeId;
+    if (match && !inCloze) {
+      out += '{{';
+      inCloze = true;
+    } else if (!match && inCloze) {
+      out += '}}';
+      inCloze = false;
+    }
+    out += s.text;
+  }
+  if (inCloze) out += '}}';
+  return out;
+}
+
 /**
  * Read-only: gather everything the command needs to (a) preview and (b) execute,
  * without mutating anything. Collects preservable history from flashcards,
@@ -90,16 +130,31 @@ export async function planPreserveHistoryAndRemove(
 
   const merged: IncrementalRep[] = [];
 
-  // 1. Flashcard reps → importedRep. Resolve each card-owning rem's name once.
-  const cardRemIds = new Set(cards.map((c) => c.remId));
-  const nameByRemId = new Map<string, string>();
-  for (const r of subtree) {
-    if (cardRemIds.has(r._id)) {
-      nameByRemId.set(r._id, await safeRemTextToString(plugin, r.text));
-    }
-  }
+  // 1. Flashcard reps → importedRep. The display name is cloze-aware, so build
+  //    it per-card. Pre-render each owning rem's rich-text elements once (text +
+  //    cId) and cache, so a rem with several cards resolves cheaply.
+  const remById = new Map(subtree.map((r) => [r._id, r]));
+  const segmentsByRemId = new Map<string, { text: string; cId?: string }[]>();
+  const getSegments = async (remId: string) => {
+    const cached = segmentsByRemId.get(remId);
+    if (cached) return cached;
+    const rem = remById.get(remId);
+    const rt = rem?.text;
+    const segs = Array.isArray(rt)
+      ? await Promise.all(
+          rt.map(async (el) => ({
+            text: await plugin.richText.toString([el as any]),
+            cId: el && typeof el === 'object' ? (el as any).cId : undefined,
+          }))
+        )
+      : [];
+    segmentsByRemId.set(remId, segs);
+    return segs;
+  };
+
   for (const c of cards) {
-    const name = nameByRemId.get(c.remId) || 'flashcard';
+    const segs = await getSegments(c.remId);
+    const name = segs.length ? renderCardName(segs, getCardClozeId(c)) : 'flashcard';
     for (const rep of c.repetitionHistory || []) {
       const conv = convertCardRep(rep, capMs, name);
       if (conv) merged.push(conv);
@@ -195,6 +250,14 @@ export async function executePreserveHistoryAndRemove(
     // No longer part of the incremental schedule.
     if (await target.hasPowerup(powerupCode)) {
       await target.removePowerup(powerupCode);
+    }
+
+    // A card-less tombstone should not keep a CardPriority tag — it owns no
+    // flashcards to prioritise and is no longer an inheritance anchor. Plain
+    // removePowerup is enough (the heavy removeCardPriorityFromRem walks children
+    // this rem no longer has, and toggles plugin_operation_active itself).
+    if (await target.hasPowerup('cardPriority')) {
+      await target.removePowerup('cardPriority');
     }
 
     // Remove the subtree's flashcards (the target's own cards must go explicitly;
