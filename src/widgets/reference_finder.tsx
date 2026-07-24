@@ -74,6 +74,14 @@ function clozeIdAtOffset(rt: any, offset: number): string | undefined {
 const fold = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
+// Treat "Figure", "Fig" and "Fig." (any capitalisation) as the same word, so
+// typing "fig 4.3" matches a rem named "Figure 4.3" and vice-versa. Collapse a
+// standalone "fig"/"fig." token to the canonical "figure" (and swallow a
+// trailing dot) everywhere matching/scoring reads folded text. `\bfig\b` won't
+// touch the "fig" inside "figure" — there's no word boundary between "g" and
+// "u" — so already-canonical text is left alone.
+const canonFig = (s: string) => s.replace(/\bfig\b\.?/g, 'figure');
+
 interface Candidate {
   id: string;
   name: string;
@@ -324,7 +332,7 @@ function ReferenceFinder() {
     async (raw: string) => {
       const reqId = ++reqIdRef.current;
       const q = normalize(raw);
-      const qf = fold(raw);
+      const qf = canonFig(fold(raw));
       if (q.length < 2) {
         setResults([]);
         return;
@@ -334,10 +342,20 @@ function ReferenceFinder() {
         const tokens = q.split(/\s+/).filter((t) => t.length >= 2);
         // Folded tokens drive matching so accents/special chars are ignored.
         const foldedTokens = qf.split(/\s+/).filter((t) => t.length >= 2);
+        // Seed the backend search with the alternate figure spelling too, so
+        // RemNote's index returns "Figure 4.3" when the user typed "fig" (and
+        // vice-versa) rather than relying only on the distinctive numeric token.
+        const searchTokens = Array.from(
+          new Set(
+            tokens.flatMap((t) =>
+              /^fig\.?$/.test(t) ? [t, 'figure'] : t === 'figure' ? [t, 'fig'] : [t]
+            )
+          )
+        );
         // Search the full query plus each token (longest first, capped to 4) so
         // a buried exact-name rem is retrieved via its most distinctive token.
         const queries = Array.from(
-          new Set<string>([raw.trim(), ...[...tokens].sort((a, b) => b.length - a.length).slice(0, 4)])
+          new Set<string>([raw.trim(), ...[...searchTokens].sort((a, b) => b.length - a.length).slice(0, 4)])
         );
 
         const seen = new Map<string, any>();
@@ -370,7 +388,7 @@ function ReferenceFinder() {
           // referenced rem's text — so pin text doesn't pollute the match/name.
           const nameRaw = await resolveRemTextForBreadcrumb(plugin, r.text);
           const name = nameRaw === 'Untitled' ? '' : nameRaw;
-          const foldName = fold(name);
+          const foldName = canonFig(fold(name));
           const type = await r.getType().catch(() => 0);
           if (conceptsOnly && type !== RemType.CONCEPT) continue;
 
@@ -389,7 +407,7 @@ function ReferenceFinder() {
               for (const a of await r.getAliases()) {
                 const atRaw = (await resolveRemTextForBreadcrumb(plugin, a.text)).trim();
                 const at = atRaw === 'Untitled' ? '' : atRaw;
-                const fa = fold(at);
+                const fa = canonFig(fold(at));
                 if (at && foldedTokens.every((t) => fa.includes(t))) {
                   matched = { id: a._id, text: at, fold: fa };
                   break;
