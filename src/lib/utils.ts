@@ -451,9 +451,11 @@ export function formatTimeAgo(timestampMs: number, nowMs: number = Date.now()): 
   let formatted = '';
 
   if (diffYears > 0) {
-    formatted = `${diffYears} year${diffYears > 1 ? 's' : ''}`;
+    const years = (diffDays / 365.25).toFixed(1);
+    formatted = `${years} year${years === '1.0' ? '' : 's'}`;
   } else if (diffMonths > 0) {
-    formatted = `${diffMonths} month${diffMonths > 1 ? 's' : ''}`;
+    const months = (diffDays / 30.436875).toFixed(1);
+    formatted = `${months} month${months === '1.0' ? '' : 's'}`;
   } else if (diffDays > 0) {
     formatted = `${diffDays} day${diffDays > 1 ? 's' : ''}`;
   } else if (diffHours > 0) {

@@ -795,13 +795,11 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
     const formatAge = (firstRepTime?: number) => {
         if (!firstRepTime) return "New";
         const diff = Date.now() - firstRepTime;
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const months = Math.floor(days / 30);
-        const years = Math.floor(days / 365);
+        const days = diff / (1000 * 60 * 60 * 24);
 
-        if (years > 0) return `${years}.${Math.floor((days % 365) / 30)}y`;
-        if (months > 0) return `${months}.${Math.floor(days % 30 / 3)}m`;
-        if (days > 0) return `${days}d`;
+        if (days >= 365) return `${(days / 365.25).toFixed(1)}y`;
+        if (days >= 30) return `${(days / 30.44).toFixed(1)}m`;
+        if (days >= 1) return `${Math.floor(days)}d`;
 
         const hours = Math.floor(diff / (1000 * 60 * 60));
         if (hours > 0) return `${hours}h`;
@@ -813,13 +811,11 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
 
     const formatInterval = (intervalMs?: number) => {
         if (!intervalMs || intervalMs <= 0) return "-";
-        const days = Math.floor(intervalMs / (1000 * 60 * 60 * 24));
-        const months = Math.floor(days / 30);
-        const years = Math.floor(days / 365);
+        const days = intervalMs / (1000 * 60 * 60 * 24);
 
-        if (years > 0) return `${years}.${Math.floor((days % 365) / 30)}y`;
-        if (months > 0) return `${months}.${Math.floor(days % 30 / 3)}m`;
-        if (days > 0) return `${days}d`;
+        if (days >= 365) return `${(days / 365.25).toFixed(1)}y`;
+        if (days >= 30) return `${(days / 30.44).toFixed(1)}m`;
+        if (days >= 1) return `${Math.floor(days)}d`;
         const hours = Math.floor(intervalMs / (1000 * 60 * 60));
         if (hours > 0) return `${hours}h`;
         return "<1h";
