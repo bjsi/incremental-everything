@@ -27,8 +27,9 @@ export interface ParentTreeNode {
   isPortal?: boolean;
   // The portal rem that mirrored it in (only meaningful with isPortal).
   portalId?: RemId;
-  // Name of the rem it really lives under, for the "where it lives" tooltip.
-  portalHomeName?: string;
+  // Breadcrumb of the ancestors it really lives under ("A › B › C"), for the
+  // "where it lives" tooltip.
+  portalBreadcrumb?: string;
   hasChildren: boolean;        // Indicates if this node has children (shows expand indicator)
   isExpanded: boolean;         // Whether the node is currently expanded
   children: ParentTreeNode[];  // Loaded children (empty until expanded)

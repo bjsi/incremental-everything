@@ -211,7 +211,7 @@ const PriorityBadge: React.FC<PriorityBadgeProps> = ({
  * home, which is what the portal shows, so picking one of these is safe; the
  * badge is there so the user knows the row isn't where it looks like it is.
  */
-const PortalBadge: React.FC<{ homeName?: string }> = ({ homeName }) => (
+const PortalBadge: React.FC<{ breadcrumb?: string }> = ({ breadcrumb }) => (
   <span
     style={{
       display: 'inline-flex',
@@ -227,8 +227,8 @@ const PortalBadge: React.FC<{ homeName?: string }> = ({ homeName }) => (
       whiteSpace: 'nowrap',
     }}
     title={
-      homeName
-        ? `Shown here through a portal — this rem lives under "${homeName}"`
+      breadcrumb
+        ? `Shown here through a portal — this rem lives under:\n${breadcrumb}`
         : 'Shown here through a portal — this rem lives elsewhere'
     }
   >
@@ -335,7 +335,7 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         isVisible={isSelected}
       />
 
-      {node.isPortal && <PortalBadge homeName={node.portalHomeName} />}
+      {node.isPortal && <PortalBadge breadcrumb={node.portalBreadcrumb} />}
 
       {/* Only headings get a badge here — the shared component's paragraph
           marker (¶) would be noise on every non-heading row. */}

@@ -1,6 +1,7 @@
 import { BuiltInPowerupCodes, RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { ActionItemType, IncrementalRem } from './incremental_rem/types';
 import { remToActionItemType } from './incremental_rem/action_items';
+import { resolveRemTextForBreadcrumb } from './richTextRemRefs';
 
 /**
  * Extract plain text from RemNote rich text format.
@@ -207,28 +208,38 @@ export const getHtmlSourceUrl = async (
 };
 
 /**
- * Get a breadcrumb string for a rem (e.g. "Grandparent > Parent").
- * Traverses up to 5 levels deep.
+ * Get a breadcrumb string of a rem's ancestors (e.g. "Grandparent › Parent"),
+ * walking up to `maxDepth` levels and truncating each segment.
+ *
+ * Ancestor names are resolved with {@link resolveRemTextForBreadcrumb}, so a
+ * rem reference contributes the referenced rem's text and a reference *pin*
+ * collapses to 📌 rather than expanding into the whole referenced rem. That
+ * matches every other breadcrumb in the plugin (Reader, Extract Viewer,
+ * Isolated Card Viewer) and keeps a pinned ancestor from bloating the tooltip.
  */
-export async function getBreadcrumbText(plugin: RNPlugin, rem: any): Promise<string> {
+export async function getBreadcrumbText(
+  plugin: RNPlugin,
+  rem: any,
+  opts: { maxDepth?: number; segmentChars?: number } = {}
+): Promise<string> {
+  const { maxDepth = 5, segmentChars = 40 } = opts;
   try {
     const parts: string[] = [];
     let current = rem;
     // We want ancestors, so start with parent
     let parent = await current.getParentRem();
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < maxDepth; i++) {
       if (!parent) break;
-      const text = await parent.text;
-      const name = extractText(text);
+      const name = (await resolveRemTextForBreadcrumb(plugin, parent.text)).trim();
       if (name) {
-        parts.unshift(name.length > 40 ? name.substring(0, 40) + '...' : name);
+        parts.unshift(name.length > segmentChars ? name.substring(0, segmentChars) + '...' : name);
       }
       parent = await parent.getParentRem();
     }
 
     if (parts.length === 0) return '';
-    return parts.join(' > ');
+    return parts.join(' › ');
   } catch (error) {
     return '';
   }

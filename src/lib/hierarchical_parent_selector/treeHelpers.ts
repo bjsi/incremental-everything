@@ -16,6 +16,7 @@ import { safeRemTextToString, findPDFinRem, findHTMLinRem, getKnownHtmlRemsKey }
 import { calculateRelativePercentile } from '../utils';
 import { getHeadingLevel } from '../outline_restructure';
 import { ChildRemEntry, getChildEntries, getPortalContainerIds } from './portals';
+import { getBreadcrumbText } from '../incRemHelpers';
 
 // ============================================================================
 // SESSION CACHE FOR ROOT CANDIDATES
@@ -92,16 +93,13 @@ export async function createTreeNode(
     }
   }
 
-  // Where the rem actually lives, so the row can say so on hover. Only paid for
-  // on portal rows, which are rare.
-  let portalHomeName: string | undefined;
+  // Where the rem actually lives, so the row can say so on hover. Uses the
+  // shared breadcrumb builder, so ancestors read the same way they do in the
+  // Reader and Extract Viewer (pins collapse to 📌 instead of expanding into
+  // the whole referenced rem). Only paid for on portal rows, which are rare.
+  let portalBreadcrumb: string | undefined;
   if (viaPortalId) {
-    try {
-      const home = await rem.getParentRem();
-      if (home) portalHomeName = await safeRemTextToString(plugin, home.text);
-    } catch {
-      // Tooltip detail only — never worth failing the node over.
-    }
+    portalBreadcrumb = (await getBreadcrumbText(plugin, rem, { maxDepth: 8 })) || undefined;
   }
 
   return {
@@ -114,7 +112,7 @@ export async function createTreeNode(
     headingLevel,
     isPortal: viaPortalId ? true : undefined,
     portalId: viaPortalId,
-    portalHomeName,
+    portalBreadcrumb,
     hasChildren,
     isExpanded: false,
     children: [],

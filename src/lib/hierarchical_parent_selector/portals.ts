@@ -88,8 +88,75 @@ export async function isPortalRem(rem: PluginRem): Promise<boolean> {
   }
 }
 
+// How far up a target's real ancestry we look for another target. Deep enough
+// for any realistic outline, bounded so a broken parent chain can't spin.
+const PORTAL_ANCESTRY_MAX_DEPTH = 30;
+
 /**
- * The rems a portal mirrors, in portal order, as live RemObjects. Returns []
+ * Keeps only the outermost rems of a portal's included set.
+ *
+ * A portal records *every* rem it shows as "directly included", so a branch and
+ * the descendants under it all come back together and would render as
+ * siblings — which is not how the user sees them in the editor, where the
+ * descendants sit under their parent. Dropping any target that descends from
+ * another target restores the real shape: only the branch roots appear at the
+ * portal's position, and the rest reappear through ordinary parentage once that
+ * root is expanded.
+ */
+async function keepOutermostTargets(
+  plugin: RNPlugin,
+  targets: PluginRem[]
+): Promise<PluginRem[]> {
+  if (targets.length < 2) return targets;
+
+  const targetIds = new Set(targets.map((t) => t._id));
+  // Seeded with the targets themselves: the common case is a parent that is
+  // also in the set, which then costs no lookup at all.
+  const parentOf = new Map<RemId, RemId | null>(
+    targets.map((t) => [t._id, t.parent ?? null] as const)
+  );
+
+  const parentIdOf = async (id: RemId): Promise<RemId | null> => {
+    const cached = parentOf.get(id);
+    if (cached !== undefined) return cached;
+    let parent: RemId | null = null;
+    try {
+      parent = (await plugin.rem.findOne(id))?.parent ?? null;
+    } catch {
+      /* treat an unreadable ancestor as the end of the chain */
+    }
+    parentOf.set(id, parent);
+    return parent;
+  };
+
+  const outermost: PluginRem[] = [];
+
+  for (const target of targets) {
+    const seen = new Set<RemId>([target._id]);
+    let cursor: RemId | null = target.parent ?? null;
+    let depth = 0;
+    let nested = false;
+
+    while (cursor && depth < PORTAL_ANCESTRY_MAX_DEPTH) {
+      if (targetIds.has(cursor)) {
+        nested = true;
+        break;
+      }
+      if (seen.has(cursor)) break; // defensive: cyclical parent chain
+      seen.add(cursor);
+      cursor = await parentIdOf(cursor);
+      depth++;
+    }
+
+    if (!nested) outermost.push(target);
+  }
+
+  return outermost;
+}
+
+/**
+ * The rems a portal mirrors, as live RemObjects in portal order, reduced to the
+ * outermost ones so the branch structure the user sees is preserved. Returns []
  * for portal flavours we deliberately ignore (see EXCLUDED_PORTAL_TYPES) and
  * for any lookup failure.
  */
@@ -116,7 +183,8 @@ export async function getPortalTargets(
     const target = await hydrateRem(plugin, raw);
     if (target) targets.push(target);
   }
-  return targets;
+
+  return keepOutermostTargets(plugin, targets);
 }
 
 /**
