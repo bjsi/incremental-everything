@@ -21,6 +21,14 @@ export interface ParentTreeNode {
   // Tri-state: undefined = not probed yet (treated as "keep", since we can't
   // prove the branch is heading-free). See annotateHeadingDescendants.
   hasHeadingDescendant?: boolean;
+  // Set when this rem is only shown here because a portal among the parent's
+  // children mirrors it — the rem itself lives elsewhere. Selecting it files
+  // the new rem in that real home, which is also what shows inside the portal.
+  isPortal?: boolean;
+  // The portal rem that mirrored it in (only meaningful with isPortal).
+  portalId?: RemId;
+  // Name of the rem it really lives under, for the "where it lives" tooltip.
+  portalHomeName?: string;
   hasChildren: boolean;        // Indicates if this node has children (shows expand indicator)
   isExpanded: boolean;         // Whether the node is currently expanded
   children: ParentTreeNode[];  // Loaded children (empty until expanded)

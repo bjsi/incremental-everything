@@ -205,6 +205,37 @@ const PriorityBadge: React.FC<PriorityBadgeProps> = ({
   );
 };
 
+/**
+ * Marks a row that is only shown in this branch because a portal mirrors it —
+ * the rem itself lives somewhere else. Filed content still lands in that real
+ * home, which is what the portal shows, so picking one of these is safe; the
+ * badge is there so the user knows the row isn't where it looks like it is.
+ */
+const PortalBadge: React.FC<{ homeName?: string }> = ({ homeName }) => (
+  <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '3px',
+      padding: '1px 5px',
+      borderRadius: '8px',
+      fontSize: '9px',
+      fontWeight: 700,
+      letterSpacing: '0.02em',
+      color: 'white',
+      backgroundColor: '#6366f1', // indigo-500: legible on both light and dark
+      whiteSpace: 'nowrap',
+    }}
+    title={
+      homeName
+        ? `Shown here through a portal — this rem lives under "${homeName}"`
+        : 'Shown here through a portal — this rem lives elsewhere'
+    }
+  >
+    ⧉ portal
+  </span>
+);
+
 interface TreeNodeRowProps {
   node: ParentTreeNode;
   isSelected: boolean;
@@ -303,6 +334,8 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         }}
         isVisible={isSelected}
       />
+
+      {node.isPortal && <PortalBadge homeName={node.portalHomeName} />}
 
       {/* Only headings get a badge here — the shared component's paragraph
           marker (¶) would be noise on every non-heading row. */}
@@ -1276,7 +1309,9 @@ function ParentSelectorWidget() {
       // Render the node row
       elements.push(
         <TreeNodeRow
-          key={`${node.remId}-${node.depth}`}
+          // Includes the parent: a portal can mirror the same rem into two
+          // different branches, so remId+depth alone is not unique.
+          key={`${node.parentId ?? 'root'}-${node.remId}-${node.depth}`}
           ref={(el) => {
             if (itemRefs.current) {
               itemRefs.current[index] = el;

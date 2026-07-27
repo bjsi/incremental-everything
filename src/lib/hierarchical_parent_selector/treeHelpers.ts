@@ -14,11 +14,8 @@ import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../consts';
 import { IncrementalRem } from '../incremental_rem';
 import { safeRemTextToString, findPDFinRem, findHTMLinRem, getKnownHtmlRemsKey } from '../pdfUtils';
 import { calculateRelativePercentile } from '../utils';
-import {
-  filterOutPowerupSlots,
-  getChildrenExcludingSlots
-} from '../powerupSlotFilter';
 import { getHeadingLevel } from '../outline_restructure';
+import { ChildRemEntry, getChildEntries, getPortalContainerIds } from './portals';
 
 // ============================================================================
 // SESSION CACHE FOR ROOT CANDIDATES
@@ -55,15 +52,21 @@ interface RootCandidatesCache {
 /**
  * Creates a ParentTreeNode from a PluginRem.
  * Checks if the rem has children and enriches with priority data if incremental.
- * 
- * UPDATED: Now excludes powerup slots when determining hasChildren
+ *
+ * UPDATED: Now excludes powerup slots when determining hasChildren, and counts
+ * portal targets as children so a branch whose only content arrives through a
+ * portal still gets an expand arrow.
+ *
+ * `viaPortalId` marks the node as mirrored in through that portal rather than
+ * reached by real parentage.
  */
 export async function createTreeNode(
   plugin: RNPlugin,
   rem: PluginRem,
   allIncrementalRems: IncrementalRem[],
   depth: number = 0,
-  parentId: RemId | null = null
+  parentId: RemId | null = null,
+  viaPortalId?: RemId
 ): Promise<ParentTreeNode> {
   const remText = await safeRemTextToString(plugin, rem.text);
   const nameSegments = await resolveRemTextSegments(plugin, rem.text);
@@ -71,8 +74,8 @@ export async function createTreeNode(
   const headingLevel = await getHeadingLevel(rem);
 
   // Check if has children (for expand indicator)
-  // UPDATED: Filter out powerup slots from children count
-  const children = await getChildrenExcludingSlots(plugin, rem);
+  // UPDATED: Filter out powerup slots, fold in portal targets
+  const children = await getChildEntries(plugin, rem);
   const hasChildren = children.length > 0;
 
   // Get priority data if incremental
@@ -89,6 +92,18 @@ export async function createTreeNode(
     }
   }
 
+  // Where the rem actually lives, so the row can say so on hover. Only paid for
+  // on portal rows, which are rare.
+  let portalHomeName: string | undefined;
+  if (viaPortalId) {
+    try {
+      const home = await rem.getParentRem();
+      if (home) portalHomeName = await safeRemTextToString(plugin, home.text);
+    } catch {
+      // Tooltip detail only — never worth failing the node over.
+    }
+  }
+
   return {
     remId: rem._id,
     name: remText,
@@ -97,6 +112,9 @@ export async function createTreeNode(
     percentile,
     isIncremental,
     headingLevel,
+    isPortal: viaPortalId ? true : undefined,
+    portalId: viaPortalId,
+    portalHomeName,
     hasChildren,
     isExpanded: false,
     children: [],
@@ -139,29 +157,36 @@ const HEADING_PROBE_MAX_DEPTH = 4;
 const HEADING_PROBE_MAX_VISITS = 120;
 
 /**
- * Depth-first search for any heading (H1–H6) beneath `rem`.
+ * Depth-first search for any heading (H1–H6) beneath `rem`, following portals
+ * as well as real children — a portal's content is visible in this branch, so
+ * a heading inside it is a reachable heading.
+ *
  * Returns true/false, or null when the budget ran out before deciding.
+ * `visited` also stops a portal that loops back to an ancestor from re-walking
+ * ground already covered.
  */
 async function subtreeHasHeading(
   plugin: RNPlugin,
   rem: PluginRem,
-  budget: { visits: number },
+  budget: { visits: number; visited: Set<RemId> },
   depth: number = 0
 ): Promise<boolean | null> {
   if (depth >= HEADING_PROBE_MAX_DEPTH) return null;
 
-  let children: PluginRem[];
+  let children: ChildRemEntry[];
   try {
-    children = await getChildrenExcludingSlots(plugin, rem);
+    children = await getChildEntries(plugin, rem);
   } catch {
     return null;
   }
 
   let exhausted = false;
 
-  for (const child of children) {
+  for (const { rem: child } of children) {
     if (budget.visits <= 0) return null;
+    if (budget.visited.has(child._id)) continue;
     budget.visits--;
+    budget.visited.add(child._id);
 
     if ((await getHeadingLevel(child)) != null) return true;
 
@@ -203,6 +228,7 @@ export async function annotateHeadingDescendants(
       if (rem) {
         const result = await subtreeHasHeading(plugin, rem, {
           visits: HEADING_PROBE_MAX_VISITS,
+          visited: new Set([node.remId]),
         });
         // `null` stays undefined: unprobed reads as "keep" downstream.
         if (result !== null) updated = { ...updated, hasHeadingDescendant: result };
@@ -234,7 +260,9 @@ export async function annotateHeadingDescendants(
  * `detectHeadingDescendants` (set when "Filter only headers" is on) additionally
  * works out which non-heading children lead to headings further down.
  *
- * UPDATED: Now filters out powerup slots (Incremental, CardPriority)
+ * UPDATED: Now filters out powerup slots (Incremental, CardPriority), and
+ * resolves portals sitting among the children into the rems they mirror, so
+ * they can be picked as destinations just like real children.
  */
 export async function loadChildrenForNode(
   plugin: RNPlugin,
@@ -246,18 +274,19 @@ export async function loadChildrenForNode(
   const parentRem = await plugin.rem.findOne(parentRemId);
   if (!parentRem) return [];
 
-  // getChildrenRem() returns children in document order (as shown in editor)
-  // UPDATED: Filter out powerup slots
-  const children = await getChildrenExcludingSlots(plugin, parentRem);
+  // Entries come back in document order (as shown in the editor), with powerup
+  // slots removed and each portal replaced by the rems it mirrors.
+  const children = await getChildEntries(plugin, parentRem);
   const childNodes: ParentTreeNode[] = [];
 
-  for (const child of children) {
+  for (const { rem: child, viaPortalId } of children) {
     const node = await createTreeNode(
       plugin,
       child,
       allIncrementalRems,
       parentDepth + 1,
-      parentRemId
+      parentRemId,
+      viaPortalId
     );
     childNodes.push(node);
   }
@@ -671,8 +700,52 @@ export async function saveLastSelectedDestination(
 }
 
 /**
+ * Breadth-first search upward from `startId` for any root candidate, stepping
+ * through portal containers as well as real parents.
+ *
+ * A rem mirrored by a portal shows up under the portal's own parent, so that
+ * container is a genuine step up the tree the user sees — even though no
+ * parent link connects them. Returns [rootCandidate, ..., startId], or null.
+ *
+ * Only used as a fallback: the plain parent walk covers the overwhelming
+ * majority of destinations and costs a single lookup per hop, whereas each hop
+ * here also asks for the rem's portals.
+ */
+async function findPortalAwarePathToRoot(
+  plugin: RNPlugin,
+  startId: RemId,
+  rootCandidateIds: Set<RemId>,
+  maxVisits: number = 200
+): Promise<RemId[] | null> {
+  const visited = new Set<RemId>([startId]);
+  const queue: Array<{ id: RemId; path: RemId[] }> = [{ id: startId, path: [startId] }];
+  let visits = 0;
+
+  while (queue.length > 0 && visits < maxVisits) {
+    const { id, path } = queue.shift()!;
+    visits++;
+
+    const rem = await plugin.rem.findOne(id);
+    if (!rem) continue;
+
+    const predecessors: RemId[] = [];
+    if (rem.parent) predecessors.push(rem.parent);
+    predecessors.push(...(await getPortalContainerIds(rem)));
+
+    for (const predId of predecessors) {
+      if (rootCandidateIds.has(predId)) return [predId, ...path];
+      if (visited.has(predId)) continue;
+      visited.add(predId);
+      queue.push({ id: predId, path: [predId, ...path] });
+    }
+  }
+
+  return null;
+}
+
+/**
  * FIXED: Attempts to find and expand the path to the last selected destination.
- * 
+ *
  * The key insight: we need to build the ancestry chain from the destination UP to a root,
  * then expand DOWN from the root to the destination.
  */
@@ -742,20 +815,33 @@ export async function expandToLastDestination(
     currentRem = parentRem;
   }
 
-  if (!foundRootId) {
-    // console.log('[ParentSelector:TreeHelpers] ERROR: Could not find a root candidate in ancestry chain');
-    // console.log('[ParentSelector:TreeHelpers] Path traversed:', pathFromDestToRoot);
-    return { tree, foundIndex: -1 };
+  let fullPathToExpand: RemId[];
+
+  if (foundRootId) {
+    // Reverse the path so it goes from root to destination
+    // pathFromDestToRoot is [destination, parent1, parent2, ...]
+    // We want [parent2, parent1, destination] (from root candidate's child down to destination)
+    pathFromDestToRoot.reverse();
+
+    // The path now is [closest_to_root, ..., destination]
+    // We need to expand: rootCandidate -> pathFromDestToRoot[0] -> ... -> destination
+    fullPathToExpand = [foundRootId, ...pathFromDestToRoot];
+  } else {
+    // No root candidate up the real-parent chain. The destination can still be
+    // visible in the tree if a portal mirrors it (or one of its ancestors) into
+    // a branch, so retry allowing portal hops.
+    const portalPath = await findPortalAwarePathToRoot(
+      plugin,
+      lastDestinationId,
+      rootCandidateIds
+    );
+    if (!portalPath) {
+      // console.log('[ParentSelector:TreeHelpers] ERROR: Could not find a root candidate in ancestry chain');
+      // console.log('[ParentSelector:TreeHelpers] Path traversed:', pathFromDestToRoot);
+      return { tree, foundIndex: -1 };
+    }
+    fullPathToExpand = portalPath;
   }
-
-  // Reverse the path so it goes from root to destination
-  // pathFromDestToRoot is [destination, parent1, parent2, ...]
-  // We want [parent2, parent1, destination] (from root candidate's child down to destination)
-  pathFromDestToRoot.reverse();
-
-  // The path now is [closest_to_root, ..., destination]
-  // We need to expand: rootCandidate -> pathFromDestToRoot[0] -> ... -> destination
-  const fullPathToExpand = [foundRootId, ...pathFromDestToRoot];
 
   // console.log('[ParentSelector:TreeHelpers] Full path to expand (root to destination):');
   for (const id of fullPathToExpand) {
@@ -939,9 +1025,15 @@ export function flattenTreeForDisplay(
         // (so a plain wrapper rem never makes its headings unreachable).
         // `hasHeadingDescendant === undefined` means "not probed" — keep it,
         // since hiding a branch we haven't inspected could strand content.
+        //
+        // Portal rows are kept unconditionally: a portal is a deliberate
+        // structural link the user placed in this branch, so it carries the
+        // same "this is a place to file things" intent a heading does, and it
+        // is frequently a plain rem that the filter would otherwise swallow.
         list = list.filter(
           (node) =>
             node.headingLevel != null ||
+            node.isPortal ||
             node.hasHeadingDescendant !== false ||
             pinned?.has(node.remId)
         );
