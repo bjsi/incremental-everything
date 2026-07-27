@@ -164,8 +164,14 @@ export async function getPortalTargets(
   plugin: RNPlugin,
   portalRem: PluginRem
 ): Promise<PluginRem[]> {
+  // The portal itself may have arrived unhydrated (portalsAndDocumentsIn hands
+  // back raw rems). Every call below is a method, so without this they would all
+  // throw into the catch blocks and silently report a portal with no contents.
+  const portal = await hydrateRem(plugin, portalRem);
+  if (!portal) return [];
+
   try {
-    const portalType = await portalRem.getPortalType();
+    const portalType = await portal.getPortalType();
     if (EXCLUDED_PORTAL_TYPES.includes(portalType)) return [];
   } catch {
     // Fall through: treat as a plain portal and let the target lookup decide.
@@ -173,7 +179,7 @@ export async function getPortalTargets(
 
   let rawTargets: PluginRem[];
   try {
-    rawTargets = (await portalRem.getPortalDirectlyIncludedRem()) ?? [];
+    rawTargets = (await portal.getPortalDirectlyIncludedRem()) ?? [];
   } catch {
     return [];
   }
@@ -251,12 +257,22 @@ export async function getChildEntries(
 /**
  * The containers a rem is reachable from through a portal — i.e. the parents of
  * the portal rems that mirror it. These are the rems that, once expanded, will
- * list this rem among their children (see getChildEntries).
+ * list this rem among their children.
  *
  * Used to re-find a remembered destination whose only route from a root
  * candidate goes through a portal, where walking real parents dead-ends.
+ *
+ * Crucially this must agree with what {@link getChildEntries} actually renders,
+ * so it filters through {@link getPortalTargets} rather than accepting every rem
+ * the portal includes. A portal records its whole displayed subtree, but only
+ * the *outermost* rems are listed under the container — a nested one is reached
+ * by expanding its own ancestor. Reporting the container for a nested rem would
+ * hand the caller a hop that doesn't exist in the tree, stranding it.
  */
-export async function getPortalContainerIds(rem: PluginRem): Promise<RemId[]> {
+export async function getPortalContainerIds(
+  plugin: RNPlugin,
+  rem: PluginRem
+): Promise<RemId[]> {
   let containers: PluginRem[];
   try {
     containers = await rem.portalsAndDocumentsIn();
@@ -265,11 +281,20 @@ export async function getPortalContainerIds(rem: PluginRem): Promise<RemId[]> {
   }
 
   const ids: RemId[] = [];
-  for (const container of containers) {
+  for (const raw of containers) {
+    // These come back unhydrated, and everything below needs live methods.
+    const container = await hydrateRem(plugin, raw);
+    if (!container) continue;
+
     // `portalsAndDocumentsIn` also returns documents, which are plain ancestors
     // and already covered by the real-parent walk.
     if (!(await isPortalRem(container))) continue;
-    if (container.parent) ids.push(container.parent);
+    if (!container.parent) continue;
+
+    const targets = await getPortalTargets(plugin, container);
+    if (!targets.some((t) => t._id === rem._id)) continue;
+
+    ids.push(container.parent);
   }
   return ids;
 }

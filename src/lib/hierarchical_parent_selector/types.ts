@@ -36,6 +36,13 @@ export interface ParentTreeNode {
   childrenLoaded: boolean;     // Whether children have been fetched
   depth: number;               // Depth in the tree (0 = root level)
   parentId: RemId | null;      // Parent node's remId (for tree navigation)
+  // Identifies this node's *position* in the tree (its ancestor path), set by
+  // flattenTreeForDisplay. The same rem can legitimately occupy several
+  // positions — as a root candidate and again deeper down, or mirrored in by
+  // portals — and expanding one copy shares the very same children array with
+  // every other copy. Keying rows by rem identity therefore collides; key them
+  // by this instead.
+  displayKey?: string;
 }
 
 /**

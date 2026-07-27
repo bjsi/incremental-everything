@@ -845,11 +845,14 @@ function ParentSelectorWidget() {
   // ---------------------------------------------------------------------------
 
   const handleToggleExpand = useCallback(
-    async (nodeRemId: RemId) => {
+    // Takes the clicked row, not just its id: the same rem can occupy several
+    // rows at different depths, and looking it up by remId would pick an
+    // arbitrary one — loading its children against the wrong depth and
+    // indenting them under the wrong row.
+    async (nodeInList: ParentTreeNode) => {
       if (loadingNodeId) return;
 
-      const nodeInList = displayList.find((n) => n.remId === nodeRemId);
-      if (!nodeInList) return;
+      const nodeRemId = nodeInList.remId;
 
       if (nodeInList.isExpanded) {
         setTree((prevTree) =>
@@ -875,7 +878,14 @@ function ParentSelectorWidget() {
         setTree((prevTree) =>
           updateNodeInTree(prevTree, nodeRemId, (node) => ({
             ...node,
-            children,
+            // updateNodeInTree matches on remId, so every copy of this rem gets
+            // these children. Re-depth them per copy (and give each its own
+            // array) so a copy sitting at another level still indents its
+            // children correctly instead of inheriting the clicked row's depth.
+            children:
+              node.depth === nodeInList.depth
+                ? children
+                : children.map((c) => ({ ...c, depth: node.depth + 1 })),
             childrenLoaded: true,
             isExpanded: true,
           }))
@@ -891,7 +901,7 @@ function ParentSelectorWidget() {
         );
       }
     },
-    [displayList, loadingNodeId, plugin, allIncrementalRems, headingsOnly]
+    [loadingNodeId, plugin, allIncrementalRems, headingsOnly]
   );
 
   // NEW: Handler to start creating a child for the selected node
@@ -902,7 +912,7 @@ function ParentSelectorWidget() {
 
     // If the node is not expanded and has children, expand it first
     if (selectedNode.hasChildren && !selectedNode.isExpanded) {
-      handleToggleExpand(selectedNode.remId);
+      handleToggleExpand(selectedNode);
     }
 
     setCreatingChildForNodeId(selectedNode.remId);
@@ -1177,14 +1187,14 @@ function ParentSelectorWidget() {
         case 'Tab':
           e.preventDefault();
           if (selectedNode?.hasChildren && !selectedNode.isExpanded) {
-            handleToggleExpand(selectedNode.remId);
+            handleToggleExpand(selectedNode);
           }
           break;
 
         case 'ArrowLeft':
           e.preventDefault();
           if (selectedNode?.isExpanded) {
-            handleToggleExpand(selectedNode.remId);
+            handleToggleExpand(selectedNode);
           } else if (selectedNode?.parentId) {
             const parentIndex = displayList.findIndex(
               (n) => n.remId === selectedNode.parentId
@@ -1309,9 +1319,10 @@ function ParentSelectorWidget() {
       // Render the node row
       elements.push(
         <TreeNodeRow
-          // Includes the parent: a portal can mirror the same rem into two
-          // different branches, so remId+depth alone is not unique.
-          key={`${node.parentId ?? 'root'}-${node.remId}-${node.depth}`}
+          // Position-based (see ParentTreeNode.displayKey). The same rem can
+          // occupy several rows, and every identity-derived field is identical
+          // between those rows — only the ancestor path tells them apart.
+          key={node.displayKey ?? `${index}-${node.remId}`}
           ref={(el) => {
             if (itemRefs.current) {
               itemRefs.current[index] = el;
@@ -1322,7 +1333,7 @@ function ParentSelectorWidget() {
           isSuggested={node.remId === suggestedRemId}
           isLoadingChildren={loadingNodeId === node.remId}
           onSelect={() => handleSelect(node)}
-          onToggleExpand={() => handleToggleExpand(node.remId)}
+          onToggleExpand={() => handleToggleExpand(node)}
           onMouseEnter={() => handleRowHover(index)}
           onAddChild={() => {
             setSelectedIndex(index);

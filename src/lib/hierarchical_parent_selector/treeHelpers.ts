@@ -709,6 +709,17 @@ export async function saveLastSelectedDestination(
  * majority of destinations and costs a single lookup per hop, whereas each hop
  * here also asks for the rem's portals.
  */
+// Traces the fallback search hop by hop: every visit with its parent and portal
+// containers, each hop rejected for not being rendered, the resolved path, and
+// whether the destination was found. Off by default; flip to true when a
+// remembered destination fails to be restored.
+//
+// Worth keeping: this route is hard to reason about from the outside — it only
+// runs when the plain parent walk fails, and both bugs found here (a portal hop
+// silently returning nothing, and a path routed through rems the tree hides)
+// looked identical from the UI, namely a destination that just wasn't there.
+const PORTAL_PATH_DEBUG = false;
+
 async function findPortalAwarePathToRoot(
   plugin: RNPlugin,
   startId: RemId,
@@ -719,6 +730,28 @@ async function findPortalAwarePathToRoot(
   const queue: Array<{ id: RemId; path: RemId[] }> = [{ id: startId, path: [startId] }];
   let visits = 0;
 
+  // What each rem actually lists as children in the selector. A raw `.parent`
+  // link is NOT enough: powerup slots, aliases and search portals all have real
+  // parent links but are filtered out of the tree, so a path routed through one
+  // is a path the walk-down can't reproduce — it finds no node and gives up,
+  // stranding the destination. Deriving the hop test from getChildEntries is
+  // what keeps the search and the render in agreement. Cached per rem, since
+  // the same candidate parent is tested repeatedly.
+  const childIdsCache = new Map<RemId, Set<RemId>>();
+  const renderedChildIdsOf = async (id: RemId): Promise<Set<RemId>> => {
+    const cached = childIdsCache.get(id);
+    if (cached) return cached;
+    let ids = new Set<RemId>();
+    try {
+      const rem = await plugin.rem.findOne(id);
+      if (rem) ids = new Set((await getChildEntries(plugin, rem)).map((e) => e.rem._id));
+    } catch {
+      /* unreadable parent: treat as having no children, so no hop goes through it */
+    }
+    childIdsCache.set(id, ids);
+    return ids;
+  };
+
   while (queue.length > 0 && visits < maxVisits) {
     const { id, path } = queue.shift()!;
     visits++;
@@ -728,16 +761,51 @@ async function findPortalAwarePathToRoot(
 
     const predecessors: RemId[] = [];
     if (rem.parent) predecessors.push(rem.parent);
-    predecessors.push(...(await getPortalContainerIds(rem)));
+    const portalContainers = await getPortalContainerIds(plugin, rem);
+    predecessors.push(...portalContainers);
+
+    if (PORTAL_PATH_DEBUG) {
+      console.log(
+        '[ParentSelector:PortalPath] visit',
+        await safeRemTextToString(plugin, rem.text),
+        { id, parent: rem.parent, portalContainers }
+      );
+    }
 
     for (const predId of predecessors) {
-      if (rootCandidateIds.has(predId)) return [predId, ...path];
+      if (!(await renderedChildIdsOf(predId)).has(id)) {
+        if (PORTAL_PATH_DEBUG) {
+          console.log(
+            '[ParentSelector:PortalPath]   skip hop',
+            predId,
+            '→',
+            id,
+            '(parent does not list it — hidden from the tree)'
+          );
+        }
+        continue;
+      }
+
+      if (rootCandidateIds.has(predId)) {
+        const result = [predId, ...path];
+        if (PORTAL_PATH_DEBUG) {
+          console.log('[ParentSelector:PortalPath] reached root candidate after', visits, 'visits:', result);
+        }
+        return result;
+      }
       if (visited.has(predId)) continue;
       visited.add(predId);
       queue.push({ id: predId, path: [predId, ...path] });
     }
   }
 
+  if (PORTAL_PATH_DEBUG) {
+    console.warn(
+      '[ParentSelector:PortalPath] no route to any root candidate after',
+      visits,
+      'visits (queue drained:', queue.length === 0, ')'
+    );
+  }
   return null;
 }
 
@@ -841,11 +909,16 @@ export async function expandToLastDestination(
     fullPathToExpand = portalPath;
   }
 
-  // console.log('[ParentSelector:TreeHelpers] Full path to expand (root to destination):');
-  for (const id of fullPathToExpand) {
-    const rem = await plugin.rem.findOne(id);
-    const name = rem ? await safeRemTextToString(plugin, rem.text) : 'unknown';
-    // console.log('[ParentSelector:TreeHelpers]   -', id, ':', name);
+  if (PORTAL_PATH_DEBUG) {
+    const labels: string[] = [];
+    for (const id of fullPathToExpand) {
+      const rem = await plugin.rem.findOne(id);
+      labels.push(rem ? await safeRemTextToString(plugin, rem.text) : 'unknown');
+    }
+    console.log(
+      `[ParentSelector:TreeHelpers] Path to expand (via ${foundRootId ? 'real parents' : 'portal fallback'}):`,
+      labels.join(' › ')
+    );
   }
 
   // Now expand each node along the path (except the last one, which is the destination)
@@ -900,7 +973,18 @@ export async function expandToLastDestination(
     nodeToExpand = findNode(updatedTree);
 
     if (!nodeToExpand) {
-      // console.log('[ParentSelector:TreeHelpers] ERROR: Could not find node to expand:', nodeIdToExpand);
+      // The path claims this rem is reachable but the tree doesn't list it —
+      // i.e. the hop that produced the path disagrees with what the previous
+      // step's children actually contain. Silent before; the destination just
+      // vanished.
+      console.warn(
+        '[ParentSelector:TreeHelpers] Path broken — no tree node for',
+        nodeIdToExpand,
+        `(step ${i} of`,
+        fullPathToExpand.length,
+        '); expected it among the children of',
+        i > 0 ? fullPathToExpand[i - 1] : '(root candidates)'
+      );
       break;
     }
 
@@ -948,9 +1032,13 @@ export async function expandToLastDestination(
   const flatList = flattenTreeForDisplay(updatedTree);
   const finalIndex = flatList.findIndex(n => n.remId === lastDestinationId);
 
-  // console.log('[ParentSelector:TreeHelpers] Final flattened list has', flatList.length, 'items');
-  // console.log('[ParentSelector:TreeHelpers] Destination found at index:', finalIndex);
-  // console.log('[ParentSelector:TreeHelpers] ================================================');
+  if (PORTAL_PATH_DEBUG) {
+    console.log(
+      '[ParentSelector:TreeHelpers] Destination',
+      finalIndex >= 0 ? `found at index ${finalIndex}` : 'NOT FOUND',
+      `(${flatList.length} rows)`
+    );
+  }
 
   return { tree: updatedTree, foundIndex: finalIndex };
 }
@@ -1015,7 +1103,7 @@ export function flattenTreeForDisplay(
       ? collectPinnedWithAncestors(nodes, opts.alwaysShowRemIds)
       : null;
 
-  const traverse = (nodeList: ParentTreeNode[], depth: number) => {
+  const traverse = (nodeList: ParentTreeNode[], depth: number, pathPrefix: string) => {
     let list = nodeList;
     if (depth > 0) {
       if (opts.headingsOnly) {
@@ -1042,13 +1130,22 @@ export function flattenTreeForDisplay(
     }
 
     for (const node of list) {
-      result.push(node);
+      // Stamp the node's position in the tree. The same rem can occupy several
+      // positions (a root candidate that is also reachable deeper down, or one
+      // mirrored in by portals), and expanding one copy hands the very same
+      // children array to every copy — so remId/parentId/depth are all
+      // identical between them and cannot identify a row. The ancestor path
+      // can. Copied rather than mutated, since those shared child objects are
+      // reached through more than one path.
+      const displayKey = `${pathPrefix}${node.remId}`;
+      result.push({ ...node, displayKey });
+
       if (node.isExpanded && node.children.length > 0) {
-        traverse(node.children, depth + 1);
+        traverse(node.children, depth + 1, `${displayKey}/`);
       }
     }
   };
 
-  traverse(nodes, 0);
+  traverse(nodes, 0, '');
   return result;
 }
