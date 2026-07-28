@@ -13,6 +13,7 @@ import {
     defaultCardPriorityId,
     cardPriorityCacheRefreshKey,
     pendingPrioritySaveKey,
+    batchPriorityTargetRemIdsKey,
 } from '../lib/consts';
 import {
     CARD_PRIORITY_CODE,
@@ -25,6 +26,7 @@ import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { initIncrementalRem } from '../lib/incremental_rem';
+import { scanBatchTargets } from '../lib/priority_targets';
 
 
 interface ParentExtractContext {
@@ -56,6 +58,30 @@ function PriorityLight() {
 
     const parentExtractContext: ParentExtractContext | undefined =
         context?.contextData?.parentExtractContext;
+
+    // Batch mode: Opt+P / Ctrl+Opt+P over a multi-rem selection (e.g. several
+    // table rows). The sliders are seeded from the first rem, and on save the
+    // chosen values are applied to every target — see handleSave below.
+    const isBatchMode = context?.contextData?.batchMode === true;
+    const batchRemIds = useRunAsync(async () => {
+        if (!isBatchMode) return null;
+        return await plugin.storage.getSession<string[]>(batchPriorityTargetRemIdsKey);
+    }, [isBatchMode]);
+    const batchCount: number =
+        batchRemIds?.length ?? context?.contextData?.batchCount ?? 0;
+
+    // Composition of the selection, so the sections below reflect every target
+    // rather than just the first one.
+    const batchScan = useRunAsync(async () => {
+        if (!isBatchMode || !batchRemIds?.length) return null;
+        return await scanBatchTargets(plugin, batchRemIds);
+    }, [isBatchMode, batchRemIds]);
+
+    // In batch mode only the sliders the user actually moves are applied, so a
+    // bulk card-priority edit never pushes rem #1's IncRem value onto every
+    // other IncRem in the selection.
+    const incTouched = useRef(false);
+    const cardTouched = useRef(false);
 
     // 2. Ultra-Fast Data Fetching (O(1))
     // We only fetch the primitive values needed to render the sliders.
@@ -122,6 +148,20 @@ function PriorityLight() {
         };
     }, [context?.contextData?.remId]);
 
+    // Which sections apply. Single-rem: whatever this rem is. Batch: whatever
+    // ANY target in the selection is, so a mixed set offers both dimensions
+    // instead of mirroring rem #1. Declared here (not further down) because the
+    // focus, keyboard and save paths below all need the batch-aware value —
+    // gating any of them on data.hasIncPowerup would hide the Incremental
+    // section whenever the first selected rem happened to be a plain card.
+    const showIncSection = isBatchMode
+        ? (batchScan?.incCount ?? 0) > 0
+        : !!data?.hasIncPowerup;
+    // Match priority.tsx logic: only show Card section if has cards OR has cardPriority powerup
+    const showCardSection = isBatchMode
+        ? (batchScan?.cardCount ?? 0) > 0
+        : !!(data?.hasCards || data?.hasCardPowerup);
+
     // State
     const [incVal, setIncVal] = useState<number | null>(null);
     const [cardVal, setCardVal] = useState<number | null>(null);
@@ -142,13 +182,13 @@ function PriorityLight() {
     const incKeyboard = useAcceleratedKeyboardHandler(
         incVal,
         incVal ?? 50,
-        (val) => setIncVal(Math.max(0, Math.min(100, val)))
+        (val) => { incTouched.current = true; setIncVal(Math.max(0, Math.min(100, val))); }
     );
 
     const cardKeyboard = useAcceleratedKeyboardHandler(
         cardVal,
         cardVal ?? 50,
-        (val) => setCardVal(Math.max(0, Math.min(100, val)))
+        (val) => { cardTouched.current = true; setCardVal(Math.max(0, Math.min(100, val))); }
     );
 
     // Focus Logic
@@ -156,7 +196,7 @@ function PriorityLight() {
         if (!data) return;
         setTimeout(() => {
             // If we are showing the Inc section (it has powerup), try to focus it first
-            if (data.hasIncPowerup && incSliderRef.current) {
+            if (showIncSection && incSliderRef.current) {
                 incSliderRef.current.focus();
                 incSliderRef.current.select();
             } else if (cardSliderRef.current) {
@@ -165,7 +205,7 @@ function PriorityLight() {
                 cardSliderRef.current.select();
             }
         }, 50);
-    }, [!!data, data?.hasIncPowerup]); // Re-run if data loaded
+    }, [!!data, showIncSection]); // Re-run if data loaded
 
     // Save Handlers
     const handleSave = useCallback(async () => {
@@ -178,9 +218,34 @@ function PriorityLight() {
         const effectiveInc = data.hasIncPowerup ? (incVal ?? data.defaults.inc) : null;
         const incChanged = effectiveInc !== null && effectiveInc !== data.incPriority;
 
-        const showCardSection = data.hasCards || data.hasCardPowerup;
-        const effectiveCard = showCardSection ? (cardVal ?? data.defaults.card) : null;
+        const cardSectionForThisRem = data.hasCards || data.hasCardPowerup;
+        const effectiveCard = cardSectionForThisRem ? (cardVal ?? data.defaults.card) : null;
         const cardChanged = effectiveCard !== null && (effectiveCard !== data.cardPriority || !data.hasCardPowerup);
+
+        // --- Batch: hand the whole target list to the tracker and close ---
+        // Only dimensions the user actually adjusted are sent, and each is sent
+        // only if the selection contains rems it applies to. tracker.ts then
+        // routes per rem (IncRem slot vs card slot). The optimistic cache
+        // updates below are skipped: they are per-rem and we only hold loaded
+        // data for the first target, so the tracker refreshes caches as it writes.
+        if (isBatchMode && batchRemIds && batchRemIds.length > 1) {
+            const sendInc = incTouched.current && (batchScan?.incCount ?? 0) > 0;
+            const sendCard = cardTouched.current && (batchScan?.cardCount ?? 0) > 0;
+
+            if (sendInc || sendCard) {
+                plugin.storage.setSession(pendingPrioritySaveKey, {
+                    remIds: batchRemIds,
+                    incPriority: sendInc ? (incVal ?? data.defaults.inc) : null,
+                    cardPriority: sendCard ? (cardVal ?? data.defaults.card) : null,
+                    cardSource: 'manual',
+                    triggerCascade: true,
+                }).catch(console.error);
+                plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now()).catch(console.error);
+            }
+            plugin.storage.setSession(batchPriorityTargetRemIdsKey, null).catch(console.error);
+            plugin.widget.closePopup();
+            return;
+        }
 
         // --- Optimistic UI updates (sync session writes — safe in popup context) ---
         if (incChanged) {
@@ -226,7 +291,7 @@ function PriorityLight() {
         // ⚡ Close immediately — optimistic cache is already in place, DB writes happen in tracker.ts
         console.log(`[PriorityLight] handleSave total before closePopup: ${Math.round(performance.now() - tSave)}ms`);
         plugin.widget.closePopup();
-    }, [data, incVal, cardVal, plugin]);
+    }, [data, incVal, cardVal, plugin, isBatchMode, batchRemIds, batchScan]);
 
     // Tab cycling
     const handleTab = (e: React.KeyboardEvent) => {
@@ -235,7 +300,7 @@ function PriorityLight() {
         const active = document.activeElement;
 
         // If Inc is present, we might cycle. If not, Tab might just refocus Card or do nothing.
-        if (data?.hasIncPowerup) {
+        if (showIncSection) {
             if (active?.closest('[data-section="inc"]')) {
                 cardSliderRef.current?.focus();
                 cardSliderRef.current?.select();
@@ -252,8 +317,11 @@ function PriorityLight() {
 
     // React Error #310 fix: Move redirect side-effect to a top-level unconditional useEffect
     // This ensures hook order is consistent across renders
+    // Never redirect in batch mode: rem #1 may be a bare rem while other targets
+    // are cards or IncRems, and handing off to the single-rem popup would drop
+    // the rest of the selection.
     useEffect(() => {
-        if (data && !data.hasIncPowerup && !(data.hasCards || data.hasCardPowerup)) {
+        if (!isBatchMode && data && !data.hasIncPowerup && !(data.hasCards || data.hasCardPowerup)) {
             const redirect = async () => {
                 // Set session storage fallback so priority.tsx can find the remId
                 await plugin.storage.setSession('priorityPopupTargetRemId', data.rem._id);
@@ -264,7 +332,7 @@ function PriorityLight() {
             };
             redirect();
         }
-    }, [data, plugin]);
+    }, [data, plugin, isBatchMode]);
 
     if (!data) {
         return <div className="h-20 flex items-center justify-center text-sm">Loading...</div>;
@@ -273,13 +341,18 @@ function PriorityLight() {
     const currentInc = incVal ?? data.defaults.inc;
     const currentCard = cardVal ?? data.defaults.card;
 
-    // Match priority.tsx logic: only show Card section if has cards OR has cardPriority powerup
-    const showCardSection = data.hasCards || data.hasCardPowerup;
-    const showIncSection = data.hasIncPowerup;
-
     // If neither section can be shown, redirect to the main priority widget
     // which handles inheritance and complex priority cases
     if (!showIncSection && !showCardSection) {
+        if (isBatchMode) {
+            return (
+                <div className="h-20 flex items-center justify-center text-sm text-center px-4 opacity-70">
+                    {batchScan
+                        ? 'None of the selected rems are IncRems or have flashcards.'
+                        : 'Checking selection…'}
+                </div>
+            );
+        }
         // UI feedback only - side effect handled in useEffect above
         return <div className="h-20 flex items-center justify-center text-sm">Redirecting...</div>;
     }
@@ -300,13 +373,15 @@ function PriorityLight() {
                 }
             }}
             onKeyUp={() => {
-                if (data.hasIncPowerup) incKeyboard.handleKeyUp();
+                if (showIncSection) incKeyboard.handleKeyUp();
                 cardKeyboard.handleKeyUp();
             }}
         >
             <div className="flex flex-col mb-2">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold opacity-60 uppercase tracking-wide">Light Priority</h3>
+                    <h3 className="text-xs font-bold opacity-60 uppercase tracking-wide">
+                        {batchCount > 1 ? `Light Priority — ${batchCount} rems` : 'Light Priority'}
+                    </h3>
                     <button
                         className="text-xs opacity-50 hover:opacity-100 px-2"
                         onClick={() => plugin.widget.closePopup()}
@@ -321,7 +396,18 @@ function PriorityLight() {
                         {data.front}
                         {data.back && <span className="opacity-80"> → {data.back}</span>}
                     </span>
+                    {batchCount > 1 && (
+                        <span className="text-xs opacity-60"> and {batchCount - 1} more</span>
+                    )}
                 </div>
+                {batchCount > 1 && (
+                    <div className="mt-1 text-[10px] opacity-60 leading-snug">
+                        Only sliders you adjust are applied.
+                        {!!batchScan?.skippedCount && (
+                            <> {batchScan.skippedCount} rem{batchScan.skippedCount > 1 ? 's' : ''} skipped (no IncRem or cards).</>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Parent extract context — only shown for the "Create Cloze with Priority" flow */}
@@ -369,7 +455,7 @@ function PriorityLight() {
             )}
 
             {/* Incremental Rem Section - HIDDEN if not an Incremental Rem */}
-            {data.hasIncPowerup && (
+            {showIncSection && (
                 <div
                     className="flex flex-col gap-1"
                     data-section="inc"
@@ -377,12 +463,17 @@ function PriorityLight() {
                     <div className="flex justify-between text-xs font-semibold mb-1">
                         <span className="flex items-center gap-1">
                             <span>📖</span> Incremental
+                            {isBatchMode && batchScan && (
+                                <span className="text-[10px] font-normal opacity-70">
+                                    ({batchScan.incCount} of {batchScan.total})
+                                </span>
+                            )}
                         </span>
                     </div>
                     <PrioritySlider
                         ref={incSliderRef}
                         value={currentInc}
-                        onChange={(v) => { setIncVal(v); }}
+                        onChange={(v) => { incTouched.current = true; setIncVal(v); }}
                         useAbsoluteColoring={true}
                         onKeyDown={(e) => {
                             if (e.key === 'Tab') handleTab(e);
@@ -402,13 +493,19 @@ function PriorityLight() {
                     <div className="flex justify-between text-xs font-semibold mb-1">
                         <span className="flex items-center gap-1">
                             <span>🎴</span> Flashcard
-                            {!data.hasCardPowerup && <span className="text-[10px] font-normal opacity-70 italic">(Create)</span>}
+                            {isBatchMode && batchScan ? (
+                                <span className="text-[10px] font-normal opacity-70">
+                                    ({batchScan.cardCount} of {batchScan.total})
+                                </span>
+                            ) : (
+                                !data.hasCardPowerup && <span className="text-[10px] font-normal opacity-70 italic">(Create)</span>
+                            )}
                         </span>
                     </div>
                     <PrioritySlider
                         ref={cardSliderRef}
                         value={currentCard}
-                        onChange={(v) => { setCardVal(v); }}
+                        onChange={(v) => { cardTouched.current = true; setCardVal(v); }}
                         useAbsoluteColoring={true}
                         onKeyDown={(e) => {
                             if (e.key === 'Tab') handleTab(e);

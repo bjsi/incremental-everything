@@ -154,6 +154,11 @@ export const orphanRemIdsKey = 'orphan-rem-ids-key';
 // Pending priority save job: written by priority_light popup before closing,
 // picked up and executed by tracker.ts in the persistent index widget.
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
+// Rem ids a priority popup should apply to when opened in batch mode (Opt+P /
+// Ctrl+Opt+P over a multi-rem selection, e.g. several table rows). Written by the
+// command, read by priority.tsx / priority_light.tsx. Distinct from
+// batchPriorityIntervalRemIds, which is the post-extract IncRem-only flow.
+export const batchPriorityTargetRemIdsKey = 'batchPriorityTargetRemIds';
 // Pending card priority removal job: written by the Priority popup before closing,
 // picked up and executed by tracker.ts. Allows instant popup close per fire-and-forget philosophy.
 export const pendingCardPriorityRemovalKey = 'pendingCardPriorityRemoval';

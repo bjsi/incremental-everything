@@ -10,6 +10,7 @@ import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getPowerupSlotByCodeSafe } from '../lib/powerup_slot_compat';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getIncrementalRemFromRem, initIncrementalRem, IncrementalRem } from '../lib/incremental_rem';
+import { scanBatchTargets } from '../lib/priority_targets';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import {
   getCardPriority,
@@ -35,7 +36,8 @@ import {
   defaultPriorityId,
   defaultCardPriorityId,
   pendingPrioritySaveKey,
-  pendingCardPriorityRemovalKey
+  pendingCardPriorityRemovalKey,
+  batchPriorityTargetRemIdsKey
 } from '../lib/consts';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
@@ -91,6 +93,23 @@ function Priority() {
     const ctx = await plugin.widget.getWidgetContext<any>();
     return ctx;
   }, []);
+
+  // Batch mode: Opt+P over a multi-rem selection (e.g. several table rows).
+  // Sliders and percentile context are seeded from the first rem; saveAndClose
+  // applies the chosen values to every target.
+  const isBatchMode = widgetContext?.contextData?.batchMode === true;
+  const batchRemIds = useRunAsync(async () => {
+    if (!isBatchMode) return null;
+    return await plugin.storage.getSession<string[]>(batchPriorityTargetRemIdsKey);
+  }, [isBatchMode]);
+  const batchCount: number =
+    batchRemIds?.length ?? widgetContext?.contextData?.batchCount ?? 0;
+
+  // Composition of the selection, so the sections below reflect every target.
+  const batchScan = useRunAsync(async () => {
+    if (!isBatchMode || !batchRemIds?.length) return null;
+    return await scanBatchTargets(plugin, batchRemIds);
+  }, [isBatchMode, batchRemIds]);
 
   const rem = useTrackerPlugin(async (plugin) => {
     let remId = widgetContext?.contextData?.remId;
@@ -586,9 +605,16 @@ function Priority() {
   // Replaced by synchronous useMemo above to prevent "Blue Flash" flicker.
 
   // Event Handlers
-  const showIncSection = !!incRemInfo; // Converts to boolean - undefined/null become false
+  // In batch mode the sections reflect the WHOLE selection rather than the first
+  // rem, so a mixed set offers both dimensions instead of silently dropping
+  // whichever one rem #1 lacks. tracker.ts routes each value per rem.
+  const showIncSection = isBatchMode
+    ? (batchScan?.incCount ?? 0) > 0
+    : !!incRemInfo; // Converts to boolean - undefined/null become false
   // UPDATED: Only show card section if strictly has cards. If powerup exists but no cards, show Inheritance section.
-  const showCardSection = hasCards === true || (cardInfo && cardInfo.cardCount > 0);
+  const showCardSection = isBatchMode
+    ? (batchScan?.cardCount ?? 0) > 0
+    : hasCards === true || (cardInfo && cardInfo.cardCount > 0);
 
   const saveIncPriority = useCallback(async (priority: number) => {
     if (!rem) return;
@@ -748,14 +774,43 @@ function Priority() {
     }).catch(console.error);
   }, [rem, cardInfo, hasCardPriorityPowerup, saveCardPriority, plugin]);
 
+  // Hidden in batch mode: this section exists to set a rem up as an inheritance
+  // anchor, which a bulk edit should never do implicitly (and its state is read
+  // from rem #1 anyway, so it would misdescribe the rest of the selection).
   const showInheritanceSection =
-    (!showIncSection && !showCardSection) ||
-    (showIncSection && !hasCards && cardInfo?.source === 'manual') ||
-    showInheritanceForIncRem;
+    !isBatchMode &&
+    ((!showIncSection && !showCardSection) ||
+      (showIncSection && !hasCards && cardInfo?.source === 'manual') ||
+      showInheritanceForIncRem);
 
   const saveAndClose = useCallback(async (incP: number, cardP: number) => {
     if (!rem) return;
     isSaving.current = true;
+
+    // Batch returns early, before the single-rem optimistic saves below: those
+    // are closed over rem #1 and cannot help rems 2..N, and since the sections
+    // now reflect the whole selection they would write rem #1's cache for a
+    // dimension the user never adjusted. The tracker refreshes both caches for
+    // every rem it writes, rem #1 included.
+    if (isBatchMode && batchRemIds && batchRemIds.length > 1) {
+      // Only dimensions the user actually adjusted are sent, and only if the
+      // selection contains rems they apply to.
+      const sendInc = incIsDirty.current && (batchScan?.incCount ?? 0) > 0;
+      const sendCard = cardIsDirty.current && (batchScan?.cardCount ?? 0) > 0;
+
+      if (sendInc || sendCard) {
+        plugin.storage.setSession(pendingPrioritySaveKey, {
+          remIds: batchRemIds,
+          incPriority: sendInc ? incP : null,
+          cardPriority: sendCard ? cardP : null,
+          cardSource: 'manual',
+          triggerCascade: true,
+        }).catch(console.error);
+      }
+      plugin.storage.setSession(batchPriorityTargetRemIdsKey, null).catch(console.error);
+      plugin.widget.closePopup();
+      return;
+    }
 
     // Define what actually needs writing
     const incChanged = showIncSection && incP !== incRemInfo?.priority;
@@ -785,7 +840,7 @@ function Priority() {
 
     // Close immediately ("Fire and Forget")
     plugin.widget.closePopup();
-  }, [plugin, rem, incRemInfo, cardInfo, hasCardPriorityPowerup, showIncSection, showCardSection, showInheritanceSection, saveIncPriority, saveCardPriority]);
+  }, [plugin, rem, incRemInfo, cardInfo, hasCardPriorityPowerup, showIncSection, showCardSection, showInheritanceSection, saveIncPriority, saveCardPriority, isBatchMode, batchRemIds]);
 
   const handleConfirmAndClose = useCallback(async () => {
     const bothSectionsVisible = showIncSection && (showCardSection || showInheritanceSection);
@@ -1030,7 +1085,7 @@ function Priority() {
       <div className="flex items-center justify-between mb-1">
         <div className="flex flex-col overflow-hidden mr-2">
           <h2 className="text-base font-bold" style={{ color: 'var(--rn-clr-content-primary)' }}>
-            Priority Settings
+            {batchCount > 1 ? `Priority Settings — ${batchCount} rems` : 'Priority Settings'}
           </h2>
           <div className="mt-1 overflow-hidden text-ellipsis whitespace-nowrap" style={{ width: '100%' }} title={remContent ? `${remContent.front}${remContent.back ? ` → ${remContent.back}` : ''}` : ''}>
             {remContent && (
@@ -1039,7 +1094,17 @@ function Priority() {
                 {remContent.back && <span className="opacity-80"> → {remContent.back}</span>}
               </span>
             )}
+            {batchCount > 1 && (
+              <span className="text-xs opacity-60"> and {batchCount - 1} more</span>
+            )}
           </div>
+          {batchCount > 1 && (
+            <div className="mt-1 text-[10px] opacity-60 leading-snug">
+              Only sliders you adjust are applied
+              {batchScan && <> · {batchScan.incCount} IncRem{batchScan.incCount === 1 ? '' : 's'}, {batchScan.cardCount} with cards</>}
+              {!!batchScan?.skippedCount && <> · {batchScan.skippedCount} skipped</>}
+            </div>
+          )}
         </div>
         <button
           onClick={() => plugin.widget.closePopup()}

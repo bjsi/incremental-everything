@@ -197,11 +197,13 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   let prioritySaveRunning = false;
   plugin.track(async (rp) => {
     const job = await rp.storage.getSession<{
-      remId: string;
+      remId?: string;
+      /** Batch form (Opt+P / Ctrl+Opt+P over a multi-rem selection). */
+      remIds?: string[];
       incPriority: number | null;
       cardPriority: number | null;
       cardSource: string;
-      needsAddPowerup: boolean;
+      needsAddPowerup?: boolean;
       triggerCascade: boolean;
     }>(pendingPrioritySaveKey);
 
@@ -215,9 +217,95 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     incRemBatchActive = true;
     await plugin.storage.setSession('plugin_operation_active', true);
 
+    // Batch form: the chosen priorities applied across a multi-rem selection,
+    // routed per rem by what that rem already is — mirroring which sections the
+    // single-rem popup would have shown for it:
+    //   has Incremental powerup        -> IncRem priority slot
+    //   has cards / cardPriority tag   -> card priority slot
+    //   neither                        -> skipped
+    // Two deliberate differences from the single-rem popup: an IncRem with no
+    // cards gets ONLY the IncRem slot (tagging it cardPriority would add a slot
+    // it does not need and put the value in the wrong place), and a bare rem is
+    // never tagged cardPriority just to act as an inheritance anchor. Bulk edits
+    // should not create powerups the user did not ask for; the single-rem popup
+    // remains the place to set up an inheritance anchor deliberately.
+    if (job.remIds?.length) {
+      console.log(`[Tracker] pendingPrioritySave (batch) picked up for ${job.remIds.length} rems`);
+      const cascadeRemIds: string[] = [];
+      try {
+        const { setCardPriority } = await import('../lib/card_priority');
+        const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
+        const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
+        const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
+
+        for (const remId of job.remIds) {
+          const rem = await plugin.rem.findOne(remId);
+          if (!rem) {
+            console.warn('[Tracker] pendingPrioritySave (batch): rem not found', remId);
+            continue;
+          }
+
+          const [hasIncPowerup, hasCardPowerup] = await Promise.all([
+            rem.hasPowerup(powerupCode),
+            rem.hasPowerup('cardPriority'),
+          ]);
+
+          if (job.incPriority !== null && hasIncPowerup) {
+            await rem.setPowerupProperty(powerupCode, 'priority', [job.incPriority.toString()]);
+            const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
+            if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
+            cascadeRemIds.push(remId);
+          }
+
+          // Only rems that already carry the powerup, or that have real cards to
+          // prioritise, are card targets. The powerup is still added for a card
+          // rem seeing its first assignment — that is the value's home, not an
+          // inheritance anchor.
+          const isCardTarget =
+            hasCardPowerup || (job.cardPriority !== null && (await rem.getCards()).length > 0);
+
+          if (job.cardPriority !== null && isCardTarget) {
+            if (!hasCardPowerup) {
+              await rem.addPowerup('cardPriority');
+            }
+            await setCardPriority(plugin as any, rem, job.cardPriority, job.cardSource as any, true);
+            updateCardPriorityCache(plugin as any, rem._id, true, {
+              remId: rem._id,
+              priority: job.cardPriority,
+              source: job.cardSource,
+            } as any);
+            cascadeRemIds.push(remId);
+          }
+        }
+
+        await flushCacheUpdatesNow(plugin as any);
+
+        if (job.triggerCascade && cascadeRemIds.length) {
+          const isLight = await shouldUseLightMode(plugin as any);
+          if (!isLight) {
+            // The cascade watcher accepts an array, so all touched rems cascade
+            // in one pass rather than the last one winning.
+            await plugin.storage.setSession(
+              'pendingInheritanceCascade',
+              Array.from(new Set(cascadeRemIds))
+            );
+          }
+        }
+
+        console.log(`[Tracker] pendingPrioritySave (batch) complete for ${job.remIds.length} rems`);
+      } catch (err) {
+        console.error('[Tracker] pendingPrioritySave (batch) failed:', err);
+      } finally {
+        prioritySaveRunning = false;
+        incRemBatchActive = false;
+        await plugin.storage.setSession('plugin_operation_active', false);
+      }
+      return;
+    }
+
     console.log('[Tracker] pendingPrioritySave picked up for remId:', job.remId);
     try {
-      const rem = await plugin.rem.findOne(job.remId);
+      const rem = job.remId ? await plugin.rem.findOne(job.remId) : undefined;
       if (!rem) {
         console.warn('[Tracker] pendingPrioritySave: rem not found', job.remId);
         return;

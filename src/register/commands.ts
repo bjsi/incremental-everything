@@ -116,7 +116,31 @@ import {
   breakInlineListToChildren,
   restoreListRem,
 } from '../lib/listify';
+import { resolvePriorityTargets } from '../lib/priority_targets';
+import { batchPriorityTargetRemIdsKey } from '../lib/consts';
 
+// Opens a priority popup against one or many rems. Single-rem calls behave
+// exactly as before; multi-rem calls hand the full id list to the widget through
+// session storage (openPopup's contextData is not a reliable place for arrays
+// the widget re-reads across renders) and flag batchMode so it applies to all.
+async function openPriorityPopupForTargets(
+  plugin: ReactRNPlugin,
+  widgetId: 'priority' | 'priority_light',
+  remIds: string[]
+) {
+  // Clear stale targets first so a widget that mounts mid-write can never read
+  // the previous command's selection.
+  await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+  await plugin.storage.setSession(
+    batchPriorityTargetRemIdsKey,
+    remIds.length > 1 ? remIds : null
+  );
+
+  await plugin.widget.openPopup(widgetId, {
+    remId: remIds[0],
+    ...(remIds.length > 1 ? { batchMode: true, batchCount: remIds.length } : {}),
+  });
+}
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   // Subscribe to EditorSelectionChanged so getEffectiveSelection() can recover
@@ -879,76 +903,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'pri',
     action: async () => {
       console.log('--- Set Priority Command Triggered ---');
-      let remId: string | undefined;
-      const url = await plugin.window.getURL();
-      console.log('Current URL:', url);
+      const { remIds, source } = await resolvePriorityTargets(plugin);
+      console.log(`Set Priority targets: ${remIds.length} rem(s) from ${source}`);
 
-      // Check if we are in the queue AND targeting the flashcard explicitly
-      if (url.includes('/flashcards')) {
-        console.log('In flashcards view.');
-        const currentQueueItem = await plugin.queue.getCurrentCard();
-        const sel = await plugin.editor.getSelection();
-        const selType = sel?.type;
-
-        let isTargetingQueueContext = false;
-
-        // If no editor selection, we assume queue context
-        if (!selType) {
-          isTargetingQueueContext = true;
-        } else if (currentQueueItem) { // We have a native card AND a selection
-          if (selType === SelectionType.Rem && sel.remIds.includes(currentQueueItem.remId)) {
-            isTargetingQueueContext = true;
-          } else if (selType === SelectionType.Text && sel.remId === currentQueueItem.remId) {
-            isTargetingQueueContext = true;
-          }
-        } else {
-          // No current native card, maybe our Incremental Rem view
-          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-          if (currentIncRemId) {
-            if (selType === SelectionType.Rem && sel.remIds.includes(currentIncRemId)) {
-              isTargetingQueueContext = true;
-            } else if (selType === SelectionType.Text && sel.remId === currentIncRemId) {
-              isTargetingQueueContext = true;
-            }
-          }
-        }
-
-        if (isTargetingQueueContext) {
-          if (currentQueueItem) {
-            remId = currentQueueItem.remId;
-            console.log('Found native card. remId:', remId);
-          } else {
-            console.log('Not a native card. Checking session storage for incremental rem...');
-            remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
-            console.log('remId from session storage (currentIncRemKey):', remId);
-          }
-        } else {
-          console.log('In flashcards view, but explicit selection detected. Using selection.');
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
-            remId = (sel as any).remIds[0];
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
-            remId = (sel as any).remId;
-          }
-        }
-      } else {
-        console.log('Not in flashcards view. Getting focused editor rem.');
-        const focusedRem = await plugin.focus.getFocusedRem();
-        remId = focusedRem?._id;
-        console.log('Focused editor remId:', remId);
-      }
-
-      console.log('Final remId to be used:', remId);
-
-      if (!remId) {
-        console.log('Set Priority: No focused Rem or card in queue found. Aborting.');
+      if (!remIds.length) {
+        console.log('Set Priority: No selection, focused Rem or card in queue found. Aborting.');
         await plugin.app.toast('Could not find a Rem to set priority for.');
         return;
       }
 
-      console.log(`Opening 'priority' popup for remId: ${remId}`);
-      await plugin.widget.openPopup('priority', {
-        remId: remId,
-      });
+      await openPriorityPopupForTargets(plugin, 'priority', remIds);
     },
   });
 
@@ -962,68 +926,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async () => {
       const tCmd = performance.now();
       console.log('[set-priority-light] Command triggered');
-      let remId: string | undefined;
-      const url = await plugin.window.getURL();
 
-      // Context detection logic (Same as main command)
-      if (url.includes('/flashcards')) {
-        const currentQueueItem = await plugin.queue.getCurrentCard();
-        const sel = await plugin.editor.getSelection();
-        const selType = sel?.type;
+      const { remIds, source } = await resolvePriorityTargets(plugin);
+      console.log(
+        `[set-priority-light] context detection done: ${Math.round(performance.now() - tCmd)}ms, ` +
+        `${remIds.length} rem(s) from ${source}`
+      );
 
-        let isTargetingQueueContext = false;
-
-        if (!selType) {
-          isTargetingQueueContext = true;
-        } else if (currentQueueItem) {
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentQueueItem.remId)) {
-            isTargetingQueueContext = true;
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentQueueItem.remId) {
-            isTargetingQueueContext = true;
-          }
-        } else {
-          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-          if (currentIncRemId) {
-            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
-              isTargetingQueueContext = true;
-            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
-              isTargetingQueueContext = true;
-            }
-          }
-        }
-
-        if (isTargetingQueueContext) {
-          if (currentQueueItem) {
-            remId = currentQueueItem.remId;
-          } else {
-            remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
-          }
-        } else {
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
-            remId = sel.remIds[0];
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
-            remId = sel.remId;
-          }
-        }
-      } else {
-        const focusedRem = await plugin.focus.getFocusedRem();
-        remId = focusedRem?._id;
-      }
-
-      console.log(`[set-priority-light] context detection done: ${Math.round(performance.now() - tCmd)}ms, remId: ${remId}`);
-
-      if (!remId) {
+      if (!remIds.length) {
         await plugin.app.toast('No Rem found to set priority.');
         return;
       }
 
-      // Clear stale session storage to prevent race condition with widget context
-      await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
-      console.log(`[set-priority-light] session cleared: ${Math.round(performance.now() - tCmd)}ms`);
-
-      await plugin.widget.openPopup('priority_light', {
-        remId: remId,
-      });
+      await openPriorityPopupForTargets(plugin, 'priority_light', remIds);
       console.log(`[set-priority-light] openPopup returned: ${Math.round(performance.now() - tCmd)}ms`);
     },
   });
