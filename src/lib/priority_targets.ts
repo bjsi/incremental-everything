@@ -44,7 +44,32 @@ export type BatchTargetScan = {
    */
   incSeed: number | null;
   cardSeed: number | null;
+  /**
+   * Spread of the current values behind each seed, so the popup can say the
+   * targets disagree rather than presenting an average as if it were everyone's
+   * value. `mixed` is false when every valued target already shares one number.
+   */
+  incSpread: PrioritySpread | null;
+  cardSpread: PrioritySpread | null;
 };
+
+export type PrioritySpread = {
+  min: number;
+  max: number;
+  mixed: boolean;
+};
+
+function mean(values: number[]): number | null {
+  if (!values.length) return null;
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+}
+
+function spread(values: number[]): PrioritySpread | null {
+  if (!values.length) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return { min, max, mixed: min !== max };
+}
 
 // Classifies a batch selection so the popup can show the Inc section when ANY
 // target is an IncRem and the Card section when ANY target has cards — rather
@@ -59,10 +84,8 @@ export async function scanBatchTargets(
   let incCount = 0;
   let cardCount = 0;
   let skippedCount = 0;
-  let incSum = 0;
-  let incValued = 0;
-  let cardSum = 0;
-  let cardValued = 0;
+  const incValues: number[] = [];
+  const cardValues: number[] = [];
 
   for (const remId of sample) {
     const rem = await plugin.rem.findOne(remId);
@@ -80,10 +103,7 @@ export async function scanBatchTargets(
       incCount++;
       const raw = await rem.getPowerupProperty(powerupCode, prioritySlotCode);
       const value = raw ? parseInt(raw, 10) : NaN;
-      if (!isNaN(value)) {
-        incSum += value;
-        incValued++;
-      }
+      if (!isNaN(value)) incValues.push(value);
     }
 
     if (isCard) {
@@ -91,10 +111,7 @@ export async function scanBatchTargets(
       // Resolved value (own or inherited) — the number the badges show, which
       // is what the user is averaging in their head when they select rows.
       const value = await getCardPriorityValue(plugin as any, rem);
-      if (typeof value === 'number' && !isNaN(value)) {
-        cardSum += value;
-        cardValued++;
-      }
+      if (typeof value === 'number' && !isNaN(value)) cardValues.push(value);
     }
 
     if (!isInc && !isCard) skippedCount++;
@@ -106,8 +123,10 @@ export async function scanBatchTargets(
     skippedCount,
     total: remIds.length,
     capped: remIds.length > BATCH_SCAN_CAP,
-    incSeed: incValued ? Math.round(incSum / incValued) : null,
-    cardSeed: cardValued ? Math.round(cardSum / cardValued) : null,
+    incSeed: mean(incValues),
+    cardSeed: mean(cardValues),
+    incSpread: spread(incValues),
+    cardSpread: spread(cardValues),
   };
 }
 

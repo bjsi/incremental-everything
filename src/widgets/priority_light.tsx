@@ -476,7 +476,10 @@ function PriorityLight() {
                             <span>📖</span> Incremental
                             {isBatchMode && batchScan && (
                                 <span className="text-[10px] font-normal opacity-70">
-                                    ({batchScan.incCount} of {batchScan.total})
+                                    ({batchScan.incCount} of {batchScan.total}
+                                    {batchScan.incSpread?.mixed
+                                        ? ` · mixed ${batchScan.incSpread.min}–${batchScan.incSpread.max}, avg ${batchScan.incSeed}`
+                                        : ''})
                                 </span>
                             )}
                         </span>
@@ -506,7 +509,10 @@ function PriorityLight() {
                             <span>🎴</span> Flashcard
                             {isBatchMode && batchScan ? (
                                 <span className="text-[10px] font-normal opacity-70">
-                                    ({batchScan.cardCount} of {batchScan.total})
+                                    ({batchScan.cardCount} of {batchScan.total}
+                                    {batchScan.cardSpread?.mixed
+                                        ? ` · mixed ${batchScan.cardSpread.min}–${batchScan.cardSpread.max}, avg ${batchScan.cardSeed}`
+                                        : ''})
                                 </span>
                             ) : (
                                 !data.hasCardPowerup && <span className="text-[10px] font-normal opacity-70 italic">(Create)</span>

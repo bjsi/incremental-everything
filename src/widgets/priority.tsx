@@ -1117,6 +1117,14 @@ function Priority() {
               Only sliders you adjust are applied
               {batchScan && <> · {batchScan.incCount} IncRem{batchScan.incCount === 1 ? '' : 's'}, {batchScan.cardCount} with cards</>}
               {!!batchScan?.skippedCount && <> · {batchScan.skippedCount} skipped</>}
+              {/* Sliders open on the class average; say so when the targets disagree,
+                  rather than letting an average read as everyone's current value. */}
+              {batchScan?.incSpread?.mixed && (
+                <> · IncRem mixed {batchScan.incSpread.min}–{batchScan.incSpread.max} (avg {batchScan.incSeed})</>
+              )}
+              {batchScan?.cardSpread?.mixed && (
+                <> · Cards mixed {batchScan.cardSpread.min}–{batchScan.cardSpread.max} (avg {batchScan.cardSeed})</>
+              )}
             </div>
           )}
         </div>
