@@ -27,6 +27,13 @@ import { CARD_PRIORITY_CODE, PRIORITY_SLOT } from './card_priority/types';
 export const BAND_COUNT = 10;
 
 /**
+ * How often the bulk operations log progress to the console. Separate from the
+ * write batch size below: batching controls how many writes are in flight,
+ * this only controls how chatty the console is.
+ */
+export const PROGRESS_LOG_INTERVAL = 250;
+
+/**
  * Shared by the powerup name, the data-rem-tags slug and the tag-bar hide rule —
  * all three must agree or the badge silently stops matching.
  */
@@ -277,10 +284,16 @@ export async function removeAllPriorityBands(plugin: RNPlugin): Promise<number> 
         })
       );
 
+      const prev = done;
       done += batch.length;
-      // Console every batch so progress is visible even when toasts are
+      // Console at a fixed interval so progress is visible even when toasts are
       // throttled; toast only every 10% so a long run does not spam them.
-      console.log(`[PriorityBands] ${done}/${total} band tags removed`);
+      if (
+        Math.floor(prev / PROGRESS_LOG_INTERVAL) !== Math.floor(done / PROGRESS_LOG_INTERVAL) ||
+        done === total
+      ) {
+        console.log(`[PriorityBands] ${done}/${total} band tags removed`);
+      }
       const pct = Math.floor((done / total) * 100);
       if (pct >= lastToastPct + 10 && done < total) {
         lastToastPct = pct - (pct % 10);
@@ -304,8 +317,9 @@ export async function removeAllPriorityBands(plugin: RNPlugin): Promise<number> 
 /**
  * syncPriorityBand over many rems, skipping ids that no longer resolve.
  *
- * `onProgress` fires every 50 rems so a KB-wide refresh can report progress
- * rather than looking hung — the same cadence removeAllPriorityBands uses.
+ * `onProgress` fires every PROGRESS_LOG_INTERVAL rems so a KB-wide refresh can
+ * report progress rather than looking hung — the cadence removeAllPriorityBands
+ * also uses.
  */
 export async function syncPriorityBands(
   plugin: RNPlugin,
@@ -324,7 +338,7 @@ export async function syncPriorityBands(
       }
     }
     done++;
-    if (onProgress && (done % 50 === 0 || done === remIds.length)) {
+    if (onProgress && (done % PROGRESS_LOG_INTERVAL === 0 || done === remIds.length)) {
       onProgress(done, remIds.length, changed);
     }
   }
