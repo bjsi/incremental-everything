@@ -153,6 +153,8 @@ export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
 export const orphanRemIdsKey = 'orphan-rem-ids-key';
 // Pending priority save job: written by priority_light popup before closing,
 // picked up and executed by tracker.ts in the persistent index widget.
+// Setting id AND registerCSS id for the table-cell priority badges.
+export const showPriorityBandsInTablesId = 'showPriorityBandsInTables';
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
 // Rem ids a priority popup should apply to when opened in batch mode (Opt+P /
 // Ctrl+Opt+P over a multi-rem selection, e.g. several table rows). Written by the

@@ -2,6 +2,7 @@ import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
 import { buildComprehensiveScope } from '../scope_helpers';
 import { findClosestAncestorWithAnyPriority } from '../priority_inheritance';
+import { syncPriorityBand } from '../priority_bands';
 import dayjs from 'dayjs';
 import {
   allCardPriorityInfoKey,
@@ -167,6 +168,17 @@ export async function setCardPriority(
     rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]),
     rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()])
   ]);
+
+  // Keep the table-cell badge in step. Static import: a dynamic import() here
+  // emits a chunk the RemNote index sandbox cannot evaluate ("Cannot use
+  // 'import.meta' outside a module"). priority_bands only pulls constants from
+  // card_priority/types, so there is no cycle to dodge. syncPriorityBand writes
+  // nothing when the band is already correct, so this cannot loop.
+  try {
+    await syncPriorityBand(plugin, rem);
+  } catch (err) {
+    console.error('[CardPriority] band sync failed', err);
+  }
 }
 
 /**

@@ -20,6 +20,7 @@ import {
   videoExtractEndSlotCode,
 } from '../lib/consts';
 import { initIncrementalRem } from '../lib/incremental_rem';
+import { BAND_COUNT, bandPowerupCode, bandPowerupName } from '../lib/priority_bands';
 
 // Re-export for backwards compatibility
 export { initIncrementalRem };
@@ -168,4 +169,17 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
       ],
     },
   });
+
+  // Priority band powerups — one per band of ten. These exist purely as CSS
+  // hooks: RemNote puts powerup slugs in `data-rem-tags` on the rem span, and
+  // that attribute is the ONLY channel that reaches inside a table cell, where
+  // no plugin widget can render. See lib/priority_bands.ts.
+  for (let band = 0; band < BAND_COUNT; band++) {
+    await plugin.app.registerPowerup({
+      name: bandPowerupName(band),
+      code: bandPowerupCode(band),
+      description: `Priority ${band * 10}–${band * 10 + 9} — used to draw the table-cell priority badge. Managed automatically.`,
+      options: { slots: [] },
+    });
+  }
 }

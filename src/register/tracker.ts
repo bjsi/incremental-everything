@@ -1,5 +1,6 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { syncPriorityBand } from '../lib/priority_bands';
 import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -252,6 +253,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
           if (job.incPriority !== null && hasIncPowerup) {
             await rem.setPowerupProperty(powerupCode, 'priority', [job.incPriority.toString()]);
+            await syncPriorityBand(plugin as any, rem);
             const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
             if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
             cascadeRemIds.push(remId);
@@ -314,6 +316,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       // 1. IncRem priority write
       if (job.incPriority !== null) {
         await rem.setPowerupProperty(powerupCode, 'priority', [job.incPriority.toString()]);
+        await syncPriorityBand(plugin as any, rem);
         const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
         const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
         const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
@@ -627,6 +630,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
             const newP = Math.max(0, Math.min(100, oldP + agg.incDelta));
             if (oldP !== newP) {
               await rem.setPowerupProperty(powerupCode, 'priority', [newP.toString()]);
+              await syncPriorityBand(plugin as any, rem);
               const updated = await getIncrementalRemFromRem(plugin as any, rem);
               if (updated) await updateIncrementalRemCache(plugin as any, updated);
               messages.push(`IncRem ${oldP} → ${newP}`);

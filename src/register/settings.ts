@@ -20,7 +20,10 @@ import {
   displayWeightedShieldId,
   autoFocusQueueDashboardId,
   enableHideInQueueIntegrationId,
+  showPriorityBandsInTablesId,
 } from '../lib/consts';
+import { buildPriorityBandCSS, PRIORITY_BAND_TAG_HIDE_CSS } from '../lib/priority_bands';
+import { percentileToHslColor } from '../lib/utils';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
 const HIDE_CARD_PRIORITY_CSS = `
@@ -325,6 +328,33 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   const shouldShowLeftBorderForIncRems = await plugin.settings.getSetting('showLeftBorderForIncRems');
   if (shouldShowLeftBorderForIncRems) {
     await plugin.app.registerCSS(showLeftBorderForIncRemsId, SHOW_LEFT_BORDER_CSS);
+  }
+
+  // Table-cell priority badges. RemNote renders no plugin widget inside a table
+  // cell, so `priority_editor` cannot follow the user into a table; this CSS
+  // draws a badge from the band powerup tags instead. See lib/priority_bands.ts.
+  //
+  // Registered here because registerPluginSettings runs from onActivate in
+  // widgets/index.tsx — registerCSS is index-only and silently no-ops elsewhere.
+  // Like the border/indicator toggles above, taking effect needs a reload.
+  plugin.settings.registerBooleanSetting({
+    id: showPriorityBandsInTablesId,
+    title: 'Show Priority Badges in Table Cells',
+    description:
+      'Tables are the one place the priority editor cannot render. Shows a coloured band badge (e.g. "70s") in the top-right of each table cell. Run "Refresh Priority Badges" once to fill in existing rems. Takes effect after a reload.',
+    defaultValue: true,
+  });
+
+  // Unconditional: the band tags are an implementation detail, so their tag-bar
+  // chips stay hidden even when the badges themselves are switched off.
+  await plugin.app.registerCSS('priority-band-tag-hide', PRIORITY_BAND_TAG_HIDE_CSS);
+
+  const shouldShowPriorityBands = await plugin.settings.getSetting(showPriorityBandsInTablesId);
+  if (shouldShowPriorityBands) {
+    await plugin.app.registerCSS(
+      showPriorityBandsInTablesId,
+      buildPriorityBandCSS((band) => percentileToHslColor(band * 10 + 5))
+    );
   }
 
   // Dismissed Rems settings
