@@ -119,7 +119,7 @@ import {
 import { resolvePriorityTargets } from '../lib/priority_targets';
 // Static, not dynamic: any chunk a dynamic import() emits here is evaluated by
 // the RemNote index sandbox as a classic script and dies on `import.meta`.
-import { syncPriorityBands, removeAllPriorityBands } from '../lib/priority_bands';
+import { syncPriorityBands, removeAllPriorityBands, clearBandEligibilityCache } from '../lib/priority_bands';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { batchPriorityTargetRemIdsKey } from '../lib/consts';
 
@@ -1394,6 +1394,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       'Recomputes the band tag that draws the priority badge inside table cells, for every IncRem and every rem with a card priority.',
     action: async () => {
       console.log('[PriorityBands] Refresh started');
+      // Tag definitions may have changed since the cache was filled.
+      clearBandEligibilityCache();
       await plugin.app.toast('Refreshing priority badges…');
       const t0 = performance.now();
       try {

@@ -99,6 +99,67 @@ export async function effectivePriorityForBadge(
   return isNaN(value) ? null : value;
 }
 
+// --- Eligibility -----------------------------------------------------------
+//
+// A band only earns its keep if the rem can actually appear as a table row, and
+// a RemNote table is a view over rems sharing a tag, with that tag's slots as
+// columns. So a rem is eligible when it carries at least one NON-powerup tag
+// that defines slots. Without this filter every card and extract in the KB gets
+// a synced powerup write — tens of thousands in a large KB, nearly all of them
+// for rems that will never be seen in a table.
+//
+// Known limitation: a table built from a document/portal view rather than a tag
+// gets no badges, because there is no tag to key on.
+
+const tagHasSlotsCache = new Map<string, boolean>();
+
+/** Tag definitions change rarely; call this before a full refresh to re-read them. */
+export function clearBandEligibilityCache(): void {
+  tagHasSlotsCache.clear();
+}
+
+async function tagDefinesSlots(tag: PluginRem): Promise<boolean> {
+  const cached = tagHasSlotsCache.get(tag._id);
+  if (cached !== undefined) return cached;
+
+  let has = false;
+  try {
+    for (const child of await tag.getChildrenRem()) {
+      if (await child.isSlot()) {
+        has = true;
+        break;
+      }
+    }
+  } catch (err) {
+    console.error('[PriorityBands] slot check failed for tag', tag._id, err);
+  }
+  tagHasSlotsCache.set(tag._id, has);
+  return has;
+}
+
+/**
+ * Whether this rem could ever be rendered as a table row — the only place the
+ * badge is visible. Cheap by design: one getTagRems() plus cached per-tag
+ * lookups, so it can gate the expensive powerup reads and writes below.
+ */
+export async function isBandEligible(rem: PluginRem): Promise<boolean> {
+  let tags: PluginRem[] = [];
+  try {
+    tags = (await rem.getTagRems()) as PluginRem[];
+  } catch (err) {
+    console.error('[PriorityBands] getTagRems failed for', rem._id, err);
+    return false;
+  }
+
+  for (const tag of tags) {
+    // Our own powerups (Incremental, CardPriority, the bands themselves) are not
+    // evidence of anything: they sit on nearly every rem the plugin touches.
+    if (await tag.isPowerup()) continue;
+    if (await tagDefinesSlots(tag)) return true;
+  }
+  return false;
+}
+
 /**
  * Brings a rem's band tag in line with its current priority.
  *
@@ -113,6 +174,10 @@ export async function syncPriorityBand(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<boolean> {
+  // Gate first: this returns for the large majority of rems in a big KB, before
+  // any of the ten hasPowerup reads below, let alone a write.
+  if (!(await isBandEligible(rem))) return false;
+
   const priority = await effectivePriorityForBadge(plugin, rem);
   const desired = priority === null ? null : bandForPriority(priority);
 
@@ -161,58 +226,72 @@ export async function removeAllPriorityBands(plugin: RNPlugin): Promise<number> 
     return 0;
   }
 
+  console.log('[PriorityBands] Removal started');
   await plugin.app.toast('Removing priority band tags…');
   // Suppress GlobalRemChanged listener during bulk writes, as the CardPriority
   // cleanup does — this touches every banded rem in the KB.
   await plugin.storage.setSession('plugin_operation_active', true);
 
   try {
-    // Collect per band: a rem should only ever carry one, but a crash between
-    // remove and add could leave two, and this must clean up regardless.
-    const tagged = new Map<string, PluginRem>();
+    // Enumerate per band and remove THAT band from THAT powerup's tagged rems.
+    // Walking rems and testing all ten bands each would cost ~10 reads per rem
+    // before any write; the tagged lists already tell us exactly which pairs
+    // exist, which is roughly a tenth of the calls.
+    const pairs: Array<{ rem: PluginRem; band: number }> = [];
+    const uniqueRems = new Set<string>();
     for (let band = 0; band < BAND_COUNT; band++) {
       const powerup = await plugin.powerup.getPowerupByCode(bandPowerupCode(band));
-      for (const rem of (await powerup?.taggedRem()) || []) {
-        tagged.set(rem._id, rem);
+      const tagged = (await powerup?.taggedRem()) || [];
+      for (const rem of tagged) {
+        pairs.push({ rem: rem as PluginRem, band });
+        uniqueRems.add(rem._id);
+      }
+      if (tagged.length) {
+        console.log(`[PriorityBands] band ${band} (${bandLabel(band)}): ${tagged.length} rems`);
       }
     }
 
-    const rems = [...tagged.values()];
-    if (!rems.length) {
+    if (!pairs.length) {
+      console.log('[PriorityBands] Removal complete — no band tags found');
       await plugin.app.toast('No priority band tags found to remove');
       return 0;
     }
 
-    let removed = 0;
-    const total = rems.length;
-    const batchSize = 50;
-    console.log(`[PriorityBands] removing bands from ${total} rems...`);
+    const total = pairs.length;
+    console.log(`[PriorityBands] Removing ${total} band tags across ${uniqueRems.size} rems...`);
+    await plugin.app.toast(`Removing ${total} band tags from ${uniqueRems.size} rems…`);
 
-    for (let i = 0; i < rems.length; i += batchSize) {
-      const batch = rems.slice(i, i + batchSize);
+    let done = 0;
+    let lastToastPct = 0;
+    const batchSize = 50;
+
+    for (let i = 0; i < pairs.length; i += batchSize) {
+      const batch = pairs.slice(i, i + batchSize);
       await Promise.all(
-        batch.map(async (rem) => {
-          for (let band = 0; band < BAND_COUNT; band++) {
-            try {
-              if (await rem.hasPowerup(bandPowerupCode(band))) {
-                await rem.removePowerup(bandPowerupCode(band));
-              }
-            } catch (e) {
-              console.log(`[PriorityBands] could not remove band ${band} from ${rem._id}:`, e);
-            }
+        batch.map(async ({ rem, band }) => {
+          try {
+            await rem.removePowerup(bandPowerupCode(band));
+          } catch (e) {
+            console.log(`[PriorityBands] could not remove band ${band} from ${rem._id}:`, e);
           }
         })
       );
 
-      removed += batch.length;
-      const progress = Math.round((removed / total) * 100);
-      if (progress % 10 === 0 || removed === total) {
-        await plugin.app.toast(`Band cleanup: ${progress}% (${removed}/${total})`);
+      done += batch.length;
+      // Console every batch so progress is visible even when toasts are
+      // throttled; toast only every 10% so a long run does not spam them.
+      console.log(`[PriorityBands] ${done}/${total} band tags removed`);
+      const pct = Math.floor((done / total) * 100);
+      if (pct >= lastToastPct + 10 && done < total) {
+        lastToastPct = pct - (pct % 10);
+        await plugin.app.toast(`Band cleanup: ${lastToastPct}% (${done}/${total})`);
       }
     }
 
-    await plugin.app.toast(`Removed priority band tags from ${total} rems.`);
-    return total;
+    const summary = `Priority band tags removed: ${total} tags across ${uniqueRems.size} rems.`;
+    console.log(`[PriorityBands] ✅ ${summary}`);
+    await plugin.app.toast(`✅ ${summary}`);
+    return uniqueRems.size;
   } catch (err) {
     console.error('[PriorityBands] removal failed', err);
     await plugin.app.toast('Removing priority band tags failed — see console.');
