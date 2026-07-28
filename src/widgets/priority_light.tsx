@@ -166,17 +166,28 @@ function PriorityLight() {
     const [incVal, setIncVal] = useState<number | null>(null);
     const [cardVal, setCardVal] = useState<number | null>(null);
 
-    // Sync State with Data (only if not saving/dirty)
+    // Sync State with Data (only if not saving/dirty).
+    // In batch mode the seed is the mean current priority of each class across
+    // the whole selection, not rem #1's value — which would otherwise be the
+    // default (50) for any dimension rem #1 happens to lack.
     useEffect(() => {
+        // Wait for the scan in batch mode: it resolves after `data`, and seeding
+        // the defaults first would leave the sliders non-null, so the averages
+        // below would never be applied.
+        if (isBatchMode && !batchScan) return;
+
         if (data && !isSaving.current) {
-            if (incVal === null && data.incPriority !== null) setIncVal(data.incPriority);
-            if (cardVal === null && data.cardPriority !== null) setCardVal(data.cardPriority);
+            const incSeed = isBatchMode ? batchScan?.incSeed ?? null : data.incPriority;
+            const cardSeed = isBatchMode ? batchScan?.cardSeed ?? null : data.cardPriority;
+
+            if (incVal === null && incSeed !== null) setIncVal(incSeed);
+            if (cardVal === null && cardSeed !== null) setCardVal(cardSeed);
 
             // If null, set defaults for the slider visual (but don't save yet)
-            if (incVal === null && data.incPriority === null) setIncVal(data.defaults.inc);
-            if (cardVal === null && data.cardPriority === null) setCardVal(data.defaults.card);
+            if (incVal === null && incSeed === null) setIncVal(data.defaults.inc);
+            if (cardVal === null && cardSeed === null) setCardVal(data.defaults.card);
         }
-    }, [data]);
+    }, [data, isBatchMode, batchScan]);
 
     // Keyboard Handlers
     const incKeyboard = useAcceleratedKeyboardHandler(

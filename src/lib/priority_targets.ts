@@ -12,8 +12,8 @@
 // Mirrors how createExtract() resolves targets for Opt+X / Opt+Shift+X.
 
 import { RNPlugin, ReactRNPlugin, SelectionType } from '@remnote/plugin-sdk';
-import { currentIncRemKey, powerupCode } from './consts';
-import { CARD_PRIORITY_CODE } from './card_priority';
+import { currentIncRemKey, powerupCode, prioritySlotCode } from './consts';
+import { CARD_PRIORITY_CODE, getCardPriorityValue } from './card_priority';
 import { getEffectiveSelection } from './editor_selection';
 
 export type PriorityTargets = {
@@ -35,6 +35,15 @@ export type BatchTargetScan = {
   total: number;
   /** True when `total` exceeded BATCH_SCAN_CAP, so the counts are of the sample. */
   capped: boolean;
+  /**
+   * Mean current priority across the targets carrying each dimension, used to
+   * seed the sliders. Without these the popup seeded from rem #1 alone, so
+   * selecting a card first showed the IncRem slider at the default (50) rather
+   * than anything to do with the IncRems being edited. Null when no target has
+   * that dimension or none of them has a value set.
+   */
+  incSeed: number | null;
+  cardSeed: number | null;
 };
 
 // Classifies a batch selection so the popup can show the Inc section when ANY
@@ -50,6 +59,10 @@ export async function scanBatchTargets(
   let incCount = 0;
   let cardCount = 0;
   let skippedCount = 0;
+  let incSum = 0;
+  let incValued = 0;
+  let cardSum = 0;
+  let cardValued = 0;
 
   for (const remId of sample) {
     const rem = await plugin.rem.findOne(remId);
@@ -63,8 +76,27 @@ export async function scanBatchTargets(
     ]);
     const isCard = hasCardPowerup || (await rem.getCards()).length > 0;
 
-    if (isInc) incCount++;
-    if (isCard) cardCount++;
+    if (isInc) {
+      incCount++;
+      const raw = await rem.getPowerupProperty(powerupCode, prioritySlotCode);
+      const value = raw ? parseInt(raw, 10) : NaN;
+      if (!isNaN(value)) {
+        incSum += value;
+        incValued++;
+      }
+    }
+
+    if (isCard) {
+      cardCount++;
+      // Resolved value (own or inherited) — the number the badges show, which
+      // is what the user is averaging in their head when they select rows.
+      const value = await getCardPriorityValue(plugin as any, rem);
+      if (typeof value === 'number' && !isNaN(value)) {
+        cardSum += value;
+        cardValued++;
+      }
+    }
+
     if (!isInc && !isCard) skippedCount++;
   }
 
@@ -74,6 +106,8 @@ export async function scanBatchTargets(
     skippedCount,
     total: remIds.length,
     capped: remIds.length > BATCH_SCAN_CAP,
+    incSeed: incValued ? Math.round(incSum / incValued) : null,
+    cardSeed: cardValued ? Math.round(cardSum / cardValued) : null,
   };
 }
 

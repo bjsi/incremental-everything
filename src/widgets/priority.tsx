@@ -478,7 +478,7 @@ function Priority() {
   }, [cardData?.cardInfo?.source, convertedToManual]);
 
   useEffect(() => {
-    if (isSaving.current) return;
+    if (isSaving.current || isBatchMode) return;
     if (incRemInfo) {
       if (!incIsDirty.current) {
         setIncAbsPriority(incRemInfo.priority);
@@ -498,7 +498,7 @@ function Priority() {
   }, [incRemInfo, defaultIncPriority]);
 
   useEffect(() => {
-    if (isSaving.current) return;
+    if (isSaving.current || isBatchMode) return;
     if (cardInfo) {
       if (!cardIsDirty.current) {
         setCardAbsPriority(cardInfo.priority);
@@ -519,7 +519,7 @@ function Priority() {
 
   // Snap to Inheritance Effect
   useEffect(() => {
-    if (isSaving.current) return;
+    if (isSaving.current || isBatchMode) return;
     // If we have an ancestor priority, and the current card priority is either strictly "default" source 
     // OR we are purely using the default setting (meaning cardInfo might be undefined yet),
     // then snap to the ancestor's priority to show what will be inherited.
@@ -532,6 +532,20 @@ function Priority() {
       }
     }
   }, [ancestorPriorityInfo, cardInfo]);
+
+  // Batch: seed each slider from the mean current priority of its class across
+  // the whole selection. The three effects above are skipped in batch mode
+  // because they read rem #1 only — which left, say, the IncRem slider sitting
+  // at the default whenever the first selected rem was a plain card.
+  useEffect(() => {
+    if (isSaving.current || !isBatchMode || !batchScan) return;
+    if (!incIsDirty.current) {
+      setIncAbsPriority(batchScan.incSeed ?? defaultIncPriority ?? 50);
+    }
+    if (!cardIsDirty.current) {
+      setCardAbsPriority(batchScan.cardSeed ?? defaultCardPriority ?? 50);
+    }
+  }, [isBatchMode, batchScan, defaultIncPriority, defaultCardPriority]);
 
   // This tracker is fast and only runs in 'full' mode, so it's fine.
   useTrackerPlugin(async (plugin) => {
