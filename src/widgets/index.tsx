@@ -25,7 +25,7 @@ import { enableHideInQueueIntegrationId, pdfHighlightBordersReloadKey } from '..
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { registerJumpToRemHelper } from '../register/window';
-import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS } from '../lib/ui_helpers';
+import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS } from '../lib/ui_helpers';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -85,6 +85,7 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerClozeExtractCSS(plugin);
   await registerTagBadgeCSS(plugin);
   await registerIgnoreTagCSS(plugin);
+  await registerHighlightBandBadgeCSS(plugin);
 
   await registerCommands(plugin);
 

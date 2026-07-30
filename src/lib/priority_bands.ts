@@ -15,7 +15,7 @@
 // The cost of that mechanism is granularity: a tag is a boolean, so a badge can
 // show which band of ten a rem sits in, not its exact number.
 
-import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
+import { BuiltInPowerupCodes, PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { powerupCode, prioritySlotCode } from './consts';
 // Import from card_priority/types, a leaf module of plain constants, NOT from
 // card_priority/index. index calls syncPriorityBand, so importing it back here
@@ -87,9 +87,17 @@ export function bandLabel(band: number): string {
  * does not enumerate, since it walks the CardPriority powerup's tagged rems.
  */
 export async function effectivePriorityForBadge(
-  _plugin: RNPlugin,
+  plugin: RNPlugin,
   rem: PluginRem
 ): Promise<number | null> {
+  return (await readBadgePriority(plugin, rem)).priority;
+}
+
+/** effectivePriorityForBadge plus the IncRem flag it already had to look up. */
+async function readBadgePriority(
+  _plugin: RNPlugin,
+  rem: PluginRem
+): Promise<{ priority: number | null; isInc: boolean }> {
   const [isInc, hasCardPowerup] = await Promise.all([
     rem.hasPowerup(powerupCode),
     rem.hasPowerup(CARD_PRIORITY_CODE),
@@ -101,9 +109,72 @@ export async function effectivePriorityForBadge(
     ? await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT)
     : null;
 
-  if (!raw) return null;
+  if (!raw) return { priority: null, isInc };
   const value = parseInt(raw, 10);
-  return isNaN(value) ? null : value;
+  return { priority: isNaN(value) ? null : value, isInc };
+}
+
+/**
+ * Mirrors an IncRem's band onto the PDF/HTML highlight it was extracted from.
+ *
+ * An extract records its origin as a pinned Rem reference in its own text
+ * (see createRemUnderParent in lib/highlightActions.ts), so the highlight is
+ * reachable from the IncRem without storing anything new. Giving the highlight
+ * the same band lets CSS badge it in the Highlights side panel and tint its
+ * marker in the PDF itself — priority information that until now lived only on
+ * the extract, invisible while re-reading the source document.
+ *
+ * The highlight carries no priority of its own, so it is never a target of
+ * syncPriorityBand: its band arrives only from here, and only from the IncRem
+ * that references it.
+ */
+async function syncHighlightBands(
+  rem: PluginRem,
+  desired: number | null
+): Promise<void> {
+  let refs: PluginRem[] = [];
+  try {
+    refs = (await rem.remsBeingReferenced()) as PluginRem[];
+  } catch (err) {
+    console.error('[PriorityBands] remsBeingReferenced failed for', rem._id, err);
+    return;
+  }
+
+  for (const ref of refs) {
+    const isHighlight =
+      (await ref.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) ||
+      (await ref.hasPowerup(BuiltInPowerupCodes.HTMLHighlight));
+    if (!isHighlight) continue;
+    try {
+      await applyBand(ref, desired);
+    } catch (err) {
+      console.error('[PriorityBands] highlight band sync failed for', ref._id, err);
+    }
+  }
+}
+
+/** Reconciles a rem to exactly one band tag (or none). Returns true if it wrote. */
+async function applyBand(rem: PluginRem, desired: number | null): Promise<boolean> {
+  const present: number[] = [];
+  for (let band = 0; band < BAND_COUNT; band++) {
+    if (await rem.hasPowerup(bandPowerupCode(band))) present.push(band);
+  }
+
+  // Already correct — and exactly one tag, so no stale bands to clean up.
+  if (present.length === 1 && present[0] === desired) return false;
+  if (!present.length && desired === null) return false;
+
+  let wrote = false;
+  for (const band of present) {
+    if (band === desired) continue;
+    await rem.removePowerup(bandPowerupCode(band));
+    wrote = true;
+  }
+  if (desired !== null && !present.includes(desired)) {
+    await rem.addPowerup(bandPowerupCode(desired));
+    wrote = true;
+  }
+  return wrote;
 }
 
 // --- Eligibility -----------------------------------------------------------
@@ -181,32 +252,22 @@ export async function syncPriorityBand(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<boolean> {
-  // Gate first: this returns for the large majority of rems in a big KB, before
-  // any of the ten hasPowerup reads below, let alone a write.
-  if (!(await isBandEligible(rem))) return false;
-
-  const priority = await effectivePriorityForBadge(plugin, rem);
+  const { priority, isInc } = await readBadgePriority(plugin, rem);
   const desired = priority === null ? null : bandForPriority(priority);
 
-  const present: number[] = [];
-  for (let band = 0; band < BAND_COUNT; band++) {
-    if (await rem.hasPowerup(bandPowerupCode(band))) present.push(band);
+  // Extracts are rarely tagged with a slotted tag, so this has to run BEFORE the
+  // table gate below or a PDF extract would never reach its source highlight.
+  // Restricted to IncRems: card-priority writes cascade across whole subtrees and
+  // must not pay for a reference lookup each.
+  if (isInc) {
+    await syncHighlightBands(rem, desired);
   }
 
-  // Already correct — and exactly one tag, so no stale bands to clean up.
-  if (present.length === 1 && present[0] === desired) return false;
+  // Gate: returns for the large majority of rems in a big KB, before the ten
+  // hasPowerup reads in applyBand, let alone a write.
+  if (!(await isBandEligible(rem))) return false;
 
-  let wrote = false;
-  for (const band of present) {
-    if (band === desired) continue;
-    await rem.removePowerup(bandPowerupCode(band));
-    wrote = true;
-  }
-  if (desired !== null && !present.includes(desired)) {
-    await rem.addPowerup(bandPowerupCode(desired));
-    wrote = true;
-  }
-  return wrote;
+  return applyBand(rem, desired);
 }
 
 /**
@@ -387,6 +448,81 @@ ${sel}::before {
 }
 ${rules}
 `;
+}
+
+/**
+ * Badge + marker tint for PDF/HTML highlights that have been extracted.
+ *
+ * The highlight carries the band of the IncRem extracted from it, so the
+ * priority is visible in two places it never used to be: as a pill in the
+ * Highlights side panel, and as the colour of the highlight's marker in the PDF
+ * itself — so a priority is legible while re-reading the source, not only from
+ * the extract.
+ *
+ * Scoped to `[data-rem-tags~="pdfextract"]`, the tag the extraction flow already
+ * applies to exactly this rem, so untouched highlights keep the neutral styling.
+ *
+ * `markerColors` must be emitted INSIDE registerPdfHighlightCSS's stylesheet,
+ * after its base rules — those set the marker border with `!important`, and
+ * ordering between separate registerCSS calls is not guaranteed.
+ */
+export function buildHighlightBandCSS(colorForBand: (band: number) => string): {
+  badges: string;
+  markerColors: string;
+} {
+  const highlight = '[data-rem-tags~="pdfextract"]';
+
+  const badgeRules = Array.from({ length: BAND_COUNT }, (_, band) => `
+.rem${highlight}[data-rem-tags~="${bandTagSlug(band)}"]::after {
+  content: "${bandLabel(band)}";
+  background: ${colorForBand(band)};
+}`).join('\n');
+
+  // Anchored on the `.rem` span, NOT on `.rem-text`. In the Highlights side
+  // panel `.rem-text` carries the `flex` class, which turns a pseudo-element
+  // into a flex ITEM — block-level and stretched to the full line, so the badge
+  // inflated into a coloured slab covering the highlight's text. In a table cell
+  // the same class list has no `flex`, which is why the table badge was fine.
+  // `.rem` is already `position: relative` in both render paths, and the explicit
+  // inset/size/display below keep the box shrink-wrapped whatever the parent is.
+  const badges = `
+/* Priority band badges on extracted highlights (Incremental Everything) */
+.rem${highlight}[data-rem-tags*="priorityband"] {
+  position: relative;
+}
+.rem${highlight}[data-rem-tags*="priorityband"]::after {
+  position: absolute;
+  display: inline-block;
+  inset: auto;
+  top: 2px;
+  right: 2px;
+  width: auto;
+  height: auto;
+  flex: none;
+  align-self: flex-start;
+  z-index: 5;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  color: #fff;
+  pointer-events: none;
+  white-space: nowrap;
+}
+${badgeRules}
+`;
+
+  // Tints the dashed underline and the left bar drawn by the base pdfextract
+  // rules, leaving the highlight's own background colour alone.
+  const markerColors = Array.from({ length: BAND_COUNT }, (_, band) => `
+    [data-rem-tags~="pdf-highlight"]${highlight}[data-rem-tags~="${bandTagSlug(band)}"],
+    [data-rem-tags~="html-highlight"]${highlight}[data-rem-tags~="${bandTagSlug(band)}"] {
+      border-bottom-color: ${colorForBand(band)} !important;
+      border-right-color: ${colorForBand(band)} !important;
+    }`).join('\n');
+
+  return { badges, markerColors };
 }
 
 /**
