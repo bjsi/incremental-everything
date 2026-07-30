@@ -9,7 +9,6 @@ import {
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   powerupCode,
-  prioritySlotCode,
   allIncrementalRemKey,
   allCardPriorityInfoKey
 } from '../lib/consts';
