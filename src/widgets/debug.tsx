@@ -15,7 +15,7 @@ import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep, IncrementalRem } from '../lib/incremental_rem/types';
 import { isPowerupPropertySafe } from '../lib/powerupSlotFilter';
 import { getCardPriority } from '../lib/card_priority';
-import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree } from '../lib/card_priority/batch';
+import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree, findOrphanedImportedCardPriorities } from '../lib/card_priority/batch';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -1700,6 +1700,28 @@ function Debug() {
     );
   };
 
+  // Cross-KB import diagnostic. Answers ONE question: after importing rems from
+  // another KB and finding their manual priorities replaced by the default, is the
+  // original value still physically present (attached to the imported KB's own
+  // CardPriority powerup, which getPowerupByCode can't reach), or did it never
+  // arrive? Read-only — it decides whether a recovery pass is worth writing.
+  const handleScanImportedPriorities = async () => {
+    if (!rem) return;
+    await plugin.app.toast('Scanning for imported (orphaned) card priorities...');
+    const result = await findOrphanedImportedCardPriorities(plugin, rem, true);
+    const recoverable = result.nodes.filter((n) => n.recoverable).length;
+    if (result.nodes.length === 0) {
+      await plugin.app.toast(
+        'No orphaned priority values found — the values likely did not survive the export. See console.'
+      );
+    } else {
+      await plugin.app.toast(
+        `Found ${result.nodes.length} rem(s) with priorities on ${result.foreignPowerups.length} foreign ` +
+        `CardPriority powerup(s); ${recoverable} recoverable. See console (console.table).`
+      );
+    }
+  };
+
   // KB-wide audit that answers: does `getPowerupByCode('cardPriority').taggedRem()`
   // match reality? "Remove All CardPriority Tags" and the cache both enumerate via
   // taggedRem(), yet it can return far fewer rems than are actually tagged. This
@@ -3145,6 +3167,21 @@ function Debug() {
                  title="Walk this rem + descendants and log the full structure of every node carrying cardPriority/cards (console.table) to diagnose rogue tags"
                >
                  Dump Slot Structure
+               </button>
+               <button
+                 onClick={handleScanImportedPriorities}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-secondary)',
+                   color: 'var(--rn-clr-content-primary)',
+                   border: '1px solid var(--rn-clr-border)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="For rems imported from another KB: check whether their original card priorities are still present on the imported KB's CardPriority powerup (read-only)"
+               >
+                 Scan Imported Priorities
                </button>
              </div>
            </h2>

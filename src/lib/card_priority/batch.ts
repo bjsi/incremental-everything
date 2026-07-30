@@ -1246,3 +1246,229 @@ export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
     : '';
   await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tag(s) across your KB${anchorNote}.`);
 }
+
+// ---------------------------------------------------------------------------
+// Cross-KB import diagnostic
+// ---------------------------------------------------------------------------
+//
+// Symptom this exists for: rems exported from one KB and imported into another
+// arrive with their manual card priorities gone, every card sitting at the
+// default instead.
+//
+// Mechanism: a powerup is an ordinary rem, and its _id is per-KB. An exported
+// rem carries its CardPriority tag as a reference to the SOURCE KB's powerup
+// rem. A native (.rem) import re-creates that powerup rem as a copy rather than
+// re-pointing the tag at the powerup this plugin registered in the target KB, so
+// `getPowerupByCode('cardPriority')` and the imported tag are two different rems.
+// Every slot read through the code — which is how getCardPriority works — then
+// returns null.
+//
+// It does not stop there. Importing touches every rem, GlobalRemChanged fires,
+// and the null read sends autoAssignCardPriority down its final branch, writing
+// `default` against the TARGET KB's powerup (see register/events.ts and the
+// autoAssign chain in ./index.ts). So the rem ends up carrying two CardPriority
+// powerups: the imported one holding the real value, and a fresh one holding the
+// default that overwrote it in the UI.
+//
+// That second tag is also the good news: the `default` write lands on different
+// slot rems, so it does not destroy the imported value. This walk finds those
+// orphaned values so we can tell whether a migration is possible before writing
+// one.
+
+export interface OrphanedPriorityNode {
+  remId: string;
+  text: string;
+  depth: number;
+  /** What the plugin sees today, through THIS KB's registered powerup. */
+  activePriority: string | null;
+  activeSource: string | null;
+  /** What is sitting on a foreign CardPriority powerup, unreachable by code. */
+  orphanPriority: string | null;
+  orphanSource: string | null;
+  orphanPowerupId: string | null;
+  /** True when the two disagree — i.e. a real recovery candidate. */
+  recoverable: boolean;
+}
+
+export interface OrphanScanResult {
+  registeredPowerupId: string | null;
+  nodes: OrphanedPriorityNode[];
+  /** Distinct foreign powerup rems seen, with how many rems each accounts for. */
+  foreignPowerups: Array<{ id: string; name: string; remCount: number }>;
+}
+
+/** Slot display names as registered in register/powerups.tsx, lowercased. */
+const CARD_PRIORITY_SLOT_NAMES: Record<string, 'priority' | 'source' | 'lastUpdated'> = {
+  'priority': 'priority',
+  'priority source': 'source',
+  'last updated': 'lastUpdated',
+};
+
+/**
+ * Reads a property rem's value. Deliberately not safeRemTextToString: that maps
+ * empty to the literal 'Untitled', which here would read as a value rather than
+ * as absence.
+ */
+async function readSlotValue(plugin: RNPlugin, rem: PluginRem): Promise<string | null> {
+  try {
+    if (!rem.text?.length) return null;
+    const s = await plugin.richText.toString(rem.text);
+    return s && s.trim().length > 0 ? s.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * DIAGNOSTIC: walk `rootRem` (+ descendants) looking for card priority values
+ * attached to a CardPriority powerup OTHER than the one registered in this KB —
+ * the signature of a cross-KB import.
+ *
+ * Read-only. Writes nothing, so it is safe to run on a suspect subtree before
+ * deciding whether a recovery pass is worth building.
+ */
+export async function findOrphanedImportedCardPriorities(
+  plugin: RNPlugin,
+  rootRem: PluginRem,
+  recursive: boolean = true
+): Promise<OrphanScanResult> {
+  const registered = await plugin.powerup.getPowerupByCode('cardPriority');
+  const registeredPowerupId = registered?._id ?? null;
+  const slotDefs = await getCardPrioritySlotDefIds(plugin);
+
+  const nodes: OrphanedPriorityNode[] = [];
+  const foreign = new Map<string, { name: string; remCount: number }>();
+
+  // Cache per slot-def rem: is it a CardPriority slot, and which one? Slot
+  // definitions are shared by every rem carrying the tag, so this collapses the
+  // per-child lookups to one resolution per distinct slot across the whole walk.
+  const slotIdentity = new Map<
+    string,
+    { kind: 'priority' | 'source' | 'lastUpdated'; powerupId: string | null } | null
+  >();
+
+  const identifySlot = async (slotRem: PluginRem) => {
+    const cached = slotIdentity.get(slotRem._id);
+    if (cached !== undefined) return cached;
+
+    let result: { kind: 'priority' | 'source' | 'lastUpdated'; powerupId: string | null } | null = null;
+    try {
+      const name = (await readSlotValue(plugin, slotRem))?.toLowerCase();
+      const kind = name ? CARD_PRIORITY_SLOT_NAMES[name] : undefined;
+      if (kind) {
+        // Confirm it really is a CardPriority slot and not some unrelated rem
+        // that happens to be called "Priority": its parent must be a powerup
+        // rem named CardPriority.
+        const parent = slotRem.parent ? await plugin.rem.findOne(slotRem.parent) : undefined;
+        const parentName = parent ? (await readSlotValue(plugin, parent))?.toLowerCase() : null;
+        if (parent && parentName === 'cardpriority') {
+          result = { kind, powerupId: parent._id };
+        }
+      }
+    } catch {
+      result = null;
+    }
+    slotIdentity.set(slotRem._id, result);
+    return result;
+  };
+
+  const visit = async (node: PluginRem, depth: number) => {
+    let orphanPriority: string | null = null;
+    let orphanSource: string | null = null;
+    let orphanPowerupId: string | null = null;
+
+    let children: PluginRem[] = [];
+    try { children = await node.getChildrenRem(); } catch { children = []; }
+
+    for (const child of children) {
+      let tags: PluginRem[] = [];
+      try { tags = (await child.getTagRems()) as PluginRem[]; } catch { continue; }
+
+      for (const tag of tags) {
+        // A slot this KB owns is by definition reachable via getPowerupProperty,
+        // so it is not what we are hunting.
+        if (slotDefs.all.has(tag._id)) continue;
+
+        const identity = await identifySlot(tag);
+        if (!identity) continue;
+        if (identity.powerupId && identity.powerupId === registeredPowerupId) continue;
+
+        const value = await readSlotValue(plugin, child);
+        if (value === null) continue;
+
+        if (identity.kind === 'priority') orphanPriority = value;
+        else if (identity.kind === 'source') orphanSource = value;
+        orphanPowerupId = identity.powerupId;
+      }
+    }
+
+    if (orphanPriority !== null || orphanSource !== null) {
+      let activePriority: string | null = null;
+      let activeSource: string | null = null;
+      try { activePriority = (await node.getPowerupProperty('cardPriority', 'priority')) || null; } catch { /* ignore */ }
+      try { activeSource = (await node.getPowerupProperty('cardPriority', 'prioritySource')) || null; } catch { /* ignore */ }
+
+      if (orphanPowerupId) {
+        const entry = foreign.get(orphanPowerupId) || { name: 'CardPriority (imported)', remCount: 0 };
+        entry.remCount++;
+        foreign.set(orphanPowerupId, entry);
+      }
+
+      nodes.push({
+        remId: node._id,
+        text: await safeRemTextToString(plugin, node.text),
+        depth,
+        activePriority,
+        activeSource,
+        orphanPriority,
+        orphanSource,
+        orphanPowerupId,
+        // Only interesting when the live value differs from the imported one —
+        // matching values mean the import already resolved correctly for this rem.
+        recoverable: orphanPriority !== null && orphanPriority !== activePriority,
+      });
+    }
+
+    if (recursive) {
+      for (const child of children) {
+        await visit(child, depth + 1);
+      }
+    }
+  };
+
+  await visit(rootRem, 0);
+
+  const foreignPowerups = [...foreign.entries()].map(([id, v]) => ({
+    id,
+    name: v.name,
+    remCount: v.remCount,
+  }));
+
+  console.log('\n========== IMPORTED CARD PRIORITY SCAN ==========');
+  console.log(`Registered cardPriority powerup in this KB: ${registeredPowerupId ?? '(none)'}`);
+  console.log(`Rems carrying priority values on a FOREIGN powerup: ${nodes.length}`);
+  console.log(`Of those, recoverable (imported value differs from live value): ${nodes.filter(n => n.recoverable).length}`);
+  if (foreignPowerups.length > 0) {
+    console.log('Foreign CardPriority powerup rems found:');
+    console.table(foreignPowerups);
+  }
+  if (nodes.length > 0) {
+    console.table(
+      nodes.map((n) => ({
+        rem: n.text.slice(0, 50),
+        remId: n.remId,
+        live: `${n.activePriority ?? '—'} (${n.activeSource ?? '—'})`,
+        imported: `${n.orphanPriority ?? '—'} (${n.orphanSource ?? '—'})`,
+        recoverable: n.recoverable,
+      }))
+    );
+  } else {
+    console.log(
+      'No orphaned values found. If priorities are still missing, the values did not ' +
+      'survive the export at all — recovery would have to come from the source KB.'
+    );
+  }
+  console.log('==================================================\n');
+
+  return { registeredPowerupId, nodes, foreignPowerups };
+}

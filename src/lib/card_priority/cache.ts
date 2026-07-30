@@ -468,10 +468,38 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
               return;
             }
 
-            const calculated = await calculateNewPriority(plugin, rem);
-            await setCardPriority(plugin, rem, calculated.priority, calculated.source);
+            // Read the current value BEFORE calculating, and pass it in.
+            //
+            // This third argument is not optional in spirit: calculateNewPriority's
+            // first act is to return `existingPriority` unchanged when its source is
+            // 'manual' or 'incremental'. Called without it (the previous behaviour)
+            // that guard is dead code, and the function recomputes from scratch —
+            // IncRem → ancestor → default — then the write below stamps the result
+            // over whatever the user had set by hand.
+            //
+            // Normally that was invisible, because a rem with a manual priority is
+            // tagged, and tagged rems never reach Phase 2 (they are filtered out via
+            // the powerup's taggedRem() list in loadCardPriorityCache). The damage
+            // appears whenever that list under-reports — which it demonstrably does;
+            // it is exactly what the debug widget's CardPriority Tag Audit exists to
+            // measure — and most dramatically right after importing rems from another
+            // knowledge base, where the tags have not been indexed yet at startup.
+            // Every imported manual priority was then silently rewritten to the
+            // default on the next plugin load.
+            const existing = await getCardPriority(plugin, rem);
+            const calculated = await calculateNewPriority(plugin, rem, existing);
 
-            const cardInfo = await getCardPriority(plugin, rem);
+            let cardInfo = existing;
+            const unchanged =
+              existing &&
+              existing.priority === calculated.priority &&
+              existing.source === calculated.source;
+
+            if (!unchanged) {
+              await setCardPriority(plugin, rem, calculated.priority, calculated.source);
+              cardInfo = await getCardPriority(plugin, rem);
+            }
+
             if (cardInfo) {
               newPriorities.push(cardInfo);
             }
