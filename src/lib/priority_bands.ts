@@ -473,33 +473,40 @@ export function buildHighlightBandCSS(colorForBand: (band: number) => string): {
   const highlight = '[data-rem-tags~="pdfextract"]';
 
   const badgeRules = Array.from({ length: BAND_COUNT }, (_, band) => `
-.rem${highlight}[data-rem-tags~="${bandTagSlug(band)}"]::after {
+.rem${highlight}[data-rem-tags~="${bandTagSlug(band)}"]::before {
   content: "${bandLabel(band)}";
   background: ${colorForBand(band)};
 }`).join('\n');
 
-  // Anchored on the `.rem` span, NOT on `.rem-text`. In the Highlights side
-  // panel `.rem-text` carries the `flex` class, which turns a pseudo-element
-  // into a flex ITEM — block-level and stretched to the full line, so the badge
-  // inflated into a coloured slab covering the highlight's text. In a table cell
-  // the same class list has no `flex`, which is why the table badge was fine.
-  // `.rem` is already `position: relative` in both render paths, and the explicit
-  // inset/size/display below keep the box shrink-wrapped whatever the parent is.
+  // Absolutely positioned on the `.rem` span, bottom-right. Three earlier
+  // placements each failed for a different reason, so they are worth recording:
+  //   1. absolute inside `.rem-text` — that element is a flex container in the
+  //      side panel, so the pseudo became a stretched flex item, a coloured slab
+  //      over the text;
+  //   2. absolute on `.rem`, top-right — hidden behind the tags chip and backlink
+  //      counter, which are anchored in that corner;
+  //   3. in-flow flex item after the text — visible, but it reserves horizontal
+  //      width in an already narrow panel and forced the text to wrap early.
+  // Absolute keeps it out of flow (no width reserved); bottom-right is the corner
+  // RemNote leaves empty. `::before` rather than `::after` because on `.rem`,
+  // `::after` renders past the tag bar.
+  //
+  // Caveat: on a single-line highlight the two corners nearly coincide, so the
+  // badge can sit close to the counter.
   const badges = `
 /* Priority band badges on extracted highlights (Incremental Everything) */
 .rem${highlight}[data-rem-tags*="priorityband"] {
   position: relative;
 }
-.rem${highlight}[data-rem-tags*="priorityband"]::after {
+.rem${highlight}[data-rem-tags*="priorityband"]::before {
   position: absolute;
   display: inline-block;
   inset: auto;
-  top: 2px;
-  right: 2px;
+  bottom: 2px;
+  right: 4px;
   width: auto;
   height: auto;
   flex: none;
-  align-self: flex-start;
   z-index: 5;
   padding: 0 5px;
   border-radius: 8px;
@@ -543,6 +550,18 @@ ${badgeRules}
  */
 export const PRIORITY_BAND_TAG_HIDE_CSS = `
 .hierarchy-editor__tag-bar__tag[data-test^="Applied Powerup Pill ${BAND_POWERUP_NAME_PREFIX}"] {
+  display: none;
+}
+
+/* RemNote renders a tag bar chip two ways. The applied-powerup pill above is
+   identifiable by name; the second, inline variant (marked by .rem-powerup-icon)
+   carries NO attribute naming its powerup, and CSS cannot match on text. It
+   surfaces when a band is a rem's only visible tag — with two or more, RemNote
+   collapses them into a "2 tags" chip and the band never shows.
+   So this hides powerup pills on band-carrying rems specifically. The ✂️
+   pdfextract chip is unaffected: pdfextract is an ordinary tag rem, not a
+   powerup, so it has no .rem-powerup-icon. */
+.rem[data-rem-tags*="priorityband"] .hierarchy-editor__tag-bar__tag:has(.rem-powerup-icon) {
   display: none;
 }
 `;
