@@ -16,6 +16,7 @@ import { IncrementalRep, IncrementalRem } from '../lib/incremental_rem/types';
 import { isPowerupPropertySafe } from '../lib/powerupSlotFilter';
 import { getCardPriority } from '../lib/card_priority';
 import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree, findOrphanedImportedCardPriorities } from '../lib/card_priority/batch';
+import { diagnosePowerupReadPath } from '../lib/powerup_read_diagnostic';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -1700,6 +1701,26 @@ function Debug() {
     );
   };
 
+  // Powerup READ-PATH diagnostic. The export-file comparison proved the values are
+  // present and untouched in the target KB, so the remaining question is why
+  // getPowerupProperty() cannot see them. Covers BOTH powerups. Read-only.
+  const handleDiagnoseReadPath = async () => {
+    if (!rem) return;
+    await plugin.app.toast('Probing powerup read path...');
+    const report = await diagnosePowerupReadPath(plugin, rem);
+    const broken = report.powerups.filter((p) => p.verdict.startsWith('BROKEN'));
+    const mismatch = report.powerups.some((p) => p.verdict.includes('IDENTITY MISMATCH'));
+    if (broken.length === 0) {
+      await plugin.app.toast('Read path OK for both powerups. See console.');
+    } else {
+      await plugin.app.toast(
+        `${broken.length} powerup(s) unreadable` +
+        (mismatch ? ' — powerup IDENTITY MISMATCH found.' : '.') +
+        ' See console.'
+      );
+    }
+  };
+
   // Cross-KB import diagnostic. Answers ONE question: after importing rems from
   // another KB and finding their manual priorities replaced by the default, is the
   // original value still physically present (attached to the imported KB's own
@@ -3182,6 +3203,21 @@ function Debug() {
                  title="For rems imported from another KB: check whether their original card priorities are still present on the imported KB's CardPriority powerup (read-only)"
                >
                  Scan Imported Priorities
+               </button>
+               <button
+                 onClick={handleDiagnoseReadPath}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-secondary)',
+                   color: 'var(--rn-clr-content-primary)',
+                   border: '1px solid var(--rn-clr-border)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="Why can't the plugin read this rem's Incremental/CardPriority values? Compares getPowerupByCode() against the rem's actual tags and probes every slot (read-only)"
+               >
+                 Diagnose Read Path
                </button>
              </div>
            </h2>

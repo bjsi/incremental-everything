@@ -1251,29 +1251,24 @@ export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
 // Cross-KB import diagnostic
 // ---------------------------------------------------------------------------
 //
-// Symptom this exists for: rems exported from one KB and imported into another
-// arrive with their manual card priorities gone, every card sitting at the
-// default instead.
+// Checks whether a rem's card priority is attached to a CardPriority powerup other
+// than the one this KB registered — i.e. whether values are present but unreachable
+// by code, rather than absent.
 //
-// Mechanism: a powerup is an ordinary rem, and its _id is per-KB. An exported
-// rem carries its CardPriority tag as a reference to the SOURCE KB's powerup
-// rem. A native (.rem) import re-creates that powerup rem as a copy rather than
-// re-pointing the tag at the powerup this plugin registered in the target KB, so
-// `getPowerupByCode('cardPriority')` and the imported tag are two different rems.
-// Every slot read through the code — which is how getCardPriority works — then
-// returns null.
+// HISTORICAL NOTE, so this is not misread as a statement of cause: this was written
+// while investigating manual priorities being lost on import between knowledge
+// bases, under the hypothesis that the values had been orphaned onto an imported
+// duplicate powerup. That hypothesis was WRONG. The cause was established later by
+// exporting the same document from source and target and diffing the raw files
+// (scripts/analyze_rem_export.js): RemNote's importer attaches a transient,
+// unresolvable CardPriority powerup, then ~250ms later re-points the rem at the
+// registered one and DISCARDS the slot values in the swap. It reproduces with the
+// plugin fully disabled, so no plugin code causes or can prevent it.
 //
-// It does not stop there. Importing touches every rem, GlobalRemChanged fires,
-// and the null read sends autoAssignCardPriority down its final branch, writing
-// `default` against the TARGET KB's powerup (see register/events.ts and the
-// autoAssign chain in ./index.ts). So the rem ends up carrying two CardPriority
-// powerups: the imported one holding the real value, and a fresh one holding the
-// default that overwrote it in the UI.
-//
-// That second tag is also the good news: the `default` write lands on different
-// slot rems, so it does not destroy the imported value. This walk finds those
-// orphaned values so we can tell whether a migration is possible before writing
-// one.
+// This scan correctly returns zero in that scenario — the values are cleared in
+// place, not relocated. It is retained because "value sitting on a foreign powerup"
+// remains a coherent state to rule out, and ruling it out is what redirected the
+// investigation. Read-only.
 
 export interface OrphanedPriorityNode {
   remId: string;

@@ -21,6 +21,17 @@ import {
 } from '../lib/consts';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { BAND_COUNT, bandPowerupCode, bandPowerupName } from '../lib/priority_bands';
+// Registration must use the same constants every READER uses. Hardcoding the code
+// or slot codes here lets the definition drift away from the reads, and the failure
+// mode is silent: getPowerupProperty() would simply return nothing for a rem that
+// visibly carries the tag. card_priority/types is a leaf module of plain constants,
+// so importing it here introduces no cycle.
+import {
+  CARD_PRIORITY_CODE,
+  PRIORITY_SLOT,
+  SOURCE_SLOT,
+  LAST_UPDATED_SLOT,
+} from '../lib/card_priority/types';
 
 // Re-export for backwards compatibility
 export { initIncrementalRem };
@@ -70,24 +81,24 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
   // Create Separate Flashcard Priority Powerup
   await plugin.app.registerPowerup({
     name: 'CardPriority',
-    code: 'cardPriority',
+    code: CARD_PRIORITY_CODE,
     description: 'Priority system for flashcards',
     options: {
       slots: [
         {
-          code: 'priority',
+          code: PRIORITY_SLOT,
           name: 'Priority',
           propertyType: PropertyType.NUMBER,
           propertyLocation: PropertyLocation.BELOW,
         },
         {
-          code: 'prioritySource',
+          code: SOURCE_SLOT,
           name: 'Priority Source',
           propertyType: PropertyType.TEXT,
           hidden: true,
         },
         {
-          code: 'lastUpdated',
+          code: LAST_UPDATED_SLOT,
           name: 'Last Updated',
           propertyType: PropertyType.NUMBER,  // Timestamp
           hidden: true,

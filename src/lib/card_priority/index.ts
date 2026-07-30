@@ -3,7 +3,6 @@ import { getIncrementalRemFromRem } from '../incremental_rem';
 import { buildComprehensiveScope } from '../scope_helpers';
 import { findClosestAncestorWithAnyPriority } from '../priority_inheritance';
 import { syncPriorityBand } from '../priority_bands';
-import { sleep } from '../utils';
 import dayjs from 'dayjs';
 import {
   allCardPriorityInfoKey,
@@ -183,80 +182,12 @@ export async function setCardPriority(
 }
 
 /**
- * How long to wait before believing that a rem genuinely has no stored card
- * priority. See confirmNoStoredPriority.
- */
-const PRIORITY_SETTLE_MS = 1500;
-
-/**
- * Distinguishes "this card has never been prioritised" from "this rem's data has
- * not finished arriving yet". getCardPriority cannot tell them apart: when the
- * priority slot reads empty it falls through to the ancestor value or the
- * default and reports source 'inherited'/'default' — the same answer it gives
- * for a genuinely unprioritised card.
- *
- * That ambiguity is destructive, because autoAssignCardPriority acts on it by
- * WRITING. During an import (or any partially-synced moment) a rem can surface
- * with its cards already attached but its cardPriority slot values still in
- * flight; the empty read then looks like "never prioritised", and the default
- * gets stamped over a manual priority that was about to land. This is the
- * mechanism behind manual priorities being reset to the default after importing
- * rems from another knowledge base — GlobalRemChanged fires on each newly
- * created rem and calls autoAssignCardPriority before the values settle.
- *
- * Returns true only when the absence is confirmed:
- *   - a readable priority value          → not absent, never write
- *   - the cardPriority tag but no value  → partial state, never write
- *   - neither, twice, PRIORITY_SETTLE_MS apart → genuinely absent, safe to write
- *
- * Only the last case pays the delay, and only on the path that is about to write.
- * A rem with a readable priority — the overwhelming majority — returns on the
- * first probe with no wait.
- */
-async function confirmNoStoredPriority(_plugin: RNPlugin, rem: PluginRem): Promise<boolean> {
-  const probe = async () => {
-    const [hasTag, raw] = await Promise.all([
-      rem.hasPowerup(CARD_PRIORITY_CODE).catch(() => false),
-      rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null),
-    ]);
-    return { hasTag: !!hasTag, raw };
-  };
-
-  const first = await probe();
-  if (first.raw) return false;
-  if (first.hasTag) {
-    console.warn(
-      `[CardPriority] ${rem._id} carries the cardPriority tag but its priority slot is unreadable — ` +
-      `treating as partially-loaded and skipping auto-assign rather than overwriting with a computed value.`
-    );
-    return false;
-  }
-
-  // Neither tag nor value. Could be a genuinely new card, or a rem still
-  // materialising. Give it a moment and ask again before writing.
-  await sleep(PRIORITY_SETTLE_MS);
-
-  const second = await probe();
-  if (second.raw || second.hasTag) {
-    console.warn(
-      `[CardPriority] ${rem._id} gained a card priority while settling — skipping auto-assign ` +
-      `(its stored value would have been overwritten).`
-    );
-    return false;
-  }
-  return true;
-}
-
-/**
  * Automatically assign priority to cards based on context.
  *
  * IMPORTANT: Each branch must check whether the existing priority already
  * matches (value + source) before calling setCardPriority. Writing without
  * this guard updates LAST_UPDATED_SLOT with Date.now(), which modifies the
  * Rem and re-fires GlobalRemChanged — creating an infinite ~1 s loop.
- *
- * Every branch that writes must ALSO pass confirmNoStoredPriority first: an
- * empty read is not proof that the card is unprioritised.
  */
 export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): Promise<number> {
   const existingPriority = await getCardPriority(plugin, rem);
@@ -271,7 +202,6 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
     if (existingPriority && existingPriority.source === 'incremental' && existingPriority.priority === incRemInfo.priority) {
       return incRemInfo.priority;
     }
-    if (!(await confirmNoStoredPriority(plugin, rem))) return existingPriority?.priority ?? incRemInfo.priority;
     await setCardPriority(plugin, rem, incRemInfo.priority, 'incremental');
     return incRemInfo.priority;
   }
@@ -288,7 +218,6 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
     if (existingPriority && existingPriority.source === 'inherited' && existingPriority.priority === ancestorPriority.priority) {
       return ancestorPriority.priority;
     }
-    if (!(await confirmNoStoredPriority(plugin, rem))) return existingPriority?.priority ?? ancestorPriority.priority;
     await setCardPriority(plugin, rem, ancestorPriority.priority, 'inherited');
     return ancestorPriority.priority;
   }
@@ -305,7 +234,6 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
   if (existingPriority && existingPriority.source === 'default' && existingPriority.priority === defaultPriority) {
     return defaultPriority;
   }
-  if (!(await confirmNoStoredPriority(plugin, rem))) return existingPriority?.priority ?? defaultPriority;
   await setCardPriority(plugin, rem, defaultPriority, 'default');
   return defaultPriority;
 }

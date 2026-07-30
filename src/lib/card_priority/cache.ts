@@ -477,15 +477,18 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
             // IncRem → ancestor → default — then the write below stamps the result
             // over whatever the user had set by hand.
             //
-            // Normally that was invisible, because a rem with a manual priority is
-            // tagged, and tagged rems never reach Phase 2 (they are filtered out via
-            // the powerup's taggedRem() list in loadCardPriorityCache). The damage
-            // appears whenever that list under-reports — which it demonstrably does;
-            // it is exactly what the debug widget's CardPriority Tag Audit exists to
-            // measure — and most dramatically right after importing rems from another
-            // knowledge base, where the tags have not been indexed yet at startup.
-            // Every imported manual priority was then silently rewritten to the
-            // default on the next plugin load.
+            // It stays invisible in normal use, because a rem with a manual priority
+            // is tagged, and tagged rems never reach Phase 2 (they are filtered out
+            // via the powerup's taggedRem() list in loadCardPriorityCache). The risk
+            // is whenever that list under-reports — which it demonstrably does; it is
+            // exactly what the debug widget's CardPriority Tag Audit exists to
+            // measure. Any rem it omits reaches Phase 2 and, before this change,
+            // had its manual priority recomputed away.
+            //
+            // NOTE: this is a latent bug fixed on its own merits. It is NOT the cause
+            // of manual priorities being lost when importing between knowledge bases —
+            // that was traced to RemNote's importer and reproduced with the plugin
+            // fully disabled (see the wiki Troubleshooting entry).
             const existing = await getCardPriority(plugin, rem);
             const calculated = await calculateNewPriority(plugin, rem, existing);
 
