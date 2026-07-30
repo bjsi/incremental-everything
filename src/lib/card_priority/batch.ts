@@ -6,6 +6,7 @@ import {
   seenCardInSessionKey,
   cardShieldCleanupBackupPrefix,
   cardShieldCleanupBackupIndexKey,
+  orphanRemIdsKey,
 } from '../consts';
 import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { isPowerupPropertySafe } from '../powerupSlotFilter';
@@ -367,9 +368,15 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
     await plugin.app.toast('✅ Card Priorities Update complete! See console for details.');
     alert(message);
 
-    // Offer to clean up orphan cards whose parent Rem no longer exists
-    if (notFoundRemIds.length > 0) {
-      await removeOrphanCards(plugin, notFoundRemIds);
+    // Offer to clean up orphan cards whose parent Rem no longer exists.
+    // Union this run's not-found rems with any flagged by the last cache build
+    // (Phase 2 stashes them under orphanRemIdsKey), then clear the stash so the
+    // startup nag doesn't persist after the user has acted on it.
+    const stashedOrphanIds = (await plugin.storage.getSession<string[]>(orphanRemIdsKey)) || [];
+    const orphanIdsToCheck = Array.from(new Set([...notFoundRemIds, ...stashedOrphanIds]));
+    if (orphanIdsToCheck.length > 0) {
+      await removeOrphanCards(plugin, orphanIdsToCheck);
+      await plugin.storage.setSession(orphanRemIdsKey, []);
     }
   } catch (error) {
     console.error('Error during Card Priorities Update:', error);
@@ -428,9 +435,66 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
     return;
   }
 
-  // Group confirmed orphan cards by remId for a readable summary
+  // ── Segregate by review history ──────────────────────────────────────
+  // A card's repetitionHistory holds its review & time-spent records, which
+  // still surface in some RemNote statistics even after the parent rem is
+  // gone. Let the user preserve those cards while cleaning the rest.
+  const hasHistory = (card: (typeof confirmedOrphanCards)[number]) =>
+    Array.isArray(card.repetitionHistory) && card.repetitionHistory.length > 0;
+  const withHistory = confirmedOrphanCards.filter(hasHistory);
+  const withoutHistory = confirmedOrphanCards.filter((c) => !hasHistory(c));
+
+  console.log(
+    `Orphan cards: ${confirmedOrphanCards.length} total — ` +
+    `${withHistory.length} with review history, ${withoutHistory.length} without.`
+  );
+
+  // Decide which set to remove. If none have history, there is nothing to
+  // preserve, so skip the choice and remove them all as before.
+  let cardsToRemove = confirmedOrphanCards;
+  if (withHistory.length > 0) {
+    // OK      → preserve history: remove only the history-less cards.
+    // Cancel  → fall through to a second confirm for deleting everything.
+    const preserveHistory = confirm(
+      `🗑️ Remove Orphan Cards\n\n` +
+      `Found ${confirmedOrphanCards.length} orphan card(s):\n` +
+      `  • ${withHistory.length} have review history (reviews & time-spent stats)\n` +
+      `  • ${withoutHistory.length} have no review history\n\n` +
+      `Deleting cards with review history permanently removes those records from RemNote statistics.\n\n` +
+      `➡️ OK = delete only the ${withoutHistory.length} card(s) WITHOUT history (keep the ${withHistory.length} with history)\n` +
+      `➡️ Cancel = choose to delete ALL, including those with history`
+    );
+
+    if (preserveHistory) {
+      cardsToRemove = withoutHistory;
+    } else {
+      const deleteAll = confirm(
+        `⚠️ Delete ALL orphan cards?\n\n` +
+        `This permanently removes all ${confirmedOrphanCards.length} orphan card(s), including the ` +
+        `${withHistory.length} with review history — their review/time-spent records will be lost.\n\n` +
+        `OK = delete all ${confirmedOrphanCards.length}\n` +
+        `Cancel = abort (delete nothing)`
+      );
+      if (!deleteAll) {
+        console.log('Orphan card removal cancelled by user (history choice).');
+        await plugin.app.toast('Orphan card removal cancelled.');
+        return;
+      }
+      cardsToRemove = confirmedOrphanCards;
+    }
+  }
+
+  if (cardsToRemove.length === 0) {
+    console.log('No orphan cards to remove after history filter (all had review history).');
+    await plugin.app.toast('ℹ️ Nothing to remove — all orphan cards have review history.');
+    return;
+  }
+
+  const preservedCount = confirmedOrphanCards.length - cardsToRemove.length;
+
+  // Group the cards we will remove by remId for a readable summary
   const byRemId: Record<string, number> = {};
-  for (const card of confirmedOrphanCards) {
+  for (const card of cardsToRemove) {
     byRemId[card.remId] = (byRemId[card.remId] || 0) + 1;
   }
 
@@ -444,7 +508,8 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   // First: a summary dialog so the user knows the total scope
   const overviewOk = confirm(
     `🗑️ Remove Orphan Cards\n\n` +
-    `Found ${confirmedOrphanCards.length} card(s) across ${entries.length} missing Rem(s).\n\n` +
+    `About to remove ${cardsToRemove.length} card(s) across ${entries.length} missing Rem(s).\n\n` +
+    `${preservedCount > 0 ? `Preserving ${preservedCount} card(s) with review history.\n\n` : ''}` +
     `These cards are no longer reviewable and take up space in your queue.\n\n` +
     `⚠️ This action cannot be undone.\n\n` +
     `You will be shown the list ${totalPages > 1 ? `in ${totalPages} pages of ${confirmPageSize}` : 'now'} to confirm.\n\n` +
@@ -490,8 +555,8 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   const batchSize = 25;
 
   try {
-    for (let i = 0; i < confirmedOrphanCards.length; i += batchSize) {
-      const batch = confirmedOrphanCards.slice(i, i + batchSize);
+    for (let i = 0; i < cardsToRemove.length; i += batchSize) {
+      const batch = cardsToRemove.slice(i, i + batchSize);
       await Promise.all(
         batch.map(async (card) => {
           try {
@@ -505,8 +570,8 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
         })
       );
 
-      const progress = Math.round(((i + batch.length) / confirmedOrphanCards.length) * 100);
-      await plugin.app.toast(`Removing orphan cards: ${progress}% (${i + batch.length}/${confirmedOrphanCards.length})`);
+      const progress = Math.round(((i + batch.length) / cardsToRemove.length) * 100);
+      await plugin.app.toast(`Removing orphan cards: ${progress}% (${i + batch.length}/${cardsToRemove.length})`);
     }
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
@@ -515,6 +580,7 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   const resultMessage =
     `🗑️ Orphan Card Cleanup Complete\n\n` +
     `• Removed: ${removed} card(s)\n` +
+    `${preservedCount > 0 ? `• Preserved (with review history): ${preservedCount} card(s)\n` : ''}` +
     `${removalErrors > 0 ? `• Failed: ${removalErrors} card(s) — check console\n` : ''}` +
     `\nThese cards belonged to Rems that no longer exist in your knowledge base.`;
 
@@ -1179,4 +1245,225 @@ export async function sanitizeAllRogueCardPriorityTags(plugin: RNPlugin) {
     ? ` (${preservedAnchors.length} manual/incremental anchor(s) preserved)`
     : '';
   await plugin.app.toast(`Sanitized! Cleaned ${totalCleaned} rogue tag(s) across your KB${anchorNote}.`);
+}
+
+// ---------------------------------------------------------------------------
+// Cross-KB import diagnostic
+// ---------------------------------------------------------------------------
+//
+// Checks whether a rem's card priority is attached to a CardPriority powerup other
+// than the one this KB registered — i.e. whether values are present but unreachable
+// by code, rather than absent.
+//
+// HISTORICAL NOTE, so this is not misread as a statement of cause: this was written
+// while investigating manual priorities being lost on import between knowledge
+// bases, under the hypothesis that the values had been orphaned onto an imported
+// duplicate powerup. That hypothesis was WRONG. The cause was established later by
+// exporting the same document from source and target and diffing the raw files
+// (scripts/analyze_rem_export.js): RemNote's importer attaches a transient,
+// unresolvable CardPriority powerup, then ~250ms later re-points the rem at the
+// registered one and DISCARDS the slot values in the swap. It reproduces with the
+// plugin fully disabled, so no plugin code causes or can prevent it.
+//
+// This scan correctly returns zero in that scenario — the values are cleared in
+// place, not relocated. It is retained because "value sitting on a foreign powerup"
+// remains a coherent state to rule out, and ruling it out is what redirected the
+// investigation. Read-only.
+
+export interface OrphanedPriorityNode {
+  remId: string;
+  text: string;
+  depth: number;
+  /** What the plugin sees today, through THIS KB's registered powerup. */
+  activePriority: string | null;
+  activeSource: string | null;
+  /** What is sitting on a foreign CardPriority powerup, unreachable by code. */
+  orphanPriority: string | null;
+  orphanSource: string | null;
+  orphanPowerupId: string | null;
+  /** True when the two disagree — i.e. a real recovery candidate. */
+  recoverable: boolean;
+}
+
+export interface OrphanScanResult {
+  registeredPowerupId: string | null;
+  nodes: OrphanedPriorityNode[];
+  /** Distinct foreign powerup rems seen, with how many rems each accounts for. */
+  foreignPowerups: Array<{ id: string; name: string; remCount: number }>;
+}
+
+/** Slot display names as registered in register/powerups.tsx, lowercased. */
+const CARD_PRIORITY_SLOT_NAMES: Record<string, 'priority' | 'source' | 'lastUpdated'> = {
+  'priority': 'priority',
+  'priority source': 'source',
+  'last updated': 'lastUpdated',
+};
+
+/**
+ * Reads a property rem's value. Deliberately not safeRemTextToString: that maps
+ * empty to the literal 'Untitled', which here would read as a value rather than
+ * as absence.
+ */
+async function readSlotValue(plugin: RNPlugin, rem: PluginRem): Promise<string | null> {
+  try {
+    if (!rem.text?.length) return null;
+    const s = await plugin.richText.toString(rem.text);
+    return s && s.trim().length > 0 ? s.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * DIAGNOSTIC: walk `rootRem` (+ descendants) looking for card priority values
+ * attached to a CardPriority powerup OTHER than the one registered in this KB —
+ * the signature of a cross-KB import.
+ *
+ * Read-only. Writes nothing, so it is safe to run on a suspect subtree before
+ * deciding whether a recovery pass is worth building.
+ */
+export async function findOrphanedImportedCardPriorities(
+  plugin: RNPlugin,
+  rootRem: PluginRem,
+  recursive: boolean = true
+): Promise<OrphanScanResult> {
+  const registered = await plugin.powerup.getPowerupByCode('cardPriority');
+  const registeredPowerupId = registered?._id ?? null;
+  const slotDefs = await getCardPrioritySlotDefIds(plugin);
+
+  const nodes: OrphanedPriorityNode[] = [];
+  const foreign = new Map<string, { name: string; remCount: number }>();
+
+  // Cache per slot-def rem: is it a CardPriority slot, and which one? Slot
+  // definitions are shared by every rem carrying the tag, so this collapses the
+  // per-child lookups to one resolution per distinct slot across the whole walk.
+  const slotIdentity = new Map<
+    string,
+    { kind: 'priority' | 'source' | 'lastUpdated'; powerupId: string | null } | null
+  >();
+
+  const identifySlot = async (slotRem: PluginRem) => {
+    const cached = slotIdentity.get(slotRem._id);
+    if (cached !== undefined) return cached;
+
+    let result: { kind: 'priority' | 'source' | 'lastUpdated'; powerupId: string | null } | null = null;
+    try {
+      const name = (await readSlotValue(plugin, slotRem))?.toLowerCase();
+      const kind = name ? CARD_PRIORITY_SLOT_NAMES[name] : undefined;
+      if (kind) {
+        // Confirm it really is a CardPriority slot and not some unrelated rem
+        // that happens to be called "Priority": its parent must be a powerup
+        // rem named CardPriority.
+        const parent = slotRem.parent ? await plugin.rem.findOne(slotRem.parent) : undefined;
+        const parentName = parent ? (await readSlotValue(plugin, parent))?.toLowerCase() : null;
+        if (parent && parentName === 'cardpriority') {
+          result = { kind, powerupId: parent._id };
+        }
+      }
+    } catch {
+      result = null;
+    }
+    slotIdentity.set(slotRem._id, result);
+    return result;
+  };
+
+  const visit = async (node: PluginRem, depth: number) => {
+    let orphanPriority: string | null = null;
+    let orphanSource: string | null = null;
+    let orphanPowerupId: string | null = null;
+
+    let children: PluginRem[] = [];
+    try { children = await node.getChildrenRem(); } catch { children = []; }
+
+    for (const child of children) {
+      let tags: PluginRem[] = [];
+      try { tags = (await child.getTagRems()) as PluginRem[]; } catch { continue; }
+
+      for (const tag of tags) {
+        // A slot this KB owns is by definition reachable via getPowerupProperty,
+        // so it is not what we are hunting.
+        if (slotDefs.all.has(tag._id)) continue;
+
+        const identity = await identifySlot(tag);
+        if (!identity) continue;
+        if (identity.powerupId && identity.powerupId === registeredPowerupId) continue;
+
+        const value = await readSlotValue(plugin, child);
+        if (value === null) continue;
+
+        if (identity.kind === 'priority') orphanPriority = value;
+        else if (identity.kind === 'source') orphanSource = value;
+        orphanPowerupId = identity.powerupId;
+      }
+    }
+
+    if (orphanPriority !== null || orphanSource !== null) {
+      let activePriority: string | null = null;
+      let activeSource: string | null = null;
+      try { activePriority = (await node.getPowerupProperty('cardPriority', 'priority')) || null; } catch { /* ignore */ }
+      try { activeSource = (await node.getPowerupProperty('cardPriority', 'prioritySource')) || null; } catch { /* ignore */ }
+
+      if (orphanPowerupId) {
+        const entry = foreign.get(orphanPowerupId) || { name: 'CardPriority (imported)', remCount: 0 };
+        entry.remCount++;
+        foreign.set(orphanPowerupId, entry);
+      }
+
+      nodes.push({
+        remId: node._id,
+        text: await safeRemTextToString(plugin, node.text),
+        depth,
+        activePriority,
+        activeSource,
+        orphanPriority,
+        orphanSource,
+        orphanPowerupId,
+        // Only interesting when the live value differs from the imported one —
+        // matching values mean the import already resolved correctly for this rem.
+        recoverable: orphanPriority !== null && orphanPriority !== activePriority,
+      });
+    }
+
+    if (recursive) {
+      for (const child of children) {
+        await visit(child, depth + 1);
+      }
+    }
+  };
+
+  await visit(rootRem, 0);
+
+  const foreignPowerups = [...foreign.entries()].map(([id, v]) => ({
+    id,
+    name: v.name,
+    remCount: v.remCount,
+  }));
+
+  console.log('\n========== IMPORTED CARD PRIORITY SCAN ==========');
+  console.log(`Registered cardPriority powerup in this KB: ${registeredPowerupId ?? '(none)'}`);
+  console.log(`Rems carrying priority values on a FOREIGN powerup: ${nodes.length}`);
+  console.log(`Of those, recoverable (imported value differs from live value): ${nodes.filter(n => n.recoverable).length}`);
+  if (foreignPowerups.length > 0) {
+    console.log('Foreign CardPriority powerup rems found:');
+    console.table(foreignPowerups);
+  }
+  if (nodes.length > 0) {
+    console.table(
+      nodes.map((n) => ({
+        rem: n.text.slice(0, 50),
+        remId: n.remId,
+        live: `${n.activePriority ?? '—'} (${n.activeSource ?? '—'})`,
+        imported: `${n.orphanPriority ?? '—'} (${n.orphanSource ?? '—'})`,
+        recoverable: n.recoverable,
+      }))
+    );
+  } else {
+    console.log(
+      'No orphaned values found. If priorities are still missing, the values did not ' +
+      'survive the export at all — recovery would have to come from the source KB.'
+    );
+  }
+  console.log('==================================================\n');
+
+  return { registeredPowerupId, nodes, foreignPowerups };
 }

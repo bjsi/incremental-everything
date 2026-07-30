@@ -524,7 +524,7 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
         }
       }
 
-      // Cluster-aware: prefer the sibling cardId signaled by card_priority_display widget.
+      // Cluster-aware: prefer the sibling cardId signaled by card_info_bar widget.
       // Falls back to data.cardId when the widget hasn't mounted or hasn't signaled yet.
       // Note: do NOT clear clusterVisibleCardId here — queue_session.ts also reads it in
       // its own QueueCompleteCard listener, and clear order across listeners is not
@@ -698,7 +698,7 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       // --- Cluster card drill detection ---
       // QueueCompleteCard does not fire for cluster card ratings. GlobalRemChanged fires instead,
       // but with the cluster PARENT rem's ID — not the individual child card rem IDs. The bridge
-      // is clusterVisibleCardId: card_priority_display writes the sibling's cardId there before
+      // is clusterVisibleCardId: card_info_bar writes the sibling's cardId there before
       // the user can rate it, and GlobalRemChanged fires before QueueLoadCard clears it for the
       // next card. So at the time this runs, clusterVisibleCardId == the sibling just rated.
       //
@@ -1105,7 +1105,7 @@ export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
 /**
  * Handles Mastery Drill add/remove for cards that are presented inside the drill popup
  * but whose ratings produce no QueueCompleteCard event (cluster cards) and whose
- * clusterVisibleCardId signal is unavailable (card_priority_display is not mounted there).
+ * clusterVisibleCardId signal is unavailable (card_info_bar is not mounted there).
  *
  * Strategy: on each QueueLoadCard (next card loaded → previous card was just rated) and on
  * QueueExit (last card in drill), check the previous card's latest repetition history entry.

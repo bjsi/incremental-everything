@@ -2,7 +2,7 @@ import { renderWidget, usePlugin, useRunAsync, useTrackerPlugin } from '@remnote
 import React, { useState, useMemo, useRef } from 'react';
 import { allIncrementalRemKey, allCardPriorityInfoKey, powerupCode, prioritySlotCode } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { CardPriorityInfo } from '../lib/card_priority';
 import { extractText, determineIncRemType, getTotalTimeSpent, getTopLevelDocument, getBreadcrumbText } from '../lib/incRemHelpers';
@@ -295,7 +295,7 @@ export function IncRemMainView() {
     pendingPriorityChanges.current[remId] = newPriority;
 
     // Persist to powerup property
-    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+    await setIncRemPriority(plugin, rem, newPriority);
 
     // Update the cache
     const incRemInfo = await getIncrementalRemFromRem(plugin, rem);

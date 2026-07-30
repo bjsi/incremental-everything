@@ -2,6 +2,7 @@ import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { getIncrementalRemFromRem } from '../incremental_rem';
 import { buildComprehensiveScope } from '../scope_helpers';
 import { findClosestAncestorWithAnyPriority } from '../priority_inheritance';
+import { syncPriorityBand } from '../priority_bands';
 import dayjs from 'dayjs';
 import {
   allCardPriorityInfoKey,
@@ -167,6 +168,17 @@ export async function setCardPriority(
     rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]),
     rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()])
   ]);
+
+  // Keep the table-cell badge in step. Static import: a dynamic import() here
+  // emits a chunk the RemNote index sandbox cannot evaluate ("Cannot use
+  // 'import.meta' outside a module"). priority_bands only pulls constants from
+  // card_priority/types, so there is no cycle to dodge. syncPriorityBand writes
+  // nothing when the band is already correct, so this cannot loop.
+  try {
+    await syncPriorityBand(plugin, rem);
+  } catch (err) {
+    console.error('[CardPriority] band sync failed', err);
+  }
 }
 
 /**
@@ -463,13 +475,50 @@ export async function recalculateTreeInheritance(
   plugin: RNPlugin,
   rootRem: PluginRem
 ): Promise<number> {
-  let updatedCount = 0;
-  const descendants = await rootRem.getDescendants();
+  return recalculateTreeInheritanceBatch(plugin, [rootRem]);
+}
 
-  // Fast path: a rem with no descendants (e.g. a freshly-created leaf extract) has
-  // nothing to cascade into. Return before the expensive plugin.card.getAll() below,
-  // which loads the ENTIRE card database — a ~seconds-long cost on large libraries
-  // that was being paid on every new-IncRem save for zero benefit.
+/**
+ * Batch form of recalculateTreeInheritance: cascades from MANY roots in a single pass.
+ *
+ * Why this exists: the per-root function loads the ENTIRE card database
+ * (plugin.card.getAll()) to build the has-cards index. Bulk flows — batch card
+ * priority over a tag, batch IncRem priority, interval batch save — produce one
+ * cascade root per modified rem (hundreds of them), and running them one at a time
+ * paid that multi-second full-DB load once *per root*. A 625-rem batch cost ~17
+ * minutes of background cascades, essentially all of it repeated getAll() calls.
+ *
+ * Here the card index and the defaultCardPriority setting are read ONCE, and the
+ * union of all roots' descendants is deduplicated before the walk — overlapping
+ * subtrees (common when the selection is a tag's members) are visited a single time.
+ *
+ * @param onProgress optional callback invoked as descendant batches complete, so
+ *   long-running bulk cascades can report progress instead of going silent.
+ */
+export async function recalculateTreeInheritanceBatch(
+  plugin: RNPlugin,
+  rootRems: PluginRem[],
+  onProgress?: (done: number, total: number) => void
+): Promise<number> {
+  if (rootRems.length === 0) return 0;
+
+  // Union of every root's descendants, deduplicated by rem id. Roots frequently
+  // share subtrees (or are each other's descendants) in bulk operations, and
+  // walking a rem twice is pure waste — the second pass finds the value already
+  // correct and does nothing.
+  const descendantsById = new Map<string, PluginRem>();
+  for (const rootRem of rootRems) {
+    const descendants = await rootRem.getDescendants();
+    for (const d of descendants) {
+      if (!descendantsById.has(d._id)) descendantsById.set(d._id, d);
+    }
+  }
+  const descendants = [...descendantsById.values()];
+
+  // Fast path: roots with no descendants at all (e.g. freshly-created leaf extracts)
+  // have nothing to cascade into. Return before the expensive plugin.card.getAll()
+  // below, which loads the ENTIRE card database — a ~seconds-long cost on large
+  // libraries that was being paid on every new-IncRem save for zero benefit.
   if (descendants.length === 0) {
     return 0;
   }
@@ -485,6 +534,11 @@ export async function recalculateTreeInheritance(
     if (c.remId) remIdsWithCards.add(c.remId);
   }
 
+  // Hoisted out of the per-descendant loop: this is a constant for the whole walk.
+  const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+  const { updateCardPriorityCache } = await import('./cache');
+
+  let updatedCount = 0;
   const batchSize = 50;
   for (let i = 0; i < descendants.length; i += batchSize) {
     const batch = descendants.slice(i, i + batchSize);
@@ -510,19 +564,19 @@ export async function recalculateTreeInheritance(
       const cardInfo = await getCardPriority(plugin, descendant);
       if (!cardInfo || (cardInfo.source !== 'manual' && cardInfo.source !== 'incremental')) {
         const closerAncestor = await findClosestAncestorWithPriority(plugin, descendant);
-        const targetPriority = closerAncestor ? closerAncestor.priority : ((await plugin.settings.getSetting<number>('defaultCardPriority')) || 50);
+        const targetPriority = closerAncestor ? closerAncestor.priority : defaultPriority;
         const targetSource = closerAncestor ? 'inherited' : 'default';
 
         if (!cardInfo || cardInfo.priority !== targetPriority || cardInfo.source !== targetSource) {
           await setCardPriority(plugin, descendant, targetPriority, targetSource);
           // We let the caller flush the cache updates
-          // Import updateCardPriorityCache locally to avoid circular dependencies if necessary
-          const { updateCardPriorityCache } = await import('./cache');
           await updateCardPriorityCache(plugin, descendant._id);
           updatedCount++;
         }
       }
     }));
+
+    onProgress?.(Math.min(i + batchSize, descendants.length), descendants.length);
   }
   return updatedCount;
 }

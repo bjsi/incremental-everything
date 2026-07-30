@@ -8,7 +8,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useMemo } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { getCardPriority } from '../lib/card_priority';
+import { getCardPriority, setCardPriority } from '../lib/card_priority';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
@@ -65,9 +65,10 @@ async function getBreadcrumb(plugin: RNPlugin, rem: PluginRem): Promise<string> 
     : undefined;
 
   for (let i = 0; i < MAX_BREADCRUMB_DEPTH && current; i++) {
-    const label = current.text
-      ? await plugin.richText.toString(current.text)
-      : 'Untitled';
+    // safeRemTextToString, not a truthiness ternary around richText.toString(): an
+    // empty rich-text array `[]` is truthy but toString() rejects it ("Invalid input"),
+    // which threw out of getBreadcrumb and dropped the whole rem from the list.
+    const label = await safeRemTextToString(plugin, current.text);
     parts.unshift(label.substring(0, 40)); // cap label length
     current = current.parent ? await plugin.rem.findOne(current.parent) : undefined;
   }
@@ -155,10 +156,11 @@ function BatchCardPriority() {
           return;
         }
 
-        const frontText = anchorRem.text
-          ? await plugin.richText.toString(anchorRem.text)
-          : await safeRemTextToString(plugin, anchorRem.text);
-        const backText = anchorRem.backText
+        // Always go through safeRemTextToString: the old `text ? toString(text) : safe(...)`
+        // ternary routed AROUND the safe helper for every non-null value, so an empty
+        // array (truthy) or corrupt richText hit toString() raw and threw "Invalid input".
+        const frontText = await safeRemTextToString(plugin, anchorRem.text);
+        const backText = anchorRem.backText?.length
           ? await plugin.richText.toString(anchorRem.backText)
           : '';
         const anchorText = backText
@@ -209,10 +211,8 @@ function BatchCardPriority() {
 
         for (const rem of scopedRems) {
           try {
-            const remFront = rem.text
-              ? await plugin.richText.toString(rem.text)
-              : await safeRemTextToString(plugin, rem.text);
-            const remBack = rem.backText
+            const remFront = await safeRemTextToString(plugin, rem.text);
+            const remBack = rem.backText?.length
               ? await plugin.richText.toString(rem.backText)
               : '';
             const remText = remBack ? `${remFront} → ${remBack}` : remFront;
@@ -363,9 +363,13 @@ function BatchCardPriority() {
             }
 
             await remData.rem.addPowerup('cardPriority');
-            await remData.rem.setPowerupProperty('cardPriority', 'priority', [priority.toString()]);
-            await remData.rem.setPowerupProperty('cardPriority', 'prioritySource', ['manual']);
-            await remData.rem.setPowerupProperty('cardPriority', 'lastUpdated', [new Date().toISOString()]);
+            // setCardPriority rather than three raw setPowerupProperty calls: it is
+            // the chokepoint that also syncs the PriorityBand table-cell badge, and
+            // writing the slots directly left every rem in the batch showing a stale
+            // band. It also writes lastUpdated as an epoch number — the raw path wrote
+            // an ISO string, which getCardPriority's `parseInt(lastUpdated) || now`
+            // silently read back as the year (2026 ms after 1970).
+            await setCardPriority(plugin, remData.rem, priority, 'manual');
             await updateCardPriorityCache(plugin, remData.remId);
 
             // Show progress

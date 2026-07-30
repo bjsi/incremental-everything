@@ -333,6 +333,17 @@ export async function registerClozeExtractCSS(plugin: ReactRNPlugin) {
       opacity: 1;
       filter: grayscale(0%);
     }
+
+    /* Dark-mode contrast fix for the "already-clozed" source mark that Create
+       Cloze Deletion applies to the parent text (yellow highlight + red font,
+       see commands.ts). Bright-yellow-bg/red-text is low-contrast on a dark
+       canvas; swap to deep amber + light coral. The yellow+red class pair is
+       unique to our mark, so native RemNote clozes are left untouched. Covers
+       both the editor leaf container and the queue linear-editor item. */
+    .dark .has-highlight-color.highlight-color--yellow.text-color--red {
+      background-color: #4a3700 !important;
+      color: #ff9e80 !important;
+    }
   `;
   await plugin.app.registerCSS('cloze-extract-badge', css);
 }

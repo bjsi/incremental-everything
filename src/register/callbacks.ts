@@ -47,11 +47,11 @@ const QUEUE_LAYOUT_FIX_CSS = `
     flex-grow: 1 !important;
   }
 
-  /* Ensure card_priority_display (our widget) renders above flashcard-repetition-history.
+  /* Ensure card_info_bar (our widget) renders above flashcard-repetition-history.
      The parent flashcard container is already "flex flex-col", so flex order is sufficient.
-     Scoped to only activate when our card_priority_display iframe is present, so regular
+     Scoped to only activate when our card_info_bar iframe is present, so regular
      flashcards without the plugin widget are not affected. */
-  .box-border.flex.flex-col:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=card_priority_display&"])
+  .box-border.flex.flex-col:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=card_info_bar&"])
     .fade-in-first-load:has(iframe[data-plugin-id="flashcard-repetition-history"]) {
     order: 1;
   }

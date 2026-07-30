@@ -31,8 +31,13 @@ import {
   priorityCalcScopeRemIdsKey,
   sourceFloatingTargetKey,
   sourceFloatingActiveIdKey,
+  preservedHistoryPowerupCode,
 } from '../lib/consts';
-import { computeWeightedShieldBreakdown } from '../lib/utils';
+import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
+import {
+  planPreserveHistoryAndRemove,
+  executePreserveHistoryAndRemove,
+} from '../lib/history_transfer';
 import { resolvePowerupSlotDiagnostic } from '../lib/powerup_slot_compat';
 import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
@@ -111,7 +116,35 @@ import {
   breakInlineListToChildren,
   restoreListRem,
 } from '../lib/listify';
+import { resolvePriorityTargets } from '../lib/priority_targets';
+// Static, not dynamic: any chunk a dynamic import() emits here is evaluated by
+// the RemNote index sandbox as a classic script and dies on `import.meta`.
+import { syncPriorityBands, removeAllPriorityBands, clearBandEligibilityCache } from '../lib/priority_bands';
+import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
+import { batchPriorityTargetRemIdsKey } from '../lib/consts';
 
+// Opens a priority popup against one or many rems. Single-rem calls behave
+// exactly as before; multi-rem calls hand the full id list to the widget through
+// session storage (openPopup's contextData is not a reliable place for arrays
+// the widget re-reads across renders) and flag batchMode so it applies to all.
+async function openPriorityPopupForTargets(
+  plugin: ReactRNPlugin,
+  widgetId: 'priority' | 'priority_light',
+  remIds: string[]
+) {
+  // Clear stale targets first so a widget that mounts mid-write can never read
+  // the previous command's selection.
+  await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
+  await plugin.storage.setSession(
+    batchPriorityTargetRemIdsKey,
+    remIds.length > 1 ? remIds : null
+  );
+
+  await plugin.widget.openPopup(widgetId, {
+    remId: remIds[0],
+    ...(remIds.length > 1 ? { batchMode: true, batchCount: remIds.length } : {}),
+  });
+}
 
 export async function registerCommands(plugin: ReactRNPlugin) {
   // Subscribe to EditorSelectionChanged so getEffectiveSelection() can recover
@@ -130,6 +163,107 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       await plugin.app.toast(
         enabled ? 'Highlight marker borders shown' : 'Highlight marker borders hidden (peek)'
       );
+    },
+  });
+
+  // Preserve history & remove: delete a rem's content (and its whole subtree)
+  // the way native delete does, but first consolidate all repetition history in
+  // the subtree — flashcards, Incremental and Dismissed powerups — onto the
+  // target's Dismissed powerup so the Study Dashboard keeps the study time.
+  await plugin.app.registerCommand({
+    id: 'preserve-history-and-remove',
+    name: 'Preserve history & remove',
+    quickCode: 'phr',
+    action: async () => {
+      // Resolve the target rem in BOTH contexts — the focused rem in the editor,
+      // or the current rem in the queue (the active card's rem, or the active
+      // IncRem via session storage). Mirrors 'Review in Editor (Execute Repetition)'.
+      let target: PluginRem | undefined;
+      const url = await plugin.window.getURL();
+      const isQueue = !!(url && url.includes('/flashcards'));
+      if (isQueue) {
+        const currentQueueItem = await plugin.queue.getCurrentCard();
+        let remId = currentQueueItem?.remId;
+        if (!remId) {
+          remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+        }
+        target = remId ? (await plugin.rem.findOne(remId)) || undefined : undefined;
+      } else {
+        target = await plugin.focus.getFocusedRem();
+      }
+
+      if (!target) {
+        await plugin.app.toast(
+          isQueue
+            ? 'No active card or Incremental Rem in the queue.'
+            : 'No focused rem — place your cursor in a rem first.'
+        );
+        return;
+      }
+      if (await target.hasPowerup(preservedHistoryPowerupCode)) {
+        await plugin.app.toast('This rem is already a preserved-history tombstone.');
+        return;
+      }
+
+      // Resolve the name up-front so the confirmation can name the exact rem —
+      // critical in the queue, where the previewer/sidebar can hold a different
+      // rem than the one you think is selected.
+      const rawName = await safeRemTextToString(plugin, target.text);
+      const remName = rawName.length > 80 ? rawName.slice(0, 80) + '…' : rawName;
+
+      await plugin.app.toast('🔍 Scanning subtree…');
+      const plan = await planPreserveHistoryAndRemove(plugin, target);
+
+      const repCount = plan.merged.length;
+      const timeStr = formatDuration(Math.round(plan.totalReviewSeconds)) || '0s';
+      const historyLine =
+        repCount > 0
+          ? `• ${repCount} review(s) (≈ ${timeStr}) will be preserved on this rem`
+          : `• No review history found — this will FULLY delete the rem`;
+
+      const ok = confirm(
+        `🪦 Preserve history & remove\n\n` +
+          `Rem: "${remName}"\n\n` +
+          (plan.descendantCount > 0
+            ? `• ${plan.descendantCount} descendant rem(s) will be permanently deleted\n`
+            : '') +
+          (plan.cards.length > 0 ? `• ${plan.cards.length} flashcard(s) will be removed\n` : '') +
+          `${historyLine}\n` +
+          (plan.externalRefCount > 0
+            ? `• ${plan.externalRefCount} reference(s) from elsewhere will break\n`
+            : '') +
+          `\n⚠️ This cannot be undone.\n\nContinue?`
+      );
+      if (!ok) {
+        await plugin.app.toast('Cancelled.');
+        return;
+      }
+
+      // In the queue, advance off the current card BEFORE deleting it. Otherwise
+      // the queue keeps trying to render a rem/card we just removed and crashes
+      // ("Something went wrong"). removeCurrentCardFromQueue advances without
+      // recording a review (unlike rateCurrentCard). addToBackStack=false since
+      // the card is about to be deleted. Best-effort — it may not apply to an
+      // IncRem-type queue item.
+      if (isQueue) {
+        try {
+          await plugin.queue.removeCurrentCardFromQueue(false);
+        } catch (e) {
+          console.warn('[PreserveHistory] Could not advance the queue before deletion:', e);
+        }
+      }
+
+      try {
+        await executePreserveHistoryAndRemove(plugin, plan);
+        await plugin.app.toast(
+          repCount > 0
+            ? `✅ Content removed. ${repCount} review(s) (${timeStr}) preserved.`
+            : `✅ Rem fully deleted (no history to preserve).`
+        );
+      } catch (e) {
+        console.error('[PreserveHistory] Error:', e);
+        await plugin.app.toast('❌ Error during Preserve history & remove — see console.');
+      }
     },
   });
 
@@ -773,76 +907,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'pri',
     action: async () => {
       console.log('--- Set Priority Command Triggered ---');
-      let remId: string | undefined;
-      const url = await plugin.window.getURL();
-      console.log('Current URL:', url);
+      const { remIds, source } = await resolvePriorityTargets(plugin);
+      console.log(`Set Priority targets: ${remIds.length} rem(s) from ${source}`);
 
-      // Check if we are in the queue AND targeting the flashcard explicitly
-      if (url.includes('/flashcards')) {
-        console.log('In flashcards view.');
-        const currentQueueItem = await plugin.queue.getCurrentCard();
-        const sel = await plugin.editor.getSelection();
-        const selType = sel?.type;
-
-        let isTargetingQueueContext = false;
-
-        // If no editor selection, we assume queue context
-        if (!selType) {
-          isTargetingQueueContext = true;
-        } else if (currentQueueItem) { // We have a native card AND a selection
-          if (selType === SelectionType.Rem && sel.remIds.includes(currentQueueItem.remId)) {
-            isTargetingQueueContext = true;
-          } else if (selType === SelectionType.Text && sel.remId === currentQueueItem.remId) {
-            isTargetingQueueContext = true;
-          }
-        } else {
-          // No current native card, maybe our Incremental Rem view
-          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-          if (currentIncRemId) {
-            if (selType === SelectionType.Rem && sel.remIds.includes(currentIncRemId)) {
-              isTargetingQueueContext = true;
-            } else if (selType === SelectionType.Text && sel.remId === currentIncRemId) {
-              isTargetingQueueContext = true;
-            }
-          }
-        }
-
-        if (isTargetingQueueContext) {
-          if (currentQueueItem) {
-            remId = currentQueueItem.remId;
-            console.log('Found native card. remId:', remId);
-          } else {
-            console.log('Not a native card. Checking session storage for incremental rem...');
-            remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
-            console.log('remId from session storage (currentIncRemKey):', remId);
-          }
-        } else {
-          console.log('In flashcards view, but explicit selection detected. Using selection.');
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
-            remId = (sel as any).remIds[0];
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
-            remId = (sel as any).remId;
-          }
-        }
-      } else {
-        console.log('Not in flashcards view. Getting focused editor rem.');
-        const focusedRem = await plugin.focus.getFocusedRem();
-        remId = focusedRem?._id;
-        console.log('Focused editor remId:', remId);
-      }
-
-      console.log('Final remId to be used:', remId);
-
-      if (!remId) {
-        console.log('Set Priority: No focused Rem or card in queue found. Aborting.');
+      if (!remIds.length) {
+        console.log('Set Priority: No selection, focused Rem or card in queue found. Aborting.');
         await plugin.app.toast('Could not find a Rem to set priority for.');
         return;
       }
 
-      console.log(`Opening 'priority' popup for remId: ${remId}`);
-      await plugin.widget.openPopup('priority', {
-        remId: remId,
-      });
+      await openPriorityPopupForTargets(plugin, 'priority', remIds);
     },
   });
 
@@ -856,68 +930,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async () => {
       const tCmd = performance.now();
       console.log('[set-priority-light] Command triggered');
-      let remId: string | undefined;
-      const url = await plugin.window.getURL();
 
-      // Context detection logic (Same as main command)
-      if (url.includes('/flashcards')) {
-        const currentQueueItem = await plugin.queue.getCurrentCard();
-        const sel = await plugin.editor.getSelection();
-        const selType = sel?.type;
+      const { remIds, source } = await resolvePriorityTargets(plugin);
+      console.log(
+        `[set-priority-light] context detection done: ${Math.round(performance.now() - tCmd)}ms, ` +
+        `${remIds.length} rem(s) from ${source}`
+      );
 
-        let isTargetingQueueContext = false;
-
-        if (!selType) {
-          isTargetingQueueContext = true;
-        } else if (currentQueueItem) {
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentQueueItem.remId)) {
-            isTargetingQueueContext = true;
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentQueueItem.remId) {
-            isTargetingQueueContext = true;
-          }
-        } else {
-          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-          if (currentIncRemId) {
-            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
-              isTargetingQueueContext = true;
-            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
-              isTargetingQueueContext = true;
-            }
-          }
-        }
-
-        if (isTargetingQueueContext) {
-          if (currentQueueItem) {
-            remId = currentQueueItem.remId;
-          } else {
-            remId = await plugin.storage.getSession<string>(currentIncRemKey) || undefined;
-          }
-        } else {
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
-            remId = sel.remIds[0];
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
-            remId = sel.remId;
-          }
-        }
-      } else {
-        const focusedRem = await plugin.focus.getFocusedRem();
-        remId = focusedRem?._id;
-      }
-
-      console.log(`[set-priority-light] context detection done: ${Math.round(performance.now() - tCmd)}ms, remId: ${remId}`);
-
-      if (!remId) {
+      if (!remIds.length) {
         await plugin.app.toast('No Rem found to set priority.');
         return;
       }
 
-      // Clear stale session storage to prevent race condition with widget context
-      await plugin.storage.setSession('priorityPopupTargetRemId', undefined);
-      console.log(`[set-priority-light] session cleared: ${Math.round(performance.now() - tCmd)}ms`);
-
-      await plugin.widget.openPopup('priority_light', {
-        remId: remId,
-      });
+      await openPriorityPopupForTargets(plugin, 'priority_light', remIds);
       console.log(`[set-priority-light] openPopup returned: ${Math.round(performance.now() - tCmd)}ms`);
     },
   });
@@ -1357,6 +1382,83 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Backfill / repair for the table-cell priority badges. The band tags are kept
+  // current by the write paths (setCardPriority and the three IncRem priority
+  // writes in tracker.ts), so this exists for two cases: the first run after
+  // enabling the feature, and repairing drift from a priority written by a path
+  // that predates the hooks.
+  plugin.app.registerCommand({
+    id: 'refresh-priority-bands',
+    name: 'Refresh Priority Badges (Tables)',
+    description:
+      'Recomputes the band tag that draws the priority badge inside table cells, for every IncRem and every rem with a card priority.',
+    action: async () => {
+      console.log('[PriorityBands] Refresh started');
+      // Tag definitions may have changed since the cache was filled.
+      clearBandEligibilityCache();
+      await plugin.app.toast('Refreshing priority badges…');
+      const t0 = performance.now();
+      try {
+        const [incPowerup, cardPowerup] = await Promise.all([
+          plugin.powerup.getPowerupByCode(powerupCode),
+          plugin.powerup.getPowerupByCode(CARD_PRIORITY_CODE),
+        ]);
+        const [incRems, cardRems] = await Promise.all([
+          incPowerup?.taggedRem() ?? Promise.resolve([]),
+          cardPowerup?.taggedRem() ?? Promise.resolve([]),
+        ]);
+
+        const remIds = Array.from(
+          new Set([...incRems, ...cardRems].map((r) => r._id))
+        );
+
+        // Suppress GlobalRemChanged for the duration — this writes powerups across
+        // potentially thousands of rems, exactly what the flag exists for.
+        console.log(
+          `[PriorityBands] Scanning ${remIds.length} rems ` +
+          `(${incRems.length} IncRems, ${cardRems.length} with card priority)`
+        );
+
+        if (!remIds.length) {
+          console.log('[PriorityBands] Refresh complete — nothing to do');
+          await plugin.app.toast('Priority badges: nothing to refresh.');
+          return;
+        }
+
+        await plugin.storage.setSession('plugin_operation_active', true);
+        let changed = 0;
+        try {
+          changed = await syncPriorityBands(plugin as any, remIds, (done, total, sofar) => {
+            console.log(`[PriorityBands] ${done}/${total} scanned, ${sofar} updated`);
+          });
+        } finally {
+          await plugin.storage.setSession('plugin_operation_active', false);
+        }
+
+        const secs = Math.round((performance.now() - t0) / 100) / 10;
+        const summary =
+          `Priority badges refreshed: ${changed} updated of ${remIds.length} rems in ${secs}s.`;
+        console.log(`[PriorityBands] ✅ ${summary}`);
+        await plugin.app.toast(`✅ ${summary}`);
+      } catch (err) {
+        console.error('[PriorityBands] refresh failed', err);
+        await plugin.app.toast('Refreshing priority badges failed — see console.');
+      }
+    },
+  });
+
+  // Command to bulk-import Incremental Rems with pre-computed rep histories
+  // from a JSON payload (e.g. generated by scripts/convert_study_log.py)
+  plugin.app.registerCommand({
+    id: 'import-incremental-history',
+    name: 'Import Incremental Rems with History',
+    description:
+      'Create Incremental Rems from a JSON file, including full repetition history, priority and Created date.',
+    action: async () => {
+      await plugin.widget.openPopup('import_increm_history');
+    },
+  });
+
   // Command to jump to rem by ID using a popup widget
   plugin.app.registerCommand({
     id: 'jump-to-rem-by-id',
@@ -1532,6 +1634,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       'Completely remove all CardPriority powerup tags and data from your knowledge base',
     action: async () => {
       await removeAllCardPriorityTags(plugin);
+    },
+  });
+
+  // Band cleanup — mirrors the CardPriority cleanup above. Unlike that one this
+  // destroys nothing: bands are derived from the priority slots, so "Refresh
+  // Priority Badges (Tables)" rebuilds them exactly.
+  await plugin.app.registerCommand({
+    id: 'cleanup-priority-bands',
+    name: 'Remove All Priority Band Tags',
+    description:
+      'Remove the PriorityBand0-9 tags that draw priority badges in table cells. No priority data is lost; rebuild with "Refresh Priority Badges (Tables)".',
+    action: async () => {
+      await removeAllPriorityBands(plugin as any);
     },
   });
 

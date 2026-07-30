@@ -127,6 +127,34 @@ export function formatDateForDisplay(canonical: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+/**
+ * Resolve a canonical "YYYY-MM-DD" string to local midnight of that calendar day.
+ *
+ * `new Date("2026-07-27")` is spec-mandated to parse date-only ISO strings as
+ * *UTC* midnight, so west-of-Greenwich users landed on the previous local day
+ * (UTC-3: 2026-07-26 21:00 local) and every custom range silently reported the
+ * wrong day. Building the Date from local Y/M/D components avoids the round trip.
+ * Non-canonical strings fall back to the permissive parse.
+ */
+function parseLocalDay(raw: string): number | null {
+  const m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : getStartOfDay(d);
+}
+
+/**
+ * Exclusive end of the local day containing `ms` (i.e. next local midnight).
+ * Adding a literal 86400000 would drift by an hour across a DST transition;
+ * incrementing the date component keeps the boundary on midnight.
+ */
+function nextLocalMidnight(ms: number): number {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+
 export function resolvePeriod(
   p: Period,
   customStart: string,
@@ -175,16 +203,16 @@ export function resolvePeriod(
     case 'since': {
       // "From this day on" — start = picked date, end = now (open-ended).
       // We reuse customStart for the date; customEnd is ignored.
-      const s = new Date(customStart);
-      const sMs = isNaN(s.getTime()) ? 0 : getStartOfDay(s);
-      return { startMs: sMs, endMs: now.getTime() + 86400000 };
+      const sMs = parseLocalDay(customStart);
+      return { startMs: sMs ?? 0, endMs: now.getTime() + 86400000 };
     }
     case 'custom': {
-      const s = new Date(customStart);
-      const e = new Date(customEnd);
-      const sMs = isNaN(s.getTime()) ? 0 : getStartOfDay(s);
-      const eMs = isNaN(e.getTime()) ? now.getTime() + 86400000 : getStartOfDay(e) + 86400000;
-      return { startMs: sMs, endMs: eMs };
+      const sMs = parseLocalDay(customStart);
+      const eMs = parseLocalDay(customEnd);
+      return {
+        startMs: sMs ?? 0,
+        endMs: eMs === null ? now.getTime() + 86400000 : nextLocalMidnight(eMs),
+      };
     }
   }
 }

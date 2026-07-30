@@ -87,6 +87,21 @@ const CORE_CSS = `
 .rn-queue__content .indented-rem:has(> .indented-rem > .rn-question-rem[data-queue-rem-container-tags~="removegrandparent"]) {
   margin-left: 0px !important;
 }
+
+/* ===== Preserved History (tombstones) =====
+   The 'Preserve history & remove' command scrubs a rem's content and tags it
+   with the Preserved History powerup. Always hidden — both in the editor
+   outline AND in the queue, where the tombstone can otherwise surface as extra
+   content under an Extra Card Detail parent. Defensive double-match covers
+   RemNote-side slugification differences. */
+.rem[data-rem-tags~="preservedhistory"],
+.rem[data-rem-tags~="preserved-history"] {
+  display: none !important;
+}
+.rn-queue__content [data-queue-rem-container-tags~="preservedhistory"]:not(.rn-question-rem),
+.rn-queue__content [data-queue-rem-container-tags~="preserved-history"]:not(.rn-question-rem) {
+  display: none !important;
+}
 `;
 
 /* LEGACY CSS — Hide in Queue, No Hierarchy, Hide Parent, Hide Grandparent.

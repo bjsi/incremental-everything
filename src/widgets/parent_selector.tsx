@@ -10,7 +10,13 @@ import {
   ReactRNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/consts';
+import {
+  powerupCode,
+  prioritySlotCode,
+  allIncrementalRemKey,
+  parentSelectorHeadingsOnlyKey,
+  parentSelectorHeadingsFirstKey,
+} from '../lib/consts';
 import { calculateRelativePercentile, percentileToHslColor } from '../lib/utils';
 import { IncrementalRem, initIncrementalRem } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -25,11 +31,13 @@ import {
   expandToLastDestination,
   flattenTreeForDisplay,
   createTreeNode,
+  annotateHeadingDescendants,
 } from '../lib/hierarchical_parent_selector/treeHelpers';
 import { createRemUnderParent } from '../lib/highlightActions';
 import { getIncrementalPageRange } from '../lib/pdfUtils';
 import { RemTextSegments } from '../components';
 import { applyHeadingLevel, getHeadingLevel } from '../lib/outline_restructure';
+import { HeadingBadge } from '../components/HeadingBadge';
 
 // ============================================================================
 // STYLES
@@ -197,6 +205,37 @@ const PriorityBadge: React.FC<PriorityBadgeProps> = ({
   );
 };
 
+/**
+ * Marks a row that is only shown in this branch because a portal mirrors it —
+ * the rem itself lives somewhere else. Filed content still lands in that real
+ * home, which is what the portal shows, so picking one of these is safe; the
+ * badge is there so the user knows the row isn't where it looks like it is.
+ */
+const PortalBadge: React.FC<{ breadcrumb?: string }> = ({ breadcrumb }) => (
+  <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '3px',
+      padding: '1px 5px',
+      borderRadius: '8px',
+      fontSize: '9px',
+      fontWeight: 700,
+      letterSpacing: '0.02em',
+      color: 'white',
+      backgroundColor: '#6366f1', // indigo-500: legible on both light and dark
+      whiteSpace: 'nowrap',
+    }}
+    title={
+      breadcrumb
+        ? `Shown here through a portal — this rem lives under:\n${breadcrumb}`
+        : 'Shown here through a portal — this rem lives elsewhere'
+    }
+  >
+    ⧉ portal
+  </span>
+);
+
 interface TreeNodeRowProps {
   node: ParentTreeNode;
   isSelected: boolean;
@@ -295,6 +334,12 @@ const TreeNodeRow = React.forwardRef<HTMLDivElement, TreeNodeRowProps>((
         }}
         isVisible={isSelected}
       />
+
+      {node.isPortal && <PortalBadge breadcrumb={node.portalBreadcrumb} />}
+
+      {/* Only headings get a badge here — the shared component's paragraph
+          marker (¶) would be noise on every non-heading row. */}
+      {node.headingLevel != null && <HeadingBadge level={node.headingLevel} />}
 
       <PriorityBadge
         priority={node.priority}
@@ -444,9 +489,98 @@ function ParentSelectorWidget() {
   const hasInitiallyScrolled = useRef(false);
   const listContainerRef = useRef<HTMLDivElement>(null);
 
+  // --- Hover arming -------------------------------------------------------
+  // The popup opens under the cursor and then scrolls the suggested row into
+  // view, which drags rows *underneath a stationary mouse* and fires
+  // mouseenter — silently throwing away the suggestion before the user has
+  // done anything. So hover only takes over once the pointer has genuinely
+  // moved (beyond jitter) and the popup has settled. Keyboard navigation
+  // disarms it again, so arrow keys can't be undone by a resting cursor.
+  const HOVER_GRACE_MS = 400;
+  const HOVER_MOVE_THRESHOLD_PX = 5;
+  const hoverArmedRef = useRef(false);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const mountedAtRef = useRef(Date.now());
+
+  const disarmHover = useCallback(() => {
+    hoverArmedRef.current = false;
+    // Re-baseline: the next move must clear the threshold from here.
+    lastMousePosRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      const prev = lastMousePosRef.current;
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+      if (!prev) return;
+      if (Date.now() - mountedAtRef.current < HOVER_GRACE_MS) return;
+      const moved = Math.abs(e.clientX - prev.x) + Math.abs(e.clientY - prev.y);
+      if (moved >= HOVER_MOVE_THRESHOLD_PX) hoverArmedRef.current = true;
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    return () => window.removeEventListener('mousemove', onMouseMove);
+  }, []);
+
+
   // NEW: State for inline child creation
   const [creatingChildForNodeId, setCreatingChildForNodeId] = useState<RemId | null>(null);
   const [isCreatingChild, setIsCreatingChild] = useState(false);
+
+  const handleRowHover = useCallback(
+    (index: number) => {
+      if (!hoverArmedRef.current || creatingChildForNodeId) return;
+      setSelectedIndex(index);
+    },
+    [creatingChildForNodeId]
+  );
+
+  // Per-device display settings for expanded branches (see consts).
+  // `settingsLoaded` gates initialization so the first selected index is
+  // computed against the same list the user will actually see.
+  const [headingsOnly, setHeadingsOnly] = useState(false);
+  const [headingsFirst, setHeadingsFirst] = useState(true);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [only, first] = await Promise.all([
+        plugin.storage.getLocal<boolean>(parentSelectorHeadingsOnlyKey),
+        plugin.storage.getLocal<boolean>(parentSelectorHeadingsFirstKey),
+      ]);
+      if (cancelled) return;
+      setHeadingsOnly(only === true);     // default OFF
+      setHeadingsFirst(first !== false);  // default ON
+      setSettingsLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [plugin]);
+
+  const toggleHeadingsOnly = useCallback(async () => {
+    const next = !headingsOnly;
+    setHeadingsOnly(next);
+    plugin.storage.setLocal(parentSelectorHeadingsOnlyKey, next);
+    containerRef.current?.focus();
+
+    // Branches expanded while the filter was off were never probed, so we don't
+    // yet know which of their plain rems lead to headings. Fill that in now;
+    // until it lands those rems stay visible, which is the safe direction.
+    if (next) {
+      const annotated = await annotateHeadingDescendants(plugin, tree, { recurse: true });
+      setTree(annotated);
+    }
+  }, [headingsOnly, plugin, tree]);
+
+  const toggleHeadingsFirst = useCallback(() => {
+    setHeadingsFirst((prev) => {
+      const next = !prev;
+      plugin.storage.setLocal(parentSelectorHeadingsFirstKey, next);
+      return next;
+    });
+    containerRef.current?.focus();
+  }, [plugin]);
 
   // Auto-focus the container when the popup opens
   useEffect(() => {
@@ -475,8 +609,45 @@ function ParentSelectorWidget() {
     []
   );
 
-  const displayList = useMemo(() => flattenTreeForDisplay(tree), [tree]);
+  // Rems the filter must never hide: the remembered destination and whatever
+  // we're suggesting. Both are often plain rems, and hiding the row the popup
+  // is actively recommending would be the worst possible filter behavior.
+  const pinnedRemIds = useMemo(() => {
+    const ids = new Set<RemId>();
+    if (contextData?.lastSelectedDestination) ids.add(contextData.lastSelectedDestination);
+    if (contextData?.contextRemId) ids.add(contextData.contextRemId);
+    if (suggestedRemId) ids.add(suggestedRemId);
+    return ids;
+  }, [contextData, suggestedRemId]);
+
+  const displayOptions = useMemo(
+    () => ({ headingsOnly, headingsFirst, alwaysShowRemIds: pinnedRemIds }),
+    [headingsOnly, headingsFirst, pinnedRemIds]
+  );
+
+  const displayList = useMemo(
+    () => flattenTreeForDisplay(tree, displayOptions),
+    [tree, displayOptions]
+  );
   const selectedNode = displayList[selectedIndex] || null;
+
+  // Keep the highlight on the same rem when the display options reorder or
+  // filter the list; if that rem is gone, just keep the index in range.
+  const selectedRemIdRef = useRef<RemId | null>(null);
+  useEffect(() => {
+    if (selectedNode) selectedRemIdRef.current = selectedNode.remId;
+  }, [selectedNode]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    const targetId = selectedRemIdRef.current;
+    const idx = targetId ? displayList.findIndex((n) => n.remId === targetId) : -1;
+    if (idx >= 0) {
+      setSelectedIndex((prev) => (prev === idx ? prev : idx));
+    } else {
+      setSelectedIndex((prev) => Math.min(prev, Math.max(0, displayList.length - 1)));
+    }
+  }, [displayList, isInitialized]);
 
   // Scroll to selected item whenever selectedIndex changes or after initialization
   useEffect(() => {
@@ -541,6 +712,9 @@ function ParentSelectorWidget() {
     // Without this gate the effect ran 3–4× per popup as each dep resolved
     // separately, redoing the full tree expansion each time.
     if (contextData === undefined || allIncrementalRems === undefined) return;
+    // Display settings decide the row order, so the initial selected index is
+    // only meaningful once they've loaded.
+    if (!settingsLoaded) return;
     if (!contextData?.rootCandidates || isInitialized) return;
 
     const initializeTree = async () => {
@@ -549,9 +723,14 @@ function ParentSelectorWidget() {
       let initialTree = [...contextData.rootCandidates];
       const incrementalRemsToUse = allIncrementalRems || [];
 
+      // The rem to land on. expandToLastDestination reports an index into an
+      // unfiltered, editor-order list, so we track the id and resolve it to an
+      // index once the tree is final — against the list the user will see.
+      let targetRemId: RemId | null = null;
+
       if (contextData.lastSelectedDestination) {
         try {
-          const { tree: expandedTree, foundIndex } = await expandToLastDestination(
+          const { tree: expandedTree } = await expandToLastDestination(
             plugin,
             initialTree,
             contextData.lastSelectedDestination,
@@ -559,9 +738,7 @@ function ParentSelectorWidget() {
           );
 
           initialTree = expandedTree;
-          if (foundIndex >= 0) {
-            setSelectedIndex(foundIndex);
-          }
+          targetRemId = contextData.lastSelectedDestination;
         } catch (error) {
           console.error('[ParentSelector:Widget] Error expanding to last destination:', error);
         }
@@ -569,7 +746,7 @@ function ParentSelectorWidget() {
         // No prior memory but we know which IncRem the user is currently reviewing
         // (from queue or editor review timer) — suggest that one.
         try {
-          const { tree: expandedTree, foundIndex } = await expandToLastDestination(
+          const { tree: expandedTree } = await expandToLastDestination(
             plugin,
             initialTree,
             contextData.contextRemId,
@@ -578,9 +755,7 @@ function ParentSelectorWidget() {
 
           initialTree = expandedTree;
           setSuggestedRemId(contextData.contextRemId);
-          if (foundIndex >= 0) {
-            setSelectedIndex(foundIndex);
-          }
+          targetRemId = contextData.contextRemId;
         } catch (error) {
           console.error('[ParentSelector:Widget] Error expanding to contextRemId:', error);
         }
@@ -593,6 +768,9 @@ function ParentSelectorWidget() {
             let bestRemId: RemId | null = null;
             let bestSize = Infinity;
 
+            // Scan every candidate, not just the visible ones — a filtered-out
+            // rem can still be the tightest page-range match, and pinning it
+            // below makes it visible.
             const flatAll = flattenTreeForDisplay(initialTree);
             for (const node of flatAll) {
               if (!node.isIncremental) continue;
@@ -610,13 +788,36 @@ function ParentSelectorWidget() {
 
             if (bestRemId) {
               setSuggestedRemId(bestRemId);
-              const suggestedIdx = flatAll.findIndex(n => n.remId === bestRemId);
-              if (suggestedIdx >= 0) setSelectedIndex(suggestedIdx);
+              targetRemId = bestRemId;
             }
           } catch (e) {
             console.error('[ParentSelector:Widget] Error computing suggestion:', e);
           }
         }
+      }
+
+      // expandToLastDestination loads children without the probe, so annotate
+      // whatever it pre-expanded before the filtered view is first rendered.
+      if (headingsOnly) {
+        try {
+          initialTree = await annotateHeadingDescendants(plugin, initialTree, {
+            recurse: true,
+          });
+        } catch (error) {
+          console.error('[ParentSelector:Widget] Error probing heading descendants:', error);
+        }
+      }
+
+      // Resolve the landing row against the final tree and the same display
+      // options the first render will use.
+      if (targetRemId) {
+        const foundIndex = flattenTreeForDisplay(initialTree, {
+          ...displayOptions,
+          // suggestedRemId lands in state asynchronously, so pin the target
+          // explicitly rather than waiting for displayOptions to catch up.
+          alwaysShowRemIds: new Set([...pinnedRemIds, targetRemId]),
+        }).findIndex((n) => n.remId === targetRemId);
+        if (foundIndex >= 0) setSelectedIndex(foundIndex);
       }
 
       setTree(initialTree);
@@ -625,18 +826,33 @@ function ParentSelectorWidget() {
     };
 
     initializeTree();
-  }, [contextData, allIncrementalRems, plugin, isInitialized]);
+    // displayOptions/pinnedRemIds are deliberately not dependencies: they only
+    // seed the initial selected index here, and later changes are handled by
+    // the re-locate effect.
+  }, [contextData, allIncrementalRems, plugin, isInitialized, settingsLoaded]);
+
+  // Loading the tree can outlast the grace period, and any mouse jitter while
+  // the user waits would leave hover armed for the moment the list appears and
+  // scrolls. So restart the guard from when there is actually a list to hover.
+  useEffect(() => {
+    if (!isInitialized) return;
+    mountedAtRef.current = Date.now();
+    disarmHover();
+  }, [isInitialized, disarmHover]);
 
   // ---------------------------------------------------------------------------
   // HANDLERS
   // ---------------------------------------------------------------------------
 
   const handleToggleExpand = useCallback(
-    async (nodeRemId: RemId) => {
+    // Takes the clicked row, not just its id: the same rem can occupy several
+    // rows at different depths, and looking it up by remId would pick an
+    // arbitrary one — loading its children against the wrong depth and
+    // indenting them under the wrong row.
+    async (nodeInList: ParentTreeNode) => {
       if (loadingNodeId) return;
 
-      const nodeInList = displayList.find((n) => n.remId === nodeRemId);
-      if (!nodeInList) return;
+      const nodeRemId = nodeInList.remId;
 
       if (nodeInList.isExpanded) {
         setTree((prevTree) =>
@@ -655,13 +871,21 @@ function ParentSelectorWidget() {
           plugin,
           nodeRemId,
           allIncrementalRems || [],
-          nodeInList.depth
+          nodeInList.depth,
+          { detectHeadingDescendants: headingsOnly }
         );
 
         setTree((prevTree) =>
           updateNodeInTree(prevTree, nodeRemId, (node) => ({
             ...node,
-            children,
+            // updateNodeInTree matches on remId, so every copy of this rem gets
+            // these children. Re-depth them per copy (and give each its own
+            // array) so a copy sitting at another level still indents its
+            // children correctly instead of inheriting the clicked row's depth.
+            children:
+              node.depth === nodeInList.depth
+                ? children
+                : children.map((c) => ({ ...c, depth: node.depth + 1 })),
             childrenLoaded: true,
             isExpanded: true,
           }))
@@ -677,7 +901,7 @@ function ParentSelectorWidget() {
         );
       }
     },
-    [displayList, loadingNodeId, plugin, allIncrementalRems]
+    [loadingNodeId, plugin, allIncrementalRems, headingsOnly]
   );
 
   // NEW: Handler to start creating a child for the selected node
@@ -688,7 +912,7 @@ function ParentSelectorWidget() {
 
     // If the node is not expanded and has children, expand it first
     if (selectedNode.hasChildren && !selectedNode.isExpanded) {
-      handleToggleExpand(selectedNode.remId);
+      handleToggleExpand(selectedNode);
     }
 
     setCreatingChildForNodeId(selectedNode.remId);
@@ -777,7 +1001,7 @@ function ParentSelectorWidget() {
           }));
 
           // Calculate the new display list and find the index of the new child
-          const newDisplayList = flattenTreeForDisplay(updatedTree);
+          const newDisplayList = flattenTreeForDisplay(updatedTree, displayOptions);
           const newChildIndex = newDisplayList.findIndex((n) => n.remId === newRemId);
 
           console.log('[ParentSelector:Widget] New child index in updated tree:', newChildIndex);
@@ -804,7 +1028,7 @@ function ParentSelectorWidget() {
         setCreatingChildForNodeId(null);
       }
     },
-    [creatingChildForNodeId, isCreatingChild, displayList, plugin, allIncrementalRems]
+    [creatingChildForNodeId, isCreatingChild, displayList, plugin, allIncrementalRems, displayOptions]
   );
 
   // NEW: Handler to cancel child creation
@@ -819,6 +1043,10 @@ function ParentSelectorWidget() {
   const handleSelect = useCallback(
     async (node: ParentTreeNode) => {
       if (!contextData || isCreating || creatingChildForNodeId) return;
+      // The popup opens under the cursor that just clicked the toolbar button,
+      // so a quick second click would land on whatever row happens to be there
+      // and create the rem for real. Ignore clicks until the popup settles.
+      if (Date.now() - mountedAtRef.current < HOVER_GRACE_MS) return;
 
       setIsCreating(true);
 
@@ -869,6 +1097,69 @@ function ParentSelectorWidget() {
     plugin.widget.closePopup();
   }, [plugin]);
 
+  // The rem the popup opened on: the remembered destination if there is one,
+  // otherwise whatever we suggested. This is what "restore" jumps back to.
+  const recoverTarget = useMemo(() => {
+    if (contextData?.lastSelectedDestination) {
+      return { remId: contextData.lastSelectedDestination, label: 'Last destination' };
+    }
+    if (suggestedRemId) {
+      return { remId: suggestedRemId, label: 'Suggested' };
+    }
+    return null;
+  }, [contextData, suggestedRemId]);
+
+  const handleRecoverSelection = useCallback(async () => {
+    if (!recoverTarget || isCreating || creatingChildForNodeId) return;
+    const { remId } = recoverTarget;
+
+    // Restoring is a keyboard action, so stop a resting cursor from immediately
+    // undoing it the next time a row slides under the pointer.
+    disarmHover();
+    selectedRemIdRef.current = remId;
+
+    const idx = displayList.findIndex((n) => n.remId === remId);
+    if (idx >= 0) {
+      setSelectedIndex(idx);
+      return;
+    }
+
+    // Not visible — the user collapsed the path since. Re-expand to it.
+    try {
+      const { tree: expandedTree } = await expandToLastDestination(
+        plugin,
+        tree,
+        remId,
+        allIncrementalRems || []
+      );
+      let nextTree = expandedTree;
+      if (headingsOnly) {
+        nextTree = await annotateHeadingDescendants(plugin, nextTree, { recurse: true });
+      }
+      setTree(nextTree);
+
+      const foundIndex = flattenTreeForDisplay(nextTree, {
+        ...displayOptions,
+        alwaysShowRemIds: new Set([...pinnedRemIds, remId]),
+      }).findIndex((n) => n.remId === remId);
+      if (foundIndex >= 0) setSelectedIndex(foundIndex);
+    } catch (error) {
+      console.error('[ParentSelector:Widget] Error restoring selection:', error);
+    }
+  }, [
+    recoverTarget,
+    isCreating,
+    creatingChildForNodeId,
+    displayList,
+    tree,
+    plugin,
+    allIncrementalRems,
+    headingsOnly,
+    displayOptions,
+    pinnedRemIds,
+    disarmHover,
+  ]);
+
   // ---------------------------------------------------------------------------
   // KEYBOARD NAVIGATION
   // ---------------------------------------------------------------------------
@@ -882,11 +1173,13 @@ function ParentSelectorWidget() {
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
+          disarmHover();
           setSelectedIndex((prev) => Math.min(prev + 1, displayList.length - 1));
           break;
 
         case 'ArrowUp':
           e.preventDefault();
+          disarmHover();
           setSelectedIndex((prev) => Math.max(prev - 1, 0));
           break;
 
@@ -894,14 +1187,14 @@ function ParentSelectorWidget() {
         case 'Tab':
           e.preventDefault();
           if (selectedNode?.hasChildren && !selectedNode.isExpanded) {
-            handleToggleExpand(selectedNode.remId);
+            handleToggleExpand(selectedNode);
           }
           break;
 
         case 'ArrowLeft':
           e.preventDefault();
           if (selectedNode?.isExpanded) {
-            handleToggleExpand(selectedNode.remId);
+            handleToggleExpand(selectedNode);
           } else if (selectedNode?.parentId) {
             const parentIndex = displayList.findIndex(
               (n) => n.remId === selectedNode.parentId
@@ -922,6 +1215,13 @@ function ParentSelectorWidget() {
         case 'Escape':
           e.preventDefault();
           handleClose();
+          break;
+
+        // 'l' (last) jumps back to the remembered/suggested destination.
+        case 'l':
+        case 'L':
+          e.preventDefault();
+          handleRecoverSelection();
           break;
 
         // NEW: '+' or 'n' to add a child to the selected node
@@ -947,6 +1247,8 @@ function ParentSelectorWidget() {
     handleSelect,
     handleClose,
     handleStartAddChild,
+    handleRecoverSelection,
+    disarmHover,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -1017,7 +1319,10 @@ function ParentSelectorWidget() {
       // Render the node row
       elements.push(
         <TreeNodeRow
-          key={`${node.remId}-${node.depth}`}
+          // Position-based (see ParentTreeNode.displayKey). The same rem can
+          // occupy several rows, and every identity-derived field is identical
+          // between those rows — only the ancestor path tells them apart.
+          key={node.displayKey ?? `${index}-${node.remId}`}
           ref={(el) => {
             if (itemRefs.current) {
               itemRefs.current[index] = el;
@@ -1028,8 +1333,8 @@ function ParentSelectorWidget() {
           isSuggested={node.remId === suggestedRemId}
           isLoadingChildren={loadingNodeId === node.remId}
           onSelect={() => handleSelect(node)}
-          onToggleExpand={() => handleToggleExpand(node.remId)}
-          onMouseEnter={() => !creatingChildForNodeId && setSelectedIndex(index)}
+          onToggleExpand={() => handleToggleExpand(node)}
+          onMouseEnter={() => handleRowHover(index)}
           onAddChild={() => {
             setSelectedIndex(index);
             setCreatingChildForNodeId(node.remId);
@@ -1138,20 +1443,51 @@ function ParentSelectorWidget() {
             Select Parent Rem
           </span>
         </div>
-        <button
-          onClick={handleClose}
-          style={{
-            border: 'none',
-            background: 'transparent',
-            fontSize: '18px',
-            cursor: 'pointer',
-            color: 'var(--rn-clr-content-secondary)',
-            padding: '4px',
-            borderRadius: '4px',
-          }}
-        >
-          ×
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Jump back to where the popup opened, for when the selection got
+              knocked off by a stray hover. Hidden once it's already selected. */}
+          {recoverTarget && selectedNode?.remId !== recoverTarget.remId && (
+            <button
+              onClick={handleRecoverSelection}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                fontSize: '11px',
+                fontWeight: 500,
+                borderRadius: '4px',
+                border: '1px solid var(--rn-clr-border-primary)',
+                background: 'transparent',
+                color: 'var(--rn-clr-content-secondary)',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              title={`Reselect ${recoverTarget.label.toLowerCase()} (press L)`}
+            >
+              ↩ {recoverTarget.label}
+            </button>
+          )}
+          <button
+            onClick={handleClose}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              fontSize: '18px',
+              cursor: 'pointer',
+              color: 'var(--rn-clr-content-secondary)',
+              padding: '4px',
+              borderRadius: '4px',
+            }}
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       {/* Instructions */}
@@ -1178,7 +1514,42 @@ function ParentSelectorWidget() {
           <kbd style={kbdStyle}>→</kbd> to expand, <kbd style={kbdStyle}>←</kbd> to collapse,{' '}
           <kbd style={kbdStyle}>Enter</kbd> to select,{' '}
           <kbd style={kbdStyle}>+</kbd>/<kbd style={kbdStyle}>n</kbd> to add child
+          {recoverTarget && (
+            <>
+              , <kbd style={kbdStyle}>L</kbd> to reselect {recoverTarget.label.toLowerCase()}
+            </>
+          )}
         </p>
+
+        {/* Both options apply only to expanded branches — the IncRem candidates
+            at the root are always shown, in their original order. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginTop: '10px' }}>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '11px' }}
+            title="Inside expanded branches, show only rems with a heading (H1–H6)"
+          >
+            <input
+              type="checkbox"
+              checked={headingsOnly}
+              onChange={toggleHeadingsOnly}
+              style={{ cursor: 'pointer', margin: 0 }}
+            />
+            Filter only headers
+          </label>
+
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '11px' }}
+            title="Inside expanded branches, list headings before other rems, shallowest level first"
+          >
+            <input
+              type="checkbox"
+              checked={headingsFirst}
+              onChange={toggleHeadingsFirst}
+              style={{ cursor: 'pointer', margin: 0 }}
+            />
+            List headings first
+          </label>
+        </div>
       </div>
 
       {/* Tree List */}

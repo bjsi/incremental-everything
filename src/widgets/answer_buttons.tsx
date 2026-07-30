@@ -7,10 +7,10 @@ import {
   PluginRem,
   BuiltInPowerupCodes,
 } from '@remnote/plugin-sdk';
-import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
+import React, { useMemo, useRef, useState, useLayoutEffect, useEffect } from 'react';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
-import { IncrementalRep } from '../lib/incremental_rem/types';
+import { IncrementalRep, repCountsForScheduling } from '../lib/incremental_rem/types';
 import { NextRepTime } from '../components/NextRepTime';
 import { DraggableButton } from '../components/buttons/DraggableButton';
 import { Button } from '../components/buttons/Button';
@@ -40,6 +40,7 @@ import { WeightedShieldTooltip } from '../components';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import { getHtmlSourceUrl } from '../lib/incRemHelpers';
 import { transferToDismissed } from '../lib/dismissed';
+import { setPendingReviewNote, getPendingReviewNote, MAX_NOTE_LENGTH } from '../lib/history_notes';
 import { addToIncrementalHistory } from '../lib/history_utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
@@ -276,15 +277,10 @@ export function AnswerButtons() {
     if (!coreData?.incRemInfo?.history || coreData.incRemInfo.history.length === 0) {
       return { reps: 0, totalMinutes: 0 };
     }
-    // Only count real repetitions (events that count for interval calculation)
-    // Includes: undefined, 'rep', 'rescheduledInQueue', 'executeRepetition'
-    // Excludes: 'madeIncremental', 'dismissed', 'rescheduledInEditor', 'manualDateReset'
-    const realReps = coreData.incRemInfo.history.filter(
-      h => h.eventType === undefined ||
-        h.eventType === 'rep' ||
-        h.eventType === 'rescheduledInQueue' ||
-        h.eventType === 'executeRepetition'
-    );
+    // Only count real repetitions (events that count for interval calculation).
+    // Uses the shared scheduling predicate — excludes markers, slot edits, and
+    // 'importedRep' (imported flashcard reviews never belong to a rem's schedule).
+    const realReps = coreData.incRemInfo.history.filter(h => repCountsForScheduling(h.eventType));
     const reps = realReps.length;
     const totalSeconds = realReps.reduce((total, rep) => total + (rep.reviewTimeSeconds || 0), 0);
     const totalMinutes = Math.round(totalSeconds / 6) / 10; // Round to 1 decimal
@@ -312,6 +308,26 @@ export function AnswerButtons() {
     const sameRow = Math.abs(sepMid - statsMid) < 4;
     setStatsSepVisible(sameRow);
   }); // No deps — runs after every render so it catches the first render where refs are populated
+
+  // Review note (📝): parked per-rem in session storage on every keystroke and
+  // attached to the history entry written by whichever action ends this review
+  // (Next / Reschedule / Dismiss) — see stampNoteAndContext in lib/history_notes.
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const currentRemId = baseData?.rem?._id;
+  useEffect(() => {
+    // New card: reset the input, then prefill from a previously parked note
+    // (e.g. typed earlier this session but not yet consumed).
+    setNoteOpen(false);
+    setNoteText('');
+    if (!currentRemId) return;
+    getPendingReviewNote(plugin, currentRemId).then((parked) => {
+      if (parked) {
+        setNoteText(parked);
+        setNoteOpen(true);
+      }
+    });
+  }, [currentRemId]);
 
   // ✅ NOW we can do early returns AFTER all hooks are called
   if (!coreData) {
@@ -438,9 +454,11 @@ export function AnswerButtons() {
           e.preventDefault();
         }
       }}
-      onClick={() => {
+      onClick={(e) => {
         // After any click, return focus to the parent window so native
-        // RemNote shortcuts work immediately.
+        // RemNote shortcuts work immediately. EXCEPT for text inputs (the
+        // review-note field) — blurring those would make typing impossible.
+        if ((e.target as HTMLElement).closest('input, textarea')) return;
         try {
           if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
@@ -576,6 +594,36 @@ export function AnswerButtons() {
           <div style={buttonStyles.label}>Open Editor</div>
           <div style={buttonStyles.sublabel}>New Tab</div>
         </Button>
+
+        {/* Review-note toggle — compact icon (styled like the ℹ️ help icon).
+            Tinted while the input is open or a note is pending. */}
+        <span
+          role="button"
+          onClick={() => setNoteOpen((o) => !o)}
+          style={{
+            cursor: 'pointer',
+            fontSize: '18px',
+            opacity: noteOpen || noteText ? 1 : 0.7,
+            padding: '4px',
+            borderRadius: '6px',
+            transition: 'opacity 0.2s, background-color 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: noteOpen || noteText ? 'var(--rn-clr-background-tertiary)' : 'transparent',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '1';
+            e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = noteOpen || noteText ? '1' : '0.7';
+            e.currentTarget.style.backgroundColor = noteOpen || noteText ? 'var(--rn-clr-background-tertiary)' : 'transparent';
+          }}
+          title="Review note: attach an observation to this repetition's history entry (saved when you press Next / Reschedule / Dismiss)"
+        >
+          📝
+        </span>
 
         {activeHighlightId && (
           <>
@@ -841,6 +889,42 @@ export function AnswerButtons() {
           ℹ️
         </span>
       </div>
+
+      {/* Review-note input — parked in session storage on every keystroke and
+          attached to this repetition's history entry by Next/Reschedule/Dismiss. */}
+      {noteOpen && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px' }}>📝</span>
+          <input
+            type="text"
+            autoFocus
+            value={noteText}
+            maxLength={MAX_NOTE_LENGTH}
+            placeholder="Observation for this repetition (saved with Next / Reschedule / Dismiss)…"
+            onChange={(e) => {
+              setNoteText(e.target.value);
+              setPendingReviewNote(plugin, rem._id, e.target.value).catch(console.error);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setNoteOpen(false);
+              }
+              // Keep queue shortcuts from firing while typing.
+              e.stopPropagation();
+            }}
+            style={{
+              flex: 1,
+              fontSize: '12px',
+              padding: '6px 10px',
+              borderRadius: '8px',
+              border: '1px solid var(--rn-clr-border-primary)',
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              color: 'var(--rn-clr-content-primary)',
+              outline: 'none',
+            }}
+          />
+        </div>
+      )}
 
       {/* Priority and Shield Info Bar */}
       {(incRemInfo || (shouldDisplayShield && shieldStatusAsync)) && (

@@ -140,7 +140,7 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  plugin.app.registerWidget('card_priority_display', WidgetLocation.FlashcardUnder, {
+  plugin.app.registerWidget('card_info_bar', WidgetLocation.FlashcardUnder, {
     powerupFilter: 'cardPriority',
     dimensions: {
       width: '100%',
@@ -176,6 +176,11 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // Register incremental rem main view - comprehensive view with filters
   plugin.app.registerWidget('inc_rem_main_view', WidgetLocation.Popup, {
     dimensions: { height: 800, width: 1000 },
+  });
+
+  // Import Incremental Rems (with full rep history) from a JSON payload
+  plugin.app.registerWidget('import_increm_history', WidgetLocation.Popup, {
+    dimensions: { height: 'auto', width: 620 },
   });
 
   // Register parent selector popup for creating rems under incremental rems

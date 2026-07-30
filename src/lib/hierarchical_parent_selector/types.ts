@@ -1,5 +1,6 @@
 import { RemId, RichTextInterface } from '@remnote/plugin-sdk';
 import { RemTextSegment } from '../richTextRemRefs';
+import { HeadingLevel } from '../outline_restructure';
 
 /**
  * Represents a node in the hierarchical parent selector tree.
@@ -12,12 +13,36 @@ export interface ParentTreeNode {
   priority: number | null;
   percentile: number | null;
   isIncremental: boolean;
+  // Heading level (H1–H6) if the rem carries the built-in Header powerup, else null.
+  // Optional because nodes cached by older versions predate this field.
+  headingLevel?: HeadingLevel | null;
+  // Whether a heading lives somewhere below this (non-heading) rem, so the
+  // "Filter only headers" view can keep the branch as a path to it.
+  // Tri-state: undefined = not probed yet (treated as "keep", since we can't
+  // prove the branch is heading-free). See annotateHeadingDescendants.
+  hasHeadingDescendant?: boolean;
+  // Set when this rem is only shown here because a portal among the parent's
+  // children mirrors it — the rem itself lives elsewhere. Selecting it files
+  // the new rem in that real home, which is also what shows inside the portal.
+  isPortal?: boolean;
+  // The portal rem that mirrored it in (only meaningful with isPortal).
+  portalId?: RemId;
+  // Breadcrumb of the ancestors it really lives under ("A › B › C"), for the
+  // "where it lives" tooltip.
+  portalBreadcrumb?: string;
   hasChildren: boolean;        // Indicates if this node has children (shows expand indicator)
   isExpanded: boolean;         // Whether the node is currently expanded
   children: ParentTreeNode[];  // Loaded children (empty until expanded)
   childrenLoaded: boolean;     // Whether children have been fetched
   depth: number;               // Depth in the tree (0 = root level)
   parentId: RemId | null;      // Parent node's remId (for tree navigation)
+  // Identifies this node's *position* in the tree (its ancestor path), set by
+  // flattenTreeForDisplay. The same rem can legitimately occupy several
+  // positions — as a root candidate and again deeper down, or mirrored in by
+  // portals — and expanding one copy shares the very same children array with
+  // every other copy. Keying rows by rem identity therefore collides; key them
+  // by this instead.
+  displayKey?: string;
 }
 
 /**

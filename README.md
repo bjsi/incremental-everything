@@ -36,7 +36,7 @@ A full suite of history and practice tools now built into the right sidebar:
 
 ### 📱 Performance Modes
 - **Light Mode (Default for Mobile/Web)**: Fast, stable, and essential features only. Prevents crashes on phones and tablets.
-- **Full Mode (Desktop Power User)**: Complete feature set with heavy statistical calculations for detailed analytics.
+- **Full Mode (Desktop Power User)**: Complete feature set with heavy cache load on startup (of the priority of all your flashcard rems), enabling real-time statistical calculations for detailed analytics.
 
 ### 🧰 More than Incremental Reading: a Toolset for Your KB
 Beyond the core learning loop, Incremental Everything ships **dozens of standalone utilities** that make day-to-day note-taking and knowledge-base organization faster — useful even when you're not reviewing. A few examples:

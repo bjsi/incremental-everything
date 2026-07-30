@@ -1,5 +1,5 @@
 import { Card, RNPlugin, RemId } from '@remnote/plugin-sdk';
-import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey } from '../consts';
+import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey, orphanRemIdsKey } from '../consts';
 import { CardPriorityInfo, PrioritySource, calculateCardRemPercentilesFromCards } from './types';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
@@ -445,6 +445,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
 
   let processed = 0;
   let errorCount = 0;
+  const notFoundRemIds: string[] = [];
   const batchSize = 30;
   const delayBetweenBatches = 100;
 
@@ -459,21 +460,56 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
           try {
             const rem = await plugin.rem.findOne(remId);
             if (!rem) {
-              errorCount++;
+              // The card store reports this rem, but the rem itself is gone —
+              // i.e. an orphan card. Collect the IDs and log them once as a
+              // group below (a per-rem warn here spams the console with an
+              // async stack trace for every orphan).
+              notFoundRemIds.push(remId);
               return;
             }
 
-            const calculated = await calculateNewPriority(plugin, rem);
-            await setCardPriority(plugin, rem, calculated.priority, calculated.source);
+            // Read the current value BEFORE calculating, and pass it in.
+            //
+            // This third argument is not optional in spirit: calculateNewPriority's
+            // first act is to return `existingPriority` unchanged when its source is
+            // 'manual' or 'incremental'. Called without it (the previous behaviour)
+            // that guard is dead code, and the function recomputes from scratch —
+            // IncRem → ancestor → default — then the write below stamps the result
+            // over whatever the user had set by hand.
+            //
+            // It stays invisible in normal use, because a rem with a manual priority
+            // is tagged, and tagged rems never reach Phase 2 (they are filtered out
+            // via the powerup's taggedRem() list in loadCardPriorityCache). The risk
+            // is whenever that list under-reports — which it demonstrably does; it is
+            // exactly what the debug widget's CardPriority Tag Audit exists to
+            // measure. Any rem it omits reaches Phase 2 and, before this change,
+            // had its manual priority recomputed away.
+            //
+            // NOTE: this is a latent bug fixed on its own merits. It is NOT the cause
+            // of manual priorities being lost when importing between knowledge bases —
+            // that was traced to RemNote's importer and reproduced with the plugin
+            // fully disabled (see the wiki Troubleshooting entry).
+            const existing = await getCardPriority(plugin, rem);
+            const calculated = await calculateNewPriority(plugin, rem, existing);
 
-            const cardInfo = await getCardPriority(plugin, rem);
+            let cardInfo = existing;
+            const unchanged =
+              existing &&
+              existing.priority === calculated.priority &&
+              existing.source === calculated.source;
+
+            if (!unchanged) {
+              await setCardPriority(plugin, rem, calculated.priority, calculated.source);
+              cardInfo = await getCardPriority(plugin, rem);
+            }
+
             if (cardInfo) {
               newPriorities.push(cardInfo);
             }
 
             processed++;
           } catch (error) {
-            console.error(`DEFERRED: Error processing rem ${remId}:`, error);
+            console.error(`[Card Priority Cache] DEFERRED: Error processing rem ${remId}:`, error);
             errorCount++;
           }
         })
@@ -508,11 +544,31 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
     }
 
     const totalTime = Math.round((Date.now() - startTime) / 1000);
+    const notFoundCount = notFoundRemIds.length;
     console.log(
       `[Card Priority Cache] Phase 2 complete. ` +
       `Processed ${processed} cards in ${totalTime}s ` +
-      `(${errorCount} errors)`
+      `(${notFoundCount} orphan rems skipped, ${errorCount} errors)`
     );
+
+    // Persist orphan rem IDs so the 'Update all inherited Card Priorities'
+    // cleanup can reuse them without re-scanning, and surface a non-destructive
+    // suggestion. We deliberately do NOT auto-delete here: cache build runs at
+    // startup before sync may have fully hydrated, so a transient null must not
+    // trigger irreversible card removal.
+    if (notFoundCount > 0) {
+      console.log(`[Card Priority Cache] ${notFoundCount} orphan rem(s) (cards exist but rem not found):`);
+      console.log(notFoundRemIds.join('\n'));
+      await plugin.storage.setSession(orphanRemIdsKey, notFoundRemIds);
+      setTimeout(() => {
+        plugin.app.toast(
+          `⚠️ ${notFoundCount} orphan card${notFoundCount === 1 ? '' : 's'} detected (their rem was deleted). ` +
+          `Run 'Update all inherited Card Priorities' command to review and clean them up.`
+        );
+      }, 2500);
+    } else {
+      await plugin.storage.setSession(orphanRemIdsKey, []);
+    }
 
     await plugin.app.toast(`✅ Background processing complete! All ${processed} card priorities are now cached (${totalTime}s).`);
     await plugin.storage.setSession('card_priority_cache_fully_loaded', true);

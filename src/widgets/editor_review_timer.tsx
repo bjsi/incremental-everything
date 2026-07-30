@@ -4,7 +4,7 @@ import {
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, currentSubQueueIdKey, remnoteEnvironmentId, pageRangeWidgetId } from '../lib/consts';
@@ -19,6 +19,14 @@ import { getRemReadPoint } from '../lib/remReadPoint';
 import { PageControls } from '../components/reader/ui';
 import { usePdfPageControls } from '../components/reader/usePdfPageControls';
 import { startIncRemEngagement, endIncRemEngagement, forceSaveSession } from '../lib/queue_session';
+import {
+  setPendingReviewNote,
+  getPendingReviewNote,
+  consumePendingReviewNote,
+  buildRepContext,
+  stampNoteAndContext,
+  MAX_NOTE_LENGTH,
+} from '../lib/history_notes';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 
@@ -41,6 +49,10 @@ function EditorReviewTimer() {
   // HTML rem ID parallel to hostRemId — set even when a PDF is also present
   // so the bookmark Scroll button can surface bookmarks saved in Text Reader mode.
   const [htmlRemId, setHtmlRemId] = useState<string | null>(null);
+  // Review note (📝): parked per-rem in session storage on every keystroke and
+  // attached to this session's history entry by End Review / Next / Dismiss.
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState('');
 
   const timerData = useTrackerPlugin(
     async (rp) => {
@@ -94,6 +106,50 @@ function EditorReviewTimer() {
     return () => {
       endIncRemEngagement(plugin);
     };
+  }, [timerData?.remId, plugin]);
+
+  // New session/rem: reset the note input, then prefill from a parked note
+  // (typed in the queue's note field or the editor review popup before the
+  // timer started) so the user sees what will be saved and can extend it.
+  useEffect(() => {
+    setNoteOpen(false);
+    setNoteText('');
+    if (!timerData?.remId) return;
+    getPendingReviewNote(plugin, timerData.remId).then((parked) => {
+      if (parked) {
+        setNoteText(parked);
+        setNoteOpen(true);
+      }
+    });
+  }, [timerData?.remId]);
+
+  // Auto-scroll to the last bookmark when a timer session starts from the
+  // editor popup ("Timer" button). The popup that started the session sets a
+  // pending-scroll flag and then closes itself immediately — killing any
+  // scroll it might have fired (the warm path's inline setTimeout dies with
+  // the popup iframe, and closing the popup bounces focus off the reader).
+  // This widget is persistent, so it can drive openAndScrollToHighlight
+  // reliably. Gated by remId + a 30s staleness guard, and cleared on consume
+  // so it fires exactly once per session start.
+  useEffect(() => {
+    if (!timerData?.remId) return;
+    (async () => {
+      const pending = await plugin.storage.getSession<{
+        hostRemId: string;
+        highlightId: string;
+        remId: string;
+        requestedAt: number;
+      }>('editor-review-timer-pending-scroll');
+      if (!pending || pending.remId !== timerData.remId) return;
+      if (Date.now() - (pending.requestedAt ?? 0) > 30_000) {
+        await plugin.storage.setSession('editor-review-timer-pending-scroll', undefined);
+        return;
+      }
+      // Clear right before firing so it runs exactly once (even under a
+      // StrictMode double-mount, the second pass sees no flag and no-ops).
+      await plugin.storage.setSession('editor-review-timer-pending-scroll', undefined);
+      await openAndScrollToHighlight(plugin, pending.hostRemId, pending.highlightId);
+    })();
   }, [timerData?.remId, plugin]);
 
   const pdfControls = usePdfPageControls(plugin, timerData?.remId, pdfRemId, 0);
@@ -315,7 +371,7 @@ function EditorReviewTimer() {
     try {
       // Update priority if changed
       if (timerData.priority !== undefined && timerData.priority !== null) {
-        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+        await setIncRemPriority(plugin, rem, timerData.priority);
       }
 
       // Calculate review time in seconds
@@ -337,7 +393,18 @@ function EditorReviewTimer() {
         // We just update the reviewTimeSeconds of the last history entry.
         const updatedHistory = [...(incRem.history || [])];
         if (updatedHistory.length > 0) {
-          updatedHistory[updatedHistory.length - 1].reviewTimeSeconds = reviewTimeSeconds;
+          const lastEntry = updatedHistory[updatedHistory.length - 1];
+          lastEntry.reviewTimeSeconds = reviewTimeSeconds;
+
+          // Attach a note typed during this editor session to the same entry the
+          // handoff wrote (appending to any note already stamped at handoff), and
+          // refresh the reading-state snapshot to end-of-session values.
+          const sessionNote = await consumePendingReviewNote(plugin, timerData.remId);
+          if (sessionNote && sessionNote !== lastEntry.notes) {
+            lastEntry.notes = lastEntry.notes ? `${lastEntry.notes}\n${sessionNote}` : sessionNote;
+          }
+          const ctx = await buildRepContext(plugin, rem);
+          if (ctx) lastEntry.context = ctx;
         }
 
         await updateSRSDataForRem(plugin, timerData.remId, incRem.nextRepDate, updatedHistory);
@@ -357,19 +424,22 @@ function EditorReviewTimer() {
         const wasEarly = daysDifference < 0;
         const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
 
-        const newHistory: IncrementalRep[] = [
-          ...(incRem.history || []),
-          {
-            date: actualDate,
-            scheduled: scheduledDate,
-            interval: timerData.interval || 0,
-            wasEarly: wasEarly,
-            daysEarlyOrLate: daysEarlyOrLate,
-            reviewTimeSeconds: reviewTimeSeconds,
-            priority: incRem.priority, // Record priority at time of rep
-            eventType: 'executeRepetition' as const,
-          },
-        ];
+        const repEntry: IncrementalRep = {
+          date: actualDate,
+          scheduled: scheduledDate,
+          interval: timerData.interval || 0,
+          wasEarly: wasEarly,
+          daysEarlyOrLate: daysEarlyOrLate,
+          reviewTimeSeconds: reviewTimeSeconds,
+          priority: incRem.priority, // Record priority at time of rep
+          eventType: 'executeRepetition' as const,
+        };
+
+        // Attach the parked note (typed here or in the review popup) + a
+        // reading-state snapshot to the entry this session just created.
+        await stampNoteAndContext(plugin, rem, repEntry);
+
+        const newHistory: IncrementalRep[] = [...(incRem.history || []), repEntry];
 
         await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
         await addToIncrementalHistory(plugin, timerData.remId);
@@ -448,7 +518,7 @@ function EditorReviewTimer() {
     try {
       // Update priority if changed
       if (timerData.priority !== undefined && timerData.priority !== null) {
-        await currentRem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+        await setIncRemPriority(plugin, currentRem, timerData.priority);
       }
 
       // Calculate review time and sync PDF page
@@ -471,19 +541,22 @@ function EditorReviewTimer() {
       const wasEarly = daysDifference < 0;
       const daysEarlyOrLate = Math.round(daysDifference * 10) / 10;
 
-      const newHistory: IncrementalRep[] = [
-        ...(currentIncRem.history || []),
-        {
-          date: actualDate,
-          scheduled: scheduledDate,
-          interval: timerData.interval || 0,
-          wasEarly: wasEarly,
-          daysEarlyOrLate: daysEarlyOrLate,
-          reviewTimeSeconds: reviewTimeSeconds,
-          priority: currentIncRem.priority,
-          eventType: 'executeRepetition' as const,
-        },
-      ];
+      const repEntry: IncrementalRep = {
+        date: actualDate,
+        scheduled: scheduledDate,
+        interval: timerData.interval || 0,
+        wasEarly: wasEarly,
+        daysEarlyOrLate: daysEarlyOrLate,
+        reviewTimeSeconds: reviewTimeSeconds,
+        priority: currentIncRem.priority,
+        eventType: 'executeRepetition' as const,
+      };
+
+      // Attach the parked note + reading-state snapshot to this item's entry
+      // before moving on to the next queue item.
+      await stampNoteAndContext(plugin, currentRem, repEntry);
+
+      const newHistory: IncrementalRep[] = [...(currentIncRem.history || []), repEntry];
 
       await updateSRSDataForRem(plugin, timerData.remId, newNextRepDate, newHistory);
       await addToIncrementalHistory(plugin, timerData.remId);
@@ -873,7 +946,65 @@ function EditorReviewTimer() {
         </div>
       )}
 
+      {/* Review-note input — parked in session storage on every keystroke and
+          attached to this session's history entry by End Review / Next / Dismiss. */}
+      {noteOpen && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+          <span style={{ fontSize: '13px' }}>📝</span>
+          <input
+            type="text"
+            autoFocus
+            value={noteText}
+            maxLength={MAX_NOTE_LENGTH}
+            placeholder="Observation for this repetition (saved on End Review / Next / Dismiss)…"
+            onChange={(e) => {
+              setNoteText(e.target.value);
+              if (timerData?.remId) {
+                setPendingReviewNote(plugin, timerData.remId, e.target.value).catch(console.error);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setNoteOpen(false);
+              e.stopPropagation();
+            }}
+            style={{
+              flex: 1,
+              fontSize: '12px',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              border: '1px solid var(--rn-clr-border-primary, rgba(128,128,128,0.35))',
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              color: 'var(--rn-clr-content-primary)',
+              outline: 'none',
+            }}
+          />
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', rowGap: '6px' }}>
+        {/* Note toggle */}
+        <button
+          onClick={() => setNoteOpen((o) => !o)}
+          style={{
+            padding: '6px 10px',
+            fontSize: '13px',
+            backgroundColor: noteOpen ? '#8b5cf6' : '#6b7280',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = noteOpen ? '#7c3aed' : '#4b5563';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = noteOpen ? '#8b5cf6' : '#6b7280';
+          }}
+          title="Review note: attach an observation to this repetition's history entry"
+        >
+          📝
+        </button>
         {/* Pause / Continue button */}
         <button
           onClick={isPaused ? handleResume : handlePause}

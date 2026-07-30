@@ -9,7 +9,6 @@ import {
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   powerupCode,
-  prioritySlotCode,
   allIncrementalRemKey,
   allCardPriorityInfoKey
 } from '../lib/consts';
@@ -17,7 +16,7 @@ import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, CardPriorityInfo } from
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { setCardPriority } from '../lib/card_priority';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { remToActionItemType } from '../lib/incremental_rem';
@@ -568,11 +567,7 @@ function BatchPriority() {
 
         if (remData.hasIncRem && remData.newIncPriority !== null) {
           console.log(`   - Updating IncRem ${i + 1}/${toUpdate.length}: ${remData.name} to priority ${remData.newIncPriority}`);
-          await remData.rem.setPowerupProperty(
-            powerupCode,
-            prioritySlotCode,
-            [remData.newIncPriority.toString()]
-          );
+          await setIncRemPriority(plugin, remData.rem, remData.newIncPriority);
         }
 
         if (remData.hasCardPriority && remData.newCardPriority !== null) {

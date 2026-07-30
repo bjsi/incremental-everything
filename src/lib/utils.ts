@@ -386,6 +386,11 @@ export function formatCountdown(ms: number): string {
 export function formatDuration(seconds: number): string {
   if (!seconds || seconds === 0) return '';
 
+  // Times are conceptually whole seconds; round defensively so a fractional
+  // input can never render as e.g. "2m 14.7729999…s".
+  seconds = Math.round(seconds);
+  if (seconds === 0) return '';
+
   if (seconds < 60) {
     return `${seconds}s`;
   } else if (seconds < 3600) {
@@ -446,9 +451,11 @@ export function formatTimeAgo(timestampMs: number, nowMs: number = Date.now()): 
   let formatted = '';
 
   if (diffYears > 0) {
-    formatted = `${diffYears} year${diffYears > 1 ? 's' : ''}`;
+    const years = (diffDays / 365.25).toFixed(1);
+    formatted = `${years} year${years === '1.0' ? '' : 's'}`;
   } else if (diffMonths > 0) {
-    formatted = `${diffMonths} month${diffMonths > 1 ? 's' : ''}`;
+    const months = (diffDays / 30.436875).toFixed(1);
+    formatted = `${months} month${months === '1.0' ? '' : 's'}`;
   } else if (diffDays > 0) {
     formatted = `${diffDays} day${diffDays > 1 ? 's' : ''}`;
   } else if (diffHours > 0) {

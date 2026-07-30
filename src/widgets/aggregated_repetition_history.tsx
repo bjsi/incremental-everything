@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { renderWidget, usePlugin, WidgetLocation, useRunAsync, PluginRem, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { IncrementalRep } from '../lib/incremental_rem/types';
+import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
@@ -42,12 +42,18 @@ function getTotalTime(history: IncrementalRep[]): number {
 }
 
 function getRepCount(history: IncrementalRep[]): number {
-    return history?.filter(h =>
-        h.eventType === undefined ||
-        h.eventType === 'rep' ||
-        h.eventType === 'rescheduledInQueue' ||
-        h.eventType === 'executeRepetition'
-    ).length || 0;
+    return history?.filter(h => repCountsForStats(h.eventType)).length || 0;
+}
+
+/**
+ * Collect the user notes stored on a node's history entries, newest first,
+ * formatted for a hover tooltip ("Jul 16: stopped at the proof…").
+ */
+function getHistoryNotes(history: IncrementalRep[]): string[] {
+    return (history || [])
+        .filter(h => h.notes)
+        .sort((a, b) => b.date - a.date)
+        .map(h => `${new Date(h.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}: ${h.notes}`);
 }
 
 // --- Components ---
@@ -273,6 +279,19 @@ const TreeNode = ({
                     <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginLeft: '8px', minWidth: '50px', textAlign: 'right' }}>
                         {node.aggrTime > 0 ? formatDuration(node.aggrTime) : ''}
                     </div>
+                    {(() => {
+                        // 📝 indicator when this node's own history carries user notes;
+                        // hover shows them (newest first). Open the single view for details.
+                        const notes = getHistoryNotes(node.history);
+                        return notes.length > 0 ? (
+                            <div
+                                style={{ marginLeft: '6px', fontSize: '11px', cursor: 'help', opacity: 0.8 }}
+                                title={notes.join('\n')}
+                            >
+                                📝{notes.length > 1 ? notes.length : ''}
+                            </div>
+                        ) : null;
+                    })()}
                     <div
                         style={{
                             marginLeft: '8px',

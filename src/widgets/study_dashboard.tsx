@@ -9,7 +9,7 @@ import {
     useRunAsync,
     WidgetLocation,
 } from '@remnote/plugin-sdk';
-import { IncrementalRep } from '../lib/incremental_rem/types';
+import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import {
     dismissedHistorySlotCode,
     dismissedPowerupCode,
@@ -159,13 +159,34 @@ interface ProgressState {
 const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
 const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
 
+// Stats predicate (Study Dashboard) — delegates to the shared source of truth so
+// it can't drift. INCLUDES 'importedRep' (reviews imported from removed flashcards).
 function isRealIncRep(et: IncrementalRep['eventType']): boolean {
-    return (
-        et === undefined ||
-        et === 'rep' ||
-        et === 'executeRepetition' ||
-        et === 'rescheduledInQueue'
-    );
+    return repCountsForStats(et);
+}
+
+/**
+ * Collect the user notes stored on a rem's IncRem/dismissed history entries,
+ * newest first, formatted for a hover tooltip ("Jul 16: stopped at the proof…").
+ * Capped so tooltips on heavily-annotated rems stay readable.
+ */
+const MAX_TOOLTIP_NOTES = 8;
+function getHistoryNotesTooltip(rd: RemData | null): string | null {
+    if (!rd) return null;
+    const withNotes = [...(rd.incHistory || []), ...(rd.dismHistory || [])]
+        .filter((h) => h.notes)
+        .sort((a, b) => b.date - a.date);
+    if (withNotes.length === 0) return null;
+    const lines = withNotes
+        .slice(0, MAX_TOOLTIP_NOTES)
+        .map(
+            (h) =>
+                `${new Date(h.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}: ${h.notes}`
+        );
+    if (withNotes.length > MAX_TOOLTIP_NOTES) {
+        lines.push(`… +${withNotes.length - MAX_TOOLTIP_NOTES} more (open Repetition History)`);
+    }
+    return lines.join('\n');
 }
 
 function isRealCardScore(score: number | undefined): boolean {
@@ -1613,6 +1634,26 @@ function HierarchyRow({
                         'Untitled'
                     )}
                 </div>
+                {(() => {
+                    // 📝 indicator when this rem's history carries user notes;
+                    // hover shows them (newest first, dated).
+                    const notesTooltip = getHistoryNotesTooltip(node.selfData);
+                    return notesTooltip ? (
+                        <span
+                            style={{
+                                marginLeft: 4,
+                                fontSize: 11,
+                                cursor: 'help',
+                                opacity: 0.8,
+                                flexShrink: 0,
+                            }}
+                            title={notesTooltip}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            📝
+                        </span>
+                    ) : null;
+                })()}
             </div>
             <div style={{ textAlign: 'right', fontFamily: 'monospace' }}>
                 {totalTimeMs > 0 ? formatMs(totalTimeMs) : '-'}

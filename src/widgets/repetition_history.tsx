@@ -1,6 +1,6 @@
 import React from 'react';
 import { renderWidget, usePlugin, WidgetLocation, useRunAsync } from '@remnote/plugin-sdk';
-import { IncrementalRep } from '../lib/incremental_rem/types';
+import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import { formatDuration } from '../lib/utils';
 import dayjs from 'dayjs';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
@@ -56,6 +56,100 @@ async function loadPdfPageInfo(plugin: any, rem: any, remId: string): Promise<Pd
         console.error('[RepetitionHistoryPopup] Error loading PDF page info:', e);
         return null;
     }
+}
+
+/**
+ * Human label for a QueueInteractionScore (as stored in context.flashcardScore).
+ * Numeric values come from the SDK enum: AGAIN=0, TOO_EARLY=0.01, HARD=0.5,
+ * GOOD=1, EASY=1.5. Returns undefined for scores without a review-grade meaning
+ * or when score is undefined. Exported as the single source of truth so other
+ * history/dashboard widgets import it instead of redefining the mapping.
+ */
+export function scoreLabel(score: number | undefined): string | undefined {
+    switch (score) {
+        case 0: return 'Again';
+        case 0.01: return 'Too early';
+        case 0.5: return 'Hard';
+        case 1: return 'Good';
+        case 1.5: return 'Easy';
+        default: return undefined;
+    }
+}
+
+/**
+ * Compact one-line rendering of a machine context snapshot (IncrementalRep.context):
+ * "p.57 of 40–80 · Deep Learning.pdf · 🔖 “bookmark…”".
+ */
+function formatRepContext(ctx: NonNullable<IncrementalRep['context']>): string {
+    const parts: string[] = [];
+    if (ctx.page !== undefined) {
+        const range =
+            ctx.rangeStart !== undefined ? ` of ${ctx.rangeStart}–${ctx.rangeEnd ?? '∞'}` : '';
+        parts.push(`p.${ctx.page}${range}`);
+    } else if (ctx.rangeStart !== undefined) {
+        parts.push(`pp.${ctx.rangeStart}–${ctx.rangeEnd ?? '∞'}`);
+    }
+    if (ctx.videoTime !== undefined) {
+        const m = Math.floor(ctx.videoTime / 60);
+        const s = Math.floor(ctx.videoTime % 60).toString().padStart(2, '0');
+        parts.push(`▶ ${m}:${s}`);
+    }
+    if (ctx.pdfName) parts.push(ctx.pdfName);
+    if (ctx.bookmark) parts.push(`🔖 “${ctx.bookmark}”`);
+    // Imported-from-flashcard provenance (eventType 'importedRep').
+    if (ctx.flashcardName || ctx.flashcardScore !== undefined) {
+        const label = scoreLabel(ctx.flashcardScore);
+        const name = ctx.flashcardName ? `“${ctx.flashcardName}”` : 'flashcard';
+        parts.push(`🃏 ${name}${label ? ` · ${label}` : ''}`);
+    }
+    return parts.join(' · ');
+}
+
+/**
+ * Sub-row shown under a history row / event banner when the entry carries a
+ * user note (📝) and/or a machine context snapshot.
+ */
+function NoteAndContextLine({ rep }: { rep: IncrementalRep }) {
+    if (!rep.notes && !rep.context) return null;
+    return (
+        <div
+            style={{
+                padding: '2px 16px 8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
+                borderBottom: '1px solid var(--rn-clr-border-secondary)',
+                marginTop: '-1px', // merge with the row above (which has its own border)
+            }}
+        >
+            {rep.notes && (
+                <div
+                    style={{
+                        fontSize: '11px',
+                        color: 'var(--rn-clr-content-secondary)',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                    }}
+                >
+                    📝 {rep.notes}
+                </div>
+            )}
+            {rep.context && (
+                <div
+                    style={{
+                        fontSize: '10px',
+                        color: 'var(--rn-clr-content-tertiary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                    }}
+                    title={formatRepContext(rep.context)}
+                >
+                    {formatRepContext(rep.context)}
+                </div>
+            )}
+        </div>
+    );
 }
 
 /**
@@ -322,13 +416,9 @@ function RepetitionHistoryPopup() {
         pdfPageInfo.percentRead > 0 && pdfPageInfo.percentRead < 100 && totalTime > 0
             ? Math.round((totalTime * (100 - pdfPageInfo.percentRead)) / pdfPageInfo.percentRead)
             : null;
-    // Count only events that represent actual reviews (same as scheduler logic)
-    const repCount = history?.filter(h =>
-        h.eventType === undefined ||
-        h.eventType === 'rep' ||
-        h.eventType === 'rescheduledInQueue' ||
-        h.eventType === 'executeRepetition'
-    ).length || 0;
+    // Count only events that represent actual reviews (shared stats predicate;
+    // includes imported flashcard reps on preserved-history tombstones).
+    const repCount = history?.filter(h => repCountsForStats(h.eventType)).length || 0;
 
     // Calculate days late/early for next scheduled rep
     const now = Date.now();
@@ -460,7 +550,8 @@ function RepetitionHistoryPopup() {
                         // Render event markers differently
                         if (rep.eventType === 'madeIncremental') {
                             return (
-                                <div key={index} style={{
+                                <React.Fragment key={index}>
+                                <div style={{
                                     display: 'flex',
                                     gridColumn: '1 / -1',
                                     justifyContent: 'center',
@@ -476,12 +567,15 @@ function RepetitionHistoryPopup() {
                                     ▶ Made Incremental — {dayjs(rep.date).format('MMM D, YYYY')}
                                     {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </div>
+                                <NoteAndContextLine rep={rep} />
+                                </React.Fragment>
                             );
                         }
 
                         if (rep.eventType === 'dismissed') {
                             return (
-                                <div key={index} style={{
+                                <React.Fragment key={index}>
+                                <div style={{
                                     display: 'flex',
                                     gridColumn: '1 / -1',
                                     justifyContent: 'center',
@@ -496,13 +590,16 @@ function RepetitionHistoryPopup() {
                                 }}>
                                     ⏸ Dismissed — {dayjs(rep.date).format('MMM D, YYYY')}
                                 </div>
+                                <NoteAndContextLine rep={rep} />
+                                </React.Fragment>
                             );
                         }
 
                         // Rescheduled in Editor - event marker (purple, no review counted)
                         if (rep.eventType === 'rescheduledInEditor') {
                             return (
-                                <div key={index} style={{
+                                <React.Fragment key={index}>
+                                <div style={{
                                     display: 'flex',
                                     gridColumn: '1 / -1',
                                     justifyContent: 'center',
@@ -519,13 +616,16 @@ function RepetitionHistoryPopup() {
                                     {rep.interval !== undefined && ` → ${rep.interval}d`}
                                     {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </div>
+                                <NoteAndContextLine rep={rep} />
+                                </React.Fragment>
                             );
                         }
 
                         // Manual Date Reset - event marker (gray, no review counted)
                         if (rep.eventType === 'manualDateReset') {
                             return (
-                                <div key={index} style={{
+                                <React.Fragment key={index}>
+                                <div style={{
                                     display: 'flex',
                                     gridColumn: '1 / -1',
                                     justifyContent: 'center',
@@ -542,6 +642,8 @@ function RepetitionHistoryPopup() {
                                     {rep.interval !== undefined && ` → ${rep.interval}d`}
                                     {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </div>
+                                <NoteAndContextLine rep={rep} />
+                                </React.Fragment>
                             );
                         }
 
@@ -549,12 +651,14 @@ function RepetitionHistoryPopup() {
                         const getEventIndicator = () => {
                             if (rep.eventType === 'rescheduledInQueue') return '📅 ';
                             if (rep.eventType === 'executeRepetition') return '⌨️ ';
+                            if (rep.eventType === 'importedRep') return '🃏 ';
                             return '';
                         };
 
                         // Regular rep entry (includes rescheduledInQueue and executeRepetition with indicators)
                         return (
-                            <div key={index} style={gridRowStyle}>
+                            <React.Fragment key={index}>
+                            <div style={gridRowStyle}>
                                 <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
                                     <span>{getEventIndicator()}{dayjs(rep.date).format('MMM D, YYYY')}</span>
                                     {/* Local wall-clock time of the review (24h) — disambiguates
@@ -576,6 +680,8 @@ function RepetitionHistoryPopup() {
                                     {formatEarlyLate(rep)}
                                 </span>
                             </div>
+                            <NoteAndContextLine rep={rep} />
+                            </React.Fragment>
                         );
                     })}
                 </div>

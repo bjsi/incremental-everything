@@ -9,6 +9,7 @@ import {
   betaMaxIntervalId,
 } from './consts';
 import { IncrementalRep } from './incremental_rem';
+import { repCountsForScheduling } from './incremental_rem/types';
 import * as _ from 'remeda';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -57,7 +58,12 @@ function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
  * - 'rescheduledInEditor': Reschedule from editor (no review confirmed)
  * - 'manualDateReset': Manual date change (no review)
  * - 'madeIncremental', 'dismissed': Session markers
- * 
+ * - 'importedRep': Review imported from a removed flashcard — counts for stats
+ *   but never for this rem's own scheduling.
+ *
+ * The exact predicate lives in repCountsForScheduling (types.ts) so it can't
+ * drift from the Study Dashboard's stats predicate.
+ *
  * @param history Full cleansed history array (after early-response filtering)
  * @returns Only the events that count for interval after the last 'madeIncremental' marker
  */
@@ -76,16 +82,7 @@ function getRepsSinceLastMadeIncremental(history: IncrementalRep[]): Incremental
     ? history.slice(lastSessionStartIndex + 1)
     : history;
 
-  // Filter to only events that count for interval calculation
-  // - undefined or 'rep': Normal review
-  // - 'rescheduledInQueue': Reschedule during queue review (review happened)
-  // - 'executeRepetition': Execute repetition command (review happened)
-  return entriesAfterSessionStart.filter(entry =>
-    entry.eventType === undefined ||
-    entry.eventType === 'rep' ||
-    entry.eventType === 'rescheduledInQueue' ||
-    entry.eventType === 'executeRepetition'
-  );
+  return entriesAfterSessionStart.filter(entry => repCountsForScheduling(entry.eventType));
 }
 
 export function timeWhenCardAppearsInQueueFromScheduled(

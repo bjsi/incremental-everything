@@ -108,8 +108,8 @@ function computeShieldStatus(
   };
 }
 
-export function CardPriorityDisplay() {
-  // console.log('[CardPriorityDisplay] Mounting/Rendering');
+export function CardInfoBar() {
+  // console.log('[CardInfoBar] Mounting/Rendering');
   const plugin = usePlugin();
 
   // ✅ Use the centralized function that handles mobile AND web detection
@@ -117,7 +117,7 @@ export function CardPriorityDisplay() {
     async (rp) => await getEffectivePerformanceMode(rp),
     []
   );
-  // console.log('[CardPriorityDisplay] effectiveMode:', effectiveMode);
+  // console.log('[CardInfoBar] effectiveMode:', effectiveMode);
 
   const useLightMode = effectiveMode === PERFORMANCE_MODE_LIGHT;
 
@@ -438,7 +438,7 @@ export function CardPriorityDisplay() {
     if (cardInfo) {
       return null;
     }
-    // console.log('[CardPriorityDisplay] Using on-demand path (useLightMode:', useLightMode, ', cardInfo:', !!cardInfo, ')');
+    // console.log('[CardInfoBar] Using on-demand path (useLightMode:', useLightMode, ', cardInfo:', !!cardInfo, ')');
 
     const pendingInfo = getPendingCacheUpdate(rem._id);
     if (pendingInfo) {
@@ -475,7 +475,7 @@ export function CardPriorityDisplay() {
 
   // Check isIncrementalQueueActive
   if (!rem || !finalCardInfo || isIncrementalQueueActive) {
-    // console.log('[CardPriorityDisplay] Early return — rem:', !!rem, ', finalCardInfo:', !!finalCardInfo,
+    // console.log('[CardInfoBar] Early return — rem:', !!rem, ', finalCardInfo:', !!finalCardInfo,
     //   ', isIncrementalQueueActive:', isIncrementalQueueActive,
     //   ', cardInfo:', !!cardInfo, ', lightCardInfo:', !!lightCardInfo,
     //   ', useLightMode:', useLightMode,
@@ -673,6 +673,16 @@ export function CardPriorityDisplay() {
                   >
                     SInc: <strong>{fsrsState.sInc.good.toFixed(2)}×</strong>
                   </span>
+                  {fsrsState.uFactor.good > 0 && (
+                    <>
+                      {' · '}
+                      <span title={`U-Factor (Used-Interval Increase) — how much the new interval grows compared to the interval you actually used (time since last review: ${formatStabilityDays(fsrsState.daysSinceLastReview)}).\n\nHard: ×${fsrsState.uFactor.hard.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.hard)}\nGood: ×${fsrsState.uFactor.good.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.good)}\nEasy: ×${fsrsState.uFactor.easy.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.easy)}\n\nHigher = a bigger jump in scheduling. A value of 1.0 means the new interval equals the interval you just used.`}
+                        style={{ cursor: 'help' }}
+                      >
+                        U-Factor: <strong>{fsrsState.uFactor.good.toFixed(2)}×</strong>
+                      </span>
+                    </>
+                  )}
                 </>
               )}
 
@@ -701,4 +711,4 @@ export function CardPriorityDisplay() {
   );
 }
 
-renderWidget(CardPriorityDisplay);
+renderWidget(CardInfoBar);

@@ -10,6 +10,12 @@ export const dismissedPowerupCode = 'dismissed';
 export const dismissedHistorySlotCode = 'dismissedHistory';
 export const dismissedDateSlotCode = 'dismissedDate';
 
+// Marks a "tombstone" rem whose content was removed by the
+// 'Preserve history & remove' command but whose review history was preserved on
+// its Dismissed powerup. Used purely as a CSS hook (data-rem-tags~="preservedhistory")
+// to hide the tombstone in the editor and queue.
+export const preservedHistoryPowerupCode = 'preservedHistory';
+
 // settings
 export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';
@@ -73,6 +79,18 @@ export const togglePdfHighlightBordersCommandId = 'toggle-pdf-highlight-borders'
 // is re-registered to match. See registerPdfHighlightCSS in lib/ui_helpers.ts.
 export const pdfHighlightBordersEnabledKey = 'pdf-highlight-borders-enabled';
 
+// Local (per-device) flag for the parent selector's "Filter only headers"
+// checkbox. When on, expanded branches show only rems carrying a heading
+// (H1–H6); the initial IncRem root candidates are never filtered.
+// Default OFF (undefined => false).
+export const parentSelectorHeadingsOnlyKey = 'parent-selector-headings-only';
+
+// Local (per-device) flag for the parent selector's "List headings first"
+// checkbox. When on, heading children are hoisted above the rest of a branch,
+// shallowest level first; when off, children keep their editor order.
+// Default ON (undefined => true).
+export const parentSelectorHeadingsFirstKey = 'parent-selector-headings-first';
+
 // Session key bumped whenever the borders flag is toggled. registerCSS can only be
 // called from the index widget, so the toggle (which may run in the highlight-toolbar
 // iframe) can't re-register the CSS itself. Instead it bumps this key; a plugin.track
@@ -128,9 +146,21 @@ export const noIncRemTimerWidgetId = 'no-inc-rem-timer-widget';
 export const incRemDisabledDeviceKey = 'inc-rem-disabled-device';
 
 export const cardPriorityCacheRefreshKey = 'cardPriorityCacheRefreshKey';
+// Rem IDs whose cards exist but whose parent rem could not be found during the
+// last cache build (orphan-card candidates). Written by Phase 2 of
+// loadCardPriorityCache, read by the 'Update all inherited Card Priorities'
+// cleanup so it can skip re-scanning to find them.
+export const orphanRemIdsKey = 'orphan-rem-ids-key';
 // Pending priority save job: written by priority_light popup before closing,
 // picked up and executed by tracker.ts in the persistent index widget.
+// Setting id AND registerCSS id for the table-cell priority badges.
+export const showPriorityBandsInTablesId = 'showPriorityBandsInTables';
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
+// Rem ids a priority popup should apply to when opened in batch mode (Opt+P /
+// Ctrl+Opt+P over a multi-rem selection, e.g. several table rows). Written by the
+// command, read by priority.tsx / priority_light.tsx. Distinct from
+// batchPriorityIntervalRemIds, which is the post-extract IncRem-only flow.
+export const batchPriorityTargetRemIdsKey = 'batchPriorityTargetRemIds';
 // Pending card priority removal job: written by the Priority popup before closing,
 // picked up and executed by tracker.ts. Allows instant popup close per fire-and-forget philosophy.
 export const pendingCardPriorityRemovalKey = 'pendingCardPriorityRemoval';
