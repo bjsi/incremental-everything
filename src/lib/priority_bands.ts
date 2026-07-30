@@ -16,7 +16,12 @@
 // show which band of ten a rem sits in, not its exact number.
 
 import { BuiltInPowerupCodes, PluginRem, RNPlugin } from '@remnote/plugin-sdk';
-import { powerupCode, prioritySlotCode } from './consts';
+import {
+  allCardPriorityInfoKey,
+  allIncrementalRemKey,
+  powerupCode,
+  prioritySlotCode,
+} from './consts';
 // Import from card_priority/types, a leaf module of plain constants, NOT from
 // card_priority/index. index calls syncPriorityBand, so importing it back here
 // would form a cycle — and breaking that cycle with a dynamic import() is not an
@@ -448,6 +453,83 @@ ${sel}::before {
 }
 ${rules}
 `;
+}
+
+/** Below this many samples the distribution is noise; fall back to absolute. */
+const MIN_PERCENTILE_SAMPLE = 20;
+
+/**
+ * Band→percentile mapping, computed SEPARATELY for the two priority populations.
+ *
+ * The Priority Editor ranks an IncRem against other IncRems and a card against
+ * other cards — never against a pooled list — so a single blended distribution
+ * still mismatched the widget it was meant to agree with. Keeping the pools
+ * apart lets each badge use the scale its own UI uses.
+ *
+ * Either side is null when that pool is too small to rank meaningfully; callers
+ * then fall back to the absolute value.
+ */
+export type BandPercentiles = {
+  inc: number[] | null;
+  card: number[] | null;
+};
+
+function percentilesFor(values: number[]): number[] | null {
+  if (values.length < MIN_PERCENTILE_SAMPLE) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+
+  return Array.from({ length: BAND_COUNT }, (_, band) => {
+    const midpoint = band * 10 + 5;
+    // Binary search for the count of priorities <= midpoint. Matches how the
+    // Priority Editor ranks: share of items at or below this value.
+    let lo = 0;
+    let hi = sorted.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sorted[mid] <= midpoint) lo = mid + 1;
+      else hi = mid;
+    }
+    return Math.round((lo / sorted.length) * 1000) / 10;
+  });
+}
+
+/**
+ * Samples both caches to build the mappings. CSS cannot compute, so this is
+ * resolved once and baked into the generated stylesheets — necessarily a
+ * snapshot, recomputed at startup and after a badge refresh.
+ */
+export async function computeBandPercentiles(plugin: RNPlugin): Promise<BandPercentiles> {
+  const incPriorities: number[] = [];
+  const cardPriorities: number[] = [];
+  try {
+    const [incRems, cardInfos] = await Promise.all([
+      plugin.storage.getSession<Array<{ priority?: number }>>(allIncrementalRemKey),
+      plugin.storage.getSession<Array<{ priority?: number }>>(allCardPriorityInfoKey),
+    ]);
+    for (const item of incRems || []) {
+      if (typeof item?.priority === 'number' && !isNaN(item.priority)) {
+        incPriorities.push(item.priority);
+      }
+    }
+    for (const item of cardInfos || []) {
+      if (typeof item?.priority === 'number' && !isNaN(item.priority)) {
+        cardPriorities.push(item.priority);
+      }
+    }
+  } catch (err) {
+    console.error('[PriorityBands] percentile sampling failed', err);
+    return { inc: null, card: null };
+  }
+
+  return { inc: percentilesFor(incPriorities), card: percentilesFor(cardPriorities) };
+}
+
+/**
+ * The number to feed percentileToHslColor for a band. Kept here so the table
+ * badges, the highlight badges and the PDF marker tint cannot drift apart.
+ */
+export function bandColorPercentile(percentiles: number[] | null, band: number): number {
+  return percentiles ? percentiles[band] : band * 10 + 5;
 }
 
 /**

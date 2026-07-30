@@ -1,5 +1,10 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
-import { buildHighlightBandCSS } from './priority_bands';
+import {
+  bandColorPercentile,
+  buildHighlightBandCSS,
+  buildPriorityBandCSS,
+  computeBandPercentiles,
+} from './priority_bands';
 import { percentileToHslColor } from './utils';
 import {
   queueCounterId,
@@ -8,6 +13,7 @@ import {
   hideIncEverythingId,
   pdfHighlightBordersEnabledKey,
   pdfHighlightBordersReloadKey,
+  showPriorityBandsInTablesId,
 } from './consts';
 
 /**
@@ -119,8 +125,11 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
     ? `border-bottom: 1.5px dashed #15803d !important;
       border-right: 3px solid #4baf70 !important;`
     : '';
+  // Same scale as the side-panel badges above: a PDF marker's colour comes from
+  // the IncRem extracted from that highlight.
+  const { inc: incPercentiles } = await computeBandPercentiles(plugin);
   const highlightBandCSS = buildHighlightBandCSS((band) =>
-    percentileToHslColor(band * 10 + 5)
+    percentileToHslColor(bandColorPercentile(incPercentiles, band))
   );
   const css = `
     /* PDF viewer: keep the highlight's ORIGINAL background and distinguish the tag
@@ -237,8 +246,33 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
  * which has to live inside the PDF stylesheet for ordering reasons.
  */
 export async function registerHighlightBandBadgeCSS(plugin: ReactRNPlugin) {
-  const { badges } = buildHighlightBandCSS((band) => percentileToHslColor(band * 10 + 5));
+  // Highlights are badged with the priority of the IncRem extracted from them,
+  // so they rank on the IncRem scale.
+  const { inc } = await computeBandPercentiles(plugin);
+  const { badges } = buildHighlightBandCSS((band) =>
+    percentileToHslColor(bandColorPercentile(inc, band))
+  );
   await plugin.app.registerCSS('highlight-priority-band-badges', badges);
+}
+
+/**
+ * Table-cell badges. Registered here rather than in registerPluginSettings so it
+ * can be re-run when the band→percentile mapping changes; the setting is still
+ * what gates it.
+ */
+export async function registerTableBandBadgeCSS(plugin: ReactRNPlugin) {
+  const enabled = await plugin.settings.getSetting<boolean>(showPriorityBandsInTablesId);
+  // Table rows are predominantly flashcards, so they rank on the card scale.
+  // A band tag does not record which population its priority came from, so an
+  // IncRem sharing a table is coloured on the card scale too — the trade-off
+  // named when this was chosen over a second set of band powerups.
+  const card = enabled ? (await computeBandPercentiles(plugin)).card : null;
+  await plugin.app.registerCSS(
+    showPriorityBandsInTablesId,
+    enabled
+      ? buildPriorityBandCSS((band) => percentileToHslColor(bandColorPercentile(card, band)))
+      : ''
+  );
 }
 
 export async function registerIgnoreTagCSS(plugin: ReactRNPlugin) {

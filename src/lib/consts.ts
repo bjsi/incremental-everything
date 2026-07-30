@@ -155,6 +155,11 @@ export const orphanRemIdsKey = 'orphan-rem-ids-key';
 // picked up and executed by tracker.ts in the persistent index widget.
 // Setting id AND registerCSS id for the table-cell priority badges.
 export const showPriorityBandsInTablesId = 'showPriorityBandsInTables';
+// Bumped whenever the band→percentile mapping should be recomputed and the band
+// stylesheets re-registered (caches warmed at startup, or a badge refresh). Same
+// pattern as pdfHighlightBordersReloadKey: registerCSS is index-only, so a
+// plugin.track in index.tsx watches this key and re-registers there.
+export const priorityBandColorsReloadKey = 'priority-band-colors-reload';
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
 // Rem ids a priority popup should apply to when opened in batch mode (Opt+P /
 // Ctrl+Opt+P over a multi-rem selection, e.g. several table rows). Written by the

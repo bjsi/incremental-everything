@@ -32,6 +32,7 @@ import {
   sourceFloatingTargetKey,
   sourceFloatingActiveIdKey,
   preservedHistoryPowerupCode,
+  priorityBandColorsReloadKey,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
 import {
@@ -1439,6 +1440,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         const summary =
           `Priority badges refreshed: ${changed} updated of ${remIds.length} rems in ${secs}s.`;
         console.log(`[PriorityBands] ✅ ${summary}`);
+        // Priorities moved, so the band→percentile colour mapping may have too.
+        // registerCSS is index-only; bumping this key makes the index widget's
+        // plugin.track re-register the band stylesheets with fresh colours.
+        await plugin.storage.setSession(priorityBandColorsReloadKey, Date.now());
         await plugin.app.toast(`✅ ${summary}`);
       } catch (err) {
         console.error('[PriorityBands] refresh failed', err);
