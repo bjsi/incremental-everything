@@ -1,6 +1,5 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { syncPriorityBand } from '../lib/priority_bands';
 import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -263,7 +262,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         const { setCardPriority } = await import('../lib/card_priority');
         const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
         const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
-        const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
+        const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
 
         for (const remId of job.remIds) {
           const rem = await plugin.rem.findOne(remId);
@@ -278,8 +277,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
           ]);
 
           if (job.incPriority !== null && hasIncPowerup) {
-            await rem.setPowerupProperty(powerupCode, 'priority', [job.incPriority.toString()]);
-            await syncPriorityBand(plugin as any, rem);
+            await setIncRemPriority(plugin as any, rem, job.incPriority);
             const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
             if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
             cascadeRemIds.push(remId);
@@ -341,10 +339,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
       // 1. IncRem priority write
       if (job.incPriority !== null) {
-        await rem.setPowerupProperty(powerupCode, 'priority', [job.incPriority.toString()]);
-        await syncPriorityBand(plugin as any, rem);
         const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
-        const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
+        const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
+        await setIncRemPriority(plugin as any, rem, job.incPriority);
         const updatedIncRem = await getIncrementalRemFromRem(plugin as any, rem);
         if (updatedIncRem) await updateIncrementalRemCache(plugin as any, updatedIncRem);
         console.log(`[Tracker] IncRem priority written: ${job.incPriority}`);
@@ -408,11 +405,10 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
     console.log(`[Tracker] intervalBatchSave: ${job.remIds.length} rem(s), priority=${job.priority}, interval=${job.interval}`);
     try {
-      const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
+      const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
       const { updateSRSDataForRem } = await import('../lib/scheduler');
       const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
       const { allIncrementalRemKey } = await import('../lib/consts');
-      const { powerupCode: pc, prioritySlotCode } = await import('../lib/consts');
 
       const patchedIncRems: import('../lib/incremental_rem/types').IncrementalRem[] = [];
 
@@ -421,7 +417,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         if (!rem) { console.warn('[Tracker] intervalBatchSave: rem not found', remId); continue; }
 
         // 1. Write priority powerup property
-        await rem.setPowerupProperty(pc, prioritySlotCode, [job.priority.toString()]);
+        await setIncRemPriority(plugin as any, rem, job.priority);
 
         // 2. Compute and write SRS schedule
         const incRem = await getIncrementalRemFromRem(plugin as any, rem);
@@ -636,7 +632,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       }
 
       const { setCardPriority } = await import('../lib/card_priority');
-      const { getIncrementalRemFromRem } = await import('../lib/incremental_rem');
+      const { getIncrementalRemFromRem, setIncRemPriority } = await import('../lib/incremental_rem');
       const { updateIncrementalRemCache } = await import('../lib/incremental_rem/cache');
       const { updateCardPriorityCache, flushCacheUpdatesNow } = await import('../lib/card_priority/cache');
       const isLight = await shouldUseLightMode(plugin as any);
@@ -655,8 +651,7 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
             const oldP = incRemInfo.priority;
             const newP = Math.max(0, Math.min(100, oldP + agg.incDelta));
             if (oldP !== newP) {
-              await rem.setPowerupProperty(powerupCode, 'priority', [newP.toString()]);
-              await syncPriorityBand(plugin as any, rem);
+              await setIncRemPriority(plugin as any, rem, newP);
               const updated = await getIncrementalRemFromRem(plugin as any, rem);
               if (updated) await updateIncrementalRemCache(plugin as any, updated);
               messages.push(`IncRem ${oldP} → ${newP}`);

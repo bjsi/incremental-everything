@@ -6,7 +6,7 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, pageRangeWidgetId } from '../lib/consts';
@@ -42,7 +42,7 @@ async function handleEditorReview(
   const incRem = await getIncrementalRemFromRem(plugin, rem);
   if (!incRem) return null;
 
-  await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+  await setIncRemPriority(plugin, rem, newPriority);
 
   const computedNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
   const newNextRepDate = overrideNextRepDate ?? computedNextRepDate;

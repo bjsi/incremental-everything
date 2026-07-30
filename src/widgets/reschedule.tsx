@@ -6,7 +6,7 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useRef } from 'react';
-import { getIncrementalRemFromRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, requestQueueDashboardRefocus, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, incremReviewStartTimeKey } from '../lib/consts';
@@ -37,7 +37,7 @@ async function handleRescheduleAndPriorityUpdate(
     const incRem = await getIncrementalRemFromRem(plugin, rem);
     if (!incRem) return;
 
-    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+    await setIncRemPriority(plugin, rem, newPriority);
 
     const newNextRepDate = Date.now() + intervalDays * 1000 * 60 * 60 * 24;
 

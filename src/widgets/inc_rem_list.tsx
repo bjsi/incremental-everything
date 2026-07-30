@@ -2,7 +2,7 @@ import { ReactRNPlugin, renderWidget, usePlugin, useTrackerPlugin } from '@remno
 import React, { useState, useRef } from 'react';
 import { allIncrementalRemKey, popupDocumentIdKey, powerupCode, prioritySlotCode } from '../lib/consts';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { buildDocumentScope } from '../lib/scope_helpers';
 import { extractText, determineIncRemType, getTotalTimeSpent, getBreadcrumbText } from '../lib/incRemHelpers';
@@ -194,7 +194,7 @@ export function IncRemList() {
 
     pendingPriorityChanges.current[remId] = newPriority;
 
-    await rem.setPowerupProperty(powerupCode, prioritySlotCode, [newPriority.toString()]);
+    await setIncRemPriority(plugin, rem, newPriority);
 
     // Update the cache
     const incRemInfo = await getIncrementalRemFromRem(plugin, rem);

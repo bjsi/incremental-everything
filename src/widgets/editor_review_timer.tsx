@@ -4,7 +4,7 @@ import {
   useTrackerPlugin,
 } from '@remnote/plugin-sdk';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache, removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../lib/scheduler';
 import { powerupCode, prioritySlotCode, currentSubQueueIdKey, remnoteEnvironmentId, pageRangeWidgetId } from '../lib/consts';
@@ -371,7 +371,7 @@ function EditorReviewTimer() {
     try {
       // Update priority if changed
       if (timerData.priority !== undefined && timerData.priority !== null) {
-        await rem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+        await setIncRemPriority(plugin, rem, timerData.priority);
       }
 
       // Calculate review time in seconds
@@ -518,7 +518,7 @@ function EditorReviewTimer() {
     try {
       // Update priority if changed
       if (timerData.priority !== undefined && timerData.priority !== null) {
-        await currentRem.setPowerupProperty(powerupCode, prioritySlotCode, [timerData.priority.toString()]);
+        await setIncRemPriority(plugin, currentRem, timerData.priority);
       }
 
       // Calculate review time and sync PDF page

@@ -14,6 +14,7 @@ import {
 } from '../lib/consts';
 import { IncrementalRep, IncrementalRem } from '../lib/incremental_rem/types';
 import { getDailyDocReferenceForDate, sleep } from '../lib/utils';
+import { syncPriorityBand } from '../lib/priority_bands';
 
 /**
  * Import Incremental Rems with History
@@ -202,6 +203,15 @@ async function runImport(
           ? [rem.setPowerupProperty(powerupCode, originalIncrementalDateSlotCode, createdRef)]
           : []),
       ]);
+
+      // Same reasoning as initIncrementalRem: the slot write stays in the parallel
+      // batch, and the band is reconciled once afterwards. Imported rems are ordinary
+      // KB rems that may already carry a slot-defining tag, so they can be band-eligible.
+      try {
+        await syncPriorityBand(plugin, rem);
+      } catch (err) {
+        console.error('[ImportIncremHistory] band sync failed', err);
+      }
 
       const parsed = IncrementalRem.safeParse({
         remId: rem._id,

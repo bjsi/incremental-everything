@@ -26,6 +26,7 @@ import { stampNoteAndContext } from '../history_notes';
 import { updateIncrementalRemCache } from './cache';
 import { mergeHistoryFromDismissed } from '../dismissed';
 import { registerRemsAsPdfKnown, registerRemsAsHtmlKnown, isHtmlSource } from '../pdfUtils';
+import { syncPriorityBand } from '../priority_bands';
 
 type ReviewOverrideOptions = {
   /**
@@ -38,6 +39,46 @@ type ReviewOverrideOptions = {
    */
   overrideIntervalDays?: number;
 };
+
+/**
+ * THE write path for an Incremental Rem's priority. Use this instead of calling
+ * `rem.setPowerupProperty(powerupCode, prioritySlotCode, …)` directly.
+ *
+ * Why it exists: the priority slot is not the only thing that has to move when a
+ * priority changes — the table-cell badge is drawn from a `PriorityBand0–9`
+ * powerup tag that mirrors the effective priority (see lib/priority_bands.ts),
+ * and `effectivePriorityForBadge` reads the INCREMENTAL slot in preference to the
+ * card-priority one for any rem carrying the IncRem powerup. Card priority got
+ * this for free because every writer already went through `setCardPriority`,
+ * which syncs the band internally. Incremental priority had no such chokepoint,
+ * so each of eleven call sites was expected to remember `syncPriorityBand` — and
+ * eight of them did not, leaving stale badges after batch priority changes, the
+ * Priority & Interval batch save, reschedules, editor reviews and the list views.
+ * Routing every writer through here makes that impossible to forget again.
+ *
+ * `syncPriorityBand` writes nothing when the band is already correct (and returns
+ * early for the large majority of rems, which aren't band-eligible), so this is
+ * cheap on the common path and cannot loop. A band-sync failure is logged and
+ * swallowed: the badge is a derived mirror, and losing it must never cost the
+ * caller the priority write that just succeeded.
+ *
+ * Static import of priority_bands, matching card_priority/index.ts: a dynamic
+ * import() emits a chunk the RemNote index sandbox evaluates as a classic script,
+ * which dies on `import.meta` (see the note atop register/tracker.ts).
+ * priority_bands imports only consts + card_priority/types, so there is no cycle.
+ */
+export async function setIncRemPriority(
+  plugin: RNPlugin,
+  rem: PluginRem,
+  priority: number
+): Promise<void> {
+  await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+  try {
+    await syncPriorityBand(plugin, rem);
+  } catch (err) {
+    console.error('[IncRem] band sync failed', err);
+  }
+}
 
 /**
  * Persists the results of reviewing an incremental rem.
@@ -478,6 +519,21 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
         );
       }
       await Promise.all(slotWrites);
+
+      // Band sync for the initial priority. Deliberately NOT routed through
+      // setIncRemPriority: the priority slot write above belongs in the parallel
+      // batch, and pulling it out to serialise a helper call would undo that.
+      // Kept awaited rather than fire-and-forget because the priority popup that
+      // follows also syncs on save — a detached sync could resolve after that save
+      // and reinstate the band for the pre-save priority. isBandEligible short-circuits
+      // on a fresh extract (its only tag is the Incremental powerup), so the cost
+      // to the optimised create path is a getTagRems + one isPowerup, not the ten
+      // hasPowerup reads a full sync would cost.
+      try {
+        await syncPriorityBand(plugin, rem);
+      } catch (err) {
+        console.error('[IncRem] initial band sync failed', err);
+      }
 
       if (!hasExistingHistory) {
         // Record creation event in incremental history (fire and forget)

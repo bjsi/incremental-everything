@@ -29,7 +29,7 @@ import { powerupCode, prioritySlotCode, allIncrementalRemKey } from '../lib/cons
 import { calculateRelativePercentile, formatDuration } from '../lib/utils';
 import { PdfRemItem, EditingState } from '../components';
 import { IncrementalRem } from '../lib/incremental_rem';
-import { getIncrementalRemFromRem, initIncrementalRem } from '../lib/incremental_rem';
+import { getIncrementalRemFromRem, initIncrementalRem, setIncRemPriority } from '../lib/incremental_rem';
 import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
 
 function PageRangeWidget() {
@@ -122,7 +122,7 @@ function PageRangeWidget() {
 
     const rem = await plugin.rem.findOne(remId);
     if (rem) {
-      await rem.setPowerupProperty(powerupCode, prioritySlotCode, [priority.toString()]);
+      await setIncRemPriority(plugin, rem, priority);
 
       // Update the incremental rem cache for other widgets
       const incRemInfo = await getIncrementalRemFromRem(plugin, rem);

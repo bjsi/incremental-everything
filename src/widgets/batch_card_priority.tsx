@@ -8,7 +8,7 @@ import {
 } from '@remnote/plugin-sdk';
 import React, { useState, useEffect, useMemo } from 'react';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import { getCardPriority } from '../lib/card_priority';
+import { getCardPriority, setCardPriority } from '../lib/card_priority';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { powerupCode } from '../lib/consts';
 import { updateCardPriorityCache } from '../lib/card_priority/cache';
@@ -363,9 +363,13 @@ function BatchCardPriority() {
             }
 
             await remData.rem.addPowerup('cardPriority');
-            await remData.rem.setPowerupProperty('cardPriority', 'priority', [priority.toString()]);
-            await remData.rem.setPowerupProperty('cardPriority', 'prioritySource', ['manual']);
-            await remData.rem.setPowerupProperty('cardPriority', 'lastUpdated', [new Date().toISOString()]);
+            // setCardPriority rather than three raw setPowerupProperty calls: it is
+            // the chokepoint that also syncs the PriorityBand table-cell badge, and
+            // writing the slots directly left every rem in the batch showing a stale
+            // band. It also writes lastUpdated as an epoch number — the raw path wrote
+            // an ISO string, which getCardPriority's `parseInt(lastUpdated) || now`
+            // silently read back as the year (2026 ms after 1970).
+            await setCardPriority(plugin, remData.rem, priority, 'manual');
             await updateCardPriorityCache(plugin, remData.remId);
 
             // Show progress
