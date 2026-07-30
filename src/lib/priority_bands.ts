@@ -420,41 +420,6 @@ export async function syncPriorityBands(
  * wrapper; the OPEN and ⋯ buttons share that corner but only fade in on hover,
  * so the badge sits under them at a lower z-index rather than fighting for space.
  */
-export function buildPriorityBandCSS(colorForBand: (band: number) => string): string {
-  const rules = Array.from({ length: BAND_COUNT }, (_, band) => {
-    const sel = `.tree-node--table-cell .rem[data-rem-tags~="${bandTagSlug(band)}"] .rem-text`;
-    return `
-${sel}::before {
-  content: "${bandLabel(band)}";
-  background: ${colorForBand(band)};
-}`;
-  }).join('\n');
-
-  // ::before rather than ::after because that is the pseudo-element the corner
-  // placement was actually verified with against a live table.
-  return `
-/* Priority band badges in table cells (Incremental Everything) */
-.tree-node--table-cell .rem[data-rem-tags*="priorityband"] .rem-text {
-  position: relative;
-}
-.tree-node--table-cell .rem[data-rem-tags*="priorityband"] .rem-text::before {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  z-index: 5;
-  padding: 1px 6px;
-  border-radius: 9px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 15px;
-  color: #fff;
-  pointer-events: none;
-  white-space: nowrap;
-}
-${rules}
-`;
-}
-
 /** Below this many samples the distribution is noise; fall back to absolute. */
 const MIN_PERCENTILE_SAMPLE = 20;
 
@@ -612,6 +577,61 @@ ${badgeRules}
     }`).join('\n');
 
   return { badges, markerColors };
+}
+
+export function buildPriorityBandCSS(colors: {
+  inc: (band: number) => string;
+  card: (band: number) => string;
+}): string {
+  // Two colour scales, chosen per rem by the tags it already carries.
+  //
+  // The Priority Editor ranks an IncRem among IncRems and a card among cards, so
+  // one blended scale mismatched it. A band tag does not record which population
+  // its value came from — but the rem itself does: an IncRem carries
+  // `incremental` and a prioritised card carries `cardpriority`, both already in
+  // data-rem-tags. So the card scale is the base rule and the IncRem scale is an
+  // override with one extra attribute selector, giving it higher specificity.
+  //
+  // The precedence matches readBadgePriority(): a rem that is BOTH an IncRem and
+  // has a card priority is badged with its IncRem priority, and the override
+  // colours it on the IncRem scale accordingly.
+  const rules = Array.from({ length: BAND_COUNT }, (_, band) => {
+    const slug = bandTagSlug(band);
+    const base = `.tree-node--table-cell .rem[data-rem-tags~="${slug}"] .rem-text`;
+    const incOverride = `.tree-node--table-cell .rem[data-rem-tags~="${slug}"][data-rem-tags~="incremental"] .rem-text`;
+    return `
+${base}::before {
+  content: "${bandLabel(band)}";
+  background: ${colors.card(band)};
+}
+${incOverride}::before {
+  background: ${colors.inc(band)};
+}`;
+  }).join('\n');
+
+  // ::before rather than ::after because that is the pseudo-element the corner
+  // placement was actually verified with against a live table.
+  return `
+/* Priority band badges in table cells (Incremental Everything) */
+.tree-node--table-cell .rem[data-rem-tags*="priorityband"] .rem-text {
+  position: relative;
+}
+.tree-node--table-cell .rem[data-rem-tags*="priorityband"] .rem-text::before {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 5;
+  padding: 1px 6px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  color: #fff;
+  pointer-events: none;
+  white-space: nowrap;
+}
+${rules}
+`;
 }
 
 /**

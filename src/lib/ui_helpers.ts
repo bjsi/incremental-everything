@@ -262,15 +262,19 @@ export async function registerHighlightBandBadgeCSS(plugin: ReactRNPlugin) {
  */
 export async function registerTableBandBadgeCSS(plugin: ReactRNPlugin) {
   const enabled = await plugin.settings.getSetting<boolean>(showPriorityBandsInTablesId);
-  // Table rows are predominantly flashcards, so they rank on the card scale.
-  // A band tag does not record which population its priority came from, so an
-  // IncRem sharing a table is coloured on the card scale too — the trade-off
-  // named when this was chosen over a second set of band powerups.
-  const card = enabled ? (await computeBandPercentiles(plugin)).card : null;
+  // Both scales are emitted; the stylesheet picks per rem from the `incremental`
+  // / `cardpriority` tags the rem already carries, so a table mixing IncRems and
+  // flashcards colours each on the scale its own Priority Editor uses.
+  const percentiles = enabled
+    ? await computeBandPercentiles(plugin)
+    : { inc: null, card: null };
   await plugin.app.registerCSS(
     showPriorityBandsInTablesId,
     enabled
-      ? buildPriorityBandCSS((band) => percentileToHslColor(bandColorPercentile(card, band)))
+      ? buildPriorityBandCSS({
+          inc: (band) => percentileToHslColor(bandColorPercentile(percentiles.inc, band)),
+          card: (band) => percentileToHslColor(bandColorPercentile(percentiles.card, band)),
+        })
       : ''
   );
 }
