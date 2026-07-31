@@ -136,14 +136,16 @@ async function readBadgePriority(
 async function syncHighlightBands(
   rem: PluginRem,
   desired: number | null
-): Promise<void> {
+): Promise<number> {
   let refs: PluginRem[] = [];
   try {
     refs = (await rem.remsBeingReferenced()) as PluginRem[];
   } catch (err) {
     console.error('[PriorityBands] remsBeingReferenced failed for', rem._id, err);
-    return;
+    return 0;
   }
+
+  let wrote = 0;
 
   for (const ref of refs) {
     const isHighlight =
@@ -151,11 +153,12 @@ async function syncHighlightBands(
       (await ref.hasPowerup(BuiltInPowerupCodes.HTMLHighlight));
     if (!isHighlight) continue;
     try {
-      await applyBand(ref, desired);
+      if (await applyBand(ref, desired)) wrote++;
     } catch (err) {
       console.error('[PriorityBands] highlight band sync failed for', ref._id, err);
     }
   }
+  return wrote;
 }
 
 /** Reconciles a rem to exactly one band tag (or none). Returns true if it wrote. */
@@ -253,10 +256,19 @@ export async function isBandEligible(rem: PluginRem): Promise<boolean> {
  * writing nothing when it already matches keeps this safe to call from the same
  * paths that write priorities.
  */
+export type BandSyncResult = {
+  /** The rem's own table badge changed. */
+  self: boolean;
+  /** How many source highlights had their badge changed by propagation. */
+  highlights: number;
+  /** Whether the rem could carry a table badge at all (see isBandEligible). */
+  eligible: boolean;
+};
+
 export async function syncPriorityBand(
   plugin: RNPlugin,
   rem: PluginRem
-): Promise<boolean> {
+): Promise<BandSyncResult> {
   const { priority, isInc } = await readBadgePriority(plugin, rem);
   const desired = priority === null ? null : bandForPriority(priority);
 
@@ -264,15 +276,15 @@ export async function syncPriorityBand(
   // table gate below or a PDF extract would never reach its source highlight.
   // Restricted to IncRems: card-priority writes cascade across whole subtrees and
   // must not pay for a reference lookup each.
-  if (isInc) {
-    await syncHighlightBands(rem, desired);
-  }
+  const highlights = isInc ? await syncHighlightBands(rem, desired) : 0;
 
   // Gate: returns for the large majority of rems in a big KB, before the ten
   // hasPowerup reads in applyBand, let alone a write.
-  if (!(await isBandEligible(rem))) return false;
+  if (!(await isBandEligible(rem))) {
+    return { self: false, highlights, eligible: false };
+  }
 
-  return applyBand(rem, desired);
+  return { self: await applyBand(rem, desired), highlights, eligible: true };
 }
 
 /**
@@ -390,36 +402,34 @@ export async function removeAllPriorityBands(plugin: RNPlugin): Promise<number> 
 export async function syncPriorityBands(
   plugin: RNPlugin,
   remIds: string[],
-  onProgress?: (done: number, total: number, changed: number) => void
-): Promise<number> {
-  let changed = 0;
+  onProgress?: (done: number, total: number, stats: BandSyncStats) => void
+): Promise<BandSyncStats> {
+  const stats: BandSyncStats = { changed: 0, eligible: 0, highlights: 0 };
   let done = 0;
+
   for (const remId of remIds) {
     const rem = await plugin.rem.findOne(remId);
     if (rem) {
       try {
-        if (await syncPriorityBand(plugin, rem)) changed++;
+        const result = await syncPriorityBand(plugin, rem);
+        if (result.eligible) stats.eligible++;
+        stats.highlights += result.highlights;
+        // A rem counts as changed if its own badge moved OR it pushed a band onto
+        // a source highlight. Counting only the former reported 0 updated across
+        // a whole knowledge base while highlights were in fact being written.
+        if (result.self || result.highlights > 0) stats.changed++;
       } catch (err) {
         console.error('[PriorityBands] sync failed for', remId, err);
       }
     }
     done++;
     if (onProgress && (done % PROGRESS_LOG_INTERVAL === 0 || done === remIds.length)) {
-      onProgress(done, remIds.length, changed);
+      onProgress(done, remIds.length, stats);
     }
   }
-  return changed;
+  return stats;
 }
 
-/**
- * The badge stylesheet. Scoped to `.tree-node--table-cell` so it only appears
- * where the real widget cannot follow — outside tables `priority_editor` still
- * renders the exact number and stays the better badge.
- *
- * Drawn in the cell's top-right corner. `.rem-text` is the cell's positioned
- * wrapper; the OPEN and ⋯ buttons share that corner but only fade in on hover,
- * so the badge sits under them at a lower z-index rather than fighting for space.
- */
 /** Below this many samples the distribution is noise; fall back to absolute. */
 const MIN_PERCENTILE_SAMPLE = 20;
 
@@ -434,6 +444,15 @@ const MIN_PERCENTILE_SAMPLE = 20;
  * Either side is null when that pool is too small to rank meaningfully; callers
  * then fall back to the absolute value.
  */
+export type BandSyncStats = {
+  /** Rems whose own badge changed, or which updated a source highlight. */
+  changed: number;
+  /** Rems that can carry a table badge (tagged with a slot-defining tag). */
+  eligible: number;
+  /** Highlight badges written by propagation from an IncRem. */
+  highlights: number;
+};
+
 export type BandPercentiles = {
   inc: number[] | null;
   card: number[] | null;

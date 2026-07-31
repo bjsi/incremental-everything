@@ -1427,18 +1427,24 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         }
 
         await plugin.storage.setSession('plugin_operation_active', true);
-        let changed = 0;
+        let stats = { changed: 0, eligible: 0, highlights: 0 };
         try {
-          changed = await syncPriorityBands(plugin as any, remIds, (done, total, sofar) => {
-            console.log(`[PriorityBands] ${done}/${total} scanned, ${sofar} updated`);
+          stats = await syncPriorityBands(plugin as any, remIds, (done, total, sofar) => {
+            console.log(
+              `[PriorityBands] ${done}/${total} scanned — ${sofar.changed} updated ` +
+              `(${sofar.eligible} table-eligible, ${sofar.highlights} highlights)`
+            );
           });
         } finally {
           await plugin.storage.setSession('plugin_operation_active', false);
         }
 
         const secs = Math.round((performance.now() - t0) / 100) / 10;
+        // Report the breakdown: "0 updated" is ambiguous on its own, since it can
+        // mean everything was already correct OR nothing was eligible.
         const summary =
-          `Priority badges refreshed: ${changed} updated of ${remIds.length} rems in ${secs}s.`;
+          `Priority badges refreshed: ${stats.changed} updated of ${remIds.length} rems ` +
+          `(${stats.eligible} table-eligible, ${stats.highlights} highlight badges) in ${secs}s.`;
         console.log(`[PriorityBands] ✅ ${summary}`);
         // Priorities moved, so the band→percentile colour mapping may have too.
         // registerCSS is index-only; bumping this key makes the index widget's
