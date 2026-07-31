@@ -146,12 +146,16 @@ async function readBadgePriority(
  * to a highlight is an ordinary reference.
  */
 export function referencedRemIdsFromText(rem: PluginRem): string[] {
-  const text = (rem as any).text;
-  if (!Array.isArray(text)) return [];
   const ids: string[] = [];
-  for (const item of text) {
-    if (item && typeof item === 'object' && item.i === 'q' && typeof item._id === 'string') {
-      ids.push(item._id);
+  // BOTH sides. A Q&A flashcard commonly cites its source in the ANSWER, so
+  // reading only `text` missed most card→highlight links — which is why
+  // highlights with several referencing cards still came back unbanded.
+  for (const field of [(rem as any).text, (rem as any).backText]) {
+    if (!Array.isArray(field)) continue;
+    for (const item of field) {
+      if (item && typeof item === 'object' && item.i === 'q' && typeof item._id === 'string') {
+        ids.push(item._id);
+      }
     }
   }
   return ids;
@@ -885,18 +889,38 @@ ${badgeRules}
   // Declares the marker as well as its colour, rather than only tinting. The base
   // rules in registerPdfHighlightCSS draw a marker for `pdfextract` and
   // `incremental` highlights only, so a highlight banded purely through a
-  // flashcard link had nothing to tint. Same widths as those rules, so an
-  // extracted highlight looks exactly as before apart from the colour.
-  const markerColors = Array.from({ length: BAND_COUNT }, (_, band) => `
-    ${pdf}[data-rem-tags~="${bandTagSlug(band)}"],
-    ${html}[data-rem-tags~="${bandTagSlug(band)}"] {
-      border-bottom: 1.5px dashed ${colorForBand(band)} !important;
-      border-right: 3px solid ${colorForBand(band)} !important;
-      padding-bottom: 2.7px;
+  // flashcard link had nothing to tint.
+  //
+  // NOT scoped to `.rem`: in the PDF viewer the highlight element has no such
+  // class, which is exactly why the base rules omit it too. Scoping to `.rem`
+  // made these rules apply in the editor and sidebar but never in the PDF.
+  //
+  // Two provenance styles, both carrying the band colour:
+  //   extracted (pdfextract) — dashed underline + SOLID bar, as before;
+  //   banded only            — dotted underline + DOTTED bar.
+  // So the colour always reads as priority, while the line style says whether
+  // you have already extracted from this highlight.
+  const markerColors = Array.from({ length: BAND_COUNT }, (_, band) => {
+    const slug = bandTagSlug(band);
+    const color = colorForBand(band);
+    const shared = `padding-bottom: 2.7px;
       padding-left: 4px;
       box-decoration-break: clone;
-      -webkit-box-decoration-break: clone;
-    }`).join('\n');
+      -webkit-box-decoration-break: clone;`;
+    return `
+    [data-rem-tags~="pdf-highlight"][data-rem-tags~="pdfextract"][data-rem-tags~="${slug}"],
+    [data-rem-tags~="html-highlight"][data-rem-tags~="pdfextract"][data-rem-tags~="${slug}"] {
+      border-bottom: 1.5px dashed ${color} !important;
+      border-right: 3px solid ${color} !important;
+      ${shared}
+    }
+    [data-rem-tags~="pdf-highlight"][data-rem-tags~="${slug}"]:not([data-rem-tags~="pdfextract"]),
+    [data-rem-tags~="html-highlight"][data-rem-tags~="${slug}"]:not([data-rem-tags~="pdfextract"]) {
+      border-bottom: 1.5px dotted ${color} !important;
+      border-right: 3px dotted ${color} !important;
+      ${shared}
+    }`;
+  }).join('\n');
 
   return { badges, markerColors };
 }
