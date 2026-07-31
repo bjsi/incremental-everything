@@ -1421,8 +1421,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // Suppress GlobalRemChanged for the duration — this writes powerups across
         // potentially thousands of rems, exactly what the flag exists for.
         console.log(
-          `[PriorityBands] Scanning ${remIds.length} rems ` +
-          `(${incRems.length} IncRems, ${cardRems.length} with card priority)`
+          `[PriorityBands] Phase 1/2 — TABLE badges. Scanning ${remIds.length} prioritised rems ` +
+          `(${incRems.length} IncRems, ${cardRems.length} with card priority). ` +
+          `Also harvests their links, which phase 2 needs to find highlights.`
         );
 
         if (!remIds.length) {
@@ -1432,7 +1433,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         }
 
         await plugin.storage.setSession('plugin_operation_active', true);
-        let stats = { changed: 0, eligible: 0, highlights: 0 };
+        let stats = { changed: 0, eligible: 0 };
         // Highlights this plugin never extracted from cannot be enumerated (see
         // syncAllHighlightBands), so phase 1 harvests the links out of each
         // prioritised rem's text as it goes and phase 2 resolves them.
@@ -1440,25 +1441,33 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         try {
           stats = await syncPriorityBands(plugin as any, remIds, (done, total, sofar) => {
             console.log(
-              `[PriorityBands] ${done}/${total} scanned — ${sofar.changed} updated ` +
-              `(${sofar.eligible} table-eligible, ${sofar.highlights} highlights)`
+              `[PriorityBands] Phase 1 (table badges) ${done}/${total} scanned — ` +
+              `${sofar.changed} updated, ${sofar.eligible} table-eligible`
             );
           }, referencedIds);
         } finally {
           await plugin.storage.setSession('plugin_operation_active', false);
         }
 
-        // Phase 2: reconcile highlight badges in the REVERSE direction — each
-        // highlight pulls from every rem linking to it. Deterministic where phase
-        // 1 was last-writer-wins, and it is the only path that sees dismissed
-        // rems and card-only links. Cheap: highlights number in the hundreds.
+        console.log(
+          `[PriorityBands] Phase 1 done — ${stats.changed} table badges updated ` +
+          `(${stats.eligible} of ${remIds.length} rems were table-eligible)`
+        );
+
+        // Phase 2: HIGHLIGHT badges, in the REVERSE direction — each highlight
+        // pulls from every rem linking to it. Deterministic where a push would be
+        // last-writer-wins, and it is the only path that sees dismissed rems and
+        // card-only links. Phase 1 does no highlight work at all.
+        console.log('[PriorityBands] Phase 2/2 — HIGHLIGHT badges. Enumerating highlights…');
         await plugin.storage.setSession('plugin_operation_active', true);
-        let highlightStats = { scanned: 0, changed: 0 };
+        let highlightStats = { scanned: 0, changed: 0, noPriority: 0, alreadyCorrect: 0 };
         try {
           highlightStats = await syncAllHighlightBands(
             plugin as any,
             (done, total, sofar) => {
-              console.log(`[PriorityBands] highlights ${done}/${total} — ${sofar} updated`);
+              console.log(
+                `[PriorityBands] Phase 2 (highlight badges) ${done}/${total} — ${sofar} updated`
+              );
             },
             referencedIds
           );
@@ -1466,17 +1475,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           await plugin.storage.setSession('plugin_operation_active', false);
         }
         console.log(
-          `[PriorityBands] highlight pass: ${highlightStats.changed} updated ` +
-          `of ${highlightStats.scanned} highlights`
+          `[PriorityBands] Phase 2 done — ${highlightStats.changed} highlight badges updated ` +
+          `of ${highlightStats.scanned} examined ` +
+          `(${highlightStats.alreadyCorrect} already correct, ` +
+          `${highlightStats.noPriority} resolved to no priority)`
         );
 
         const secs = Math.round((performance.now() - t0) / 100) / 10;
         // Report the breakdown: "0 updated" is ambiguous on its own, since it can
         // mean everything was already correct OR nothing was eligible.
         const summary =
-          `Priority badges refreshed: ${stats.changed} updated of ${remIds.length} rems ` +
-          `(${stats.eligible} table-eligible) · ${highlightStats.changed} of ` +
-          `${highlightStats.scanned} highlights in ${secs}s.`;
+          `Priority badges refreshed in ${secs}s — tables: ${stats.changed} updated ` +
+          `(${stats.eligible} eligible of ${remIds.length} rems); ` +
+          `highlights: ${highlightStats.changed} updated of ${highlightStats.scanned}.`;
         console.log(`[PriorityBands] ✅ ${summary}`);
         // Priorities moved, so the band→percentile colour mapping may have too.
         // registerCSS is index-only; bumping this key makes the index widget's
