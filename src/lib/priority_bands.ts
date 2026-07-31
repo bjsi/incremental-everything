@@ -486,7 +486,7 @@ export async function syncPriorityBands(
    */
   referencedIds?: Set<string>
 ): Promise<BandSyncStats> {
-  const stats: BandSyncStats = { changed: 0, eligible: 0, highlights: 0 };
+  const stats: BandSyncStats = { changed: 0, eligible: 0 };
   let done = 0;
 
   for (const remId of remIds) {
@@ -498,11 +498,7 @@ export async function syncPriorityBands(
       try {
         const result = await syncPriorityBand(plugin, rem, { skipHighlights: true });
         if (result.eligible) stats.eligible++;
-        stats.highlights += result.highlights;
-        // A rem counts as changed if its own badge moved OR it pushed a band onto
-        // a source highlight. Counting only the former reported 0 updated across
-        // a whole knowledge base while highlights were in fact being written.
-        if (result.self || result.highlights > 0) stats.changed++;
+        if (result.self) stats.changed++;
       } catch (err) {
         console.error('[PriorityBands] sync failed for', remId, err);
       }
@@ -638,7 +634,7 @@ export async function syncAllHighlightBands(
   onProgress?: (done: number, total: number, changed: number) => void,
   /** Ids referenced by prioritised rems; those that are highlights join the pass. */
   candidateIds?: Set<string>
-): Promise<{ scanned: number; changed: number }> {
+): Promise<{ scanned: number; changed: number; noPriority: number; alreadyCorrect: number }> {
   // Enumerated from several sources and unioned by id. The powerup route is the
   // one that reaches highlights this plugin never touched; the pdfextract tag is
   // kept as a second source so extracted highlights cannot regress if the powerup
@@ -703,10 +699,19 @@ export async function syncAllHighlightBands(
   console.log(`[PriorityBands] ${highlights.length} highlights to reconcile`);
 
   let changed = 0;
+  let noPriority = 0;
+  let alreadyCorrect = 0;
   let done = 0;
   for (const highlight of highlights) {
     try {
-      if (await applyBand(highlight, await computeHighlightBand(highlight))) changed++;
+      // Split the "not updated" case in two. A highlight reached via
+      // referenced-in-text is referenced BY a prioritised rem, so it should
+      // resolve to a band; if it does not, the reverse lookup disagrees with the
+      // forward one and that is a bug, not a no-op.
+      const band = await computeHighlightBand(highlight);
+      if (band === null) noPriority++;
+      if (await applyBand(highlight, band)) changed++;
+      else if (band !== null) alreadyCorrect++;
     } catch (err) {
       console.error('[PriorityBands] highlight band sync failed for', highlight._id, err);
     }
@@ -715,7 +720,7 @@ export async function syncAllHighlightBands(
       onProgress(done, highlights.length, changed);
     }
   }
-  return { scanned: highlights.length, changed };
+  return { scanned: highlights.length, changed, noPriority, alreadyCorrect };
 }
 
 /** Below this many samples the distribution is noise; fall back to absolute. */
@@ -733,13 +738,15 @@ const MIN_PERCENTILE_SAMPLE = 20;
  * then fall back to the absolute value.
  */
 export type BandSyncStats = {
-  /** Rems whose own badge changed, or which updated a source highlight. */
+  /** Rems whose own table badge changed. */
   changed: number;
   /** Rems that can carry a table badge (tagged with a slot-defining tag). */
   eligible: number;
-  /** Highlight badges written by propagation from an IncRem. */
-  highlights: number;
 };
+
+// NOTE: this used to carry a `highlights` count too. The bulk path now passes
+// skipHighlights, leaving highlight work entirely to syncAllHighlightBands, so
+// the field was structurally always 0 — a number that could only mislead.
 
 export type BandPercentiles = {
   inc: number[] | null;
