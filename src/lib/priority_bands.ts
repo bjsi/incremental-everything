@@ -124,7 +124,8 @@ async function readBadgePriority(
  *
  * An extract records its origin as a pinned Rem reference in its own text
  * (see createRemUnderParent in lib/highlightActions.ts), so the highlight is
- * reachable from the IncRem without storing anything new. Giving the highlight
+ * reachable from the IncRem without storing anything new — and when the pin has
+ * been moved down onto a direct child, from there instead. Giving the highlight
  * the same band lets CSS badge it in the Highlights side panel and tint its
  * marker in the PDF itself — priority information that until now lived only on
  * the extract, invisible while re-reading the source document.
@@ -133,30 +134,61 @@ async function readBadgePriority(
  * syncPriorityBand: its band arrives only from here, and only from the IncRem
  * that references it.
  */
-async function syncHighlightBands(
+async function applyBandToHighlightRefs(
   rem: PluginRem,
   desired: number | null
-): Promise<number> {
+): Promise<{ found: number; wrote: number }> {
   let refs: PluginRem[] = [];
   try {
     refs = (await rem.remsBeingReferenced()) as PluginRem[];
   } catch (err) {
     console.error('[PriorityBands] remsBeingReferenced failed for', rem._id, err);
-    return 0;
+    return { found: 0, wrote: 0 };
   }
 
+  let found = 0;
   let wrote = 0;
-
   for (const ref of refs) {
     const isHighlight =
       (await ref.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) ||
       (await ref.hasPowerup(BuiltInPowerupCodes.HTMLHighlight));
     if (!isHighlight) continue;
+    found++;
     try {
       if (await applyBand(ref, desired)) wrote++;
     } catch (err) {
       console.error('[PriorityBands] highlight band sync failed for', ref._id, err);
     }
+  }
+  return { found, wrote };
+}
+
+async function syncHighlightBands(
+  rem: PluginRem,
+  desired: number | null
+): Promise<number> {
+  const own = await applyBandToHighlightRefs(rem, desired);
+  if (own.found > 0) return own.wrote;
+
+  // Fallback: the pin lives on a direct child, not on the extract itself.
+  //
+  // A common workflow turns an extract into a CONCEPT — the paragraph is retitled
+  // with the concept it defines (Cmd+Opt+C), its prose is broken out into child
+  // rems, and the pin reference moves down with the prose. Keeping the pin on the
+  // concept would pollute search results and would repeat as clutter everywhere
+  // the concept is referenced, so it deliberately does not live there. Without
+  // this fallback such highlights would never be badged.
+  //
+  // Only reached when the rem references no highlight of its own, so the ordinary
+  // extract — which does — never pays for the child walk. First level only:
+  // deeper descendants belong to other extracts, not to this one.
+  let wrote = 0;
+  try {
+    for (const child of (await rem.getChildrenRem()) as PluginRem[]) {
+      wrote += (await applyBandToHighlightRefs(child, desired)).wrote;
+    }
+  } catch (err) {
+    console.error('[PriorityBands] child highlight scan failed for', rem._id, err);
   }
   return wrote;
 }
