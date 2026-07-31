@@ -21,11 +21,11 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
-import { enableHideInQueueIntegrationId, pdfHighlightBordersReloadKey } from '../lib/consts';
+import { enableHideInQueueIntegrationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { registerJumpToRemHelper } from '../register/window';
-import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS } from '../lib/ui_helpers';
+import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS } from '../lib/ui_helpers';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -79,8 +79,22 @@ async function onActivate(plugin: ReactRNPlugin) {
   // the persisted local flag itself to decide whether to draw the marker borders.
   plugin.track(async (rp) => {
     await rp.storage.getSession(pdfHighlightBordersReloadKey); // reactive trigger
+    // Also re-runs when the band→percentile colour mapping changes: the PDF
+    // marker tint is emitted inside this stylesheet.
+    await rp.storage.getSession(priorityBandColorsReloadKey);
     await registerPdfHighlightCSS(plugin);
   });
+
+  // Band badge colours come from the RELATIVE position of each band in the
+  // priority distribution, which is only known once the caches are warm — well
+  // after activation. This re-registers both badge stylesheets whenever that
+  // mapping should be recomputed (cache load below, or a badge refresh).
+  plugin.track(async (rp) => {
+    await rp.storage.getSession(priorityBandColorsReloadKey); // reactive trigger
+    await registerTableBandBadgeCSS(plugin);
+    await registerHighlightBandBadgeCSS(plugin);
+  });
+
   await registerPluginHidingCSS(plugin);
   await registerClozeExtractCSS(plugin);
   await registerTagBadgeCSS(plugin);
@@ -107,8 +121,12 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Get the performance mode
   const useLightMode = await shouldUseLightMode(plugin);
   if (!useLightMode) {
-    // Run the full, expensive cache build
-    loadCardPriorityCache(plugin);
+    // Run the full, expensive cache build, then recompute the band colours: the
+    // percentile mapping is meaningless until this cache exists.
+    loadCardPriorityCache(plugin).then(
+      () => plugin.storage.setSession(priorityBandColorsReloadKey, Date.now()),
+      (err) => console.error('CACHE: card priority cache build failed', err)
+    );
 
   } else {
     // In 'light' mode, just set an empty cache.

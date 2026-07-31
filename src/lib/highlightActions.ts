@@ -8,6 +8,7 @@ import {
   RichTextInterface,
 } from '@remnote/plugin-sdk';
 import { sanitizeRichTextForSetText } from './richTextSanitize';
+import { syncPriorityBand } from './priority_bands';
 import {
   parentSelectorWidgetId,
   powerupCode,
@@ -357,6 +358,19 @@ export const runIncRemCreateTail = async (
     if (pdfExtractTag) await highlightRem.addTag(pdfExtractTag._id);
   } catch (err) {
     console.error('[IncRemTail] pdfextract tag failed:', err);
+  }
+
+  // 2b. Mirror the extract's priority band onto that same highlight, so the
+  // Highlights side panel badges it and its PDF marker takes the band colour.
+  // syncPriorityBand normally propagates this when the priority is written, but
+  // the priority popup can be answered before this tail runs — in which case the
+  // highlight was not yet reachable as a reference target. Reconciling here is a
+  // no-op when the band already matches.
+  try {
+    const newRemForBand = await plugin.rem.findOne(newRemId);
+    if (newRemForBand) await syncPriorityBand(plugin, newRemForBand);
+  } catch (err) {
+    console.error('[IncRemTail] priority band sync failed:', err);
   }
 
   // 3. Remember this parent as the last destination for this PDF/context.

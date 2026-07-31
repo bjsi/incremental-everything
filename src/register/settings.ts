@@ -22,8 +22,7 @@ import {
   enableHideInQueueIntegrationId,
   showPriorityBandsInTablesId,
 } from '../lib/consts';
-import { buildPriorityBandCSS, PRIORITY_BAND_TAG_HIDE_CSS } from '../lib/priority_bands';
-import { percentileToHslColor } from '../lib/utils';
+import { PRIORITY_BAND_TAG_HIDE_CSS } from '../lib/priority_bands';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
 const HIDE_CARD_PRIORITY_CSS = `
@@ -349,13 +348,8 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   // chips stay hidden even when the badges themselves are switched off.
   await plugin.app.registerCSS('priority-band-tag-hide', PRIORITY_BAND_TAG_HIDE_CSS);
 
-  const shouldShowPriorityBands = await plugin.settings.getSetting(showPriorityBandsInTablesId);
-  if (shouldShowPriorityBands) {
-    await plugin.app.registerCSS(
-      showPriorityBandsInTablesId,
-      buildPriorityBandCSS((band) => percentileToHslColor(band * 10 + 5))
-    );
-  }
+  // The badge stylesheet itself is registered by registerTableBandBadgeCSS from
+  // index.tsx, which re-runs when the band→percentile colour mapping changes.
 
   // Dismissed Rems settings
   plugin.settings.registerBooleanSetting({

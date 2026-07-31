@@ -1,11 +1,19 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import {
+  bandColorPercentile,
+  buildHighlightBandCSS,
+  buildPriorityBandCSS,
+  computeBandPercentiles,
+} from './priority_bands';
+import { percentileToHslColor } from './utils';
+import {
   queueCounterId,
   scrollToHighlightId,
   // collapseTopBarId, // Disabled: feature not working
   hideIncEverythingId,
   pdfHighlightBordersEnabledKey,
   pdfHighlightBordersReloadKey,
+  showPriorityBandsInTablesId,
 } from './consts';
 
 /**
@@ -117,6 +125,12 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
     ? `border-bottom: 1.5px dashed #15803d !important;
       border-right: 3px solid #4baf70 !important;`
     : '';
+  // Same scale as the side-panel badges above: a PDF marker's colour comes from
+  // the IncRem extracted from that highlight.
+  const { inc: incPercentiles } = await computeBandPercentiles(plugin);
+  const highlightBandCSS = buildHighlightBandCSS((band) =>
+    percentileToHslColor(bandColorPercentile(incPercentiles, band))
+  );
   const css = `
     /* PDF viewer: keep the highlight's ORIGINAL background and distinguish the tag
        with (a) a dashed underline and (b) a thin left bar. The underline gets
@@ -214,9 +228,55 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
       font-size: 12px;
       content: '✂️';
     }
+
+    /* Tint the extract marker with the priority band of the IncRem extracted
+       from this highlight, so importance is visible while re-reading the PDF.
+       Emitted here, after the base rules above, because those set the border
+       with !important and ordering between registerCSS calls is not guaranteed.
+       Gated on the same "peek" toggle: with borders off there is nothing to tint. */
+    ${bordersEnabled ? highlightBandCSS.markerColors : ''}
   `;
 
   await plugin.app.registerCSS('pdf-inc-highlight-styling', css);
+}
+
+/**
+ * Badges on extracted highlights, shown wherever the highlight rem renders —
+ * most usefully the Highlights side panel. Separate from the marker tint above,
+ * which has to live inside the PDF stylesheet for ordering reasons.
+ */
+export async function registerHighlightBandBadgeCSS(plugin: ReactRNPlugin) {
+  // Highlights are badged with the priority of the IncRem extracted from them,
+  // so they rank on the IncRem scale.
+  const { inc } = await computeBandPercentiles(plugin);
+  const { badges } = buildHighlightBandCSS((band) =>
+    percentileToHslColor(bandColorPercentile(inc, band))
+  );
+  await plugin.app.registerCSS('highlight-priority-band-badges', badges);
+}
+
+/**
+ * Table-cell badges. Registered here rather than in registerPluginSettings so it
+ * can be re-run when the band→percentile mapping changes; the setting is still
+ * what gates it.
+ */
+export async function registerTableBandBadgeCSS(plugin: ReactRNPlugin) {
+  const enabled = await plugin.settings.getSetting<boolean>(showPriorityBandsInTablesId);
+  // Both scales are emitted; the stylesheet picks per rem from the `incremental`
+  // / `cardpriority` tags the rem already carries, so a table mixing IncRems and
+  // flashcards colours each on the scale its own Priority Editor uses.
+  const percentiles = enabled
+    ? await computeBandPercentiles(plugin)
+    : { inc: null, card: null };
+  await plugin.app.registerCSS(
+    showPriorityBandsInTablesId,
+    enabled
+      ? buildPriorityBandCSS({
+          inc: (band) => percentileToHslColor(bandColorPercentile(percentiles.inc, band)),
+          card: (band) => percentileToHslColor(bandColorPercentile(percentiles.card, band)),
+        })
+      : ''
+  );
 }
 
 export async function registerIgnoreTagCSS(plugin: ReactRNPlugin) {
