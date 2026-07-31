@@ -136,6 +136,27 @@ async function readBadgePriority(
  * syncPriorityBand: its band arrives only from here, and only from the IncRem
  * that references it.
  */
+/**
+ * Rem ids referenced from a rem's own rich text.
+ *
+ * Parses the text in memory instead of calling remsBeingReferenced(), which is a
+ * round trip per rem — unaffordable across a 50k-rem sweep, and the reason the
+ * push was removed from the bulk path. Reference items carry `i: 'q'` and the
+ * target's `_id`; the pin flag is deliberately ignored, since a hand-made link
+ * to a highlight is an ordinary reference.
+ */
+export function referencedRemIdsFromText(rem: PluginRem): string[] {
+  const text = (rem as any).text;
+  if (!Array.isArray(text)) return [];
+  const ids: string[] = [];
+  for (const item of text) {
+    if (item && typeof item === 'object' && item.i === 'q' && typeof item._id === 'string') {
+      ids.push(item._id);
+    }
+  }
+  return ids;
+}
+
 async function applyBandToHighlightRefs(
   rem: PluginRem,
   desired: number | null
@@ -450,7 +471,16 @@ export async function removeAllPriorityBands(plugin: RNPlugin): Promise<number> 
 export async function syncPriorityBands(
   plugin: RNPlugin,
   remIds: string[],
-  onProgress?: (done: number, total: number, stats: BandSyncStats) => void
+  onProgress?: (done: number, total: number, stats: BandSyncStats) => void,
+  /**
+   * Collects every rem id referenced from a prioritised rem's text. Built-in
+   * powerup membership is NOT enumerable — getPowerupByCode resolves the PDF
+   * Highlight powerup but its taggedRem() returns nothing — so highlights this
+   * plugin never extracted from cannot be listed directly. Harvesting the links
+   * while we are already walking these rems is the way to reach them, and costs
+   * nothing extra: the text is already in memory.
+   */
+  referencedIds?: Set<string>
 ): Promise<BandSyncStats> {
   const stats: BandSyncStats = { changed: 0, eligible: 0, highlights: 0 };
   let done = 0;
@@ -458,6 +488,9 @@ export async function syncPriorityBands(
   for (const remId of remIds) {
     const rem = await plugin.rem.findOne(remId);
     if (rem) {
+      if (referencedIds) {
+        for (const id of referencedRemIdsFromText(rem)) referencedIds.add(id);
+      }
       try {
         const result = await syncPriorityBand(plugin, rem, { skipHighlights: true });
         if (result.eligible) stats.eligible++;
@@ -598,21 +631,72 @@ export async function computeHighlightBand(highlight: PluginRem): Promise<number
  */
 export async function syncAllHighlightBands(
   plugin: RNPlugin,
-  onProgress?: (done: number, total: number, changed: number) => void
+  onProgress?: (done: number, total: number, changed: number) => void,
+  /** Ids referenced by prioritised rems; those that are highlights join the pass. */
+  candidateIds?: Set<string>
 ): Promise<{ scanned: number; changed: number }> {
+  // Enumerated from several sources and unioned by id. The powerup route is the
+  // one that reaches highlights this plugin never touched; the pdfextract tag is
+  // kept as a second source so extracted highlights cannot regress if the powerup
+  // lookup comes back empty. Each source logs its own count, because a silent 0
+  // here is indistinguishable from "nothing needed updating".
   const byId = new Map<string, PluginRem>();
-  try {
-    for (const code of [BuiltInPowerupCodes.PDFHighlight, BuiltInPowerupCodes.HTMLHighlight]) {
-      const powerup = await plugin.powerup.getPowerupByCode(code);
-      for (const rem of ((await powerup?.taggedRem()) || []) as PluginRem[]) {
+
+  const addFrom = async (label: string, load: () => Promise<PluginRem[]>) => {
+    try {
+      const rems = await load();
+      let added = 0;
+      for (const rem of rems || []) {
+        if (!byId.has(rem._id)) added++;
         byId.set(rem._id, rem);
       }
+      console.log(`[PriorityBands] source "${label}": ${rems?.length ?? 0} rems (${added} new)`);
+    } catch (err) {
+      console.error(`[PriorityBands] source "${label}" failed`, err);
     }
-  } catch (err) {
-    console.error('[PriorityBands] could not enumerate highlights', err);
-    return { scanned: 0, changed: 0 };
+  };
+
+  for (const code of [BuiltInPowerupCodes.PDFHighlight, BuiltInPowerupCodes.HTMLHighlight]) {
+    await addFrom(`powerup:${code}`, async () => {
+      const powerup = await plugin.powerup.getPowerupByCode(code);
+      if (!powerup) {
+        console.warn(`[PriorityBands] getPowerupByCode("${code}") returned undefined`);
+        return [];
+      }
+      return ((await powerup.taggedRem()) || []) as PluginRem[];
+    });
   }
+
+  await addFrom('tag:pdfextract', async () => {
+    const tagRem = await plugin.rem.findByName(['pdfextract'], null);
+    if (!tagRem) {
+      console.warn('[PriorityBands] no rem named "pdfextract" found');
+      return [];
+    }
+    return ((await tagRem.taggedRem()) || []) as PluginRem[];
+  });
+
+  if (candidateIds?.size) {
+    await addFrom('referenced-in-text', async () => {
+      const found: PluginRem[] = [];
+      for (const id of candidateIds) {
+        if (byId.has(id)) continue; // already enumerated; skip the lookup
+        const rem = await plugin.rem.findOne(id);
+        if (!rem) continue;
+        const isHighlight =
+          (await rem.hasPowerup(BuiltInPowerupCodes.PDFHighlight)) ||
+          (await rem.hasPowerup(BuiltInPowerupCodes.HTMLHighlight));
+        if (isHighlight) found.push(rem as PluginRem);
+      }
+      console.log(
+        `[PriorityBands] resolved ${candidateIds.size} referenced ids -> ${found.length} highlights`
+      );
+      return found;
+    });
+  }
+
   const highlights = [...byId.values()];
+  console.log(`[PriorityBands] ${highlights.length} highlights to reconcile`);
 
   let changed = 0;
   let done = 0;

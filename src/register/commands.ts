@@ -1433,13 +1433,17 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
         await plugin.storage.setSession('plugin_operation_active', true);
         let stats = { changed: 0, eligible: 0, highlights: 0 };
+        // Highlights this plugin never extracted from cannot be enumerated (see
+        // syncAllHighlightBands), so phase 1 harvests the links out of each
+        // prioritised rem's text as it goes and phase 2 resolves them.
+        const referencedIds = new Set<string>();
         try {
           stats = await syncPriorityBands(plugin as any, remIds, (done, total, sofar) => {
             console.log(
               `[PriorityBands] ${done}/${total} scanned — ${sofar.changed} updated ` +
               `(${sofar.eligible} table-eligible, ${sofar.highlights} highlights)`
             );
-          });
+          }, referencedIds);
         } finally {
           await plugin.storage.setSession('plugin_operation_active', false);
         }
@@ -1451,15 +1455,19 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         await plugin.storage.setSession('plugin_operation_active', true);
         let highlightStats = { scanned: 0, changed: 0 };
         try {
-          highlightStats = await syncAllHighlightBands(plugin as any, (done, total, sofar) => {
-            console.log(`[PriorityBands] highlights ${done}/${total} — ${sofar} updated`);
-          });
+          highlightStats = await syncAllHighlightBands(
+            plugin as any,
+            (done, total, sofar) => {
+              console.log(`[PriorityBands] highlights ${done}/${total} — ${sofar} updated`);
+            },
+            referencedIds
+          );
         } finally {
           await plugin.storage.setSession('plugin_operation_active', false);
         }
         console.log(
           `[PriorityBands] highlight pass: ${highlightStats.changed} updated ` +
-          `of ${highlightStats.scanned} extracted highlights`
+          `of ${highlightStats.scanned} highlights`
         );
 
         const secs = Math.round((performance.now() - t0) / 100) / 10;
