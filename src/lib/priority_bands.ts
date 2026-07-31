@@ -19,6 +19,8 @@ import { BuiltInPowerupCodes, PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import {
   allCardPriorityInfoKey,
   allIncrementalRemKey,
+  dismissedHistorySlotCode,
+  dismissedPowerupCode,
   powerupCode,
   prioritySlotCode,
 } from './consts';
@@ -299,7 +301,20 @@ export type BandSyncResult = {
 
 export async function syncPriorityBand(
   plugin: RNPlugin,
-  rem: PluginRem
+  rem: PluginRem,
+  options?: {
+    /**
+     * Skip pushing this rem's band onto its source highlights.
+     *
+     * Set by the bulk refresh, whose highlight phase (syncAllHighlightBands)
+     * recomputes every highlight from all of its links anyway — so the push is
+     * not merely redundant there, it is the expensive part: a reference lookup,
+     * and sometimes a child walk, for every IncRem in the knowledge base.
+     * Live edits leave it on, since that is what updates a highlight the instant
+     * you set a priority rather than at the next manual refresh.
+     */
+    skipHighlights?: boolean;
+  }
 ): Promise<BandSyncResult> {
   const { priority, isInc } = await readBadgePriority(plugin, rem);
   const desired = priority === null ? null : bandForPriority(priority);
@@ -308,7 +323,8 @@ export async function syncPriorityBand(
   // table gate below or a PDF extract would never reach its source highlight.
   // Restricted to IncRems: card-priority writes cascade across whole subtrees and
   // must not pay for a reference lookup each.
-  const highlights = isInc ? await syncHighlightBands(rem, desired) : 0;
+  const highlights =
+    isInc && !options?.skipHighlights ? await syncHighlightBands(rem, desired) : 0;
 
   // Gate: returns for the large majority of rems in a big KB, before the ten
   // hasPowerup reads in applyBand, let alone a write.
@@ -443,7 +459,7 @@ export async function syncPriorityBands(
     const rem = await plugin.rem.findOne(remId);
     if (rem) {
       try {
-        const result = await syncPriorityBand(plugin, rem);
+        const result = await syncPriorityBand(plugin, rem, { skipHighlights: true });
         if (result.eligible) stats.eligible++;
         stats.highlights += result.highlights;
         // A rem counts as changed if its own badge moved OR it pushed a band onto
@@ -460,6 +476,158 @@ export async function syncPriorityBands(
     }
   }
   return stats;
+}
+
+type LinkedPriority = {
+  value: number;
+  /** False for a Dismissed rem, which only counts when nothing live links here. */
+  live: boolean;
+};
+
+/**
+ * The priority a linked rem contributes to its highlight's badge, or null if it
+ * carries none.
+ *
+ * "Live" means the rem still has an active priority — an IncRem still in the
+ * queue, or a rem with a card priority. A Dismissed rem contributes its last
+ * recorded priority: dismissal means the material was processed and its cards
+ * made, NOT that it was unimportant, so the value stays meaningful. It is still
+ * marked non-live because a highlight that some live rem links to should be
+ * badged from that rem, not from a finished one.
+ *
+ * The dismissed value comes from the history preserved on the Dismissed powerup:
+ * IncrementalRep entries record the absolute priority at review time. The
+ * 'dismissed' marker entry itself carries none (see markAsDismissed), so this
+ * scans backwards for the most recent entry that has one — a rem dismissed
+ * before ever being reviewed therefore contributes nothing.
+ */
+async function linkedRemPriority(rem: PluginRem): Promise<LinkedPriority | null> {
+  const [isInc, hasCard] = await Promise.all([
+    rem.hasPowerup(powerupCode),
+    rem.hasPowerup(CARD_PRIORITY_CODE),
+  ]);
+
+  if (isInc) {
+    const raw = await rem.getPowerupProperty(powerupCode, prioritySlotCode);
+    const value = raw ? parseInt(raw, 10) : NaN;
+    if (!isNaN(value)) return { value, live: true };
+  }
+  if (hasCard) {
+    const raw = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+    const value = raw ? parseInt(raw, 10) : NaN;
+    if (!isNaN(value)) return { value, live: true };
+  }
+
+  if (!(await rem.hasPowerup(dismissedPowerupCode))) return null;
+  try {
+    const raw = await rem.getPowerupProperty(dismissedPowerupCode, dismissedHistorySlotCode);
+    if (!raw) return null;
+    const history = JSON.parse(raw) as Array<{ priority?: number }>;
+    for (let i = history.length - 1; i >= 0; i--) {
+      const value = history[i]?.priority;
+      if (typeof value === 'number' && !isNaN(value)) return { value, live: false };
+    }
+  } catch (err) {
+    console.error('[PriorityBands] dismissed history parse failed for', rem._id, err);
+  }
+  return null;
+}
+
+/**
+ * The band a highlight should carry, from every rem that links to it.
+ *
+ * Reads in the REVERSE direction to syncPriorityBand: rather than each rem
+ * pushing onto its highlights, a highlight pulls from everything referencing it.
+ * That makes several links deterministic — the forward direction was last-writer-
+ * wins, so the surviving band depended on processing order — and it is far
+ * cheaper, since highlights number in the hundreds against tens of thousands of
+ * rems.
+ *
+ * Plain average, no weighting. Dismissed rems are used only when no live rem
+ * links the highlight.
+ */
+export async function computeHighlightBand(highlight: PluginRem): Promise<number | null> {
+  let linked: PluginRem[] = [];
+  try {
+    linked = (await highlight.remsReferencingThis()) as PluginRem[];
+  } catch (err) {
+    console.error('[PriorityBands] remsReferencingThis failed for', highlight._id, err);
+    return null;
+  }
+
+  const live: number[] = [];
+  const dismissed: number[] = [];
+
+  for (const rem of linked) {
+    let found = await linkedRemPriority(rem);
+
+    // Concept workflow: the pin sits on a child while the priority lives on the
+    // parent concept, so a linking rem with no priority of its own defers one
+    // level up. Mirrors the child fallback in syncHighlightBands.
+    if (!found) {
+      try {
+        const parent = (await rem.getParentRem()) as PluginRem | undefined;
+        if (parent) found = await linkedRemPriority(parent);
+      } catch {
+        /* orphaned or inaccessible parent — nothing to contribute */
+      }
+    }
+
+    if (!found) continue;
+    (found.live ? live : dismissed).push(found.value);
+  }
+
+  const pool = live.length ? live : dismissed;
+  if (!pool.length) return null;
+
+  const mean = pool.reduce((a, b) => a + b, 0) / pool.length;
+  return bandForPriority(Math.round(mean));
+}
+
+/**
+ * Reconciles every highlight's badge from the rems linking to it.
+ *
+ * Enumerates by the built-in PDF/HTML highlight powerups rather than by the
+ * plugin's own `pdfextract` tag. That tag only marks highlights THIS plugin
+ * extracted from, which would have excluded every highlight linked to flashcards
+ * made by hand or before this feature existed — exactly the links whose
+ * priorities are most worth surfacing while re-reading a document.
+ *
+ * The wider scope costs reads, not writes: a highlight with no prioritised link
+ * resolves to null, and applyBand writes nothing when there is no band to remove.
+ */
+export async function syncAllHighlightBands(
+  plugin: RNPlugin,
+  onProgress?: (done: number, total: number, changed: number) => void
+): Promise<{ scanned: number; changed: number }> {
+  const byId = new Map<string, PluginRem>();
+  try {
+    for (const code of [BuiltInPowerupCodes.PDFHighlight, BuiltInPowerupCodes.HTMLHighlight]) {
+      const powerup = await plugin.powerup.getPowerupByCode(code);
+      for (const rem of ((await powerup?.taggedRem()) || []) as PluginRem[]) {
+        byId.set(rem._id, rem);
+      }
+    }
+  } catch (err) {
+    console.error('[PriorityBands] could not enumerate highlights', err);
+    return { scanned: 0, changed: 0 };
+  }
+  const highlights = [...byId.values()];
+
+  let changed = 0;
+  let done = 0;
+  for (const highlight of highlights) {
+    try {
+      if (await applyBand(highlight, await computeHighlightBand(highlight))) changed++;
+    } catch (err) {
+      console.error('[PriorityBands] highlight band sync failed for', highlight._id, err);
+    }
+    done++;
+    if (onProgress && (done % PROGRESS_LOG_INTERVAL === 0 || done === highlights.length)) {
+      onProgress(done, highlights.length, changed);
+    }
+  }
+  return { scanned: highlights.length, changed };
 }
 
 /** Below this many samples the distribution is noise; fall back to absolute. */
@@ -557,8 +725,9 @@ export function bandColorPercentile(percentiles: number[] | null, band: number):
  * itself — so a priority is legible while re-reading the source, not only from
  * the extract.
  *
- * Scoped to `[data-rem-tags~="pdfextract"]`, the tag the extraction flow already
- * applies to exactly this rem, so untouched highlights keep the neutral styling.
+ * Applies to any highlight carrying a band — see syncAllHighlightBands for why
+ * that is not limited to highlights this plugin extracted from. Highlights with
+ * no prioritised link carry no band and keep the neutral styling.
  *
  * `markerColors` must be emitted INSIDE registerPdfHighlightCSS's stylesheet,
  * after its base rules — those set the marker border with `!important`, and
@@ -568,13 +737,22 @@ export function buildHighlightBandCSS(colorForBand: (band: number) => string): {
   badges: string;
   markerColors: string;
 } {
-  const highlight = '[data-rem-tags~="pdfextract"]';
+  // Keyed on the highlight powerups themselves, NOT on the plugin's `pdfextract`
+  // tag: a band is now computed for every highlight with a prioritised link,
+  // including ones linked only to hand-made flashcards. Requiring pdfextract
+  // would badge only what this plugin extracted from.
+  const pdf = '.rem[data-rem-tags~="pdf-highlight"]';
+  const html = '.rem[data-rem-tags~="html-highlight"]';
 
-  const badgeRules = Array.from({ length: BAND_COUNT }, (_, band) => `
-.rem${highlight}[data-rem-tags~="${bandTagSlug(band)}"]::before {
+  const badgeRules = Array.from({ length: BAND_COUNT }, (_, band) => {
+    const slug = bandTagSlug(band);
+    return `
+${pdf}[data-rem-tags~="${slug}"]::before,
+${html}[data-rem-tags~="${slug}"]::before {
   content: "${bandLabel(band)}";
   background: ${colorForBand(band)};
-}`).join('\n');
+}`;
+  }).join('\n');
 
   // Absolutely positioned on the `.rem` span, bottom-right. Three earlier
   // placements each failed for a different reason, so they are worth recording:
@@ -592,11 +770,13 @@ export function buildHighlightBandCSS(colorForBand: (band: number) => string): {
   // Caveat: on a single-line highlight the two corners nearly coincide, so the
   // badge can sit close to the counter.
   const badges = `
-/* Priority band badges on extracted highlights (Incremental Everything) */
-.rem${highlight}[data-rem-tags*="priorityband"] {
+/* Priority band badges on highlights (Incremental Everything) */
+${pdf}[data-rem-tags*="priorityband"],
+${html}[data-rem-tags*="priorityband"] {
   position: relative;
 }
-.rem${highlight}[data-rem-tags*="priorityband"]::before {
+${pdf}[data-rem-tags*="priorityband"]::before,
+${html}[data-rem-tags*="priorityband"]::before {
   position: absolute;
   display: inline-block;
   inset: auto;
@@ -618,13 +798,20 @@ export function buildHighlightBandCSS(colorForBand: (band: number) => string): {
 ${badgeRules}
 `;
 
-  // Tints the dashed underline and the left bar drawn by the base pdfextract
-  // rules, leaving the highlight's own background colour alone.
+  // Declares the marker as well as its colour, rather than only tinting. The base
+  // rules in registerPdfHighlightCSS draw a marker for `pdfextract` and
+  // `incremental` highlights only, so a highlight banded purely through a
+  // flashcard link had nothing to tint. Same widths as those rules, so an
+  // extracted highlight looks exactly as before apart from the colour.
   const markerColors = Array.from({ length: BAND_COUNT }, (_, band) => `
-    [data-rem-tags~="pdf-highlight"]${highlight}[data-rem-tags~="${bandTagSlug(band)}"],
-    [data-rem-tags~="html-highlight"]${highlight}[data-rem-tags~="${bandTagSlug(band)}"] {
-      border-bottom-color: ${colorForBand(band)} !important;
-      border-right-color: ${colorForBand(band)} !important;
+    ${pdf}[data-rem-tags~="${bandTagSlug(band)}"],
+    ${html}[data-rem-tags~="${bandTagSlug(band)}"] {
+      border-bottom: 1.5px dashed ${colorForBand(band)} !important;
+      border-right: 3px solid ${colorForBand(band)} !important;
+      padding-bottom: 2.7px;
+      padding-left: 4px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
     }`).join('\n');
 
   return { badges, markerColors };
