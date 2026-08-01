@@ -123,7 +123,7 @@ This is a non-clickable hint that appears **only for certain card types** (like 
 <img src="assets/queue-shortcuts.png" width="900" alt="Queue Shortcuts" />
 
 
-<img width="900" alt="answer buttons bar" src="https://github.com/user-attachments/assets/94b5bfab-4860-46f3-8997-bea085d8f595" />
+<img width="900" alt="answer buttons bar" src="assets/uploaded/94b5bfab-4860-46f3-8997-bea085d8f595.png" />
 
 
 
@@ -303,7 +303,7 @@ This new button instantly opens the full source document in a new browser tab, r
 A highlight sparks a complex new idea that requires more space than a simple comment. Or you want to take notes of what you are reading in a PDF section, and paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation). Use the button to open the full editor, where you have access to all of RemNote's formatting tools, can link to other ideas, and can write extensive notes alongside the original PDF. This allows you to capture detailed thoughts without being constrained by the queue's limited interface.
 
 
-<img width="900" alt="open editor new tab button" src="https://github.com/user-attachments/assets/138c8770-1786-41c8-87a5-2fb3c4e12979" />
+<img width="900" alt="open editor new tab button" src="assets/uploaded/138c8770-1786-41c8-87a5-2fb3c4e12979.png" />
 
 
 ####  ⚙️  Related Setting: Preferred RemNote Environment
@@ -311,19 +311,19 @@ A highlight sparks a complex new idea that requires more space than a simple com
 For users who primarily work on the beta version of RemNote, a new "Preferred RemNote Environment" setting has been added. This dropdown menu in the plugin settings allows you to choose whether the "Open Editor in New Tab" button directs you to the stable (`www.remnote.com`) or beta (`beta.remnote.com`) environment. This ensures a seamless workflow by keeping you in your preferred version of RemNote.
 
 
-<img width="750" alt="remnote-environment" src="https://github.com/user-attachments/assets/3f69d55a-75b4-4696-9a55-61969eabefa0" />
+<img width="750" alt="remnote-environment" src="assets/uploaded/3f69d55a-75b4-4696-9a55-61969eabefa0.png" />
 
 ### Open URL to use Web Clipper 📎
 
 This button only appears for HTML-type Incremental Rems. When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.
 
-<img width="900" alt="open url use clipper button" src="https://github.com/user-attachments/assets/c4609bf8-4250-4b58-aa1c-933607599ed2" />
+<img width="900" alt="open url use clipper button" src="assets/uploaded/c4609bf8-4250-4b58-aa1c-933607599ed2.png" />
 
 
-<img width="800" alt="Open html IncRem in browser for Clipper" src="https://github.com/user-attachments/assets/c6539d74-6b00-4e20-8d37-6fbe6bae2d03" />
+<img width="800" alt="Open html IncRem in browser for Clipper" src="assets/uploaded/c6539d74-6b00-4e20-8d37-6fbe6bae2d03.png" />
 
 
-<img width="1000" alt="IR on RemNote Clipper" src="https://github.com/user-attachments/assets/842393b8-0787-47ef-9ad6-5a2304145efa" />
+<img width="1000" alt="IR on RemNote Clipper" src="assets/uploaded/842393b8-0787-47ef-9ad6-5a2304145efa.png" />
 
 See also: [Using the RemNote Clipper](https://help.remnote.com/en/articles/6030855-using-the-remnote-clipper).
 

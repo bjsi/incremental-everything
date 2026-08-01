@@ -184,7 +184,7 @@ A chronological log of the Rems you have navigated to in the Editor. Helps you q
 
 📖 **Full documentation:** [Visited Rem History](History-Queue-Dashboard-and-Mastery-Drill.md#visited-rem-history)
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/rem-history-editing.gif" alt="Visited Rem History" width="500">
+<img src="assets/uploaded/5d52f2_rem-history-editing.gif" alt="Visited Rem History" width="500">
 
 ---
 
@@ -200,9 +200,9 @@ Records the chronological history of every flashcard reviewed in the queue (clus
 
 📖 **Full documentation:** [Flashcard History](History-Queue-Dashboard-and-Mastery-Drill.md#flashcard-history)
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/flashcard-history.png" alt="Flashcard History" width="600">
+<img src="assets/uploaded/206c21_flashcard-history.png" alt="Flashcard History" width="600">
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/filter.gif" alt="Flashcard History Filter" width="500">
+<img src="assets/uploaded/3edb13_filter.gif" alt="Flashcard History Filter" width="500">
 
 ---
 
@@ -227,7 +227,7 @@ Each section includes an absolute slider (0–100), a color-coded relative perce
 
 **Clear Card Priority button:** When only the **Inheritance Priority** section is shown and the Rem has **no flashcards of its own**, a **Clear Card Priority** button appears. This removes the `cardPriority` inheritance anchor from the Rem in a single click — the only in-widget path to do so without manually deleting the tag in the editor. The popup closes instantly (fire-and-forget); the actual powerup removal runs in the background tracker.
 
-<img width="500" alt="Main priority dialog" src="https://github.com/user-attachments/assets/457026b6-0e93-44c4-be9c-84c230ee8b4a" />
+<img width="500" alt="Main priority dialog" src="assets/uploaded/457026b6-0e93-44c4-be9c-84c230ee8b4a.png" />
 
 ### 3.2. Light Priority Widget
 **Shortcut:** `Ctrl+Opt+P`
@@ -287,9 +287,9 @@ Tracks every practice session with a real-time live view and a full history tabl
 
 📖 **Full documentation:** [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history--live-dashboard)
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/queue-history-live.png" alt="Practiced Queue History Live" width="500">
+<img src="assets/uploaded/da7c68_queue-history-live.png" alt="Practiced Queue History Live" width="500">
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/queue-history.png" alt="Practiced Queue History" width="700">
+<img src="assets/uploaded/b6f15b_queue-history.png" alt="Practiced Queue History" width="700">
 
 ---
 
@@ -354,7 +354,7 @@ Plots your daily [Priority Shield](Prioritization-&-Sorting.md#priority-shield) 
     - **Yellow Area**: The visual volume of your dismissed material.
 - **Detailed Tooltips**: Hover over any IncRem graph to see a breakdown of your Incremental Rems, Dismissed Rems, Total Universe, and an calculated **Processing Percentage** metric showing exactly how much of your total universe has been successfully dismissed.
 
-<img width="1000" alt="priority-shield-cards" src="https://github.com/user-attachments/assets/206bcc27-a186-42be-9d52-66afccc16b9e" />
+<img width="1000" alt="priority-shield-cards" src="assets/uploaded/206bcc27-a186-42be-9d52-66afccc16b9e.png" />
 
 <img src="assets/priority-shield-graph-zoom.gif" width="800" alt="Priority Shield Graph Zoom" />
 
@@ -404,7 +404,7 @@ Lets you manually override the next review date and adjust priority in one popup
 
 A hierarchical tree selector that lets you choose where to place a new extract. Supports keyboard navigation (arrow keys, Enter to select), inline child creation via the `+` button, and automatic priority inheritance from the chosen parent. Expanded branches show **H1–H6 badges** and can list headings first or filter down to headings only; `L` reselects the last/suggested destination.
 
-![Creat Inc Rem parent selection](https://github.com/user-attachments/assets/9cbcdd80-b782-4dcc-b033-cda82fc91be8)
+![Creat Inc Rem parent selection](assets/uploaded/9cbcdd80-b782-4dcc-b033-cda82fc91be8.gif)
 
 📖 **Full documentation:** [Create Incremental Rem from PDF Highlights](Create-Incremental-Rem-from-PDF-Highlights.md)
 
@@ -509,7 +509,7 @@ A focused sub-queue of flashcards rated *Forgot* or *Hard*, designed for deliber
 
 📖 **Full documentation:** [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/final-drill.png" alt="Mastery Drill" width="900">
+<img src="assets/uploaded/f69a4d_final-drill.png" alt="Mastery Drill" width="900">
 
 ---
 

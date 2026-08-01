@@ -146,9 +146,9 @@ When reviewing PDF items in the editor, the **Review in Editor Timer** (a widget
 
 To access the timer and review controls, you must click the **"Notes"** button within the PDF viewer to open the associated document. The timer will then be visible at the top of the notes pane, above the document title.
 
-<img width="800" alt="PDF Viewer interface" src="https://github.com/user-attachments/assets/9a136bf1-d00c-423c-acb9-6e998640a3a7" />
+<img width="800" alt="PDF Viewer interface" src="assets/uploaded/9a136bf1-d00c-423c-acb9-6e998640a3a7.png" />
 
-<img width="900" alt="Notes pane showing the Review in Editor Timer" src="https://github.com/user-attachments/assets/b802926f-a168-463c-8b63-892333bef427" />
+<img width="900" alt="Notes pane showing the Review in Editor Timer" src="assets/uploaded/b802926f-a168-463c-8b63-892333bef427.png" />
 
 #### Tracking Progress in the Editor
 

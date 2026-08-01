@@ -112,5 +112,5 @@ If you need a destination that doesn't exist yet (e.g., "Section D" under "Chapt
 | **Use when** | Quick marking for later review | Organizing into knowledge structure |
 
 
-![Creat Inc Rem parent selection](https://github.com/user-attachments/assets/9cbcdd80-b782-4dcc-b033-cda82fc91be8)
+![Creat Inc Rem parent selection](assets/uploaded/9cbcdd80-b782-4dcc-b033-cda82fc91be8.gif)
 

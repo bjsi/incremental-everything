@@ -86,7 +86,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 
   **Advanced Features:** Interactive table with filtering by name/type/priority range, sorting by any column, "Preview Changes" mode, and CSV export.
 
-  <img width="250" alt="Batch Priority Change — Document Menu" src="https://github.com/user-attachments/assets/8589e1e8-1af1-410c-b705-5b56c9e6ee56" />
+  <img width="250" alt="Batch Priority Change — Document Menu" src="assets/uploaded/8589e1e8-1af1-410c-b705-5b56c9e6ee56.png" />
 
   <img width="900" alt="batch priority change widget" src="assets/batch-priority-change-widget-new.png" />
 
@@ -102,7 +102,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 
   **Access:** Focus a tag rem and run the command from the Command Palette, or use the Document Menu.
 
-  <img width="450" alt="Batch Card Priority Assignment by Tag" src="https://github.com/user-attachments/assets/b4fed324-d03d-4fb6-871f-2c643ed63467" />
+  <img width="450" alt="Batch Card Priority Assignment by Tag" src="assets/uploaded/b4fed324-d03d-4fb6-871f-2c643ed63467.png" />
 
 ## Special Operations
 
@@ -124,7 +124,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[PDF Control Panel](PDF-Incremental-Reading-Workflow.md#3-pdf-control-panel)** — `quick: pdf`
   Opens the advanced PDF Control Panel popup for the current PDF source. Allows you to set page ranges for chapters, view and manage all other Rems using the same PDF, track reading time per session and total, view reading history, and set priorities — all from a single interface.
 
-  <img width="550" alt="PDF Control Panel" src="https://github.com/user-attachments/assets/b4efa027-aed6-4e1e-ac7c-f8d310af2f88" />
+  <img width="550" alt="PDF Control Panel" src="assets/uploaded/b4efa027-aed6-4e1e-ac7c-f8d310af2f88.gif" />
 
 - **[Copy Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources)** (`Ctrl+Shift+F1`) — `quick: copy`
   Copies all sources from the **focused Rem** into a session clipboard. Use this to capture the PDF source rem from a template chapter before pasting it onto other chapters/sections.

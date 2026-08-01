@@ -40,15 +40,15 @@ You can create a review document from anywhere in RemNote:
 
 ### 1. Access the Creator
 * **Command Palette:** Type `/Create Priority Review Document` and press Enter.
-<img width="700" alt="CleanShot 2025-12-09 at 12 12 49@2x" src="https://github.com/user-attachments/assets/d3dd2dcf-f0f0-4720-b6d2-ec6b5850eeee" />
+<img width="700" alt="CleanShot 2025-12-09 at 12 12 49@2x" src="assets/uploaded/d3dd2dcf-f0f0-4720-b6d2-ec6b5850eeee.png" />
 
 
 * **Document Menu:** Click the 3-dots menu (`...`) at the top right of any document → "Create Priority Review Document".
-<img width="700" alt="Create Priority Review Document" src="https://github.com/user-attachments/assets/3191b597-1b5e-4af3-b172-ee70784c5311" />
+<img width="700" alt="Create Priority Review Document" src="assets/uploaded/3191b597-1b5e-4af3-b172-ee70784c5311.png" />
 
 
 * **Queue Menu:** Inside the queue, click the plugin menu icon (puzzle piece or 3-dots) → "Create Priority Review Document".
-<img width="700" alt="queue menu create priority review doc" src="https://github.com/user-attachments/assets/70378912-9b7a-4bd1-b13c-2de2aec75b9f" />
+<img width="700" alt="queue menu create priority review doc" src="assets/uploaded/70378912-9b7a-4bd1-b13c-2de2aec75b9f.png" />
 
 
 * **Keyboard Shortcut:** Press [`Opt+Shift+R`](Keyboard-Shortcuts.md#batch-operations) (Mac) or [`Alt+Shift+R`](Keyboard-Shortcuts.md#batch-operations) (Windows).
@@ -84,9 +84,9 @@ The plugin will generate a new document tagged `#Priority Review Queue` and auto
 2.  Review your items as normal.
 3.  When finished, you can safely **delete** the Priority Review Document. The actual items (your cards and notes) are just references; deleting the review document **does not** delete your actual data.
 
-<img width="800" alt="Priority Review Document" src="https://github.com/user-attachments/assets/10db4390-8299-4167-be38-7afc431d1aec" />
+<img width="800" alt="Priority Review Document" src="assets/uploaded/10db4390-8299-4167-be38-7afc431d1aec.png" />
 
-<img width="800" alt="deleting priority review document" src="https://github.com/user-attachments/assets/afd7a2d7-3318-4496-b69b-0f5b29dbe0c9" />
+<img width="800" alt="deleting priority review document" src="assets/uploaded/afd7a2d7-3318-4496-b69b-0f5b29dbe0c9.png" />
 
 ---
 
@@ -114,9 +114,9 @@ This visualization helps you verify:
 *   **[Priority Shield](Prioritization-&-Sorting.md#priority-shield) Logic:** Confirm that the system is correctly prioritizing your high-value items as expected.
 *   **Scope Distribution:** Visualize the balance of absolute priorities and relative percentiles within your included Incremental Rems and Flashcards.
 
-<img width="400" alt="Sorting Criteria randomness" src="https://github.com/user-attachments/assets/544ec922-131d-4017-95dd-df6a6798b8c1" />
+<img width="400" alt="Sorting Criteria randomness" src="assets/uploaded/544ec922-131d-4017-95dd-df6a6798b8c1.png" />
 
-<img width="500" alt="Create Priority Review Doc dialog" src="https://github.com/user-attachments/assets/6f8f9a49-16e9-469f-b204-420e90814f40" />
+<img width="500" alt="Create Priority Review Doc dialog" src="assets/uploaded/6f8f9a49-16e9-469f-b204-420e90814f40.png" />
 
 ## Paused Document Filtering
 

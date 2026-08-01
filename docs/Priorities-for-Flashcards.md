@@ -67,9 +67,9 @@ If you previously used tags like `#HighPriority` or `#P1` to organise your cards
 1. Focus on the **anchor rem** (e.g., `#Important`, or any rem that other rems reference or are tagged with).
 2. Open the **Document Menu** (⋯) and click **"Batch Assign Card Priority for tagged/referencing Rems"** — or run the command **"Batch Assign Card Priority for tagged/referencing rems"** (`Opt+Shift+C`) from the Command Palette.
 
-<img width="800" alt="menu item match assign priority tag" src="https://github.com/user-attachments/assets/5d42bf59-755a-41a7-a3a3-8b71742ab442" />
+<img width="800" alt="menu item match assign priority tag" src="assets/uploaded/5d42bf59-755a-41a7-a3a3-8b71742ab442.png" />
 
-<img width="400" alt="batch assign priority tag command" src="https://github.com/user-attachments/assets/1156bd8a-ca17-4166-bc1f-c7765f97fa2a" />
+<img width="400" alt="batch assign priority tag command" src="assets/uploaded/1156bd8a-ca17-4166-bc1f-c7765f97fa2a.png" />
 
 
 3.  Set a priority range (e.g., 3-12).
@@ -154,7 +154,7 @@ This effectively bypasses the native scheduler's "all cards are equal" logic and
 
 Just like for reading material, the queue displays a **[Priority Shield](Prioritization-&-Sorting.md#priority-shield)** for flashcards (toggleable in settings).
 
-<img width="800" alt="Priority Shield for Cards" src="https://github.com/user-attachments/assets/32a25755-03dd-4fee-8257-21639c4b8ef6" />
+<img width="800" alt="Priority Shield for Cards" src="assets/uploaded/32a25755-03dd-4fee-8257-21639c4b8ef6.png" />
 
 * **What it shows:** The priority of the most important due card you *haven't* reviewed yet.
 * **Interpretation:**
@@ -179,7 +179,7 @@ When the session ends, before writing the shield value to the history graph, the
 
 You can view the history of your Card Shield in the "[Prioritization-&-Sorting#priority-shield-history](Priority-Shield-History.md)" graph to track your retention discipline over time.
 
-<img width="800" alt="Card Priority Shield history" src="https://github.com/user-attachments/assets/d082cc01-a089-41c0-a6c0-24ece4662400" />
+<img width="800" alt="Card Priority Shield history" src="assets/uploaded/d082cc01-a089-41c0-a6c0-24ece4662400.png" />
 
 
 ## Maintenance: Keeping Inherited Priorities in Sync
@@ -238,7 +238,7 @@ For large-scale reorganizations or after running bulk operations (Batch Priority
   * Now, when you create a [Priority Review Document](Priority-Review-Document.md) of this book (or whatever scope that includes this book), the plugin will make sure you review the rems of this valuable chapter first!
 
 
-<img width="700" alt="CleanShot 2026-01-03 at 16 06 53@2x" src="https://github.com/user-attachments/assets/c04bec93-9af1-4de3-946c-959601f97d34" />
+<img width="700" alt="CleanShot 2026-01-03 at 16 06 53@2x" src="assets/uploaded/c04bec93-9af1-4de3-946c-959601f97d34.png" />
 
 ## See also
 

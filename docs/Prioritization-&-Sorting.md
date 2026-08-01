@@ -125,7 +125,7 @@ It displays detailed context, including:
 
 #### What the Priority dialog displays:
 
-<img width="500" alt="new priority dialog" src="https://github.com/user-attachments/assets/457026b6-0e93-44c4-be9c-84c230ee8b4a" />
+<img width="500" alt="new priority dialog" src="assets/uploaded/457026b6-0e93-44c4-be9c-84c230ee8b4a.png" />
 
   - (1) [Absolute] Priority input field (selected when the dialog opens, so that you can just type the priority and press Enter to save)
   - (2) Priority Badge: the number shows the absolute priority; the **color code** provides visual indication of the **relative priority** (shown in 4)
@@ -249,7 +249,7 @@ Designed specifically for **Flashcards**. You can now assign `CardPriority` to h
 *   **Intelligent Handling:** Capable of checking if the item is also an Incremental Rem, allowing you to use its existing IncRem priority as the Card Priority.
 *   **Safety:** Safely updates rems that already have `manual` priorities by requiring explicit "Overwrite" confirmation.
 
-<img width="500" alt="batch card priority widget" src="https://github.com/user-attachments/assets/b4fed324-d03d-4fb6-871f-2c643ed63467" />
+<img width="500" alt="batch card priority widget" src="assets/uploaded/b4fed324-d03d-4fb6-871f-2c643ed63467.png" />
 
 ---
 
@@ -482,9 +482,9 @@ The Shield metric for Incremental Rems is separate of that for Flashcards; each 
 > [!NOTE]
 > **Card Shield only:** The card shield uses a **"start of today"** boundary — only cards with a `nextRepetitionTime` on or before midnight of the current day (user's local timezone) are counted. Cards that become due *during* the session (e.g. from an *Again* rating) are excluded until the next day. This keeps the shield stable throughout the day and aligns with the SuperMemo principle that the Outstanding Queue is formed once per day. See [Priorities-for-Flashcards#start-of-today-boundary](Priorities-for-Flashcards.md) for full details.
 
-<img width="1000" alt="priority-shield-increm" src="https://github.com/user-attachments/assets/b698cb43-4f16-4907-a92a-ab1cda800ca7" />
+<img width="1000" alt="priority-shield-increm" src="assets/uploaded/b698cb43-4f16-4907-a92a-ab1cda800ca7.png" />
 
-<img width="1000" alt="priority-shield-cards" src="https://github.com/user-attachments/assets/206bcc27-a186-42be-9d52-66afccc16b9e" />
+<img width="1000" alt="priority-shield-cards" src="assets/uploaded/206bcc27-a186-42be-9d52-66afccc16b9e.png" />
 
 
 
@@ -640,7 +640,7 @@ You can track your performance over time by accessing the **"Priority Shield His
     *   If your **Total Universe (Black)** drops, it means you have physically deleted IncRems from your Knowledge Base entirely, or completely stripped their `Incremental` tag rather than using the `Dismissed` powerup.
 *   For **Flashcards**, this number will usually only increase (unless you delete cards). The evolution will show you the total size of your knowledge base over time.
 
-<img width="900" alt="priority-shield-history" src="https://github.com/user-attachments/assets/1a1591e2-7aaf-4304-be75-48f4e1260fc9" />
+<img width="900" alt="priority-shield-history" src="assets/uploaded/1a1591e2-7aaf-4304-be75-48f4e1260fc9.png" />
 
 <img src="assets/priority-shield-graph-zoom.gif" width="800" alt="Priority Shield Graph Zoom" />
 

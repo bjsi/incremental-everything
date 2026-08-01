@@ -107,11 +107,11 @@ Tag any Rem with **Remove from Queue** (using the command). Its content will be 
 
 **Editor:**
 
-![](https://raw.githubusercontent.com/remnoteio/remnote-official-plugins/main/hide-in-queue/images/editor.png)
+![](assets/uploaded/bf66f3_editor.png)
 
 **Queue:**
 
-![](https://raw.githubusercontent.com/remnoteio/remnote-official-plugins/main/hide-in-queue/images/queue.png)
+![](assets/uploaded/dace24_queue.png)
 
 ### Hide in Queue vs. Remove from Queue
 
@@ -126,11 +126,11 @@ Tag any Rem with **No Hierarchy** (using the command). Any ancestors will be hid
 
 **Editor:**
 
-![](https://raw.githubusercontent.com/remnoteio/remnote-official-plugins/main/hide-in-queue/images/no-hier-ed.png)
+![](assets/uploaded/03b82b_no-hier-ed.png)
 
 **Queue:**
 
-![](https://raw.githubusercontent.com/remnoteio/remnote-official-plugins/main/hide-in-queue/images/no-hier-queue.png)
+![](assets/uploaded/691337_no-hier-queue.png)
 
 ---
 
@@ -142,13 +142,13 @@ Similar to **Hide in Queue**, but instead of tagging the parent Rem, the user ta
 
 **Editor:**
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-parent-editor.png)
+![](assets/uploaded/291e8e_hide-parent-editor.png)
 
 **Queue:**
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-parent-queue-question.png)
+![](assets/uploaded/af5b9a_hide-parent-queue-question.png)
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-parent-queue-answer.png)
+![](assets/uploaded/5b566c_hide-parent-queue-answer.png)
 
 ---
 
@@ -158,13 +158,13 @@ Tag any Rem with **Hide Grandparent** (using the command `Hide Grandparent` or `
 
 **Editor:**
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-grandparent-editor.png)
+![](assets/uploaded/f9b3c0_hide-grandparent-editor.png)
 
 **Queue:**
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-grandparent-queue-question.png)
+![](assets/uploaded/962e5f_hide-grandparent-queue-question.png)
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-grandparent-queue-answer.png)
+![](assets/uploaded/5cc63d_hide-grandparent-queue-answer.png)
 
 ---
 
