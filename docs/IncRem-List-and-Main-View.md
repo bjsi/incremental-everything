@@ -101,7 +101,7 @@ A small hint line appears at the bottom of the date filter bar summarizing the a
 - **Show items created this month:** Set **Created** → *is between* → `4/1` and `4/30`
 - **Show items never reviewed yet:** Leave **Last Review** empty and sort by Last Review (ascending)
 
-<img src="assets/increm-list-date-filters.png" width="800" alt="IncRem List Date Filters row" />
+![IncRem List Date Filters row](assets/increm-list-date-filters.png){ width="800" }
 
 ### Inline Priority Editing
 
@@ -114,7 +114,7 @@ Click the **Priority Badge** on any row to open an inline editor directly below 
 
 The change is saved immediately and the badge updates in place.
 
-<img src="assets/increm-list-priority-and-review.gif" width="800" alt="IncRem List Inline Priority and Review in Editor workflow" />
+![IncRem List Inline Priority and Review in Editor workflow](assets/increm-list-priority-and-review.gif){ width="800" }
 
 ---
 
@@ -148,9 +148,9 @@ If you click "Review in Editor" while viewing your full backlog or a custom filt
 
 In both cases, you can click **"Filter to Due Only"** to instantly update your view, or click **"Proceed As-Is"** to continue with your current selection.
 
-<img src="assets/increm-list-warning.png" width="700" alt="Header-level Due warning banner" />
+![Header-level Due warning banner](assets/increm-list-warning.png){ width="700" }
 
-<img src="assets/increm-list-warning-row.png" width="700" alt="Inline row-level Due warning" />
+![Inline row-level Due warning](assets/increm-list-warning-row.png){ width="700" }
 
 ### State Preservation
 
@@ -182,7 +182,7 @@ The plugin provides two priority distribution graphs at different scopes, helpin
 
 The **IncRem Counter badge** includes a **📊 button** (to the left of "View All") that toggles an inline priority distribution graph for the **current document**.
 
-<img src="assets/priority-graph-icon.png" width="600" alt="Priority Distribution Graph icon on the IncRem Counter badge" />
+![Priority Distribution Graph icon on the IncRem Counter badge](assets/priority-graph-icon.png){ width="600" }
 
 - **How to view:** Click the 📊 icon on the IncRem Counter badge below the document title
 - **Scope:** Only IncRems within the current document's scope
@@ -203,9 +203,9 @@ Each bar is **stacked** to show the processing status within each priority bucke
 
 Hover over any bar for a tooltip showing total, due, processed counts, and **% processed** for both series.
 
-<img src="assets/priority-graph-doc-2.png" width="600" alt="Document Priority Distribution Graph with stacked due/processed bars" />
+![Document Priority Distribution Graph with stacked due/processed bars](assets/priority-graph-doc-2.png){ width="600" }
 
-<img src="assets/priority-graph-doc.gif" width="600" alt="Document Priority Distribution Graph (animated)" />
+![Document Priority Distribution Graph (animated)](assets/priority-graph-doc.gif){ width="600" }
 
 ### KB Priority Distribution Graph
 
@@ -226,9 +226,9 @@ The KB graph displays two **stacked** bar series on a shared x-axis of priority 
 
 Hover over any bar for a tooltip showing the full breakdown: total, due, processed, and **% processed** for both series.
 
-<img src="assets/priority-graph-KB-2.png" width="600" alt="KB Priority Distribution Graph with stacked due/processed bars" />
+![KB Priority Distribution Graph with stacked due/processed bars](assets/priority-graph-KB-2.png){ width="600" }
 
-<img src="assets/priority-graph-KB.gif" width="600" alt="KB Priority Distribution Graph (animated)" />
+![KB Priority Distribution Graph (animated)](assets/priority-graph-KB.gif){ width="600" }
 
 ### Why They're Useful
 

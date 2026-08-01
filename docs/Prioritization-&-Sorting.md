@@ -3,41 +3,6 @@
 
 To get the most out of Incremental Everything, it's essential to understand how to manage your review queue effectively. This guide breaks down the advanced prioritization and sorting tools at your disposal, allowing you to tailor your learning sessions to your exact needs.
 
-## Table of Contents
-
-- [The Priority System Explained](#the-priority-system-explained)
-  - [Priority Value (Absolute Priority)](#priority-value-absolute-priority)
-  - [Relative Priority](#relative-priority)
-- [Priority Inheritance System](#priority-inheritance-system)
-  - [Use Cases](#use-cases)
-- [Setting Priorities](#setting-priorities)
-  - [Main Priority Popup](#main-priority-popup)
-    - [What the Priority dialog displays:](#what-the-priority-dialog-displays)
-  - [Light Priority Popup](#light-priority-popup)
-  - [Quick Priority Shortcuts](#quick-priority-shortcuts)
-  - [Priority Editor Widget](#priority-editor-widget)
-  - [Bulk Priority for a Multi-Selection](#bulk-priority-for-a-multi-selection)
-  - [Batch Priority Change (IncRems & Flashcards)](#batch-priority-change-increms--flashcards)
-  - [Batch Card Priority (Flashcards)](#batch-card-priority-flashcards)
-  - [Other Methods](#other-methods)
-- [Priorities in Tables](#priorities-in-tables)
-  - [Keeping the badges in sync](#keeping-the-badges-in-sync)
-- [Priorities on PDF Highlights](#priorities-on-pdf-highlights)
-  - [Where a highlight's priority comes from](#where-a-highlights-priority-comes-from)
-  - [Keeping highlight badges in sync](#keeping-highlight-badges-in-sync)
-- [Sorting Criteria](#sorting-criteria)
-  - [Saved Presets](#saved-presets)
-  - [1) Incremental Rem Randomness](#1-incremental-rem-randomness)
-  - [2) Flashcard Randomness](#2-flashcard-randomness)
-  - [3) Flashcard Ratio](#3-flashcard-ratio)
-  - [How Randomness Works: The Priority-Weighted Lottery](#how-randomness-works-the-priority-weighted-lottery)
-- [Priority Shield](#priority-shield)
-  - [What it Measures](#what-it-measures)
-  - [How to Interpret It](#how-to-interpret-it)
-  - [Weighted Shield](#weighted-shield)
-  - [Priority Shield History](#priority-shield-history)
-- [How the Plugin Prioritizes Due Items](#how-the-plugin-prioritizes-due-items)
-
 ---
 ## The Priority System Explained
 
@@ -125,7 +90,7 @@ It displays detailed context, including:
 
 #### What the Priority dialog displays:
 
-<img width="500" alt="new priority dialog" src="https://github.com/user-attachments/assets/457026b6-0e93-44c4-be9c-84c230ee8b4a" />
+![new priority dialog](assets/uploaded/457026b6-0e93-44c4-be9c-84c230ee8b4a.png){ width="500" }
 
   - (1) [Absolute] Priority input field (selected when the dialog opens, so that you can just type the priority and press Enter to save)
   - (2) Priority Badge: the number shows the absolute priority; the **color code** provides visual indication of the **relative priority** (shown in 4)
@@ -149,7 +114,7 @@ It works exactly like the main popup but skips the heavy calculations (like chec
 
 **When to use:** For routine day-to-day adjustments when speed is paramount.
 
-<img src="assets/light-priority-widget.png" width="400" alt="Light Priority Widget" />
+![Light Priority Widget](assets/light-priority-widget.png){ width="400" }
 
 ---
 
@@ -166,9 +131,9 @@ The step in which priorities will increase or decrease can be configured in the 
 
 **When to use:** During review sessions when you want to adjust an item's priority up or down in a predefined step without stopping.
 
-<img src="assets/quick-priority-editor.gif" width="600" alt="Quick Priority in the Editor" />
+![Quick Priority in the Editor](assets/quick-priority-editor.gif){ width="600" }
 
-<img src="assets/quick-priority-queue.gif" width="600" alt="Quick Priority in the Queue" />
+![Quick Priority in the Queue](assets/quick-priority-queue.gif){ width="600" }
 
 ---
 
@@ -181,7 +146,7 @@ This widget provides a persistent visual indicator of the item's priority.
 
 **When to use:** When editing a document and you want to manage priorities without using keyboard shortcuts.
 
-<img src="assets/priority-editor.png" width="800" alt="Priority Editor" />
+![Priority Editor](assets/priority-editor.png){ width="800" }
 
 ---
 
@@ -231,7 +196,7 @@ A powerful table view for unified priority management across an entire document 
     *   **Apply to Filtered** — applies changes exclusively to the filtered items.
     *   When no filters are active, buttons revert to their standard labels and affect all items as before.
 
-<img width="900" alt="batch priority change widget" src="assets/batch-priority-change-widget-new.png" />
+![batch priority change widget](assets/batch-priority-change-widget-new.png){ width="900" }
 
 ---
 
@@ -249,7 +214,7 @@ Designed specifically for **Flashcards**. You can now assign `CardPriority` to h
 *   **Intelligent Handling:** Capable of checking if the item is also an Incremental Rem, allowing you to use its existing IncRem priority as the Card Priority.
 *   **Safety:** Safely updates rems that already have `manual` priorities by requiring explicit "Overwrite" confirmation.
 
-<img width="500" alt="batch card priority widget" src="https://github.com/user-attachments/assets/b4fed324-d03d-4fb6-871f-2c643ed63467" />
+![batch card priority widget](assets/uploaded/b4fed324-d03d-4fb6-871f-2c643ed63467.png){ width="500" }
 
 ---
 
@@ -257,7 +222,7 @@ Designed specifically for **Flashcards**. You can now assign `CardPriority` to h
 
 *   **Reschedule Command (`Ctrl+J`):** The reschedule popup also includes a priority slider, allowing you to change both the due date and the priority in one go.
 
-<img src="assets/reschedule.png" width="400" alt="Reschedule Widget" />
+![Reschedule Widget](assets/reschedule.png){ width="400" }
 
 *   **Extract with Priority (`Opt+Shift+X`):** When focused on a Rem or having a text selection, you can immediately create an extract and open the priority popup for the new item.
 
@@ -269,7 +234,7 @@ Tables are the one place the **[Priority Editor Widget](#priority-editor-widget)
 
 Instead, the plugin writes each Rem's priority band into a hidden tag and draws the badge with CSS, which works even in the lightweight rendering tables use before you hover a row.
 
-<img src="assets/priority-band-tables.png" width="800" alt="Priority band badges in a table" />
+![Priority band badges in a table](assets/priority-band-tables.png){ width="800" }
 
 **What you see.** A small coloured pill at the **top-right of the row's first cell**, reading the band the Rem falls in — `50s` for a priority of 50–59 — and coloured on the same scale as every other priority badge in the plugin, so a more important `10s` reads warm and a less important `50s` reads green.
 
@@ -354,7 +319,7 @@ Accessed via the *three-dot menu in the top-right of the queue*, the **"Sorting 
 > [!NOTE]
 > **Knowledge Base Scope:** Your Sorting Criteria configurations are scoped to your active Knowledge Base. If you use multiple Knowledge Bases, you can maintain completely different sorting priorities and ratios for each one without interference. The name of the currently active Knowledge Base is displayed at the top of the popup as a reminder.
 
-<img width="350" alt="Screenshot of the 'Sorting Criteria' menu" src="assets/sorting-criteria-preset.png" />
+![Screenshot of the ](assets/sorting-criteria-preset.png){ width="350" }
 
 
 
@@ -482,9 +447,9 @@ The Shield metric for Incremental Rems is separate of that for Flashcards; each 
 > [!NOTE]
 > **Card Shield only:** The card shield uses a **"start of today"** boundary — only cards with a `nextRepetitionTime` on or before midnight of the current day (user's local timezone) are counted. Cards that become due *during* the session (e.g. from an *Again* rating) are excluded until the next day. This keeps the shield stable throughout the day and aligns with the SuperMemo principle that the Outstanding Queue is formed once per day. See [Priorities-for-Flashcards#start-of-today-boundary](Priorities-for-Flashcards.md) for full details.
 
-<img width="1000" alt="priority-shield-increm" src="https://github.com/user-attachments/assets/b698cb43-4f16-4907-a92a-ab1cda800ca7" />
+![priority-shield-increm](assets/uploaded/b698cb43-4f16-4907-a92a-ab1cda800ca7.png){ width="1000" }
 
-<img width="1000" alt="priority-shield-cards" src="https://github.com/user-attachments/assets/206bcc27-a186-42be-9d52-66afccc16b9e" />
+![priority-shield-cards](assets/uploaded/206bcc27-a186-42be-9d52-66afccc16b9e.png){ width="1000" }
 
 
 
@@ -505,7 +470,7 @@ The core purpose of the Priority Shield is to move beyond guessing and provide y
 
 While the standard Priority Shield identifies the *single* most important item you’ve missed, the **Weighted Shield** (represented by the ⚖️ icon) provides a macro-level diagnostic of your entire workload. It measures the fraction of your total priority-weighted queue that has been processed. 
 
-<img width="1000" alt="Weighted Shield" src="assets/shield-weighted-card.png" />
+![Weighted Shield](assets/shield-weighted-card.png){ width="1000" }
 
 **How it works:**
 * Each item is weighted exponentially by its priority percentile. High-priority items carry significantly more weight than low-priority items (a top-priority item carries approximately 10× the weight of a bottom-priority item).
@@ -519,7 +484,7 @@ Clicking on the Weighted Shield metric in the queue toolbar will open a detailed
 
 You can also open this popup directly from the command palette via **Open Weighted Shield Popup** (`quick: wsh`) — it uses the current sub-queue when invoked from the queue, and the focused rem when invoked from the editor.
 
-<img width="600" alt="Weighted Shield Breakdown" src="assets/weighted-shield-breakdown3.png" />
+![Weighted Shield Breakdown](assets/weighted-shield-breakdown3.png){ width="600" }
 
 The popup table contains two columns that may need explanation:
 
@@ -575,7 +540,7 @@ The **Weighted Shield value** (⚖️ %) shown in the shield header is precisely
 
 When both Incremental Rems and Cards groups are present, the wide popup exposes a second tab — **Card Priority × Memory Analytics** — that replays FSRS over every card in your knowledge base and aggregates per priority-percentile bucket. Each bucket holds an equal number of cards (deciles by inherited Rem priority, so a Rem with multiple cards contributes one entry per card), plus a consolidated **All KB** row at the bottom for comparison.
 
-<img width="1000" alt="Card Priority × Memory Analytics" src="assets/weighted-shield-memory-analytics.png" />
+![Card Priority × Memory Analytics](assets/weighted-shield-memory-analytics.png){ width="1000" }
 
 20 columns are organized into four groups, with hover tooltips explaining each one:
 
@@ -640,9 +605,9 @@ You can track your performance over time by accessing the **"Priority Shield His
     *   If your **Total Universe (Black)** drops, it means you have physically deleted IncRems from your Knowledge Base entirely, or completely stripped their `Incremental` tag rather than using the `Dismissed` powerup.
 *   For **Flashcards**, this number will usually only increase (unless you delete cards). The evolution will show you the total size of your knowledge base over time.
 
-<img width="900" alt="priority-shield-history" src="https://github.com/user-attachments/assets/1a1591e2-7aaf-4304-be75-48f4e1260fc9" />
+![priority-shield-history](assets/uploaded/1a1591e2-7aaf-4304-be75-48f4e1260fc9.png){ width="900" }
 
-<img src="assets/priority-shield-graph-zoom.gif" width="800" alt="Priority Shield Graph Zoom" />
+![Priority Shield Graph Zoom](assets/priority-shield-graph-zoom.gif){ width="800" }
 
 
 ---

@@ -2,22 +2,6 @@
 
 The **Priority Review Document** is a powerful feature designed to solve the "information overflow" problem inherent to Incremental Reading. It allows you to generate a custom, disposable review queue containing your highest-priority material — both Flashcards and Incremental Rems — sorted exactly how you want them.
 
-## Table of Contents
-
-- [The Problem: Why do I need this?](#the-problem-why-do-i-need-this)
-- [The Solution](#the-solution)
-- [How to Create a Priority Review Document](#how-to-create-a-priority-review-document)
-  - [1. Access the Creator](#1-access-the-creator)
-  - [2. Configure Your Session](#2-configure-your-session)
-  - [3. Review](#3-review)
-- [How Items Are Selected](#how-items-are-selected)
-  - [Priority Review Document Graph View](#priority-review-document-graph-view)
-- [Paused Document Filtering](#paused-document-filtering)
-- [Card Cluster Support](#card-cluster-support)
-- [Smart Scope & Priority Shield Integration](#smart-scope--priority-shield-integration)
-- [Best Practices](#best-practices)
-- [Technical: Card State Detection](#technical-card-state-detection)
-
 ---
 ## The Problem: Why do I need this?
 
@@ -40,15 +24,15 @@ You can create a review document from anywhere in RemNote:
 
 ### 1. Access the Creator
 * **Command Palette:** Type `/Create Priority Review Document` and press Enter.
-<img width="700" alt="CleanShot 2025-12-09 at 12 12 49@2x" src="https://github.com/user-attachments/assets/d3dd2dcf-f0f0-4720-b6d2-ec6b5850eeee" />
+![CleanShot 2025-12-09 at 12 12 49@2x](assets/uploaded/d3dd2dcf-f0f0-4720-b6d2-ec6b5850eeee.png){ width="700" }
 
 
 * **Document Menu:** Click the 3-dots menu (`...`) at the top right of any document → "Create Priority Review Document".
-<img width="700" alt="Create Priority Review Document" src="https://github.com/user-attachments/assets/3191b597-1b5e-4af3-b172-ee70784c5311" />
+![Create Priority Review Document](assets/uploaded/3191b597-1b5e-4af3-b172-ee70784c5311.png){ width="700" }
 
 
 * **Queue Menu:** Inside the queue, click the plugin menu icon (puzzle piece or 3-dots) → "Create Priority Review Document".
-<img width="700" alt="queue menu create priority review doc" src="https://github.com/user-attachments/assets/70378912-9b7a-4bd1-b13c-2de2aec75b9f" />
+![queue menu create priority review doc](assets/uploaded/70378912-9b7a-4bd1-b13c-2de2aec75b9f.png){ width="700" }
 
 
 * **Keyboard Shortcut:** Press [`Opt+Shift+R`](Keyboard-Shortcuts.md#batch-operations) (Mac) or [`Alt+Shift+R`](Keyboard-Shortcuts.md#batch-operations) (Windows).
@@ -74,7 +58,7 @@ A popup will appear allowing you to tailor the session:
 > * **Tab / Shift+Tab** cycles between the Scope selection and the Number of Items field.
 > * **Enter** at any point — regardless of which element has focus — triggers "Create Review Document" immediately, while **Esc** cancels the operation and closes the widget.
 
-<img width="600" alt="create priority review doc popup" src="assets/priority-review-doc-creator-2.png" />
+![create priority review doc popup](assets/priority-review-doc-creator-2.png){ width="600" }
 
 
 ### 3. Review
@@ -84,9 +68,9 @@ The plugin will generate a new document tagged `#Priority Review Queue` and auto
 2.  Review your items as normal.
 3.  When finished, you can safely **delete** the Priority Review Document. The actual items (your cards and notes) are just references; deleting the review document **does not** delete your actual data.
 
-<img width="800" alt="Priority Review Document" src="https://github.com/user-attachments/assets/10db4390-8299-4167-be38-7afc431d1aec" />
+![Priority Review Document](assets/uploaded/10db4390-8299-4167-be38-7afc431d1aec.png){ width="800" }
 
-<img width="800" alt="deleting priority review document" src="https://github.com/user-attachments/assets/afd7a2d7-3318-4496-b69b-0f5b29dbe0c9" />
+![deleting priority review document](assets/uploaded/afd7a2d7-3318-4496-b69b-0f5b29dbe0c9.png){ width="800" }
 
 ---
 
@@ -107,16 +91,16 @@ The plugin uses a sophisticated selection process to ensure you see the right ma
 
 To help users visualize how the items are selected, a **Priority Distribution Graph** is automatically generated at the **top** of the Priority Review Document (in a rem with the **Priority Review Graph** _powerup_).
 
-<img src="assets/priority-review-doc-graph.png" width="800" alt="Priority Review Doc Graph" />
+![Priority Review Doc Graph](assets/priority-review-doc-graph.png){ width="800" }
 
 This visualization helps you verify:
 *   **The effect of Randomness:** See how "shuffled" your review session is compared to a strict priority order.
 *   **[Priority Shield](Prioritization-&-Sorting.md#priority-shield) Logic:** Confirm that the system is correctly prioritizing your high-value items as expected.
 *   **Scope Distribution:** Visualize the balance of absolute priorities and relative percentiles within your included Incremental Rems and Flashcards.
 
-<img width="400" alt="Sorting Criteria randomness" src="https://github.com/user-attachments/assets/544ec922-131d-4017-95dd-df6a6798b8c1" />
+![Sorting Criteria randomness](assets/uploaded/544ec922-131d-4017-95dd-df6a6798b8c1.png){ width="400" }
 
-<img width="500" alt="Create Priority Review Doc dialog" src="https://github.com/user-attachments/assets/6f8f9a49-16e9-469f-b204-420e90814f40" />
+![Create Priority Review Doc dialog](assets/uploaded/6f8f9a49-16e9-469f-b204-420e90814f40.png){ width="500" }
 
 ## Paused Document Filtering
 

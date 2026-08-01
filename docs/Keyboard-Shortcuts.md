@@ -28,7 +28,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | `Ctrl` + `D` | [Dismiss Incremental Rem](Reviewing-Items-in-the-Queue.md#dismiss) | Permanently finishes the item by transferring its history to the Dismissed state and removing the Incremental power-up. Same as the "Dismiss" button. | Editor and Queue |
 | `Ctrl` + `Shift` + `J` | [Review & Open](Reviewing-Items-in-the-Queue.md#review--open) | Reviews the item (rescheduling it), opens it in the editor, and starts the Editor Review Timer. When the processing is finished, it open the queue document again, so the user can continue the queue.| Editor and Queue |
 
-<img src="assets/queue-shortcuts.png" width="900" alt="Queue Shortcuts" />
+![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
 ### Priority Commands
 

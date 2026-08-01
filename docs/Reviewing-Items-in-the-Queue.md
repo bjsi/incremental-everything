@@ -16,37 +16,6 @@ During a study session, Incremental Everything presents your Incremental Rems on
 
 Each button is designed for a specific action to manage your learning flow efficiently.
 
-## Table of Contents
-
-- [The Answer Buttons](#the-answer-buttons)
-- [Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem)
-  - [Read-point and status emphasis in Rem-type cards](#read-point-and-status-emphasis-in-rem-type-cards)
-- [A Strategic Guide to the Answer Buttons](#a-strategic-guide-to-the-answer-buttons)
-  - [Next](#next)
-    - [The Scheduling Algorithm](#the-scheduling-algorithm)
-    - [The "One Memory, One Action" Principle](#the-one-memory-one-action-principle)
-  - [Reschedule](#reschedule)
-    - [Technical Note: Reschedule Event Types](#technical-note-reschedule-event-types)
-  - [Dismiss](#dismiss)
-  - [Change Priority](#change-priority)
-  - [Review in Editor](#review-in-editor)
-    - [The Workflow Loop](#the-workflow-loop)
-    - [When to use it](#when-to-use-it)
-    - [Why use this instead of the native "Go to Rem" (Shortcut: G)?](#why-use-this-instead-of-the-native-go-to-rem-shortcut-g)
-  - [Open Editor in New Tab](#open-editor-in-new-tab)
-    - [The Problem It Solves](#the-problem-it-solves)
-    - [How It Works & When to Use It](#how-it-works--when-to-use-it)
-    - [⚙️ Related Setting: Preferred RemNote Environment](#️-related-setting-preferred-remnote-environment)
-  - [Open URL to use Web Clipper 📎](#open-url-to-use-web-clipper-)
-- [Card Stats & FSRS Integration](#card-stats--fsrs-integration)
-  - [What's Displayed](#whats-displayed)
-  - [Flashcard Repetition History](#flashcard-repetition-history)
-  - [FSRS Configuration](#fsrs-configuration)
-    - [Required Setup: FSRS Weights](#required-setup-fsrs-weights)
-    - [Limitation: Global Weights Only](#limitation-global-weights-only)
-    - [Plugin Settings Reference](#plugin-settings-reference)
-- [Incremental Rem History](#incremental-rem-history)
-
 ---
 
 ## The Answer Buttons
@@ -120,10 +89,10 @@ When the current Inc Rem has **more than one PDF source**, a small PDF dropdown 
 * **Press 'P' to Edit:**
 This is a non-clickable hint that appears **only for certain card types** (like regular Rem or PDFs). It reminds you that you can press the "P" key to open the Rem in the pop-up "previewer" for quick edits — a fast alternative when you don't want to use the sidebar. (For Rem-type IncRems the primary editing path is the auto-opened **Document Notes sidebar**, since typing directly in the queue card is unreliable — which is exactly why that card is read-only; see [Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem) below.)
 
-<img src="assets/queue-shortcuts.png" width="900" alt="Queue Shortcuts" />
+![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
 
-<img width="900" alt="answer buttons bar" src="https://github.com/user-attachments/assets/94b5bfab-4860-46f3-8997-bea085d8f595" />
+![answer buttons bar](assets/uploaded/94b5bfab-4860-46f3-8997-bea085d8f595.png){ width="900" }
 
 
 
@@ -213,7 +182,7 @@ Using "Reschedule" is a **one-time override**. The custom interval you set appli
 **📝 Note field:**
 The popup includes an optional **Note** input — record *why* you postponed ("waiting for prerequisite chapter", "revisit after exam"). The note is stored on this reschedule's history entry and shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history--aggregated-view), so future-you knows what past-you was thinking.
 
-<img src="assets/reschedule.png" width="400" alt="Reschedule Widget" />
+![Reschedule Widget](assets/reschedule.png){ width="400" }
 
 #### Technical Note: Reschedule Event Types
 
@@ -303,7 +272,7 @@ This new button instantly opens the full source document in a new browser tab, r
 A highlight sparks a complex new idea that requires more space than a simple comment. Or you want to take notes of what you are reading in a PDF section, and paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation). Use the button to open the full editor, where you have access to all of RemNote's formatting tools, can link to other ideas, and can write extensive notes alongside the original PDF. This allows you to capture detailed thoughts without being constrained by the queue's limited interface.
 
 
-<img width="900" alt="open editor new tab button" src="https://github.com/user-attachments/assets/138c8770-1786-41c8-87a5-2fb3c4e12979" />
+![open editor new tab button](assets/uploaded/138c8770-1786-41c8-87a5-2fb3c4e12979.png){ width="900" }
 
 
 ####  ⚙️  Related Setting: Preferred RemNote Environment
@@ -311,19 +280,19 @@ A highlight sparks a complex new idea that requires more space than a simple com
 For users who primarily work on the beta version of RemNote, a new "Preferred RemNote Environment" setting has been added. This dropdown menu in the plugin settings allows you to choose whether the "Open Editor in New Tab" button directs you to the stable (`www.remnote.com`) or beta (`beta.remnote.com`) environment. This ensures a seamless workflow by keeping you in your preferred version of RemNote.
 
 
-<img width="750" alt="remnote-environment" src="https://github.com/user-attachments/assets/3f69d55a-75b4-4696-9a55-61969eabefa0" />
+![remnote-environment](assets/uploaded/3f69d55a-75b4-4696-9a55-61969eabefa0.png){ width="750" }
 
 ### Open URL to use Web Clipper 📎
 
 This button only appears for HTML-type Incremental Rems. When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.
 
-<img width="900" alt="open url use clipper button" src="https://github.com/user-attachments/assets/c4609bf8-4250-4b58-aa1c-933607599ed2" />
+![open url use clipper button](assets/uploaded/c4609bf8-4250-4b58-aa1c-933607599ed2.png){ width="900" }
 
 
-<img width="800" alt="Open html IncRem in browser for Clipper" src="https://github.com/user-attachments/assets/c6539d74-6b00-4e20-8d37-6fbe6bae2d03" />
+![Open html IncRem in browser for Clipper](assets/uploaded/c6539d74-6b00-4e20-8d37-6fbe6bae2d03.png){ width="800" }
 
 
-<img width="1000" alt="IR on RemNote Clipper" src="https://github.com/user-attachments/assets/842393b8-0787-47ef-9ad6-5a2304145efa" />
+![IR on RemNote Clipper](assets/uploaded/842393b8-0787-47ef-9ad6-5a2304145efa.png){ width="1000" }
 
 See also: [Using the RemNote Clipper](https://help.remnote.com/en/articles/6030855-using-the-remnote-clipper).
 
@@ -348,9 +317,9 @@ The info bar includes (from left to right):
 |(7) **🔬** | Opens the Flashcard Repetition History popup |
 |(8) **Incremental Rem Status Indicator** | An icon displayed on the right border whenever the current card is also an Incremental Rem |
 
-<img width="900" alt="Card Info Bar" src="assets/card-priority-display.png" />
+![Card Info Bar](assets/card-priority-display.png){ width="900" }
 
-<img src="assets/card-priority-display-full-queue.png" width="900" alt="Card Toolbar in the Queue" />
+![Card Toolbar in the Queue](assets/card-priority-display-full-queue.png){ width="900" }
 
 **Understanding D, S, and R:**
 
@@ -363,7 +332,7 @@ The info bar includes (from left to right):
 
 Clicking the 🔬 button (or pressing `Ctrl+Shift+H`) opens a detailed popup showing the card's full review history — similar to RemNote's built-in Practice History. You can close this popup anytime by pressing `Esc`.
 
-<img src="assets/flashcard-rep-history.png" width="900" alt="Flashcard Repetition History" />
+![Flashcard Repetition History](assets/flashcard-rep-history.png){ width="900" }
 
 **Header & Summary Information:**
 *   **Rem Name:** The document's parent name is displayed bolded at the very top.
@@ -401,7 +370,7 @@ To get accurate D/S/R values that match RemNote's internal calculations, you nee
 
 If left empty, the official FSRS v6.1.1 default weights are used, which will produce approximate but likely inaccurate values for your specific study patterns.
 
-<img src="assets/DSR-settings.png" width="800" alt="DSR Settings" />
+![DSR Settings](assets/DSR-settings.png){ width="800" }
 
 #### Limitation: Global Weights Only
 
@@ -433,4 +402,4 @@ The **Incremental Rem History** widget automatically records and displays the In
 
 This widget helps you keep track of your reading session and backtrack if needed, complementing the queue's linear flow. It's also a good companion to the **[History and Final Drill](https://www.remnote.com/plugins/final_drill_and_history)** plugin.
 
-<img src="assets/incremental-history.png" width="400" alt="Incremental Rem History Widget" />
+![Incremental Rem History Widget](assets/incremental-history.png){ width="400" }

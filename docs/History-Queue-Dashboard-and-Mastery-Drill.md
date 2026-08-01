@@ -6,17 +6,6 @@ They add a suite of history and practice tools to your right sidebar: a **Live S
 
 ---
 
-## Table of Contents
-
-- [Migrating from the Standalone Plugin](#migrating-from-the-standalone-plugin)
-- [Visited Rem History](#visited-rem-history)
-- [Flashcard History](#flashcard-history)
-- [Practiced Queues History & Live Dashboard](#practiced-queues-history--live-dashboard)
-- [Mastery Drill](#mastery-drill)
-- [How to Use](#how-to-use)
-- [Settings](#settings)
-- [Commands](#commands)
-
 ---
 
 ## Migrating from the Standalone Plugin
@@ -69,7 +58,7 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Search:** Includes a search bar to instantly filter your history. Supports multi-word queries (e.g., "Biology Exam") and deep text search across all recorded items.
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/rem-history-editing.gif" alt="Visited Rem History" width="500">
+![Visited Rem History](assets/uploaded/5d52f2_rem-history-editing.gif){ width="500" }
 
 ---
 
@@ -89,9 +78,9 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Cluster-aware recording:** Inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters), each sibling card is recorded individually as it becomes visible — not just the cluster anchor. This ensures your history accurately reflects every card you actually reviewed.
 
-<img src="assets/flashcard-history-sidebar.png" alt="Flashcard History" width="600">
+![Flashcard History](assets/flashcard-history-sidebar.png){ width="600" }
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/filter.gif" alt="Flashcard History Filter" width="500">
+![Flashcard History Filter](assets/uploaded/3edb13_filter.gif){ width="500" }
 
 ---
 
@@ -101,7 +90,7 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Live Dashboard:** Displays real-time metrics for your currently active queue session, including current speed, retention rate, and the age of the exact card you are reviewing.
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/queue-history-live.png" alt="Practiced Queue History Live" width="500">
+![Practiced Queue History Live](assets/uploaded/da7c68_queue-history-live.png){ width="500" }
 
 ### Metrics Collected
 
@@ -156,7 +145,7 @@ Above the Sessions Summary table you'll find a **Refresh Statistics** button alo
 
 **When to use it:** click Refresh whenever you want to confirm the Summary numbers match RemNote's view of your practice — for example, if a session was interrupted, after restoring a backup, or simply to validate at the end of a study day. For knowledge bases with many IncRems, the recompute may take 30 s–2 min and surfaces real-time progress.
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/queue-history.png" alt="Practiced Queue History" width="700">
+![Practiced Queue History](assets/uploaded/b6f15b_queue-history.png){ width="700" }
 
 ---
 
@@ -164,7 +153,7 @@ Above the Sessions Summary table you'll find a **Refresh Statistics** button alo
 
 Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused sub-queue of cards you have recently struggled with, so you can target them deliberately until they stick.
 
-<img src="assets/mastery-drill.png" alt="Mastery Drill" width="900">
+![Mastery Drill](assets/mastery-drill.png){ width="900" }
 
 ### How It Works
 
@@ -204,7 +193,7 @@ The drill toolbar (bottom row) provides per-card actions for the currently visib
 - **Edit Current:** Opens an inline editor for the currently visible card.
 - **Remove from Drill:** Removes the current card from the drill queue without rating it.
 
-<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/final-drill-editor.png" alt="Mastery Drill Editor" width="900">
+![Mastery Drill Editor](assets/uploaded/ee94ab_final-drill-editor.png){ width="900" }
 
 ### Keyboard Shortcuts
 
@@ -240,7 +229,7 @@ Three tabs are added to the right sidebar:
 3. Open the drill using the **`Mastery Drill`** command in the Command Palette (Quick Code: `dri`), or click *Start Drill* in the notification widget.
 4. The queue clears as you master cards (rate them Good or Easy).
 
-<img src="assets/drill-notification.png" alt="Mastery Drill Notification" width="350">
+![Mastery Drill Notification](assets/drill-notification.png){ width="350" }
 
 ---
 

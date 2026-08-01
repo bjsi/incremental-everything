@@ -1,69 +1,3 @@
-# Table of Contents
-- [Queue Display Utilities](#queue-display-utilities)
-  - [Activation](#activation)
-  - [Hide in Queue (`hiq`)](#hide-in-queue-hiq)
-  - [Remove from Queue (`rfq`)](#remove-from-queue-rfq)
-  - [No Hierarchy (`nh`)](#no-hierarchy-nh)
-  - [Hide Parent (`hp`)](#hide-parent-hp)
-  - [Hide Grandparent (`hgp`)](#hide-grandparent-hgp)
-  - [Remove Parent (`rp`) — New](#remove-parent-rp--new)
-  - [Remove Grandparent (`rgp`) — New](#remove-grandparent-rgp--new)
-  - [Create Extract — Source Rem Hiding Behavior](#create-extract--source-rem-hiding-behavior)
-  - [Queue Support](#queue-support)
-- [Text Case Converter](#text-case-converter)
-  - [How it works / Como funciona](#how-it-works--como-funciona)
-  - [English Title Case rules / Regras do English Title Case](#english-title-case-rules--regras-do-english-title-case)
-  - [Other features / Outras funcionalidades](#other-features--outras-funcionalidades)
-- [Restructure Outline by Headings](#restructure-outline-by-headings)
-  - [How to invoke](#how-to-invoke)
-  - [Preview popup](#preview-popup)
-  - [Algorithm](#algorithm)
-  - [Heading levels supported](#heading-levels-supported)
-  - [Undo](#undo)
-  - [Edge cases](#edge-cases)
-- [Set Next Heading Level](#set-next-heading-level)
-  - [Invocation](#invocation)
-  - [Behavior](#behavior)
-  - [Grandparent fallback](#grandparent-fallback)
-  - [Multi-rem selections](#multi-rem-selections)
-  - [Notes & edge cases](#notes--edge-cases)
-- [Apply Heading Levels by Hierarchy (Table of Contents)](#apply-heading-levels-by-hierarchy-table-of-contents)
-  - [Invoking the ToC command](#invoking-the-toc-command)
-  - [Depth → level mapping](#depth--level-mapping)
-  - [Promote / Demote (shift one level)](#promote--demote-shift-one-level)
-  - [Preview & apply](#preview--apply)
-  - [Undo](#undo-heading-levels)
-  - [Notes](#notes-heading-levels)
-- [Bulletize Inline Selected Text](#bulletize-inline-selected-text)
-  - [How to invoke](#how-to-invoke-1)
-  - [What it does](#what-it-does)
-  - [Notes](#notes)
-- [Inlinize & Break Lists (from PDF Highlights)](#inlinize--break-lists-from-pdf-highlights)
-  - [The workflow](#the-workflow)
-  - [Inlinize Detected List (`inl`)](#inlinize-detected-list-inl)
-  - [Break Inline List Into Children (`brl`)](#break-inline-list-into-children-brl)
-  - [Restore List Rem (`rlr`)](#restore-list-rem-rlr)
-  - [How detection works](#how-detection-works)
-  - [Known limitations](#known-limitations)
-- [Find Rem — Reference or Open](#find-rem--reference-or-open)
-  - [How to invoke](#how-to-invoke-2)
-  - [Why it finds Rems the normal search can't](#why-it-finds-rems-the-normal-search-cant)
-  - [Find by alias](#find-by-alias)
-  - [Recommended use cases](#recommended-use-cases)
-  - [Insert as a pin](#insert-as-a-pin)
-  - [Insert text with a pin](#insert-text-with-a-pin)
-  - [Cloze-aware insertion](#cloze-aware-insertion)
-  - [Accent-insensitive & selection-aware](#accent-insensitive--selection-aware)
-  - [Stays on-screen near the edges](#stays-on-screen-near-the-edges)
-- [Open Source in Popup](#open-source-in-popup)
-  - [Two ways to open it](#two-ways-to-open-it)
-  - [How to invoke](#how-to-invoke-3)
-  - [What it opens](#what-it-opens)
-  - [Scroll to Highlight](#scroll-to-highlight)
-  - [Floating window — interaction & closing](#floating-window--interaction--closing)
-  - [Recommended use cases](#recommended-use-cases-1)
-- [Omnibar Selection Recovery](#omnibar-selection-recovery)
-
 ---
 
 # Queue Display Utilities
@@ -107,11 +41,11 @@ Tag any Rem with **Remove from Queue** (using the command). Its content will be 
 
 **Editor:**
 
-![](https://raw.githubusercontent.com/remnoteio/remnote-official-plugins/main/hide-in-queue/images/editor.png)
+![](assets/uploaded/bf66f3_editor.png)
 
 **Queue:**
 
-![](https://raw.githubusercontent.com/remnoteio/remnote-official-plugins/main/hide-in-queue/images/queue.png)
+![](assets/uploaded/dace24_queue.png)
 
 ### Hide in Queue vs. Remove from Queue
 
@@ -126,11 +60,11 @@ Tag any Rem with **No Hierarchy** (using the command). Any ancestors will be hid
 
 **Editor:**
 
-![](https://raw.githubusercontent.com/remnoteio/remnote-official-plugins/main/hide-in-queue/images/no-hier-ed.png)
+![](assets/uploaded/03b82b_no-hier-ed.png)
 
 **Queue:**
 
-![](https://raw.githubusercontent.com/remnoteio/remnote-official-plugins/main/hide-in-queue/images/no-hier-queue.png)
+![](assets/uploaded/691337_no-hier-queue.png)
 
 ---
 
@@ -142,13 +76,13 @@ Similar to **Hide in Queue**, but instead of tagging the parent Rem, the user ta
 
 **Editor:**
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-parent-editor.png)
+![](assets/uploaded/291e8e_hide-parent-editor.png)
 
 **Queue:**
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-parent-queue-question.png)
+![](assets/uploaded/af5b9a_hide-parent-queue-question.png)
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-parent-queue-answer.png)
+![](assets/uploaded/5b566c_hide-parent-queue-answer.png)
 
 ---
 
@@ -158,13 +92,13 @@ Tag any Rem with **Hide Grandparent** (using the command `Hide Grandparent` or `
 
 **Editor:**
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-grandparent-editor.png)
+![](assets/uploaded/f9b3c0_hide-grandparent-editor.png)
 
 **Queue:**
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-grandparent-queue-question.png)
+![](assets/uploaded/962e5f_hide-grandparent-queue-question.png)
 
-![](https://raw.githubusercontent.com/hugomarins/remnote-official-plugins/main/hide-in-queue/images/hide-grandparent-queue-answer.png)
+![](assets/uploaded/5cc63d_hide-grandparent-queue-answer.png)
 
 ---
 

@@ -6,18 +6,6 @@ It was inspired by the [Statistics Plugin](https://github.com/Justtolook/RemNote
 
 ---
 
-## Table of Contents
-
-- [What it shows](#what-it-shows)
-- [Opening it](#opening-it)
-- [Filters](#filters)
-- [Summary section](#summary-section)
-- [Hierarchy section](#hierarchy-section)
-- [Global vs. Document](#global-vs-document)
-- [Comprehensive scope + hierarchy](#comprehensive-scope--hierarchy)
-- [Performance notes](#performance-notes)
-- [Command](#command)
-
 ---
 
 ## What it shows
@@ -27,7 +15,7 @@ The popup has two stacked sections:
 1. **Summary** — three rows (*Incremental*, *Dismissed*, *Flashcards*) plus a bold **Total** row, with columns for `Items`, `Items w/ Reps`, `Reps`, `Time`, and (for Flashcards) average retention and speed.
 2. **Hierarchy** — every top-level rem with activity in the selected period, expandable into the full ancestor tree. Each row shows total time, card reps + time, IncRem reps + time (sum of Incremental + Dismissed history), retention %, and speed in cards-per-minute.
 
-<img src="assets/study-dashboard.png" alt="Study Dashboard" width="900">
+![Study Dashboard](assets/study-dashboard.png){ width="900" }
 
 ---
 

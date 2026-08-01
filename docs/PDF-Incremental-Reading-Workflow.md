@@ -65,7 +65,7 @@ When you have many chapters, manually adding the PDF source to each one would be
 > [!NOTE]
 > The clipboard is **session-scoped** — copied source IDs are stored in session storage and discarded when you close the tab. There is no cross-session contamination.
 
-<img src="assets/copy-paste-source.gif" width="900" alt="Copy and Paste source" />
+![Copy and Paste source](assets/copy-paste-source.gif){ width="900" }
 
 ---
 
@@ -94,7 +94,7 @@ This is useful when you split a chapter into sub-sections during incremental rea
 
 **Coverage badge:** Parent rows show an **X/Ypp** badge with a tiny fill bar indicating how many pages are already covered by child rems. Hover to see the percentage (e.g. `"25 of 30 pages covered by sub-rems (83%)"`). This tells you at a glance how much of a chapter still needs to be sub-divided.
 
-<img src="assets/pdf-control-panel.png" width="650" alt="PDF Control Panel" />
+![PDF Control Panel](assets/pdf-control-panel.png){ width="650" }
 
 ---
 
@@ -105,11 +105,11 @@ When you select text in the PDF Reader and create a highlight, the native RemNot
 | Icon | Tool | Description |
 |------|------|-------------|
 | 🔖 | **Set Bookmark Position** | Manually records your current reading position at this highlight's exact page. *(Note: Using the extraction tools below will also do this automatically).* |
-| <img src="https://cdn-icons-png.flaticon.com/512/8365/8365483.png" width="16" /> | **Create Incremental Rem** | Extracts the highlight into a standalone Incremental Rem and lets you choose precisely where it should live in your Knowledge Base hierarchy. See the [Create-Incremental-Rem-from-PDF-Highlights](dedicated-guide-here.md) for full details. |
-| <img src="https://cdn-icons-png.flaticon.com/512/1504/1504044.png" width="16" /> | **Toggle Incremental Rem** | Quick-tags the highlight itself as an Incremental Rem without moving it. The button background turns blue to indicate the highlight is now actively tracked in your queue. |
+| ![](https://cdn-icons-png.flaticon.com/512/8365/8365483.png){ width="16" } | **Create Incremental Rem** | Extracts the highlight into a standalone Incremental Rem and lets you choose precisely where it should live in your Knowledge Base hierarchy. See the [Create-Incremental-Rem-from-PDF-Highlights](dedicated-guide-here.md) for full details. |
+| ![](https://cdn-icons-png.flaticon.com/512/1504/1504044.png){ width="16" } | **Toggle Incremental Rem** | Quick-tags the highlight itself as an Incremental Rem without moving it. The button background turns blue to indicate the highlight is now actively tracked in your queue. |
 | 👁️ / 🙈 | **Toggle Marker Borders (Peek)** | Shows/hides the extract & incremental **marker borders** (see below) over all PDF highlights, so you can read a busy page cleanly. Turns amber while markers are hidden. Also available as the **Toggle PDF Highlight Marker Borders** command (quick code `tb`), and remembered per device (default: on). |
 
-<img width="700" alt="Pdf highlight menu buttons" src="assets/pdfhighlight-toolbar-2.png" />
+![Pdf highlight menu buttons](assets/pdfhighlight-toolbar-2.png){ width="700" }
 
 ### Visual Recognition: Extract & Incremental Markers
 
@@ -122,9 +122,9 @@ The original background is preserved (the markers sit over it), so recognition n
 
 > **Peek to read cleanly.** If the markers ever get in the way, use the **👁️ / 🙈 button** in the toolbar (or the *Toggle PDF Highlight Marker Borders* command, quick code `tb`) to hide them all at once, then toggle back. The setting is remembered per device.
 
-<img width="800" alt="PDF highlight visual recognition markers" src="assets/pdf-highlights-recognition.png" />
+![PDF highlight visual recognition markers](assets/pdf-highlights-recognition.png){ width="800" }
 
-<img width="800" alt="PDF marker borders peek toggle button" src="assets/pdf-borders-toggle-button.png" />
+![PDF marker borders peek toggle button](assets/pdf-borders-toggle-button.png){ width="800" }
 
 ### Automatic Position Tracking
 A major benefit of using the **Create Incremental Rem** or **Toggle Incremental Rem** tools while you are reviewing a chapter in the Queue is that the plugin **automatically assumes you have read up to that highlight's page**.
@@ -152,7 +152,7 @@ When reading a PDF or HTML Incremental Rem in the queue, you can easily pull up 
 
 ![PDF Side Notes](assets/pdf-side-notes.gif)
 
-<img src="assets/side-notes-highlights.png" width="800" alt="Document Notes Sidebar — Highlight IncRem Selector" />
+![Document Notes Sidebar — Highlight IncRem Selector](assets/side-notes-highlights.png){ width="800" }
 
 ---
 
@@ -232,12 +232,12 @@ The Priority Editor (shown to the right of every Incremental Rem in the editor) 
 - **Reading stats** — Total reading time (⏱️) and last recorded page appear below the buttons.
 - **PDF Control Panel ↗** — Opens the full PDF Control Panel popup for deeper management.
 
-<img src="assets/pdf-range-inline.png" width="800" alt="Setting PDF range inline in Editor" />
+![Setting PDF range inline in Editor](assets/pdf-range-inline.png){ width="800" }
 
 > [!TIP]
 > Open a document, keep the PDF visible on the right side, and expand the Priority Editor on the left. You can then set and adjust page ranges for each chapter rem without ever leaving the document view.
 
-<img src="assets/page-range-inline-flow.gif" width="900" alt="Setting PDF range inline in Editor" />
+![Setting PDF range inline in Editor](assets/page-range-inline-flow.gif){ width="900" }
 ---
 
 ## Summary
