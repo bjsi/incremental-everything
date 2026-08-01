@@ -129,6 +129,10 @@ export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shie
 // clears this KB's shield partition, plus an index listing them for restore.
 export const cardShieldCleanupBackupPrefix = 'card-shield-cleanup-backup-';
 export const cardShieldCleanupBackupIndexKey = 'card-shield-cleanup-backup-index';
+// Restore point of a rem's Incremental history, captured by the debug tools
+// before a hand-edit. One synced key per backed-up rem — lives here (not in
+// debug.tsx) so the synced-key audit can reconstruct the family.
+export const debugHistoryBackupPrefix = 'debug_history_backup_';
 
 // --- Keys for the Weighted Priority Shield ---
 // NOTE: the weighted-shield value is stored INLINE on each main shield-history

@@ -1,5 +1,6 @@
 import { renderWidget, usePlugin } from '@remnote/plugin-sdk';
 import { useState, useRef, useEffect } from 'react';
+import { safeRemTextToString } from '../lib/pdfUtils';
 
 export function JumpToRemInput() {
   const plugin = usePlugin();
@@ -30,12 +31,15 @@ export function JumpToRemInput() {
         return;
       }
       
-      const remText = await rem.text;
-      const textPreview = remText ? (typeof remText === 'string' ? remText : '[Complex content]') : '[No text]';
+      // rem.text is rich text, not a string — resolving it needs the same helper
+      // the rest of the plugin uses, or every non-plain rem reads "[Complex content]".
+      const textPreview = (await safeRemTextToString(plugin, rem.text)) || '[No text]';
       const preview = textPreview.length > 100 ? textPreview.substring(0, 100) + '...' : textPreview;
       
       console.log(`✅ Found rem: "${preview}"`);
-      await plugin.app.toast(`✅ Found: ${preview.substring(0, 40)}...`);
+      await plugin.app.toast(
+        `✅ Found: ${preview.length > 40 ? preview.substring(0, 40) + '…' : preview}`
+      );
       
       // Close the popup
       await plugin.widget.closePopup();
