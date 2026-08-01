@@ -30,8 +30,17 @@ import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedD
   priorityShieldHistoryKey, documentPriorityShieldHistoryKey,
   cardPriorityShieldHistoryKey, documentCardPriorityShieldHistoryKey,
   cardShieldCleanupBackupIndexKey, cardShieldCleanupBackupPrefix,
-  allCardPriorityInfoKey, allIncrementalRemKey,
+  allCardPriorityInfoKey, allIncrementalRemKey, debugHistoryBackupPrefix,
   seenCardInSessionKey, seenRemInSessionKey } from '../lib/consts';
+import {
+  auditSyncedKeys,
+  probeWriteCapacity,
+  testNullFreesSlot,
+  SYNCED_KEY_CAP,
+  AuditResult,
+  CapacityReport,
+  NullFreesSlotReport,
+} from '../lib/synced_key_audit';
 import { CardPriorityInfo } from '../lib/card_priority';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -39,7 +48,7 @@ dayjs.extend(relativeTime);
 
 // Synced-storage key holding a restore point of a rem's Incremental history,
 // captured before a hand-edit so a bad edit can be rolled back.
-const historyBackupKey = (remId: string) => `debug_history_backup_${remId}`;
+const historyBackupKey = (remId: string) => `${debugHistoryBackupPrefix}${remId}`;
 
 interface HistoryBackup {
   savedAt: number;
@@ -280,7 +289,14 @@ function Debug() {
   const [historyDraft, setHistoryDraft] = useState('');
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [isSavingHistory, setIsSavingHistory] = useState(false);
-  
+
+  // Synced-storage key audit (RemNote caps plugins at 1000 synced keys).
+  const [keyAudit, setKeyAudit] = useState<AuditResult | null>(null);
+  const [keyAuditProgress, setKeyAuditProgress] = useState('');
+  const [isAuditingKeys, setIsAuditingKeys] = useState(false);
+  const [capacityReport, setCapacityReport] = useState<CapacityReport | null>(null);
+  const [nullTestReport, setNullTestReport] = useState<NullFreesSlotReport | null>(null);
+
   const debugData = useTrackerPlugin(
     async (rp) => {
       const rem = await rp.rem.findOne(remId);
@@ -1564,6 +1580,66 @@ function Debug() {
       await plugin.app.toast('Global apply failed — check console.');
     } finally {
       setIsGlobalCleaning(false);
+    }
+  };
+
+  const handleAuditSyncedKeys = async () => {
+    setIsAuditingKeys(true);
+    setKeyAudit(null);
+    setNullTestReport(null);
+    try {
+      const result = await auditSyncedKeys(plugin, setKeyAuditProgress);
+      setKeyAudit(result);
+      setKeyAuditProgress('');
+      await plugin.app.toast(
+        `Audit done — ${result.totals.live + result.totals.nulled} named key(s) of ${result.cap}.`
+      );
+    } catch (e) {
+      console.error('[KeyAudit] Scan failed', e);
+      setKeyAuditProgress('');
+      await plugin.app.toast('Key audit failed — check console.');
+    } finally {
+      setIsAuditingKeys(false);
+    }
+  };
+
+  const handleProbeCapacity = async () => {
+    setIsAuditingKeys(true);
+    try {
+      const report = await probeWriteCapacity(plugin);
+      setCapacityReport(report);
+      console.log('[KeyAudit] Capacity probe:', report);
+      await plugin.app.toast(
+        report.atCap ? 'At cap — no new synced key can be written.' : 'Free capacity — a new key was accepted.'
+      );
+    } finally {
+      setIsAuditingKeys(false);
+    }
+  };
+
+  const handleTestNullFreesSlot = async () => {
+    const sacrificial = keyAudit?.disposable?.[0];
+    if (!sacrificial) return;
+    const confirmed = confirm(
+      `Test whether setSynced(key, null) frees a slot?\n\n` +
+      `This temporarily nulls a disposable backup key:\n  ${sacrificial}\n\n` +
+      `Its value is dumped to the console first and restored afterwards. Continue?`
+    );
+    if (!confirmed) return;
+    setIsAuditingKeys(true);
+    try {
+      const report = await testNullFreesSlot(plugin, sacrificial);
+      setNullTestReport(report);
+      console.log('[KeyAudit] null-frees-slot report:', report);
+      await plugin.app.toast(
+        report.nullFreesSlot === null
+          ? 'Test inconclusive — see the steps in the panel.'
+          : report.nullFreesSlot
+            ? 'Nulling a key DOES free a slot.'
+            : 'Nulling a key does NOT free a slot.'
+      );
+    } finally {
+      setIsAuditingKeys(false);
     }
   };
 
@@ -3523,6 +3599,129 @@ function Debug() {
                 </details>
               ))
             )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Synced Storage Key Audit
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={handleAuditSyncedKeys}
+              disabled={isAuditingKeys}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isAuditingKeys ? 'wait' : 'pointer' }}
+            >
+              {isAuditingKeys ? 'Working…' : 'Scan Keys'}
+            </button>
+            <button
+              onClick={handleProbeCapacity}
+              disabled={isAuditingKeys}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isAuditingKeys ? 'wait' : 'pointer' }}
+            >
+              Test Capacity
+            </button>
+            <button
+              onClick={handleTestNullFreesSlot}
+              disabled={isAuditingKeys || !keyAudit?.disposable?.length}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', border: '1px solid var(--rn-clr-border-warning)', borderRadius: '4px', cursor: (isAuditingKeys || !keyAudit?.disposable?.length) ? 'not-allowed' : 'pointer' }}
+            >
+              Does null free a slot?
+            </button>
+          </div>
+        </h2>
+        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '8px' }}>
+          RemNote 1.27.16 caps a plugin at <strong>{SYNCED_KEY_CAP}</strong> synced keys and the SDK cannot enumerate
+          them, so this reconstructs every key the plugin can write from the KB (IncRems × PDFs, documents, links,
+          videos, …) and probes each with <code>getSynced</code>. <strong>live</strong> = holds a value,{' '}
+          <strong>nulled</strong> = the key exists holding <code>null</code> (our "delete" pattern — still occupying a
+          slot). Orphan keys whose rem was deleted can't be named; they show up as <em>unaccounted</em>. Every candidate
+          costs one IPC read, so a large KB can take a few minutes and will feel sluggish while it runs. Full dump in
+          console.
+        </div>
+        {keyAuditProgress && (
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '8px' }}>
+            {keyAuditProgress}
+          </div>
+        )}
+        {capacityReport && (
+          <div style={{ fontSize: '12px', marginBottom: '8px', padding: '8px', borderRadius: '4px', backgroundColor: capacityReport.atCap ? 'var(--rn-clr-background-warning)' : 'var(--rn-clr-background-secondary)', color: capacityReport.atCap ? 'var(--rn-clr-content-warning)' : 'inherit' }}>
+            {capacityReport.atCap
+              ? `At cap — writing a new key was rejected. ${capacityReport.error ?? ''}`
+              : 'Free capacity — a brand-new key was accepted (and released again).'}
+          </div>
+        )}
+        {keyAudit && (
+          <div>
+            <div style={{ fontSize: '11px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', marginBottom: '8px', padding: '8px', backgroundColor: 'var(--rn-clr-background-secondary)', borderRadius: '4px' }}>
+              <div>Named keys occupying slots: <strong>{keyAudit.occupied}</strong> / {keyAudit.cap}</div>
+              <div>Unaccounted (unnameable orphans): <strong style={{ color: keyAudit.unaccounted > 0 ? '#ef4444' : 'inherit' }}>~{keyAudit.unaccounted}</strong></div>
+              <div>Live: <strong>{keyAudit.totals.live}</strong> · Nulled: <strong style={{ color: keyAudit.totals.nulled > 0 ? '#ef4444' : 'inherit' }}>{keyAudit.totals.nulled}</strong></div>
+              <div>Probed: <strong>{keyAudit.totals.probed}</strong> candidate keys in {(keyAudit.durationMs / 1000).toFixed(1)}s</div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                Scanned: {keyAudit.scanned.allRems} rems ({keyAudit.scanned.incRems} IncRem ·{' '}
+                {keyAudit.scanned.dismissed} Dismissed) · {keyAudit.scanned.pdfPairs} IncRem×PDF pairs ·{' '}
+                {keyAudit.scanned.videoUrls} video URLs · {keyAudit.kbIds.length} KB id(s)
+              </div>
+            </div>
+            {!keyAudit.nullSignalUsable && (
+              <div style={{ fontSize: '12px', marginBottom: '8px', padding: '8px', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)' }}>
+                Calibration failed: a key that was never written did not read back as <code>undefined</code>, so
+                "nulled" can't be told apart from "absent". That column is excluded from the occupied count — use the
+                null-frees-slot experiment instead.
+              </div>
+            )}
+            {keyAudit.nullSignalUsable && keyAudit.totals.nulled > 0 && (
+              <div style={{ fontSize: '12px', marginBottom: '8px', padding: '8px', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)' }}>
+                <strong>{keyAudit.totals.nulled}</strong> key(s) exist holding <code>null</code> — writing null does not
+                delete the key, so every cleanup path in the plugin is leaking slots.
+              </div>
+            )}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ fontSize: '11px', width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                    <th style={{ padding: '4px' }}>Family</th>
+                    <th style={{ padding: '4px', textAlign: 'right' }}>Live</th>
+                    <th style={{ padding: '4px', textAlign: 'right' }}>Nulled</th>
+                    <th style={{ padding: '4px', textAlign: 'right' }}>Probed</th>
+                    <th style={{ padding: '4px' }}>Coverage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...keyAudit.families]
+                    .sort((a, b) => (b.live + b.nulled) - (a.live + a.nulled))
+                    .map((f) => (
+                      <tr key={f.family} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                        <td style={{ padding: '4px' }}>
+                          <div style={{ fontWeight: 600 }}>{f.family}</div>
+                          <code style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>{f.pattern}</code>
+                          {f.note && (
+                            <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', fontStyle: 'italic' }}>{f.note}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '4px', textAlign: 'right', fontWeight: 600 }}>{f.live}</td>
+                        <td style={{ padding: '4px', textAlign: 'right', color: f.nulled > 0 ? '#ef4444' : 'inherit' }}>{f.nulled}</td>
+                        <td style={{ padding: '4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{f.probed}</td>
+                        <td style={{ padding: '4px', color: f.coverage === 'full' ? '#10b981' : 'var(--rn-clr-content-tertiary)' }}>{f.coverage}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        {nullTestReport && (
+          <div style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px', fontSize: '11px' }}>
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+              null-frees-slot test — sacrificed <code>{nullTestReport.sacrificedKey}</code>
+              {nullTestReport.restored ? ' (restored)' : ' (NOT restored — see console)'}
+            </div>
+            <ol style={{ margin: 0, paddingLeft: '18px' }}>
+              {nullTestReport.steps.map((s, i) => (
+                <li key={i} style={{ marginBottom: '2px' }}>{s}</li>
+              ))}
+            </ol>
           </div>
         )}
       </div>

@@ -515,7 +515,7 @@ interface ListBreakSnapshot {
   childIds: string[];
 }
 
-const snapshotKey = (remId: string) => `listBreakSnapshot:${remId}`;
+export const snapshotKey = (remId: string) => `listBreakSnapshot:${remId}`;
 
 // Split a rich text into any PDF-highlight pin references it contains and the
 // remaining nodes. A pin is a reference node (`i: 'q'`) whose target rem is a

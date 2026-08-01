@@ -2,6 +2,35 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.29 - August 1st, 2026
+
+### ⚠️ Service notice: the plugin is temporarily out of operation on RemNote 1.27.16
+
+RemNote 1.27.16 — now on the **stable** channel as well as beta — introduced *"safeguards that prevent plugins from saving oversized data or creating too many relationships"*. Three of them break Incremental Everything, and none can be worked around from the plugin's side:
+
+- **You can no longer create new Incremental Rems.** A plugin's powerup may now be applied to at most **5000 Rems**. Applying the `Incremental` tag to Rem number 5001 is rejected outright. A powerup *is* its set of tagged Rems, so there is no way to mark something as incremental without that relationship — and no redesign brings a knowledge base of 5000+ incremental items back under the ceiling. The `Card Priority` tag is far past it too.
+- **Nothing new can be saved to plugin storage.** Plugins are capped at **1000 synced-storage keys**, there is no API to delete a key, and writing `null` to one does not release it — as confirmed by direct experiment. The plugin's storage is therefore permanently full: new Priority Review Documents, reading positions for newly added PDFs, and video positions can no longer be stored.
+- **The Card Priority index cannot be built.** `plugin.card.getAll()` and `plugin.rem.getAll()` were removed in favour of `findMany`, which requires IDs you must already have — so there is no way to discover cards at all. Card-priority sorting, the Priority Shield, flashcard badges, the distribution graph, Card Analytics, the Study Dashboard, FSRS calibration and every batch tool consequently behave as if no flashcard has a priority.
+
+**No data has been lost.** Priorities, schedules and repetition histories all live on your Rems and are untouched — the plugin simply cannot read or extend them properly while these limits stand. If you are still on a build older than 1.27.16, holding off on updating may keep things working.
+
+All three have been reported to the RemNote team with the supporting evidence, along with a request to revert them and to give plugin authors notice and documentation before anything like them returns. This page will be updated the moment the plugin is operational again.
+
+### 📚 New: the User's Manual has moved to a dedicated documentation site
+
+The documentation has left the GitHub Wiki and now lives at **[hugomarins.github.io/incremental-everything](https://hugomarins.github.io/incremental-everything/)**.
+
+The Wiki had outgrown itself: 28 pages with no real search, a flat sidebar that gave no sense of where you were, and an appearance fixed by GitHub. The new site is built with **MkDocs Material** and fixes exactly those things:
+
+- **Real search.** Full-text search across every page, with live suggestions and highlighted matches — instead of hunting through the sidebar or relying on the browser's find-in-page one page at a time.
+- **Structure you can see.** The manual is now ordered as a course — Getting Started, the Core Loop, Prioritization, Advanced Workflows, References, FAQ — with a table of contents for the page you're reading always visible, so long pages such as *Utilities* stop being a scroll of undifferentiated text.
+- **Readable anywhere.** Proper mobile layout, light and dark themes that follow your system, and copy buttons on code blocks.
+- **Better onboarding.** A newcomer landing on the manual can now find the answer to a specific question in seconds, which the Wiki never really allowed.
+
+The old Wiki now carries a redirect notice and is no longer updated. Every link in the README and in the plugin's store listing points to the new site.
+
+📖 See [Contributing to the Wiki](Contributing-to-the-Wiki.md) for how to suggest documentation changes now that the docs live in the plugin's own repository.
+
 ## v1.0.28 - July 31st, 2026
 
 ### ✨ New: Priority badges on PDF highlights

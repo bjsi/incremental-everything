@@ -1,0 +1,59 @@
+# Documentation — where it lives and how to update it
+
+The User's Manual is published at **<https://hugomarins.github.io/incremental-everything/>**.
+
+Its source lives in this repository under [`docs/`](docs/). There is no separate documentation repository any more.
+
+## History
+
+Until August 2026 the manual was a **GitHub Wiki** at `https://github.com/bjsi/incremental-everything/wiki`, stored in its own git repository (`bjsi/incremental-everything.wiki.git`, cloned locally at `../incremental-everything.wiki/`). That wiki has been stripped to a redirect notice and **must not be edited** — anything written there is invisible to users.
+
+## How to update the docs
+
+1. Edit the `.md` files in `docs/`.
+2. If you added a **new page**, add it to the `nav:` section of [`mkdocs.yml`](mkdocs.yml) — see below.
+3. Commit and push to `main`.
+
+### Adding a new page — two steps, not one
+
+Creating `docs/My-New-Page.md` is only half the job. A page that is **not** listed in `nav:` still builds, still gets a URL, and is still found by search — but it appears **nowhere in the left sidebar**, so it is reachable only by direct link. Add it under the right section:
+
+```yaml
+nav:
+  - "User's Manual":
+    - 6. Essential References:
+      - My New Page: My-New-Page.md   # ← add this line
+```
+
+`nav:` is the successor to the old wiki's `_Sidebar.md`: same job, different file. The improvement is that it also defines page **order, nesting and section grouping** in one place, rather than being a hand-maintained list of links that could silently drift from the pages that actually existed.
+
+[`.github/workflows/docs.yml`](.github/workflows/docs.yml) rebuilds the site and deploys it to the `gh-pages` branch on every push touching `docs/**` or `mkdocs.yml`. **No manual build step.** The generated `site/` directory is git-ignored; never commit it.
+
+To preview locally:
+
+```bash
+pip install mkdocs-material
+mkdocs serve      # http://127.0.0.1:8000
+```
+
+## Conventions
+
+**Links between pages** point at the Markdown file, not the published URL — `[Utilities](Utilities.md)`, `[the Shield](Prioritization-&-Sorting.md#weighted-shield)`. MkDocs rewrites them and warns when a target disappears. The old wiki-style `[[Page#anchor|label]]` syntax does **not** work here.
+
+**Published URLs** are `https://hugomarins.github.io/incremental-everything/<Page-File-Name>/` (directory URLs, no `.md`), with anchors appended after the trailing slash: `.../Utilities/#find-rem--reference-or-open`. Use this form only when linking from outside the docs (README, plugin manifest, Discord).
+
+**Assets** live in `docs/assets/`, referenced relatively: `![Alt](assets/thing.png)`. Images that had been pasted straight into the old GitHub Wiki (and so lived on GitHub's CDN under opaque UUID filenames) were downloaded into `docs/assets/uploaded/`.
+
+## Shipping a feature — do BOTH, together
+
+1. **Add a `docs/Changelog.md` entry**, newest at the top, headed `## vX.Y.Z - Month Dth, Year`, with emoji-prefixed subheadings (✨ New / 🐛 Fixed / ♻️ Changed / ⚡ Improved). Bump `public/manifest.json` → `version.patch` to match. (`package.json` is stuck at `0.0.1` and is not the version of record.)
+2. **Update the page that documents the feature itself** — `Utilities.md`, `Plugin-Widgets-Reference.md`, `Plugin-Commands-Reference.md`, `Keyboard-Shortcuts.md`, `Plugin-Settings-Reference.md`, as applicable. Several of these have their own table of contents or item numbering that must be kept in sync when inserting a section.
+
+**Every changelog entry ends with a 📖 link to the page section** that explains the feature in full, e.g. `📖 See [Widgets → Card Priority Display](Plugin-Widgets-Reference.md#11-card-priority-display).` The changelog is *what changed*; the feature page is *how it works*. Never leave the changelog as the only place a feature is described.
+
+## Links pointing at the docs from elsewhere
+
+Keep these in sync when the site URL changes:
+
+- `README.md`, `README_ES.md`, `README_PT-BR.md`
+- `public/manifest.json` → `projectUrl` and `changeLogUrl`

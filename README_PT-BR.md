@@ -20,12 +20,34 @@ O Incremental Everything permite que você intercale suas revisões de flashcard
 Gerencie a sobrecarga de informações com um sistema robusto de prioridade dupla:
 - **Prioridades Absolutas e Relativas**: Priorize itens de 0 a 100 e veja exatamente onde eles se classificam na sua base de conhecimento.
 - **Herança de Prioridade**: Novos extratos e flashcards herdam automaticamente a prioridade de seu material de origem.
-- **Escudo de Prioridade**: Uma ferramenta de diagnóstico em tempo real que mostra sua capacidade de processar material de alta prioridade.
+- **Escudo de Prioridade e Escudo Ponderado**: Ferramentas de diagnóstico que mostram sua capacidade de processar material de alta prioridade e a fração da sua fila total, ponderada por prioridade, que você já processou.
+- **Análises FSRS**: Estatísticas de Dificuldade (D), Estabilidade (S) e Recuperabilidade (R) calculadas em tempo real para seus flashcards.
 - **Documentos de Revisão Prioritária**: Gere sessões de estudo focadas para seus N itens mais importantes (leitura passiva e flashcards) quando estiver sobrecarregado.
+
+### 📊 Histórico, Painel e Mastery Drill *(novo na v0.2.182)*
+Um conjunto completo de ferramentas de histórico e prática, agora integrado à barra lateral direita:
+- **Histórico de Rems Visitados**: volte de imediato a qualquer documento que você acessou recentemente.
+- **Histórico de Flashcards**: encontre e abra qualquer flashcard que você revisou, com busca pelo texto da frente e do verso.
+- **Painel de Filas Praticadas**: métricas da sessão em tempo real (velocidade, retenção, idade dos cards) e um histórico completo de cada sessão de prática, com backup via Exportar/Importar.
+- **Mastery Drill**: uma fila de repráctica focada nos cards que você avaliou como *Forgot* ou *Hard* — inspirada no Final Drill do SuperMemo. Abra pelo comando `Mastery Drill` ou pela notificação na Barra Lateral Esquerda.
+
+👉 [Documentação completa](https://hugomarins.github.io/incremental-everything/History-Queue-Dashboard-and-Mastery-Drill/)
 
 ### 📱 Modos de Desempenho
 - **Modo Leve (Padrão para Móvel/Web)**: Apenas funcionalidades rápidas, estáveis e essenciais. Previne travamentos em telefones e tablets.
-- **Modo Completo (Usuário Avançado de Desktop)**: Conjunto completo de funcionalidades com cálculos estatísticos pesados para análises detalhadas.
+- **Modo Completo (Usuário Avançado de Desktop)**: Conjunto completo de funcionalidades, com uma carga pesada de cache na inicialização (a prioridade de todos os Rems com flashcards), que habilita cálculos estatísticos em tempo real para análises detalhadas.
+
+### 🧰 Mais que Leitura Incremental: um Conjunto de Ferramentas para sua BC
+Além do ciclo principal de aprendizado, o Incremental Everything traz **dezenas de utilitários independentes** que tornam mais rápido o dia a dia de tomar notas e organizar sua base de conhecimento — úteis mesmo quando você não está revisando. Alguns exemplos:
+
+- **Ferramentas de estrutura e títulos**: [Reestruturar Outline por Títulos](https://hugomarins.github.io/incremental-everything/Utilities/#restructure-outline-by-headings) (reaninha sob seus títulos um documento plano ou mal colado), [Aplicar Níveis de Título por Hierarquia (Sumário)](https://hugomarins.github.io/incremental-everything/Utilities/#apply-heading-levels-by-hierarchy-table-of-contents) e [Definir Próximo Nível de Título](https://hugomarins.github.io/incremental-everything/Utilities/#set-next-heading-level) — todas com pré-visualização lado a lado e desfazer em um clique.
+- **Controle de exibição na fila**: [Ocultar / Remover Pai e Avô, entre outros](https://hugomarins.github.io/incremental-everything/Utilities/#queue-display-utilities), para limpar como os Rems ancestrais aparecem nos seus flashcards.
+- **Auxiliares de edição**: [Conversor de Maiúsculas/Minúsculas](https://hugomarins.github.io/incremental-everything/Utilities/#text-case-converter) (ciclo com Shift+F3, com regras de capitalização para inglês e português) e [Transformar Texto Selecionado em Tópicos](https://hugomarins.github.io/incremental-everything/Utilities/#bulletize-inline-selected-text), para restaurar os bullets que os destaques de PDF achatam.
+- **Navegação e fontes**: [Find Rem](https://hugomarins.github.io/incremental-everything/Utilities/#find-rem--reference-or-open) (revela Rems que a busca `[[` do RemNote não encontra) e [Abrir Fonte em Popup / Janela Flutuante](https://hugomarins.github.io/incremental-everything/Utilities/#open-source-in-popup), para consultar um PDF ou site sem sair da fila.
+- **Análises e diagnóstico**: o [Painel de Estudos](https://hugomarins.github.io/incremental-everything/Study-Dashboard/) com estatísticas de aprendizado de toda a base de conhecimento, e o [conjunto de Históricos e o Painel de Filas Praticadas](https://hugomarins.github.io/incremental-everything/History-Queue-Dashboard-and-Mastery-Drill/) para revisitar qualquer documento, flashcard ou sessão passada.
+- **Detalhe por item**: explore a linha do tempo de um único item com os popups de [Histórico de Repetições de Flashcards](https://hugomarins.github.io/incremental-everything/Plugin-Widgets-Reference/#211-flashcard-repetition-history) e [Histórico de Repetições de IncRems](https://hugomarins.github.io/incremental-everything/Plugin-Widgets-Reference/#212-increm-repetition-history--aggregated-view) — este último com um **resumo agregado** de repetições, tempo e contagens de toda a subárvore de descendentes de um Rem. Tudo apoiado por um motor **FSRS v6** embutido que calcula Dificuldade / Estabilidade / Recuperabilidade por card, além de um [detalhamento do Escudo ponderado por prioridade](https://hugomarins.github.io/incremental-everything/Prioritization-&-Sorting/#weighted-shield) clicável, mostrando quanto da sua carga de trabalho você já processou.
+
+👉 Veja a página de **[Utilitários](https://hugomarins.github.io/incremental-everything/Utilities/)** para a lista completa, e a **[Referência de Comandos do Plugin](https://hugomarins.github.io/incremental-everything/Plugin-Commands-Reference/)** para todos os comandos.
 
 ## Instalação
 
@@ -35,7 +57,9 @@ Gerencie a sobrecarga de informações com um sistema robusto de prioridade dupl
 
 Este README cobre o básico. Para os guias completos, visite o **Manual do Usuário**:
 
-👉 **[Wiki do Incremental Everything](https://github.com/bjsi/incremental-everything/wiki)**
+👉 **[Incremental Everything — Manual do Usuário](https://hugomarins.github.io/incremental-everything/)**
+
+*(A documentação saiu do Wiki do GitHub em agosto de 2026. O novo site tem busca completa, funciona no celular e possui temas claro e escuro — atualize seus favoritos, por favor.)*
 
 ### 🎥 Vídeos sobre o básico
 
@@ -48,20 +72,23 @@ Este README cobre o básico. Para os guias completos, visite o **Manual do Usuá
 - **O que é Leitura Incremental?**: [Jornada Incremental - Leitura Incremental em Termos Simples](https://youtu.be/V4xEziM8mco)
 
 ### Links Úteis
-- **[Histórico de Mudanças](https://github.com/bjsi/incremental-everything/wiki/Changelog)**: Veja as últimas funcionalidades e atualizações.
+- **[Histórico de Mudanças](https://hugomarins.github.io/incremental-everything/Changelog/)**: Veja as últimas funcionalidades e atualizações.
 - **[Discord](http://bit.ly/RemNoteDiscord)**: Junte-se à comunidade e converse conosco (procure pelos canais do plugin).
 
 
 ## Uso
 
 ### Começando
-1. **Torne Incremental**: Marque qualquer Rem, PDF ou Site como `Incremental` usando o comando `/Incremental Everything` (Atalho: `Alt+X`).
+1. **Torne Incremental**: Marque qualquer Rem, PDF ou Site como `Incremental` usando o comando `/Make Incremental (Extract)` (Atalho: `Alt+X`).
+   * **Extrair Seleção**: Se você tiver texto selecionado, `Alt+X` extrairá aquele trecho específico para um novo Rem filho e o vinculará de volta.
 
 ![Tornar Incremental usando o comando](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/tag-inc-rem.gif)
 
-2. **Priorize**: Use `Alt+P` para definir sua importância.
-3. **Revise**: O plugin intercala esses itens na sua fila regular de flashcards.
-4. **Desative**: Remova a etiqueta `Incremental` ou pressione o botão **Dismiss** (Descartar) na fila se tiver terminado de revisar.
+2. **Priorize**: Use `Alt+P` ou `Alt+Shift+X` (Extrair com Prioridade) para definir sua importância.
+3. **Copiar/Colar Fontes**: Vincule vários capítulos a um mesmo PDF de forma eficiente com `Ctrl+Shift+F1` (Copiar) e `Alt+Shift+V` (Colar).
+4. **Crie Flashcards**: Use `Alt+Z` para criar rapidamente uma **Cloze Deletion** a partir do texto selecionado.
+5. **Revise**: O plugin intercala esses itens na sua fila regular de flashcards.
+6. **Desative**: Remova a etiqueta `Incremental` ou pressione o botão **Dismiss** (Descartar) na fila se tiver terminado de revisar.
 
 ### ⚡ Priorização e Ordenação
 - 0 é para seu material mais importante e 100 é para o menos importante.
@@ -72,7 +99,7 @@ Este README cobre o básico. Para os guias completos, visite o **Manual do Usuá
 ### Agendamento
 
 - **Agendador Padrão**: Usa uma fórmula exponencial — `intervalo = ⌈Multiplicador ^ N⌉` dias (o multiplicador é 1.5 por padrão). Simples e eficaz para itens que precisam de poucas revisões.
-- **Agendador Beta (Curva de Saturação)**: Uma alternativa opcional onde os intervalos começam em um *Intervalo da Primeira Revisão* configurável (padrão 5 dias) e se aproximam gradualmente de um *Intervalo Máximo* (padrão 30 dias). Ideal para itens que precisam de muitas revisões (livros, capítulos). Consulte a página wiki [IncRem Scheduler](https://github.com/bjsi/incremental-everything/wiki/IncRem-Scheduler) para detalhes.
+- **Agendador Beta (Curva de Saturação)**: Uma alternativa opcional onde os intervalos começam em um *Intervalo da Primeira Revisão* configurável (padrão 5 dias) e se aproximam gradualmente de um *Intervalo Máximo* (padrão 30 dias). Ideal para itens que precisam de muitas revisões (livros, capítulos). Consulte a página [IncRem Scheduler](https://hugomarins.github.io/incremental-everything/IncRem-Scheduler/) para detalhes.
 - Você pode definir manualmente a próxima data de repetição usando o comando **Reagendar** (**Ctrl+J**), ou os recursos de tabelas e propriedades do RemNote.
 
 ### 📱 Suporte Móvel
@@ -87,12 +114,16 @@ O plugin agora possui **Modo Leve Automático**.
 - Funciona se você marcar o PDF/site em si, um Rem com uma única fonte, ou um Rem com **múltiplos PDFs como fonte** — o plugin permite alternar entre eles e fixar um como o PDF *ativo* para aquele Inc Rem.
 - O plugin renderizará a visualização de leitura do PDF ou site dentro da fila.
 - Se você quiser transformar um destaque em um Rem incremental, clique no destaque e clique no ícone da peça de quebra-cabeça.
-- ** 📄 PDFs e Web**
+- 📄 **PDFs e Web**
   - **Estado Visual**: Os destaques ficam **Verdes** quando alternados como Incrementais e **Azuis** quando extraídos.
+  - **Selos de Etiqueta**: Para não poluir o editor, as etiquetas `Incremental` e `pdfextract` são substituídas por selos compactos de emoji — **🔍** para `Incremental` e **✂️** para `pdfextract` — assim você continua identificando o tipo de item num relance, sem perder espaço horizontal.
   - **Painel de Controle de PDF**: Gerencie capítulos, defina intervalos de páginas e veja o histórico de leitura para documentos longos.
-  - **Seletor multi-PDF** *(novo)*: Quando um Inc Rem tem múltiplos PDFs como fonte, um dropdown aparece no Reader (ao lado do ícone 📝 de Notas do Documento), no Cronômetro de Revisão no Editor, no popup de Executar Repetição, no Painel de Controle de PDF e no Priority Editor — permitindo alternar o PDF em exibição e fixar um como ativo para aquele Inc Rem. A ordem de resolução é **fixação explícita → `#preferthispdf` → primeiro PDF**, aplicada uniformemente em todas as superfícies.
+  - **Seletor multi-PDF** *(novo)*: Quando um Inc Rem tem múltiplos PDFs como fonte, um dropdown aparece no Reader (ao lado do ícone 📝 de Notas do Documento), no Cronômetro de Revisão no Editor, no popup de Executar Repetição, no Painel de Controle de PDF e na Barra de Ferramentas do Editor — permitindo alternar o PDF em exibição e fixar um como ativo para aquele Inc Rem. A ordem de resolução é **fixação explícita → `#preferthispdf` → primeiro PDF**, aplicada uniformemente em todas as superfícies.
   - **Rastreamento de Posição**: O plugin salva automaticamente sua última página lida ao usar o fluxo de Capítulos de PDF ou ao criar extrações.
   - **Criar Rem Incremental**: Selecione o texto em um PDF -> Destaque-o -> Clique no ícone de quebra-cabeça -> **"Create Incremental Rem"**. Isso extrai o texto para um novo Rem sob um pai de sua escolha (usando o seletor inteligente de pais).
+
+![Barra de ferramentas de destaque de PDF](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/pdfhighlight-toolbar.png)
+
 ![Destacar](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/highlight.gif)
 
 ### Escrita Incremental
@@ -104,10 +135,12 @@ O plugin agora possui **Modo Leve Automático**.
 
 - Você pode marcar vídeos do YouTube com a etiqueta `Incremental` para assisti-los incrementalmente.
 - Funcionará se você marcar o Rem do link em si, ou um Rem com o link do YouTube como fonte.
+- **Extrações de Vídeo**: Crie subtrechos precisos com marcações de início e fim, cada um com seu próprio agendamento e prioridade.
+- **Transcrição Automática**: Busque automaticamente as transcrições do YouTube para os intervalos extraídos, deixando o conteúdo pesquisável e pronto para clozes. [P.S.: atualmente fora do ar após as recentes medidas anti-bot do YouTube]
 - O plugin salvará automaticamente seu progresso e velocidade de reprodução.
 - Você pode abrir a seção de notas redimensionável à esquerda para fazer anotações enquanto assiste.
 
-![Vídeo Incremental](https://raw.githubusercontent.com/bjsi/incremental-everything/main/img/inc-vid.png)
+![Vídeo Incremental](https://hugomarins.github.io/incremental-everything/assets/YT-extract-mode.png)
 
 ### Matemática Incremental
 
@@ -139,11 +172,11 @@ Existem muitas maneiras de filtrar a tabela para criar um subconjunto de Rem par
 
 ### Posição de Leitura Incremental de PDF
 
-Ao ler um PDF grande (como um livro) como um Rem incremental regular, o plugin pode não retornar de forma confiável ao seu último ponto de leitura incremental.
+Antes, as posições de leitura de PDFs grandes se perdiam com facilidade.
 
-  * **O Problema**: Se você abrir e rolar o mesmo PDF em outra janela ou aba, sua posição de leitura incremental será perdida. O visualizador de PDF nativo do RemNote lembra apenas a posição mais recente de um documento, o que sobrescreve a posição da sua sessão de leitura incremental. Isso também significa que você não pode ter vários Rems incrementais para capítulos diferentes do mesmo arquivo PDF, pois todos compartilhariam a mesma posição de rolagem.
-  * **A Causa**: Isso se deve a uma limitação no SDK de Plugins do RemNote atual. O plugin carece das ferramentas necessárias para salvar e restaurar programaticamente uma posição de rolagem específica para um PDF e deve depender do comportamento padrão do RemNote.
-  * **Como Você Pode Ajudar**: Para corrigir isso, precisamos que os desenvolvedores do RemNote expandam as capacidades de sua API de Plugins. Enviamos uma Solicitação de Recurso pedindo essas ferramentas. Por favor, ajude-nos votando na solicitação na plataforma de feedback do RemNote. Mais votos aumentarão sua prioridade.
+  * **A Solução**: O plugin agora suporta um **fluxo de trabalho por capítulos**. Ao dividir um PDF em vários Rems Incrementais (cada um com seu intervalo de páginas definido) ou ao usar **Destaques de PDF** como itens incrementais, o plugin **salva e restaura de forma confiável a sua posição de leitura** para cada item específico.
+  * **O Desafio Remanescente**: Embora já consigamos rastrear a posição de cada item, o SDK de Plugins do RemNote ainda não oferece controle programático direto sobre o motor de rolagem interno do visualizador de PDF nativo. Ou seja: conseguimos levar você até a página correta, mas ainda não controlar a rolagem vertical exata dentro dessa página.
+  * **Como Você Pode Ajudar**: Seguimos defendendo uma API de Plugins mais robusta. Por favor, continue votando em nosso pedido por um melhor controle programático da rolagem.
 
 ➡️ **[Vote na Solicitação de Recurso no Site de Feedback do RemNote](https://feedback.remnote.com/p/feature-request-programmatic-control-over-pdf-scroll-position-for-plugins?b=Plugin-Requests)**
 
