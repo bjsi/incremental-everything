@@ -2,22 +2,6 @@
 
 The **Priority Review Document** is a powerful feature designed to solve the "information overflow" problem inherent to Incremental Reading. It allows you to generate a custom, disposable review queue containing your highest-priority material — both Flashcards and Incremental Rems — sorted exactly how you want them.
 
-## Table of Contents
-
-- [The Problem: Why do I need this?](#the-problem-why-do-i-need-this)
-- [The Solution](#the-solution)
-- [How to Create a Priority Review Document](#how-to-create-a-priority-review-document)
-  - [1. Access the Creator](#1-access-the-creator)
-  - [2. Configure Your Session](#2-configure-your-session)
-  - [3. Review](#3-review)
-- [How Items Are Selected](#how-items-are-selected)
-  - [Priority Review Document Graph View](#priority-review-document-graph-view)
-- [Paused Document Filtering](#paused-document-filtering)
-- [Card Cluster Support](#card-cluster-support)
-- [Smart Scope & Priority Shield Integration](#smart-scope--priority-shield-integration)
-- [Best Practices](#best-practices)
-- [Technical: Card State Detection](#technical-card-state-detection)
-
 ---
 ## The Problem: Why do I need this?
 

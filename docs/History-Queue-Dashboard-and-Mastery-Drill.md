@@ -6,17 +6,6 @@ They add a suite of history and practice tools to your right sidebar: a **Live S
 
 ---
 
-## Table of Contents
-
-- [Migrating from the Standalone Plugin](#migrating-from-the-standalone-plugin)
-- [Visited Rem History](#visited-rem-history)
-- [Flashcard History](#flashcard-history)
-- [Practiced Queues History & Live Dashboard](#practiced-queues-history--live-dashboard)
-- [Mastery Drill](#mastery-drill)
-- [How to Use](#how-to-use)
-- [Settings](#settings)
-- [Commands](#commands)
-
 ---
 
 ## Migrating from the Standalone Plugin

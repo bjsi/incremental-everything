@@ -1,46 +1,6 @@
 # Plugin Widgets Reference
 This page serves as a comprehensive visual and functional guide to every widget in the **Incremental Everything (Plus)** plugin.
 
-## Table of Contents
-- [1. In-Queue Widgets](#1-in-queue-widgets)
-  - [1.1. Card Info Bar](#11-card-info-bar)
-  - [1.2. Queue Toolbar Priority](#12-queue-toolbar-priority)
-  - [1.3. Answer Buttons Info Bar](#13-answer-buttons-info-bar)
-  - [1.4. Document Notes Sidebar](#14-document-notes-sidebar)
-  - [1.5. PDF Switcher](#15-pdf-switcher)
-- [2. History & Progress Tracking](#2-history--progress-tracking)
-  - [2.1. Review History popups](#21-review-history-popups-for-individual-itemsbranches)
-    - [2.1.1. Flashcard Repetition History](#211-flashcard-repetition-history)
-    - [2.1.2. IncRem Repetition History & Aggregated View](#212-increm-repetition-history--aggregated-view)
-  - [2.2. Last seen items history in Right-Sidebar](#22-last-seen-items-history-in-right-sidebar)
-    - [2.2.1. Incremental Rem History](#221-incremental-rem-history)
-    - [2.2.2. Visited Rem History](#222-visited-rem-history)
-    - [2.2.3. Flashcard History Sidebar](#223-flashcard-history-sidebar)
-- [3. Prioritization & Sorting Widgets](#3-prioritization--sorting-widgets)
-  - [3.1. Full Priority Widget](#31-full-priority-widget)
-  - [3.2. Light Priority Widget](#32-light-priority-widget)
-  - [3.3. Priority & Interval Popup](#33-priority--interval-popup)
-  - [3.4. Sorting Criteria Menu](#34-sorting-criteria-menu)
-- [4. Analysis & Visualization](#4-analysis--visualization)
-  - [4.1. Practiced Queues History & Live Dashboard](#41-practiced-queues-history--live-dashboard)
-  - [4.2. Study Dashboard](#42-study-dashboard)
-  - [4.3. Priority Distribution Graphs](#43-priority-distribution-graphs)
-  - [4.4. Priority Shield Graph](#44-priority-shield-graph)
-- [5. List & Overview Views](#5-list--overview-views)
-  - [5.1. IncRem List & Main View](#51-increm-list--main-view)
-- [6. Utility Popups](#6-utility-popups)
-  - [6.1. Reschedule Widget](#61-reschedule-widget)
-  - [6.2. Parent Selector](#62-parent-selector)
-  - [6.3. Execute Repetition Popup](#63-execute-repetition-popup)
-  - [6.4. Find Rem (Reference or Open)](#64-find-rem--reference-or-open)
-  - [6.5. Source Popup (modal, queue-safe PDF/HTML viewer)](#65-source-popup-modal-queue-safe-pdfhtml-viewer)
-  - [6.6. Source Popup (floating, non-blocking)](#66-source-popup-floating-non-blocking)
-  - [6.7. Restructure Outline Preview Popup](#67-restructure-outline-preview-popup)
-  - [6.8. Read Points Popup](#68-read-points-popup)
-- [7. Mastery Drill](#7-mastery-drill)
-  - [7.1. Mastery Drill Popup](#71-mastery-drill-popup)
-  - [7.2. Mastery Drill Notification](#72-mastery-drill-notification)
-
 ---
 
 ## 1. In-Queue Widgets

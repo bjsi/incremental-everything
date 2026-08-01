@@ -16,37 +16,6 @@ During a study session, Incremental Everything presents your Incremental Rems on
 
 Each button is designed for a specific action to manage your learning flow efficiently.
 
-## Table of Contents
-
-- [The Answer Buttons](#the-answer-buttons)
-- [Editing a Rem-type Incremental Rem](#editing-a-rem-type-incremental-rem)
-  - [Read-point and status emphasis in Rem-type cards](#read-point-and-status-emphasis-in-rem-type-cards)
-- [A Strategic Guide to the Answer Buttons](#a-strategic-guide-to-the-answer-buttons)
-  - [Next](#next)
-    - [The Scheduling Algorithm](#the-scheduling-algorithm)
-    - [The "One Memory, One Action" Principle](#the-one-memory-one-action-principle)
-  - [Reschedule](#reschedule)
-    - [Technical Note: Reschedule Event Types](#technical-note-reschedule-event-types)
-  - [Dismiss](#dismiss)
-  - [Change Priority](#change-priority)
-  - [Review in Editor](#review-in-editor)
-    - [The Workflow Loop](#the-workflow-loop)
-    - [When to use it](#when-to-use-it)
-    - [Why use this instead of the native "Go to Rem" (Shortcut: G)?](#why-use-this-instead-of-the-native-go-to-rem-shortcut-g)
-  - [Open Editor in New Tab](#open-editor-in-new-tab)
-    - [The Problem It Solves](#the-problem-it-solves)
-    - [How It Works & When to Use It](#how-it-works--when-to-use-it)
-    - [⚙️ Related Setting: Preferred RemNote Environment](#️-related-setting-preferred-remnote-environment)
-  - [Open URL to use Web Clipper 📎](#open-url-to-use-web-clipper-)
-- [Card Stats & FSRS Integration](#card-stats--fsrs-integration)
-  - [What's Displayed](#whats-displayed)
-  - [Flashcard Repetition History](#flashcard-repetition-history)
-  - [FSRS Configuration](#fsrs-configuration)
-    - [Required Setup: FSRS Weights](#required-setup-fsrs-weights)
-    - [Limitation: Global Weights Only](#limitation-global-weights-only)
-    - [Plugin Settings Reference](#plugin-settings-reference)
-- [Incremental Rem History](#incremental-rem-history)
-
 ---
 
 ## The Answer Buttons

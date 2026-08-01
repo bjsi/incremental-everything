@@ -2,15 +2,6 @@
 
 This page contains guides for troubleshooting common issues and using diagnostic tools.
 
-## Table of Contents
-- [🚀 Jump to Rem by ID - User Guide](#-jump-to-rem-by-id---user-guide)
-- [🛠 Pre-compute Card Priorities - Error Guide](#-pre-compute-card-priorities---error-guide)
-- [🧹 Rogue CardPriority Tags Sanitization](#-rogue-cardpriority-tags-sanitization)
-- [📄 PDF Highlight Repair Tool](#-pdf-highlight-repair-tool)
-- [📊 Page History Diagnostic & Cleanup (Debug Widget)](#-page-history-diagnostic--cleanup-debug-widget)
-- [🔎 Search / Linkage Diagnostics (Debug Widget)](#-search--linkage-diagnostics-debug-widget)
-- [📦 Priorities Lost When Importing Between Knowledge Bases](#-priorities-lost-when-importing-between-knowledge-bases)
-
 ---
 
 ## 🚀 Jump to Rem by ID - User Guide

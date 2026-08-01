@@ -4,20 +4,6 @@ Standard Spaced Repetition Systems (SRS) treat every due card as equally urgent.
 
 This page explains how the plugin allows you to layer a priority system on top of RemNote's standard flashcards.
 
-## Table of Contents
-- [How It Works](#how-it-works)
-  - [Priority Sources](#priority-sources)
-  - [The Inheritance Logic](#the-inheritance-logic)
-- [Setting & Managing Priorities](#setting--managing-priorities)
-  - [1. The Unified Priority Widget](#1-the-unified-priority-widget-altp)
-  - [2. Batch Assignment](#2-batch-assignment-for-tag-or-reference-migration)
-- [The "Queue Problem" & The Solution](#the-queue-problem--the-solution)
-- [Monitoring Your Load: Card Shield](#monitoring-your-load-card-shield)
-- [Maintenance: Keeping Inherited Priorities in Sync](#maintenance-keeping-inherited-priorities-in-sync)
-  - [Automatic Propagation (Full Mode)](#automatic-propagation-full-mode)
-  - [Manual Full-KB Sweep](#manual-full-kb-sweep-update-all-inherited-card-priorities)
-- [See Also](#see-also)
-
 ---
 
 ## How It Works

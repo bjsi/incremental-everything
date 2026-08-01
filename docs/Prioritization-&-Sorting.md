@@ -3,41 +3,6 @@
 
 To get the most out of Incremental Everything, it's essential to understand how to manage your review queue effectively. This guide breaks down the advanced prioritization and sorting tools at your disposal, allowing you to tailor your learning sessions to your exact needs.
 
-## Table of Contents
-
-- [The Priority System Explained](#the-priority-system-explained)
-  - [Priority Value (Absolute Priority)](#priority-value-absolute-priority)
-  - [Relative Priority](#relative-priority)
-- [Priority Inheritance System](#priority-inheritance-system)
-  - [Use Cases](#use-cases)
-- [Setting Priorities](#setting-priorities)
-  - [Main Priority Popup](#main-priority-popup)
-    - [What the Priority dialog displays:](#what-the-priority-dialog-displays)
-  - [Light Priority Popup](#light-priority-popup)
-  - [Quick Priority Shortcuts](#quick-priority-shortcuts)
-  - [Priority Editor Widget](#priority-editor-widget)
-  - [Bulk Priority for a Multi-Selection](#bulk-priority-for-a-multi-selection)
-  - [Batch Priority Change (IncRems & Flashcards)](#batch-priority-change-increms--flashcards)
-  - [Batch Card Priority (Flashcards)](#batch-card-priority-flashcards)
-  - [Other Methods](#other-methods)
-- [Priorities in Tables](#priorities-in-tables)
-  - [Keeping the badges in sync](#keeping-the-badges-in-sync)
-- [Priorities on PDF Highlights](#priorities-on-pdf-highlights)
-  - [Where a highlight's priority comes from](#where-a-highlights-priority-comes-from)
-  - [Keeping highlight badges in sync](#keeping-highlight-badges-in-sync)
-- [Sorting Criteria](#sorting-criteria)
-  - [Saved Presets](#saved-presets)
-  - [1) Incremental Rem Randomness](#1-incremental-rem-randomness)
-  - [2) Flashcard Randomness](#2-flashcard-randomness)
-  - [3) Flashcard Ratio](#3-flashcard-ratio)
-  - [How Randomness Works: The Priority-Weighted Lottery](#how-randomness-works-the-priority-weighted-lottery)
-- [Priority Shield](#priority-shield)
-  - [What it Measures](#what-it-measures)
-  - [How to Interpret It](#how-to-interpret-it)
-  - [Weighted Shield](#weighted-shield)
-  - [Priority Shield History](#priority-shield-history)
-- [How the Plugin Prioritizes Due Items](#how-the-plugin-prioritizes-due-items)
-
 ---
 ## The Priority System Explained
 

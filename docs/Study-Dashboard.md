@@ -6,18 +6,6 @@ It was inspired by the [Statistics Plugin](https://github.com/Justtolook/RemNote
 
 ---
 
-## Table of Contents
-
-- [What it shows](#what-it-shows)
-- [Opening it](#opening-it)
-- [Filters](#filters)
-- [Summary section](#summary-section)
-- [Hierarchy section](#hierarchy-section)
-- [Global vs. Document](#global-vs-document)
-- [Comprehensive scope + hierarchy](#comprehensive-scope--hierarchy)
-- [Performance notes](#performance-notes)
-- [Command](#command)
-
 ---
 
 ## What it shows

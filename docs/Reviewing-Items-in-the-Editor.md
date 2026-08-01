@@ -6,28 +6,6 @@ This page covers the two main alternative workflows for reviewing items outside 
 
 ---
 
-## Table of Contents
-
-- [1. Execute Repetition Command](#1-execute-repetition-command)
-  - [When to Use It](#when-to-use-it)
-  - [How It Works](#how-it-works)
-  - [Key Behavior](#key-behavior)
-  - [Execute Repetition vs. Reschedule in Editor](#execute-repetition-vs-reschedule-in-editor)
-- [2. Sequential Review via IncRem Lists](#2-sequential-review-via-increm-lists)
-  - [The Problem This Solves](#the-problem-this-solves)
-  - [How to Start a Sequential Review](#how-to-start-a-sequential-review)
-  - [The Workflow](#the-workflow)
-  - [Layout & Responsiveness](#layout--responsiveness)
-  - [Reviewing PDF Items](#reviewing-pdf-items)
-  - [Jumping Back to Your Last Bookmark](#jumping-back-to-your-last-bookmark)
-- [Read Points for Rem-type Incremental Rems](#read-points-for-rem-type-incremental-rems)
-  - [Setting a Read Point](#setting-a-read-point)
-  - [Jumping to the Read Point](#jumping-to-the-read-point)
-- [3. Incremental Reading: Extracts & Clozes](#3-incremental-reading-extracts--clozes)
-  - [Extracting Text](#extracting-text)
-  - [Creating Clozes](#creating-clozes)
-  - [Built-in Remove From Queue Support](#built-in-remove-from-queue-support)
-
 ---
 
 ## 1. Execute Repetition Command
