@@ -107,7 +107,7 @@ Tables were the one place the **Priority Editor** could not follow you. RemNote 
 
 **Seeing priorities.** Each row now shows a small coloured pill at the **top-right of its first cell**, reading the band the Rem falls in — `50s` for a priority of 50–59 — coloured on the same scale as every other priority badge in the plugin, so a more important `10s` reads warm and a less important `50s` reads green. Scanning that column now tells you the shape of a whole table at a glance.
 
-<img src="assets/priority-band-tables.png" width="700" alt="Priority band badges in a table" />
+![Priority band badges in a table](assets/priority-band-tables.png){ width="700" }
 
 Because the only channel that reaches inside a table cell is a **tag**, and a tag is a yes/no rather than a value, the badge shows a band of ten rather than the exact number. Outside tables the Priority Editor still shows the precise value and remains the better badge.
 
@@ -363,7 +363,7 @@ The IncRem Repetition History popup now shows an estimated total review time.
 
 When a Rem reads from a **PDF with a page range** set, the **[IncRem Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history--aggregated-view)** popup now shows a footer with the PDF name, the **page range**, your **current page**, and the **degree of processing** (`% read`, with a progress bar). It also adds an **estimated remaining time**, extrapolated from the total time spent so far and the progress achieved. The footer works for **dismissed Rems** too, and the percentage/estimate are omitted for open-ended ranges (`start–∞`).
 
-<img src="assets/repetition-history-popup-pdf.png" width="400" alt="IncRem Repetition History Popup PDF Progress section" />
+![IncRem Repetition History Popup PDF Progress section](assets/repetition-history-popup-pdf.png){ width="400" }
 
 ---
 
@@ -438,7 +438,7 @@ Following the [clearer editor highlight colors](#v02294---july-1st-2026), the **
   - 🟢 **Green** — `#incremental`: **toggled incremental** in-place (tracked in your queue, not extracted yet).
 - The highlight keeps its **original background** — the markers sit over it, so recognition never fights with RemNote's own highlight colors. The right bar (in the free right margin) is the reliable block marker; the dashed underline reinforces it at block edges.
 
-<img width="800" alt="PDF highlight visual recognition" src="assets/pdf-highlights-recognition.png" />
+![PDF highlight visual recognition](assets/pdf-highlights-recognition.png){ width="800" }
 
 #### 👁️ Peek toggle — hide the markers to read cleanly
 
@@ -448,7 +448,7 @@ If the markers ever get in the way, you can hide them all at once (and bring the
 - Or run the **Toggle PDF Highlight Marker Borders** command (quick code `tb`) — assign it a keyboard shortcut for an instant peek if you forget the button.
 - Your choice is remembered **per device** (default: markers **on**).
 
-<img width="800" alt="PDF marker borders peek toggle button" src="assets/pdf-borders-toggle-button.png" />
+![PDF marker borders peek toggle button](assets/pdf-borders-toggle-button.png){ width="800" }
 
 *(Why markers instead of a background tint in the PDF viewer? The PDF-viewer highlight is a translucent overlay blended over the page, so recolouring its background muddies the text — especially in dark mode. Keeping the original background and adding a marker on top reads cleanly in both themes.)*
 
@@ -775,7 +775,7 @@ The opener now uses a **handshake**: the widget writes a session-storage flag on
 
 The [Weighted Shield Breakdown popup](Prioritization-&-Sorting.md#weighted-shield) (`wsh` command) now exposes a second tab — **Card Priority × Memory Analytics** — that replays FSRS over every card in your knowledge base and aggregates per priority-percentile bucket. Each bucket holds an equal number of cards (deciles by inherited Rem priority), plus a consolidated **All KB** row.
 
-<img src="assets/weighted-shield-memory-analytics.png" width="1000" alt="Card Priority × Memory Analytics" />
+![Card Priority × Memory Analytics](assets/weighted-shield-memory-analytics.png){ width="1000" }
 
 20 columns across four groups, with hover tooltips on every header:
 
@@ -818,11 +818,11 @@ The **Execute Repetition** popup (`Ctrl+Shift+J` in the editor) has been complet
 - **Ahead-of-Schedule Info Banner**: If you review an Incremental Rem before its scheduled due date, an amber warning banner appears at the top of the popup informing you how many days early you are.
 - **Scheduling Conflict Warning**: Shows a dialog if confirming would schedule a date earlier than currently planned (regression warning), with options to Keep Current Date (record review and time in history but preserve the existing scheduled date), Use New Date, or Custom Interval. Supports quick keyboard navigation (arrows, numbers, Enter, Esc).
 
-<img src="assets/review-in-editor.png" width="600" alt="Modernized Execute Repetition Popup" />
+![Modernized Execute Repetition Popup](assets/review-in-editor.png){ width="600" }
 
-<img src="assets/review-in-editor-warning.png" width="600" alt="Ahead-of-Schedule Warning Banner" />
+![Ahead-of-Schedule Warning Banner](assets/review-in-editor-warning.png){ width="600" }
 
-<img src="assets/review-in-editor-scheduling-resolution.png" width="600" alt="Scheduling Conflict Resolution modal" />
+![Scheduling Conflict Resolution modal](assets/review-in-editor-scheduling-resolution.png){ width="600" }
 
 ---
 
@@ -952,7 +952,7 @@ A new popup, opened via the **`Open Study Dashboard`** command (quick code `sdb`
 
 📖 **Full documentation:** [Study Dashboard](Study-Dashboard.md).
 
-<img src="assets/study-dashboard.png" alt="Study Dashboard" width="900">
+![Study Dashboard](assets/study-dashboard.png){ width="900" }
 
 ---
 
@@ -1007,7 +1007,7 @@ The **Flashcard History** and **Incremental Rem History** sidebars now show a **
 
 The Sorting Criteria popup now has a **Presets** panel at the top. Type a name and press Enter (or click 💾 Save) to store your current randomness and flashcard-ratio settings; select a saved preset from the dropdown to restore all three values at once. Presets are KB-scoped.
 
-<img width="350" alt="Screenshot of the 'Sorting Criteria' menu" src="assets/sorting-criteria-preset.png" />
+![Screenshot of the ](assets/sorting-criteria-preset.png){ width="350" }
 
 ### 🔧 New: PDF Highlight Repair Tool
 
@@ -1042,7 +1042,7 @@ The Priority Review Document creator now includes a **"Skip paused documents"** 
 
 **How it works under the hood:** The check is lazy — the ancestor walk that detects the Deck `Status` slot only runs for cards that would actually be selected, so performance scales with the number of items requested, not the size of your knowledge base.
 
-<img width="600" alt="create priority review doc popup" src="assets/priority-review-doc-creator-2.png" />
+![create priority review doc popup](assets/priority-review-doc-creator-2.png){ width="600" }
 
 ---
 
@@ -1101,9 +1101,9 @@ Previously, each bar showed only the total count for a priority bucket (e.g. 630
 
 The **tooltip** now shows the full breakdown for each series: total count, due count, processed count, and **% processed** (degree of processing within that bucket).
 
-<img src="assets/priority-graph-KB-2.png" width="600" alt="KB Priority Distribution Graph with stacked due/processed bars" />
+![KB Priority Distribution Graph with stacked due/processed bars](assets/priority-graph-KB-2.png){ width="600" }
 
-<img src="assets/priority-graph-doc-2.png" width="600" alt="Document Priority Distribution Graph with stacked due/processed bars" />
+![Document Priority Distribution Graph with stacked due/processed bars](assets/priority-graph-doc-2.png){ width="600" }
 
 ---
 
@@ -1115,7 +1115,7 @@ The [Weighted Shield Breakdown popup](Prioritization-&-Sorting.md#weighted-shiel
 
 This complements the fixed 10-decile bucket view, letting you answer questions the deciles can't — e.g. *"How protected is everything I've prioritized at 25 or less (25 or more important)?"* or *"What share of my total weighted workload sits in my top-50 items?"* — without leaving the popup. Available in both the Flashcard and Incremental Rem Weighted Shield popups.
 
-<img width="600" alt="Weighted Shield Breakdown" src="assets/weighted-shield-breakdown3.png" />
+![Weighted Shield Breakdown](assets/weighted-shield-breakdown3.png){ width="600" }
 
 ---
 
@@ -1152,7 +1152,7 @@ The [Create Priority Review Document](Priority-Review-Document.md#how-to-create-
 - **Tab / Shift+Tab** cycles between the Scope selection and the Number of Items field.
 - **Enter** at any point — regardless of which element has focus — triggers "Create Review Document" immediately, while **Esc** cancels the operation and closes the widget.
 
-<img width="600" alt="create priority review doc popup" src="assets/priority-review-doc-creator.png" />
+![create priority review doc popup](assets/priority-review-doc-creator.png){ width="600" }
 
 ---
 
@@ -1206,7 +1206,7 @@ The **📝 Document Notes** sidebar now works when reviewing **PDF Highlight** o
 - **Single IncRem:** Auto-selects and shows the `DocumentViewer` for that IncRem immediately — no extra click needed.
 - **Multiple IncRems:** Shows a **selector** listing all discovered IncRems, so you can pick which one's notes to view. A "← Switch" button in the header lets you return to the selector at any time.
 
-<img src="assets/side-notes-highlights.png" width="800" alt="Document Notes Sidebar — Highlight IncRem Selector" />
+![Document Notes Sidebar — Highlight IncRem Selector](assets/side-notes-highlights.png){ width="800" }
 
 ---
 
@@ -1218,7 +1218,7 @@ The **📝 Document Notes** sidebar now works when reviewing **PDF Highlight** o
 - **Rating Filtering**: You can now filter the flashcard history by rating grade using a new set of radio buttons at the top of the widget, making it easy to find specific cards based on their performance.
 - Both standard flashcards and cluster cards are supported and record their rating accurately into the history.
 
-<img src="assets/flashcard-history-sidebar.png" alt="Flashcard History Sidebar" width="600">
+![Flashcard History Sidebar](assets/flashcard-history-sidebar.png){ width="600" }
 
 ---
 
@@ -1670,9 +1670,9 @@ Fixed a bug where pressing the **Create IncRem** button (funnel icon in the PDF 
 * **Visual Feedback:** When disabled, a `🚫 Inc Rems disabled (Device)` yellow banner appears in the Queue Toolbar during the first 10 seconds of entering the queue. It provides a quick way to re-enable Incremental Rems without pestering you or taking up valuable mobile screen real-estate permanently.
 * **Separated from 15-Min Timer:** This new device-specific state behaves identically to the "15 min" timer (temporarily blocking IncRems), but is correctly saved to Local Storage instead of Synced Storage so toggling it on your phone won't affect your desktop. 
 
-<img width="400" alt="Queue Menu in Mobile" src="assets/queue-menu-mobile.png" />
+![Queue Menu in Mobile](assets/queue-menu-mobile.png){ width="400" }
 
-<img width="400" alt="Queue in Mobile showing No Inc Rem in this Device indicator" src="assets/queue-mobile-devicenoincrem-indicator.png" />
+![Queue in Mobile showing No Inc Rem in this Device indicator](assets/queue-mobile-devicenoincrem-indicator.png){ width="400" }
 
 ### ✨ New: Create Incremental Rem from Queue Flashcards natively
 * **Direct Queue Conversion:** You can now press `Alt+X` (Make Incremental (Extract)) or `Alt+Shift+X` (Extract with Priority) while reviewing a flashcard in the queue to instantly turn that specific flashcard into an Incremental Rem. The command smartly targets the active flashcard Rem without requiring you to manually select the text or use the previewer, integrating flawlessly into your routine flow if you realize a certain flashcard should become a reading task (to clarify issues, add extra details, etc).
@@ -1680,9 +1680,9 @@ Fixed a bug where pressing the **Create IncRem** button (funnel icon in the PDF 
 ### 🎨 UI Polish: Card Priority Display Indicator
 * **Incremental Rem Status Indicator:** The **Card Priority Display** widget (at the bottom of flashcards) now displays an unmistakable visual indicator (the mining icon) on the right border whenever the card you are answering is also an Incremental Rem. This allows you to instantly know the dual-status of the material.
 
-<img width="900" alt="Card Toolbar Increm Indicator" src="assets/card-toolbar-increm-indicator.png" />
+![Card Toolbar Increm Indicator](assets/card-toolbar-increm-indicator.png){ width="900" }
 
-<img src="assets/card-priority-display-full-queue.png" width="900" alt="Card Toolbar in the Queue" />
+![Card Toolbar in the Queue](assets/card-priority-display-full-queue.png){ width="900" }
 
 ## v0.2.173 - April 13th, 2026
 
@@ -1705,14 +1705,14 @@ We've improved how PDFs are handled to support deep, structured reading. This up
 * **Automatic Bookmarking:** Creating an extract or toggling a highlight as incremental now automatically updates your reading position to that location, adding an entry to your reading history.
 * **Enhanced PDF Toolbar:** Three new utility buttons have been added to the native PDF highlight menu:
     * 🔖 **Set Bookmark Position:** Manually record your current page.
-    * <img src="https://cdn-icons-png.flaticon.com/512/8365/8365483.png" width="16" /> **Create Incremental Rem:** Extract highlights into standalone items and choose their location in your hierarchy.
-    * <img src="https://cdn-icons-png.flaticon.com/512/1504/1504044.png" width="16" /> **Toggle Incremental Rem:** Quick-tag a highlight for later review without moving it.
+    * ![](https://cdn-icons-png.flaticon.com/512/8365/8365483.png){ width="16" } **Create Incremental Rem:** Extract highlights into standalone items and choose their location in your hierarchy.
+    * ![](https://cdn-icons-png.flaticon.com/512/1504/1504044.png){ width="16" } **Toggle Incremental Rem:** Quick-tag a highlight for later review without moving it.
 * **Hierarchical Management:** Use the **PDF Control Panel** to split long PDFs into chapters, manage page ranges, and view reading statistics in a containment tree.
 * **Inline Management:** Manage PDF page ranges and record positions directly from the **Priority Editor** sidebar without leaving your document.
 
 📖 **Learn more:** See the full [PDF Incremental Reading Workflow](PDF-Incremental-Reading-Workflow.md) and the guide on [Create-Incremental-Rem-from-PDF-Highlights](Creating-IncRems-from-PDF-Highlights.md).
 
-<img width="700" alt="Pdf highlight menu buttons" src="assets/pdfhighlight-toolbar.png" />
+![Pdf highlight menu buttons](assets/pdfhighlight-toolbar.png){ width="700" }
 
 
 ### ✨ Re-enabled: Collapse Queue Top Bar (IncRem Only)
@@ -1866,7 +1866,7 @@ Two new options have been added to the sort dropdown:
 
 The "Created At" field is also now visible on each row below the last-reviewed date.
 
-<img src="assets/increm-list-date-filters.png" width="800" alt="IncRem List Date Filters" />
+![IncRem List Date Filters](assets/increm-list-date-filters.png){ width="800" }
 
 #### Incremental History Widget: Unified Timeline
 
@@ -1878,7 +1878,7 @@ The **Incremental History** sidebar widget now shows a **unified chronological t
   - 🟣 **Reviewed** — a review session on this date
 - All events are sorted together by time (most recent first), giving a single coherent log of all your Incremental activity.
 
-<img src="assets/incremental-history-created.png" width="400" alt="Incremental History widget showing Created and Reviewed badges" />
+![Incremental History widget showing Created and Reviewed badges](assets/incremental-history-created.png){ width="400" }
 
 
 ### ⌨️ Improved Keyboard Navigation: Priority & Interval Widget
@@ -1905,9 +1905,9 @@ A brand-new **Weighted Shield** metric has been introduced to give you a macro-l
 
 📖 **Learn more:** See the [Prioritization-&-Sorting#weighted-shield](Weighted-Shield.md) documentation and the updated [Plugin-Settings-Reference#queue-display](Plugin-Settings.md) for more details.
 
-<img width="1000" alt="Weighted Shield" src="assets/shield-weighted-card.png" />
+![Weighted Shield](assets/shield-weighted-card.png){ width="1000" }
 
-<img width="600" alt="Weighted Shield Breakdown" src="assets/weighted-shield-breakdown.png" />
+![Weighted Shield Breakdown](assets/weighted-shield-breakdown.png){ width="600" }
 
 ### 🐛 Bug Fix: Queue Layout CSS No Longer Hides Flashcard Widgets
 
@@ -1943,7 +1943,7 @@ Unlike the existing `Card Priority Display` (which lives at the bottom of the fl
 - Reacts instantly to queue navigation and manual priority updates.
 - Controlled via a new opt-in plugin setting: **Display Queue Toolbar Priority** (enabled by default).
 
-<img src="assets/queue-toolbar-priority-widget.png" width="600" alt="Priority shown above Queue" />
+![Priority shown above Queue](assets/queue-toolbar-priority-widget.png){ width="600" }
 
 ---
 
@@ -1997,7 +1997,7 @@ Two new commands designed to speed up the **PDF split workflow** — the techniq
 - **Multi-source support:** all sources from the template rem are copied together, including rems tagged with `#preferthispdf`.
 - **Session-scoped clipboard:** the copied source IDs live in session storage and are cleared when you close the tab — no cross-session contamination.
 
-<img src="assets/copy-paste-source.gif" width="900" alt="Copy and Paste source" />
+![Copy and Paste source](assets/copy-paste-source.gif){ width="900" }
 
 📖 See [PDF-Incremental-Reading-Workflow#copying-and-pasting-sources](PDF-Incremental-Reading-Workflow.md) for the full step-by-step guide.
 
@@ -2020,7 +2020,7 @@ The **All Rems Using This PDF** section of the PDF Control Panel now displays a 
 
 This makes it easy to see at a glance how much of a chapter has been split into sub-sections and how much still needs to be processed.
 
-<img src="assets/pdf-control-panel.png" width="650" alt="PDF Control Panel" />
+![PDF Control Panel](assets/pdf-control-panel.png){ width="650" }
 
 ### ✨ New: Inline PDF Range Management in the Priority Editor
 
@@ -2044,9 +2044,9 @@ The **Priority Editor** sidebar widget (visible to the right of every Incrementa
 
 This lets you set and adjust a rem's page range, record where you left off, and view reading stats — all without opening a popup or leaving the document where the PDF is visible on the right side.
 
-<img src="assets/pdf-range-inline.png" width="800" alt="Setting PDF range inline in Editor" />
+![Setting PDF range inline in Editor](assets/pdf-range-inline.png){ width="800" }
 
-<img src="assets/page-range-inline-flow.gif" width="900" alt="Setting PDF range inline in Editor" />
+![Setting PDF range inline in Editor](assets/page-range-inline-flow.gif){ width="900" }
 
 ### 🐛 Fix: PDF Control Panel Now Respects `#preferthispdf`
 
@@ -2132,7 +2132,7 @@ Previously, `Alt+Shift+X` on a multi-rem selection would silently initialize all
 | `Alt+X` | Initialize with defaults | Initialize all with defaults |
 | `Alt+Shift+X` | Initialize + open popup | Initialize all + open popup → apply to all |
 
-<img src="assets/extract-multiple-rems-with-priority.gif" width="800" alt="Extract with Priority - Multi-Rem Batch Mode" />
+![Extract with Priority - Multi-Rem Batch Mode](assets/extract-multiple-rems-with-priority.gif){ width="800" }
 
 ---
 
@@ -2200,7 +2200,7 @@ We've enhanced the **Editor Review Timer** widget with a new primary action and 
 *   **Responsive Button Wrapping:** The widget's layout has been overhauled with `flex-wrap` and row-gap logic. If you're working in a narrow sidebar or a collapsed editor, the buttons will now gracefully flow into multiple lines instead of shrinking or overlapping the timer text.
 *   **Hierarchical "End Review" Label:** The "End Review and Back to..." buttons have been redesigned with a two-line hierarchical layout. "End Review" is now larger and bold, while the destination sub-label ("and Back to Queue/List") is smaller and slightly transparent, reducing the button's total width and improving readability.
 
-<img src="assets/review-timer-done-button.png" width="800" alt="Editor Review Timer with new Done button and two-line labels" />
+![Editor Review Timer with new Done button and two-line labels](assets/review-timer-done-button.png){ width="800" }
 
 ### ⚠️ IncRem Table: Intelligent Due-Filter Warnings
 
@@ -2213,9 +2213,9 @@ To prevent accidentally reviewing large numbers of items that aren't actually du
 
 📖 **Full documentation:** See the [Reviewing-Items-in-the-Editor#2-sequential-review-via-increm-lists](Sequential-Review.md) and [IncRem-List-and-Main-View#due-filter-warning](Due-Filter-Warnings.md) sections in the wiki.
 
-<img src="assets/increm-list-warning.png" width="700" alt="Header-level Due warning banner" />
+![Header-level Due warning banner](assets/increm-list-warning.png){ width="700" }
 
-<img src="assets/increm-list-warning-row.png" width="700" alt="Inline row-level Due warning" />
+![Inline row-level Due warning](assets/increm-list-warning-row.png){ width="700" }
 
 
 ---
@@ -2352,11 +2352,11 @@ Both the anchor rem name and each scoped rem's name now show `Front → Back` wh
 
 * Migrating from a previous tag prioritization system (e.g. p1, p2, p3 tags) 
 
-<img src="assets/batch-card-assign-priority-taggedrems.png" width="900" alt="Batch Card Priority widget with scope selector, breadcrumb tree, and priority column" />
+![Batch Card Priority widget with scope selector, breadcrumb tree, and priority column](assets/batch-card-assign-priority-taggedrems.png){ width="900" }
 
 * Decreasing the priority using an Universal Descriptor considered of lower importance (e.g. `~Translation`)
 
-<img src="assets/batch-card-assign-priority-referencingrems.png" width="900" alt="Batch Card Priority widget" />
+![Batch Card Priority widget](assets/batch-card-assign-priority-referencingrems.png){ width="900" }
 
 
 📖 See [Priorities-for-Flashcards#2-batch-assignment-for-tag-or-reference-migration](Batch-Assignment.md) in the wiki for step-by-step instructions and full feature details.
@@ -2426,7 +2426,7 @@ When you create a new Incremental Rem — via **Extract with Priority** (`Opt+Sh
 > [!NOTE]
 > The **Quick Set Priority** (`Ctrl+Opt+P`) command and the full **Set Priority** (`Opt+P`) command are unchanged and still open their existing widgets. The new popup is only triggered during **new rem creation** flows.
 
-<img src="assets/priority-interval-widget.png" width="400" alt="Priority & Interval Popup Widget" />
+![Priority & Interval Popup Widget](assets/priority-interval-widget.png){ width="400" }
 
 ---
 
@@ -2451,7 +2451,7 @@ When you create a new Incremental Rem — via **Extract with Priority** (`Opt+Sh
 *   **Card Status Tracking:** The "Type" column has been upgraded to track specific flashcard states, showing whether an item actually "Has Cards" or is simply carrying a priority tag for "Inheritance only".
 *   **Advanced Type Filtering:** The dropdown type filter now supports **multi-selection** (hold Cmd/Ctrl while clicking) and dynamically populates to only show the exact property types mapped to your current document hierarchy. You can instantly filter to see only Extract rems along with rems that have active flashcards.
 
-<img width="900" alt="batch priority change widget" src="assets/batch-priority-change-widget-new.png" />
+![batch priority change widget](assets/batch-priority-change-widget-new.png){ width="900" }
 
 ## v0.2.142 - March 23rd, 2026
 
@@ -2484,7 +2484,7 @@ We have overhauled the Randomness sliders in the **Sorting Criteria** widget to 
 *   **Visual Feedback:** The widget now displays the **Actual % of Items Swapped** underneath the slider instead of the generic text, and features 21 visual tick markers to help you gauge your setting exactly.
 *   **Backward Compatible:** Your old randomness values have been perfectly preserved in the database. When you open the settings, the slider thumb will simply appear shifted to perfectly match your target randomness on the new scale!
 
-<img width="350" alt="Screenshot of the 'Sorting Criteria' menu" src="assets/sorting-criteria.png" />
+![Screenshot of the ](assets/sorting-criteria.png){ width="350" }
 
 ---
 
@@ -2601,7 +2601,7 @@ We've fundamentally improved the **Priority Shield History** widget with better 
 ### 🐛 Bug Fix: Priority Shield Title
 *   Fixed a bug where the actual document name in the chart titles would display as `[object Object]` instead of the plain title name.
 
-<img src="assets/priority-shield-graph-zoom.gif" width="800" alt="Priority Shield Graph Zoom" />
+![Priority Shield Graph Zoom](assets/priority-shield-graph-zoom.gif){ width="800" }
 
 📖 **Full documentation:** See the [Prioritization-&-Sorting#priority-shield-history](Priority-Shield-History.md) and [Plugin-Widgets-Reference#priority-shield-graph](Plugin-Widgets-Reference.md) pages.
 
@@ -2620,7 +2620,7 @@ We've introduced a powerful new way to process your Incremental Rems outside of 
 *   **"Next" Button in Timer:** The Editor Review Timer now features a **"Next (N) →"** button when you are in a sequential review flow. Clicking "Next" securely logs your repetition interval and reading time, and instantly teleports you to the next item in the sorted list. This allows you to fluidly churn through your reading backlog without ever leaving the full-power editor! 
 *   **History Integration:** All repetitions made via the Editor Review Timer are now fully logged in the **Incremental History** widget.
 
-<img src="assets/sequential-review-increm-list.gif" width="800" alt="Sequential Review flow using IncRem List" />
+![Sequential Review flow using IncRem List](assets/sequential-review-increm-list.gif){ width="800" }
 
 📖 **Full documentation:** See the new [Reviewing Items in the Editor](Reviewing-Items-in-the-Editor.md) wiki page for a complete guide to Editor workflows.
 
@@ -2740,7 +2740,7 @@ The IncRem List and All Inc Rems widgets now support powerful new workflows that
 *   **Review in Editor (🔗)**: A new icon on each row lets you launch a timed review session directly from the list. This opens the Rem in the editor, starts the Editor Review Timer, and defers the actual SRS rescheduling until you click "End Review" — matching the true behavior of the [Execute Repetition Command](Reviewing-Items-in-the-Queue.md#execute-repetition-command-editor-review). When you finish, the list automatically reopens and restores your exact same document filter and sorting state.
 *   **Inline Priority Editing**: Clicking the Priority badge on any row now opens a fully-featured inline editor. You can rapidly adjust priorities using ↑/↓ arrow keys with acceleration (tap faster for bigger jumps), exactly like the priority widgets in the queue.
 
-<img src="assets/increm-list-priority-and-review.gif" width="800" alt="IncRem List Inline Priority and Review in Editor workflow" />
+![IncRem List Inline Priority and Review in Editor workflow](assets/increm-list-priority-and-review.gif){ width="800" }
 
 ### 🐛 Bug Fix: False "Manual Date Reset" Events
 
@@ -2821,7 +2821,7 @@ Added multiple safety nets to proactively reset the `incremental-queue-active` f
 *   **SInc metric:** After the Retrievability (R), the info bar now shows `SInc: 1.42×` — the stability multiplier if you press **Good**. Hover to see the SInc for all three recall grades (Hard / Good / Easy) with projected stability values.
 *   **Friendly stability format:** Stability is now shown in human-readable units: days (`5.0d`), months (`3.5m`), or years (`2.0y`) instead of raw day counts.
 
-<img src="assets/DSR-stats-zoom.png" width="900" alt="Card Stats with SInc" />
+![Card Stats with SInc](assets/DSR-stats-zoom.png){ width="900" }
 
 **What's new in the Flashcard Repetition History popup:**
 
@@ -2830,7 +2830,7 @@ Added multiple safety nets to proactively reset the `incremental-queue-active` f
 *   **Friendly stability in S column:** The S column now shows both raw days and the friendly format (e.g., `35.2d (1.2m)`).
 *   **Wider pluginData column:** Increased width and character limit for better visibility of plugin metadata.
 
-<img src="assets/flashcard-rep-history.png" width="900" alt="Flashcard Repetition History with SInc" />
+![Flashcard Repetition History with SInc](assets/flashcard-rep-history.png){ width="900" }
 
 📖 **Full documentation:** [Reviewing Items in the Queue#card-stats--fsrs-integration](Reviewing-Items-in-the-Queue#card-stats--fsrs-integration.md)
 
@@ -2847,7 +2847,7 @@ The info bar now displays:
 *   **Reps & Time:** Total number of reviews and cumulative time spent on the card.
 *   **FSRS DSR:** Difficulty (D), Stability (S), and Retrievability (R) — the three core metrics of the [FSRS algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm) — computed in real time from the card's full repetition history.
 
-<img src="assets/DSR-stats.png" width="900" alt="Card Stats with FSRS DSR" />
+![Card Stats with FSRS DSR](assets/DSR-stats.png){ width="900" }
 
 **Flashcard Repetition History Popup:**
 
@@ -2859,7 +2859,7 @@ Clicking the 🔬 button opens a detailed **Repetition History** popup, modeled 
 *   **D & S per review** — how Difficulty and Stability evolved over time
 *   **pluginData** — raw data from plugin-driven reviews (historical)
 
-<img src="assets/flashcard-rep-history.png" width="900" alt="Flashcard Repetition History Popup" />
+![Flashcard Repetition History Popup](assets/flashcard-rep-history.png){ width="900" }
 
 **FSRS Integration Details:**
 
@@ -2889,7 +2889,7 @@ Added two new keyboard commands for faster navigation when reviewing Incremental
 
 **Dismiss command also works in the Editor:** When focused on an Incremental Rem outside the queue, `Ctrl+D` will dismiss it directly (transfer history to Dismissed powerup and remove the Incremental tag).
 
-<img src="assets/queue-shortcuts.png" width="900" alt="Queue Shortcuts" />
+![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
 **Technical details:**
 *   Both commands replicate the exact behavior of the corresponding answer buttons, including card priority inheritance, review time tracking, PDF page history, and SRS interval calculations.
@@ -3052,11 +3052,11 @@ We've added powerful new visualizations to help you understand and manage the pr
     *   **Absolute Priority View**: See how your items are distributed across the 0-100 priority scale.
     *   **KB Percentile View**: See how your document's items rank compared to the *entire Knowledge Base*.
 
-    <img src="assets/priority-graph-icon.png" width="600" alt="Priority Distribution Graph icon" />
+    ![Priority Distribution Graph icon](assets/priority-graph-icon.png){ width="600" }
 
-    <img src="assets/priority-graph-doc.png" width="600" alt="Document Priority Graph" />
+    ![Document Priority Graph](assets/priority-graph-doc.png){ width="600" }
     
-    <img src="assets/priority-graph-doc.gif" width="600" alt="Document Priority Graph" />
+    ![Document Priority Graph](assets/priority-graph-doc.gif){ width="600" }
 
 
 *   **KB-Wide Graph:**
@@ -3064,9 +3064,9 @@ We've added powerful new visualizations to help you understand and manage the pr
     *   Shows the priority distribution for your *entire Knowledge Base*.
     *   Helps you spot imbalances (e.g., too many low-priority items) and adjust your strategy.
 
-    <img src="assets/priority-graph-KB.png" width="600" alt="KB Priority Graph" />
+    ![KB Priority Graph](assets/priority-graph-KB.png){ width="600" }
     
-    <img src="assets/priority-graph-KB.gif" width="600" alt="KB Priority Graph" />
+    ![KB Priority Graph](assets/priority-graph-KB.gif){ width="600" }
 
 ### 📋 IncRem List Widget Improvements
 
@@ -3132,7 +3132,7 @@ A powerful new view that gives you a high-level overview of your progress stats 
 *   **Smart Routing**: The `Ctrl+Shift+H` command now intelligently opens the **Single History** view for individual items or the **Aggregated View** for folders with incremental descendants.
 *   **Toggle Views**: Easily switch between "Single" and "Aggregated" views with a new toggle button in the window header.
 
-<img src="assets/aggregated-repetition-history.gif" width="600" alt="Aggregated Repetition History" />
+![Aggregated Repetition History](assets/aggregated-repetition-history.gif){ width="600" }
 
 ### 📝 Other Improvements
 
@@ -3212,7 +3212,7 @@ When you're done reviewing an Incremental Rem, you can now **preserve its comple
 
 3. **Visual Indicator**: Dismissed Rems show a **yellow left border** in the editor (can be toggled off in settings).
 
-<img src="assets/visual-feedback-editor.png" width="600" alt="Yellow left border visual indicator for dismissed Rems" />
+![Yellow left border visual indicator for dismissed Rems](assets/visual-feedback-editor.png){ width="600" }
 
 4. **Re-activating**: If you make a previously-dismissed Rem incremental again, the old history is **restored and merged** with the new session. A "Made Incremental" marker is added to distinguish learning sessions.
 
@@ -3229,7 +3229,7 @@ The Repetition History widget now records and displays the **priority value at t
 - The **"Made Incremental"** event marker shows the initial priority set
 - All history entries (Next button, Reschedule, Editor Review) now record priority
 
-<img src="assets/repetition-history-popup.png" width="400" alt="Repetition History with Priority" />
+![Repetition History with Priority](assets/repetition-history-popup.png){ width="400" }
 
 ### 📋 Reschedule Event Type Tracking
 
@@ -3299,9 +3299,9 @@ Added a new **Repetition History** popup that provides detailed insights into yo
 - Info bar now displays **"X Reps, Y min"** stats inline before the history icon
 - Centralized layout with `|` separators between Priority, Shield, and History sections
 
-<img src="assets/reps-info-bar.png" width="600" alt="Repetition History Popup" />
+![Repetition History Popup](assets/reps-info-bar.png){ width="600" }
 
-<img src="assets/repetition-history-popup.png" width="400" alt="Repetition History Popup" />
+![Repetition History Popup](assets/repetition-history-popup.png){ width="400" }
 
 ## v0.2.81 - January 24th, 2026
 
@@ -3318,13 +3318,13 @@ Implemented the Incremental Rem History feature, which records Incremental Rems 
 * Shows "seen X time ago".
 * Limits history to 200 items.
 
-<img src="assets/incremental-history.png" width="400" alt="Incremental Rem History Widget" /> 
+![Incremental Rem History Widget](assets/incremental-history.png){ width="400" } 
 
 
 ## v0.2.70 - January 22nd, 2026
 
 * Improved **Reschedule** widget appearance and behavior.
-<img src="assets/reschedule.png" width="400" alt="Reschedule Widget" />
+![Reschedule Widget](assets/reschedule.png){ width="400" }
 
 
 
@@ -3336,7 +3336,7 @@ This release brings a significant refactoring of how priorities are handled, foc
 
 *   **Minimum-Lag Main Priority Widget (Opt+P):** We've optimized the main priority widget to eliminate lag, making interactions fast even in large Knowledge Bases. You should use this widget whenever you want to make analytics about your priority distribution.
 *   **New Zero-Lag "Light Priority Widget" (Ctrl+Opt+P):** Implemented a streamlined version of the priority controls for even faster day-to-day adjustments.
-<img src="assets/light-priority-widget.png" width="400" alt="Light Priority Widget" />
+![Light Priority Widget](assets/light-priority-widget.png){ width="400" }
 
 **Note:** If you are on **Windows** instead of Mac, you may need to disable the default keybindings for "Add All Properties" in the settings to avoid conflicts with this plugin. Go to Settings > Keyboard Shortcuts, search for "Add All Properties" and disable it.
 
@@ -3346,9 +3346,9 @@ This release brings a significant refactoring of how priorities are handled, foc
     *   *(Note: Lower numbers = Higher priority)*
     *   *(Note: you can adjust the desired step size in the settings)*
 
-<img src="assets/quick-priority-editor.gif" width="600" alt="Quick Priority in the Editor" />
+![Quick Priority in the Editor](assets/quick-priority-editor.gif){ width="600" }
 
-<img src="assets/quick-priority-queue.gif" width="600" alt="Quick Priority in the Queue" />
+![Quick Priority in the Queue](assets/quick-priority-queue.gif){ width="600" }
 
 ## v0.2.65 - January 21st, 2026
 
@@ -3385,7 +3385,7 @@ This release brings a significant refactoring of how priorities are handled, foc
 *   **Adaptive Visuals**: Priority sliders now intelligently switch between absolute colors (for immediate feedback) and relative percentile colors (for context).
 *   **Smart Inheritance**: New items automatically "snap" to inherited priority values or your configured defaults.
 
-<img width="450" alt="priority" src="assets/uploaded/9800abee-cb4b-44a0-a3ba-8b97f0c43ef4.gif" />
+![priority](assets/uploaded/9800abee-cb4b-44a0-a3ba-8b97f0c43ef4.gif){ width="450" }
 
 
 ## v0.2.59 - January 8th, 2026
@@ -3401,7 +3401,7 @@ We've completely overhauled how PDF highlights are styled to give you immediate 
 
 (Note: This update was only possible because RemNote recently exposed the data-rem-tags of PDF highlights in the DOM.)
 
-<img alt="pdf-highlights" src="assets/uploaded/f375e389-b3d9-4e4c-9cda-b8958f60dc27.png" />
+![pdf-highlights](assets/uploaded/f375e389-b3d9-4e4c-9cda-b8958f60dc27.png)
 
 
 ## v0.2.58 - January 8th, 2026
@@ -3415,12 +3415,12 @@ We've completely overhauled how PDF highlights are styled to give you immediate 
 ## v0.2.55 - January 3rd, 2026
 * Moved the **Summary** and [Priority-Review-Document#priority-review-document-graph-view](Priority-Distribution-Graph.md) to the top of [Priority Review Document](Priority-Review-Document.md)s (instead of the bottom).
 
-<img width="800" alt="priority-review-doc-graphattop" src="assets/uploaded/4cbed8d9-dda8-4120-a3d9-06df42d4695a.png" />
+![priority-review-doc-graphattop](assets/uploaded/4cbed8d9-dda8-4120-a3d9-06df42d4695a.png){ width="800" }
 
 
 * Changed the name of the "**Pre-compute all card priorities**" command to "**[Priorities-for-Flashcards#maintenance-the-update-all-inherited-card-priorities-command](Update-all-inherited-Card-Priorities.md)**".
 
-<img width="700" alt="CleanShot 2026-01-03 at 16 06 53@2x" src="assets/uploaded/c04bec93-9af1-4de3-946c-959601f97d34.png" />
+![CleanShot 2026-01-03 at 16 06 53@2x](assets/uploaded/c04bec93-9af1-4de3-946c-959601f97d34.png){ width="700" }
 
 ## v0.2.54 - December 31th, 2025 - Improved [Priority-Review-Document#priority-review-document-graph-view](Priority-Review-Document-Graph-View.md) and Metadata for Summary
 
@@ -3428,7 +3428,7 @@ Graph View now can also show distributions by relative priority percentile.
 
 Summary now shows scope size data (total number of IncRems, Rems with Cards and Cards).
 
-<img width="750" src="assets/uploaded/ac603000-cfa0-476a-8588-4f98399870c6.gif" />
+![](assets/uploaded/ac603000-cfa0-476a-8588-4f98399870c6.gif){ width="750" }
 
 
 ## v0.2.53 - December 30th, 2025
@@ -3437,11 +3437,11 @@ Summary now shows scope size data (total number of IncRems, Rems with Cards and 
 
 Implemented a visual distribution graph for Priority Review Documents. This feature appends a bar chart to the end of newly created review documents, visualizing the priority distribution of the included Incremental Rems and Flashcards. This helps users verify the effect of the requested randomness parameters in their [Prioritization-&-Sorting#sorting-criteria](Sorting-Criteria.md), and that the "[Prioritization-&-Sorting#priority-shield](Priority-Shield.md)" logic is correctly prioritizing high-value items.
 
-<img width="500" alt="Sorting Criteria randomness" src="assets/uploaded/544ec922-131d-4017-95dd-df6a6798b8c1.png" />
+![Sorting Criteria randomness](assets/uploaded/544ec922-131d-4017-95dd-df6a6798b8c1.png){ width="500" }
 
-<img width="600" alt="Create Priority Review Doc dialog" src="assets/uploaded/6f8f9a49-16e9-469f-b204-420e90814f40.png" />
+![Create Priority Review Doc dialog](assets/uploaded/6f8f9a49-16e9-469f-b204-420e90814f40.png){ width="600" }
 
-<img width="850" alt="Priority Review Graph" src="assets/uploaded/aa809587-3b29-4cb9-9e0c-eefe962d87a0.png" />
+![Priority Review Graph](assets/uploaded/aa809587-3b29-4cb9-9e0c-eefe962d87a0.png){ width="850" }
 
 
 
@@ -3453,12 +3453,12 @@ This aims to declutter the interface from these usually unhelpful information.
 
 What was this:
 
-<img width="600" alt="clutter priority slots" src="assets/uploaded/b0775d2e-50a7-4299-8bf3-bc124f95164c.png" />
+![clutter priority slots](assets/uploaded/b0775d2e-50a7-4299-8bf3-bc124f95164c.png){ width="600" }
 
 
 Now looks like this:
 
-<img width="600" alt="no more clutter priority slots" src="assets/uploaded/4af46856-9fc2-4344-ae39-392b4c920a02.png" />
+![no more clutter priority slots](assets/uploaded/4af46856-9fc2-4344-ae39-392b4c920a02.png){ width="600" }
 
 
 
@@ -3476,10 +3476,10 @@ Now looks like this:
 
 Added a new "📎 Open URL" button to the answer bar for HTML-type Incremental Rems. When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.
 
-<img width="800" alt="Open html IncRem in browser for Clipper" src="assets/uploaded/c6539d74-6b00-4e20-8d37-6fbe6bae2d03.png" />
+![Open html IncRem in browser for Clipper](assets/uploaded/c6539d74-6b00-4e20-8d37-6fbe6bae2d03.png){ width="800" }
 
 
-<img width="1000" alt="IR on RemNote Clipper" src="assets/uploaded/842393b8-0787-47ef-9ad6-5a2304145efa.png" />
+![IR on RemNote Clipper](assets/uploaded/842393b8-0787-47ef-9ad6-5a2304145efa.png){ width="1000" }
 
 See also: [Using the RemNote Clipper](https://help.remnote.com/en/articles/6030855-using-the-remnote-clipper).
 
@@ -3555,16 +3555,16 @@ This eliminates the friction of closing the popup, navigating to the editor to c
 
 - Added a plugin setting **“Show regular Rems in isolated view (Queue)”** so Extracts Incremental Rems can use the isolated card layout and still toggle to context (ExtractViewer) if desired, using the button (and switch back and forth).
 
-<img width="800" alt="Show regular Rems in isolated view" src="assets/uploaded/3d07244c-8af7-4c53-96cf-513166c1e70e.png" />
+![Show regular Rems in isolated view](assets/uploaded/3d07244c-8af7-4c53-96cf-513166c1e70e.png){ width="800" }
 
-<img width="800" alt="isolated card view for regular rems" src="assets/uploaded/976402c4-54d3-4053-8b93-5f2b2981d265.gif" />
+![isolated card view for regular rems](assets/uploaded/976402c4-54d3-4053-8b93-5f2b2981d265.gif){ width="800" }
 
-<img width="800" alt="isolated card view for regular rems change to context" src="assets/uploaded/03f5f706-6881-4ed7-8def-38bfadc08a98.gif" />
+![isolated card view for regular rems change to context](assets/uploaded/03f5f706-6881-4ed7-8def-38bfadc08a98.gif){ width="800" }
 
 
 - Fixed Priority Shield for Cards not showing relative priorities
 
-<img width="700" alt="Priority Shield for Cards" src="assets/uploaded/32a25755-03dd-4fee-8257-21639c4b8ef6.png" />
+![Priority Shield for Cards](assets/uploaded/32a25755-03dd-4fee-8257-21639c4b8ef6.png){ width="700" }
 
 
 
@@ -3585,7 +3585,7 @@ A new gesture has been added to the "Next" button for faster scheduling when rev
 This is particularly useful for content you're actively working through, like reading a book chapter by chapter. Instead of the SRS algorithm potentially scheduling your next reading session days or weeks away, you can quickly force the content to reappear today or tomorrow — keeping your momentum without opening the Reschedule popup.
 
 
-<img width="700" alt="Next for Tomorrow or Today" src="assets/uploaded/492c7b49-8279-421a-93ce-d81e9e3fa7a4.gif" />
+![Next for Tomorrow or Today](assets/uploaded/492c7b49-8279-421a-93ce-d81e9e3fa7a4.gif){ width="700" }
 
 
 ### ✨ New Feature: "Create Incremental Rem" from PDF Highlights
@@ -3594,7 +3594,7 @@ This is particularly useful for content you're actively working through, like re
 
 A new option has been added to the PDF highlight popup menu that streamlines the process of turning extracts into standalone incremental reading items.
 
-<img width="700" alt="Create Inc Rem pdf highlight menu button" src="assets/uploaded/b54cc992-2610-4bfa-9bfd-3196a5c377ff.png" />
+![Create Inc Rem pdf highlight menu button](assets/uploaded/b54cc992-2610-4bfa-9bfd-3196a5c377ff.png){ width="700" }
 
 
 **How it works:**
@@ -3623,7 +3623,7 @@ This is ideal for workflows where you want to:
 - **Create Incremental Rem**: Creates a *new* Rem with the highlight content under a parent of your choice, with a reference back to the source
 
 
-<img width="700" alt="Create Inc Rem pdf highlight menu item" src="assets/uploaded/045887cb-76a0-4aa8-9fb9-41bae48a8051.gif" />
+![Create Inc Rem pdf highlight menu item](assets/uploaded/045887cb-76a0-4aa8-9fb9-41bae48a8051.gif){ width="700" }
 
 
 ## v0.2.33 - November 26, 2025
@@ -3632,7 +3632,7 @@ This is ideal for workflows where you want to:
 
 ### Isolated Card Viewer for PDF Highlights
 - Added isolated card view for highlights and rems in queue, providing a focused review experience
-<img width="600" alt="Isolated Card Viewer" src="assets/uploaded/18fca0ba-34a7-4a61-85da-70911a38ec9f.gif" />
+![Isolated Card Viewer](assets/uploaded/18fca0ba-34a7-4a61-85da-70911a38ec9f.gif){ width="600" }
 
 
 - **Create Rem** button allows creating new rems directly from the viewer
@@ -3641,9 +3641,9 @@ This is ideal for workflows where you want to:
   - New parent selection feature when creating rems from PDF highlights
   - Shows all PDF rems that has the specific PDF as source, including Done/untagged ones
 - Type badge and hover feedback for better visual distinction
-<img width="600" alt="Parent Selection" src="assets/uploaded/0dce82d5-a4fd-4eb2-9c2a-2a14d443cb04.gif" />
+![Parent Selection](assets/uploaded/0dce82d5-a4fd-4eb2-9c2a-2a14d443cb04.gif){ width="600" }
 
-<img width="600" alt="Where the extract goes" src="assets/uploaded/3491c836-b8e0-45ea-bfa0-10c190267aa4.png" />
+![Where the extract goes](assets/uploaded/3491c836-b8e0-45ea-bfa0-10c190267aa4.png){ width="600" }
 
 
 
@@ -3653,7 +3653,7 @@ This is ideal for workflows where you want to:
 - Relative priority for slider color feedback
 - Improved UI and badge design
 
-<img width="500" alt="new priority dialog" src="assets/uploaded/457026b6-0e93-44c4-be9c-84c230ee8b4a.png" />
+![new priority dialog](assets/uploaded/457026b6-0e93-44c4-be9c-84c230ee8b4a.png){ width="500" }
 
 - What is displays:
   - (1) [Absolute] Priority input field (selected when the dialog opens, so that you can just type the priority and press Enter to save)
@@ -3671,15 +3671,15 @@ This is ideal for workflows where you want to:
 - Type badges with descriptive tooltips
 - Time spent tracking displayed in Inc Rem list
 - Redesigned "View All" with compact professional layout
-<img width="700" alt="IncRem List bar" src="assets/uploaded/e90b85f8-fcb2-4733-b07f-f6d071e55e1b.png" />
+![IncRem List bar](assets/uploaded/e90b85f8-fcb2-4733-b07f-f6d071e55e1b.png){ width="700" }
 
-<img width="700" alt="IncRem List" src="assets/uploaded/ca71cf88-cf3a-48eb-9a63-efc4b0964f89.gif" />
+![IncRem List](assets/uploaded/ca71cf88-cf3a-48eb-9a63-efc4b0964f89.gif){ width="700" }
 
 
 ### PDF Control Panel Enhancements
 - Time spent tracking per session and total time spent in a PDF
 - Review history and data persists even after rem is marked Done
-<img width="500" alt="priority dialog" src="assets/uploaded/7eea3d5c-6e4f-4cbe-b75f-bd120d6b33b5.png" />
+![priority dialog](assets/uploaded/7eea3d5c-6e4f-4cbe-b75f-bd120d6b33b5.png){ width="500" }
 
 
 
@@ -3717,15 +3717,15 @@ This is ideal for workflows where you want to:
 ### 🚀 **New Features & Improvements**
 * **PDF Time Tracking:** The PDF Control Panel now displays the time spent in each session and the total review time for the document.
 
-<img width="550" alt="CleanShot 2025-11-25 at 10 09 22@2x" src="assets/uploaded/12d40948-fa3d-48a3-9589-1a604a259f40.png" />
+![CleanShot 2025-11-25 at 10 09 22@2x](assets/uploaded/12d40948-fa3d-48a3-9589-1a604a259f40.png){ width="550" }
 
 
-<img width="550" alt="PDF Control Panel" src="assets/uploaded/b4efa027-aed6-4e1e-ac7c-f8d310af2f88.gif" />
+![PDF Control Panel](assets/uploaded/b4efa027-aed6-4e1e-ac7c-f8d310af2f88.gif){ width="550" }
 
 
 * **Persistent Reading Stats:** Reading statistics and history are now visible for all Rems associated with a PDF, even after they have been marked as "Done" (untagged).
 
-<img width="600" alt="PDF Control Panel" src="assets/uploaded/7f61d981-0e15-47c2-bdfe-141f730d1c64.gif" />
+![PDF Control Panel](assets/uploaded/7f61d981-0e15-47c2-bdfe-141f730d1c64.gif){ width="600" }
 
 
 
@@ -3739,7 +3739,7 @@ This is ideal for workflows where you want to:
 
 - Added a blue left border to Incremental Rems, to make it easier to spot your "extracts" among other rems (if you prefer, you can disable this in your settings).
 
-<img width="750" alt="CleanShot 2025-11-22 at 16 46 29" src="assets/uploaded/089a7e66-b385-41ae-a3d7-6c5177da666a.png" />
+![CleanShot 2025-11-22 at 16 46 29](assets/uploaded/089a7e66-b385-41ae-a3d7-6c5177da666a.png){ width="750" }
 
 ## v0.2.29 - November 18, 2025
 
@@ -3759,9 +3759,9 @@ This is ideal for workflows where you want to:
 - "View All" button added to counter widget with keyboard shortcut (Opt+Shift+I)
 - Auto-close popup when clicking on a rem item
 
-<img width="700" alt="view all button" src="assets/uploaded/efcbb2e8-4ee7-4d00-bcff-fcc253559f86.png" />
+![view all button](assets/uploaded/efcbb2e8-4ee7-4d00-bcff-fcc253559f86.png){ width="700" }
 
-<img width="800" alt="main view for incremental rem" src="assets/uploaded/0899cfc0-8f01-4567-866a-e298a757349b.png" />
+![main view for incremental rem](assets/uploaded/0899cfc0-8f01-4567-866a-e298a757349b.png){ width="800" }
 
 
 
@@ -3773,16 +3773,16 @@ This is ideal for workflows where you want to:
 - Added menu item in PDF viewer (Document Menu) for direct access to control panel (3-dot icon at the top-right of Documents)
 - Replaced hardcoded colors with RemNote CSS variables for theme consistency
 
-<img width="700" alt="Screenshot 2025-11-15 at 12 23 19" src="assets/uploaded/a8b4431f-48ea-45a3-8682-bff4a3744238.png" />
+![Screenshot 2025-11-15 at 12 23 19](assets/uploaded/a8b4431f-48ea-45a3-8682-bff4a3744238.png){ width="700" }
 
 
-<img width="500" alt="image" src="assets/uploaded/cbe9760e-a985-4880-9418-6268bf58517d.png" />
+![image](assets/uploaded/cbe9760e-a985-4880-9418-6268bf58517d.png){ width="500" }
 
 
-<img width="500" alt="image" src="assets/uploaded/33ac0900-573c-4034-a47d-978aca7ef31b.png" />
+![image](assets/uploaded/33ac0900-573c-4034-a47d-978aca7ef31b.png){ width="500" }
 
 
-<img width="500" alt="image" src="assets/uploaded/46ab5012-6273-48a0-8bbd-7563599451e6.png" />
+![image](assets/uploaded/46ab5012-6273-48a0-8bbd-7563599451e6.png){ width="500" }
 
 
 ## v0.2.26 - November 15, 2025
@@ -3791,12 +3791,12 @@ This is ideal for workflows where you want to:
 
 - Added a document-scoped counter widget that displays due/total incremental rems for the current document
 
-<img width="700" alt="Screenshot 2025-11-15 at 09 36 24" src="assets/uploaded/c63527e6-277b-45b5-a566-1ce166af4585.png" />
+![Screenshot 2025-11-15 at 09 36 24](assets/uploaded/c63527e6-277b-45b5-a566-1ce166af4585.png){ width="700" }
 
 
 - Added a clickable popup that shows a detailed list of all incremental rems with their status, priority, and review history
 
-<img width="600" alt="incremental rems list popup" src="assets/uploaded/26ba6acd-00c0-4835-9602-8c499d01fb7e.png" />
+![incremental rems list popup](assets/uploaded/26ba6acd-00c0-4835-9602-8c499d01fb7e.png){ width="600" }
 
 
 
@@ -3815,7 +3815,7 @@ This is ideal for workflows where you want to:
 
 - Improved Closest Ancestor info in the Priority widget (corrected logic and improved styling).
 
-<img width="350" alt="image" src="assets/uploaded/2c9d0f68-c7e9-464f-9513-eca9afd914d2.png" />
+![image](assets/uploaded/2c9d0f68-c7e9-464f-9513-eca9afd914d2.png){ width="350" }
 
 
 ## v0.2.21 - November 10, 2025
@@ -3858,7 +3858,7 @@ Users can choose from 5 highlight colors:
 
 You can now review Incremental Rems without entering the queue! Use the new command **"Execute Incremental Rem Repetition (Review in Editor)" (Ctrl+Shift+J)** to register the processing of IncRems while working in the Editor.
 
-<img width="650" alt="image" src="assets/uploaded/37f55794-e95d-4e1e-9c57-4a209299b943.png" />
+![image](assets/uploaded/37f55794-e95d-4e1e-9c57-4a209299b943.png){ width="650" }
 
 
 #### Key Features:
@@ -3869,7 +3869,7 @@ You can now review Incremental Rems without entering the queue! Use the new comm
 - Adjust the next review interval (the initially suggested one is that you would get if reviewing in the queue) and priority
 - Click "Confirm" to save your review
 
-<img width="400" alt="image" src="assets/uploaded/2118aecf-9220-4a03-a54f-8a788cf04aed.png" />
+![image](assets/uploaded/2118aecf-9220-4a03-a54f-8a788cf04aed.png){ width="400" }
 
 
 **Timer Mode:**
@@ -3877,7 +3877,7 @@ You can now review Incremental Rems without entering the queue! Use the new comm
 - A timer appears above your document while you work
 - Click "End Review" when finished to save everything with precise timing
 
-<img width="800" alt="image" src="assets/uploaded/8abda311-f0dc-4aa5-81c5-747055cf5ccc.png" />
+![image](assets/uploaded/8abda311-f0dc-4aa5-81c5-747055cf5ccc.png){ width="800" }
 
 
 #### Use Cases:
@@ -3914,13 +3914,13 @@ Solved card_priority_display widget Light Mode detection bug that prevented it f
 
 **Improved efficiency of the Pre-compute Card Priorities command:**
 
-<img width="700" alt="image" src="assets/uploaded/263d4d0d-4951-4b30-b737-1f097f481aad.png" />
+![image](assets/uploaded/263d4d0d-4951-4b30-b737-1f097f481aad.png){ width="700" }
 
 
 - **Skip unnecessary updates**: Now only retags and updates `lastUpdated` timestamp when a card's priority value or source actually changes
 - **Avoid redundant syncing**: Rems with unchanged priorities are skipped entirely, reducing RemNote sync and wiring operations and improving performance
 - **Accurate reporting**: Fixed logic that was incorrectly detecting the presence of cardPriority tags, eliminating false "newly tagged" reports on subsequent runs
-<img width="500" alt="image" src="assets/uploaded/a1c6f962-ebf6-4f10-b47c-979dc46ca21e.png" />
+![image](assets/uploaded/a1c6f962-ebf6-4f10-b47c-979dc46ca21e.png){ width="500" }
 
 
 **Result**: Now you can run pre-computation frequently to ensure the few priorities you have manually set in between will be inherited by many other cards, significantly improving the flashcard prioritization based on a few manual inputs that can be inherited by many other flashcards.
@@ -3931,7 +3931,7 @@ Solved card_priority_display widget Light Mode detection bug that prevented it f
 
 No need to fear the **Full Mode** anymore! This implementation adds automatic Light Mode detection for web browsers, similar to the existing mobile detection feature. When users access RemNote through a web browser, the plugin will automatically use Light Mode for better performance and stability.
 
-<img width="800" alt="image" src="assets/uploaded/10250030-ed46-40ae-a53e-c8c8117fe331.png" />
+![image](assets/uploaded/10250030-ed46-40ae-a53e-c8c8117fe331.png){ width="800" }
 
 
 ## v0.2.12 - November 3rd, 2025
@@ -4061,7 +4061,7 @@ The Full performance mode can be resource-intensive and potentially cause crashe
 - **When Enabled**: Light Mode is automatically used on mobile devices for stability
 - **When Disabled**: Your performance mode setting applies on all devices (use with caution on mobile)
 
-<img width="800" alt="image" src="assets/uploaded/594dd4e3-b73d-47e0-be99-f2078189cf5d.png" />
+![image](assets/uploaded/594dd4e3-b73d-47e0-be99-f2078189cf5d.png){ width="800" }
 
 
 ### Benefits
@@ -4092,7 +4092,7 @@ This ensures RemNote remains responsive and stable on all devices! 🎉
 
 -  In reader metadata page control section, added self-check for IncRem (now PDF directly tagged Incremental will also show page controls)
 -  Reader breadcrumb and metadata sections now adapt to dark and light modes.
-<img width="800" alt="image" src="assets/uploaded/3f4611c3-fe90-4c18-89dc-8808bb28e39b.png" />
+![image](assets/uploaded/3f4611c3-fe90-4c18-89dc-8808bb28e39b.png){ width="800" }
 
 
 ## v0.2.5 - October 30, 2025
@@ -4163,7 +4163,7 @@ The universe size line reveals:
 The graph now shows three synchronized metrics:
 - **Solid lines**: Absolute and Relative Priority (existing metrics)
 - **Dashed line**: Universe Size (new metric)
-<img width="800" alt="image" src="assets/uploaded/9b27e119-0b55-4cc4-a5ab-36149f63ff50.png" />
+![image](assets/uploaded/9b27e119-0b55-4cc4-a5ab-36149f63ff50.png){ width="800" }
 
 
 Example insights from the new visualization:
@@ -4191,7 +4191,7 @@ New description added to help users understand:
 ### Other Improvements
 
 - Priority widget in Editor can now be set to show for both IncRem and Cards, only for IncRem or be disabled.
-<img width="600" alt="image" src="assets/uploaded/2c75af6c-fe8d-47d2-aff4-9b1ee9fd6ebd.png" />
+![image](assets/uploaded/2c75af6c-fe8d-47d2-aff4-9b1ee9fd6ebd.png){ width="600" }
 
 
 ## v0.2.3 - October 29, 2025 - Card Priority System Enhancements
@@ -4209,7 +4209,7 @@ This update introduces powerful new tools for managing card priorities in bulk a
     * Intelligently handles IncRems, allowing you to use their existing IncRem priority as their Card Priority.
     * Safely updates rems with existing `manual` priorities by requiring explicit "Overwrite" confirmation.
 
-<img width="450" alt="image" src="assets/uploaded/b4fed324-d03d-4fb6-871f-2c643ed63467.png" />
+![image](assets/uploaded/b4fed324-d03d-4fb6-871f-2c643ed63467.png){ width="450" }
 
 
 
@@ -4219,7 +4219,7 @@ This update introduces powerful new tools for managing card priorities in bulk a
     * The `priority_editor` (the small widget in the right-hand editor margin) now provides immediate visual feedback.
     * The priority number for **Cards** will appear **bold** if its source is `"manual"`, making it easy to distinguish manually-set priorities from inherited or default ones.
 
-<img width="600" alt="image" src="assets/uploaded/4db11892-29a7-414d-b4f7-8c0857111557.png" />
+![image](assets/uploaded/4db11892-29a7-414d-b4f7-8c0857111557.png){ width="600" }
 
 
 
@@ -4228,9 +4228,9 @@ This update introduces powerful new tools for managing card priorities in bulk a
 ### 🐛 Bug Fixes & Improvements
 
 - Added a plugin setting to hide cardPriority tags in the editor to reduce clutter, as the priority_editor widget already gives visual feedback.
-<img width="700" alt="image" src="assets/uploaded/01afc5dd-b429-4a70-baac-e9aee555bf9f.png" />
+![image](assets/uploaded/01afc5dd-b429-4a70-baac-e9aee555bf9f.png){ width="700" }
 
-<img width="700" alt="image" src="assets/uploaded/f148c4cf-5c0c-45c8-a159-ae7f4d0a0c8e.png" />
+![image](assets/uploaded/f148c4cf-5c0c-45c8-a159-ae7f4d0a0c8e.png){ width="700" }
 
 - Corrected IncRem counter CSS injection and adapted it to the Light mode.
 
@@ -4240,7 +4240,7 @@ This update introduces powerful new tools for managing card priorities in bulk a
 ### 🐛 Bug Fixes & Improvements
 
 - Now the Priority Review Document creator popup widget is visible properly when in dark mode.
-<img width="400" alt="image" src="assets/uploaded/46ea4201-b42f-434a-989d-64d485e30c02.png" />
+![image](assets/uploaded/46ea4201-b42f-434a-989d-64d485e30c02.png){ width="400" }
 
 
 
@@ -4514,8 +4514,8 @@ This version introduces a powerful new widget for managing the priorities of mul
     * Via the **Command Palette** by searching for "Batch Priority Change".
     * Using the new keyboard shortcut `Option+Shift+P` (`opt+shift+p`).
     * From the **Document Menu** (`...` on a Rem) on any Rem to act on it and its descendants.
-<img width="250" alt="batch-priority-change-documentmenuitem" src="assets/uploaded/8589e1e8-1af1-410c-b705-5b56c9e6ee56.png" />
-<img width="800" alt="batch-priority-change-command" src="assets/uploaded/228dbe9d-7f53-4969-b7b3-3400989d3b92.png" />
+![batch-priority-change-documentmenuitem](assets/uploaded/8589e1e8-1af1-410c-b705-5b56c9e6ee56.png){ width="250" }
+![batch-priority-change-command](assets/uploaded/228dbe9d-7f53-4969-b7b3-3400989d3b92.png){ width="800" }
 
 
 * **Powerful Priority Operations:** Select a group of Rems and apply one of four bulk operations:
@@ -4531,7 +4531,7 @@ This version introduces a powerful new widget for managing the priorities of mul
     * **Sort** the table by any column to organize your Rems exactly how you need them.
     * Includes a "Preview Changes" mode to see the impact of your operations before committing and an "Export to CSV" option for external analysis.
 
-<img width="800" alt="batch-priority-change-widget" src="assets/uploaded/823c53ef-c6dc-4def-b4b7-1c85cbd6f345.png" />
+![batch-priority-change-widget](assets/uploaded/823c53ef-c6dc-4def-b4b7-1c85cbd6f345.png){ width="800" }
 
 
 ### ✨ New Feature:  No Incremental Rem Mode (especially for mobile)
@@ -4545,11 +4545,11 @@ _ **Auto-cleanup:** The timer automatically clears itself when expired
 
 This solution effectively creates a temporary "flashcards-only" mode that's designed for mobile users who want to review without dealing with the complexities of incremental reading on a small screen.
 
-<img width="300" alt="no-inc-rem-queue-menu" src="assets/uploaded/819d37a0-94d2-40eb-af92-0dc97935666b.png" />
+![no-inc-rem-queue-menu](assets/uploaded/819d37a0-94d2-40eb-af92-0dc97935666b.png){ width="300" }
 
-<img width="800" alt="no-inc-rem-indicator-widget" src="assets/uploaded/affc9547-ccca-4336-a828-5b49f1eafe1b.png" />
+![no-inc-rem-indicator-widget](assets/uploaded/affc9547-ccca-4336-a828-5b49f1eafe1b.png){ width="800" }
 
-<img width="312" alt="no-inc-rem-sorting-criteria" src="assets/uploaded/afe2eb81-460b-4734-90c4-4dcb5b99c85f.png" />
+![no-inc-rem-sorting-criteria](assets/uploaded/afe2eb81-460b-4734-90c4-4dcb5b99c85f.png){ width="312" }
 
 
 ### ⚙️ UI/UX Improvements for Answer Buttons and PDF Reader Metadata
@@ -4586,10 +4586,10 @@ Redesigned the answer buttons and PDF reader metadata section to improve visual 
 - Optimized reading history to prevent duplicate entries
 - Improved component performance with proper React hooks usage
 
-<img width="1000" alt="new-answer-buttons-and-pdf-metadata2" src="assets/uploaded/ee717077-8319-48a4-a010-c0afeeb7a3f1.png" />
+![new-answer-buttons-and-pdf-metadata2](assets/uploaded/ee717077-8319-48a4-a010-c0afeeb7a3f1.png){ width="1000" }
 
 
-<img width="1000" alt="new-answer-buttons-and-pdf-metadata" src="assets/uploaded/cf63f571-a1e4-4b49-ba91-1d5e90bbb205.png" />
+![new-answer-buttons-and-pdf-metadata](assets/uploaded/cf63f571-a1e4-4b49-ba91-1d5e90bbb205.png){ width="1000" }
 
 
 ### Other minor improvements / bug fixes
@@ -4611,9 +4611,9 @@ This update introduces four powerful new features designed to make your workflow
 - Page range settings are saved persistently and remain even if a Rem is untagged as incremental.
 - You can also see the **Reading History** of any of these PDF "Chapters", making a full assessment of your progress in that PDF.
 
-<img width="608" alt="pdf-control-panel" src="assets/uploaded/62a32b02-e517-4600-9875-4c71c3a14da1.png" />
-<img width="900" alt="set-page-range-in-queue" src="assets/uploaded/2e84cb06-578f-4f84-a5fc-0396e1f37f57.png" />
-<img width="871" alt="pdf-control-panel-command-in-editor" src="assets/uploaded/945be4b9-edf6-43e6-aa58-30026d431f0f.png" />
+![pdf-control-panel](assets/uploaded/62a32b02-e517-4600-9875-4c71c3a14da1.png){ width="608" }
+![set-page-range-in-queue](assets/uploaded/2e84cb06-578f-4f84-a5fc-0396e1f37f57.png){ width="900" }
+![pdf-control-panel-command-in-editor](assets/uploaded/945be4b9-edf6-43e6-aa58-30026d431f0f.png){ width="871" }
 
 
 ### ✨ New Feature: [Prioritization-&-Sorting#priority-shield](Priority-Shield.md) & History Graph (= Priority Protection)
@@ -4629,15 +4629,15 @@ The core purpose of the Priority Shield is to move beyond guessing and provide y
 This new feature includes:
 
 * **Real-Time Status in the Queue**: A "Priority Shield" display appears below the answer buttons, giving you an at-a-glance status of your protection for both your entire Knowledge Base and the current document you are studying.
-<img width="1000" alt="image" src="assets/uploaded/8353b2ed-a2a1-4ee7-999d-9abd97f82734.png" />
+![image](assets/uploaded/8353b2ed-a2a1-4ee7-999d-9abd97f82734.png){ width="1000" }
 
 
 * **Historical Graph**: A new "Priority Shield History" menu item in the queue opens a popup with a detailed graph, allowing you to track your performance over time with two key metrics: **Absolute Priority** and **Relative Priority (%)**.
 
-<img width="800" alt="priority-shield-graph" src="assets/uploaded/a0ca9daf-72dd-4a65-a0c7-ac10dd5be17b.png" />
+![priority-shield-graph](assets/uploaded/a0ca9daf-72dd-4a65-a0c7-ac10dd5be17b.png){ width="800" }
 
 * **Customizable Display**: The real-time display can be toggled on or off in the plugin's settings to keep your UI as clean as you prefer.
-<img width="700" alt="image" src="assets/uploaded/462f56e5-c179-4e5e-a3b9-fd8ce6469886.png" />
+![image](assets/uploaded/462f56e5-c179-4e5e-a3b9-fd8ce6469886.png){ width="700" }
 
 
 ### ✨ New Feature: [Prioritization-&-Sorting#priority-inheritance-system](Priority-Inheritance-System.md)
@@ -4662,7 +4662,7 @@ If you have a parent rem for a broad topic like "Quantum Mechanics" with a set p
 
 The "Set Priority" and "Reschedule" popups have also been updated to display the ancestor's priority, giving you immediate context when you decide to manually override the inherited value.
 
-<img width="315" alt="priority-popup-ancestor-context" src="assets/uploaded/2b00dfb4-e02f-4769-a831-6a60910d38dc.png" />
+![priority-popup-ancestor-context](assets/uploaded/2b00dfb4-e02f-4769-a831-6a60910d38dc.png){ width="315" }
 
 
 
@@ -4681,7 +4681,7 @@ This new button appears in the answer bar exclusively for PDF and PDF highlight 
 -  **Use Case: In-Depth Note-Taking During Review**
 A highlight sparks a complex new idea that requires more space than a simple comment. Or you want to take notes of what you are reading in a PDF section, and paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation). Use the button to open the full editor, where you have access to all of RemNote's formatting tools, can link to other ideas, and can write extensive notes alongside the original PDF. This allows you to capture detailed thoughts without being constrained by the queue's limited interface.
 
-<img width="800" alt="open-editor-new-tab" src="assets/uploaded/32fefa9b-a770-4009-8006-b9276b3c704b.png" />
+![open-editor-new-tab](assets/uploaded/32fefa9b-a770-4009-8006-b9276b3c704b.png){ width="800" }
 
 
 ####  ⚙️  New Setting: Preferred RemNote Environment
@@ -4689,7 +4689,7 @@ A highlight sparks a complex new idea that requires more space than a simple com
 For users who primarily work on the beta version of RemNote, a new "Preferred RemNote Environment" setting has been added. This dropdown menu in the plugin settings allows you to choose whether the "Open Editor in New Tab" button directs you to the stable (`www.remnote.com`) or beta (`beta.remnote.com`) environment. This ensures a seamless workflow by keeping you in your preferred version of RemNote.
 
 
-<img width="750" alt="remnote-environment" src="assets/uploaded/3f69d55a-75b4-4696-9a55-61969eabefa0.png" />
+![remnote-environment](assets/uploaded/3f69d55a-75b4-4696-9a55-61969eabefa0.png){ width="750" }
 
 ### ⚙️ UI/UX Improvements
 

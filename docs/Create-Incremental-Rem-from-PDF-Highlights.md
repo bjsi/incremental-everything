@@ -8,7 +8,7 @@ This feature allows you to extract PDF highlights into standalone Incremental Re
 4. **Select a parent** from the hierarchical tree that appears
 5. **Press Enter** to confirm — your new Incremental Rem is created
 
-<img width="700" alt="Create Inc Rem pdf highlight menu button" src="assets/pdfhighlight-create-inc-rem.png" />
+![Create Inc Rem pdf highlight menu button](assets/pdfhighlight-create-inc-rem.png){ width="700" }
 
 ## Parent Selector Features
 

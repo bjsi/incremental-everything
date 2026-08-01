@@ -97,7 +97,7 @@ When you've fully processed an item and extracted all valuable knowledge:
 3. A **yellow left border** appears in the editor to indicate the Rem has preserved history
 4. The item no longer appears in your queue
 
-<img src="assets/visual-feedback-editor.png" width="600" alt="Yellow left border visual indicator for dismissed Rems" />
+![Yellow left border visual indicator for dismissed Rems](assets/visual-feedback-editor.png){ width="600" }
 
 **Visual Settings:**
 - **Show Yellow Left Border for Dismissed Rems** — Toggle the visual indicator (default: on)
@@ -133,7 +133,7 @@ Gives you detailed insights into your review history for any specific Incrementa
 *   **Next Review:** Scheduled date with days late/early indicator
 *   **History Table:** Date, time spent, interval, priority, and status for each repetition
 
-<img src="assets/repetition-history-popup.png" width="400" alt="Repetition History Popup" />
+![Repetition History Popup](assets/repetition-history-popup.png){ width="400" }
 
 ### 2. Aggregated History View
 
@@ -143,7 +143,7 @@ Gives you a high-level overview of progress stats for a Rem and **all its descen
 *   **Tree-View Hierarchy:** Displays a hierarchical tree of your Incremental Rems, sorted exactly as they appear in your document.
 *   **Aggregated Metrics:** Shows total repetitions, time spent, and item counts for the current selection **plus** all its descendants.
 
-<img src="assets/aggregated-repetition-history.gif" width="600" alt="Aggregated Repetition History" />
+![Aggregated Repetition History](assets/aggregated-repetition-history.gif){ width="600" }
 
 ### How to Access (Smart Routing)
 

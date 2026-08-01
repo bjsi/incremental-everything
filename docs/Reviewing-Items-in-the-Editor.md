@@ -46,7 +46,7 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
 2. Press `Ctrl+Shift+J` (or use the slash command "Execute Incremental Rem Repetition").
 3. A modernized popup appears (matching the design language of the priority and page-range widgets, with card sections, custom styling, and a keyboard shortcut hint bar):
 
-   <img src="assets/review-in-editor.png" width="500" alt="Execute Repetition popup" />
+   ![Execute Repetition popup](assets/review-in-editor.png){ width="500" }
 
 4. Choose from the available options:
    - **Manual time entry**: Enter the time you spent (in seconds) and click Submit.
@@ -63,11 +63,11 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
 - **Indicator in history**: Shows with a ⌨️ indicator in the Repetition History widget.
 - **Ahead-of-Schedule Warning Banner**: If you review an Incremental Rem before its scheduled due date, an amber warning banner will appear at the top of the popup informing you how many days early you are:
 
-  <img src="assets/review-in-editor-warning.png" width="500" alt="Ahead-of-Schedule warning banner" />
+  ![Ahead-of-Schedule warning banner](assets/review-in-editor-warning.png){ width="500" }
 
 - **Scheduling Conflict (Next-Rep-Date Regression)**: When confirming a review (via Confirm Review or Start Timer) would calculate a new due date earlier than the currently scheduled one (e.g. if you previously rescheduled it far in the future), a Scheduling Conflict dialog is shown before proceeding:
 
-  <img src="assets/review-in-editor-scheduling-resolution.png" width="500" alt="Scheduling Conflict dialog" />
+  ![Scheduling Conflict dialog](assets/review-in-editor-scheduling-resolution.png){ width="500" }
 
   You can resolve the conflict using the following options (which also support keyboard shortcuts):
   - **Keep Current Date** (`Enter` or `1`): Log the review and time in history but preserve the existing future due date. (Note: once you start typing a custom interval, `Enter` confirms the typed interval instead).
@@ -134,11 +134,11 @@ The switcher is hidden when the Inc Rem has zero or one PDF sources. See [PDF-In
 
 The timer widget is designed to be fully responsive. If used in a narrow sidebar or a collapsed window, the buttons and controls will automatically wrap into multiple lines to prevent overlap and ensure the timer remains legible.
 
-<img src="assets/review-timer-done-button.png" width="800" alt="Editor Review Timer with new Dismiss button and two-line labels" />
+![Editor Review Timer with new Dismiss button and two-line labels](assets/review-timer-done-button.png){ width="800" }
 
 This flow provides the best of both worlds: the queue sorting, combined with the unrestricted creative workspace of the full editor!
 
-<img src="assets/sequential-review-increm-list.gif" width="800" alt="Sequential Review flow using IncRem List" />
+![Sequential Review flow using IncRem List](assets/sequential-review-increm-list.gif){ width="800" }
 
 ### Reviewing PDF Items
 
@@ -146,9 +146,9 @@ When reviewing PDF items in the editor, the **Review in Editor Timer** (a widget
 
 To access the timer and review controls, you must click the **"Notes"** button within the PDF viewer to open the associated document. The timer will then be visible at the top of the notes pane, above the document title.
 
-<img width="800" alt="PDF Viewer interface" src="assets/uploaded/9a136bf1-d00c-423c-acb9-6e998640a3a7.png" />
+![PDF Viewer interface](assets/uploaded/9a136bf1-d00c-423c-acb9-6e998640a3a7.png){ width="800" }
 
-<img width="900" alt="Notes pane showing the Review in Editor Timer" src="assets/uploaded/b802926f-a168-463c-8b63-892333bef427.png" />
+![Notes pane showing the Review in Editor Timer](assets/uploaded/b802926f-a168-463c-8b63-892333bef427.png){ width="900" }
 
 #### Tracking Progress in the Editor
 

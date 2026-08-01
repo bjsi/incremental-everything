@@ -67,15 +67,15 @@ If you previously used tags like `#HighPriority` or `#P1` to organise your cards
 1. Focus on the **anchor rem** (e.g., `#Important`, or any rem that other rems reference or are tagged with).
 2. Open the **Document Menu** (⋯) and click **"Batch Assign Card Priority for tagged/referencing Rems"** — or run the command **"Batch Assign Card Priority for tagged/referencing rems"** (`Opt+Shift+C`) from the Command Palette.
 
-<img width="800" alt="menu item match assign priority tag" src="assets/uploaded/5d42bf59-755a-41a7-a3a3-8b71742ab442.png" />
+![menu item match assign priority tag](assets/uploaded/5d42bf59-755a-41a7-a3a3-8b71742ab442.png){ width="800" }
 
-<img width="400" alt="batch assign priority tag command" src="assets/uploaded/1156bd8a-ca17-4166-bc1f-c7765f97fa2a.png" />
+![batch assign priority tag command](assets/uploaded/1156bd8a-ca17-4166-bc1f-c7765f97fa2a.png){ width="400" }
 
 
 3.  Set a priority range (e.g., 3-12).
 4.  The plugin will apply this `Manual` priority to every Rem tagged with `#Important` (or that references the Rem).
 
-<img src="assets/batch-card-assign-priority-taggedrems.png" width="900" alt="Batch Card Priority widget" />
+![Batch Card Priority widget](assets/batch-card-assign-priority-taggedrems.png){ width="900" }
 
 ### 3. Unified Batch Priority Change
 
@@ -127,7 +127,7 @@ While the tool above is specialized for migrations, the **[Prioritization-&-Sort
 
 * Decreasing the priority using an Universal Descriptor considered of lower importance (e.g. `~Translation`)
 
-<img src="assets/batch-card-assign-priority-referencingrems.png" width="900" alt="Batch Card Priority widget" />
+![Batch Card Priority widget](assets/batch-card-assign-priority-referencingrems.png){ width="900" }
 
 
 
@@ -154,7 +154,7 @@ This effectively bypasses the native scheduler's "all cards are equal" logic and
 
 Just like for reading material, the queue displays a **[Priority Shield](Prioritization-&-Sorting.md#priority-shield)** for flashcards (toggleable in settings).
 
-<img width="800" alt="Priority Shield for Cards" src="assets/uploaded/32a25755-03dd-4fee-8257-21639c4b8ef6.png" />
+![Priority Shield for Cards](assets/uploaded/32a25755-03dd-4fee-8257-21639c4b8ef6.png){ width="800" }
 
 * **What it shows:** The priority of the most important due card you *haven't* reviewed yet.
 * **Interpretation:**
@@ -179,7 +179,7 @@ When the session ends, before writing the shield value to the history graph, the
 
 You can view the history of your Card Shield in the "[Prioritization-&-Sorting#priority-shield-history](Priority-Shield-History.md)" graph to track your retention discipline over time.
 
-<img width="800" alt="Card Priority Shield history" src="assets/uploaded/d082cc01-a089-41c0-a6c0-24ece4662400.png" />
+![Card Priority Shield history](assets/uploaded/d082cc01-a089-41c0-a6c0-24ece4662400.png){ width="800" }
 
 
 ## Maintenance: Keeping Inherited Priorities in Sync
@@ -238,7 +238,7 @@ For large-scale reorganizations or after running bulk operations (Batch Priority
   * Now, when you create a [Priority Review Document](Priority-Review-Document.md) of this book (or whatever scope that includes this book), the plugin will make sure you review the rems of this valuable chapter first!
 
 
-<img width="700" alt="CleanShot 2026-01-03 at 16 06 53@2x" src="assets/uploaded/c04bec93-9af1-4de3-946c-959601f97d34.png" />
+![CleanShot 2026-01-03 at 16 06 53@2x](assets/uploaded/c04bec93-9af1-4de3-946c-959601f97d34.png){ width="700" }
 
 ## See also
 
