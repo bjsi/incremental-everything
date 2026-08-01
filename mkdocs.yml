@@ -1,0 +1,95 @@
+site_name: Incremental Everything — User's Manual
+site_url: https://bjsi.github.io/incremental-everything/
+site_description: The official User's Manual for the Incremental Everything plugin for RemNote.
+site_author: bjsi
+repo_url: https://github.com/bjsi/incremental-everything
+repo_name: bjsi/incremental-everything
+edit_uri: ""
+
+theme:
+  name: material
+  logo: assets/inc-logo.png
+  favicon: assets/inc-logo.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - toc.follow
+
+plugins:
+  - search:
+      lang: en
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - "User's Manual":
+    - 1. Getting Started: Getting-Started.md
+    - "2. What is Incrementalism?": What-is-Incrementalism?.md
+    - 3. The Core Loop:
+      - IR Flow — Reading, Extracting & Clozing: IR-Flow--Reading-Extracting-and-Clozing.md
+      - Reviewing Items in the Queue: Reviewing-Items-in-the-Queue.md
+      - Reviewing Items in the Editor: Reviewing-Items-in-the-Editor.md
+    - "4. Prioritization & Sorting": Prioritization-&-Sorting.md
+    - "4a. Priorities for Flashcards": Priorities-for-Flashcards.md
+    - "4b. Priority Review Document": Priority-Review-Document.md
+    - 5. Advanced Workflows:
+      - PDF Incremental Reading Workflow: PDF-Incremental-Reading-Workflow.md
+      - Create Incremental Rem from PDF Highlights: Create-Incremental-Rem-from-PDF-Highlights.md
+      - Incremental Video: Incremental-Video.md
+      - IncRem List & Main View: IncRem-List-and-Main-View.md
+      - History, Queue Dashboard & Mastery Drill: History-Queue-Dashboard-and-Mastery-Drill.md
+      - Study Dashboard: Study-Dashboard.md
+    - 6. Essential References:
+      - Plugin Widgets Reference: Plugin-Widgets-Reference.md
+      - Plugin Commands Reference: Plugin-Commands-Reference.md
+      - Plugin Settings Reference: Plugin-Settings-Reference.md
+      - IncRem Scheduler: IncRem-Scheduler.md
+      - Keyboard Shortcuts: Keyboard-Shortcuts.md
+      - Utilities: Utilities.md
+      - Full Mode vs Light Mode: Full-Mode-x-Light-Mode.md
+    - 7. FAQ & Troubleshooting:
+      - Does the plugin prioritize due-today items?: Does-the-plugin-prioritize-items-that-are-due-today-over-older-items?.md
+      - How priority and due date interact: How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration.md
+      - How to hide card priorities?: How-to-hide-card-priorities?.md
+      - Troubleshooting: Troubleshooting.md
+    - 8. Changelog: Changelog.md
+    - 9. Contributing to the Wiki: Contributing-to-the-Wiki.md

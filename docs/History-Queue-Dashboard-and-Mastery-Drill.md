@@ -1,0 +1,269 @@
+# History, Queue Dashboard & Mastery Drill
+
+These features were originally developed as a companion plugin (*History, Queue Dashboard and Mastery Drill*) and have been fully integrated into **Incremental Everything** as of v0.2.182.
+
+They add a suite of history and practice tools to your right sidebar: a **Live Session Dashboard** with real-time study metrics, a **Practiced Queues History** to track sessions over time, a **Flashcard History** to find recently reviewed cards, a **Visited Rem History** to retrace your navigation, and a **Mastery Drill** queue to deliberately target your most difficult material.
+
+---
+
+## Table of Contents
+
+- [Migrating from the Standalone Plugin](#migrating-from-the-standalone-plugin)
+- [Visited Rem History](#visited-rem-history)
+- [Flashcard History](#flashcard-history)
+- [Practiced Queues History & Live Dashboard](#practiced-queues-history--live-dashboard)
+- [Mastery Drill](#mastery-drill)
+- [How to Use](#how-to-use)
+- [Settings](#settings)
+- [Commands](#commands)
+
+---
+
+## Migrating from the Standalone Plugin
+
+> **This section only applies to users who previously had the *History, Queue Dashboard and Mastery Drill* plugin installed.** If you are a new Incremental Everything user, skip ahead.
+
+### Background
+
+Both plugins store their data in isolated, plugin-scoped namespaces — so running them simultaneously will not corrupt any data. However, both plugins register a command with the same name (*Mastery Drill: deliberately practice poorly rated cards*), which causes two identical entries in the Command Palette. Each plugin also maintains its own separate drill queue; rating a card *Forgot* or *Hard* would add it to **both** queues independently. Running both at the same time is therefore confusing and not recommended.
+
+The cleanest migration path is to disable IE's Mastery Drill while you finish and export from the old plugin, then uninstall the old plugin and re-enable IE's drill.
+
+### Migration Protocol
+
+**Step 1 — Disable IE's Mastery Drill temporarily**
+
+In RemNote Settings → Plugins → Incremental Everything, enable the **Skip Mastery Drill** toggle. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
+
+**Step 2 — Complete your old Mastery Drill queue *(optional)*
+
+Open the old plugin's drill via Command Palette → *Mastery Drill* and practice the queue to completion. Any cards you don't practice will not transfer to IE — they will simply repopulate in IE's drill the next time you rate them *Forgot* or *Hard* in a regular queue session. If you don't mind losing the pending items, skip this step.
+
+**Step 3 — Export your Practiced Queues history from the old plugin**
+
+In the old plugin's *Practiced Queues History* sidebar tab, click the **Export** button and save the JSON file.
+
+> **What cannot be migrated:** Flashcard History and Visited Rem History do not transfer. IE has been tracking its own copies from the moment it was installed, so those tabs will already contain recent entries.
+
+**Step 4 — Uninstall the old plugin**
+
+Go to **RemNote Settings → Plugins**, find *History, Queue Dashboard and Mastery Drill*, and uninstall it.
+
+**Step 5 — Re-enable IE's Mastery Drill**
+
+In RemNote Settings → Plugins → Incremental Everything, disable the **Skip Mastery Drill** toggle. Then **reload RemNote**. IE's drill popup, notification widget, and command are now active again, and AGAIN/HARD tracking resumes.
+
+**Step 6 — Import your Practiced Queues history**
+
+In IE's *Practiced Queues History* sidebar tab, click the **Import** button and select the JSON file from step 3. Duplicate sessions are automatically detected and skipped.
+
+---
+
+## Visited Rem History
+
+**What it does:** Records a chronological history of the Rems you have navigated to in the Editor.
+
+**Why use it:** Quickly jump back to documents you were just working on without losing your place.
+
+**Interaction:** You can expand and edit the Rem directly in the right sidebar.
+
+**Search:** Includes a search bar to instantly filter your history. Supports multi-word queries (e.g., "Biology Exam") and deep text search across all recorded items.
+
+<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/rem-history-editing.gif" alt="Visited Rem History" width="500">
+
+---
+
+## Flashcard History
+
+**What it does:** Records the chronological history of the Rems associated with the flashcards you have just seen in the Flashcard Queue.
+
+**Why use it:** If you want to check context or edit a flashcard you just reviewed, you can easily find it here without interrupting your session flow.
+
+**Interaction:** Clicking on a flashcard will open the Rem in the Editor.
+
+**Search & Filter:** Effortlessly find a card you practiced moments or days ago. The search checks both the front (question) and back (answer/context) of your cards. You can also filter the history by rating grade (Again, Hard, Good, Easy) using the radio buttons at the top.
+
+**Rating Badges:** Each card in the history displays a colored badge indicating the grade you assigned to it during the review session.
+
+**Priority Badge & inline editing:** Each entry also shows a priority badge, right-aligned in the badge row. Click it to open an inline slider editor directly in the row — adjust with the number field or the drag slider, then Save. No popup is opened, so editing a priority here never conflicts with the queue's target-rem selection. The change is written by the plugin's persistent background tracker, so it is saved reliably and still triggers the priority-inheritance cascade. The Incremental Rem History sidebar has the same badge, showing the IncRem priority (colored by its KB-wide percentile).
+
+**Cluster-aware recording:** Inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters), each sibling card is recorded individually as it becomes visible — not just the cluster anchor. This ensures your history accurately reflects every card you actually reviewed.
+
+<img src="assets/flashcard-history-sidebar.png" alt="Flashcard History" width="600">
+
+<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/filter.gif" alt="Flashcard History Filter" width="500">
+
+---
+
+## Practiced Queues History & Live Dashboard
+
+**What it does:** Tracks your practice sessions and metrics.
+
+**Live Dashboard:** Displays real-time metrics for your currently active queue session, including current speed, retention rate, and the age of the exact card you are reviewing.
+
+<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/queue-history-live.png" alt="Practiced Queue History Live" width="500">
+
+### Metrics Collected
+
+| Metric | Description |
+|---|---|
+| **Total Time** | Total time spent in the session |
+| **Retention Rate** | Remembered vs. Forgot percentage |
+| **Speed (CPM / s/card)** | Cards per minute and seconds per card, with visual indicator |
+| **Card Age** | Age of the card currently being reviewed (live view only) |
+| **Cost** | Minutes per year of card age/coverage |
+| **Interval** | Time until next scheduled review (prev/current card) |
+| **Sessions Summary** | Aggregated stats for Today, Yesterday, This Week, Last Week, and more |
+| **Flashcards** | Count and time for regular flashcards |
+| **Incremental Rems** | Count and time for IncRems reviewed during the session — tracked from the queue widget, the Editor Review Timer, and the Editor Review popup |
+
+**Cluster-aware tracking:** Card count, time, and retention are tracked per sibling card in a cluster — not just the cluster anchor. Average speed (s/card) and total card count correctly reflect all siblings rated.
+
+**IncRem tracking across all review surfaces:** IncRem count and time are recorded no matter where the review takes place — in the queue widget, via the ⏱️ Start Timer (editor timer), or via the Editor Review popup (manual-minutes confirm). If you open an IncRem in the editor directly from the queue (*Review in Editor*), the time is counted once in the same session rather than creating a duplicate engagement. Editor-only reviews (not started from a queue) appear as a separate **"Editor Review"** session that auto-saves after 60 minutes of inactivity.
+
+### Monthly Higher Shield Catch-Up
+
+The live session card has a small **📈 Monthly Higher Shield** block at the bottom that ties the current session back to your recent [Priority Shield](Prioritization-&-Sorting.md#priority-shield) history. Up to four rows appear — Knowledge Base × Document, each split between Incremental Rems and Cards — using the same line format as the threshold-slider caption in the [Weighted Shield popup](Prioritization-&-Sorting.md#weighted-shield):
+
+> 🌐 **KB · Cards** — priority ≤ **N** → **X** due to catch up
+> 📄 **Doc · IncRem** — ✓ At monthly higher priority shield (≤ **N**)
+
+**What it tells you.** "Monthly higher shield" is the **highest absolute-priority cutoff your shield reached in the last 30 days** — the deepest into your low-number, high-importance priorities your processing kept up with, recorded once per day on the [Priority Shield Graph](Plugin-Widgets-Reference.md#44-priority-shield-graph). The catch-up count is then the number of items currently due at-or-above that historical cutoff (`priority ≤ N`), excluding items you have already reviewed in the current session — so this number **drains live** as you clear the top of the queue.
+
+**How to read it.** A non-zero count is the smallest top-priority backlog you would need to clear, in this session or soon, to put the shield back at the highest level it has touched in the last month. When the count reaches 0 the row collapses to the `✓ At monthly higher priority shield` form — meaning the scope's most important items are already processed and the next shield record could match or exceed the recent high. Rows are shown only when shield history exists for that scope/item-kind combination, so a fresh KB or a never-visited document will simply have fewer (or no) rows.
+
+This is intentionally a passive readout — it doesn't gate or sort the queue. It's there so you can see, at a glance, how much top-priority work stands between you and your best recent protection level without opening the Weighted Shield popup.
+
+**Why use it:** Gain insights into your study habits, track your velocity, and monitor your usage of incremental reading tools alongside standard flashcards.
+
+**Interaction:** Clicking on a session opens the document in the Editor, so you can review the material again.
+
+**Export & Import:** Back up your practice session history across all Knowledge Bases to a local JSON file, and import it back at any time (duplicate sessions are automatically skipped).
+
+### Refresh Statistics — Authoritative Summary Recompute
+
+Above the Sessions Summary table you'll find a **Refresh Statistics** button alongside an "Updated *N* ago" timestamp. Clicking it walks RemNote's durable state — every card's repetition history, every Incremental Rem's history slot, and the Dismissed powerup's preserved history — and recomputes the per-period totals from ground truth instead of from the live event listeners.
+
+**Why it exists:** event-listener tracking can miss sessions when the queue is interrupted without firing `QueueExit` (tab closed, page navigated, plugin reloaded), and can over- or under-count IncRem time in certain engagement edge cases. The authoritative recompute reconciles the Summary against the same data RemNote uses for its own statistics.
+
+**How it works:**
+- A chunked progress bar shows progress through cards → IncRems → Dismissed rems. The recompute is cancellable at any time.
+- After the first recompute, the Summary is sourced from authoritative aggregates. Live listener data continues to fill the **gap after the recompute timestamp**, so today's ongoing session still updates the totals in real time.
+- Listener data is **never deleted**. Both the raw recent-session list and the rolled-over older buckets remain intact and continue to power the per-session History log below the Summary.
+- For days *before 2026-01-30* (when the Dismissed powerup was introduced), the Summary takes `MAX(authoritative, listener)` per field per day — recovering reps from rems that were dismissed-and-deleted before powerup-based history preservation existed, when they were captured by the listener at the time.
+- Filters mirror RemNote's own conventions: only flashcard scores `Again`/`Hard`/`Good`/`Easy` count (`TOO_EARLY`, `VIEWED_AS_LEECH`, `RESET`, `MANUAL_DATE`, `MANUAL_EASE` are excluded); for IncRems only real reviews count (`rescheduledInEditor`, `manualDateReset`, and lifecycle markers are excluded). Flashcard response time is capped by the **Flashcard response time limit** setting; IncRem `reviewTimeSeconds` is intentionally uncapped (an IncRem rep can legitimately span several minutes of reading).
+- A diagnostic per-day diff is logged to the browser console after each Refresh — useful when investigating discrepancies between the authoritative and listener views.
+
+**When to use it:** click Refresh whenever you want to confirm the Summary numbers match RemNote's view of your practice — for example, if a session was interrupted, after restoring a backup, or simply to validate at the end of a study day. For knowledge bases with many IncRems, the recompute may take 30 s–2 min and surfaces real-time progress.
+
+<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/queue-history.png" alt="Practiced Queue History" width="700">
+
+---
+
+## Mastery Drill
+
+Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused sub-queue of cards you have recently struggled with, so you can target them deliberately until they stick.
+
+<img src="assets/mastery-drill.png" alt="Mastery Drill" width="900">
+
+### How It Works
+
+- Any flashcard you rate **Forgot** or **Hard** is automatically added to the Mastery Drill queue.
+  - **Forgot** cards usually already have a RemNote relearning step. If you complete it successfully (Good/Easy), the card is cleared from the drill. The drill ensures you actually complete the relearning step, especially useful when studying document-scoped queues rather than the global queue.
+  - **Hard** cards are the real differentiator. Drilling them is equivalent to reviewing slightly ahead of time — FSRS accounts for this and the resulting interval is nearly unchanged. The purpose is to raise retrievability close to 100%.
+  - Unlike *SuperMemo*, these reviews **are recorded** in your repetition history.
+- Cards stay in the drill until you rate them **Good** or **Easy** inside the Mastery Drill.
+- A periodic notification widget appears in the Left Sidebar when ≥ 10 cards are pending, with a motivational phrase and a direct *Start Drill* button.
+
+### Why Use It
+
+Use the Mastery Drill to review only items you struggled with recently, ensuring you master them before they fall back into the scheduled queue. Working in a difficult-only mode puts your brain on an emergency alertness level — you approach repetitions differently when recall failure is expected, which is often enough to finally wrap your mind around harder material.
+
+> The Mastery Drill is optional. Not using it has no negative consequences: the scheduler will test you again at the next scheduled repetition and handle failures accordingly. But using it costs little and significantly increases success on subsequent repetitions.
+
+### Minimum Delay
+
+Cards rated *Again* or *Hard* enter the drill queue immediately but are held back for a configurable cooldown period (default: **120 minutes**) before appearing in the drill. This prevents you from re-reviewing the same card seconds after rating it, giving the initial repetition time to consolidate. While cards are cooling, a **"X cooling"** badge is shown in the drill toolbar. The notification widget in the Left Sidebar also excludes cooling cards from its count, so it only shows cards that are genuinely ready to drill.
+
+### Queue Management
+
+The drill toolbar (top row) provides several queue management tools:
+
+- **Clear Queue:** Empties the entire Mastery Drill queue at any time to start fresh.
+- **Clear Low Priority Cards:** Opens a distribution view showing how many drill cards fall into each of 20 priority buckets (0–5, 6–10, …, 96–100). Set a priority threshold and remove all cards above it in one click — useful when the queue has accumulated low-priority cards that aren't worth drilling urgently.
+- **Old Items Warning:** If items linger past the configured threshold (default: 7 days), a warning badge appears. Hover it to read an explanation of why stale items may be better left to the scheduler. Clear them with one click to keep sessions focused on fresh struggles.
+
+### Editor Access
+
+The drill toolbar (bottom row) provides per-card actions for the currently visible card:
+
+- **Priority Badge:** Shows the current card's priority. Click it to open an inline priority editor directly in the toolbar — no popup needed.
+- **Go to Rem:** Opens the Rem in RemNote's native Editor (closes the drill popup; a resume trigger re-opens it on return).
+- **Edit Later:** Prompts for an optional note, marks the card's Rem with the *Edit Later* powerup (storing the note in the Message slot), and removes the card from the drill queue.
+- **Edit Previous:** Opens an inline editor for the card you just rated — useful for quick corrections after seeing the answer.
+- **Edit Current:** Opens an inline editor for the currently visible card.
+- **Remove from Drill:** Removes the current card from the drill queue without rating it.
+
+<img src="https://raw.githubusercontent.com/hugomarins/final-drill-and-history/main/images/final-drill-editor.png" alt="Mastery Drill Editor" width="900">
+
+### Keyboard Shortcuts
+
+The Mastery Drill popup supports the standard RemNote queue keyboard shortcuts:
+
+| Key | Action |
+|---|---|
+| **1** | Again (if answer revealed) — or reveal answer first |
+| **2** | Hard (if answer revealed) — or reveal answer first |
+| **3** / **Space** | Good (if answer revealed) — or reveal answer first |
+| **4** | Easy (if answer revealed) — or reveal answer first |
+| **←** | Go back to the previous card |
+| **→** | Skip the current card (can be undone with ←) |
+
+If the answer has not yet been revealed, the first rating keystroke reveals it. The second keystroke records the rating. Shortcuts are suppressed when focus is on a text input or editable field.
+
+---
+
+## How to Use
+
+### Right Sidebar Tabs
+
+Three tabs are added to the right sidebar:
+
+1. **Rem History** — Navigate through your knowledge base as usual. Click items in the list to jump back.
+2. **Flashcard History** — Start a flashcard queue. As you rate cards, they appear here. Click a Rem to open it in the Editor.
+3. **Practiced Queue History** — Monitor session stats and click on a queue name to navigate back to it.
+
+### Mastery Drill
+
+1. Rate any flashcard **Forgot** or **Hard** during your regular queue.
+2. A notification will appear periodically in the Left Sidebar when the queue accumulates ≥ 10 pending cards.
+3. Open the drill using the **`Mastery Drill`** command in the Command Palette (Quick Code: `dri`), or click *Start Drill* in the notification widget.
+4. The queue clears as you master cards (rate them Good or Easy).
+
+<img src="assets/drill-notification.png" alt="Mastery Drill Notification" width="350">
+
+---
+
+## Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `Auto focus Queue Dashboard` | Off | When enabled, opens the Practiced Queues dashboard in the Right Sidebar automatically every time you enter a queue — no need to open the sidebar manually. It also **restores the dashboard after you press Next or Dismiss on an Incremental Rem**, bringing you back to the live session metrics once the sidebar was used for editing (Rem notes) or RemNote auto-focused its own pane (PDF/HTML). |
+| `Flashcard Response Time Limit` | 180 s | Caps recorded study time per card to prevent inflated stats when you step away from your device. |
+| `Skip Mastery Drill` | Off | Master switch to disable all Mastery Drill features: hides the drill popup and sidebar notification widgets, removes the `Mastery Drill` command, and stops tracking *Again*/*Hard* cards. Flashcard and Practiced Queue history are not affected. |
+| `Old Items Threshold` | 7 days | Number of days after which a Mastery Drill item is flagged as stale. Hover the warning badge in the toolbar for an explanation. |
+| `Mastery Drill Minimum Delay` | 120 min | A card rated *Again* or *Hard* will not appear in the drill until at least this many minutes have passed. Prevents re-reviewing the same card too soon after the initial rating. |
+| `Disable Mastery Drill Notification` | Off | Hides the periodic Left Sidebar notification widget. The notification only counts cards that have passed the minimum delay and are genuinely ready to drill. |
+
+📖 See [Plugin Settings Reference](Plugin-Settings-Reference.md) for the full settings list.
+
+---
+
+## Commands
+
+| Command | Quick Code | Description |
+|---|---|---|
+| `Mastery Drill` | `dri` | Opens the Mastery Drill popup. |
+| `Debug: Clear Flashcard History` | — | Clears all flashcard history data (useful if sync errors occur). |
+
+📖 See [Plugin Commands Reference](Plugin-Commands-Reference.md) for the full command list.
