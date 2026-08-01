@@ -1,5 +1,5 @@
 <p align="center">
-  ![Incremental Everything Logo](assets/inc-logo.png){ width="400" }
+  <img src="assets/inc-logo.png" width="400" alt="Incremental Everything Logo" />
 </p>
 
 Welcome to the official **User's Manual** for the **Incremental Everything plugin** for RemNote!

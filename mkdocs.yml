@@ -8,8 +8,8 @@ edit_uri: ""
 
 theme:
   name: material
-  logo: assets/inc-logo.png
-  favicon: assets/inc-logo.png
+  logo: assets/logo.png
+  favicon: assets/logo.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
