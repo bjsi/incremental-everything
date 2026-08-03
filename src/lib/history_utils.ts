@@ -4,6 +4,8 @@ export interface IncrementalHistoryData {
     key: number;
     remId: RemId;
     time: number;
+    /** @deprecated Legacy field. Row expansion is component state now — entries
+     *  written before that change still carry it, and it is ignored. */
     open?: boolean;
     kbId?: string;
     text?: string;

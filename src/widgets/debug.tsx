@@ -37,6 +37,7 @@ import {
   probeWriteCapacity,
   testNullFreesSlot,
   SYNCED_KEY_CAP,
+  formatBytes,
   AuditResult,
   CapacityReport,
   NullFreesSlotReport,
@@ -1592,7 +1593,7 @@ function Debug() {
       setKeyAudit(result);
       setKeyAuditProgress('');
       await plugin.app.toast(
-        `Audit done — ${result.totals.live + result.totals.nulled} named key(s) of ${result.cap}.`
+        `Audit done — ${result.occupied} named key(s) of ${result.cap}, ${formatBytes(result.totalBytes)} measured.`
       );
     } catch (e) {
       console.error('[KeyAudit] Scan failed', e);
@@ -3635,9 +3636,10 @@ function Debug() {
           them, so this reconstructs every key the plugin can write from the KB (IncRems × PDFs, documents, links,
           videos, …) and probes each with <code>getSynced</code>. <strong>live</strong> = holds a value,{' '}
           <strong>nulled</strong> = the key exists holding <code>null</code> (our "delete" pattern — still occupying a
-          slot). Orphan keys whose rem was deleted can't be named; they show up as <em>unaccounted</em>. Every candidate
-          costs one IPC read, so a large KB can take a few minutes and will feel sluggish while it runs. Full dump in
-          console.
+          slot). Orphan keys whose rem was deleted can't be named; they show up as <em>unaccounted</em>. Sizes are the
+          UTF-8 length of each value's JSON — a close proxy for what syncs, measured against RemNote's{' '}
+          {formatBytes(900 * 1024)} per-key and {formatBytes(10 * 1024 * 1024)} total ceilings. Every candidate costs
+          one IPC read, so a large KB can take a few minutes and will feel sluggish while it runs. Full dump in console.
         </div>
         {keyAuditProgress && (
           <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '8px' }}>
@@ -3658,6 +3660,15 @@ function Debug() {
               <div>Unaccounted (unnameable orphans): <strong style={{ color: keyAudit.unaccounted > 0 ? '#ef4444' : 'inherit' }}>~{keyAudit.unaccounted}</strong></div>
               <div>Live: <strong>{keyAudit.totals.live}</strong> · Nulled: <strong style={{ color: keyAudit.totals.nulled > 0 ? '#ef4444' : 'inherit' }}>{keyAudit.totals.nulled}</strong></div>
               <div>Probed: <strong>{keyAudit.totals.probed}</strong> candidate keys in {(keyAudit.durationMs / 1000).toFixed(1)}s</div>
+              <div>
+                Measured footprint: <strong>{formatBytes(keyAudit.totalBytes)}</strong> / {formatBytes(keyAudit.totalBudget)}{' '}
+                ({((keyAudit.totalBytes / keyAudit.totalBudget) * 100).toFixed(1)}%)
+              </div>
+              <div>
+                Biggest key: <strong style={{ color: keyAudit.sizeWarnings.length > 0 ? '#ef4444' : 'inherit' }}>
+                  {keyAudit.largestKeys[0] ? formatBytes(keyAudit.largestKeys[0].bytes) : '—'}
+                </strong> / {formatBytes(keyAudit.perKeyLimit)} per-key ceiling
+              </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 Scanned: {keyAudit.scanned.allRems} rems ({keyAudit.scanned.incRems} IncRem ·{' '}
                 {keyAudit.scanned.dismissed} Dismissed) · {keyAudit.scanned.pdfPairs} IncRem×PDF pairs ·{' '}
@@ -3669,6 +3680,20 @@ function Debug() {
                 Calibration failed: a key that was never written did not read back as <code>undefined</code>, so
                 "nulled" can't be told apart from "absent". That column is excluded from the occupied count — use the
                 null-frees-slot experiment instead.
+              </div>
+            )}
+            {keyAudit.sizeWarnings.length > 0 && (
+              <div style={{ fontSize: '12px', marginBottom: '8px', padding: '8px', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)' }}>
+                <strong>{keyAudit.sizeWarnings.length}</strong> key(s) past half the {formatBytes(keyAudit.perKeyLimit)} per-key
+                ceiling — these are the ones that need a retention window or restructuring, not migration:
+                <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px' }}>
+                  {keyAudit.sizeWarnings.map((k) => (
+                    <li key={k.key} style={{ wordBreak: 'break-all' }}>
+                      <code style={{ fontSize: '10px' }}>{k.key}</code> — {formatBytes(k.bytes)}{' '}
+                      ({((k.bytes / keyAudit.perKeyLimit) * 100).toFixed(0)}%)
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
             {keyAudit.nullSignalUsable && keyAudit.totals.nulled > 0 && (
@@ -3683,6 +3708,8 @@ function Debug() {
                   <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
                     <th style={{ padding: '4px' }}>Family</th>
                     <th style={{ padding: '4px', textAlign: 'right' }}>Live</th>
+                    <th style={{ padding: '4px', textAlign: 'right' }}>Size</th>
+                    <th style={{ padding: '4px', textAlign: 'right' }}>Largest</th>
                     <th style={{ padding: '4px', textAlign: 'right' }}>Nulled</th>
                     <th style={{ padding: '4px', textAlign: 'right' }}>Probed</th>
                     <th style={{ padding: '4px' }}>Coverage</th>
@@ -3690,7 +3717,7 @@ function Debug() {
                 </thead>
                 <tbody>
                   {[...keyAudit.families]
-                    .sort((a, b) => (b.live + b.nulled) - (a.live + a.nulled))
+                    .sort((a, b) => b.bytes - a.bytes || (b.live + b.nulled) - (a.live + a.nulled))
                     .map((f) => (
                       <tr key={f.family} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
                         <td style={{ padding: '4px' }}>
@@ -3701,6 +3728,10 @@ function Debug() {
                           )}
                         </td>
                         <td style={{ padding: '4px', textAlign: 'right', fontWeight: 600 }}>{f.live}</td>
+                        <td style={{ padding: '4px', textAlign: 'right' }}>{f.bytes > 0 ? formatBytes(f.bytes) : '—'}</td>
+                        <td style={{ padding: '4px', textAlign: 'right', color: f.largest && f.largest.bytes >= keyAudit.perKeyLimit * 0.5 ? '#ef4444' : 'var(--rn-clr-content-tertiary)' }}>
+                          {f.largest ? formatBytes(f.largest.bytes) : '—'}
+                        </td>
                         <td style={{ padding: '4px', textAlign: 'right', color: f.nulled > 0 ? '#ef4444' : 'inherit' }}>{f.nulled}</td>
                         <td style={{ padding: '4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{f.probed}</td>
                         <td style={{ padding: '4px', color: f.coverage === 'full' ? '#10b981' : 'var(--rn-clr-content-tertiary)' }}>{f.coverage}</td>
@@ -3709,6 +3740,29 @@ function Debug() {
                 </tbody>
               </table>
             </div>
+            {keyAudit.largestKeys.length > 0 && (
+              <details style={{ marginTop: '8px' }}>
+                <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>
+                  Largest keys ({keyAudit.largestKeys.length}) — per-key ceiling {formatBytes(keyAudit.perKeyLimit)}
+                </summary>
+                <table style={{ fontSize: '11px', width: '100%', borderCollapse: 'collapse', marginTop: '4px' }}>
+                  <tbody>
+                    {keyAudit.largestKeys.map((k) => {
+                      const pct = (k.bytes / keyAudit.perKeyLimit) * 100;
+                      return (
+                        <tr key={k.key} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                          <td style={{ padding: '3px 4px', wordBreak: 'break-all' }}><code style={{ fontSize: '10px' }}>{k.key}</code></td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{formatBytes(k.bytes)}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: pct >= 50 ? '#ef4444' : 'var(--rn-clr-content-tertiary)' }}>
+                            {pct.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </details>
+            )}
           </div>
         )}
         {nullTestReport && (

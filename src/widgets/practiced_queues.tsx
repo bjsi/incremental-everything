@@ -261,9 +261,11 @@ function PracticedQueues() {
         DAILY_AGGREGATES_KEY,
         []
     );
-    const [authoritativeRaw] = useSyncedStorageState<DailyAggregate[]>(
+    // Stored shape varies (legacy array vs the compact kbId→date→row store), so
+    // this stays untyped and filterAuthoritativeForKb does the decoding.
+    const [authoritativeRaw] = useSyncedStorageState<unknown>(
         AUTHORITATIVE_AGGREGATES_KEY,
-        []
+        null
     );
     const [authoritativeLastComputed] = useSyncedStorageState<number>(
         AUTHORITATIVE_LAST_COMPUTED_KEY,

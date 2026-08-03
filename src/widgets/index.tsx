@@ -24,6 +24,7 @@ import {
 import { enableHideInQueueIntegrationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
+import { compactAuthoritativeAggregatesIfNeeded } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS } from '../lib/ui_helpers';
 
@@ -66,6 +67,12 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Document graph Rem was deleted. Errors are logged inside the helper and
   // must not block activation.
   void cleanupOrphanedReviewGraphs(plugin);
+
+  // Fire-and-forget: shrink the authoritative-aggregates key into its compact
+  // form if it is still the legacy array. Needs no card/rem enumeration, so it
+  // works while those APIs are unavailable — and until it runs, that key sits
+  // over RemNote's 900KB per-key ceiling and every write to it is rejected.
+  void compactAuthoritativeAggregatesIfNeeded(plugin);
 
   registerCallbacks(plugin);
   await registerWidgets(plugin);

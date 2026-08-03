@@ -19,6 +19,131 @@ import { repCountsForStats } from './incremental_rem/types';
 export const AUTHORITATIVE_AGGREGATES_KEY = 'authoritativeDailyAggregates';
 export const AUTHORITATIVE_LAST_COMPUTED_KEY = 'authoritativeAggregatesLastComputed';
 
+// ---------------------------------------------------------------------------
+// Storage format
+//
+// This key holds one bucket per (day, knowledge base) for the user's ENTIRE
+// review history, so it grows forever — roughly 175 bytes per bucket in the
+// original `DailyAggregate[]` form, of which the six numbers that carry the
+// actual data were a minority: every bucket repeated eight field names and a
+// 24-character kbId. At ~7,250 buckets that reached 1.21MB and blew past
+// RemNote's 900KB per-key ceiling, so every recompute was silently rejected and
+// the dashboard's authoritative figures froze.
+//
+// Buckets are therefore stored keyed by kbId → date → a positional row, which
+// writes the kbId once per KB instead of once per day and drops the field names
+// entirely. Same data, ~5x smaller. `ids` is not stored at all: the authoritative
+// walk never populates it (findOrCreateBucket creates an empty array and nothing
+// pushes to it) — it exists only on the listener-derived aggregates, which live
+// under a different key and keep their original format.
+//
+// Reads accept either shape, so no migration step is needed: the next successful
+// recompute rewrites the key in the compact form.
+// ---------------------------------------------------------------------------
+
+/** [totalTime, cardsCount, cardsTime, incRemsCount, incRemsTime, forgotCount] — times in ms. */
+type CompactRow = [number, number, number, number, number, number];
+
+interface CompactAggregateStore {
+  /** Format version. Absent/array ⇒ the legacy `DailyAggregate[]` form. */
+  v: 2;
+  /** kbId → date (YYYY-MM-DD) → row */
+  kbs: Record<string, Record<string, CompactRow>>;
+}
+
+function isCompactStore(raw: unknown): raw is CompactAggregateStore {
+  return !!raw && !Array.isArray(raw) && typeof raw === 'object' && (raw as any).v === 2;
+}
+
+/** Accepts either storage shape (or junk) and returns plain buckets. */
+export function decodeAuthoritativeAggregates(raw: unknown): DailyAggregate[] {
+  if (!raw) return [];
+
+  if (isCompactStore(raw)) {
+    const out: DailyAggregate[] = [];
+    for (const [kbId, byDate] of Object.entries(raw.kbs || {})) {
+      for (const [date, row] of Object.entries(byDate || {})) {
+        if (!Array.isArray(row)) continue;
+        out.push({
+          date,
+          kbId,
+          totalTime: row[0] || 0,
+          cardsCount: row[1] || 0,
+          cardsTime: row[2] || 0,
+          incRemsCount: row[3] || 0,
+          incRemsTime: row[4] || 0,
+          forgotCount: row[5] || 0,
+          ids: [], // never populated for authoritative buckets; kept for shape compatibility
+        });
+      }
+    }
+    return out;
+  }
+
+  // Legacy: a plain array of DailyAggregate.
+  if (Array.isArray(raw)) return raw.filter((b): b is DailyAggregate => !!b && typeof b === 'object');
+
+  return [];
+}
+
+/**
+ * Rewrite the stored value in the compact form if it is still the legacy array.
+ *
+ * This is deliberately independent of the recompute: recomputing walks every
+ * card (`plugin.card.getAll`, removed in RemNote 1.27.16) and cannot run at all
+ * right now, whereas this only reads the key and writes it back in a smaller
+ * shape — no card data, no rem enumeration, nothing the platform took away.
+ * That matters because the legacy value is over the 900KB per-key ceiling, so
+ * until it shrinks, EVERY write to this key is rejected.
+ *
+ * Idempotent: a value already in v2 form is left alone, so this is safe to run
+ * on every activation. Also safe at the 1000-key cap — the key already exists,
+ * and overwrites of existing keys are still accepted.
+ */
+export async function compactAuthoritativeAggregatesIfNeeded(plugin: RNPlugin): Promise<boolean> {
+  try {
+    const raw = await plugin.storage.getSynced(AUTHORITATIVE_AGGREGATES_KEY);
+    if (!raw || isCompactStore(raw)) return false; // nothing stored, or already compact
+    if (!Array.isArray(raw) || raw.length === 0) return false;
+
+    const beforeBytes = JSON.stringify(raw).length;
+    const payload = encodeAuthoritativeAggregates(decodeAuthoritativeAggregates(raw));
+    const afterBytes = JSON.stringify(payload).length;
+
+    await plugin.storage.setSynced(AUTHORITATIVE_AGGREGATES_KEY, payload);
+    console.log(
+      `[AuthoritativeAggregates] Compacted ${raw.length} buckets: ` +
+        `${(beforeBytes / 1024).toFixed(1)}KB → ${(afterBytes / 1024).toFixed(1)}KB ` +
+        `(${(beforeBytes / afterBytes).toFixed(1)}x smaller, now ` +
+        `${((afterBytes / (900 * 1024)) * 100).toFixed(0)}% of the 900KB per-key limit).`
+    );
+    return true;
+  } catch (err) {
+    console.warn('[AuthoritativeAggregates] Compaction failed', err);
+    return false;
+  }
+}
+
+export function encodeAuthoritativeAggregates(buckets: DailyAggregate[]): CompactAggregateStore {
+  const kbs: Record<string, Record<string, CompactRow>> = {};
+  for (const b of buckets) {
+    if (!b || !b.date || !b.kbId) continue;
+    // Times are milliseconds accumulated from reviewTimeSeconds * 1000, so they
+    // are whole numbers already; rounding only guards against float drift
+    // producing a 17-digit literal in the JSON.
+    const row: CompactRow = [
+      Math.round(b.totalTime || 0),
+      Math.round(b.cardsCount || 0),
+      Math.round(b.cardsTime || 0),
+      Math.round(b.incRemsCount || 0),
+      Math.round(b.incRemsTime || 0),
+      Math.round(b.forgotCount || 0),
+    ];
+    (kbs[b.kbId] ||= {})[b.date] = row;
+  }
+  return { v: 2, kbs };
+}
+
 // Days strictly before this local date are not fully reliable for IncRem stats:
 // the Dismissed powerup (which preserves history when a rem is no longer
 // Incremental) was introduced on 2026-01-30 (commit fc21734). Reviews on rems
@@ -244,19 +369,45 @@ export async function saveAuthoritativeAggregates(
   currentKbBuckets: DailyAggregate[]
 ): Promise<void> {
   const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
-  const existing =
-    ((await plugin.storage.getSynced(AUTHORITATIVE_AGGREGATES_KEY)) as DailyAggregate[]) || [];
+  const existing = decodeAuthoritativeAggregates(
+    await plugin.storage.getSynced(AUTHORITATIVE_AGGREGATES_KEY)
+  );
   const otherKbs = existing.filter((b) => !!b && b.kbId !== kbId && b.kbId !== UNKNOWN_KB_ID);
-  await plugin.storage.setSynced(AUTHORITATIVE_AGGREGATES_KEY, [...otherKbs, ...currentKbBuckets]);
+  const payload = encodeAuthoritativeAggregates([...otherKbs, ...currentKbBuckets]);
+
+  // This key outgrew RemNote's 900KB per-key ceiling once already, and a write
+  // over it is rejected rather than truncated — which is silent unless we look.
+  // Log the size so a regression shows up in the console instead of as a
+  // dashboard that mysteriously stops updating.
+  const bytes = JSON.stringify(payload).length;
+  const pctOfLimit = (bytes / (900 * 1024)) * 100;
+  if (pctOfLimit >= 50) {
+    console.warn(
+      `[AuthoritativeAggregates] Payload is ${(bytes / 1024).toFixed(1)}KB — ` +
+        `${pctOfLimit.toFixed(0)}% of the 900KB per-key limit. Consider rolling old days up into months.`
+    );
+  } else {
+    console.log(
+      `[AuthoritativeAggregates] Saving ${otherKbs.length + currentKbBuckets.length} buckets, ` +
+        `${(bytes / 1024).toFixed(1)}KB (${pctOfLimit.toFixed(1)}% of the per-key limit).`
+    );
+  }
+
+  await plugin.storage.setSynced(AUTHORITATIVE_AGGREGATES_KEY, payload);
   await plugin.storage.setSynced(AUTHORITATIVE_LAST_COMPUTED_KEY, Date.now());
 }
 
+/**
+ * Takes the raw stored value in EITHER format (legacy array or compact store)
+ * and returns this KB's buckets. Callers pass whatever `getSynced` /
+ * `useSyncedStorageState` handed them; decoding lives here so no consumer has
+ * to know which shape is on disk.
+ */
 export function filterAuthoritativeForKb(
-  aggregates: DailyAggregate[] | null | undefined,
+  aggregates: unknown,
   currentKbId: string
 ): DailyAggregate[] {
-  if (!aggregates) return [];
-  return aggregates.filter((a) => !!a && a.kbId === currentKbId);
+  return decodeAuthoritativeAggregates(aggregates).filter((a) => a.kbId === currentKbId);
 }
 
 /**
