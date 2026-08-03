@@ -129,6 +129,15 @@ export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shie
 // clears this KB's shield partition, plus an index listing them for restore.
 export const cardShieldCleanupBackupPrefix = 'card-shield-cleanup-backup-';
 export const cardShieldCleanupBackupIndexKey = 'card-shield-cleanup-backup-index';
+// Characters kept per side (front / back) in the history jump-lists. The stored
+// `text` field is "front back", so one entry holds at most 2×limit + 1 chars.
+// These lists are searched by substring and shown as one-line previews — they are
+// caches for navigation, not a copy of the card, and they live in synced storage
+// where a 900KB per-key ceiling applies. Keep the writer and the widget backfill
+// on the same constant so they cannot drift apart.
+export const flashcardHistoryTextLimit = 500;
+export const remHistoryTextLimit = 200;
+
 // Restore point of a rem's Incremental history, captured by the debug tools
 // before a hand-edit. One synced key per backed-up rem — lives here (not in
 // debug.tsx) so the synced-key audit can reconstruct the family.

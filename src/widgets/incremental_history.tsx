@@ -172,14 +172,18 @@ function IncrementalHistory() {
         }
     };
 
-    const setData = (itemKey: number, changes: Partial<IncrementalHistoryData>) => {
-        const originalIndex = historyDataRaw.findIndex(x => x.key === itemKey);
-        if (originalIndex !== -1) {
-            const oldData = historyDataRaw[originalIndex];
-            const newData = { ...oldData, ...changes };
-            historyDataRaw.splice(originalIndex, 1, newData);
-            setHistoryData([...historyDataRaw]);
-        }
+    // Row expansion is transient UI state and is deliberately NOT persisted.
+    // It used to live on the stored entry as `open`, so every chevron click
+    // rewrote the whole history array to synced storage. Component state costs
+    // nothing and removes that write entirely.
+    const [openKeys, setOpenKeys] = useState<Set<number>>(new Set());
+    const toggleOpen = (itemKey: number) => {
+        setOpenKeys((prev) => {
+            const next = new Set(prev);
+            if (next.has(itemKey)) next.delete(itemKey);
+            else next.add(itemKey);
+            return next;
+        });
     };
 
     const [numLoaded, setNumLoaded] = React.useState(1);
@@ -231,7 +235,8 @@ function IncrementalHistory() {
                     data={data}
                     remId={data.remId}
                     key={data.key || Math.random()}
-                    setData={(c) => setData(data.key, c)}
+                    open={openKeys.has(data.key)}
+                    toggleOpen={() => toggleOpen(data.key)}
                     closeIndex={() => closeIndex(data.key)}
                     percentile={percentileMap[data.remId]}
                 />
@@ -280,13 +285,15 @@ function EventBadge({ eventType }: { eventType?: 'reviewed' | 'created' | 'dismi
 function HistoryItem({
     data,
     remId,
-    setData,
+    open,
+    toggleOpen,
     closeIndex,
     percentile,
 }: {
     data: IncrementalHistoryData;
     remId: string;
-    setData: (changes: Partial<IncrementalHistoryData>) => void;
+    open: boolean;
+    toggleOpen: () => void;
     closeIndex: () => void;
     percentile?: number;
 }) {
@@ -349,12 +356,12 @@ function HistoryItem({
             <div className="flex gap-2 mb-2">
                 <div
                     className="flex items-center justify-center flex-shrink-0 w-6 h-6 rounded-md cursor-pointer hover:bg-gray-200"
-                    onClick={() => setData({ open: !data.open })}
+                    onClick={toggleOpen}
                 >
                     <img
                         src={`${plugin.rootURL}chevron_down.svg`}
                         style={{
-                            transform: `rotate(${data.open ? 0 : -90}deg)`,
+                            transform: `rotate(${open ? 0 : -90}deg)`,
                             transitionProperty: "transform",
                             transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)",
                             transitionDuration: "150ms",
@@ -423,7 +430,7 @@ function HistoryItem({
                     />
                 </div>
             )}
-            {data.open && (
+            {open && (
                 <div className="m-2">
                     <RemHierarchyEditorTree height="auto" width="100%" remId={remId} />
                 </div>

@@ -11,13 +11,16 @@ import '../style.css';
 import '../App.css';
 import { timeSince } from "../lib/utils";
 import { safeRemTextToString } from "../lib/pdfUtils";
+import { remHistoryTextLimit } from "../lib/consts";
 
 const NUM_TO_LOAD_IN_BATCH = 20;
 
 export interface RemHistoryData {
     key: number;
     remId: RemId;
-    open: boolean;
+    /** @deprecated Legacy field. Row expansion is component state now — entries
+     *  written before that change still carry it, and it is ignored. */
+    open?: boolean;
     time: number;
     kbId?: string;
     text?: string;
@@ -51,8 +54,8 @@ function RemHistory() {
                     const rem = await plugin.rem.findOne(item.remId);
                     const frontText = await safeRemTextToString(plugin, rem?.text);
                     const backText = await safeRemTextToString(plugin, rem?.backText);
-                    const cleanFront = frontText === 'Untitled' && (!rem?.text || rem.text.length === 0) ? '' : frontText.substring(0, 200);
-                    const cleanBack = backText === 'Untitled' && (!rem?.backText || rem.backText.length === 0) ? '' : backText.substring(0, 200);
+                    const cleanFront = frontText === 'Untitled' && (!rem?.text || rem.text.length === 0) ? '' : frontText.substring(0, remHistoryTextLimit);
+                    const cleanBack = backText === 'Untitled' && (!rem?.backText || rem.backText.length === 0) ? '' : backText.substring(0, remHistoryTextLimit);
                     const text = `${cleanFront} ${cleanBack}`.trim();
                     updates.set(item.key, text);
                 } catch (e) {
@@ -128,14 +131,18 @@ function RemHistory() {
         }
     };
 
-    const setData = (itemKey: number, changes: Partial<RemHistoryData>) => {
-        const originalIndex = remDataRaw.findIndex(x => x.key === itemKey);
-        if (originalIndex !== -1) {
-            const oldData = remDataRaw[originalIndex];
-            const newData = { ...oldData, ...changes };
-            remDataRaw.splice(originalIndex, 1, newData);
-            setRemData([...remDataRaw]);
-        }
+    // Row expansion is transient UI state and is deliberately NOT persisted.
+    // It used to live on the stored entry as `open`, so every chevron click
+    // rewrote the whole history array to synced storage. Component state costs
+    // nothing and removes that write entirely.
+    const [openKeys, setOpenKeys] = useState<Set<number>>(new Set());
+    const toggleOpen = (itemKey: number) => {
+        setOpenKeys((prev) => {
+            const next = new Set(prev);
+            if (next.has(itemKey)) next.delete(itemKey);
+            else next.add(itemKey);
+            return next;
+        });
     };
 
     const [numLoaded, setNumLoaded] = React.useState(1);
@@ -173,7 +180,8 @@ function RemHistory() {
                     data={data}
                     remId={data.remId}
                     key={data.key || Math.random()}
-                    setData={(c) => setData(data.key, c)}
+                    open={openKeys.has(data.key)}
+                    toggleOpen={() => toggleOpen(data.key)}
                     closeIndex={() => closeIndex(data.key)}
                 />
             ))}
@@ -192,14 +200,16 @@ function RemHistory() {
 interface RemHistoryItemProps {
     data: RemHistoryData;
     remId: string;
-    setData: (changes: Partial<RemHistoryData>) => void;
+    open: boolean;
+    toggleOpen: () => void;
     closeIndex: () => void;
 }
 
 function RemHistoryItem({
     data,
     remId,
-    setData,
+    open,
+    toggleOpen,
     closeIndex,
 }: RemHistoryItemProps) {
     const plugin = usePlugin();
@@ -216,12 +226,12 @@ function RemHistoryItem({
             <div className="flex gap-2 mb-2">
                 <div
                     className="flex items-center justify-center flex-shrink-0 w-6 h-6 rounded-md cursor-pointer hover:bg-gray-200"
-                    onClick={() => setData({ open: !data.open })}
+                    onClick={toggleOpen}
                 >
                     <img
                         src={`${plugin.rootURL}chevron_down.svg`}
                         style={{
-                            transform: `rotate(${data.open ? 0 : -90}deg)`,
+                            transform: `rotate(${open ? 0 : -90}deg)`,
                             transitionProperty: "transform",
                             transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)",
                             transitionDuration: "150ms",
@@ -254,7 +264,7 @@ function RemHistoryItem({
                     />
                 </div>
             </div>
-            {data.open && (
+            {open && (
                 <div className="m-2">
                     <RemHierarchyEditorTree height="auto" width="100%" remId={remId} />
                 </div>

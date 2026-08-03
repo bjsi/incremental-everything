@@ -55,11 +55,27 @@ import { AUTHORITATIVE_AGGREGATES_KEY, AUTHORITATIVE_LAST_COMPUTED_KEY } from '.
 
 export const SYNCED_KEY_CAP = 1000;
 
+/** RemNote's documented ceilings: 900KB for a single synced value, 10MB for a
+ *  plugin's whole synced footprint. Measured sizes here are the UTF-8 length of
+ *  `JSON.stringify(value)` — a close proxy for what gets synced, not the exact
+ *  on-disk figure, which we have no way to read. */
+export const PER_KEY_BYTE_LIMIT = 900 * 1024;
+export const TOTAL_BYTE_BUDGET = 10 * 1024 * 1024;
+/** Flag a key once it passes half of the per-key ceiling — enough runway to act. */
+const SIZE_WARN_RATIO = 0.5;
+/** How many of the biggest keys to keep for the report. */
+const LARGEST_KEYS_KEPT = 20;
+
 /** Probe concurrency. Each getSynced is an IPC round trip; the bridge chokes
  *  well before this becomes a throughput win, so keep it modest. */
 const PROBE_CONCURRENCY = 12;
 
 export type ProbeState = 'live' | 'nulled' | 'absent';
+
+export interface KeySize {
+  key: string;
+  bytes: number;
+}
 
 export interface FamilyReport {
   family: string;
@@ -72,6 +88,10 @@ export interface FamilyReport {
   /** Keys that exist holding null — almost certainly still consuming a slot. */
   nulled: number;
   absent: number;
+  /** Sum of measured sizes of this family's live keys. */
+  bytes: number;
+  /** The single fattest key in this family, if any. */
+  largest?: KeySize;
   /** Up to 5 example keys that came back live. */
   sample: string[];
   /** Keys safe to sacrifice in the capacity experiment (pure backup/orphan data). */
@@ -104,6 +124,14 @@ export interface AuditResult {
   occupied: number;
   /** cap − occupied: keys that must exist but that we could not name. */
   unaccounted: number;
+  /** Total measured size of every live key we could name. */
+  totalBytes: number;
+  perKeyLimit: number;
+  totalBudget: number;
+  /** The fattest keys found, biggest first. */
+  largestKeys: KeySize[];
+  /** Keys past half the per-key ceiling — the ones worth restructuring. */
+  sizeWarnings: KeySize[];
   disposable: string[];
   kbIds: string[];
   scanned: {
@@ -130,23 +158,46 @@ interface FamilyCandidates {
 
 // --- probing ---------------------------------------------------------------
 
-async function probeKey(plugin: RNPlugin, key: string): Promise<ProbeState> {
+const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+
+/** UTF-8 byte length of a value's JSON form. Falls back to the string length
+ *  where TextEncoder is unavailable, which only under-counts non-ASCII. */
+function measureBytes(value: unknown): number {
+  let json: string;
+  try {
+    json = JSON.stringify(value) ?? '';
+  } catch {
+    return 0; // circular or otherwise unserializable — should not happen for stored data
+  }
+  return textEncoder ? textEncoder.encode(json).length : json.length;
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+async function probeKey(plugin: RNPlugin, key: string): Promise<{ state: ProbeState; bytes: number }> {
   try {
     const value = await plugin.storage.getSynced(key);
-    if (value === undefined) return 'absent';
-    if (value === null) return 'nulled';
-    return 'live';
+    if (value === undefined) return { state: 'absent', bytes: 0 };
+    if (value === null) return { state: 'nulled', bytes: 0 };
+    // Measure and drop the value immediately — holding thousands of them would
+    // cost more memory than the storage we're auditing.
+    return { state: 'live', bytes: measureBytes(value) };
   } catch {
     // A read that throws tells us nothing about existence; treat as absent so we
     // never over-count, and let the unaccounted figure absorb it.
-    return 'absent';
+    return { state: 'absent', bytes: 0 };
   }
 }
 
 async function probeFamily(
   plugin: RNPlugin,
   candidates: FamilyCandidates,
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
+  onLiveKey?: (entry: KeySize) => void
 ): Promise<FamilyReport> {
   // The same key can be generated twice (e.g. a PDF reachable both directly and
   // as a source); counting it twice would overstate slot usage.
@@ -159,6 +210,7 @@ async function probeFamily(
     live: 0,
     nulled: 0,
     absent: 0,
+    bytes: 0,
     sample: [],
     disposable: [],
     note: candidates.note,
@@ -166,11 +218,14 @@ async function probeFamily(
 
   for (let i = 0; i < keys.length; i += PROBE_CONCURRENCY) {
     const chunk = keys.slice(i, i + PROBE_CONCURRENCY);
-    const states = await Promise.all(chunk.map((k) => probeKey(plugin, k)));
-    states.forEach((state, j) => {
+    const results = await Promise.all(chunk.map((k) => probeKey(plugin, k)));
+    results.forEach(({ state, bytes }, j) => {
       const key = chunk[j];
       if (state === 'live') {
         report.live++;
+        report.bytes += bytes;
+        if (!report.largest || bytes > report.largest.bytes) report.largest = { key, bytes };
+        onLiveKey?.({ key, bytes });
         if (report.sample.length < 5) report.sample.push(key);
         if (candidates.disposable) report.disposable!.push(key);
       } else if (state === 'nulled') {
@@ -502,7 +557,7 @@ async function buildCandidates(
  *  and the live/nulled/absent split cannot be trusted. */
 async function calibrateNullSignal(plugin: RNPlugin): Promise<boolean> {
   const neverWritten = `__ie_key_audit_calibration_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const state = await probeKey(plugin, neverWritten);
+  const { state } = await probeKey(plugin, neverWritten);
   if (state !== 'absent') {
     console.warn(
       `[KeyAudit] Calibration: an unwritten key read back as "${state}" — undefined/null are indistinguishable, ` +
@@ -525,12 +580,30 @@ export async function auditSyncedKeys(
   const totalCandidates = candidates.reduce((s, f) => s + f.keys.length, 0);
   let done = 0;
   const reports: FamilyReport[] = [];
+  // Running top-N by size. Kept as a plain sorted array — N is tiny, and the
+  // alternative (retaining every live key's size) would be thousands of entries.
+  const largestKeys: KeySize[] = [];
+  const recordSize = (entry: KeySize) => {
+    if (largestKeys.length < LARGEST_KEYS_KEPT) {
+      largestKeys.push(entry);
+      largestKeys.sort((a, b) => b.bytes - a.bytes);
+    } else if (entry.bytes > largestKeys[largestKeys.length - 1].bytes) {
+      largestKeys[largestKeys.length - 1] = entry;
+      largestKeys.sort((a, b) => b.bytes - a.bytes);
+    }
+  };
+
   for (const family of candidates) {
-    const report = await probeFamily(plugin, family, (chunkDone, chunkTotal) => {
-      onProgress?.(
-        `Probing ${family.family}: ${chunkDone}/${chunkTotal} (${done + chunkDone}/${totalCandidates} total)…`
-      );
-    });
+    const report = await probeFamily(
+      plugin,
+      family,
+      (chunkDone, chunkTotal) => {
+        onProgress?.(
+          `Probing ${family.family}: ${chunkDone}/${chunkTotal} (${done + chunkDone}/${totalCandidates} total)…`
+        );
+      },
+      recordSize
+    );
     done += report.probed;
     reports.push(report);
   }
@@ -548,10 +621,16 @@ export async function auditSyncedKeys(
   // Nulled keys only count as occupied when the absent/null distinction survived
   // calibration; otherwise every unwritten key reads as null and would inflate it.
   const occupied = totals.live + (nullSignalUsable ? totals.nulled : 0);
+  const totalBytes = reports.reduce((s, r) => s + r.bytes, 0);
 
   const result: AuditResult = {
     durationMs: Date.now() - started,
     families: reports,
+    totalBytes,
+    perKeyLimit: PER_KEY_BYTE_LIMIT,
+    totalBudget: TOTAL_BYTE_BUDGET,
+    largestKeys,
+    sizeWarnings: largestKeys.filter((k) => k.bytes >= PER_KEY_BYTE_LIMIT * SIZE_WARN_RATIO),
     totals,
     cap: SYNCED_KEY_CAP,
     occupied,
@@ -575,18 +654,42 @@ export function logAuditResult(result: AuditResult): void {
   );
   console.log(`KB ids seen: ${result.kbIds.join(', ')}`);
   console.table(
-    result.families.map((f) => ({
-      family: f.family,
-      probed: f.probed,
-      live: f.live,
-      nulled: f.nulled,
-      coverage: f.coverage,
-    }))
+    [...result.families]
+      .sort((a, b) => b.bytes - a.bytes)
+      .map((f) => ({
+        family: f.family,
+        probed: f.probed,
+        live: f.live,
+        nulled: f.nulled,
+        size: formatBytes(f.bytes),
+        largest: f.largest ? formatBytes(f.largest.bytes) : '—',
+        coverage: f.coverage,
+      }))
   );
   console.log(
     `TOTAL — probed ${result.totals.probed}, live ${result.totals.live}, nulled ${result.totals.nulled}`
   );
   console.log(`Occupying slots: ${result.occupied} of ${result.cap}`);
+  console.log(
+    `Measured footprint: ${formatBytes(result.totalBytes)} of ${formatBytes(result.totalBudget)} ` +
+      `(${((result.totalBytes / result.totalBudget) * 100).toFixed(1)}% of the plugin budget)`
+  );
+  if (result.largestKeys.length > 0) {
+    console.log(`Largest keys (per-key ceiling ${formatBytes(result.perKeyLimit)}):`);
+    console.table(
+      result.largestKeys.map((k) => ({
+        key: k.key,
+        size: formatBytes(k.bytes),
+        '% of per-key limit': `${((k.bytes / result.perKeyLimit) * 100).toFixed(1)}%`,
+      }))
+    );
+  }
+  for (const warn of result.sizeWarnings) {
+    console.warn(
+      `[KeyAudit] "${warn.key}" is ${formatBytes(warn.bytes)} — ` +
+        `${((warn.bytes / result.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(result.perKeyLimit)} per-key ceiling.`
+    );
+  }
   console.log(`Unaccounted (orphans we cannot name): ~${result.unaccounted}`);
   if (!result.nullSignalUsable) {
     console.warn(

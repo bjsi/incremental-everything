@@ -15,7 +15,7 @@ import { safeRemTextToString } from "../lib/pdfUtils";
 import { PriorityBadge } from "../components";
 import { InlinePriorityEditor } from "../components/InlineEditors";
 import { getCardPriority, CardPriorityInfo, CARD_PRIORITY_CODE } from "../lib/card_priority";
-import { pendingPrioritySaveKey } from "../lib/consts";
+import { pendingPrioritySaveKey, flashcardHistoryTextLimit } from "../lib/consts";
 
 const NUM_TO_LOAD_IN_BATCH = 30;
 
@@ -24,6 +24,8 @@ export interface FlashcardHistoryData {
     remId: RemId;
     cardId: string;
     time: number;
+    /** @deprecated Legacy field. Row expansion is component state now — entries
+     *  written before that change still carry it, and it is ignored. */
     open?: boolean;
     kbId?: string;
     text?: string;
@@ -59,8 +61,8 @@ function FlashcardHistory() {
                     const rem = await plugin.rem.findOne(item.remId);
                     const frontText = await safeRemTextToString(plugin, rem?.text);
                     const backText = await safeRemTextToString(plugin, rem?.backText);
-                    const cleanFront = frontText === 'Untitled' && (!rem?.text || rem.text.length === 0) ? '' : frontText.substring(0, 1000);
-                    const cleanBack = backText === 'Untitled' && (!rem?.backText || rem.backText.length === 0) ? '' : backText.substring(0, 1000);
+                    const cleanFront = frontText === 'Untitled' && (!rem?.text || rem.text.length === 0) ? '' : frontText.substring(0, flashcardHistoryTextLimit);
+                    const cleanBack = backText === 'Untitled' && (!rem?.backText || rem.backText.length === 0) ? '' : backText.substring(0, flashcardHistoryTextLimit);
                     const text = `${cleanFront} ${cleanBack}`.trim();
                     updates.set(item.key, text);
                 } catch (e) {
@@ -140,14 +142,19 @@ function FlashcardHistory() {
         }
     };
 
-    const setData = (itemKey: number, changes: Partial<FlashcardHistoryData>) => {
-        const originalIndex = historyDataRaw.findIndex(x => x.key === itemKey);
-        if (originalIndex !== -1) {
-            const oldData = historyDataRaw[originalIndex];
-            const newData = { ...oldData, ...changes };
-            historyDataRaw.splice(originalIndex, 1, newData);
-            setHistoryData([...historyDataRaw]);
-        }
+    // Row expansion is transient UI state and is deliberately NOT persisted.
+    // It used to live on the stored entry as `open`, which meant every click of a
+    // chevron rewrote the whole history array — half a megabyte of synced storage
+    // per expand/collapse. Keeping it in component state costs nothing and removes
+    // that write entirely.
+    const [openKeys, setOpenKeys] = useState<Set<number>>(new Set());
+    const toggleOpen = (itemKey: number) => {
+        setOpenKeys((prev) => {
+            const next = new Set(prev);
+            if (next.has(itemKey)) next.delete(itemKey);
+            else next.add(itemKey);
+            return next;
+        });
     };
 
     const [numLoaded, setNumLoaded] = React.useState(1);
@@ -202,7 +209,8 @@ function FlashcardHistory() {
                     data={data}
                     remId={data.remId}
                     key={data.key || Math.random()}
-                    setData={(c) => setData(data.key, c)}
+                    open={openKeys.has(data.key)}
+                    toggleOpen={() => toggleOpen(data.key)}
                     closeIndex={() => closeIndex(data.key)}
                 />
             ))}
@@ -272,12 +280,14 @@ function RatingBadge({ score }: { score?: QueueInteractionScore }) {
 function HistoryItem({
     data,
     remId,
-    setData,
+    open,
+    toggleOpen,
     closeIndex,
 }: {
     data: FlashcardHistoryData;
     remId: string;
-    setData: (changes: Partial<FlashcardHistoryData>) => void;
+    open: boolean;
+    toggleOpen: () => void;
     closeIndex: () => void;
 }) {
     const plugin = usePlugin();
@@ -338,12 +348,12 @@ function HistoryItem({
             <div className="flex gap-2 mb-2">
                 <div
                     className="flex items-center justify-center flex-shrink-0 w-6 h-6 rounded-md cursor-pointer hover:bg-gray-200"
-                    onClick={() => setData({ open: !data.open })}
+                    onClick={toggleOpen}
                 >
                     <img
                         src={`${plugin.rootURL}chevron_down.svg`}
                         style={{
-                            transform: `rotate(${data.open ? 0 : -90}deg)`,
+                            transform: `rotate(${open ? 0 : -90}deg)`,
                             transitionProperty: "transform",
                             transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)",
                             transitionDuration: "150ms",
@@ -413,7 +423,7 @@ function HistoryItem({
                     />
                 </div>
             )}
-            {data.open && (
+            {open && (
                 <div className="m-2">
                     <RemHierarchyEditorTree height="auto" width="100%" remId={remId} />
                 </div>

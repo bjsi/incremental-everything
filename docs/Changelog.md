@@ -2,6 +2,40 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.30 - August 3rd, 2026
+
+Housekeeping release, prompted by the storage limits described in v1.0.29. Everything here reduces what the plugin keeps in — and writes to — RemNote's plugin storage. Two of these were genuine defects that the new limits merely exposed.
+
+### 🐛 Fixed: the Study Dashboard's lifetime statistics had silently stopped updating
+
+The store holding your day-by-day review totals had grown to **1.21MB** — roughly 7,250 daily buckets covering your entire review history — which is past RemNote's new 900KB ceiling for a single plugin value. Writes over that ceiling are *rejected rather than truncated*, and the rejection was being swallowed, so every recomputation was quietly discarded and the dashboard's lifetime figures froze at whatever had last been saved.
+
+The store is now written compactly: your knowledge base's id is recorded once instead of once per day, and each day is a plain row of numbers rather than a block of repeated field names. Same data, **about a third of the size** — no day of history is lost. The conversion runs by itself the next time the plugin starts and needs none of the APIs RemNote removed in 1.27.16, so it works even on the broken build.
+
+One limitation while 1.27.16 stands: this restores the plugin's *ability* to save these statistics, but recomputing fresh ones still walks every flashcard, which needs the removed `card.getAll` back.
+
+### ⚡ Improved: expanding a history row no longer rewrites the whole list
+
+**Flashcard History**, **Visited Rem History** and **IncRem Repetition History** each stored the expanded/collapsed state of every row *in synced storage*. Clicking a chevron therefore rewrote the entire list — in the case of Flashcard History, more than half a megabyte pushed through the sync layer, for a triangle rotating.
+
+That state now lives in the panel itself, and those writes are gone entirely. The visible trade-off: expanded rows no longer stay expanded after you close and reopen a panel.
+
+### ⚡ Improved: leaner history entries
+
+**Flashcard History** now keeps up to 500 characters of a card's front and back (previously 1000), which is ample for the searchable preview these lists exist to provide.
+
+**Visited Rem History** was applying *no limit at all* when recording a visit — the full text of every Rem you navigated to went into storage — while the same panel truncated to 200 characters whenever it filled in missing entries. Both paths now share one limit, so they can no longer disagree.
+
+Existing entries keep their current text and shrink naturally as they are rewritten; nothing is discarded up front.
+
+### 🛠️ New: Synced Storage Key Audit (Debug Widget)
+
+A diagnostic behind the `Debug Incremental Everything` command. It reconstructs every storage key the plugin is capable of writing — from your Incremental Rems, PDFs, documents and videos — probes each one, and reports how many exist, how much space each family occupies, which individual keys are approaching RemNote's 900KB per-key and 10MB total ceilings, and how many orphaned keys are left behind by deleted Rems.
+
+This is what produced the numbers behind the three fixes above, and it is how the storage picture will be verified once RemNote provides deletion and enumeration APIs.
+
+📖 See [Study Dashboard](Study-Dashboard.md) for the statistics affected by the first fix, and [Troubleshooting](Troubleshooting.md) for the Debug Widget tools.
+
 ## v1.0.29 - August 1st, 2026
 
 ### ⚠️ Service notice: the plugin is temporarily out of operation on RemNote 1.27.16

@@ -22,6 +22,8 @@ import {
   sourceFloatingActiveIdKey,
   autoFocusQueueDashboardId,
   pendingQueueDashboardRefocusKey,
+  flashcardHistoryTextLimit,
+  remHistoryTextLimit,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -560,8 +562,8 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
           try {
             const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
             const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
-            frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
-            backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
+            frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
+            backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
           } catch (error) {
             console.warn('Error parsing Rem text for flashcard history:', error);
             frontText = '[Complex Media Rem]';
@@ -577,7 +579,6 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
               key: Math.random(),
               remId,
               cardId: effectiveCardId,
-              open: false,
               time: new Date().getTime(),
               kbId: currentKbId,
               text,
@@ -767,8 +768,8 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                   try {
                     const frontRaw = clusterRem?.text ? await safeRemTextToString(plugin, clusterRem.text) : '';
                     const backRaw = clusterRem?.backText ? await safeRemTextToString(plugin, clusterRem.backText) : '';
-                    frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
-                    backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
+                    frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
+                    backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
                   } catch (_e) {
                     frontText = '[Complex Media Rem]';
                   }
@@ -779,7 +780,6 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                       key: Math.random(),
                       remId: card?.remId,
                       cardId: clusterCardId,
-                      open: false,
                       time: new Date().getTime(),
                       kbId: currentKbId,
                       text,
@@ -1079,8 +1079,16 @@ export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
     try {
       const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
       const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
-      frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw : '';
-      backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw : '';
+      // Capped to match the widget's own backfill: this writer had no limit at
+      // all, so visiting a Rem with a long body stored the whole thing.
+      frontText =
+        typeof frontRaw === 'string' && frontRaw !== 'Untitled'
+          ? frontRaw.substring(0, remHistoryTextLimit)
+          : '';
+      backText =
+        typeof backRaw === 'string' && backRaw !== 'Untitled'
+          ? backRaw.substring(0, remHistoryTextLimit)
+          : '';
     } catch (error) {
       console.warn('Error parsing Rem text for visited history:', error);
     }
@@ -1091,7 +1099,6 @@ export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
       {
         key: Math.random(),
         remId: currentRemId,
-        open: false,
         time: new Date().getTime(),
         kbId: currentKbId,
         text,
@@ -1169,8 +1176,8 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
         try {
           const frontRaw = drillRem?.text ? await safeRemTextToString(plugin, drillRem.text) : '';
           const backRaw = drillRem?.backText ? await safeRemTextToString(plugin, drillRem.backText) : '';
-          frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, 1000) : '';
-          backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, 1000) : '';
+          frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
+          backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
         } catch (_e) {
           frontText = '[Complex Media Rem]';
         }
@@ -1181,7 +1188,6 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
             key: Math.random(),
             remId: card?.remId,
             cardId,
-            open: false,
             time: new Date().getTime(),
             kbId: currentKbId,
             text,
