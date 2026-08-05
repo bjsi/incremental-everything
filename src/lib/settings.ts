@@ -171,7 +171,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
 
   [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
-  [masteryDrillMinDelayMinutesId]: 120,
+  [masteryDrillMinDelayMinutesId]: 180,
   [disableFinalDrillNotificationId]: false,
 };
 
@@ -190,6 +190,7 @@ export type SettingGroupId =
   | 'editor'
   | 'fsrs'
   | 'masteryDrill'
+  | 'performance'
   | 'integrations'
   | 'misc';
 
@@ -212,6 +213,13 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     blurb:
       'Per-flashcard priorities. This is the only part of Incremental Everything that does ' +
       'heavy background work across your whole knowledge base, so it is opt-in.',
+  },
+  performance: {
+    label: 'Performance',
+    blurb:
+      'How much work the plugin is allowed to do, and where. Kept in RemNote\'s own settings ' +
+      'panel so they stay reachable if the plugin is slow to load.',
+    helpPath: 'Full-Mode-x-Light-Mode/',
   },
   scheduling: {
     label: 'Scheduling',
@@ -589,11 +597,11 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     description: 'Stops the Mastery Drill sidebar notification from appearing.',
   },
 
-  // --- Integrations / performance (native tier) ---
+  // --- Performance (native tier) ---
   [performanceModeId]: {
     kind: 'dropdown',
     tier: 'native',
-    group: 'integrations',
+    group: 'performance',
     helpPath: 'Full-Mode-x-Light-Mode/',
     title: 'Performance Mode',
     description:
@@ -607,7 +615,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   [alwaysUseLightModeOnMobileId]: {
     kind: 'boolean',
     tier: 'native',
-    group: 'integrations',
+    group: 'performance',
     title: 'Always Use Light Mode on Mobile',
     description:
       'Switches to Light performance mode on iOS and Android, preventing crashes and improving ' +
@@ -616,12 +624,13 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   [alwaysUseLightModeOnWebId]: {
     kind: 'boolean',
     tier: 'native',
-    group: 'integrations',
+    group: 'performance',
     title: 'Always Use Light Mode on Web Browser',
     description:
       'Switches to Light performance mode in the browser, where Full mode can be slow or unstable. ' +
       'Recommended.',
   },
+  // --- Integrations ---
   [enableHideInQueueIntegrationId]: {
     kind: 'boolean',
     tier: 'native',
