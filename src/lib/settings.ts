@@ -169,7 +169,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [remnoteEnvironmentId]: 'www',
   [flashcardResponseTimeLimitId]: 180,
 
-  [skipMasteryDrillId]: false,
+  [skipMasteryDrillId]: true,
   [oldItemThresholdId]: 7,
   [masteryDrillMinDelayMinutesId]: 120,
   [disableFinalDrillNotificationId]: false,
@@ -545,7 +545,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   // --- Mastery Drill ---
   [skipMasteryDrillId]: {
     kind: 'boolean',
-    tier: 'native',
+    tier: 'popup',
     group: 'masteryDrill',
     reloadRequired: true,
     title: 'Skip Mastery Drill',

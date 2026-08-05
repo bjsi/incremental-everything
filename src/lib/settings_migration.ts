@@ -41,8 +41,12 @@ export { ieSettingsValuesKey, ieSettingsMigratedKey, ieSettingsMigrationReportKe
  *     still reaches users who never customised that setting.
  * v3: seed popup-tier settings only — native-tier ones stay in RemNote's panel
  *     and are read from there, so storing them would just go stale.
+ * v4: skip_mastery_drill moved native -> popup. A KB seeded at v3 has no blob
+ *     entry for it (it was native then), so without a re-seed its stored value
+ *     in RemNote's panel would be ignored in favour of the default. ANY tier
+ *     change from native to popup needs a bump for exactly this reason.
  */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 /** Give up retrying after this many activations, so a permanently unreadable
  *  setting cannot make every boot re-run the seed forever. */
