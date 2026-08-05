@@ -197,6 +197,12 @@ export interface SettingGroupSpec {
   label: string;
   /** Shown under the group heading in the popup. */
   blurb?: string;
+  /**
+   * Page on the docs site, relative to IE_DOCS_BASE_URL, for the feature the
+   * whole group configures. Renders a "?" beside the group heading — better
+   * than repeating the same link on each of its settings.
+   */
+  helpPath?: string;
 }
 
 /** Display order is the key order here. */
@@ -218,7 +224,11 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
   queue: { label: 'Queue', blurb: 'What the queue shows during review.' },
   editor: { label: 'Editor Indicators', blurb: 'Visual markers on rems in the editor.' },
   fsrs: { label: 'FSRS', blurb: 'Difficulty / Stability / Retrievability display.' },
-  masteryDrill: { label: 'Mastery Drill', blurb: 'Deliberate practice of poorly-rated cards.' },
+  masteryDrill: {
+    label: 'Mastery Drill',
+    blurb: 'Deliberate practice of poorly-rated cards.',
+    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#mastery-drill',
+  },
   integrations: { label: 'Integrations', blurb: 'Features ported from other plugins.' },
   misc: { label: 'Other', blurb: '' },
 };
@@ -313,6 +323,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     tier: 'popup',
     group: 'scheduling',
+    helpPath: 'IncRem-Scheduler/#beta-scheduler',
     title: 'Use Beta Scheduler (Saturating Curve)',
     description:
       'Intervals start at the First Review Interval and gradually approach the Max Interval ' +
@@ -452,6 +463,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     tier: 'popup',
     group: 'queue',
+    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#practiced-queues-history--live-dashboard',
     title: 'Auto-focus Queue Dashboard',
     description:
       'Opens the Practiced Queues dashboard in the right sidebar on queue entry, for a live view ' +
@@ -499,6 +511,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     tier: 'popup',
     group: 'editor',
     reloadRequired: true,
+    helpPath: 'Prioritization-%26-Sorting/#priorities-in-tables',
     title: 'Show Priority Badges in Table Cells',
     description:
       'Tables are the one place the priority editor cannot render, so a coloured band badge ' +
@@ -511,6 +524,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     tier: 'popup',
     group: 'fsrs',
+    helpPath: 'Reviewing-Items-in-the-Queue/#card-stats--fsrs-integration',
     title: 'Display FSRS DSR Stats (Flashcards)',
     description:
       'Shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card ' +
@@ -575,6 +589,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'dropdown',
     tier: 'native',
     group: 'integrations',
+    helpPath: 'Full-Mode-x-Light-Mode/',
     title: 'Performance Mode',
     description:
       '"Light" is recommended for web and mobile. "Full" enables relative priority and the ' +
@@ -607,6 +622,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     tier: 'native',
     group: 'integrations',
     reloadRequired: true,
+    helpPath: 'Utilities/#hide-in-queue',
     title: 'Enable Hide-in-Queue Powerups and Commands',
     description:
       'Registers the "Hide in Queue", "Remove from Queue", "No Hierarchy", "Hide Parent" and ' +

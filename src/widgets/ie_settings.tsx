@@ -435,7 +435,15 @@ export function IESettingsWidget() {
           ) : (
             shownGroups.map(({ group, ids }) => (
               <div key={group} style={{ marginBottom: 18 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 6 }}>{IE_SETTING_GROUPS[group].label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{IE_SETTING_GROUPS[group].label}</span>
+                  {IE_SETTING_GROUPS[group].helpPath && (
+                    <HelpLink
+                      path={IE_SETTING_GROUPS[group].helpPath!}
+                      label={IE_SETTING_GROUPS[group].label}
+                    />
+                  )}
+                </div>
                 {IE_SETTING_GROUPS[group].blurb && (
                   <div
                     style={{
