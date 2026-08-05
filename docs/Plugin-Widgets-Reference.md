@@ -102,6 +102,8 @@ Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`
 - **Single History** — triggered on an individual IncRem (in the queue via the 📊 button, or in the editor via `Ctrl+Shift+H`). Shows the Rem's full repetition log: date, time spent, scheduled interval, priority at the time of review, and event type markers (📅 reschedule, ⌨️ editor review, etc.).
   - **📝 Notes & context sub-lines** — entries carrying a [review note](Reviewing-Items-in-the-Queue.md#the-answer-buttons) show it under the row (📝, full text); entries with an automatic **reading-context snapshot** show a compact line like `p.57 of 40–80 · Book.pdf · 🔖 "bookmark…"` — the page you were on **at that rep**, so your reading trajectory across sessions is visible. Event banners (Dismissed, Rescheduled in Editor, …) show their note the same way — a dismissal reason lives right on the dismissal marker.
   - **PDF reading-progress footer** — when the Rem (active *or* dismissed) reads from a PDF with a **page range** set, a footer shows the PDF name, the page range, your current page, the **degree of processing** (`% read`, with a progress bar), and an **estimated remaining time** (extrapolated from the total time spent and the degree of processing reached). The percentage and estimate are omitted for open-ended ranges (`start–∞`), where there's no finite end to measure against.
+  - **➕ Session — recording study done outside RemNote** — see [Recording and correcting records](#recording-and-correcting-records) below.
+  - **✏️ / 🗑 per record** — hover any row to edit or delete it; see the same section.
 
 ![IncRem Repetition History Popup](assets/repetition-history-popup.png){ width="400" }
 
@@ -112,6 +114,31 @@ Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`
 ![Aggregated Repetition History](assets/aggregated-repetition-history.gif){ width="600" }
 
 The `Ctrl+Shift+H` command **intelligently routes** to the right view: Single for individual items, Aggregated for folders. If triggered on a flashcard, it opens the [Flashcard Repetition History](#flashcard-repetition-history) instead.
+
+##### Recording and correcting records
+
+The Single History view is not read-only: a repetition log is only as useful as it is complete, and a good deal of studying happens away from RemNote — a paper read on a train, a chapter in the physical book, a lecture watched elsewhere. Both actions below work on active Incremental Rems *and* on dismissed Rems (where the history lives on the Dismissed powerup).
+
+**➕ Session** *(header button)* — records a study session after the fact. You give it a **date**, the **end time** of the session and the **total time** spent (hours + minutes), plus an optional note. The entry appears in the log with a **📖** indicator as an *external session*, and counts towards the Rem's **reps**, its **total time**, the [Study Dashboard](Study-Dashboard.md) and the scheduler's repetition count — exactly as an in-app editor review (⌨️) does.
+
+![Add external session button](assets/repetition-history-add-session-button.png){ width="400" }
+
+Whether the schedule moves depends on where the session lands in the log:
+
+- **The session is the newest record** (or the Rem has no records yet) — the dialog offers **Reschedule next repetition**, prefilled with the interval the scheduler would give this Rem right now, counted from the session's date. This mirrors [Review in Editor](Reviewing-Items-in-the-Editor.md) (`Ctrl+Shift+J`): you studied it, so it gets scheduled forward. Untick the box to record the time without moving the date.
+- **The session predates the newest record** — the schedule is left untouched and the dialog says so. A backdated entry is bookkeeping; it must not overwrite a due date that later reviews have already set.
+
+![Add external session dialog](assets/repetition-history-add-session.png){ width="400" }
+
+The session's end time cannot be in the future. Its **early/late status** is computed against what was actually due at that moment — taken from the next-repetition date stamped by the last record preceding it — so a backdated entry reads correctly rather than being measured against today's due date.
+
+**✏️ Edit / 🗑 Delete** *(hover any record)* — the two buttons appear at the right edge of a row when you hover it, and work on event banners (Made Incremental, Dismissed, …) as well as review rows.
+
+![Edit and delete buttons on a hovered record](assets/repetition-history-edit-record-button.png){ width="400" }
+
+**Edit** changes the **date**, **end time**, **total time** and note of an existing record; early/late status is recomputed, and the log is kept in chronological order. Editing never changes the schedule. **Delete** asks for confirmation first, reporting the study time that will disappear from the Rem's totals, and warns when the record is a lifecycle marker — removing a *Made Incremental* or *Dismissed* marker changes how the scheduler counts repetitions for that Rem. Deletion cannot be undone.
+
+![Edit record dialog](assets/repetition-history-edit-record.png){ width="400" }
 
 ---
 

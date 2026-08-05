@@ -2,6 +2,35 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.32 - August 5th, 2026
+
+### ✨ New: record study done outside RemNote, and correct the records you already have
+
+The **Repetition History** popup was a read-only log. Two things it could not express: study that happened away from RemNote (a paper read on a train, a chapter in the physical book), and a record that came out wrong — a session whose timer ran on after you stopped reading, or one you forgot to start.
+
+**➕ Session** *(header button)* records a study session after the fact: a **date**, the **end time** of the session, the **total time** spent, and an optional note. The entry is logged with a **📖** indicator as an *external session* and counts towards the Rem's reps, its total time, the Study Dashboard and the scheduler's repetition count — exactly as an in-app editor review (⌨️) does.
+
+![The Add session button in the Repetition History header](assets/repetition-history-add-session-button.png){ width="400" }
+
+![Add external session dialog](assets/repetition-history-add-session.png){ width="400" }
+
+Whether it also moves the schedule depends on where it lands in the log:
+
+- **Newest record** (or the Rem's first) — the dialog offers **Reschedule next repetition**, prefilled with the interval the scheduler would give the Rem right now, counted from the session's date. This mirrors `Ctrl+Shift+J`: you studied it, so it gets scheduled forward. Untick to record the time only.
+- **Backdated** — the schedule is left untouched, and the dialog says so. Bookkeeping must not overwrite a due date that later reviews have already set.
+
+Its **early/late status** is measured against what was genuinely due at that moment — read from the next-repetition date stamped on the last record preceding it — not against today's due date.
+
+**✏️ Edit** and **🗑 Delete** appear at the right edge of any record when you hover it, on event banners as well as review rows. Editing changes a record's date, end time, total time and note — early/late status is recomputed and the log is re-sorted chronologically, but the schedule is never touched. Deleting confirms first, reports the study time about to leave the Rem's totals, and warns when the record is a lifecycle marker, since removing a *Made Incremental* or *Dismissed* marker changes how the scheduler counts repetitions. Both work on dismissed Rems too.
+
+![Edit and delete buttons on a hovered record](assets/repetition-history-edit-record-button.png){ width="400" }
+
+![Edit record dialog](assets/repetition-history-edit-record.png){ width="400" }
+
+The popup itself is now **440px wide** (was 380px), so the header carries *Show Aggregated*, *➕ Session* and the close button on one line while the history grid keeps its column widths beside the new per-row actions.
+
+📖 See [Widgets → IncRem Repetition History: recording and correcting records](Plugin-Widgets-Reference.md#recording-and-correcting-records).
+
 ## v1.0.31 - August 5th, 2026
 
 ### ✨ Improved: orphan card removal now shows what you'd be deleting

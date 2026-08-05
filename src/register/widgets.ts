@@ -248,7 +248,10 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   // Repetition history popup for Answer Buttons
   plugin.app.registerWidget('repetition_history', WidgetLocation.Popup, {
     dimensions: {
-      width: '380px',
+      // 440px (was 380) so the header fits Show Aggregated + Add session + close
+      // on one line, and the history grid keeps its column widths beside the
+      // per-row edit/delete actions.
+      width: '440px',
       height: 'auto',
     },
   });
