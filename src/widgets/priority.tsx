@@ -685,9 +685,10 @@ function Priority() {
     // Always triggered regardless of derivedData — that hook may not have resolved yet when
     // the user saves quickly. Cost is just a setSession write; tracker.ts is protected by
     // cascadeRunning serialization and returns instantly for leaf rems with no descendants.
-    if (performanceMode === PERFORMANCE_MODE_FULL) {
-      plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
-    }
+    // Unconditional: the tracker's cascade watcher applies the
+    // flashcard-prioritisation gate, and the cascade no longer needs Full Mode —
+    // without the card-priority cache it resolves has-cards per rem instead.
+    plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
   }, [rem, incRemInfo, plugin, sessionCache, originalScopeId, performanceMode]); // 🔌 Add performanceMode
 
   const saveCardPriority = useCallback(async (priority: number) => {
@@ -759,9 +760,7 @@ function Priority() {
 
     // 🌲 Cascade inherited card priorities to descendants
     // This instructs the tracker to eventually trigger the inheritance cascade.
-    if (performanceMode === PERFORMANCE_MODE_FULL) {
-      plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
-    }
+    plugin.storage.setSession('pendingInheritanceCascade', rem._id).catch(console.error);
 
   }, [rem, plugin, sessionCache, originalScopeId, performanceMode, cardInfo, hasCardPriorityPowerup]); // 🔌 Add performanceMode
 
