@@ -463,7 +463,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     tier: 'popup',
     group: 'queue',
-    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#practiced-queues-history--live-dashboard',
+    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#practiced-queues-history-live-dashboard',
     title: 'Auto-focus Queue Dashboard',
     description:
       'Opens the Practiced Queues dashboard in the right sidebar on queue entry, for a live view ' +
@@ -524,7 +524,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     tier: 'popup',
     group: 'fsrs',
-    helpPath: 'Reviewing-Items-in-the-Queue/#card-stats--fsrs-integration',
+    helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
     title: 'Display FSRS DSR Stats (Flashcards)',
     description:
       'Shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card ' +
