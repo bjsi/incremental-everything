@@ -237,6 +237,13 @@ interface SettingSpecBase {
   helpPath?: string;
   /** Rendered as a prominent warning box above the control in the popup. */
   warning?: string;
+  /**
+   * Hide this setting in the popup unless another setting holds a given value —
+   * for parameters that only mean something once the feature they configure is
+   * switched on. Purely a display rule: the value is still stored and read
+   * normally, so turning the parent back on restores what was configured.
+   */
+  showWhen?: { id: IESettingId; equals: unknown };
 }
 
 export type SettingSpec =
@@ -314,6 +321,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'number',
     tier: 'popup',
     group: 'scheduling',
+    showWhen: { id: betaSchedulerEnabledId, equals: true },
     min: 1,
     integer: true,
     unit: 'days',
@@ -327,6 +335,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'number',
     tier: 'popup',
     group: 'scheduling',
+    showWhen: { id: betaSchedulerEnabledId, equals: true },
     min: 1,
     integer: true,
     unit: 'days',
@@ -788,4 +797,23 @@ export function useIESettingOptional<K extends IESettingId>(
 export function useIESetting<K extends IESettingId>(id: K): IESettings[K] {
   const value = useIESettingOptional(id);
   return value === undefined ? IE_SETTINGS_DEFAULTS[id] : value;
+}
+
+/**
+ * Whether a setting should be shown, given the current values. Settings with no
+ * `showWhen` are always shown.
+ */
+export function isSettingVisible(id: IESettingId, values: IESettings | undefined): boolean {
+  const dep = IE_SETTINGS_SCHEMA[id].showWhen;
+  if (!dep) return true;
+  // Nothing loaded yet: show everything rather than flash rows in and out.
+  if (!values) return true;
+  return JSON.stringify(values[dep.id]) === JSON.stringify(dep.equals);
+}
+
+/** Ids hidden right now because they depend on `id` holding a different value. */
+export function dependentsHiddenBy(id: IESettingId, values: IESettings | undefined): IESettingId[] {
+  return (Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[]).filter(
+    (other) => IE_SETTINGS_SCHEMA[other].showWhen?.id === id && !isSettingVisible(other, values)
+  );
 }

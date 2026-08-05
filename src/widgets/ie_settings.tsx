@@ -12,6 +12,8 @@ import {
   SettingSpec,
   getIESetting,
   setIESetting,
+  isSettingVisible,
+  dependentsHiddenBy,
 } from '../lib/settings';
 
 /**
@@ -91,9 +93,11 @@ interface RowProps {
   spec: SettingSpec;
   value: unknown;
   onChange: (value: unknown) => void;
+  /** Titles of settings currently hidden because they depend on this one. */
+  hiddenDependents: string[];
 }
 
-function SettingRow({ id, spec, value, onChange }: RowProps) {
+function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
   const readOnly = spec.tier === 'native';
   // Text and number inputs keep a local draft so that typing is not fought by
   // the reactive value coming back from storage; committed on blur / Enter.
@@ -267,6 +271,12 @@ function SettingRow({ id, spec, value, onChange }: RowProps) {
           )
         )}
       </div>
+
+      {hiddenDependents.length > 0 && (
+        <div style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
+          Turn this on to configure {hiddenDependents.join(' and ')}.
+        </div>
+      )}
     </div>
   );
 }
@@ -286,7 +296,12 @@ export function IESettingsWidget() {
   }, [allIds]);
 
   const query = search.trim().toLowerCase();
+  // A setting whose parent switch is off is hidden everywhere, search included:
+  // configuring a scheduler you have turned off is exactly the noise the popup
+  // exists to remove.
+  const visible = (id: IESettingId) => isSettingVisible(id, values);
   const matches = (id: IESettingId) => {
+    if (!visible(id)) return false;
     if (!query) return true;
     const spec = IE_SETTINGS_SCHEMA[id];
     return (
@@ -380,7 +395,9 @@ export function IESettingsWidget() {
             {IE_SETTING_IDS_BY_GROUP.map(({ group, ids }) => (
               <button key={group} onClick={() => setActiveGroup(group)} style={navBtn(group === activeGroup)}>
                 <span>{IE_SETTING_GROUPS[group].label}</span>
-                <span style={{ fontSize: 10, color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>{ids.length}</span>
+                <span style={{ fontSize: 10, color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
+                  {ids.filter(visible).length}
+                </span>
               </button>
             ))}
           </div>
@@ -418,6 +435,9 @@ export function IESettingsWidget() {
                     spec={IE_SETTINGS_SCHEMA[id]}
                     value={values[id]}
                     onChange={(v) => onChange(id, v)}
+                    hiddenDependents={dependentsHiddenBy(id, values).map(
+                      (dep) => IE_SETTINGS_SCHEMA[dep].title
+                    )}
                   />
                 ))}
               </div>
