@@ -30,6 +30,7 @@ import {
   CardPriorityInfo,
   QueueSessionCache,
   autoAssignCardPriority,
+  mayAutoWriteCardPriority,
   calculateCardRemPercentilesFromCards,
   expandCardInfosToCards,
   getCardPriority,
@@ -976,7 +977,8 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
                 const sourceStr = typeof existingSource === 'string' ? existingSource.toLowerCase() : null;
                 if (!sourceStr || sourceStr === 'default' || sourceStr === 'inherited') {
                   const incRemForPriority = cachedIncRem || await getIncrementalRemFromRem(plugin, rem);
-                  if (incRemForPriority) {
+                  // Automatic writer — see mayAutoWriteCardPriority.
+                  if (incRemForPriority && (await mayAutoWriteCardPriority(plugin))) {
                     console.log('[GlobalRemChanged] In-queue card creation on IncRem, applying cardPriority:', data.remId);
                     await setCardPriority(plugin, rem, incRemForPriority.priority, 'incremental');
                   }

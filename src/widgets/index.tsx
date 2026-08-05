@@ -21,7 +21,7 @@ import {
   registerCoreQueueDisplayCommands,
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
-import { enableHideInQueueIntegrationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
+import { enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { compactAuthoritativeAggregatesIfNeeded } from '../lib/authoritative_aggregates';
@@ -138,9 +138,16 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Mobile and Web Browser Light Mode Features
   await handleMobileDetectionOnStartup(plugin);
 
-  // Get the performance mode
+  // The card-priority cache, and the KB-wide pretagging pass inside it, are the
+  // heaviest thing the plugin does: phase 2 applies the CardPriority powerup to
+  // every untagged rem that owns a flashcard. Both the opt-in and light mode must
+  // allow it — the opt-in because nothing consumes the cache when prioritisation
+  // is off, light mode because the build itself is what light mode exists to avoid.
   const useLightMode = await shouldUseLightMode(plugin);
-  if (!useLightMode) {
+  const mayBuildCardPriorityCache =
+    !useLightMode && (await getIESetting(plugin, enableFlashcardPrioritisationId));
+
+  if (mayBuildCardPriorityCache) {
     // Run the full, expensive cache build, then recompute the band colours: the
     // percentile mapping is meaningless until this cache exists.
     loadCardPriorityCache(plugin).then(
@@ -149,8 +156,12 @@ async function onActivate(plugin: ReactRNPlugin) {
     );
 
   } else {
-    // In 'light' mode, just set an empty cache.
-    console.log('CACHE: Light mode enabled. Skipping card priority cache build.');
+    // Empty cache. Readers treat "absent" as "no card priorities known", which is
+    // the correct answer in both cases; the cascade falls back to per-rem
+    // rem.getCards() rather than assuming nothing has cards.
+    console.log(
+      `CACHE: Skipping card priority cache build (${useLightMode ? 'light mode' : 'flashcard prioritisation off'}).`
+    );
     await plugin.storage.setSession(allCardPriorityInfoKey, []);
   }
 }

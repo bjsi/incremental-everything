@@ -358,6 +358,12 @@ function Debug() {
         : null;
 
       const cardPriority = await getCardPriority(rp, rem);
+      // getCardPriority NEVER returns null: with no tag it resolves the value
+      // from the nearest ancestor (or the default) and reports lastUpdated: 0.
+      // So the section below renders for every rem, and its numbers say nothing
+      // about whether anything is actually stored on this one. Probe the powerup
+      // directly to tell "written here" from "resolved on read".
+      const hasCardPriorityTag = await rem.hasPowerup('cardPriority');
       const dismissed = await getDismissedHistoryFromRem(rp, rem);
       
       const isCardDisabledLocally = await rem.hasPowerup(BuiltInPowerupCodes.DisableCards);
@@ -390,6 +396,7 @@ function Debug() {
         incrementalRem,
         rawSlotProbe,
         cardPriority,
+        hasCardPriorityTag,
         dismissed,
         isCardDisabledLocally,
         isCardDisabledInAncestors,
@@ -587,7 +594,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, rawSlotProbe, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
+  const { incrementalRem, rawSlotProbe, cardPriority, hasCardPriorityTag, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
 
   const handleCardCompare = async () => {
     if (!remId) return;
@@ -3600,6 +3607,34 @@ function Debug() {
                ⚠️ <strong>Spurious Tags Detected:</strong> Rogue CardPriority tags were found on non-flashcard children. Please click "Sanitize Rogue Tags" to cure this rem.
              </div>
            )}
+           {/* Whether anything is stored on THIS rem. Without it the block below
+               reads as slot content, when for an untagged rem it is a value
+               resolved from the nearest ancestor at read time. */}
+           <div
+             style={{
+               marginBottom: '10px',
+               padding: '6px 8px',
+               borderRadius: '4px',
+               fontSize: '11px',
+               lineHeight: 1.5,
+               border: '1px solid var(--rn-clr-border)',
+               backgroundColor: 'var(--rn-clr-background-secondary)',
+             }}
+           >
+             {hasCardPriorityTag ? (
+               <span>
+                 <strong style={{ color: '#16a34a' }}>Tagged.</strong> The values below are read from
+                 this rem's CardPriority slots.
+               </span>
+             ) : (
+               <span>
+                 <strong style={{ color: '#d97706' }}>Not tagged.</strong> This rem carries no
+                 CardPriority powerup — the values below are resolved on read from the nearest
+                 ancestor (or the default). Nothing is stored here, and "Last Updated" shows the
+                 epoch because there is no stored timestamp.
+               </span>
+             )}
+           </div>
            <div className="flex gap-4 mb-2">
              <Info className="cp-priority" label="Priority" data={cardPriority.priority} />
              <Info className="cp-source" label="Source" data={<span style={{ textTransform: 'capitalize' }}>{cardPriority.source}</span>} />
@@ -3608,7 +3643,15 @@ function Debug() {
              <Info className="cp-duecards" label="Due Cards" data={cardPriority.dueCards} />
              <Info className="cp-cardcount" label="Total Cards" data={cardPriority.cardCount} />
            </div>
-           <Info className="cp-updated" label="Last Updated" data={`${dayjs(cardPriority.lastUpdated).format('MMMM D, YYYY, h:mm a')} (${dayjs(cardPriority.lastUpdated).fromNow()})`} />
+           <Info
+             className="cp-updated"
+             label="Last Updated"
+             data={
+               hasCardPriorityTag
+                 ? `${dayjs(cardPriority.lastUpdated).format('MMMM D, YYYY, h:mm a')} (${dayjs(cardPriority.lastUpdated).fromNow()})`
+                 : '— (not stored)'
+             }
+           />
         </div>
       )}
 

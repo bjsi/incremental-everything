@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import {
   allCardPriorityInfoKey,
   defaultCardPriorityId,
+  enableFlashcardPrioritisationId,
 } from '../consts';
 import {
   CardPriorityInfo,
@@ -18,6 +19,28 @@ import {
 } from './types';
 import * as _ from 'remeda';
 import { getIESetting } from '../settings';
+
+/**
+ * Whether the plugin may write CardPriority tags on its own initiative.
+ *
+ * Every *automatic* writer checks this: the startup pretagging pass, the
+ * per-edit auto-assign, the in-queue card-creation hook, the IncRem inheritance
+ * hook and the descendant cascade. With the opt-in off, none of them run, so the
+ * plugin never applies the powerup to a rem the user did not explicitly act on.
+ *
+ * Deliberately NOT applied to user-initiated writes — the priority popups, the
+ * quick-priority shortcuts, the batch tools. Those tag exactly one rem the user
+ * is looking at, and silently ignoring a slider the user just moved is worse
+ * than the write. Hiding the control is the right lever there, not this guard.
+ *
+ * What is lost while off is the bulk index (taggedRem -> cache -> shield,
+ * percentiles, Priority Review Documents), not inheritance itself:
+ * getCardPriority resolves an untagged rem's value through its ancestors on
+ * every read.
+ */
+export async function mayAutoWriteCardPriority(plugin: RNPlugin): Promise<boolean> {
+  return await getIESetting(plugin, enableFlashcardPrioritisationId);
+}
 
 /**
  * Find the closest ancestor with priority (either Incremental or CardPriority)
@@ -193,6 +216,13 @@ export async function setCardPriority(
  */
 export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): Promise<number> {
   const existingPriority = await getCardPriority(plugin, rem);
+
+  // Automatic writer: no tag is applied while flashcard prioritisation is off.
+  // The resolved value is still returned, so callers that only want to *know* the
+  // priority keep working.
+  if (!(await mayAutoWriteCardPriority(plugin))) {
+    return existingPriority?.priority ?? (await getIESetting(plugin, defaultCardPriorityId));
+  }
 
   if (existingPriority && (existingPriority.source === 'manual' || existingPriority.source === 'incremental')) {
     return existingPriority.priority;

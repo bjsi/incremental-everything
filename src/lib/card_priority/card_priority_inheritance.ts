@@ -1,6 +1,6 @@
 import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem/types';
-import { setCardPriority } from './index';
+import { setCardPriority, mayAutoWriteCardPriority } from './index';
 import { shouldUseLightMode } from '../mobileUtils';
 import { getDescendantsToDepth } from '../pdfUtils';
 
@@ -17,6 +17,9 @@ export const handleCardPriorityInheritance = async (
     incRemInfo: IncrementalRem | null
 ) => {
     if (!rem || !incRemInfo) return;
+
+    // Automatic writer — see mayAutoWriteCardPriority.
+    if (!(await mayAutoWriteCardPriority(plugin))) return;
 
     const startTime = Date.now();
 
