@@ -225,11 +225,10 @@ function Priority() {
     };
   }, [rem?._id]);
 
-  // Replace the separate hasCards, cardInfo hooks with a combined one:
-  // OPTIMIZATION: Check cardPriority powerup first - if it exists, we can skip expensive card checks
-  // since having the powerup is sufficient to show the card section.
-  // For hasCards, we use a three-tier fallback due to SDK inconsistency where rem.getCards() 
-  // sometimes returns [] even when cards exist.
+  // Combined hasCards + cardInfo lookup. Checks the cardPriority powerup first:
+  // its presence is enough to show the card section, so the card check is skipped
+  // entirely. Otherwise the card count from getCardPriority answers it, corrected
+  // by the cache where one exists — see Step 4.
   const cardData = useTrackerPlugin(
     async (plugin) => {
       if (!rem) {
@@ -253,30 +252,37 @@ function Priority() {
         };
       }
 
-      // Step 4: No powerup - need to check for cards using three-tier fallback
-      let hasCards = false;
+      // Step 4: No powerup — does this rem own cards? The answer picks which
+      // section the popup shows (card priority vs inheritance anchor).
+      //
+      // getCardPriority above already paid a rem.getCards(); cardCount is that
+      // same answer, so asking again would be a second round-trip for one number.
+      let hasCards = (cardPriorityInfo?.cardCount || 0) > 0;
 
-      // Tier 1: Try rem.getCards() first (fastest, works most of the time)
-      const directCards = await rem.getCards();
-      if (directCards.length > 0) {
-        hasCards = true;
-      } else {
-        // Tier 2: Check if rem exists in the card priority cache
-        // 🔌 Skip cache check and global registry in light mode to ensure speed
-        if (performanceMode === PERFORMANCE_MODE_LIGHT) {
-          hasCards = false;
-        } else {
-          const cachedCardInfos = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey);
-          const cachedInfo = cachedCardInfos?.find(info => info.remId === rem._id);
-
-          if (cachedInfo && cachedInfo.cardCount > 0) {
-            hasCards = true;
-          } else {
-            // Tier 3: Use global registry as final fallback (slowest but most reliable)
-            const allCards = await plugin.card.getAll();
-            const cardsForRem = allCards.filter(card => card.remId === rem._id);
-            hasCards = cardsForRem.length > 0;
-          }
+      // rem.getCards() reports [] for rems whose cards are disabled or sit in a
+      // paused deck. A fully-loaded cache corrects that: since its deferred phase
+      // it holds an entry for every rem that owns cards, which makes it
+      // authoritative in BOTH directions — a miss means no cards and needs no
+      // further probing.
+      //
+      // This replaces a third tier that ran plugin.card.getAll() and filtered the
+      // whole card database down to this one rem. Its conditions read like a rare
+      // fallback but described the most ordinary case there is — a plain rem with
+      // no cards, no powerup and therefore no cache entry — so pressing Opt+P on
+      // one loaded the entire card database to confirm a negative.
+      //
+      // With no cache (light mode, or flashcard prioritisation off) the getCards
+      // answer stands, which is exactly how light mode has always behaved here.
+      if (!hasCards) {
+        const cacheLoaded = await plugin.storage.getSession<boolean>(
+          'card_priority_cache_fully_loaded'
+        );
+        if (cacheLoaded) {
+          const cachedCardInfos =
+            (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+          hasCards = cachedCardInfos.some(
+            (info) => info.remId === rem._id && info.cardCount > 0
+          );
         }
       }
 
@@ -289,7 +295,7 @@ function Priority() {
         hasCardPriorityPowerup: hasPowerup
       };
     },
-    [rem?._id, performanceMode]
+    [rem?._id]
   );
 
   // Then use:
