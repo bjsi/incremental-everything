@@ -334,20 +334,36 @@ function Priority() {
 
     // --- FULL MODE LOGIC ---
 
-    // Calculate descendant card count (needed for "Set Card Priority for Inheritance" button)
-    // We use plugin.card.getAll() instead of rem.getCards() due to SDK inconsistency
-    // where rem.getCards() sometimes returns [] even when cards exist.
-    // Note: We cannot use the cardPriority cache here because it only contains tagged rems,
-    // but for inheritance we need to count ALL cards including untagged descendants.
-    const descendants = await rem.getDescendants();
-    const descendantIds = new Set(descendants.map(d => d._id));
-
-    // OPTIMIZATION: Use the set of IDs to filter efficiently, as suggested by RemNote support.
-    // This is already using the optimized approach of fetching all cards once and validiting IDs,
-    // avoiding individual rem fetches for each card.
-    const allCards = await plugin.card.getAll();
-    const cardsInDescendants = allCards.filter(card => descendantIds.has(card.remId));
-    const finalDescendantCardCount = cardsInDescendants.length;
+    // Descendant flashcard count, used ONLY to label the "Set Card Priority for
+    // Inheritance" section and to disable it at zero. Nothing is written from it.
+    //
+    // This used to call plugin.card.getAll() and filter the whole card database by
+    // descendant id — a full-DB load to render a number in a sentence, re-run on
+    // every change to scope/caches while the user waits on the popup.
+    //
+    // The card-priority cache answers it for free: since its deferred phase it
+    // holds an entry per rem that owns cards, tagged or not (the old comment here
+    // predated that phase), and cardCount gives cards rather than rems.
+    //
+    // No cache, no count: -1 means "unknown" and every consumer already renders
+    // the generic "Descendant flashcards" label for it — that is exactly what
+    // Light Mode has always shown. Keying on the cache rather than on the
+    // flashcard-prioritisation setting covers three cases with one condition:
+    // prioritisation off, light mode, and prioritisation on but the cache still
+    // loading — where a count taken from a partial cache would simply be wrong.
+    const cardCacheLoaded = await plugin.storage.getSession<boolean>(
+      'card_priority_cache_fully_loaded'
+    );
+    let finalDescendantCardCount = -1;
+    if (cardCacheLoaded) {
+      const cachedInfos =
+        (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+      const descendantIds = new Set((await rem.getDescendants()).map((d) => d._id));
+      finalDescendantCardCount = cachedInfos.reduce(
+        (n, info) => (descendantIds.has(info.remId) ? n + info.cardCount : n),
+        0
+      );
+    }
 
     // ... (rest of the existing derivedData logic) ...
     const effectiveScopeForCache = originalScopeId || queueSubQueueId;
