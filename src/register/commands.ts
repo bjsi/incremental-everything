@@ -34,6 +34,7 @@ import {
   preservedHistoryPowerupCode,
   priorityBandColorsReloadKey,
   enableMasteryDrillId,
+  enableFlashcardPrioritisationId,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
 import {
@@ -1679,6 +1680,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     description: 'Update all inherited Card Priorities (and pre-compute and tag all card not yet prioritized)',
     quickCode: 'ucp',
     action: async () => {
+      // This command exists to materialise inherited/default tags KB-wide, which
+      // setCardPriority refuses while the opt-in is off. Without this check it
+      // would run its whole scan and report success having written nothing.
+      if (!(await getIESetting(plugin, enableFlashcardPrioritisationId))) {
+        await plugin.app.toast(
+          'Enable Flashcard Prioritisation first — inherited priorities are not tagged while it is off.'
+        );
+        return;
+      }
       await updateAllCardPriorities(plugin);
     },
   });

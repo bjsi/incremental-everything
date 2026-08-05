@@ -203,13 +203,12 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     // Clear immediately to prevent re-trigger on the next track() tick
     await plugin.storage.setSession('pendingInheritanceCascade', null);
 
-    // The single gate for every cascade trigger. The cascade writes nothing but
-    // CardPriority tags (IncRem descendants are skipped — an IncRem owns its own
-    // priority), and those tags exist purely to make card priorities queryable in
-    // bulk: taggedRem() -> cache -> shield, percentiles, Priority Review Documents.
-    // With flashcard prioritisation off none of that is built, so the walk would be
-    // pure write amplification. Per-rem display is unaffected: getCardPriority
-    // resolves an untagged rem's inherited value through findClosestAncestorWithPriority.
+    // Skip the whole walk when flashcard prioritisation is off. The cascade only
+    // ever writes 'inherited' and 'default' sources (IncRem descendants are
+    // skipped — an IncRem owns its own priority), and setCardPriority refuses
+    // both while the opt-in is off, so every write in the walk would be a no-op.
+    // Checking once here saves getDescendants + a has-cards lookup + an ancestor
+    // walk per descendant, rather than discovering it one refused write at a time.
     //
     // Gating here rather than at each trigger is deliberate — six sites enqueue
     // cascades and only four of them ever checked light mode, so the other two

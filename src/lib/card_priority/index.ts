@@ -21,24 +21,29 @@ import * as _ from 'remeda';
 import { getIESetting } from '../settings';
 
 /**
- * Whether the plugin may write CardPriority tags on its own initiative.
+ * Whether a CardPriority tag may be written, given the source being recorded.
  *
- * Every *automatic* writer checks this: the startup pretagging pass, the
- * per-edit auto-assign, the in-queue card-creation hook, the IncRem inheritance
- * hook and the descendant cascade. With the opt-in off, none of them run, so the
- * plugin never applies the powerup to a rem the user did not explicitly act on.
+ * The rule, enforced centrally in setCardPriority so no writer can miss it:
  *
- * Deliberately NOT applied to user-initiated writes — the priority popups, the
- * quick-priority shortcuts, the batch tools. Those tag exactly one rem the user
- * is looking at, and silently ignoring a slider the user just moved is worse
- * than the write. Hiding the control is the right lever there, not this guard.
+ * - `manual` — always. The user set this priority deliberately, on one rem.
+ * - `incremental` — always. The rem is (or descends from) an Incremental Rem
+ *   whose priority it adopts; this is what Dismiss records, and the anchor it
+ *   leaves behind is what preserves the priority once the IncRem is gone.
+ * - `inherited` / `default` — only while flashcard prioritisation is on. These
+ *   are the bulk-index writes: derivable at any time by walking ancestors, and
+ *   materialising them KB-wide is precisely the cost the opt-in exists to avoid.
  *
- * What is lost while off is the bulk index (taggedRem -> cache -> shield,
- * percentiles, Priority Review Documents), not inheritance itself:
- * getCardPriority resolves an untagged rem's value through its ancestors on
- * every read.
+ * Nothing is lost by refusing the last two. getCardPriority resolves an
+ * untagged rem's value through findClosestAncestorWithPriority on every read, so
+ * inheritance keeps working; what is skipped is only the physical tag that makes
+ * it queryable in bulk (taggedRem -> cache -> shield, percentiles, Priority
+ * Review Documents).
  */
-export async function mayAutoWriteCardPriority(plugin: RNPlugin): Promise<boolean> {
+export async function mayWriteCardPrioritySource(
+  plugin: RNPlugin,
+  source: PrioritySource
+): Promise<boolean> {
+  if (source === 'manual' || source === 'incremental') return true;
   return await getIESetting(plugin, enableFlashcardPrioritisationId);
 }
 
@@ -182,6 +187,17 @@ export async function setCardPriority(
   source: PrioritySource,
   knownHasPowerup: boolean = false
 ): Promise<void> {
+  // Single enforcement point for the source rule — see mayWriteCardPrioritySource.
+  // Refusing here rather than at each call site means a new writer cannot forget,
+  // and the derivable sources ('inherited'/'default') never materialise a tag
+  // while flashcard prioritisation is off.
+  if (!(await mayWriteCardPrioritySource(plugin, source))) {
+    console.debug(
+      `[CardPriority] skipped '${source}' write on ${rem._id} — flashcard prioritisation is off`
+    );
+    return;
+  }
+
   const hasPowerup = knownHasPowerup || (await rem.hasPowerup(CARD_PRIORITY_CODE));
   if (!hasPowerup) {
     await rem.addPowerup(CARD_PRIORITY_CODE);
@@ -216,13 +232,6 @@ export async function setCardPriority(
  */
 export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): Promise<number> {
   const existingPriority = await getCardPriority(plugin, rem);
-
-  // Automatic writer: no tag is applied while flashcard prioritisation is off.
-  // The resolved value is still returned, so callers that only want to *know* the
-  // priority keep working.
-  if (!(await mayAutoWriteCardPriority(plugin))) {
-    return existingPriority?.priority ?? (await getIESetting(plugin, defaultCardPriorityId));
-  }
 
   if (existingPriority && (existingPriority.source === 'manual' || existingPriority.source === 'incremental')) {
     return existingPriority.priority;
