@@ -13,7 +13,7 @@ import {
   getIESetting,
   setIESetting,
   isSettingVisible,
-  dependentsHiddenBy,
+  hiddenDependentsOf,
 } from '../lib/settings';
 
 /**
@@ -42,6 +42,22 @@ const openDocs = (path: string) => {
 
 const isDefault = (id: IESettingId, value: unknown) =>
   JSON.stringify(value) === JSON.stringify(IE_SETTINGS_DEFAULTS[id]);
+
+/**
+ * How to tell the user to reveal the settings this one gates. A switch can gate
+ * in either direction — the Beta Scheduler hides its parameters when off and
+ * hides the Multiplier when on — so the phrase follows the required value.
+ */
+function requirementPhrase(spec: SettingSpec, requires: unknown): string {
+  if (spec.kind === 'boolean') {
+    return requires ? 'Turn this on to configure' : 'Turn this off to configure';
+  }
+  if (spec.kind === 'dropdown') {
+    const label = spec.options.find((o) => o.value === requires)?.label ?? String(requires);
+    return `Set this to “${label}” to configure`;
+  }
+  return `Set this to ${JSON.stringify(requires)} to configure`;
+}
 
 function HelpLink({ path, label }: { path: string; label: string }) {
   return (
@@ -93,8 +109,8 @@ interface RowProps {
   spec: SettingSpec;
   value: unknown;
   onChange: (value: unknown) => void;
-  /** Titles of settings currently hidden because they depend on this one. */
-  hiddenDependents: string[];
+  /** Settings hidden because they depend on this one, grouped by required value. */
+  hiddenDependents: Array<{ requires: unknown; ids: IESettingId[] }>;
 }
 
 function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
@@ -272,11 +288,15 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
         )}
       </div>
 
-      {hiddenDependents.length > 0 && (
-        <div style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
-          Turn this on to configure {hiddenDependents.join(' and ')}.
+      {hiddenDependents.map((dep) => (
+        <div
+          key={JSON.stringify(dep.requires)}
+          style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}
+        >
+          {requirementPhrase(spec, dep.requires)}{' '}
+          {dep.ids.map((depId) => IE_SETTINGS_SCHEMA[depId].title).join(' and ')}.
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -435,9 +455,7 @@ export function IESettingsWidget() {
                     spec={IE_SETTINGS_SCHEMA[id]}
                     value={values[id]}
                     onChange={(v) => onChange(id, v)}
-                    hiddenDependents={dependentsHiddenBy(id, values).map(
-                      (dep) => IE_SETTINGS_SCHEMA[dep].title
-                    )}
+                    hiddenDependents={hiddenDependentsOf(id, values)}
                   />
                 ))}
               </div>

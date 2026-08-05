@@ -302,6 +302,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'number',
     tier: 'popup',
     group: 'scheduling',
+    showWhen: { id: betaSchedulerEnabledId, equals: false },
     min: 1,
     title: 'Multiplier',
     description:
@@ -811,9 +812,26 @@ export function isSettingVisible(id: IESettingId, values: IESettings | undefined
   return JSON.stringify(values[dep.id]) === JSON.stringify(dep.equals);
 }
 
-/** Ids hidden right now because they depend on `id` holding a different value. */
-export function dependentsHiddenBy(id: IESettingId, values: IESettings | undefined): IESettingId[] {
-  return (Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[]).filter(
-    (other) => IE_SETTINGS_SCHEMA[other].showWhen?.id === id && !isSettingVisible(other, values)
-  );
+/**
+ * Settings hidden right now because they depend on `id` holding a different
+ * value, grouped by the value each needs.
+ *
+ * Grouped rather than flat because a setting can gate others in both directions
+ * — the Beta Scheduler hides its own parameters when off and hides the
+ * Multiplier when on — and the popup's hint has to name the right direction.
+ */
+export function hiddenDependentsOf(
+  id: IESettingId,
+  values: IESettings | undefined
+): Array<{ requires: unknown; ids: IESettingId[] }> {
+  const byRequired = new Map<string, { requires: unknown; ids: IESettingId[] }>();
+  for (const other of Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[]) {
+    const dep = IE_SETTINGS_SCHEMA[other].showWhen;
+    if (dep?.id !== id || isSettingVisible(other, values)) continue;
+    const key = JSON.stringify(dep.equals);
+    const entry = byRequired.get(key) ?? { requires: dep.equals, ids: [] };
+    entry.ids.push(other);
+    byRequired.set(key, entry);
+  }
+  return [...byRequired.values()];
 }
