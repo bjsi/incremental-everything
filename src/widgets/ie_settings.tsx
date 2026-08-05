@@ -49,14 +49,17 @@ const isDefault = (id: IESettingId, value: unknown) =>
  * hides the Multiplier when on — so the phrase follows the required value.
  */
 function requirementPhrase(spec: SettingSpec, requires: unknown): string {
+  // A native-tier switch cannot be flipped here, so say where it lives rather
+  // than pointing at a control the popup renders disabled.
+  const where = spec.tier === 'native' ? " in RemNote's settings" : '';
   if (spec.kind === 'boolean') {
-    return requires ? 'Turn this on to configure' : 'Turn this off to configure';
+    return `Turn this ${requires ? 'on' : 'off'}${where} to configure`;
   }
   if (spec.kind === 'dropdown') {
     const label = spec.options.find((o) => o.value === requires)?.label ?? String(requires);
-    return `Set this to “${label}” to configure`;
+    return `Set this to “${label}”${where} to configure`;
   }
-  return `Set this to ${JSON.stringify(requires)} to configure`;
+  return `Set this to ${JSON.stringify(requires)}${where} to configure`;
 }
 
 function HelpLink({ path, label }: { path: string; label: string }) {
