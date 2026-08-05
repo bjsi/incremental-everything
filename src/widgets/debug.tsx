@@ -364,6 +364,16 @@ function Debug() {
       // about whether anything is actually stored on this one. Probe the powerup
       // directly to tell "written here" from "resolved on read".
       const hasCardPriorityTag = await rem.hasPowerup('cardPriority');
+      // The three slots, verbatim. hasPowerup alone is not enough: a rem can
+      // carry the powerup with an EMPTY priority slot, and getCardPriority then
+      // falls through to the ancestor branch — reporting source 'inherited' and
+      // lastUpdated 0 exactly as an untagged rem would. Only the raw slot values
+      // distinguish "written here" from "resolved on read".
+      const cardPrioritySlots = {
+        priority: await rem.getPowerupProperty('cardPriority', 'priority'),
+        source: await rem.getPowerupProperty('cardPriority', 'prioritySource'),
+        lastUpdated: await rem.getPowerupProperty('cardPriority', 'lastUpdated'),
+      };
       const dismissed = await getDismissedHistoryFromRem(rp, rem);
       
       const isCardDisabledLocally = await rem.hasPowerup(BuiltInPowerupCodes.DisableCards);
@@ -397,6 +407,7 @@ function Debug() {
         rawSlotProbe,
         cardPriority,
         hasCardPriorityTag,
+        cardPrioritySlots,
         dismissed,
         isCardDisabledLocally,
         isCardDisabledInAncestors,
@@ -594,7 +605,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, rawSlotProbe, cardPriority, hasCardPriorityTag, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
+  const { incrementalRem, rawSlotProbe, cardPriority, hasCardPriorityTag, cardPrioritySlots, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
 
   const handleCardCompare = async () => {
     if (!remId) return;
@@ -3621,19 +3632,42 @@ function Debug() {
                backgroundColor: 'var(--rn-clr-background-secondary)',
              }}
            >
-             {hasCardPriorityTag ? (
-               <span>
-                 <strong style={{ color: '#16a34a' }}>Tagged.</strong> The values below are read from
-                 this rem's CardPriority slots.
-               </span>
-             ) : (
-               <span>
-                 <strong style={{ color: '#d97706' }}>Not tagged.</strong> This rem carries no
-                 CardPriority powerup — the values below are resolved on read from the nearest
-                 ancestor (or the default). Nothing is stored here, and "Last Updated" shows the
-                 epoch because there is no stored timestamp.
-               </span>
-             )}
+               {(() => {
+               const storedPriority = cardPrioritySlots.priority;
+               const stored = !!storedPriority;
+               return (
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                   <span>
+                     {stored ? (
+                       <>
+                         <strong style={{ color: '#16a34a' }}>Stored on this rem.</strong> The values
+                         below come from this rem's own CardPriority slots.
+                       </>
+                     ) : hasCardPriorityTag ? (
+                       <>
+                         <strong style={{ color: '#d97706' }}>Tagged, but empty.</strong> The
+                         CardPriority powerup is applied to this rem, yet its priority slot holds no
+                         value — so the numbers below are resolved on read from the nearest ancestor,
+                         exactly as they would be for an untagged rem. A tag in this state is what
+                         "Sanitize Rogue Tags" removes.
+                       </>
+                     ) : (
+                       <>
+                         <strong style={{ color: '#d97706' }}>Not tagged.</strong> No CardPriority
+                         powerup on this rem — the values below are resolved on read from the nearest
+                         ancestor (or the default).
+                       </>
+                     )}
+                   </span>
+                   <span style={{ fontFamily: 'monospace', color: 'var(--rn-clr-content-tertiary)' }}>
+                     hasPowerup={String(hasCardPriorityTag)} · slots: priority=
+                     {JSON.stringify(cardPrioritySlots.priority ?? null)} source=
+                     {JSON.stringify(cardPrioritySlots.source ?? null)} lastUpdated=
+                     {JSON.stringify(cardPrioritySlots.lastUpdated ?? null)}
+                   </span>
+                 </div>
+               );
+             })()}
            </div>
            <div className="flex gap-4 mb-2">
              <Info className="cp-priority" label="Priority" data={cardPriority.priority} />
@@ -3647,7 +3681,7 @@ function Debug() {
              className="cp-updated"
              label="Last Updated"
              data={
-               hasCardPriorityTag
+               cardPrioritySlots.lastUpdated
                  ? `${dayjs(cardPriority.lastUpdated).format('MMMM D, YYYY, h:mm a')} (${dayjs(cardPriority.lastUpdated).fromNow()})`
                  : '— (not stored)'
              }
