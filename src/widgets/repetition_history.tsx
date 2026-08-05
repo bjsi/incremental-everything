@@ -290,6 +290,15 @@ function HistoryEntryDialog({
     const [nextRepStr, setNextRepStr] = React.useState('');
     const nextRepTouched = React.useRef(false);
 
+    // A successful save unmounts this dialog (the parent clears it), and the user
+    // can also close it mid-write. Every state update that happens after an await
+    // therefore has to check we're still mounted, or React warns about updating
+    // an unmounted component.
+    const mounted = React.useRef(true);
+    React.useEffect(() => () => { mounted.current = false; }, []);
+    const failWith = (message: string) => { if (mounted.current) setError(message); };
+    const stopBusy = () => { if (mounted.current) setBusy(false); };
+
     const sessionMs = combineDateTime(dateStr, timeStr);
     const sessionValid = !Number.isNaN(sessionMs);
     const willBeNewest = sessionValid && isNewestEntry(history, sessionMs);
@@ -354,7 +363,7 @@ function HistoryEntryDialog({
                     nextRepDate: nextRepMs,
                 });
                 if (!result.ok) {
-                    setError(result.error || 'Could not record the session.');
+                    failWith(result.error || 'Could not record the session.');
                     return;
                 }
                 onSaved(
@@ -375,16 +384,16 @@ function HistoryEntryDialog({
                     target.index
                 );
                 if (!result.ok) {
-                    setError(result.error || 'Could not update the entry.');
+                    failWith(result.error || 'Could not update the entry.');
                     return;
                 }
                 onSaved('✓ Entry updated');
             }
         } catch (e) {
             console.error('[RepetitionHistoryPopup] save failed:', e);
-            setError(String(e));
+            failWith(String(e));
         } finally {
-            setBusy(false);
+            stopBusy();
         }
     };
 
@@ -394,15 +403,15 @@ function HistoryEntryDialog({
         try {
             const result = await deleteHistoryEntry(plugin, remId, entry!, target.index);
             if (!result.ok) {
-                setError(result.error || 'Could not delete the entry.');
+                failWith(result.error || 'Could not delete the entry.');
                 return;
             }
             onSaved('✓ Entry deleted');
         } catch (e) {
             console.error('[RepetitionHistoryPopup] delete failed:', e);
-            setError(String(e));
+            failWith(String(e));
         } finally {
-            setBusy(false);
+            stopBusy();
         }
     };
 
