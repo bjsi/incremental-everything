@@ -27,6 +27,8 @@ import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cle
 import { compactAuthoritativeAggregatesIfNeeded } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS } from '../lib/ui_helpers';
+import { getIESetting } from '../lib/settings';
+import { migrateIESettingsIfNeeded } from '../lib/settings_migration';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -48,13 +50,20 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerCoreQueueDisplayPowerups(plugin);
   await registerPluginSettings(plugin);
 
+  // Seed the plugin-owned settings store from the registrations that were just
+  // installed. Must run here: after registerPluginSettings (getSetting throws
+  // for an unregistered id) and before any widget can read a setting. No-ops
+  // once it has completed. Fire-and-forget would risk a widget mounting first,
+  // so it is awaited — it is ~32 reads of already-loaded values.
+  await migrateIESettingsIfNeeded(plugin);
+
   // Hide-in-Queue legacy powerups (Hide in Queue, Remove from Queue, etc.) and
   // their commands are gated by a setting. They share powerup codes with the
   // standalone Hide in Queue plugin — registering both at once causes RemNote
   // to throw "Duplicated powerup" and aborts plugin loading. The user must
   // uninstall the standalone plugin first, then enable this setting.
   const enableHideInQueueIntegration =
-    (await plugin.settings.getSetting<boolean>(enableHideInQueueIntegrationId)) ?? false;
+    await getIESetting(plugin, enableHideInQueueIntegrationId);
   if (enableHideInQueueIntegration) {
     await registerHideInQueueLegacyPowerups(plugin);
   }

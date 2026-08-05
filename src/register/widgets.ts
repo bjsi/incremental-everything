@@ -1,9 +1,10 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, skipMasteryDrillId } from '../lib/consts';
+import { getIESetting } from '../lib/settings';
 
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const skipMasteryDrill = Boolean(
-    await plugin.settings.getSetting('skip_mastery_drill')
+    await getIESetting(plugin, skipMasteryDrillId)
   );
 
   // NEW: Light Priority Widget

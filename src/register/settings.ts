@@ -21,8 +21,24 @@ import {
   autoFocusQueueDashboardId,
   enableHideInQueueIntegrationId,
   showPriorityBandsInTablesId,
+  priorityStepSizeId,
+  priorityEditorDisplayModeId,
+  hideCardPriorityTagSettingId,
+  showLeftBorderForIncRemsSettingId,
+  showDismissedIndicatorSettingId,
+  hideDismissedTagSettingId,
+  performanceModeId,
+  flashcardResponseTimeLimitId,
+  skipMasteryDrillId,
+  oldItemThresholdId,
+  masteryDrillMinDelayMinutesId,
+  disableFinalDrillNotificationId,
 } from '../lib/consts';
 import { PRIORITY_BAND_TAG_HIDE_CSS } from '../lib/priority_bands';
+// Defaults live in lib/settings.ts and are read back here, so a registration
+// and its default can never disagree. When these registrations are eventually
+// retired, the table stays behind as the only source of defaults.
+import { IE_SETTINGS_DEFAULTS, getIESetting } from '../lib/settings';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
 const HIDE_CARD_PRIORITY_CSS = `
@@ -84,7 +100,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: initialIntervalId,
     title: 'Initial Interval',
     description: 'Sets the number of days until the first repetition.',
-    defaultValue: 1,
+    defaultValue: IE_SETTINGS_DEFAULTS[initialIntervalId],
   });
 
   plugin.settings.registerNumberSetting({
@@ -92,7 +108,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Multiplier',
     description:
       'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
-    defaultValue: 1.5,
+    defaultValue: IE_SETTINGS_DEFAULTS[multiplierId],
   });
 
   // --- Beta Scheduler Settings ---
@@ -101,7 +117,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Use Beta Scheduler (Saturating Curve)',
     description:
       'Enable the beta saturating scheduler. Intervals start at the First Review Interval and gradually approach the Max Interval, instead of growing exponentially. When enabled, the Multiplier setting above is ignored. See the IncRem Scheduler wiki page for details.',
-    defaultValue: false,
+    defaultValue: IE_SETTINGS_DEFAULTS[betaSchedulerEnabledId],
   });
 
   plugin.settings.registerNumberSetting({
@@ -109,7 +125,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'First Review Interval (Beta Scheduler)',
     description:
       'Interval in days assigned after completing the first review. Not to be confused with "Initial Interval", which controls when a new IncRem first appears in the queue (before any review). Only used when the Beta Scheduler is enabled. Default: 5 days.',
-    defaultValue: 5,
+    defaultValue: IE_SETTINGS_DEFAULTS[betaFirstReviewIntervalId],
   });
 
   plugin.settings.registerNumberSetting({
@@ -117,7 +133,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Max Interval (Beta Scheduler)',
     description:
       'Upper bound in days the interval gradually approaches. The interval will never exceed this value. Only used when the Beta Scheduler is enabled. Default: 30 days.',
-    defaultValue: 30,
+    defaultValue: IE_SETTINGS_DEFAULTS[betaMaxIntervalId],
   });
 
   plugin.settings.registerBooleanSetting({
@@ -125,7 +141,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Collapse Queue Top Bar (IncRem Only)',
     description:
       'Creates extra vertical space during Incremental Rem review by collapsing the queue top bar to a thin strip. Hover over it to reveal the full bar. Has no effect on regular flashcard turns.',
-    defaultValue: false,
+    defaultValue: IE_SETTINGS_DEFAULTS[collapseQueueTopBar],
   });
 
   const COLLAPSE_TOP_BAR_CSS = `
@@ -155,7 +171,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     }
   `;
 
-  const shouldCollapseTopBar = await plugin.settings.getSetting<boolean>(collapseQueueTopBar);
+  const shouldCollapseTopBar = await getIESetting(plugin, collapseQueueTopBar);
   if (shouldCollapseTopBar) {
     await plugin.app.registerCSS(collapseTopBarCssId, COLLAPSE_TOP_BAR_CSS);
   }
@@ -166,7 +182,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: defaultPriorityId,
     title: 'Default IncRem Priority',
     description: 'Sets the default priority for new incremental rem (0-100, Lower = more important). Default: 10',
-    defaultValue: 10,
+    defaultValue: IE_SETTINGS_DEFAULTS[defaultPriorityId],
     validators: [
       {
         type: 'int' as const,
@@ -186,7 +202,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: defaultCardPriorityId,
     title: 'Default Card Priority',
     description: 'Default priority for flashcards without inherited priority (0-100, Lower = more important).  Default: 50',
-    defaultValue: 50,
+    defaultValue: IE_SETTINGS_DEFAULTS[defaultCardPriorityId],
     validators: [
       { type: 'int' as const },
       { type: 'gte' as const, arg: 0 },
@@ -195,10 +211,10 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   } as PluginNumberSetting);
 
   plugin.settings.registerNumberSetting({
-    id: 'priority-step-size',
+    id: priorityStepSizeId,
     title: 'Priority Step Size',
     description: 'Sets the step size for quick priority increase/decrease shortcuts (Ctrl+Shift+Up/Down). Default: 5',
-    defaultValue: 5,
+    defaultValue: IE_SETTINGS_DEFAULTS[priorityStepSizeId],
     validators: [
       { type: 'int' as const },
       { type: 'gte' as const, arg: 1 },
@@ -208,10 +224,10 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
 
 
   plugin.settings.registerDropdownSetting({
-    id: 'priorityEditorDisplayMode',
+    id: priorityEditorDisplayModeId,
     title: 'Priority Widget in Editor',
     description: 'Controls when to show the priority widget in the right-hand margin of each Rem in the editor.',
-    defaultValue: 'all',
+    defaultValue: IE_SETTINGS_DEFAULTS[priorityEditorDisplayModeId],
     options: [
       {
         key: 'all',
@@ -238,7 +254,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Display Priority Shield in Queue',
     description:
       'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[displayPriorityShieldId],
   });
 
   plugin.settings.registerBooleanSetting({
@@ -248,7 +264,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
       'If enabled, shows what fraction of your total priority-weighted workload has been processed. ' +
       'High-priority items carry exponentially more weight (~10× at the top vs bottom), so processing ' +
       'them gives a bigger boost. Always increases as you review items.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[displayWeightedShieldId],
   });
 
   plugin.settings.registerBooleanSetting({
@@ -256,7 +272,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Display Priority in Queue Toolbar',
     description:
       'If enabled, exhibits the PriorityBadge of the current flashcard or IncRem at the top right of the queue.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[displayQueueToolbarPriorityId],
   });
 
   plugin.settings.registerDropdownSetting({
@@ -267,7 +283,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
       'Highlights that do NOT use the isolated card view will be shown inside the PDF/HTML reader instead, ' +
       'and regular Rems that do NOT use it will be shown in the full document context. ' +
       'You can always toggle between the two views with the button in the queue — this setting only determines the initial view.',
-    defaultValue: 'highlights',
+    defaultValue: IE_SETTINGS_DEFAULTS[isolatedQueueModeId],
     options: [
       {
         key: 'highlights',
@@ -297,34 +313,34 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Auto focus Queue Dashboard',
     description:
       'When enabled, opens the Practiced Queues dashboard in the Right Sidebar automatically on Queue Enter so you always have a live view of the current session. Note: PDF IncRems may temporarily steal focus to PDF-related tabs; the dashboard tab stays available for re-selection. (Does not apply to mobile)',
-    defaultValue: false,
+    defaultValue: IE_SETTINGS_DEFAULTS[autoFocusQueueDashboardId],
   });
 
 
   // Visual Indicators in Editor
 
   plugin.settings.registerBooleanSetting({
-    id: 'hideCardPriorityTag',
+    id: hideCardPriorityTagSettingId,
     title: 'Hide CardPriority Tag in Editor',
     description:
       'If enabled, this will hide the "CardPriority" powerup tag in the editor to reduce clutter. You can still set priority with (Alt+P). After changing this setting, reload RemNote.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[hideCardPriorityTagSettingId],
   });
 
-  const shouldHide = await plugin.settings.getSetting('hideCardPriorityTag');
+  const shouldHide = await getIESetting(plugin, hideCardPriorityTagSettingId);
   if (shouldHide) {
     await plugin.app.registerCSS(hideCardPriorityTagId, HIDE_CARD_PRIORITY_CSS);
   }
 
   plugin.settings.registerBooleanSetting({
-    id: 'showLeftBorderForIncRems',
+    id: showLeftBorderForIncRemsSettingId,
     title: 'Show a green left Border for IncRems in Editor',
     description:
       'If enabled, this will show a green left border for IncRems in Editor, to make it easier to identify your "extracts".',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[showLeftBorderForIncRemsSettingId],
   });
 
-  const shouldShowLeftBorderForIncRems = await plugin.settings.getSetting('showLeftBorderForIncRems');
+  const shouldShowLeftBorderForIncRems = await getIESetting(plugin, showLeftBorderForIncRemsSettingId);
   if (shouldShowLeftBorderForIncRems) {
     await plugin.app.registerCSS(showLeftBorderForIncRemsId, SHOW_LEFT_BORDER_CSS);
   }
@@ -341,7 +357,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Show Priority Badges in Table Cells',
     description:
       'Tables are the one place the priority editor cannot render. Shows a coloured band badge (e.g. "70s") in the top-right of each table cell. Run "Refresh Priority Badges" once to fill in existing rems. Takes effect after a reload.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[showPriorityBandsInTablesId],
   });
 
   // Unconditional: the band tags are an implementation detail, so their tag-bar
@@ -353,28 +369,28 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
 
   // Dismissed Rems settings
   plugin.settings.registerBooleanSetting({
-    id: 'showDismissedIndicator',
+    id: showDismissedIndicatorSettingId,
     title: 'Show Yellow Left Border for Dismissed Rems',
     description:
       'If enabled, Rems that have been dismissed from Incremental learning (via Dismiss button) will show a yellow left border to indicate they have preserved history.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[showDismissedIndicatorSettingId],
   });
 
-  const shouldShowDismissedIndicator = await plugin.settings.getSetting('showDismissedIndicator');
+  const shouldShowDismissedIndicator = await getIESetting(plugin, showDismissedIndicatorSettingId);
   if (shouldShowDismissedIndicator) {
     await plugin.app.registerCSS(showDismissedIndicatorId, SHOW_DISMISSED_INDICATOR_CSS);
   }
 
   // Hide dismissed powerup tag setting
   plugin.settings.registerBooleanSetting({
-    id: 'hideDismissedTag',
+    id: hideDismissedTagSettingId,
     title: 'Hide Dismissed Tag in Editor',
     description:
       'If enabled, this will hide the "Dismissed" powerup tag in the editor to reduce clutter. After changing this setting, reload RemNote.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[hideDismissedTagSettingId],
   });
 
-  const shouldHideDismissedTag = await plugin.settings.getSetting('hideDismissedTag');
+  const shouldHideDismissedTag = await getIESetting(plugin, hideDismissedTagSettingId);
   if (shouldHideDismissedTag) {
     await plugin.app.registerCSS(hideDismissedTagId, HIDE_DISMISSED_TAG_CSS);
   }
@@ -393,17 +409,17 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
       'WARNING: only enable this if you do NOT have the standalone "Hide in Queue" plugin installed — duplicate powerup registration throws a fatal error that breaks this plugin. If you currently have the standalone plugin, uninstall it first, then reload RemNote.\n\n' +
       'The "Remove Parent" and "Remove Grandparent" powerups/commands (used internally by the Cloze and Extract creators) are always registered regardless of this setting.\n\n' +
       'After changing this setting, reload RemNote.',
-    defaultValue: false,
+    defaultValue: IE_SETTINGS_DEFAULTS[enableHideInQueueIntegrationId],
   });
 
   // Performance Mode
 
   plugin.settings.registerDropdownSetting({
-    id: 'performanceMode',
+    id: performanceModeId,
     title: 'Performance Mode',
     description:
       'Choose performance level. "Light" is recommended for web/mobile. "Full" can bring significant computational overhead (best used in the Desktop App); it will also automatically start a pretagging process of all flashcards, that can make RemNote slow untill everything is tagged/synced/wired/cached!',
-    defaultValue: 'light',
+    defaultValue: IE_SETTINGS_DEFAULTS[performanceModeId],
     options: [
       {
         key: 'full',
@@ -423,7 +439,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Always use Light Mode on Mobile',
     description:
       'Automatically switch to Light performance mode when using RemNote on iOS or Android. This prevents crashes and improves performance on mobile devices. Recommended: enabled.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[alwaysUseLightModeOnMobileId],
   });
 
   plugin.settings.registerBooleanSetting({
@@ -431,7 +447,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Always use Light Mode on Web Browser',
     description:
       'Automatically switch to Light performance mode when using RemNote on the web browser. Full Mode can be slow or unstable on web browsers. Recommended: enabled.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[alwaysUseLightModeOnWebId],
   });
 
 
@@ -442,7 +458,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'Display FSRS DSR Stats (Flashcards)',
     description:
       'If enabled, shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card info bar widget. Requires FSRS v6 scheduler.',
-    defaultValue: true,
+    defaultValue: IE_SETTINGS_DEFAULTS[displayFsrsDsrId],
   });
 
   plugin.settings.registerStringSetting({
@@ -450,7 +466,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     title: 'FSRS Global Weights',
     description:
       'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler settings. Leave blank to use the official FSRS v6.1.1 defaults.',
-    defaultValue: '',
+    defaultValue: IE_SETTINGS_DEFAULTS[fsrsWeightsId],
   });
 
 
@@ -460,7 +476,7 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
     id: remnoteEnvironmentId,
     title: 'RemNote Environment',
     description: 'Choose which RemNote environment to open documents in (beta.remnote.com or www.remnote.com)',
-    defaultValue: 'www',
+    defaultValue: IE_SETTINGS_DEFAULTS[remnoteEnvironmentId],
     options: [
       {
         key: 'beta',
@@ -478,19 +494,19 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
   // Practiced Queues Settings
 
   plugin.settings.registerNumberSetting({
-    id: 'flashcard_response_time_limit',
+    id: flashcardResponseTimeLimitId,
     title: 'Flashcard Response Time Limit (seconds)',
     description:
       "If you take longer to answer a flashcard than this (e.g. because you walked away), " +
       "only this much time will be counted in Practiced Queues session statistics. " +
       "Matches RemNote's native 'Flashcard Response Time Limit' setting. Default: 180s.",
-    defaultValue: 180,
+    defaultValue: IE_SETTINGS_DEFAULTS[flashcardResponseTimeLimitId],
   });
 
   // Mastery Drill Settings
 
   plugin.settings.registerBooleanSetting({
-    id: 'skip_mastery_drill',
+    id: skipMasteryDrillId,
     title: 'Skip Mastery Drill',
     description:
       'If enabled, all Mastery Drill features are turned off: the drill popup and sidebar ' +
@@ -498,29 +514,29 @@ export async function registerPluginSettings(plugin: ReactRNPlugin) {
       'Again or Hard are no longer tracked or added to the drill queue. Turn this on if you ' +
       'do not want to use the Mastery Drill workflow at all.' +
       'Requires reloading RemNote to take effect.',
-    defaultValue: false,
+    defaultValue: IE_SETTINGS_DEFAULTS[skipMasteryDrillId],
   });
 
   plugin.settings.registerNumberSetting({
-    id: 'old_item_threshold',
+    id: oldItemThresholdId,
     title: 'Old Items Threshold (Days) for Mastery Drill',
     description: 'Items older than this number of days will trigger a warning in the Mastery Drill.',
-    defaultValue: 7,
+    defaultValue: IE_SETTINGS_DEFAULTS[oldItemThresholdId],
   });
 
   plugin.settings.registerNumberSetting({
-    id: 'mastery_drill_min_delay_minutes',
+    id: masteryDrillMinDelayMinutesId,
     title: 'Mastery Drill Minimum Delay (Minutes)',
     description:
       'A card rated Again or Hard will not appear in the Mastery Drill until at least this many minutes have passed since it was last reviewed. Prevents reviewing the same card again too soon. Default: 120 minutes.',
-    defaultValue: 120,
+    defaultValue: IE_SETTINGS_DEFAULTS[masteryDrillMinDelayMinutesId],
   });
 
   plugin.settings.registerBooleanSetting({
-    id: 'disable_final_drill_notification',
+    id: disableFinalDrillNotificationId,
     title: 'Disable Mastery Drill Notifications',
     description: 'If enabled, the Mastery Drill sidebar notification will not appear.',
-    defaultValue: false,
+    defaultValue: IE_SETTINGS_DEFAULTS[disableFinalDrillNotificationId],
   });
 
 }

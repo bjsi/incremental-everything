@@ -30,6 +30,25 @@ export type IsolatedQueueMode = 'highlights' | 'rems' | 'both' | 'none';
 export const priorityStepSizeId = 'priority-step-size';
 export const enableHideInQueueIntegrationId = 'enable-hide-in-queue-integration';
 
+// Setting ids that used to be written as bare string literals at their call
+// sites. Named here so lib/settings.ts can be the single source of truth for
+// every setting's id, type and default.
+export const priorityEditorDisplayModeId = 'priorityEditorDisplayMode';
+export type PriorityEditorDisplayMode = 'all' | 'incRemOnly' | 'disable';
+// The four below are the *setting* ids. register/settings.ts has same-named
+// local consts holding the registerCSS ids for the stylesheets they toggle
+// ('hide-card-priority-tag' etc.) — hence the SettingId suffix here.
+export const hideCardPriorityTagSettingId = 'hideCardPriorityTag';
+export const showLeftBorderForIncRemsSettingId = 'showLeftBorderForIncRems';
+export const showDismissedIndicatorSettingId = 'showDismissedIndicator';
+export const hideDismissedTagSettingId = 'hideDismissedTag';
+export const performanceModeId = 'performanceMode';
+export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
+export const skipMasteryDrillId = 'skip_mastery_drill';
+export const oldItemThresholdId = 'old_item_threshold';
+export const masteryDrillMinDelayMinutesId = 'mastery_drill_min_delay_minutes';
+export const disableFinalDrillNotificationId = 'disable_final_drill_notification';
+
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';
 export const fsrsWeightsId = 'fsrs-weights';

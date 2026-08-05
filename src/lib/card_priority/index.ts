@@ -6,6 +6,7 @@ import { syncPriorityBand } from '../priority_bands';
 import dayjs from 'dayjs';
 import {
   allCardPriorityInfoKey,
+  defaultCardPriorityId,
 } from '../consts';
 import {
   CardPriorityInfo,
@@ -16,6 +17,7 @@ import {
   LAST_UPDATED_SLOT,
 } from './types';
 import * as _ from 'remeda';
+import { getIESetting } from '../settings';
 
 /**
  * Find the closest ancestor with priority (either Incremental or CardPriority)
@@ -107,7 +109,7 @@ export async function getCardPriority(
       };
     }
 
-    const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+    const defaultPriority = await getIESetting(plugin, defaultCardPriorityId);
     return {
       remId: rem._id,
       priority: defaultPriority,
@@ -144,7 +146,7 @@ export async function getCardPriorityValue(
   }
 
   // Default
-  return (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+  return await getIESetting(plugin, defaultCardPriorityId);
 }
 
 /**
@@ -226,7 +228,7 @@ export async function autoAssignCardPriority(plugin: RNPlugin, rem: PluginRem): 
     return existingPriority.priority;
   }
 
-  const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+  const defaultPriority = await getIESetting(plugin, defaultCardPriorityId);
   // Skip write if already up-to-date (prevents infinite GlobalRemChanged loop).
   // Untagged rems with matching default priority intentionally stay untagged: the widget
   // falls back to getCardPriority() and the deferred batch still pushes them into the
@@ -266,7 +268,7 @@ export async function calculateNewPriority(
     return { priority: existingPriority.priority, source: 'inherited' };
   }
 
-  const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+  const defaultPriority = await getIESetting(plugin, defaultCardPriorityId);
   return { priority: defaultPriority, source: 'default' };
 }
 
@@ -535,7 +537,7 @@ export async function recalculateTreeInheritanceBatch(
   }
 
   // Hoisted out of the per-descendant loop: this is a constant for the whole walk.
-  const defaultPriority = (await plugin.settings.getSetting<number>('defaultCardPriority')) || 50;
+  const defaultPriority = await getIESetting(plugin, defaultCardPriorityId);
   const { updateCardPriorityCache } = await import('./cache');
 
   let updatedCount = 0;

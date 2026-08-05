@@ -11,11 +11,12 @@ import {
 } from '@remnote/plugin-sdk';
 import { IncrementalRep, repCountsForStats } from '../lib/incremental_rem/types';
 import {
-    dismissedHistorySlotCode,
-    dismissedPowerupCode,
-    powerupCode,
-    repHistorySlotCode,
-    studyDashboardLastPeriodKey,
+  dismissedHistorySlotCode,
+  dismissedPowerupCode,
+  powerupCode,
+  repHistorySlotCode,
+  studyDashboardLastPeriodKey,
+  flashcardResponseTimeLimitId,
 } from '../lib/consts';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
@@ -25,6 +26,7 @@ import { resolveRemTextSegments } from '../lib/richTextRemRefs';
 import { RemText, RemTextSegments } from '../components';
 import '../style.css';
 import '../App.css';
+import { getIESetting } from '../lib/settings';
 
 // ---------------------------------------------------------------------------
 // Style helpers (mirroring the statistics plugin's chartHelpers)
@@ -156,8 +158,6 @@ interface ProgressState {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
-const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
 
 // Stats predicate (Study Dashboard) — delegates to the shared source of truth so
 // it can't drift. INCLUDES 'importedRep' (reviews imported from removed flashcards).
@@ -1962,8 +1962,7 @@ function StudyDashboardPopup() {
     }, [plugin, period, customStart, customEnd, ignorePreReset]);
 
     const cardCapMs = useRunAsync(async () => {
-        const v = await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING);
-        return ((v ?? DEFAULT_RESPONSE_TIME_LIMIT_SEC) as number) * 1000;
+        return (await getIESetting(plugin, flashcardResponseTimeLimitId)) * 1000;
     }, []);
 
     const [progress, setProgress] = useState<ProgressState>({

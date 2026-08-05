@@ -24,6 +24,7 @@ import { fsrsCalibrationLastPeriodKey, fsrsWeightsId } from '../lib/consts';
 import { parseWeightsString } from '../lib/fsrs';
 import { Period, resolvePeriod } from '../lib/period';
 import { PeriodPickerCompact } from './CardMemoryAnalyticsView';
+import { getIESetting } from '../lib/settings';
 
 // --- Cell merge helper ----------------------------------------------------
 // Used to fuse the (mostly empty) bottom-pR buckets of Grids A and B into a
@@ -399,7 +400,7 @@ export function FSRSCalibrationView() {
       setState('computing');
       setProgress({ done: 0, total: 0 });
       try {
-        const weightsRaw = await plugin.settings.getSetting<string>(fsrsWeightsId);
+        const weightsRaw = await getIESetting(plugin, fsrsWeightsId);
         const weights = parseWeightsString(weightsRaw);
         const { startMs, endMs } = resolvePeriod(p, cs, ce);
         const breakdown = await computeFSRSCalibrationBreakdown(

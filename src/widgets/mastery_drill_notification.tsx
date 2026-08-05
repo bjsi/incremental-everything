@@ -3,6 +3,8 @@ import { renderWidget, usePlugin, useTrackerPlugin } from "@remnote/plugin-sdk";
 import React, { useEffect, useState } from "react";
 import '../style.css';
 import '../App.css';
+import { getIESetting } from '../lib/settings';
+import { disableFinalDrillNotificationId, masteryDrillMinDelayMinutesId } from '../lib/consts';
 
 const MOTIVATIONAL_PHRASES = [
     "Deliberately practice the material you are struggling with.",
@@ -75,8 +77,8 @@ export const FinalDrillNotification = () => {
 
     const settings = useTrackerPlugin(
         async (reactivePlugin) => {
-            const disabled = await reactivePlugin.settings.getSetting("disable_final_drill_notification");
-            const minDelayMinutes = (await reactivePlugin.settings.getSetting<number>("mastery_drill_min_delay_minutes")) ?? 120;
+            const disabled = await getIESetting(reactivePlugin, disableFinalDrillNotificationId);
+            const minDelayMinutes = await getIESetting(reactivePlugin, masteryDrillMinDelayMinutesId);
             const ids = (await reactivePlugin.storage.getSynced("finalDrillIds")) as (string | { cardId: string; kbId?: string; addedAt?: number })[] || [];
 
             const currentKb = await reactivePlugin.kb.getCurrentKnowledgeBaseData();

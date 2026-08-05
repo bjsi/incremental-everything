@@ -46,6 +46,7 @@ import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { PriorityBadge, PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import * as _ from 'remeda';
+import { useIESettingOptional } from '../lib/settings';
 
 type Scope = { remId: string | null; name: string; };
 type ScopeMode = 'all' | 'document';
@@ -158,8 +159,11 @@ function Priority() {
     []
   );
 
-  const defaultIncPriority = useTrackerPlugin(async (plugin) => await plugin.settings.getSetting<number>(defaultPriorityId) || 10, []);
-  const defaultCardPriority = useTrackerPlugin(async (plugin) => await plugin.settings.getSetting<number>(defaultCardPriorityId) || 50, []);
+  // Optional form: the seeding effects below explicitly wait for these to load
+  // before writing an optimistic priority into state, so that a fresh rem does
+  // not visibly jump from the table default to the user's configured default.
+  const defaultIncPriority = useIESettingOptional(defaultPriorityId);
+  const defaultCardPriority = useIESettingOptional(defaultCardPriorityId);
 
   const remContent = useTrackerPlugin(async (plugin) => {
     if (!rem) return null;

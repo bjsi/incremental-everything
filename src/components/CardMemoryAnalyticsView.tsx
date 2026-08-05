@@ -20,10 +20,12 @@ import {
   cardAnalyticsCacheKey,
   cardAnalyticsLastPeriodKey,
   fsrsWeightsId,
+  flashcardResponseTimeLimitId,
 } from '../lib/consts';
 import { parseWeightsString } from '../lib/fsrs';
 import { Period, resolvePeriod, parseDateInput, formatDateForDisplay } from '../lib/period';
 import { formatTimeAgo } from '../lib/utils';
+import { getIESetting } from '../lib/settings';
 
 // --- Formatting helpers ---------------------------------------------------
 
@@ -978,10 +980,10 @@ export function CardMemoryAnalyticsView() {
       try {
         const [infos, weightsRaw, capSec] = await Promise.all([
           plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-          plugin.settings.getSetting<string>(fsrsWeightsId),
+          getIESetting(plugin, fsrsWeightsId),
           // Per-rep responseTime cap (seconds). Same setting the Study Dashboard
           // and Practiced Queues read so per-rep outliers don't dominate CPM.
-          plugin.settings.getSetting<number>('flashcard_response_time_limit'),
+          getIESetting(plugin, flashcardResponseTimeLimitId),
         ]);
         const weights = parseWeightsString(weightsRaw);
         const cardCapMs = ((capSec ?? 180) as number) * 1000;

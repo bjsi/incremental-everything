@@ -33,6 +33,7 @@ import {
   sourceFloatingActiveIdKey,
   preservedHistoryPowerupCode,
   priorityBandColorsReloadKey,
+  skipMasteryDrillId,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
 import {
@@ -128,6 +129,8 @@ import {
 } from '../lib/priority_bands';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { batchPriorityTargetRemIdsKey } from '../lib/consts';
+import { getIESetting } from '../lib/settings';
+import { getIESettingsMigrationReport, formatMigrationReport } from '../lib/settings_migration';
 
 // Opens a priority popup against one or many rems. Single-rem calls behave
 // exactly as before; multi-rem calls hand the full id list to the widget through
@@ -1862,8 +1865,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // Get settings
       const setting = await getPerformanceMode(plugin);
-      const autoSwitchMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
-      const autoSwitchWeb = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnWebId);
+      const autoSwitchMobile = await getIESetting(plugin, alwaysUseLightModeOnMobileId);
+      const autoSwitchWeb = await getIESetting(plugin, alwaysUseLightModeOnWebId);
 
       // Get friendly names
       const friendlyOS = getFriendlyOSName(os);
@@ -3065,7 +3068,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   const skipMasteryDrill = Boolean(
-    await plugin.settings.getSetting('skip_mastery_drill')
+    await getIESetting(plugin, skipMasteryDrillId)
   );
   if (!skipMasteryDrill) {
     plugin.app.registerCommand({
@@ -3254,6 +3257,26 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async () => {
       await plugin.storage.setSynced('flashcardHistoryData', []);
       await plugin.app.toast('Flashcard History cleared!');
+    },
+  });
+
+  // Settings migration status without opening the debug widget: summary in a
+  // toast, the full per-setting record in the console.
+  plugin.app.registerCommand({
+    id: 'ie_settings_migration_status',
+    name: 'Debug: Settings Migration Status',
+    action: async () => {
+      const report = await getIESettingsMigrationReport(plugin);
+      console.log(formatMigrationReport(report));
+      if (!report) {
+        await plugin.app.toast('Settings migration has not run on this knowledge base yet.');
+        return;
+      }
+      await plugin.app.toast(
+        `Settings migration ${report.complete ? 'COMPLETE' : 'INCOMPLETE'} — ` +
+          `${report.counts.migrated} carried over, ${report.counts.failed} failed ` +
+          `(of ${report.total}). Full report in the console.`
+      );
     },
   });
 
