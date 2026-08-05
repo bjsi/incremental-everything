@@ -341,9 +341,10 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
     - **Delete all** — remove everything, including reviewed cards (a second confirmation warns that their review/time-spent records will be lost).
 
     If no orphan has any history, this prompt is skipped and all are removed.
-  - Presents the list in pages of **25 Rems at a time** so the dialog always fits on screen
+  - **Every dialog states what would be lost:** the number of reviews and the total time spent — for the whole batch in the overview, and per Rem (and per card, when one Rem has several) in the detail pages. Cards with nothing recorded read `no review history`. Time is summed from each rep's `responseTime`, capped at your **Flashcard Response Time Limit** setting so one walked-away review can't inflate the figure — the same convention the [Study Dashboard](Study-Dashboard.md) uses.
+  - Presents the list in pages of **12 Rems at a time** so the dialog always fits on screen
   - Double-checks each candidate live before removal (transient errors are skipped)
-  - Removes the chosen set in batches of 25 with progress toasts; the final summary reports how many were removed and how many were **preserved**
+  - Removes the chosen set in batches of 25 with progress toasts; the final summary reports how many were removed and how many were **preserved**, each with its review count and time spent (the removed figures count only the cards that were actually deleted, so a partial failure doesn't overstate the loss)
   - You can cancel at any page without affecting already-confirmed removals
 
   Orphan cards are also flagged at **startup**: when the Card Priority cache finishes its background pass, any Rem whose cards exist but whose Rem cannot be found is counted and surfaced via a toast suggesting you run this command — **nothing is deleted automatically at startup**, since a Rem can transiently appear missing before sync finishes hydrating.

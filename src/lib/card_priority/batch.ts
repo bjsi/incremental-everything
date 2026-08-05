@@ -14,6 +14,7 @@ import { CardPriorityInfo } from './types';
 import { calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
 import { safeRemTextToString } from '../pdfUtils';
+import { formatDuration } from '../utils';
 
 export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   const confirmed = confirm(
@@ -389,6 +390,41 @@ export async function updateAllCardPriorities(plugin: RNPlugin) {
   }
 }
 
+/** Review-history summary of a single orphan card. */
+interface OrphanCardStats {
+  /** Number of entries in the card's repetitionHistory. */
+  reps: number;
+  /** Total response time, each rep capped at `capMs`. */
+  timeMs: number;
+}
+
+/**
+ * Summarize a card's repetitionHistory for the removal dialogs.
+ *
+ * `reps` is the raw history length (what "review history length" means to the
+ * user, and what `hasHistory` keys off). `timeMs` caps each rep the way the
+ * Study Dashboard does, so one walked-away rep can't dominate the total.
+ */
+function summarizeCardHistory(card: { repetitionHistory?: any[] }, capMs: number): OrphanCardStats {
+  const history = Array.isArray(card.repetitionHistory) ? card.repetitionHistory : [];
+  let timeMs = 0;
+  for (const rep of history) {
+    timeMs += Math.min(Math.max(0, rep?.responseTime || 0), capMs);
+  }
+  return { reps: history.length, timeMs };
+}
+
+/** formatDuration() returns '' for 0 — say so explicitly instead of showing a gap. */
+function describeTime(timeMs: number): string {
+  return formatDuration(Math.round(timeMs / 1000)) || 'no time recorded';
+}
+
+/** e.g. "12 review(s), 8m 4s" or "no review history". */
+function describeStats(stats: OrphanCardStats): string {
+  if (stats.reps === 0) return 'no review history';
+  return `${stats.reps} review(s), ${describeTime(stats.timeMs)}`;
+}
+
 /**
  * Finds all cards that belong to Rems that no longer exist (orphan cards),
  * asks the user for confirmation, and removes them.
@@ -444,9 +480,30 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   const withHistory = confirmedOrphanCards.filter(hasHistory);
   const withoutHistory = confirmedOrphanCards.filter((c) => !hasHistory(c));
 
+  // Per-card review stats shown in the confirmation dialogs, so the user can
+  // see exactly how much study data each deletion would destroy. Each rep's
+  // responseTime is capped at the flashcard_response_time_limit setting — the
+  // same convention the Study Dashboard / Practiced Queues use.
+  const capSetting = await plugin.settings.getSetting<number>('flashcard_response_time_limit');
+  const capSeconds = typeof capSetting === 'number' && capSetting > 0 ? capSetting : 180;
+  const capMs = capSeconds * 1000;
+  const statsOf = (card: (typeof confirmedOrphanCards)[number]) =>
+    summarizeCardHistory(card, capMs);
+  const sumStats = (cards: typeof confirmedOrphanCards) =>
+    cards.reduce(
+      (acc, c) => {
+        const s = statsOf(c);
+        return { reps: acc.reps + s.reps, timeMs: acc.timeMs + s.timeMs };
+      },
+      { reps: 0, timeMs: 0 }
+    );
+
+  const withHistoryStats = sumStats(withHistory);
+
   console.log(
     `Orphan cards: ${confirmedOrphanCards.length} total — ` +
-    `${withHistory.length} with review history, ${withoutHistory.length} without.`
+    `${withHistory.length} with review history (${withHistoryStats.reps} review(s), ` +
+    `${describeTime(withHistoryStats.timeMs)}), ${withoutHistory.length} without.`
   );
 
   // Decide which set to remove. If none have history, there is nothing to
@@ -458,7 +515,8 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
     const preserveHistory = confirm(
       `🗑️ Remove Orphan Cards\n\n` +
       `Found ${confirmedOrphanCards.length} orphan card(s):\n` +
-      `  • ${withHistory.length} have review history (reviews & time-spent stats)\n` +
+      `  • ${withHistory.length} have review history — ` +
+      `${withHistoryStats.reps} review(s), ${describeTime(withHistoryStats.timeMs)} in total\n` +
       `  • ${withoutHistory.length} have no review history\n\n` +
       `Deleting cards with review history permanently removes those records from RemNote statistics.\n\n` +
       `➡️ OK = delete only the ${withoutHistory.length} card(s) WITHOUT history (keep the ${withHistory.length} with history)\n` +
@@ -471,7 +529,8 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
       const deleteAll = confirm(
         `⚠️ Delete ALL orphan cards?\n\n` +
         `This permanently removes all ${confirmedOrphanCards.length} orphan card(s), including the ` +
-        `${withHistory.length} with review history — their review/time-spent records will be lost.\n\n` +
+        `${withHistory.length} with review history — ${withHistoryStats.reps} review(s) and ` +
+        `${describeTime(withHistoryStats.timeMs)} of study time will be lost.\n\n` +
         `OK = delete all ${confirmedOrphanCards.length}\n` +
         `Cancel = abort (delete nothing)`
       );
@@ -491,17 +550,23 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   }
 
   const preservedCount = confirmedOrphanCards.length - cardsToRemove.length;
+  const preservedStats = sumStats(confirmedOrphanCards.filter((c) => !cardsToRemove.includes(c)));
+  const removedStats = sumStats(cardsToRemove);
 
-  // Group the cards we will remove by remId for a readable summary
-  const byRemId: Record<string, number> = {};
+  // Group the cards we will remove by remId for a readable summary, carrying
+  // each card's review stats so the detail pages can show what gets lost.
+  const byRemId: Record<string, { count: number; cardStats: OrphanCardStats[] }> = {};
   for (const card of cardsToRemove) {
-    byRemId[card.remId] = (byRemId[card.remId] || 0) + 1;
+    const entry = byRemId[card.remId] || (byRemId[card.remId] = { count: 0, cardStats: [] });
+    entry.count++;
+    entry.cardStats.push(statsOf(card));
   }
 
   // ── Batched confirmation ─────────────────────────────────────────────
-  // Show native confirm() in pages of 25 entries so the dialog stays
-  // short enough to fit on screen without needing to scroll.
-  const confirmPageSize = 25;
+  // Show native confirm() in pages of a few entries so the dialog stays
+  // short enough to fit on screen without needing to scroll. Each entry now
+  // spans 2+ lines (rem id, then its review stats), hence the smaller page.
+  const confirmPageSize = 12;
   const entries = Object.entries(byRemId); // [ [remId, count], ... ]
   const totalPages = Math.ceil(entries.length / confirmPageSize);
 
@@ -509,7 +574,12 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   const overviewOk = confirm(
     `🗑️ Remove Orphan Cards\n\n` +
     `About to remove ${cardsToRemove.length} card(s) across ${entries.length} missing Rem(s).\n\n` +
-    `${preservedCount > 0 ? `Preserving ${preservedCount} card(s) with review history.\n\n` : ''}` +
+    `Review data that will be deleted: ${removedStats.reps} review(s), ` +
+    `${describeTime(removedStats.timeMs)} of study time.\n\n` +
+    `${preservedCount > 0
+      ? `Preserving ${preservedCount} card(s) with review history ` +
+        `(${preservedStats.reps} review(s), ${describeTime(preservedStats.timeMs)}).\n\n`
+      : ''}` +
     `These cards are no longer reviewable and take up space in your queue.\n\n` +
     `⚠️ This action cannot be undone.\n\n` +
     `You will be shown the list ${totalPages > 1 ? `in ${totalPages} pages of ${confirmPageSize}` : 'now'} to confirm.\n\n` +
@@ -526,7 +596,18 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   for (let p = 0; p < totalPages; p++) {
     const pageEntries = entries.slice(p * confirmPageSize, (p + 1) * confirmPageSize);
     const lines = pageEntries
-      .map(([remId, count]) => `  • ${count} card(s) — Rem: ${remId}`)
+      .map(([remId, { count, cardStats }]) => {
+        const total = cardStats.reduce(
+          (acc, s) => ({ reps: acc.reps + s.reps, timeMs: acc.timeMs + s.timeMs }),
+          { reps: 0, timeMs: 0 }
+        );
+        // With several cards under one missing rem, list each card's own stats
+        // after the rem-level total so nothing is hidden behind the sum.
+        const perCard = count > 1
+          ? `\n      per card: ${cardStats.map(describeStats).join(' | ')}`
+          : '';
+        return `  • ${count} card(s) — Rem: ${remId}\n      ${describeStats(total)}${perCard}`;
+      })
       .join('\n');
 
     const pageHeader = totalPages > 1
@@ -536,7 +617,7 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
     const pageOk = confirm(
       `🗑️ Remove Orphan Cards — ${pageHeader}` +
       `${lines}\n\n` +
-      `Confirm removal of these ${pageEntries.reduce((s, [, c]) => s + c, 0)} card(s)?`
+      `Confirm removal of these ${pageEntries.reduce((s, [, e]) => s + e.count, 0)} card(s)?`
     );
 
     if (!pageOk) {
@@ -552,6 +633,9 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
 
   let removed = 0;
   let removalErrors = 0;
+  // Tally the review data actually destroyed, so a partial failure doesn't
+  // report reviews/time that are still on disk.
+  const deletedStats: OrphanCardStats = { reps: 0, timeMs: 0 };
   const batchSize = 25;
 
   try {
@@ -560,9 +644,14 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
       await Promise.all(
         batch.map(async (card) => {
           try {
+            const s = statsOf(card);
             await card.remove();
             removed++;
-            console.log(`  ✅ Removed orphan card ${card._id} (remId: ${card.remId})`);
+            deletedStats.reps += s.reps;
+            deletedStats.timeMs += s.timeMs;
+            console.log(
+              `  ✅ Removed orphan card ${card._id} (remId: ${card.remId}) — ${describeStats(s)}`
+            );
           } catch (err) {
             removalErrors++;
             console.error(`  ❌ Failed to remove card ${card._id}:`, err);
@@ -579,8 +668,11 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
 
   const resultMessage =
     `🗑️ Orphan Card Cleanup Complete\n\n` +
-    `• Removed: ${removed} card(s)\n` +
-    `${preservedCount > 0 ? `• Preserved (with review history): ${preservedCount} card(s)\n` : ''}` +
+    `• Removed: ${removed} card(s) — ${deletedStats.reps} review(s), ${describeTime(deletedStats.timeMs)}\n` +
+    `${preservedCount > 0
+      ? `• Preserved (with review history): ${preservedCount} card(s) — ` +
+        `${preservedStats.reps} review(s), ${describeTime(preservedStats.timeMs)}\n`
+      : ''}` +
     `${removalErrors > 0 ? `• Failed: ${removalErrors} card(s) — check console\n` : ''}` +
     `\nThese cards belonged to Rems that no longer exist in your knowledge base.`;
 

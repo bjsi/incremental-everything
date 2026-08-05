@@ -2,6 +2,23 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.31 - August 5th, 2026
+
+### ✨ Improved: orphan card removal now shows what you'd be deleting
+
+The confirmation dialogs of **Update all inherited Card Priorities** used to identify orphan cards by Rem id and count alone — leaving you to approve a deletion with no idea whether those cards carried years of reviews or none at all.
+
+Every dialog in the flow now reports the **length of the review history and the total time spent**:
+
+- the **overview** states the reviews and study time about to be deleted (and, when you chose to keep the reviewed cards, what is being preserved);
+- the **detail pages** show it per missing Rem, and per card when one Rem has several;
+- the **preserve-history prompt** and the *delete ALL* warning quantify what the reviewed cards actually hold;
+- the **final summary** reports the reviews and time genuinely removed — counted from the cards that actually got deleted, so a partial failure can't overstate the loss.
+
+Cards with nothing recorded read `no review history`. Time is summed from each rep's `responseTime`, capped at your **Flashcard Response Time Limit** setting so a single walked-away review can't inflate the figure — the same convention the Study Dashboard uses. Detail pages now show **12 Rems per page** instead of 25, since each entry carries an extra line.
+
+📖 See [Commands → Update all inherited Card Priorities](Plugin-Commands-Reference.md#system--maintenance-commands) for the full cleanup flow.
+
 ## v1.0.30 - August 3rd, 2026
 
 Housekeeping release, prompted by the storage limits described in v1.0.29. Everything here reduces what the plugin keeps in — and writes to — RemNote's plugin storage. Two of these were genuine defects that the new limits merely exposed.
