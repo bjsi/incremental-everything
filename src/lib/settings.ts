@@ -407,6 +407,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     tier: 'popup',
     group: 'queue',
+    helpPath: 'Prioritization-%26-Sorting/#priority-shield',
     title: 'Display Priority Shield in Queue',
     description:
       'Shows a live status of your highest-priority due items — below the answer buttons for ' +
@@ -416,6 +417,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     tier: 'popup',
     group: 'queue',
+    helpPath: 'Prioritization-%26-Sorting/#weighted-shield',
     title: 'Display Weighted Priority Shield in Queue',
     description:
       'Shows what fraction of your total priority-weighted workload has been processed. ' +
