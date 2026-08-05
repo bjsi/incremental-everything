@@ -59,7 +59,7 @@ import {
   fsrsWeightsId,
   remnoteEnvironmentId,
   flashcardResponseTimeLimitId,
-  skipMasteryDrillId,
+  enableMasteryDrillId,
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
   disableFinalDrillNotificationId,
@@ -119,7 +119,7 @@ export interface IESettings {
   [flashcardResponseTimeLimitId]: number;
 
   // Mastery Drill
-  [skipMasteryDrillId]: boolean;
+  [enableMasteryDrillId]: boolean;
   [oldItemThresholdId]: number;
   [masteryDrillMinDelayMinutesId]: number;
   [disableFinalDrillNotificationId]: boolean;
@@ -169,7 +169,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [remnoteEnvironmentId]: 'www',
   [flashcardResponseTimeLimitId]: 180,
 
-  [skipMasteryDrillId]: true,
+  [enableMasteryDrillId]: false,
   [oldItemThresholdId]: 7,
   [masteryDrillMinDelayMinutesId]: 120,
   [disableFinalDrillNotificationId]: false,
@@ -543,22 +543,24 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
 
   // --- Mastery Drill ---
-  [skipMasteryDrillId]: {
+  [enableMasteryDrillId]: {
     kind: 'boolean',
     tier: 'popup',
     group: 'masteryDrill',
     reloadRequired: true,
-    title: 'Skip Mastery Drill',
+    title: 'Enable Mastery Drill',
     description:
-      'Turns off every Mastery Drill feature: the drill popup and sidebar notification are hidden, ' +
-      'the "Mastery Drill" command is not registered, and cards rated Again or Hard are no longer ' +
-      'tracked or queued.',
+      'Deliberate practice of the cards you just rated Again or Hard, revisited in the same ' +
+      'session once enough time has passed.\n\n' +
+      'While enabled, the plugin listens to every flashcard rating and keeps a list of the ones ' +
+      'that need drilling, and registers the drill popup, its command and the sidebar ' +
+      'notification. Leave it off if you do not use the workflow — none of that work happens then.',
   },
   [oldItemThresholdId]: {
     kind: 'number',
     tier: 'popup',
     group: 'masteryDrill',
-    showWhen: { id: skipMasteryDrillId, equals: false },
+    showWhen: { id: enableMasteryDrillId, equals: true },
     min: 1,
     integer: true,
     unit: 'days',
@@ -569,7 +571,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'number',
     tier: 'popup',
     group: 'masteryDrill',
-    showWhen: { id: skipMasteryDrillId, equals: false },
+    showWhen: { id: enableMasteryDrillId, equals: true },
     min: 0,
     integer: true,
     unit: 'minutes',
@@ -582,7 +584,7 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     kind: 'boolean',
     tier: 'popup',
     group: 'masteryDrill',
-    showWhen: { id: skipMasteryDrillId, equals: false },
+    showWhen: { id: enableMasteryDrillId, equals: true },
     title: 'Disable Mastery Drill Notifications',
     description: 'Stops the Mastery Drill sidebar notification from appearing.',
   },

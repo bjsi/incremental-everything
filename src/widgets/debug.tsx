@@ -3064,8 +3064,8 @@ function Debug() {
             <div style={{ maxHeight: '260px', overflowY: 'auto', paddingTop: '6px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
               {migrationReport.records.map((r) => (
                 <div key={r.id} style={{ lineHeight: 1.5 }}>
-                  <span style={{ color: r.status === 'failed' ? '#ef4444' : r.status === 'migrated' ? '#16a34a' : 'var(--rn-clr-content-tertiary)' }}>
-                    {r.status === 'failed' ? '✗' : r.status === 'migrated' ? '●' : '·'}
+                  <span style={{ color: r.status === 'failed' ? '#ef4444' : r.status === 'migrated' || r.status === 'converted' ? '#16a34a' : 'var(--rn-clr-content-tertiary)' }}>
+                    {r.status === 'failed' ? '✗' : r.status === 'converted' ? '~' : r.status === 'migrated' ? '●' : '·'}
                   </span>{' '}
                   <code>{r.id}</code> → <strong>{JSON.stringify(r.value)}</strong>{' '}
                   <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>[{r.status}]</span>

@@ -33,7 +33,7 @@ import {
   sourceFloatingActiveIdKey,
   preservedHistoryPowerupCode,
   priorityBandColorsReloadKey,
-  skipMasteryDrillId,
+  enableMasteryDrillId,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
 import {
@@ -3067,10 +3067,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  const skipMasteryDrill = Boolean(
-    await getIESetting(plugin, skipMasteryDrillId)
-  );
-  if (!skipMasteryDrill) {
+  const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+  if (masteryDrillEnabled) {
     plugin.app.registerCommand({
       id: 'open_mastery_drill',
       name: 'Mastery Drill: deliberately practice poorly rated cards',

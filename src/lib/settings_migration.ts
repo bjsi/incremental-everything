@@ -24,6 +24,8 @@ import {
   ieSettingsValuesKey,
   ieSettingsMigratedKey,
   ieSettingsMigrationReportKey,
+  enableMasteryDrillId,
+  legacySkipMasteryDrillId,
 } from './consts';
 
 export { ieSettingsValuesKey, ieSettingsMigratedKey, ieSettingsMigrationReportKey };
@@ -45,8 +47,35 @@ export { ieSettingsValuesKey, ieSettingsMigratedKey, ieSettingsMigrationReportKe
  *     entry for it (it was native then), so without a re-seed its stored value
  *     in RemNote's panel would be ignored in favour of the default. ANY tier
  *     change from native to popup needs a bump for exactly this reason.
+ * v5: skip_mastery_drill renamed and inverted to enable-mastery-drill, so the
+ *     opt-in reads positively like the flashcard-prioritisation gate. Handled by
+ *     LEGACY_CONVERSIONS below — a rename alone would silently reset the value.
  */
-export const SEED_VERSION = 4;
+export const SEED_VERSION = 5;
+
+/**
+ * Settings that changed id or polarity, and how to carry the old value across.
+ *
+ * A plain rename loses the value: the new id has nothing stored, so it resolves
+ * to its default. Each entry reads the old key out of the blob, transforms it
+ * and writes it under the new id, then drops the old key.
+ *
+ * Idempotent by construction — once the old key is gone there is nothing to
+ * convert, so a re-run (or a forced re-seed) does nothing.
+ */
+const LEGACY_CONVERSIONS: Array<{
+  legacyId: string;
+  newId: IESettingId;
+  convert: (legacyValue: unknown) => unknown;
+  note: string;
+}> = [
+  {
+    legacyId: legacySkipMasteryDrillId,
+    newId: enableMasteryDrillId,
+    convert: (v) => !v,
+    note: 'skip_mastery_drill -> enable-mastery-drill (inverted)',
+  },
+];
 
 /** Give up retrying after this many activations, so a permanently unreadable
  *  setting cannot make every boot re-run the seed forever. */
@@ -60,6 +89,8 @@ export type SettingMigrationStatus =
   | 'default'
   /** Already in the values blob from an earlier run; left untouched. */
   | 'already-present'
+  /** Carried over from a renamed or inverted predecessor id. */
+  | 'converted'
   /** `getSetting` threw. Nothing was written; reads fall back to the default. */
   | 'failed';
 
@@ -145,14 +176,17 @@ export function formatMigrationReport(report: SettingsMigrationReport | null): s
   lines.push(
     `Settings:  ${report.total} total | ${report.counts.migrated} carried over | ` +
       `${report.counts.default} at default | ${report.counts['already-present']} already stored | ` +
-      `${report.counts.failed} FAILED`
+      `${report.counts.converted} converted | ${report.counts.failed} FAILED`
   );
   lines.push('');
   for (const r of report.records) {
-    const flag = r.status === 'failed' ? '✗' : r.status === 'migrated' ? '●' : '·';
+    const flag =
+      r.status === 'failed' ? '✗' : r.status === 'converted' ? '~' : r.status === 'migrated' ? '●' : '·';
     lines.push(
       `  ${flag} ${r.id} → ${JSON.stringify(r.value)}` +
-        (r.status === 'migrated' ? ` (default ${JSON.stringify(r.defaultValue)})` : '') +
+        (r.status === 'migrated' || r.status === 'converted'
+          ? ` (default ${JSON.stringify(r.defaultValue)})`
+          : '') +
         `  [${r.status}]` +
         (r.error ? `\n      ${r.error}` : '')
     );
@@ -201,7 +235,38 @@ export async function migrateIESettings(
 
   console.log(`${LOG} starting (attempt ${attempt}, ${ids.length} settings, force=${!!opts.force})`);
 
+  // Renames and polarity flips run first, and win over the main loop below: the
+  // new id reads as its own default from the registration, which would overwrite
+  // the value we just carried across.
+  const converted = new Set<IESettingId>();
+  // Limitation: the old value is read from the blob only. A knowledge base that
+  // never reached the seed version where the old id lived in the blob has it in
+  // RemNote's panel instead, where it is no longer registered and so unreadable
+  // — such a KB falls back to the new default.
+  for (const conv of LEGACY_CONVERSIONS) {
+    const store = values as Record<string, unknown>;
+    if (!Object.prototype.hasOwnProperty.call(store, conv.legacyId)) continue;
+
+    const legacyValue = store[conv.legacyId];
+    const value = conv.convert(legacyValue);
+    delete store[conv.legacyId];
+    converted.add(conv.newId);
+
+    const defaultValue = IE_SETTINGS_DEFAULTS[conv.newId];
+    if (JSON.stringify(value) === JSON.stringify(defaultValue)) {
+      delete store[conv.newId];
+    } else {
+      store[conv.newId] = value;
+    }
+    records.push({ id: conv.newId, status: 'converted', value, defaultValue });
+    console.log(
+      `${LOG}   ~ ${conv.note}: ${JSON.stringify(legacyValue)} -> ${JSON.stringify(value)}`
+    );
+  }
+
   for (const id of ids) {
+    if (converted.has(id)) continue;
+
     const defaultValue = IE_SETTINGS_DEFAULTS[id];
 
     if (!opts.force && Object.prototype.hasOwnProperty.call(values, id)) {
@@ -246,6 +311,7 @@ export async function migrateIESettings(
     migrated: 0,
     default: 0,
     'already-present': 0,
+    converted: 0,
     failed: 0,
   };
   for (const r of records) counts[r.status]++;

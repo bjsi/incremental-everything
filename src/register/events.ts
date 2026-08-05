@@ -24,7 +24,7 @@ import {
   pendingQueueDashboardRefocusKey,
   flashcardHistoryTextLimit,
   remHistoryTextLimit,
-  skipMasteryDrillId,
+  enableMasteryDrillId,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -624,12 +624,10 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
 
       // Mastery Drill: add AGAIN/HARD cards, remove on GOOD+.
       // Runs unconditionally (not gated by Light Mode).
-      // Gated by the 'skip_mastery_drill' setting.
+      // Gated by the 'enable-mastery-drill' setting.
       if (score !== undefined && remId) {
-        const skipMasteryDrill = Boolean(
-          await getIESetting(plugin, skipMasteryDrillId)
-        );
-        if (!skipMasteryDrill) {
+        const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+        if (masteryDrillEnabled) {
           try {
             const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
             const currentKbId = kbData?._id;
@@ -714,8 +712,8 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       // settings read and the recentlyProcessedCards bookkeeping below.
       const clusterCardId = await plugin.storage.getSession<string>('clusterVisibleCardId');
       if (clusterCardId) {
-        const skipMasteryDrill = Boolean(await getIESetting(plugin, skipMasteryDrillId));
-        if (!skipMasteryDrill && !recentlyProcessedCards.has(data.remId)) {
+        const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+        if (masteryDrillEnabled && !recentlyProcessedCards.has(data.remId)) {
           // Claim this remId synchronously before the first await so concurrent GlobalRemChanged
           // fires for the same cluster rating don't both pass this guard and double-write.
           // We use a finally block (not a fixed TTL) to release the claim: the async work takes
@@ -1133,8 +1131,8 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
     const isFinalDrillActive = await plugin.storage.getSession<boolean>('finalDrillActive');
     if (!isFinalDrillActive) return;
 
-    const skipMasteryDrill = Boolean(await getIESetting(plugin, skipMasteryDrillId));
-    if (skipMasteryDrill) return;
+    const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+    if (!masteryDrillEnabled) return;
 
     const card = await plugin.card.findOne(prevDrillCardId);
     const history = card?.repetitionHistory;

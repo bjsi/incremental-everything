@@ -44,7 +44,9 @@ export const showDismissedIndicatorSettingId = 'showDismissedIndicator';
 export const hideDismissedTagSettingId = 'hideDismissedTag';
 export const performanceModeId = 'performanceMode';
 export const flashcardResponseTimeLimitId = 'flashcard_response_time_limit';
-export const skipMasteryDrillId = 'skip_mastery_drill';
+export const enableMasteryDrillId = 'enable-mastery-drill';
+/** Pre-inversion id, kept only so the migration can convert stored values. */
+export const legacySkipMasteryDrillId = 'skip_mastery_drill';
 export const oldItemThresholdId = 'old_item_threshold';
 export const masteryDrillMinDelayMinutesId = 'mastery_drill_min_delay_minutes';
 export const disableFinalDrillNotificationId = 'disable_final_drill_notification';
