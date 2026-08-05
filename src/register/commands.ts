@@ -3260,6 +3260,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  plugin.app.registerCommand({
+    id: 'ie_open_settings',
+    name: 'Incremental Everything: Settings',
+    description: 'Open the Incremental Everything settings popup',
+    quickCode: 'ies',
+    action: async () => {
+      await plugin.widget.openPopup('ie_settings');
+    },
+  });
+
   // Settings migration status without opening the debug widget: summary in a
   // toast, the full per-setting record in the console.
   plugin.app.registerCommand({

@@ -7,6 +7,15 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     await getIESetting(plugin, skipMasteryDrillId)
   );
 
+  // IE Settings popup — the plugin's own settings UI (grouped and layered,
+  // unlike RemNote's flat plugin-settings list).
+  plugin.app.registerWidget('ie_settings', WidgetLocation.Popup, {
+    dimensions: {
+      width: 940,
+      height: 720,
+    },
+  });
+
   // NEW: Light Priority Widget
   plugin.app.registerWidget('priority_light', WidgetLocation.Popup, {
     dimensions: {

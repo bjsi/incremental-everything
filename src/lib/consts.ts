@@ -49,9 +49,23 @@ export const oldItemThresholdId = 'old_item_threshold';
 export const masteryDrillMinDelayMinutesId = 'mastery_drill_min_delay_minutes';
 export const disableFinalDrillNotificationId = 'disable_final_drill_notification';
 
+// Opt-in gate for the heavy flashcard-prioritisation machinery (KB-wide
+// pretagging, the inheritance cascade and the card-priority cache). Off by
+// default: most users want extracts and scheduling, and should not pay for
+// per-flashcard priorities they never asked for.
+export const enableFlashcardPrioritisationId = 'enable-flashcard-prioritisation';
+
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';
 export const fsrsWeightsId = 'fsrs-weights';
+
+// --- Plugin-owned settings store (see lib/settings_migration.ts) ---
+/** Synced blob holding the values of every popup-tier setting. */
+export const ieSettingsValuesKey = 'ie_settings_v1';
+/** Seed version that last completed; gates the legacy registrations. */
+export const ieSettingsMigratedKey = 'ie_settings_migrated';
+/** Durable per-setting record of the last migration run. */
+export const ieSettingsMigrationReportKey = 'ie_settings_migration_report';
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';

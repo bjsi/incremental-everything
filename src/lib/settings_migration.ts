@@ -19,31 +19,30 @@
  * default — see the note in the loop for why.
  */
 import { RNPlugin } from '@remnote/plugin-sdk';
-import { IE_SETTINGS_DEFAULTS, IESettingId, IESettings } from './settings';
+import { IE_POPUP_TIER_IDS, IE_SETTINGS_DEFAULTS, IESettingId, IESettings } from './settings';
+import {
+  ieSettingsValuesKey,
+  ieSettingsMigratedKey,
+  ieSettingsMigrationReportKey,
+} from './consts';
 
-/** Synced blob holding the migrated values — the future settings backend. */
-export const ieSettingsValuesKey = 'ie_settings_v1';
-/**
- * The seed version that last completed, or 0/absent if none has. Gates the
- * legacy registrations.
- *
- * A version rather than a boolean because the seed ships before the popup does:
- * between now and the release that actually reads from the blob, users keep
- * changing settings in RemNote's panel, and a merge-only re-run would not pick
- * those up. Bumping SEED_VERSION in the release that flips the backend forces
- * one fresh re-read so nobody arrives at the popup with stale values.
- */
-export const ieSettingsMigratedKey = 'ie_settings_migrated';
+export { ieSettingsValuesKey, ieSettingsMigratedKey, ieSettingsMigrationReportKey };
 
 /**
  * Bump when the stored blob must be refreshed from the registrations.
- * v1: initial seed, while RemNote's settings panel is still the live backend.
+ *
+ * A version rather than a boolean because a seed can ship before the release
+ * that reads from the blob: in between, users keep changing settings in
+ * RemNote's panel, and a merge-only re-run would not pick those up. Bumping
+ * forces one fresh re-read so nobody is left with stale values.
+ *
+ * v1: initial seed, while RemNote's settings panel was still the live backend.
  * v2: store only values that differ from the default, so that editing a default
  *     still reaches users who never customised that setting.
+ * v3: seed popup-tier settings only — native-tier ones stay in RemNote's panel
+ *     and are read from there, so storing them would just go stale.
  */
-export const SEED_VERSION = 2;
-/** Durable per-setting record of the last migration run. */
-export const ieSettingsMigrationReportKey = 'ie_settings_migration_report';
+export const SEED_VERSION = 3;
 
 /** Give up retrying after this many activations, so a permanently unreadable
  *  setting cannot make every boot re-run the seed forever. */
@@ -96,6 +95,28 @@ export async function getIESettingsValues(
   plugin: RNPlugin
 ): Promise<Partial<IESettings>> {
   return (await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey)) || {};
+}
+
+/**
+ * The seed version this knowledge base last completed, or 0 if none has.
+ * Older builds wrote `true` here rather than a version number.
+ */
+export async function getSeededVersion(plugin: RNPlugin): Promise<number> {
+  const raw = await plugin.storage.getSynced<number | boolean>(ieSettingsMigratedKey);
+  return raw === true ? 1 : typeof raw === 'number' ? raw : 0;
+}
+
+/**
+ * Whether the legacy popup-tier settings still need to be registered with
+ * RemNote on this activation. `getSetting` throws for an unregistered id, so a
+ * knowledge base that has not reached the current seed version can only be read
+ * while those registrations are live.
+ *
+ * Deliberately not gated on the retry budget: registering is cheap, and a KB
+ * whose seed keeps failing must not also lose the ability to read its values.
+ */
+export async function isIESettingsSeedNeeded(plugin: RNPlugin): Promise<boolean> {
+  return (await getSeededVersion(plugin)) < SEED_VERSION;
 }
 
 /** Reads the last migration report, or null if the seed has never run. */
@@ -161,7 +182,18 @@ export async function migrateIESettings(
 
   const values = await getIESettingsValues(plugin);
   const records: SettingMigrationRecord[] = [];
-  const ids = Object.keys(IE_SETTINGS_DEFAULTS) as IESettingId[];
+  // Popup-tier only: native-tier settings keep living in RemNote's panel and are
+  // read from there, so a copy in the blob could only ever go stale.
+  const ids = IE_POPUP_TIER_IDS;
+
+  // A blob carried over from an earlier seed version may hold native-tier keys.
+  // Drop them so the stored state matches what is actually read.
+  for (const key of Object.keys(values) as IESettingId[]) {
+    if (!ids.includes(key)) {
+      delete values[key];
+      console.log(`${LOG}   - ${key}: dropped (now managed in RemNote's settings panel)`);
+    }
+  }
 
   console.log(`${LOG} starting (attempt ${attempt}, ${ids.length} settings, force=${!!opts.force})`);
 
@@ -245,9 +277,7 @@ export async function migrateIESettings(
  * be live for the reads to work.
  */
 export async function migrateIESettingsIfNeeded(plugin: RNPlugin): Promise<void> {
-  const raw = await plugin.storage.getSynced<number | boolean>(ieSettingsMigratedKey);
-  // Older builds wrote `true` here rather than a version number.
-  const doneVersion = raw === true ? 1 : typeof raw === 'number' ? raw : 0;
+  const doneVersion = await getSeededVersion(plugin);
 
   if (doneVersion >= SEED_VERSION) {
     return;

@@ -1,21 +1,30 @@
 /**
- * Single source of truth for Incremental Everything's user settings.
+ * Single source of truth for Incremental Everything's user settings: their
+ * types, defaults, presentation metadata, and where each one is stored.
  *
- * Every read of a user setting goes through `getIESetting` / `useIESetting`
- * instead of calling `plugin.settings.getSetting` directly. Two reasons:
+ * Every read goes through `getIESetting` / `useIESetting` rather than
+ * `plugin.settings.getSetting`, so that:
  *
  * 1. Defaults live in exactly one place (`IE_SETTINGS_DEFAULTS`) instead of
  *    being restated — and sometimes contradicted — at each call site.
- * 2. It gives us one seam to swap the storage backend behind. When settings
- *    move out of RemNote's settings panel into the plugin's own popup, only
- *    the body of `readRawSetting` changes; the ~70 call sites do not.
+ * 2. There is one seam (`readRawSetting`) behind which the storage backend can
+ *    differ per setting, invisible to the ~70 call sites.
+ *
+ * Two tiers, see `SettingTier`:
+ *
+ * - `popup`  — stored in the plugin's own synced blob and edited in the IE
+ *   Settings popup, which can group and layer them properly.
+ * - `native` — left in RemNote's plugin settings panel. These are the switches
+ *   that make IE do *less*; they must stay reachable when IE itself is slow,
+ *   broken, or mid-crash, which a plugin-hosted popup cannot promise. The SDK
+ *   has no setter for a registered setting, so the popup shows them read-only.
  *
  * Why the defaults table is load-bearing: `plugin.settings.getSetting` resolves
  * a setting through its *registration record* and reads `defaultValue` off it.
  * For an id that is not currently registered it does not return `undefined` —
  * it throws `TypeError: Cannot read properties of undefined (reading
- * 'defaultValue')`. So the moment a setting stops being registered, every read
- * of it throws unless something supplies the default. That is this module.
+ * 'defaultValue')`. Popup-tier settings stop being registered once a knowledge
+ * base has migrated, so this module is what keeps them readable.
  */
 import { RNPlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
 import {
@@ -42,6 +51,7 @@ import {
   showDismissedIndicatorSettingId,
   hideDismissedTagSettingId,
   enableHideInQueueIntegrationId,
+  enableFlashcardPrioritisationId,
   performanceModeId,
   alwaysUseLightModeOnMobileId,
   alwaysUseLightModeOnWebId,
@@ -53,6 +63,7 @@ import {
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
   disableFinalDrillNotificationId,
+  ieSettingsValuesKey,
 } from './consts';
 // Type-only: utils.ts imports getIESetting from this module, so a value import
 // here would close a runtime require cycle. `import type` is erased.
@@ -60,8 +71,8 @@ import type { PerformanceMode } from './utils';
 
 /**
  * The type of every user setting. Keys are the setting ids as registered with
- * RemNote; adding a setting means adding it here *and* to
- * `IE_SETTINGS_DEFAULTS` (TypeScript enforces the pair).
+ * RemNote; adding a setting means adding it here, to `IE_SETTINGS_DEFAULTS` and
+ * to `IE_SETTINGS_SCHEMA` (TypeScript enforces all three).
  */
 export interface IESettings {
   // Scheduling
@@ -94,6 +105,7 @@ export interface IESettings {
 
   // Integrations / performance
   [enableHideInQueueIntegrationId]: boolean;
+  [enableFlashcardPrioritisationId]: boolean;
   [performanceModeId]: PerformanceMode;
   [alwaysUseLightModeOnMobileId]: boolean;
   [alwaysUseLightModeOnWebId]: boolean;
@@ -116,7 +128,7 @@ export interface IESettings {
 export type IESettingId = keyof IESettings;
 
 /**
- * The default for every setting. register/settings.ts reads its `defaultValue`
+ * The default for every setting. register/settings.ts takes its `defaultValue`
  * from this table rather than restating literals, so a registration and its
  * default cannot drift apart.
  */
@@ -146,6 +158,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [hideDismissedTagSettingId]: true,
 
   [enableHideInQueueIntegrationId]: false,
+  [enableFlashcardPrioritisationId]: false,
   [performanceModeId]: 'light',
   [alwaysUseLightModeOnMobileId]: true,
   [alwaysUseLightModeOnWebId]: true,
@@ -161,6 +174,481 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [masteryDrillMinDelayMinutesId]: 120,
   [disableFinalDrillNotificationId]: false,
 };
+
+// ---------------------------------------------------------------------------
+// Presentation schema
+// ---------------------------------------------------------------------------
+
+/** Where a setting is stored and edited. See the module comment. */
+export type SettingTier = 'popup' | 'native';
+
+export type SettingGroupId =
+  | 'flashcardPriority'
+  | 'scheduling'
+  | 'priority'
+  | 'queue'
+  | 'editor'
+  | 'fsrs'
+  | 'masteryDrill'
+  | 'integrations'
+  | 'misc';
+
+export interface SettingGroupSpec {
+  label: string;
+  /** Shown under the group heading in the popup. */
+  blurb?: string;
+}
+
+/** Display order is the key order here. */
+export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
+  flashcardPriority: {
+    label: 'Flashcard Prioritisation',
+    blurb:
+      'Per-flashcard priorities. This is the only part of Incremental Everything that does ' +
+      'heavy background work across your whole knowledge base, so it is opt-in.',
+  },
+  scheduling: {
+    label: 'Scheduling',
+    blurb: 'How intervals grow between repetitions of an Incremental Rem.',
+  },
+  priority: {
+    label: 'Priority',
+    blurb: 'Defaults and editing behaviour for priority values.',
+  },
+  queue: { label: 'Queue', blurb: 'What the queue shows during review.' },
+  editor: { label: 'Editor Indicators', blurb: 'Visual markers on rems in the editor.' },
+  fsrs: { label: 'FSRS', blurb: 'Difficulty / Stability / Retrievability display.' },
+  masteryDrill: { label: 'Mastery Drill', blurb: 'Deliberate practice of poorly-rated cards.' },
+  integrations: { label: 'Integrations', blurb: 'Features ported from other plugins.' },
+  misc: { label: 'Other', blurb: '' },
+};
+
+/** Documentation site the "?" help links point at. */
+export const IE_DOCS_BASE_URL = 'https://hugomarins.github.io/incremental-everything/';
+
+interface SettingSpecBase {
+  title: string;
+  description: string;
+  group: SettingGroupId;
+  tier: SettingTier;
+  /** Takes effect only after RemNote is reloaded. Surfaced as a badge. */
+  reloadRequired?: boolean;
+  /** Page on the docs site, relative to IE_DOCS_BASE_URL. Renders a "?" link. */
+  helpPath?: string;
+  /** Rendered as a prominent warning box above the control in the popup. */
+  warning?: string;
+}
+
+export type SettingSpec =
+  | (SettingSpecBase & { kind: 'boolean' })
+  | (SettingSpecBase & {
+      kind: 'number';
+      min?: number;
+      max?: number;
+      integer?: boolean;
+      unit?: string;
+    })
+  | (SettingSpecBase & { kind: 'string'; placeholder?: string; wide?: boolean })
+  | (SettingSpecBase & { kind: 'dropdown'; options: Array<{ value: string; label: string }> });
+
+/**
+ * Title, description, control type and tier for every setting. This is what the
+ * popup renders and what register/settings.ts registers from — the descriptions
+ * used to be duplicated between the two.
+ */
+export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
+  // --- Flashcard prioritisation (the opt-in gate) ---
+  [enableFlashcardPrioritisationId]: {
+    kind: 'boolean',
+    tier: 'native',
+    group: 'flashcardPriority',
+    reloadRequired: true,
+    helpPath: 'Priorities-for-Flashcards/',
+    title: 'Enable Flashcard Prioritisation',
+    warning:
+      'Heavy. Only useful if you create Priority Review Documents for flashcards and review ' +
+      'the queue there. If you are in doubt, leave this off — nothing else in the plugin ' +
+      'depends on it.',
+    description:
+      'Turns on per-flashcard priorities: priority inheritance down your document tree, the ' +
+      'priority shield, relative percentiles, and flashcards in Priority Review Documents.\n\n' +
+      'The cost: enabling it tags flashcard rems with the CardPriority powerup across your entire ' +
+      'knowledge base and keeps them in step as you edit. On a large library that means a long ' +
+      'initial pass and continuous background work, and RemNote can feel slow until it settles.\n\n' +
+      'Everything else — extracts, incremental reading, PDF and video, scheduling, the queue, the ' +
+      'Mastery Drill, and priorities on Incremental Rems themselves — works exactly the same with ' +
+      'this off.',
+  },
+
+  // --- Scheduling ---
+  [initialIntervalId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'scheduling',
+    min: 0,
+    integer: true,
+    unit: 'days',
+    title: 'Initial Interval',
+    description: 'Number of days until the first repetition of a new Incremental Rem.',
+  },
+  [multiplierId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'scheduling',
+    min: 1,
+    title: 'Multiplier',
+    description:
+      'Multiplier used to calculate the next interval: multiplier × previous interval = next ' +
+      'interval. Ignored when the Beta Scheduler is enabled.',
+  },
+  [betaSchedulerEnabledId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'scheduling',
+    title: 'Use Beta Scheduler (Saturating Curve)',
+    description:
+      'Intervals start at the First Review Interval and gradually approach the Max Interval ' +
+      'instead of growing exponentially. When enabled, the Multiplier above is ignored.',
+  },
+  [betaFirstReviewIntervalId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'scheduling',
+    min: 1,
+    integer: true,
+    unit: 'days',
+    title: 'First Review Interval (Beta Scheduler)',
+    description:
+      'Interval assigned after completing the first review. Not to be confused with "Initial ' +
+      'Interval", which controls when a new IncRem first appears in the queue, before any review. ' +
+      'Only used when the Beta Scheduler is enabled.',
+  },
+  [betaMaxIntervalId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'scheduling',
+    min: 1,
+    integer: true,
+    unit: 'days',
+    title: 'Max Interval (Beta Scheduler)',
+    description:
+      'Upper bound the interval gradually approaches; it will never exceed this value. Only used ' +
+      'when the Beta Scheduler is enabled.',
+  },
+
+  // --- Priority ---
+  [defaultPriorityId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'priority',
+    min: 0,
+    max: 100,
+    integer: true,
+    title: 'Default IncRem Priority',
+    description: 'Priority given to new Incremental Rems. 0-100, lower = more important.',
+  },
+  [defaultCardPriorityId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'priority',
+    min: 0,
+    max: 100,
+    integer: true,
+    title: 'Default Card Priority',
+    description:
+      'Priority for flashcards with no inherited priority. 0-100, lower = more important.',
+  },
+  [priorityStepSizeId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'priority',
+    min: 1,
+    max: 50,
+    integer: true,
+    title: 'Priority Step Size',
+    description:
+      'Step used by the quick priority increase/decrease shortcuts (Ctrl+Shift+Up/Down).',
+  },
+  [priorityEditorDisplayModeId]: {
+    kind: 'dropdown',
+    tier: 'popup',
+    group: 'priority',
+    title: 'Priority Widget in Editor',
+    description:
+      'When to show the priority widget in the right-hand margin of each rem in the editor.',
+    options: [
+      { value: 'all', label: 'Show for IncRem and Cards' },
+      { value: 'incRemOnly', label: 'Show only for IncRem' },
+      { value: 'disable', label: 'Disable' },
+    ],
+  },
+
+  // --- Queue ---
+  [collapseQueueTopBar]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'queue',
+    title: 'Collapse Queue Top Bar (IncRem only)',
+    description:
+      'Frees vertical space during Incremental Rem review by collapsing the queue top bar to a ' +
+      'thin strip; hover to reveal it. No effect on regular flashcard turns.',
+  },
+  [displayPriorityShieldId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'queue',
+    title: 'Display Priority Shield in Queue',
+    description:
+      'Shows a live status of your highest-priority due items — below the answer buttons for ' +
+      'IncRems, and in the card priority widget under the flashcard for regular cards.',
+  },
+  [displayWeightedShieldId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'queue',
+    title: 'Display Weighted Priority Shield in Queue',
+    description:
+      'Shows what fraction of your total priority-weighted workload has been processed. ' +
+      'High-priority items carry exponentially more weight (~10× at the top vs the bottom), so ' +
+      'processing them gives a bigger boost.',
+  },
+  [displayQueueToolbarPriorityId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'queue',
+    title: 'Display Priority in Queue Toolbar',
+    description:
+      'Shows the priority badge of the current flashcard or IncRem at the top right of the queue.',
+  },
+  [isolatedQueueModeId]: {
+    kind: 'dropdown',
+    tier: 'popup',
+    group: 'queue',
+    title: 'Use Isolated Card View in Queue for',
+    description:
+      'Which incremental items default to the isolated card view. Highlights that do not use it ' +
+      'appear inside the PDF/HTML reader; regular rems that do not use it appear in full document ' +
+      'context. You can always toggle in the queue — this only sets the initial view.',
+    options: [
+      { value: 'highlights', label: 'Highlights (PDF/HTML)' },
+      { value: 'rems', label: 'Regular Rems' },
+      { value: 'both', label: 'Both' },
+      { value: 'none', label: 'None' },
+    ],
+  },
+  [autoFocusQueueDashboardId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'queue',
+    title: 'Auto-focus Queue Dashboard',
+    description:
+      'Opens the Practiced Queues dashboard in the right sidebar on queue entry, for a live view ' +
+      'of the session. PDF IncRems may temporarily steal focus to PDF tabs; the dashboard tab ' +
+      'stays available. Does not apply on mobile.',
+  },
+
+  // --- Editor indicators ---
+  [showLeftBorderForIncRemsSettingId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'editor',
+    reloadRequired: true,
+    title: 'Green Left Border for IncRems',
+    description: 'Marks Incremental Rems in the editor, making your extracts easy to spot.',
+  },
+  [showDismissedIndicatorSettingId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'editor',
+    reloadRequired: true,
+    title: 'Yellow Left Border for Dismissed Rems',
+    description:
+      'Marks rems dismissed from incremental learning, which keep their preserved history.',
+  },
+  [hideCardPriorityTagSettingId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'editor',
+    reloadRequired: true,
+    title: 'Hide CardPriority Tag in Editor',
+    description:
+      'Hides the "CardPriority" powerup tag to reduce clutter. Priority can still be set with Alt+P.',
+  },
+  [hideDismissedTagSettingId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'editor',
+    reloadRequired: true,
+    title: 'Hide Dismissed Tag in Editor',
+    description: 'Hides the "Dismissed" powerup tag to reduce clutter.',
+  },
+  [showPriorityBandsInTablesId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'editor',
+    reloadRequired: true,
+    title: 'Show Priority Badges in Table Cells',
+    description:
+      'Tables are the one place the priority editor cannot render, so a coloured band badge ' +
+      '(e.g. "70s") is drawn in the top-right of each cell instead. Run "Refresh Priority Badges" ' +
+      'once to fill in existing rems.',
+  },
+
+  // --- FSRS ---
+  [displayFsrsDsrId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'fsrs',
+    title: 'Display FSRS DSR Stats (Flashcards)',
+    description:
+      'Shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card ' +
+      'info bar. Requires the FSRS v6 scheduler.',
+  },
+  [fsrsWeightsId]: {
+    kind: 'string',
+    tier: 'popup',
+    group: 'fsrs',
+    wide: true,
+    placeholder: 'w0, w1, … w20 — leave blank for FSRS v6.1.1 defaults',
+    title: 'FSRS Global Weights',
+    description:
+      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler ' +
+      'settings. Leave blank to use the official defaults.',
+  },
+
+  // --- Mastery Drill ---
+  [skipMasteryDrillId]: {
+    kind: 'boolean',
+    tier: 'native',
+    group: 'masteryDrill',
+    reloadRequired: true,
+    title: 'Skip Mastery Drill',
+    description:
+      'Turns off every Mastery Drill feature: the drill popup and sidebar notification are hidden, ' +
+      'the "Mastery Drill" command is not registered, and cards rated Again or Hard are no longer ' +
+      'tracked or queued.',
+  },
+  [oldItemThresholdId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'masteryDrill',
+    min: 1,
+    integer: true,
+    unit: 'days',
+    title: 'Old Items Threshold',
+    description: 'Items older than this trigger a warning in the Mastery Drill.',
+  },
+  [masteryDrillMinDelayMinutesId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'masteryDrill',
+    min: 0,
+    integer: true,
+    unit: 'minutes',
+    title: 'Mastery Drill Minimum Delay',
+    description:
+      'A card rated Again or Hard will not appear in the drill until this long after its last ' +
+      'review, so the same card is not repeated too soon.',
+  },
+  [disableFinalDrillNotificationId]: {
+    kind: 'boolean',
+    tier: 'popup',
+    group: 'masteryDrill',
+    title: 'Disable Mastery Drill Notifications',
+    description: 'Stops the Mastery Drill sidebar notification from appearing.',
+  },
+
+  // --- Integrations / performance (native tier) ---
+  [performanceModeId]: {
+    kind: 'dropdown',
+    tier: 'native',
+    group: 'integrations',
+    title: 'Performance Mode',
+    description:
+      '"Light" is recommended for web and mobile. "Full" enables relative priority and the ' +
+      'priority shield at a significant computational cost, and is best used in the desktop app.',
+    options: [
+      { value: 'full', label: 'Full (all features, high resource use)' },
+      { value: 'light', label: 'Light (faster, no relative priority/shield)' },
+    ],
+  },
+  [alwaysUseLightModeOnMobileId]: {
+    kind: 'boolean',
+    tier: 'native',
+    group: 'integrations',
+    title: 'Always Use Light Mode on Mobile',
+    description:
+      'Switches to Light performance mode on iOS and Android, preventing crashes and improving ' +
+      'performance. Recommended.',
+  },
+  [alwaysUseLightModeOnWebId]: {
+    kind: 'boolean',
+    tier: 'native',
+    group: 'integrations',
+    title: 'Always Use Light Mode on Web Browser',
+    description:
+      'Switches to Light performance mode in the browser, where Full mode can be slow or unstable. ' +
+      'Recommended.',
+  },
+  [enableHideInQueueIntegrationId]: {
+    kind: 'boolean',
+    tier: 'native',
+    group: 'integrations',
+    reloadRequired: true,
+    title: 'Enable Hide-in-Queue Powerups and Commands',
+    description:
+      'Registers the "Hide in Queue", "Remove from Queue", "No Hierarchy", "Hide Parent" and ' +
+      '"Hide Grandparent" powerups and commands inside Incremental Everything.\n\n' +
+      'WARNING: only enable this if you do NOT have the standalone "Hide in Queue" plugin ' +
+      'installed — duplicate powerup registration throws a fatal error that breaks this plugin. ' +
+      'Uninstall the standalone plugin first, then reload RemNote.\n\n' +
+      '"Remove Parent" and "Remove Grandparent" are always registered, since the Cloze and Extract ' +
+      'creators depend on them.',
+  },
+
+  // --- Misc ---
+  [remnoteEnvironmentId]: {
+    kind: 'dropdown',
+    tier: 'popup',
+    group: 'misc',
+    title: 'RemNote Environment',
+    description: 'Which RemNote environment links should open documents in.',
+    options: [
+      { value: 'www', label: 'Regular (www.remnote.com)' },
+      { value: 'beta', label: 'Beta (beta.remnote.com)' },
+    ],
+  },
+  [flashcardResponseTimeLimitId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'misc',
+    min: 1,
+    integer: true,
+    unit: 'seconds',
+    title: 'Flashcard Response Time Limit',
+    description:
+      'Answers taking longer than this (because you walked away, say) are counted only up to this ' +
+      'limit in Practiced Queues statistics. Matches RemNote\'s own setting of the same name.',
+  },
+};
+
+/** Ids in a stable display order: by group, in `IE_SETTING_GROUPS` order. */
+export const IE_SETTING_IDS_BY_GROUP: Array<{ group: SettingGroupId; ids: IESettingId[] }> =
+  (Object.keys(IE_SETTING_GROUPS) as SettingGroupId[]).map((group) => ({
+    group,
+    ids: (Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[]).filter(
+      (id) => IE_SETTINGS_SCHEMA[id].group === group
+    ),
+  }));
+
+/** Every setting stored in the plugin's own blob rather than RemNote's panel. */
+export const IE_POPUP_TIER_IDS: IESettingId[] = (
+  Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[]
+).filter((id) => IE_SETTINGS_SCHEMA[id].tier === 'popup');
+
+// ---------------------------------------------------------------------------
+// Reading and writing
+// ---------------------------------------------------------------------------
 
 /**
  * Coerces whatever the backend handed back into the setting's declared type,
@@ -188,16 +676,22 @@ function coerce<K extends IESettingId>(id: K, raw: unknown): IESettings[K] {
 }
 
 /**
- * The one place that talks to the settings backend. Swapping RemNote's settings
- * panel for the plugin's own storage means rewriting this function and nothing
- * else.
+ * The one place that talks to a settings backend, dispatching on tier.
  *
- * Throws are swallowed on purpose: `getSetting` raises a TypeError for any id
- * that is not currently registered, and during the migration some ids will be
- * in exactly that state. `undefined` here means "no stored value", which
- * `coerce` turns into the default.
+ * Popup-tier reads hit the synced blob; a missing key means "no opinion" and
+ * resolves to the default, which is what lets a changed default still reach
+ * users who never customised that setting.
+ *
+ * Native-tier throws are swallowed on purpose: `getSetting` raises a TypeError
+ * for any id that is not currently registered, which is the state a popup-tier
+ * id is in after migration and a native id would be in only if registration
+ * failed. Either way the default is the right answer.
  */
 async function readRawSetting(plugin: RNPlugin, id: IESettingId): Promise<unknown> {
+  if (IE_SETTINGS_SCHEMA[id].tier === 'popup') {
+    const values = await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey);
+    return values ? values[id] : undefined;
+  }
   try {
     return await plugin.settings.getSetting<unknown>(id);
   } catch (e) {
@@ -234,6 +728,41 @@ export async function getIESettings<K extends IESettingId>(
     out[id] = values[i] as IESettings[K];
   });
   return out;
+}
+
+/**
+ * Writes a popup-tier setting.
+ *
+ * A value equal to the default is *removed* rather than stored, so that editing
+ * a default later still reaches everyone who has not deliberately diverged from
+ * it. Native-tier settings have no SDK setter and can only be changed in
+ * RemNote's own panel — calling this for one is a no-op with a warning.
+ */
+export async function setIESetting<K extends IESettingId>(
+  plugin: RNPlugin,
+  id: K,
+  value: IESettings[K]
+): Promise<void> {
+  if (IE_SETTINGS_SCHEMA[id].tier !== 'popup') {
+    console.warn(
+      `[IESettings] "${id}" lives in RemNote's settings panel and cannot be written by the plugin.`
+    );
+    return;
+  }
+  const values = {
+    ...((await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey)) || {}),
+  };
+  if (JSON.stringify(value) === JSON.stringify(IE_SETTINGS_DEFAULTS[id])) {
+    delete values[id];
+  } else {
+    values[id] = value;
+  }
+  await plugin.storage.setSynced(ieSettingsValuesKey, values);
+}
+
+/** Restores a popup-tier setting to its default by removing it from the blob. */
+export async function resetIESetting(plugin: RNPlugin, id: IESettingId): Promise<void> {
+  await setIESetting(plugin, id, IE_SETTINGS_DEFAULTS[id]);
 }
 
 /**
