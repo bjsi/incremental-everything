@@ -14,7 +14,7 @@ The two new powerups — **Remove Parent** and **Remove Grandparent** — are al
 
 ---
 
-## Hide in Queue (`hiq`)
+## Hide in Queue (`hiq`) { #hide-in-queue }
 
 Tag any Rem with **Hide in Queue** (using the command). Its content will be replaced on the front of descendant flashcards with "Hidden in queue":
 

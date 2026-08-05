@@ -51,7 +51,7 @@ With the default scheduler:
 
 ---
 
-## Beta Scheduler — Saturating Curve ✨
+## Beta Scheduler — Saturating Curve ✨ { #beta-scheduler }
 
 > Enable this via **Settings → Use Beta Scheduler (Saturating Curve)**.
 
