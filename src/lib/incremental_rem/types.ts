@@ -80,6 +80,10 @@ export const IncrementalRep = z.object({
    *   Study Dashboard) but is intentionally IGNORED by the scheduler for
    *   next-interval computation, since it never belonged to this rem's own
    *   incremental schedule. See context.flashcardName / context.flashcardScore.
+   * - 'externalRep': A study session recorded after the fact by the user from the
+   *   Repetition History popup ("Add session") — reading done away from RemNote.
+   *   It is a genuine repetition of this rem, so it counts for BOTH statistics and
+   *   the scheduler's rep count, exactly like 'executeRepetition'.
    *
    * The scheduler uses this to count only review events since the last 'madeIncremental' event.
    */
@@ -91,7 +95,8 @@ export const IncrementalRep = z.object({
     'executeRepetition',
     'madeIncremental',
     'dismissed',
-    'importedRep'
+    'importedRep',
+    'externalRep'
   ]).optional(),
   /**
    * The absolute priority (0-100) at the time of this repetition
@@ -165,7 +170,8 @@ export function repCountsForStats(eventType: IncrementalRep['eventType']): boole
     eventType === 'rep' ||
     eventType === 'executeRepetition' ||
     eventType === 'rescheduledInQueue' ||
-    eventType === 'importedRep'
+    eventType === 'importedRep' ||
+    eventType === 'externalRep'
   );
 }
 
@@ -174,13 +180,16 @@ export function repCountsForStats(eventType: IncrementalRep['eventType']): boole
  * Identical to {@link repCountsForStats} MINUS 'importedRep': imported flashcard
  * reps never belonged to this rem's own incremental schedule, so they must never
  * influence its intervals (even if the rem is later re-incrementalized).
+ * 'externalRep' DOES count — a session studied away from RemNote is still a
+ * repetition of this rem's own material.
  */
 export function repCountsForScheduling(eventType: IncrementalRep['eventType']): boolean {
   return (
     eventType === undefined ||
     eventType === 'rep' ||
     eventType === 'executeRepetition' ||
-    eventType === 'rescheduledInQueue'
+    eventType === 'rescheduledInQueue' ||
+    eventType === 'externalRep'
   );
 }
 
