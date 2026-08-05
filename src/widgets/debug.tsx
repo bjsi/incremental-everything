@@ -3645,11 +3645,13 @@ function Debug() {
                        </>
                      ) : hasCardPriorityTag ? (
                        <>
-                         <strong style={{ color: '#d97706' }}>Tagged, but empty.</strong> The
-                         CardPriority powerup is applied to this rem, yet its priority slot holds no
-                         value — so the numbers below are resolved on read from the nearest ancestor,
-                         exactly as they would be for an untagged rem. A tag in this state is what
-                         "Sanitize Rogue Tags" removes.
+                         <strong style={{ color: '#d97706' }}>Tagged, but the priority slot is
+                         empty.</strong> The powerup is applied to this rem, yet no value is stored
+                         in its priority slot — so the numbers below are resolved on read from the
+                         nearest ancestor, exactly as they would be for an untagged rem.{' '}
+                         {cardPriority.cardCount > 0
+                           ? '"Sanitize Rogue Tags" will NOT touch this: it only strips tags from rems that own no cards, and this one does. setCardPriority always writes priority, source and lastUpdated together, so a surviving source/lastUpdated with no priority means the value was lost after it was written, not that the write was partial. To drop tags wholesale while flashcard prioritisation is off, use the "Remove All CardPriority Tags" command.'
+                           : 'This rem owns no cards, so "Sanitize Rogue Tags" is the tool that removes it.'}
                        </>
                      ) : (
                        <>
