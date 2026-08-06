@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { RNPlugin } from '@remnote/plugin-sdk';
 import {
     getIncrementalReadingPosition,
+    setIncrementalReadingPosition,
     getIncrementalPageRange,
     clearIncrementalPDFData,
     PageRangeContext
@@ -22,8 +23,10 @@ export function usePdfPageControls(
 
     const saveCurrentPage = useCallback(async (page: number) => {
         if (!incrementalRemId || !pdfRemId) return;
-        const pageKey = `incremental_current_page_${incrementalRemId}_${pdfRemId}`;
-        await plugin.storage.setSynced(pageKey, page);
+        // Must go through the accessor: reading state lives on the Rem now, and
+        // writing the legacy key directly would be ignored by every reader once
+        // that Rem has migrated.
+        await setIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId, page);
     }, [incrementalRemId, pdfRemId, plugin]);
 
     const incrementPage = useCallback(() => {
