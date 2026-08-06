@@ -1057,7 +1057,7 @@ Adds/removes an `#ignore` tag on the focused editor Rem. Ignored rems are visual
 
 ### ✨ Improvement: Isolated Card View Setting Expanded to Cover Highlights
 
-The previous **Show regular Rems in isolated view (Queue)** boolean has been replaced by a dropdown — [**Use Isolated Card View in Queue for**](Plugin-Settings-Reference.md#queue-display) — letting you pick which item types open in the [Isolated Card Viewer](Plugin-Widgets-Reference.md) by default in the queue:
+The previous **Show regular Rems in isolated view (Queue)** boolean has been replaced by a dropdown — [**Use Isolated Card View in Queue for**](Plugin-Settings-Reference.md#queue) — letting you pick which item types open in the [Isolated Card Viewer](Plugin-Widgets-Reference.md) by default in the queue:
 
 - **Highlights (PDF/HTML)** *(default)* — only highlights open in the card view; regular Rems open in their full document context.
 - **Regular Rems** — only regular Rems open in the card view; highlights open in the PDF/HTML reader.
@@ -1454,7 +1454,7 @@ IncRem time in the **Practiced Queues** dashboard is now tracked reliably from e
 - **Removed the `QueueItemType.Plugin` heuristic.** The old code inferred that the current queue item was an IncRem by checking `QueueItemType.Plugin`. This was fragile and would silently miss editor-side reviews. It has been replaced by explicit signals from the review components.
 - **Editor-only sessions.** If you review an IncRem directly from the editor (not from a queue), the plugin now opens a dedicated **"Editor Review"** session. That session auto-saves and closes after **60 minutes of inactivity**, keeping your history clean without any manual step.
 - **Queue → editor deduplication.** When you click *Review in Editor* from the queue, the time is counted once — it carries over into the same session rather than starting a separate engagement. The queue and editor timer together record a single continuous block.
-- **New setting — Auto focus Queue Dashboard** (default `false`): when enabled, the Practiced Queues dashboard opens automatically in the Right Sidebar every time you enter a queue (except in mobile devices). See [Plugin Settings Reference](Plugin-Settings-Reference.md#queue-display) for details.
+- **New setting — Auto focus Queue Dashboard** (default `false`): when enabled, the Practiced Queues dashboard opens automatically in the Right Sidebar every time you enter a queue (except in mobile devices). See [Plugin Settings Reference](Plugin-Settings-Reference.md#queue) for details.
 
 ## v0.2.192 - May 1st, 2026
 

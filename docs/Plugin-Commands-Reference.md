@@ -63,10 +63,10 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   Opens the zero-lag Light Priority widget for immediate integer adjustments.
 
 - **Quick Increase Priority Number (Less Important)** (`Ctrl+Opt+Up` / `Ctrl+Alt+Up`)
-  Instantly increases the priority number (making the item *less* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `10`). No popup is shown.
+  Instantly increases the priority number (making the item *less* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `5`). No popup is shown.
 
 - **Quick Decrease Priority Number (More Important)** (`Ctrl+Opt+Down` / `Ctrl+Alt+Down`)
-  Instantly decreases the priority number (making the item *more* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `10`). No popup is shown.
+  Instantly decreases the priority number (making the item *more* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `5`). No popup is shown.
 
 - **[Batch Priority Change](Prioritization-&-Sorting.md#batch-priority-change-incremental-rems)**
   A powerful widget for managing the priorities of multiple Incremental Rems at once, designed for large documents with many nested items. (No quick code)
@@ -288,9 +288,6 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
 
 - **Incremental Everything: Settings** (`ies`)
   Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
-
-- **Debug: Settings Migration Status**
-  Reports whether your settings were carried over successfully when the plugin moved most of them into its own storage: a summary in a toast, and the full per-setting record in the developer console. Useful only if a setting appears to have reverted after an upgrade.
 
 - **Import Incremental Rems with History**
   Bulk-imports Incremental Rems from a **JSON payload** — including each rem's **full repetition history**, priority and next-repetition date. Built for migrating an external study log (e.g. a spreadsheet with years of study sessions) into the plugin's native history format.
