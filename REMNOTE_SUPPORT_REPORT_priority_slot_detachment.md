@@ -4,7 +4,7 @@
 **SDK:** `@remnote/plugin-sdk` ^0.0.46
 **RemNote build:** _(to be filled in — desktop build on which the dump below was taken)_
 **Date of evidence:** 2026-08-06
-**Severity:** Data is intact but unreadable through the plugin API. No data loss; silent wrong values presented to the user.
+**Severity:** Widespread. A full scan of this knowledge base finds **99.2% of Incremental Rems (5,390 / 5,434)** with a detached priority slot, **6.7% of CardPriority Rems (3,001 / 45,078)**, and **59.8% of scheduled dates (1,893 / 3,163)** pointing at Daily Documents that no longer exist. Values are recoverable in every category; none are silently correct.
 
 ---
 
@@ -156,6 +156,21 @@ Every pre-overhaul Incremental Rem examined shows the same defect, and every one
 
 In all three damaged cases the stored value agrees with the last priority recorded in the Rem's own history, which independently corroborates that these are the correct values and that nothing rewrote them.
 
+### 3.7 Scale — a full scan of the knowledge base
+
+| Powerup | Rems | OK | Detached | No value | Detached |
+|---|---|---|---|---|---|
+| `Incremental` | 5,434 | **4** | **5,390** | 40 | **99.2%** |
+| `CardPriority` | 45,078 | 41,701 | **3,001** | 376 | 6.7% |
+
+**Every single detached property in both populations points at the same orphan slot `VLmEpU417yLnZEMWf`** (5,389 + 3,001), with exactly one exception: one `Incremental` property points at `6eUpUKWrfZdU4nrgc`, which is `CardPriority`'s *registered* Priority slot. That single case is direct evidence of cross-powerup mixing of slots that share the display name "Priority".
+
+The four healthy `Incremental` Rems are the ones touched by hand during the repair testing above. In other words, **before those manual writes, the detachment rate for `Incremental` was effectively 100%.**
+
+The contrast with `CardPriority` is explained by write frequency rather than by a different fault. Card priorities are rewritten constantly by the plugin (inheritance cascades, new cards, batch operations), and — as §3.6 shows — any rewrite heals the reference. Incremental priority is written only when a user deliberately sets one, which is rare. On that reading both powerups were hit at ~100%, and `CardPriority` has been quietly self-healing ever since; the 6.7% is the residue that has not been rewritten yet.
+
+That inference matters for the remedy: it means the damage is repairable through ordinary writes, and is already repairing itself where writes happen.
+
 **Rewriting the property repairs the Rem.** Writing a new priority through the normal `setPowerupProperty` path was tested on two Rems, with dumps taken immediately before and after:
 
 ```
@@ -217,9 +232,32 @@ Here the property Rem and its slot link are both **healthy** — it correctly re
 
 This is materially different from §3. There the value survives on the Rem and can be recovered; here the referenced Rem is simply gone, and the scheduled date is unrecoverable from the property itself. (Our plugin survives it only because it independently stamps the next-repetition timestamp into its own history slot and falls back to that.)
 
-The correlation across the sample is suggestive but not conclusive at n=1 for the failing case: the two references that resolve point at a daily document **one day** ahead of when they were written, while the one that fails pointed **30 days** ahead, to a date that was still in the future at the time. A plausible mechanism is that empty, programmatically-created future daily documents did not survive the migration, orphaning every reference to them. If that is what happened, the scope would be considerably wider than §3, since it would affect any Rem scheduled far enough ahead — for this plugin, that is a large fraction of a mature knowledge base.
+### 5.1 Scale, and what the distribution shows
+
+A full scan of the knowledge base found **1,893 of 3,163 Rems with a Next Rep Date property (59.8%) pointing at a Daily Document that no longer exists.** Broken down by the scheduling interval recorded in each Rem's history — i.e. how far ahead of the write date the reference pointed:
+
+| Interval | Resolves | Dangling | Dangling |
+|---|---|---|---|
+| 0–1 days | 986 | 935 | 48.7% |
+| 2–7 days | 67 | 93 | 58.1% |
+| 8–30 days | 43 | 90 | 67.7% |
+| 31–90 days | 20 | 49 | 71.0% |
+| 90+ days | 3 | 139 | **97.9%** |
+| (interval not recorded) | 143 | 586 | 80.4% |
+
+The gradient is monotonic and steep — from roughly half at one day out to virtually total beyond ninety. But the baseline is already ~49%, so "far-future documents were pruned" does not by itself account for it.
+
+A single mechanism that fits the whole curve: **empty Daily Documents did not survive, and survival tracks the probability that the document had content.** A daily document one day ahead is very likely to be a day the user actually opened RemNote, so it accumulated content and survived. One ninety days ahead is almost certainly an auto-created, never-visited placeholder, and 97.9% of those are gone.
+
+Supporting this, the missing targets are heavily shared rather than unique per Rem: in the sample, `AE7yLF6exeF8tC1nS` is referenced by 5 different Rems and `uiFt628ESp1W6mcxq` by 6. Whole dates disappeared, not individual references.
 
 We would rather RemNote confirm or rule this out than guess at it.
+
+### 5.2 Recoverable, but not from the property
+
+Unlike §3, the value on the property cannot be recovered — the referenced Rem is gone. However, this plugin independently stamps the next-repetition timestamp into its own `History` slot on every scheduling write, so the *intended date* survives for these Rems and the schedule is not lost. Reading falls back to that stamp, which is why the affected Rems still appear in the queue on the correct day despite RemNote's own property row rendering as `Loading` indefinitely.
+
+This is a plugin-specific safety net. Any other plugin storing a date in a powerup slot, and any RemNote feature doing the same, would have no equivalent fallback.
 
 ---
 
@@ -291,7 +329,8 @@ The control Rem in §3.5 shows the identical layout (`childCount: 2`, no propert
 
 - Priority is the plugin's core scheduling input. An unreadable slot silently substitutes a default, which changes queue ordering and review weighting for every affected Rem.
 - The value presented to the user is wrong while the correct value remains on the Rem, so the fault is not visible as data loss and is easy to mistake for a plugin defect.
-- The reporting user observes this across Rems created before the overhaul; Rems created after it are unaffected. The evidence in this report is a full trace of one representative Rem.
+- Measured across this knowledge base: 5,390 Incremental Rems, 3,001 CardPriority Rems and 1,893 scheduled dates are affected (§3.7, §5.1). Rems created after the overhaul are unaffected.
+- **CardPriority is the most acute case.** `getCardPriority` has no history to fall back on — it silently resolves an inherited value or the default — so those 3,001 flashcard priorities are simply wrong in the app today, with no mitigation, even though the correct values are still present on the Rems.
 - Any plugin reading a **visible** powerup slot on pre-overhaul Rems is potentially exposed to the same failure, not only this one.
 
 ---

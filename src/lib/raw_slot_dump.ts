@@ -197,7 +197,7 @@ export interface RawSlotDumpReport {
 }
 
 /** Rem-reference elements carried by a rich-text value, by id. */
-function refIdsIn(richText: unknown): string[] {
+export function refIdsIn(richText: unknown): string[] {
   if (!Array.isArray(richText)) return [];
   return (richText as any[])
     .filter((el) => el != null && typeof el === 'object' && el.i === 'q' && el._id)
@@ -217,7 +217,7 @@ function refIdsIn(richText: unknown): string[] {
  *    a perfectly healthy `Next Rep Date` would come back as "" and be reported
  *    as EMPTY. References are resolved via `resolveRemTextToString` instead.
  */
-async function readRawText(plugin: RNPlugin, richText: unknown): Promise<string> {
+export async function readRawText(plugin: RNPlugin, richText: unknown): Promise<string> {
   if (richText == null || !Array.isArray(richText) || richText.length === 0) return '';
   if (refIdsIn(richText).length > 0) {
     try {
