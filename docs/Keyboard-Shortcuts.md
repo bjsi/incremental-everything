@@ -26,7 +26,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | :--- | :--- | :--- | :--- |
 | `Cmd` + `→` (Mac) / `Ctrl` + `→` (Win) | [Next Item in Queue](Reviewing-Items-in-the-Queue.md#next) | Marks the current Incremental Rem as reviewed, calculates the next interval, and advances to the next item. Same as the "Next" button. | Queue Only |
 | `Ctrl` + `D` | [Dismiss Incremental Rem](Reviewing-Items-in-the-Queue.md#dismiss) | Permanently finishes the item by transferring its history to the Dismissed state and removing the Incremental power-up. Same as the "Dismiss" button. | Editor and Queue |
-| `Ctrl` + `Shift` + `J` | [Review & Open](Reviewing-Items-in-the-Queue.md#review--open) | Reviews the item (rescheduling it), opens it in the editor, and starts the Editor Review Timer. When the processing is finished, it open the queue document again, so the user can continue the queue.| Editor and Queue |
+| `Ctrl` + `Shift` + `J` | [Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor) | Reviews the item (rescheduling it), opens it in the editor, and starts the Editor Review Timer. When the processing is finished, it open the queue document again, so the user can continue the queue.| Editor and Queue |
 
 ![Queue Shortcuts](assets/queue-shortcuts.png){ width="900" }
 
@@ -60,7 +60,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
 | `Shift` + `F8` | [Bulletize Inline Selected Text](Utilities.md#bulletize-inline-selected-text) | Toggles a `• ` prefix on each line of a multi-line selection **within a single rem**. Restores bullets that a PDF highlight flattened into soft-wrapped text; a collapsed cursor bulletizes the whole rem. *(Uses `Shift+F8` because `Opt+Shift+8` types `°` on macOS and `Ctrl+Opt+Shift+8` is RemNote's blue-highlight shortcut.)* | Editor Only |
-| `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities.md#find-rem--reference-or-open) | Floating picker that finds Rems RemNote's `[[` search can't surface (all-common-word names). Enter/click inserts a reference at the cursor (cloze-aware, accent-insensitive); Ctrl/Cmd+Enter inserts it as a pin (no text); Opt/Alt+Enter inserts the Rem's text then a pin ("Text with Pin", preserving formatting/images); Shift+Enter/Shift+click opens the Rem in a new pane. | Editor Only |
+| `Alt` + `Shift` + `F` | [Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open) | Floating picker that finds Rems RemNote's `[[` search can't surface (all-common-word names). Enter/click inserts a reference at the cursor (cloze-aware, accent-insensitive); Ctrl/Cmd+Enter inserts it as a pin (no text); Opt/Alt+Enter inserts the Rem's text then a pin ("Text with Pin", preserving formatting/images); Shift+Enter/Shift+click opens the Rem in a new pane. | Editor Only |
 | `Shift` + `F3` | [Text Case Converter](Utilities.md#text-case-converter) | Cycles the selection through **Title Case** → **UPPERCASE** → **lowercase**, auto-detecting the current case. Rich-text safe; also works on multi-rem selections. | Editor Only |
 
 > **No default shortcut (run by quick code or from the Omnibar).** The list-from-PDF-highlight commands ship **unbound** to avoid conflicts — invoke them by quick code: **`inl`** ([Inlinize Detected List](Utilities.md#inlinize-detected-list-inl)), **`brl`** ([Break Inline List Into Children](Utilities.md#break-inline-list-into-children-brl)), and **`rlr`** ([Restore List Rem](Utilities.md#restore-list-rem-rlr)). They act on the **focused rem** (no selection needed). Assign your own bindings in RemNote's keyboard-shortcut settings if you use them often.
@@ -73,7 +73,7 @@ While not part of the plugin itself, these native RemNote shortcuts are crucial 
 | Shortcut | Name | Function | Context |
 | :--- | :--- | :--- | :--- |
 | `P` | Open in Previewer | Opens the current incremental Rem in a popup editor for quick edits. | Queue Only |
-| `G` | Go to Rem | Exits the queue and navigates to the current Rem in the main editor. **Note:** This does *not* register your review of the card. For that, use the "[Review & Open](Reviewing-Items-in-the-Queue.md#review--open)" button. | Queue Only |
+| `G` | Go to Rem | Exits the queue and navigates to the current Rem in the main editor. **Note:** This does *not* register your review of the card. For that, use the "[Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor)" button. | Queue Only |
 
 ---
 ## macOS Notes

@@ -29,7 +29,7 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
 4. Choose from the available options:
    - **Manual time entry**: Enter the time you spent (in seconds) and click Submit.
    - **Timer mode**: Start a timer, review the content, then stop and submit.
-   - **📝 Note** (optional): an observation stored on this repetition's history entry — shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history--aggregated-view). If you choose **Start Timer**, the note is handed to the timer and saved when the session ends (you can still extend it there).
+   - **📝 Note** (optional): an observation stored on this repetition's history entry — shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view). If you choose **Start Timer**, the note is handed to the timer and saved when the session ends (you can still extend it there).
 
 ### Key Behavior
 

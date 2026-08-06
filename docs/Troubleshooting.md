@@ -368,7 +368,7 @@ Detection is **authoritative**: it uses the global card index (`plugin.card.getA
 | `manual` | You set this priority yourself (e.g. a priority anchor on a folder/document). | **Preserved** — never offered for deletion. |
 | `incremental` | Left behind when an IncRem was dismissed, so its descendants keep inheriting its priority (second only to `manual` in importance). | **Preserved** — never offered for deletion. |
 
-Card-less `manual` and `incremental` tags are legitimate **inheritance anchors**. The sanitizer reports how many it preserved (and lists them in the console) but **never deletes them**. To remove one deliberately, use the **Clear Card Priority** button in the [Priority widget](Priorities-for-Flashcards.md#setting--managing-priorities).
+Card-less `manual` and `incremental` tags are legitimate **inheritance anchors**. The sanitizer reports how many it preserved (and lists them in the console) but **never deletes them**. To remove one deliberately, use the **Clear Card Priority** button in the [Priority widget](Priorities-for-Flashcards.md#setting-managing-priorities).
 
 ### Safety Guarantees
 - The sanitizer **never** touches a rem that owns flashcards (verified against the global card index, which counts cards on paused and disabled rems too).
@@ -584,7 +584,7 @@ The probe reproduces the editor's search via `plugin.search.search()` and dumps 
 
 - **Verdict** — a plain-language summary of the likely cause.
 - **Own-text search rank** (top 50) and **Deep search rank** (top 1000) — whether the Rem appears in its *own* name search and at what position. "NOT FOUND" with many partial matches above it is the signature of common-token saturation.
-- **Found under alias? / Found under prefix?** — whether a distinctive word *does* surface the Rem (it usually does — which is exactly what the [Find Rem picker](Utilities.md#find-rem--reference-or-open) exploits).
+- **Found under alias? / Found under prefix?** — whether a distinctive word *does* surface the Rem (it usually does — which is exactly what the [Find Rem picker](Utilities.md#find-rem-reference-or-open) exploits).
 - **Type & flags** (Concept/Descriptor, isProperty/isSlot/isPowerup…), **literal character count**, **Unicode normalization** (NFC vs NFD), **hidden/zero-width characters**, **leading/trailing whitespace** — rarer causes of invisibility, each ruled in or out.
 - **Aliases**, **duplicate same-name Rems**, and the **ancestor chain** (flagging search-excluding powerups such as `SuperPrivate`, `SearchPortal`, `ImportedDocument`, `RestoredFromTrash`).
 - **`timesSelectedInSearch`** and reference counts.
@@ -593,7 +593,7 @@ Run it on a Rem that *works* and one that *doesn't* to compare — the differenc
 
 ### The Fix
 
-There is **no API to boost a Rem's search ranking**, and the Rem itself is healthy — so the solution is to bypass RemNote's ranking. Use the **[Find Rem — Reference or Open](Utilities.md#find-rem--reference-or-open)** picker (`Opt+Shift+F`): it searches each word separately and floats the exact-name match to the top, so you can insert a reference or open the otherwise-invisible Rem.
+There is **no API to boost a Rem's search ranking**, and the Rem itself is healthy — so the solution is to bypass RemNote's ranking. Use the **[Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open)** picker (`Opt+Shift+F`): it searches each word separately and floats the exact-name match to the top, so you can insert a reference or open the otherwise-invisible Rem.
 
 ---
 

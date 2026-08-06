@@ -205,7 +205,7 @@ In **Full Mode**, the plugin **automatically cascades inheritance** whenever you
 
 *   The cascade runs silently in the background — the popup closes immediately with no delay.
 *   Descendants with `inherited` card priority (that haven't been manually overridden) update automatically.
-*   The cascade only touches descendants that **actually own flashcards** (and existing inheritance anchors). Non-flashcard nodes — tag slots, property values, list items — are never tagged; they still inherit the priority dynamically without a physical `cardPriority` tag. (Earlier versions tagged the whole subtree indiscriminately, which produced [rogue CardPriority tags](Troubleshooting.md#-rogue-cardpriority-tags-sanitization); fixed in v0.2.272.)
+*   The cascade only touches descendants that **actually own flashcards** (and existing inheritance anchors). Non-flashcard nodes — tag slots, property values, list items — are never tagged; they still inherit the priority dynamically without a physical `cardPriority` tag. (Earlier versions tagged the whole subtree indiscriminately, which produced [rogue CardPriority tags](Troubleshooting.md#rogue-cardpriority-tags-sanitization); fixed in v0.2.272.)
 *   This covers both **Flashcard priority** saves and **Incremental Rem priority** saves (for descendants whose inherited card priority traces back to that IncRem).
 *   **Requests are consolidated, not queued one-by-one.** Rapid consecutive saves and bulk operations accumulate into a single cascade pass: duplicate Rems are dropped, and where several changed Rems share a subtree that subtree is walked once rather than once per Rem. A cascade already in flight absorbs anything requested while it runs and sweeps it up at the end, still in one pass.
 
