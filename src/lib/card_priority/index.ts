@@ -423,8 +423,27 @@ export async function getDueCardsWithPriorities(
 }
 
 /**
- * FALLBACK: Slow version for when cache doesn't exist
- * Also optimized to avoid rem.getCards() - uses plugin.card.getAll() instead
+ * Cache-less path for gathering due cards with their priorities.
+ *
+ * NOT merely a degraded fallback: it is the ONLY path on mobile and in the web
+ * browser, where Light Mode never builds the card-priority cache yet users still
+ * rely on card priorities. Priority Review Documents there depend on this.
+ *
+ * It needs KB-wide data — due-card counts for every rem in scope, where the scope
+ * can be the whole knowledge base — so plugin.card.getAll() is the right call
+ * here, unlike the per-rem questions elsewhere that were answered with it. It
+ * runs once per user-initiated document build, not on any interactive path.
+ *
+ * The one case it must not serve is flashcard prioritisation being switched off.
+ * The cache is then empty by design, so cache-emptiness alone would route every
+ * such build straight into a full card-database load — to build a flashcard
+ * section for a user who opted out, whose autoAssignCardPriority writes the
+ * source rule would refuse anyway. Flashcards in Priority Review Documents are
+ * listed in that setting's own description as part of what it enables.
+ *
+ * Guarded here, at the owner of the getAll, rather than at the caller: six
+ * cascade triggers taught us that per-call-site gating is the kind that gets
+ * missed when a seventh caller appears.
  */
 async function getDueCardsWithPrioritiesSlow(
   plugin: RNPlugin,
@@ -439,6 +458,14 @@ async function getDueCardsWithPrioritiesSlow(
     source: PrioritySource;
   }>
 > {
+  if (!(await getIESetting(plugin, enableFlashcardPrioritisationId))) {
+    console.log(
+      '[getDueCardsWithPrioritiesSlow] Skipped — flashcard prioritisation is off, so no card ' +
+        'database load. Incremental Rems are unaffected.'
+    );
+    return [];
+  }
+
   console.log(`[getDueCardsWithPrioritiesSlow] Starting fallback gathering...`);
 
   const results: Array<{
