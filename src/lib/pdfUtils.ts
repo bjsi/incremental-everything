@@ -3,6 +3,17 @@ import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin
 import { powerupCode, allIncrementalRemKey } from './consts';
 import { IncrementalRem } from './incremental_rem/types';
 import { resolveRemTextToString, resolveRemTextForBreadcrumb } from './richTextRemRefs';
+import {
+  loadPdfState,
+  savePdfState,
+  updateSourceState,
+  normalizeHistory,
+  PAGE_HISTORY_LIMIT,
+  getCurrentPageKey,
+  getPageRangeKey,
+  getPageHistoryKey,
+  type PageHistoryEntry,
+} from './pdf_state';
 
 export interface PageRangeContext {
   incrementalRemId: RemId | null;
@@ -19,15 +30,11 @@ export interface PageRangeContext {
 }
 
 /**
- * Enhanced structure for page history entries with duration tracking
+ * Enhanced structure for page history entries with duration tracking.
+ * Defined by the state module that persists it; re-exported here because most
+ * callers reach it through this file.
  */
-export interface PageHistoryEntry {
-  // Optional: HTML articles and PDF Text Reader highlights have no page number.
-  page?: number;
-  timestamp: number;
-  sessionDuration?: number;   // Duration in seconds for this reading session
-  highlightId?: string;       // Rem ID of the specific highlight mapped to this bookmark
-}
+export type { PageHistoryEntry } from './pdf_state';
 
 /**
  * Safely convert rem text to string, handling all edge cases
@@ -131,23 +138,15 @@ const extractTextManually = (richText: any): string => {
   return text.trim();
 };
 
-/**
- * Generate key for storing current page position per incremental rem
- */
-export const getCurrentPageKey = (incrementalRemId: string, pdfRemId: string) =>
-  `incremental_current_page_${incrementalRemId}_${pdfRemId}`;
-
-/**
- * Generate key for storing page range per incremental rem  
- */
-export const getPageRangeKey = (incrementalRemId: string, pdfRemId: string) =>
-  `incremental_page_range_${incrementalRemId}_${pdfRemId}`;
-
-/**
- * Generate key for storing page history per incremental rem
- */
-export const getPageHistoryKey = (incrementalRemId: string, pdfRemId: string) =>
-  `incremental_page_history_${incrementalRemId}_${pdfRemId}`;
+// The legacy synced-key builders now live alongside the state module that
+// migrates away from them. Re-exported here so existing importers — and the
+// storage audit, which still probes for these keys — keep working unchanged.
+export {
+  getCurrentPageKey,
+  getPageRangeKey,
+  getPageHistoryKey,
+  getActivePdfKey,
+} from './pdf_state';
 
 /**
  * Get the current reading position for an incremental rem
@@ -157,9 +156,9 @@ export const getIncrementalReadingPosition = async (
   incrementalRemId: string,
   pdfRemId: string
 ): Promise<number | null> => {
-  const pageKey = getCurrentPageKey(incrementalRemId, pdfRemId);
-  const savedPage = await plugin.storage.getSynced(pageKey);
-  return typeof savedPage === 'number' ? savedPage : null;
+  const { state } = await loadPdfState(plugin, incrementalRemId, pdfRemId);
+  const page = state.bySource[pdfRemId]?.page;
+  return typeof page === 'number' ? page : null;
 };
 
 /**
@@ -171,8 +170,7 @@ export const setIncrementalReadingPosition = async (
   pdfRemId: string,
   page: number
 ): Promise<void> => {
-  const pageKey = getCurrentPageKey(incrementalRemId, pdfRemId);
-  await plugin.storage.setSynced(pageKey, page);
+  await updateSourceState(plugin, incrementalRemId, pdfRemId, (s) => ({ ...s, page }));
 };
 
 /**
@@ -183,11 +181,9 @@ export const getIncrementalPageRange = async (
   incrementalRemId: string,
   pdfRemId: string
 ): Promise<{ start: number, end: number } | null> => {
-  const rangeKey = getPageRangeKey(incrementalRemId, pdfRemId);
-  const savedRange = await plugin.storage.getSynced(rangeKey);
-  return savedRange && typeof savedRange === 'object' && 'start' in savedRange
-    ? savedRange as { start: number, end: number }
-    : null;
+  const { state } = await loadPdfState(plugin, incrementalRemId, pdfRemId);
+  const range = state.bySource[pdfRemId]?.range;
+  return range && typeof range === 'object' && 'start' in range ? range : null;
 };
 
 /**
@@ -200,8 +196,43 @@ export const setIncrementalPageRange = async (
   start: number,
   end: number
 ): Promise<void> => {
-  const rangeKey = getPageRangeKey(incrementalRemId, pdfRemId);
-  await plugin.storage.setSynced(rangeKey, { start, end });
+  await updateSourceState(plugin, incrementalRemId, pdfRemId, (s) => ({
+    ...s,
+    range: { start, end },
+  }));
+};
+
+/**
+ * Replace the whole page history for one source. Used by the diagnostic tools
+ * that rewrite history (e.g. stripping inflated session durations); ordinary
+ * recording goes through addPageToHistory.
+ */
+export const setPageHistory = async (
+  plugin: RNPlugin,
+  incrementalRemId: string,
+  pdfRemId: string,
+  entries: PageHistoryEntry[]
+): Promise<void> => {
+  await updateSourceState(plugin, incrementalRemId, pdfRemId, (s) => ({
+    ...s,
+    history: entries.slice(-PAGE_HISTORY_LIMIT),
+  }));
+};
+
+/**
+ * Clear the page range for an incremental rem, leaving its position and history
+ * untouched. Callers used to write `null` to the range key directly; with the
+ * state on the Rem, "no range" means the field is absent.
+ */
+export const clearIncrementalPageRange = async (
+  plugin: RNPlugin,
+  incrementalRemId: string,
+  pdfRemId: string
+): Promise<void> => {
+  await updateSourceState(plugin, incrementalRemId, pdfRemId, ({ range, ...rest }) => rest);
+  // Also blank the legacy key, or the migration fallback could restore the range
+  // the user just cleared.
+  await plugin.storage.setSynced(getPageRangeKey(incrementalRemId, pdfRemId), null);
 };
 
 /**
@@ -212,32 +243,10 @@ export const getPageHistory = async (
   incrementalRemId: string,
   pdfRemId: string
 ): Promise<PageHistoryEntry[]> => {
-  const historyKey = getPageHistoryKey(incrementalRemId, pdfRemId);
-  const history = await plugin.storage.getSynced(historyKey);
-
-  // Handle both old format (just numbers) and new format (with timestamps)
-  if (Array.isArray(history)) {
-    return history.map(entry => {
-      if (typeof entry === 'number') {
-        // Old format: just page number, no timestamp
-        return { page: entry, timestamp: 0 };
-      } else if (entry && (typeof entry.page === 'number' || entry.highlightId)) {
-        // Accept entries with a real page number (PDF Reader) OR with a
-        // highlightId but no page (HTML / PDF Text Reader bookmarks).
-        return {
-          page: typeof entry.page === 'number' ? entry.page : undefined,
-          timestamp: entry.timestamp || 0,
-          sessionDuration: entry.sessionDuration,
-          highlightId: entry.highlightId
-        };
-      } else {
-        // Invalid entry
-        return null;
-      }
-    }).filter(Boolean) as PageHistoryEntry[];
-  }
-
-  return [];
+  const { state } = await loadPdfState(plugin, incrementalRemId, pdfRemId);
+  // normalizeHistory handles both historical shapes — a bare array of page
+  // numbers, and the later entry objects.
+  return normalizeHistory(state.bySource[pdfRemId]?.history);
 };
 
 /**
@@ -261,7 +270,11 @@ export const addPageToHistory = async (
 ): Promise<void> => {
   console.log(`[addPageToHistory] Triggered for Rem: ${incrementalRemId}`);
 
-  const historyKey = getPageHistoryKey(incrementalRemId, pdfRemId);
+  // One load, one save: position, history and the write all come from the same
+  // property, so reading each through its own accessor would cost three round
+  // trips to build a single entry.
+  const loaded = await loadPdfState(plugin, incrementalRemId, pdfRemId);
+  const source = loaded.state.bySource[pdfRemId] || {};
 
   // Get the page to record. `null` = explicit "no page" (HTML/text reader).
   let page: number | undefined;
@@ -271,7 +284,7 @@ export const addPageToHistory = async (
     page = pageToRecord;
   } else {
     // Get the actual current reading position instead of defaulting to 1
-    const currentPage = await getIncrementalReadingPosition(plugin, incrementalRemId, pdfRemId);
+    const currentPage = typeof source.page === 'number' ? source.page : null;
     page = currentPage || 1;
   }
 
@@ -287,7 +300,7 @@ export const addPageToHistory = async (
     sessionDuration = sessionDurationOverride;
   }
 
-  const history = await getPageHistory(plugin, incrementalRemId, pdfRemId);
+  const history = normalizeHistory(source.history);
 
   // Bookmark preservation: when no highlightId is supplied (e.g. queue "Next",
   // session-end timers, manual page save) but the most-recent same-page entry
@@ -317,10 +330,12 @@ export const addPageToHistory = async (
 
   history.push(entry);
 
-  // Keep only last 100 entries to avoid storage bloat
-  const trimmedHistory = history.slice(-100);
-
-  await plugin.storage.setSynced(historyKey, trimmedHistory);
+  // Keep only the last N entries to avoid unbounded growth
+  loaded.state.bySource[pdfRemId] = {
+    ...source,
+    history: history.slice(-PAGE_HISTORY_LIMIT),
+  };
+  await savePdfState(loaded);
 };
 
 /**
@@ -456,16 +471,41 @@ export const findIncrementalRemForPDFFast = async (
     } catch (e) { /* ignore */ }
   }
 
-  // 3. Known-rems cache — check if any stored rem is incremental and has this PDF
+  // 3. Known-rems cache — check if any stored rem is incremental AND still has
+  //    this PDF as a source.
+  //
+  //    The source check is not optional. The index is a cache of past
+  //    associations and goes stale: a chapter IncRem whose PDF source was removed
+  //    stays listed until some other path happens to trim it. Trusting the entry
+  //    on `hasPowerup` alone would resolve that detached rem as "the IncRem for
+  //    this PDF" and open the wrong chapter — silently, and preferentially, since
+  //    this is the fast path that runs before any fuller search.
+  //
+  //    `findPDFinRem` is the same predicate getInstantRemsForPDF verifies with, so
+  //    the two agree on what "associated" means. It is the more expensive call, so
+  //    the cheap hasPowerup filter runs first. Stale ids are skipped, not deleted:
+  //    this is a read path, and the self-heal in getInstantRemsForPDF owns pruning.
   const knownRemsKey = getKnownPdfRemsKey(pdfRem._id);
   const knownRemIds = (await plugin.storage.getSynced<string[]>(knownRemsKey)) || [];
+  let staleSkipped = 0;
   for (const remId of knownRemIds) {
     const rem = await plugin.rem.findOne(remId);
     if (!rem) continue;
-    if (await rem.hasPowerup(powerupCode)) {
-      console.log(`[findIncRemFast] Found via known-rems cache (${remId})`);
-      return rem;
+    if (!(await rem.hasPowerup(powerupCode))) continue;
+
+    const stillHasPdf = await findPDFinRem(plugin, rem, pdfRem._id);
+    if (!stillHasPdf) {
+      staleSkipped++;
+      continue;
     }
+
+    console.log(`[findIncRemFast] Found via known-rems cache (${remId})`);
+    return rem;
+  }
+  if (staleSkipped > 0) {
+    console.log(
+      `[findIncRemFast] Skipped ${staleSkipped} stale known-rems entr(ies) — incremental, but this PDF is no longer one of their sources.`
+    );
   }
 
   // 4. Expensive full scan as last resort
@@ -663,7 +703,6 @@ export const getAllPDFsInRem = async (
  * Lets the user pin a non-preferred PDF as the focus of their work without
  * editing tags.
  */
-export const getActivePdfKey = (incRemId: string) => `active_pdf_for_${incRemId}`;
 
 /**
  * Pin a PDF as the active one for an IncRem. Pass `null` to clear the pin.
@@ -673,7 +712,9 @@ export const setActivePdfForIncRem = async (
   incRemId: string,
   pdfRemId: string | null
 ): Promise<void> => {
-  await plugin.storage.setSynced(getActivePdfKey(incRemId), pdfRemId);
+  const loaded = await loadPdfState(plugin, incRemId);
+  loaded.state.active = pdfRemId ?? undefined;
+  await savePdfState(loaded);
 };
 
 /**
@@ -700,12 +741,14 @@ export const getActivePdfForIncRem = async (
   if (allPdfs.length === 1) return allPdfs[0].rem;
 
   // 1. Explicit active PDF
-  const activeId = await plugin.storage.getSynced<string>(getActivePdfKey(rem._id));
+  const loaded = await loadPdfState(plugin, rem._id);
+  const activeId = loaded.state.active;
   if (activeId) {
     const match = allPdfs.find(p => p.rem._id === activeId);
     if (match) return match.rem;
     // Stored PDF is no longer a source — clear the stale pin.
-    await plugin.storage.setSynced(getActivePdfKey(rem._id), null);
+    loaded.state.active = undefined;
+    await savePdfState(loaded);
   }
 
   // 2. Preferred PDF (#preferthispdf)
@@ -1279,13 +1322,19 @@ export const clearIncrementalPDFData = async (
   incrementalRemId: string,
   pdfRemId: string
 ): Promise<void> => {
-  const pageKey = getCurrentPageKey(incrementalRemId, pdfRemId);
-  const rangeKey = getPageRangeKey(incrementalRemId, pdfRemId);
-  const historyKey = getPageHistoryKey(incrementalRemId, pdfRemId);
+  // Drop this source's slice from the property. The legacy keys are also blanked
+  // so a later read cannot resurrect what the user just cleared through the
+  // migration fallback — blanking does not free the key, but it does clear the
+  // value, which is what matters here.
+  const loaded = await loadPdfState(plugin, incrementalRemId);
+  if (loaded.state.bySource[pdfRemId]) {
+    delete loaded.state.bySource[pdfRemId];
+    await savePdfState(loaded);
+  }
 
-  await plugin.storage.setSynced(pageKey, null);
-  await plugin.storage.setSynced(rangeKey, null);
-  await plugin.storage.setSynced(historyKey, null);
+  await plugin.storage.setSynced(getCurrentPageKey(incrementalRemId, pdfRemId), null);
+  await plugin.storage.setSynced(getPageRangeKey(incrementalRemId, pdfRemId), null);
+  await plugin.storage.setSynced(getPageHistoryKey(incrementalRemId, pdfRemId), null);
 };
 
 /**

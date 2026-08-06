@@ -50,7 +50,7 @@ import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
-import { safeRemTextToString, getCurrentPageKey, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
+import { safeRemTextToString, getIncrementalReadingPosition, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
 import { getHoveredReference } from './events';
 import { transferToDismissed } from '../lib/dismissed';
 import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
@@ -2499,8 +2499,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       if (remType === 'pdf') {
         const pdfRem = await getActivePdfForIncRem(plugin, rem);
         if (pdfRem) {
-          const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
-          const currentPage = await plugin.storage.getSynced<number>(pageKey);
+          const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRem._id);
           if (currentPage) {
             await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);
           }

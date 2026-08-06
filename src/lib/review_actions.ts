@@ -1,5 +1,5 @@
 import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
-import { getActivePdfForIncRem, getCurrentPageKey, addPageToHistory, safeRemTextToString } from './pdfUtils';
+import { getActivePdfForIncRem, getIncrementalReadingPosition, addPageToHistory, safeRemTextToString } from './pdfUtils';
 import { getIncrementalRemFromRem, updateReviewRemData } from './incremental_rem';
 import { incremReviewStartTimeKey } from './consts';
 import { determineIncRemType } from './incRemHelpers';
@@ -19,8 +19,7 @@ export const handleReviewInEditorRem = async (
     if (remType === 'pdf') {
         const pdfRem = await getActivePdfForIncRem(plugin, rem);
         if (pdfRem) {
-            const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
-            const currentPage = await plugin.storage.getSynced<number>(pageKey);
+            const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRem._id);
 
             if (currentPage) {
                 await addPageToHistory(plugin, rem._id, pdfRem._id, currentPage);

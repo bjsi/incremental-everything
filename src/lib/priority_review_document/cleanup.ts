@@ -1,29 +1,19 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
 import { GRAPH_DATA_KEY_PREFIX, REVIEW_GRAPH_INDEX_KEY } from '../consts';
 
+// LEGACY. Graph data now lives on the graph Rem itself (see ./graph_data.ts), so
+// nothing registers new entries here any more and no new orphans are created —
+// deleting a Priority Review Document now takes its graph data with it.
+//
+// What remains is a sweep over the entries written BEFORE that change. It can
+// only blank their values, not delete the keys (plugin storage has no deletion
+// API and writing null does not release the slot), so its benefit is limited to
+// reclaiming the bytes of graphs whose Rem is gone. Retire this once RemNote
+// ships deletion and the ledger sweep in STORAGE_PLAN.md Phase 7 can run.
+
 interface ReviewGraphIndexEntry {
   remId: string;
   createdAt: number;
-}
-
-/**
- * Registers a newly-written review-graph data entry in the synced index.
- * Call this immediately after `setSynced(GRAPH_DATA_KEY_PREFIX + graphRemId, ...)`.
- * The index is what allows the startup sweep to find orphaned keys later —
- * the SDK has no way to enumerate synced storage keys.
- */
-export async function registerReviewGraphKey(
-  plugin: RNPlugin,
-  graphRemId: string,
-): Promise<void> {
-  try {
-    const list = (await plugin.storage.getSynced<ReviewGraphIndexEntry[]>(REVIEW_GRAPH_INDEX_KEY)) || [];
-    const without = list.filter((e) => e.remId !== graphRemId);
-    without.push({ remId: graphRemId, createdAt: Date.now() });
-    await plugin.storage.setSynced(REVIEW_GRAPH_INDEX_KEY, without);
-  } catch (err) {
-    console.warn('[ReviewGraphCleanup] Failed to register key', graphRemId, err);
-  }
 }
 
 /**

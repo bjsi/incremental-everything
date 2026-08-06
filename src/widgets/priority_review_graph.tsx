@@ -10,7 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { GRAPH_DATA_KEY_PREFIX } from '../lib/consts';
+import { loadReviewGraphData } from '../lib/priority_review_document/graph_data';
 
 interface GraphDataPoint {
   range: string;
@@ -40,24 +40,12 @@ function PriorityReviewGraph() {
 
   const remId = context?.remId;
 
-  // Fetch the data and parse it
+  // Reads the graph Rem's own property, falling back to the legacy synced key
+  // (and migrating it across) for documents created before the move. Both
+  // historical value shapes are normalized inside the loader.
   const graphData = useRunAsync(async () => {
     if (!remId) return null;
-    const stored = await plugin.storage.getSynced(GRAPH_DATA_KEY_PREFIX + remId) as any;
-
-    if (!stored) return null;
-
-    // Handle legacy format (just array)
-    if (Array.isArray(stored)) {
-      return { bins: stored, binsRelative: undefined, stats: null };
-    }
-
-    // Handle new format
-    return {
-      bins: stored.bins || [],
-      binsRelative: stored.binsRelative, // May be undefined for older docs created before this update
-      stats: stored.stats || null
-    };
+    return await loadReviewGraphData(plugin, remId);
   }, [remId]);
 
   if (!graphData || !graphData.bins || graphData.bins.length === 0) {

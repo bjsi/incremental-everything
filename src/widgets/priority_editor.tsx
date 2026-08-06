@@ -23,7 +23,8 @@ import {
   getReadingStatistics,
   setIncrementalReadingPosition,
   addPageToHistory,
-  getPageRangeKey,
+  setIncrementalPageRange,
+  clearIncrementalPageRange,
   safeRemTextToString,
   PageHistoryEntry,
 } from '../lib/pdfUtils';
@@ -307,12 +308,11 @@ export function PriorityEditor() {
   const pdfSaveRange = useCallback(async () => {
     if (pdfEdit.mode !== 'range' || !remId || !hostPdfRemId) return;
     const { start, end } = pdfEdit;
-    const rangeKey = getPageRangeKey(remId, hostPdfRemId);
     if (start > 1 || end > 0) {
-      await plugin.storage.setSynced(rangeKey, { start, end });
+      await setIncrementalPageRange(plugin, remId, hostPdfRemId, start, end);
       await plugin.app.toast(`Saved page range: ${start}–${end || '∞'}`);
     } else {
-      await plugin.storage.setSynced(rangeKey, null);
+      await clearIncrementalPageRange(plugin, remId, hostPdfRemId);
       await plugin.app.toast('Cleared page range');
     }
     setPdfEdit({ mode: 'none' });

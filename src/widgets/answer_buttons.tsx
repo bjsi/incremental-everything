@@ -32,7 +32,7 @@ import { getIncrementalRemFromRem, handleNextRepetitionClick, handleNextRepetiti
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRem } from '../lib/incremental_rem';
 import { percentileToHslColor, calculateRelativePercentile, calculateVolumeBasedPercentile, calculateWeightedShield, PERFORMANCE_MODE_LIGHT } from '../lib/utils';
-import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, addPageToHistory, getPageHistory, getCurrentPageKey, getDescendantsToDepth, resolveSessionBookmarkCarry } from '../lib/pdfUtils';
+import { safeRemTextToString, getActivePdfForIncRem, findHTMLinRem, addPageToHistory, getPageHistory, getIncrementalReadingPosition, getDescendantsToDepth, resolveSessionBookmarkCarry } from '../lib/pdfUtils';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
 import { QueueSessionCache, setCardPriority } from '../lib/card_priority';
@@ -345,8 +345,7 @@ export function AnswerButtons() {
     if (remType === 'pdf') {
       const pdfRem = await getActivePdfForIncRem(plugin, rem);
       if (pdfRem) {
-        const pageKey = getCurrentPageKey(rem._id, pdfRem._id);
-        const currentPage = await plugin.storage.getSynced<number>(pageKey);
+        const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRem._id);
 
         if (currentPage) {
           // Carry a session bookmark forward so this reading-time entry does

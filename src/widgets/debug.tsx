@@ -23,6 +23,7 @@ import {
   getAllPDFsInRem,
   getPageHistory,
   getPageHistoryKey,
+  setPageHistory,
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
@@ -1496,10 +1497,12 @@ function Debug() {
     pdfName: string,
     repHistory: Array<{ date: number; reviewTimeSeconds?: number }>
   ): Promise<InflationPdfEntry | null> => {
+    // Page history now lives on the Rem, so a missing legacy key no longer means
+    // "nothing recorded" — read through the accessor and treat an empty history
+    // as nothing to analyse. storageKey is kept for display only.
     const storageKey = getPageHistoryKey(rId, pdfRem._id);
-    const rawStored = await plugin.storage.getSynced(storageKey);
-    if (rawStored == null) return null; // no key present
     const history = await getPageHistory(plugin, rId, pdfRem._id);
+    if (history.length === 0) return null;
 
     const matchesRep = (entry: { timestamp: number; sessionDuration?: number }) => {
       const dur = entry.sessionDuration;
@@ -1628,8 +1631,8 @@ function Debug() {
     try {
       for (const p of inflationPreview.perPdf) {
         if (p.stripCount === 0) continue;
-        await plugin.storage.setSynced(p.storageKey, p.patched);
-        console.log(`[InflationCleanup] Rewrote ${p.storageKey} — stripped ${p.stripCount} entr(ies).`);
+        await setPageHistory(plugin, remId!, p.pdfRemId, p.patched);
+        console.log(`[InflationCleanup] Rewrote page history for ${remId}/${p.pdfRemId} — stripped ${p.stripCount} entr(ies).`);
       }
       await plugin.app.toast(`Cleanup applied. Stripped ${totalStrip} entr(ies).`);
       setInflationPreview(null);
@@ -1746,9 +1749,9 @@ function Debug() {
       let rewritten = 0;
       for (const r of globalInflationPreview.perRem) {
         for (const p of r.perPdf) {
-          await plugin.storage.setSynced(p.storageKey, p.patched);
+          await setPageHistory(plugin, r.remId, p.pdfRemId, p.patched);
           rewritten++;
-          console.log(`[GlobalInflationCleanup] Rewrote ${p.storageKey} — stripped ${p.stripCount} entr(ies).`);
+          console.log(`[GlobalInflationCleanup] Rewrote page history for ${r.remId}/${p.pdfRemId} — stripped ${p.stripCount} entr(ies).`);
         }
       }
       await plugin.app.toast(`Global cleanup applied. Rewrote ${rewritten} key(s), stripped ${globalInflationPreview.totalStripCount} entr(ies).`);

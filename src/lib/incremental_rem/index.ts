@@ -17,7 +17,9 @@ import {
   currentIncRemKey,
   incremReviewStartTimeKey,
   pendingQueueDashboardRefocusKey,
+  dismissedPowerupCode,
 } from '../consts';
+import { readRawPdfState, writeRawPdfState } from '../pdf_state';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
 import { IncrementalRem, IncrementalRep } from './types';
 import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
@@ -451,6 +453,12 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
 
     let triggeredCascade = false;
     try {
+      // Read any PDF reading state parked on the Dismissed powerup BEFORE the
+      // merge below, which removes that powerup and would take the property with
+      // it. It is written back after the Incremental powerup is attached — a
+      // property cannot be set for a powerup the Rem does not yet carry.
+      const carriedPdfState = await readRawPdfState(rem, dismissedPowerupCode);
+
       // Independent reads — run concurrently instead of serially. The dismissed-history
       // merge and the two settings lookups don't depend on one another.
       const [dismissedHistory, initialIntervalSetting, defaultPrioritySetting] = await Promise.all([
@@ -519,6 +527,12 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
           rem.setPowerupProperty(powerupCode, originalIncrementalDateSlotCode, todayRef)
         );
       }
+      // Restore the reading state carried over from a previous dismissal, so a
+      // Rem revived with Opt+X resumes at the page it was left on.
+      if (carriedPdfState) {
+        slotWrites.push(writeRawPdfState(rem, powerupCode, carriedPdfState));
+      }
+
       await Promise.all(slotWrites);
 
       // Band sync for the initial priority. Deliberately NOT routed through
