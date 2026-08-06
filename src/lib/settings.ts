@@ -14,10 +14,11 @@
  *
  * - `popup`  — stored in the plugin's own synced blob and edited in the IE
  *   Settings popup, which can group and layer them properly.
- * - `native` — left in RemNote's plugin settings panel. These are the switches
- *   that make IE do *less*; they must stay reachable when IE itself is slow,
- *   broken, or mid-crash, which a plugin-hosted popup cannot promise. The SDK
- *   has no setter for a registered setting, so the popup shows them read-only.
+ * - `native` — left in RemNote's plugin settings panel. These govern how much
+ *   work the plugin is allowed to do, and RemNote's own panel is where someone
+ *   chasing a performance problem looks first — long before they discover that
+ *   this plugin has a settings window of its own. The SDK has no setter for a
+ *   registered setting, so the popup shows them read-only.
  *
  * Why the defaults table is load-bearing: `plugin.settings.getSetting` resolves
  * a setting through its *registration record* and reads `defaultValue` off it.
@@ -218,7 +219,7 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     label: 'Performance',
     blurb:
       'How much work the plugin is allowed to do, and where. Kept in RemNote\'s own settings ' +
-      'panel so they stay reachable if the plugin is slow to load.',
+      'panel, because that is where you would look first if the plugin felt heavy.',
     helpPath: 'Full-Mode-x-Light-Mode/',
   },
   scheduling: {
@@ -244,6 +245,20 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
 /** Documentation site the "?" help links point at. */
 export const IE_DOCS_BASE_URL = 'https://hugomarins.github.io/incremental-everything/';
 
+/**
+ * Appended to the description of the LAST native-tier setting, which is where it
+ * lands at the bottom of the plugin's section in RemNote's settings panel.
+ *
+ * RemNote renders only a title and a description per setting — there is no room
+ * for a heading, a footer or a link of our own — so the tail of the last
+ * description is the single spot available to tell someone reading that panel
+ * that the other twenty-eight settings are elsewhere.
+ */
+export const MORE_SETTINGS_POINTER =
+  'MORE SETTINGS: these are only the performance switches. Every other Incremental Everything ' +
+  'setting lives in the plugin\'s own settings window — run the "Incremental Everything: ' +
+  'Settings" command from the omnibar (quick code: ies).';
+
 interface SettingSpecBase {
   title: string;
   description: string;
@@ -255,6 +270,12 @@ interface SettingSpecBase {
   helpPath?: string;
   /** Rendered as a prominent warning box above the control in the popup. */
   warning?: string;
+  /**
+   * Appended as the very last line of this setting's description in RemNote's
+   * settings panel — after the docs link and the reload note. Panel-only: the
+   * popup does not render it. See MORE_SETTINGS_POINTER.
+   */
+  panelFooter?: string;
   /**
    * Hide this setting in the popup unless another setting holds a given value —
    * for parameters that only mean something once the feature they configure is
@@ -646,6 +667,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Uninstall the standalone plugin first, then reload RemNote.\n\n' +
       '"Remove Parent" and "Remove Grandparent" are always registered, since the Cloze and Extract ' +
       'creators depend on them.',
+    // Last native-tier setting in registration order, so this lands at the very
+    // bottom of the plugin's section in RemNote's panel.
+    panelFooter: MORE_SETTINGS_POINTER,
   },
 
   // --- Misc ---

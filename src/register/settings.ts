@@ -96,6 +96,9 @@ function panelDescription(spec: SettingSpec): string {
   parts.push(spec.description);
   if (spec.helpPath) parts.push(`Documentation: ${IE_DOCS_BASE_URL}${spec.helpPath}`);
   if (spec.reloadRequired) parts.push('Takes effect after reloading RemNote.');
+  // Last, deliberately: on the final setting of the panel this is the pointer to
+  // the settings popup, and it should read as the closing line of the section.
+  if (spec.panelFooter) parts.push(spec.panelFooter);
   return parts.join('\n\n');
 }
 

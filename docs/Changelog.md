@@ -12,7 +12,7 @@ It also hides what does not apply. The Beta Scheduler's *First Review Interval* 
 
 Your existing settings are carried over on first load — nothing to re-enter — and the ones that moved disappear from RemNote's panel afterwards.
 
-**Five settings deliberately stay in RemNote's panel**: *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches and *Enable Hide-in-Queue Powerups and Commands*. Those are the switches that make the plugin do **less**, and they have to stay reachable when the plugin itself is slow to load or failing — which a window drawn by the plugin cannot promise. They are shown in the popup too, read-only, pointing at where to change them.
+**Five settings deliberately stay in RemNote's panel**: *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches and *Enable Hide-in-Queue Powerups and Commands*. Those govern how much work the plugin is allowed to do, and RemNote's own panel is where you would go looking if it ever felt heavy — quite possibly before you knew this popup existed. They are shown in the popup too, read-only, pointing at where to change them.
 
 📖 [Plugin Settings Reference → Where the settings are](Plugin-Settings-Reference.md#where-the-settings-are)
 
@@ -36,13 +36,9 @@ The old switch was a double negative that shipped on. If you had turned *Skip Ma
 
 📖 [History, Queue Dashboard & Mastery Drill → Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
 
-### ⚡ Improved: the plugin no longer reads your whole card database while you work
+### ⚡ Improved: far fewer full card-database reads, as RemNote asked
 
-Four separate operations answered small questions by loading every flashcard in the knowledge base. The worst ran on **every priority change**, cascading inherited priorities to descendants — around 29 seconds per save on a large library. Another ran each time the priority popup opened on an ordinary Rem, loading the entire card database to establish that the Rem has no flashcards. A third did it to render a count in a label; a fourth to check a single Rem.
-
-All four now read the priority cache that was already built for them, or ask about the specific Rems involved. Nothing of the kind remains on any path you touch while editing or reviewing; the remaining whole-database reads are one-off operations you start yourself, such as building a Priority Review Document on mobile, where no cache exists.
-
-Priority inheritance also propagates on **mobile and in the web browser** now. It used to be skipped there because it was too expensive to run — the cost was the database load, not the work itself.
+Following RemNote's request that plugins stop loading unbounded numbers of Rems, four operations that used `card.getAll()` now read the priority cache already built for them, or ask only about the Rems involved — leaving no whole-database read on any path you touch while editing or reviewing. A welcome side effect: priority inheritance now propagates on **mobile and in the web browser**, where it used to be skipped because the database load made it too expensive.
 
 📖 [Full Mode × Light Mode](Full-Mode-x-Light-Mode.md)
 

@@ -22,8 +22,8 @@ import {
  *
  * Native-tier settings (see lib/settings.ts) are shown read-only with a pointer
  * to RemNote's panel: the SDK has no setter for a registered setting, and those
- * particular ones are deliberately kept where they stay reachable when the
- * plugin itself is misbehaving.
+ * particular ones are deliberately kept where someone chasing a performance
+ * problem would look for them.
  */
 
 const openDocs = (path: string) => {
@@ -267,8 +267,8 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
         {control()}
         {readOnly ? (
           <span style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
-            Change this in Settings → Plugins → Incremental Everything. It is kept there on purpose, so it stays
-            reachable if the plugin is slow or failing to load.
+            Change this in Settings → Plugins → Incremental Everything. It is kept there on purpose: that panel
+            is where you would look first if the plugin felt heavy.
           </span>
         ) : (
           modified && (
