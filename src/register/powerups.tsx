@@ -10,6 +10,8 @@ import {
   repHistorySlotCode,
   originalIncrementalDateSlotCode,
   priorityGraphPowerupCode,
+  priorityGraphDataSlotCode,
+  pdfStateSlotCode,
   dismissedPowerupCode,
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
@@ -69,6 +71,15 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
           hidden: true,
         },
         {
+          // PDF reading state — page, range, page history and active PDF, as
+          // serialized JSON. Machine state, so hidden and programmatic-only.
+          code: pdfStateSlotCode,
+          name: 'Reading State',
+          propertyType: PropertyType.TEXT,
+          hidden: true,
+          onlyProgrammaticModifying: true,
+        },
+        {
           code: originalIncrementalDateSlotCode,
           name: 'Created',
           propertyType: PropertyType.DATE,
@@ -112,7 +123,17 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
     code: priorityGraphPowerupCode,
     description: 'Displays a distribution graph of priorities for items in this document.',
     options: {
-      slots: [] // No special slots needed, we just use the tag as a trigger
+      slots: [
+        {
+          // The graph's own data, as serialized JSON. Hidden and
+          // programmatic-only: it is machine state, not something to edit by hand.
+          code: priorityGraphDataSlotCode,
+          name: 'Graph Data',
+          propertyType: PropertyType.TEXT,
+          hidden: true,
+          onlyProgrammaticModifying: true,
+        },
+      ],
     }
   });
 
@@ -135,6 +156,16 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
           name: 'Dismissed Date',
           propertyType: PropertyType.DATE,
           hidden: true,
+        },
+        {
+          // Mirror of the Incremental powerup's slot, same code and same shape.
+          // Dismissal removes the Incremental powerup, so the reading state is
+          // copied here to survive it and copied back on re-activation.
+          code: pdfStateSlotCode,
+          name: 'Reading State',
+          propertyType: PropertyType.TEXT,
+          hidden: true,
+          onlyProgrammaticModifying: true,
         },
       ],
     },

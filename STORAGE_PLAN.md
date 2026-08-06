@@ -2,7 +2,7 @@
 
 Working document for reducing what Incremental Everything keeps in RemNote's plugin synced storage. Pick it up at "Phases" — the sections above it exist so the decisions don't have to be re-derived.
 
-Last measured: **2026-08-05**. Last updated: 2026-08-05.
+Last measured: **2026-08-05**. Last updated: 2026-08-05 (Phases 2, 3 and 5 done).
 
 ---
 
@@ -123,21 +123,37 @@ Ordered by value now that only the 900 KB per-value limit is enforced.
 
 Accept knowingly: the rebuild is the existing "slow phase" full-tree walk, so a new device pays it once per PDF. Local (not session) storage keeps that cost paid once per device. A rebuild also silently drops the historical pollution in the large keys — that 183 KB entry is mostly junk from an old bug, and nothing derivable will reproduce it.
 
-### ▶ Phase 2 — Fix `findIncRemFast` source verification
-A correctness bug independent of storage: it resolves "the IncRem for this PDF" without confirming the candidate still has the PDF as a source. Small, self-contained.
+### ✅ Phase 2 — Fix `findIncRemFast` source verification *(done)*
+It resolved "the IncRem for this PDF" from the known-rems index without confirming the candidate still had the PDF as a source, so a detached chapter could be returned — and would beat a correctly-sourced rem sitting later in the same list. Now verifies with `findPDFinRem`, the same predicate `getInstantRemsForPDF` uses, after the cheap `hasPowerup` filter. Stale ids are skipped and counted in a log line (a useful measure of how polluted a PDF's index is), not deleted: this is a read path, and pruning stays owned by the self-heal.
 
-### ⏸ Phase 3 — PDF reading state onto the rem
+### ✅ Phase 3 — PDF reading state onto the rem *(done)*
 **Removes ~464 keys, ~161 KB.** Also delivers history durability for detached chapters.
 
-One hidden slot on the Incremental powerup: `{v:1, bySource: {[pdfRemId]: {page, range, history}}}` — collapsing current page, page range, page history and active PDF into a single versioned property. Keep the existing history cap. **Debounce the writes**: a page turn currently costs a plugin-storage write; on a rem it becomes a KB edit, so writing per turn trades a storage problem for sync churn.
+State lives in [`pdf_state.ts`](src/lib/pdf_state.ts) as `{v:1, active?, bySource: {[pdfRemId]: {page, range, history}}}` in one hidden, `onlyProgrammaticModifying` slot — collapsing current page, page range, page history *and* active PDF into a single property per Rem, however many PDFs it draws on. History keeps its 100-entry cap per source.
 
-Needs first: a small helper module — `getRemJson` / `setRemJson` over hidden, `onlyProgrammaticModifying` slots with JSON serialized to string, plus `readWithLegacyFallback(remGetter, syncedGetter)` for read-through migration. No bulk migration passes anywhere.
+**The slot is registered on BOTH the Incremental and Dismissed powerups**, same code, same shape. Dismissal removes the Incremental powerup, which would take the property with it, so `transferToDismissed` copies the serialized string across — after the Dismissed powerup is attached, before the caller removes the Incremental one. `initIncrementalRem` reads it back off the Dismissed powerup *before* `mergeHistoryFromDismissed` deletes that powerup, then writes it once the Incremental powerup is attached. Because both sides share a shape, transfer is a string copy; re-dismissal merges per source with the newer value winning.
+
+A separate slot rather than folding into the history slot: that slot holds `IncrementalRep[]`, read by ~8 modules that all do `tryParseJson(raw) || []` and assume every element is a rep. Wrapping or polluting it would break all of them, for no gain.
+
+Reads migrate per (Rem, PDF) pair on the way past — the legacy key names cannot be enumerated without knowing both ids, so migration is necessarily lazy. Legacy keys are blanked (not deleted — no API) by `clearIncrementalPDFData` and `clearIncrementalPageRange`, so a clear cannot be undone by the fallback resurrecting the old value.
+
+All call sites now route through the accessors in `pdfUtils`, whose signatures are unchanged: three widgets and two libs that wrote the legacy keys directly were converted, and `setPageHistory` / `clearIncrementalPageRange` were added for the two operations that had no accessor. The debug inflation tool's "no key present → skip" check became "empty history → skip", since a migrated Rem legitimately has no legacy key.
+
+**Not done: write debouncing.** A page turn is still one write, now a Rem edit rather than a storage write. Debouncing needs a cross-iframe-safe pending buffer — each widget iframe holds its own module instance, so a naive module-level buffer would make the Reader and the Page Range panel disagree. Revisit if sync churn shows up in practice.
+
+**Known gap:** a Rem dismissed with *no* review history returns early from `transferToDismissed` and never gains the Dismissed powerup, so its reading state is not preserved. Matches how history itself behaves.
 
 ### ⏸ Phase 4 — Small per-rem families
 Parent-selector destinations (114 IncRem + 47 PDF), list-break snapshots (42), debug backups (3), video positions (4). **~210 keys.** The PDF-keyed parent-selector variant needs a home on the PDF rem.
 
-### ⏸ Phase 5 — Review-graph snapshot onto its graph rem
-**13 keys.** The graph rem is plugin-created, so tagging it is invisible, and the data would then die with the document instead of leaking. This family is the purest orphan case: the synced index is empty, so every key ever written is unnameable.
+### ✅ Phase 5 — Review-graph snapshot onto its graph rem *(done)*
+The snapshot now lives in a hidden, programmatic-only `graphData` slot on the **existing** Priority Review Graph powerup the graph Rem already carries — so no new powerup and no extra tagging. Deleting the review document now takes its graph data with it, which is the point: the orphan problem disappears rather than being swept up afterwards.
+
+Reads go property-first, fall back to the legacy `priority_review_graph_data_*` key, and migrate it onto the Rem on the way past — no bulk pass, so pre-existing documents move themselves the first time they are opened. Both historical value shapes (bare bin array, and the later object) are normalized in one place. A malformed property falls back to the legacy key rather than blanking a graph the user can still see.
+
+New code in [`graph_data.ts`](src/lib/priority_review_document/graph_data.ts). `registerReviewGraphKey` is deleted (nothing registers new entries now); `cleanupOrphanedReviewGraphs` stays as a legacy sweep and is documented as such — it can only blank values, never free slots.
+
+Legacy keys are left in place: there is still no deletion API, so they wait for Phase 7.
 
 ### ⏸ Phase 6 — Retention, not migration
 The two doc-level shield keys have **no pruning at all** — add a retention window. Plus the daily-aggregate rollup (daily for ~2 years, monthly before that).

@@ -2,6 +2,29 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.34 - August 5th, 2026
+
+### 🐛 Fixed: a PDF could open the wrong chapter
+
+When a chapter Incremental Rem had its PDF source removed, it could linger in the plugin's index of "rems that use this PDF". Opening that PDF then resolved the *detached* chapter as the one to read — and it did so in preference to a correctly-linked chapter sitting further down the same list, because the lookup took the first entry it found without checking the PDF was still one of that rem's sources. It now checks.
+
+### ♻️ Changed: reading state is stored on the Rem itself
+
+Your **current page, page range, page history, active PDF and read points** used to live in the plugin's own storage, filed under keys built from the Rem's id. They now live on the Rem, in a hidden property.
+
+Nothing changes in how you use any of it, and nothing needs migrating by hand — each item moves itself the first time it is opened. What changes is what happens to it afterwards:
+
+- **Reading history now survives dismissal.** Dismissing a chapter and later making it Incremental again (`Alt+X`) used to leave its reading position behind; the state now travels with the Rem in both directions. This applies to read points on outline-style Rems too, which were similarly lost before.
+- **Reading history now survives losing the PDF source.** If you detach a chapter from its PDF — a common step once a section is processed, since the source pulls every one of the book's highlights into that chapter's scoped queue — the reading history stays on the chapter rather than becoming unreachable.
+- **Deleting a chapter now deletes its reading data.** Previously the plugin had no way to remove those entries, so every deleted chapter left its page position and history behind permanently.
+
+The same move applies to the distribution graph inside a **Priority Review Document**: its data now lives on the graph Rem, so deleting the document takes the graph data with it instead of stranding it.
+
+> [!NOTE]
+> This is the second instalment of a broader cleanup, prompted by the storage limits RemNote introduced in 1.27.16 (see [v1.0.29](#v1029-august-1st-2026)). Around 480 of the plugin's storage entries move onto the Rems they describe. Existing data is read and migrated as you go — there is no upgrade step and nothing to click.
+
+📖 See [PDF Incremental Reading Workflow](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) for how the active PDF is resolved, and [Read Points](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) for outline reading positions.
+
 ## v1.0.33 - August 5th, 2026
 
 ### ✨ New: a settings popup of the plugin's own

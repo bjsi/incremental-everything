@@ -5,13 +5,12 @@ import { getDueCardsWithPriorities } from '../card_priority';
 import {
   allIncrementalRemKey,
   priorityGraphPowerupCode,
-  GRAPH_DATA_KEY_PREFIX,
   allCardPriorityInfoKey
 } from '../consts';
 import { CardPriorityInfo, calculateCardRemPercentilesFromCards } from '../card_priority';
 import { calculateAllPercentiles } from '../utils';
 import { buildComprehensiveScope } from '../scope_helpers';
-import { registerReviewGraphKey } from './cleanup';
+import { saveReviewGraphData } from './graph_data';
 import { safeRemTextToString } from '../pdfUtils';
 import * as _ from 'remeda'; // Ensure remeda is imported for uniqBy if available, or use custom
 
@@ -561,10 +560,10 @@ Created: ${timestamp}`;
       }
     };
 
-    await plugin.storage.setSynced(GRAPH_DATA_KEY_PREFIX + graphRem._id, graphData);
-    // Track this graph Rem so the startup sweep can clear its data later
-    // if the user deletes the Priority Review Document.
-    await registerReviewGraphKey(plugin, graphRem._id);
+    // Stored on the graph Rem itself rather than under a synced key, so it is
+    // deleted along with the review document. Plugin storage has no deletion
+    // API, so the old per-graph keys could only ever be orphaned.
+    await saveReviewGraphData(plugin, graphRem, graphData);
   }
 
 

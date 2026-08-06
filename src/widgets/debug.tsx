@@ -23,6 +23,7 @@ import {
   getAllPDFsInRem,
   getPageHistory,
   getPageHistoryKey,
+  setPageHistory,
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
@@ -1387,8 +1388,11 @@ function Debug() {
       console.log(`\n========== PAGE HISTORY DUMP: ${remId} ==========`);
       for (const { rem: pdfRem } of pdfs) {
         const pdfName = await safeRemTextToString(plugin, pdfRem.text);
+        // Reading state lives on the Rem now; the legacy key is only still read
+        // here to show whether this pair has migrated. `null` next to a populated
+        // parsed history means "migrated", not "data lost".
         const storageKey = getPageHistoryKey(remId, pdfRem._id);
-        const raw = await plugin.storage.getSynced(storageKey);
+        const legacyRaw = await plugin.storage.getSynced(storageKey);
         const parsed = await getPageHistory(plugin, remId, pdfRem._id);
         const stats = await getReadingStatistics(plugin, remId, pdfRem._id);
 
@@ -1407,7 +1411,10 @@ function Debug() {
         console.log(`Sum of sessionDurations: ${durationsSum}s = ${formatDuration(durationsSum)}`);
         console.log(`getReadingStatistics().totalTimeSeconds: ${stats.totalTimeSeconds}s = ${formatDuration(stats.totalTimeSeconds)}`);
         console.log(`Min duration: ${durationsMin}s   Max duration: ${durationsMax}s   Capped(>=14400): ${capped14400Count}`);
-        console.log(`Raw storage value:`, raw);
+        console.log(
+          `Legacy synced value (${legacyRaw == null ? 'none — migrated to the Rem' : 'still present'}):`,
+          legacyRaw
+        );
         console.log(`Parsed history (JSON):`);
         console.log(JSON.stringify(parsed, null, 2));
 
@@ -1496,10 +1503,12 @@ function Debug() {
     pdfName: string,
     repHistory: Array<{ date: number; reviewTimeSeconds?: number }>
   ): Promise<InflationPdfEntry | null> => {
+    // Page history now lives on the Rem, so a missing legacy key no longer means
+    // "nothing recorded" — read through the accessor and treat an empty history
+    // as nothing to analyse. storageKey is kept for display only.
     const storageKey = getPageHistoryKey(rId, pdfRem._id);
-    const rawStored = await plugin.storage.getSynced(storageKey);
-    if (rawStored == null) return null; // no key present
     const history = await getPageHistory(plugin, rId, pdfRem._id);
+    if (history.length === 0) return null;
 
     const matchesRep = (entry: { timestamp: number; sessionDuration?: number }) => {
       const dur = entry.sessionDuration;
@@ -1628,8 +1637,8 @@ function Debug() {
     try {
       for (const p of inflationPreview.perPdf) {
         if (p.stripCount === 0) continue;
-        await plugin.storage.setSynced(p.storageKey, p.patched);
-        console.log(`[InflationCleanup] Rewrote ${p.storageKey} — stripped ${p.stripCount} entr(ies).`);
+        await setPageHistory(plugin, remId!, p.pdfRemId, p.patched);
+        console.log(`[InflationCleanup] Rewrote page history for ${remId}/${p.pdfRemId} — stripped ${p.stripCount} entr(ies).`);
       }
       await plugin.app.toast(`Cleanup applied. Stripped ${totalStrip} entr(ies).`);
       setInflationPreview(null);
@@ -1746,9 +1755,9 @@ function Debug() {
       let rewritten = 0;
       for (const r of globalInflationPreview.perRem) {
         for (const p of r.perPdf) {
-          await plugin.storage.setSynced(p.storageKey, p.patched);
+          await setPageHistory(plugin, r.remId, p.pdfRemId, p.patched);
           rewritten++;
-          console.log(`[GlobalInflationCleanup] Rewrote ${p.storageKey} — stripped ${p.stripCount} entr(ies).`);
+          console.log(`[GlobalInflationCleanup] Rewrote page history for ${r.remId}/${p.pdfRemId} — stripped ${p.stripCount} entr(ies).`);
         }
       }
       await plugin.app.toast(`Global cleanup applied. Rewrote ${rewritten} key(s), stripped ${globalInflationPreview.totalStripCount} entr(ies).`);

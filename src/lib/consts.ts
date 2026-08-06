@@ -5,6 +5,13 @@ export const nextRepDateSlotCode = 'nextRepDate';
 export const repHistorySlotCode = 'repHist';
 export const originalIncrementalDateSlotCode = 'originalIncDate';
 
+// PDF reading state (page, page range, page history, active PDF) as serialized
+// JSON, replacing four per-(Rem, PDF) synced-key families. Registered on BOTH
+// the Incremental and Dismissed powerups under the same code and shape:
+// dismissing a Rem removes the Incremental powerup, so the state is copied
+// across as an opaque string rather than being lost. See lib/pdf_state.ts.
+export const pdfStateSlotCode = 'pdfState';
+
 // Dismissed Powerup
 export const dismissedPowerupCode = 'dismissed';
 export const dismissedHistorySlotCode = 'dismissedHistory';
@@ -266,6 +273,12 @@ export const pendingScrollRequestKey = 'pending-scroll-request';
 
 // Priority Review Graph
 export const priorityGraphPowerupCode = 'priority_review_graph';
+// Hidden slot on the graph Rem holding that graph's data as serialized JSON.
+// Replaces the per-graph synced key `priority_review_graph_data_<remId>`: the
+// snapshot belongs to the graph Rem, so storing it there means it is deleted
+// with the Priority Review Document instead of being orphaned in plugin storage
+// (which has no deletion API — orphans were unreclaimable).
+export const priorityGraphDataSlotCode = 'graphData';
 export const GRAPH_DATA_KEY_PREFIX = 'priority_review_graph_data_';
 // Synced index of every graph Rem ID we've written graph data for. Used to find
 // orphaned `GRAPH_DATA_KEY_PREFIX + remId` entries on startup so they can be cleared.
