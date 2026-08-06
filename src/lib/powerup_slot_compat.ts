@@ -2,11 +2,34 @@
 //
 // Compatibility shim for `plugin.powerup.getPowerupSlotByCode`.
 //
-// Recent RemNote desktop builds (post storage/sync overhaul) deprecated the
-// runtime implementation of `getPowerupSlotByCode`: every call now rejects with
-//   "Plugin Error: Internal API Error: Error: getPowerupSlotByCode is deprecated"
-// even though the method is still declared in @remnote/plugin-sdk@0.0.46 and in
-// the public API docs. The sibling `getPowerupByCode` still works.
+// Recent RemNote desktop builds (post storage/sync overhaul) narrowed the
+// runtime implementation of `getPowerupSlotByCode`, even though the method is
+// still declared in @remnote/plugin-sdk@0.0.46 and in the public API docs. The
+// sibling `getPowerupByCode` still works.
+//
+// The failure is NOT blanket deprecation, as an earlier reading of this had it.
+// A raw-slot dump (lib/raw_slot_dump.ts) captured the actual rejection:
+//
+//   "getPowerupSlotByCode only supports visible plugin powerup slots: built-in
+//    and hidden slots are not represented as Rem. Use getPowerupProperty or
+//    getPowerupPropertyAsRichText to read slot values instead."
+//
+// So it is selective, and the split is visible-vs-hidden:
+//
+//   VISIBLE slots (Priority, Next Rep Date)   -> still resolve natively.
+//   HIDDEN  slots (History, Created, pdfState,
+//                  Priority Source, Last Updated,
+//                  the Dismissed slots)        -> throw the above.
+//
+// Note the error's premise is wrong in one respect, which is worth keeping in
+// mind: hidden slots ARE still present as Rems — the fallback below finds them
+// by walking the powerup's children and checking `isPowerupSlot()`, and it
+// resolves every one of them. Only this accessor refuses to return them.
+//
+// The practical consequence is that hidden-slot VALUES no longer live in a child
+// Rem of the tagged rem (a rem with History and Created set can have zero
+// property children), while visible-slot values still do. Anything reasoning
+// about property children must not assume the two behave alike.
 //
 // This helper is a drop-in replacement that:
 //   1. Tries the native method first (so it self-heals if RemNote restores it,

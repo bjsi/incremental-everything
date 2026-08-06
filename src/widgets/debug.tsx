@@ -17,6 +17,7 @@ import { isPowerupPropertySafe } from '../lib/powerupSlotFilter';
 import { getCardPriority } from '../lib/card_priority';
 import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree, findOrphanedImportedCardPriorities } from '../lib/card_priority/batch';
 import { diagnosePowerupReadPath } from '../lib/powerup_read_diagnostic';
+import { dumpRawPowerupSlots } from '../lib/raw_slot_dump';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -27,7 +28,7 @@ import {
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
-import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode,
+import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode, prioritySlotCode,
   priorityShieldHistoryKey, documentPriorityShieldHistoryKey,
   cardPriorityShieldHistoryKey, documentCardPriorityShieldHistoryKey,
   cardShieldCleanupBackupIndexKey, cardShieldCleanupBackupPrefix,
@@ -351,8 +352,30 @@ function Debug() {
         }
       };
 
+      // The Priority slot, verbatim. The "Priority" row in the section above is
+      // incrementalRem.priority, which has already passed through
+      // getIncrementalRemFromRem's `let priority = 10` fallback — so a displayed 10
+      // means either "10 is stored" or "the slot could not be read", and the two
+      // need completely different responses. Reading the slot directly separates
+      // them: `null` here with 10 above is a read failure, not a stored value.
+      const probePrioritySlot = async () => {
+        try {
+          const property = await rem.getPowerupProperty(powerupCode, prioritySlotCode);
+          const richText = await rem.getPowerupPropertyAsRichText(powerupCode, prioritySlotCode);
+          const asString = richText?.length ? await rp.richText.toString(richText) : '';
+          return {
+            getPowerupProperty: property === '' || property == null ? null : String(property),
+            richTextLength: Array.isArray(richText) ? richText.length : null,
+            richTextAsString: asString === '' ? null : asString,
+          };
+        } catch (e) {
+          return { error: String(e) };
+        }
+      };
+
       const rawSlotProbe = (await rem.hasPowerup(powerupCode))
         ? {
+            priority: await probePrioritySlot(),
             nextRepDate: await probeDateSlot(nextRepDateSlotCode),
             originalIncDate: await probeDateSlot(originalIncrementalDateSlotCode),
           }
@@ -579,6 +602,9 @@ function Debug() {
   }>(null);
 
   // On-screen copyable export text (mobile fallback when file/clipboard fail).
+  // Raw powerup-slot dump JSON, kept on screen so it can be copied by hand where
+  // the clipboard API and file download are both blocked (see handleDumpRawSlots).
+  const [rawSlotDumpText, setRawSlotDumpText] = useState<string | null>(null);
   // Result of the settings-migration probe (see handleProbeSettingsPersistence).
   const [isProbingSettings, setIsProbingSettings] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -1981,6 +2007,52 @@ function Debug() {
         (mismatch ? ' — powerup IDENTITY MISMATCH found.' : '.') +
         ' See console.'
       );
+    }
+  };
+
+  // RAW slot dump — evidence for the RemNote support ticket about IncRems whose
+  // priority reverted to 10. The "Priority" row above shows the value AFTER
+  // getIncrementalRemFromRem's `let priority = 10` fallback, so it cannot tell a
+  // stored 10 from an unreadable slot. This bypasses getPowerupProperty and reads
+  // the property rems directly, for this rem and every descendant. Read-only.
+  const handleDumpRawSlots = async () => {
+    if (!rem) return;
+    await plugin.app.toast('Dumping raw powerup slots (rem + descendants)...');
+    try {
+      const report = await dumpRawPowerupSlots(plugin, rem);
+      const json = JSON.stringify(report, null, 2);
+      setRawSlotDumpText(json);
+
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(json);
+        copied = true;
+      } catch { /* clipboard is often blocked inside the plugin iframe */ }
+
+      let downloaded = false;
+      try {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `raw-slot-dump-${dayjs().format('YYYY-MM-DD-HHmmss')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        downloaded = true;
+      } catch (e) {
+        console.warn('[RawSlotDump] File download failed (iframe sandbox?):', e);
+      }
+
+      await plugin.app.toast(
+        `Raw dump: ${report.scannedRems} rem(s), ${report.properties.length} propert(ies), ` +
+        `${report.unreachable.length} unreadable. ` +
+        `${downloaded ? 'JSON downloaded. ' : ''}${copied ? 'Copied. ' : ''}See console.`
+      );
+    } catch (e) {
+      console.error('[RawSlotDump] Error:', e);
+      await plugin.app.toast('Raw slot dump failed — check console.');
     }
   };
 
@@ -3411,7 +3483,27 @@ function Debug() {
             label="Next Rep (Human)"
             data={`${dayjs(incrementalRem.nextRepDate).format('MMMM D, YYYY')} (${dayjs(incrementalRem.nextRepDate).fromNow()})`}
           />
-          <Info className="priority" label="Priority" data={incrementalRem.priority} />
+          {/* Priority is no longer just a number: show where it came from, so a
+              recovered or placeholder value can never pass for a stored one. */}
+          <Info
+            className="priority"
+            label="Priority"
+            data={
+              <span>
+                {incrementalRem.priority}
+                {incrementalRem.prioritySource === 'history' && (
+                  <span style={{ marginLeft: '8px', fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>
+                    ⚠ recovered from history — the Priority slot is unreadable
+                  </span>
+                )}
+                {incrementalRem.prioritySource === 'fallback' && (
+                  <span style={{ marginLeft: '8px', fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>
+                    ⚠ placeholder — neither the slot nor the history holds a priority
+                  </span>
+                )}
+              </span>
+            }
+          />
           <Info
             className="created-at-raw"
             label="Created At (Raw)"
@@ -3513,6 +3605,27 @@ function Debug() {
           <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
             Incremental Raw Slots (diagnostic)
           </h2>
+          {/* An empty raw slot while "Priority" above shows a number means the
+              number is getIncrementalRemFromRem's fallback, not stored data. */}
+          <Info
+            className="probe-priority"
+            label="Priority slot (raw)"
+            data={
+              <>
+                <pre style={preStyle}>{JSON.stringify(rawSlotProbe.priority, null, 2)}</pre>
+                {'error' in rawSlotProbe.priority ||
+                rawSlotProbe.priority.getPowerupProperty != null ||
+                rawSlotProbe.priority.richTextAsString != null ? null : (
+                  <div style={{ marginTop: '4px', padding: '6px', borderRadius: '4px', border: '1px solid #ef4444', backgroundColor: 'rgba(239, 68, 68, 0.08)', fontSize: '11px', color: 'var(--rn-clr-content-primary)' }}>
+                    ⚠ The Priority slot reads as empty, so the{' '}
+                    <strong>Priority {String(incrementalRem?.priority)}</strong> shown above is the
+                    plugin's read fallback, not a stored value. Use “Dump Raw Slots” to check
+                    whether the real value is still on the Rem under a detached slot.
+                  </div>
+                )}
+              </>
+            }
+          />
           <Info
             className="probe-next-rep"
             label="Next Rep reference"
@@ -3522,6 +3635,33 @@ function Debug() {
             className="probe-created"
             label="Created reference"
             data={<pre style={preStyle}>{JSON.stringify(rawSlotProbe.originalIncDate, null, 2)}</pre>}
+          />
+        </div>
+      )}
+
+      {/* Result of "Dump Raw Slots", kept on screen so it can be selected and
+          copied by hand where the clipboard API and file download are blocked. */}
+      {rawSlotDumpText && (
+        <div style={{ marginTop: '16px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            Raw Slot Dump (JSON)
+            <button onClick={() => setRawSlotDumpText(null)} style={smallBtnStyle}>Clear</button>
+          </h2>
+          <textarea
+            readOnly
+            value={rawSlotDumpText}
+            onFocus={(e) => e.currentTarget.select()}
+            style={{
+              width: '100%',
+              height: '220px',
+              fontSize: '10px',
+              fontFamily: 'monospace',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid var(--rn-clr-border)',
+              backgroundColor: 'var(--rn-clr-background-secondary)',
+              color: 'var(--rn-clr-content-primary)',
+            }}
           />
         </div>
       )}
@@ -3619,6 +3759,21 @@ function Debug() {
                  title="Why can't the plugin read this rem's Incremental/CardPriority values? Compares getPowerupByCode() against the rem's actual tags and probes every slot (read-only)"
                >
                  Diagnose Read Path
+               </button>
+               <button
+                 onClick={handleDumpRawSlots}
+                 style={{
+                   fontSize: '11px',
+                   padding: '2px 8px',
+                   backgroundColor: 'var(--rn-clr-background-secondary)',
+                   color: 'var(--rn-clr-content-primary)',
+                   border: '1px solid var(--rn-clr-border)',
+                   borderRadius: '4px',
+                   cursor: 'pointer'
+                 }}
+                 title="Read the RAW stored value of every powerup property on this rem and its descendants, bypassing getPowerupProperty, and flag values that are stored but unreadable (read-only)"
+               >
+                 Dump Raw Slots
                </button>
              </div>
            </h2>

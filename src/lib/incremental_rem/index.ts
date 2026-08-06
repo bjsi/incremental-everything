@@ -21,7 +21,7 @@ import {
 } from '../consts';
 import { readRawPdfState, writeRawPdfState } from '../pdf_state';
 import { getNextSpacingDateForRem, updateSRSDataForRem } from '../scheduler';
-import { IncrementalRem, IncrementalRep } from './types';
+import { IncrementalRem, IncrementalRep, UNREADABLE_PRIORITY_FALLBACK } from './types';
 import { tryParseJson, getDailyDocReferenceForDate, sleep } from '../utils';
 import { getInitialPriority } from '../priority_inheritance';
 import { stampNoteAndContext } from '../history_notes';
@@ -322,8 +322,27 @@ export const getIncrementalRemFromRem = async (
 
   const resolvedNextRepDate = await resolveDailyDocSlot(nextRepDateSlotCode);
 
+  // Read the original incremental date slot (Daily Document reference)
+  let createdAt = await resolveDailyDocSlot(originalIncrementalDateSlotCode);
+
+  const history = tryParseJson(await r.getPowerupProperty(powerupCode, repHistorySlotCode));
+
+  // Priority resolution. The slot is authoritative, but it is not always
+  // readable: RemNote's storage/sync overhaul left some Rems with a Priority
+  // property whose slot definition no longer resolves, so getPowerupProperty
+  // returns nothing while the value is still sitting on the Rem.
+  //
+  // This used to fall straight through to a bare `let priority = 10`, which was
+  // indistinguishable from a genuinely stored 10 — a Rem whose history proved a
+  // priority of 17 displayed as P10 with nothing to say it was a guess. Worse,
+  // that fabricated number was then stamped into the next history entry
+  // (see scheduler.ts), turning a display glitch into permanent data.
+  //
+  // So: read the slot; failing that, recover the last priority the Rem itself
+  // recorded in its history; and only if there is nothing to go on at all fall
+  // back to a constant — flagged, never silent.
   const priorityRichText = await r.getPowerupPropertyAsRichText(powerupCode, prioritySlotCode);
-  let priority = 10;
+  let priority: number | undefined;
   if (priorityRichText && priorityRichText.length > 0) {
     const priorityString = await plugin.richText.toString(priorityRichText);
     const parsedPriority = parseInt(priorityString, 10);
@@ -332,10 +351,23 @@ export const getIncrementalRemFromRem = async (
     }
   }
 
-  // Read the original incremental date slot (Daily Document reference)
-  let createdAt = await resolveDailyDocSlot(originalIncrementalDateSlotCode);
-
-  const history = tryParseJson(await r.getPowerupProperty(powerupCode, repHistorySlotCode));
+  let prioritySource: IncrementalRem['prioritySource'] = 'slot';
+  if (priority === undefined && Array.isArray(history)) {
+    // Walk backwards to the most recent rep that recorded a priority.
+    for (let i = history.length - 1; i >= 0; i--) {
+      const recorded = history[i]?.priority;
+      if (typeof recorded === 'number' && !isNaN(recorded)) {
+        priority = recorded;
+        prioritySource = 'history';
+        break;
+      }
+    }
+  }
+  if (priority === undefined) {
+    priority = UNREADABLE_PRIORITY_FALLBACK;
+    prioritySource = 'fallback';
+  }
+  priority = Math.min(100, Math.max(0, priority));
 
   // Fallback: derive createdAt from the 'madeIncremental' history marker when the
   // originalIncDate slot is empty/unresolvable. This repairs rems whose Daily Doc
@@ -378,6 +410,7 @@ export const getIncrementalRemFromRem = async (
     remId: r._id,
     nextRepDate,
     priority: priority,
+    prioritySource,
     history,
     createdAt,
   };

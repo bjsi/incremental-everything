@@ -193,10 +193,39 @@ export function repCountsForScheduling(eventType: IncrementalRep['eventType']): 
   );
 }
 
+/**
+ * Priority used when a Rem's Priority slot cannot be read AND its history holds
+ * no recorded priority either — i.e. when nothing is actually known about it.
+ *
+ * This is deliberately a named constant rather than a literal inside the read
+ * path. It used to be a bare `let priority = 10` in `getIncrementalRemFromRem`,
+ * which made a fabricated value indistinguishable from a stored one: after
+ * RemNote's storage/sync overhaul detached some Priority slots, Rems whose real
+ * priority was still on them displayed as P10 with nothing marking it a guess.
+ * Anything reaching for this value must also honour `prioritySource`.
+ */
+export const UNREADABLE_PRIORITY_FALLBACK = 50;
+
+/**
+ * Where a resolved `priority` actually came from.
+ *
+ * - `slot`     — read from the Priority powerup slot. Trustworthy.
+ * - `history`  — the slot was unreadable; this is the last priority the Rem
+ *                recorded in its own repetition history. Trustworthy as a value,
+ *                but the slot needs repairing.
+ * - `fallback` — nothing was readable. The number is
+ *                {@link UNREADABLE_PRIORITY_FALLBACK} and means nothing; it must
+ *                not be written back or stamped into history.
+ */
+export const PrioritySource = z.enum(['slot', 'history', 'fallback']);
+export type PrioritySource = z.infer<typeof PrioritySource>;
+
 export const IncrementalRem = z.object({
   remId: z.string(),
   nextRepDate: z.number(),
   priority: z.number().min(0).max(100),
+  /** Provenance of `priority`. Absent on cached objects written before this existed. */
+  prioritySource: PrioritySource.optional(),
   history: z.array(IncrementalRep).optional(),
   /**
    * Timestamp (ms) when the Rem was first made Incremental.

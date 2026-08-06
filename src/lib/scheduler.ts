@@ -189,7 +189,14 @@ export async function getNextSpacingDateForRem(
       interval: newInterval,
       wasEarly: wasEarly,
       daysEarlyOrLate: daysEarlyOrLate,
-      priority: incrementalRemInfo.priority, // Record priority at time of rep
+      // Record priority at time of rep — but only when it is a real value.
+      // `prioritySource: 'fallback'` means neither the slot nor the existing
+      // history could supply one, so the number is a placeholder. Stamping it
+      // here would turn an unreadable slot into a permanent wrong priority, and
+      // would overwrite the very history entries the value can be recovered from.
+      ...(incrementalRemInfo.prioritySource === 'fallback'
+        ? {}
+        : { priority: incrementalRemInfo.priority }),
       // reviewTimeSeconds will be added by reviewRem()
     },
   ];
