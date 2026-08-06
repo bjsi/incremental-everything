@@ -27,6 +27,7 @@ import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { scanBatchTargets } from '../lib/priority_targets';
+import { getIESetting } from '../lib/settings';
 
 
 interface ParentExtractContext {
@@ -117,7 +118,7 @@ function PriorityLight() {
             rem.getCards(),
             getCardPriorityValue(rp, rem),
             rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT), // Get raw string check
-            rp.settings.getSetting<number>(defaultPriorityId),
+            getIESetting(rp, defaultPriorityId),
         ]);
         console.log(`[PriorityLight] parallel SDK fetches: ${Math.round(performance.now() - t1)}ms (cards: ${cards.length})`);
 

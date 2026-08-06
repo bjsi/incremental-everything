@@ -24,6 +24,7 @@ import {
   pendingQueueDashboardRefocusKey,
   flashcardHistoryTextLimit,
   remHistoryTextLimit,
+  enableMasteryDrillId,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -63,6 +64,7 @@ import type { FlashcardHistoryData } from '../widgets/flashcard_history';
 import { registerQueueSessionTracking, saveCurrentSession, hasActiveSession } from '../lib/queue_session';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import dayjs from 'dayjs';
+import { getIESetting } from '../lib/settings';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -182,7 +184,7 @@ export function registerQueueExitListener(
       const seenRemIds = (await plugin.storage.getSession<string[]>(seenRemInSessionKey)) || [];
       const seenCardIds = (await plugin.storage.getSession<string[]>(seenCardInSessionKey)) || [];
 
-      const displayWeighted = await plugin.settings.getSetting<boolean>(displayWeightedShieldId) ?? false;
+      const displayWeighted = await getIESetting(plugin, displayWeightedShieldId);
 
       // Save KB-level shields
       if (shouldSaveIncRem) {
@@ -421,7 +423,7 @@ export function registerQueueEnterListener(
     };
 
     // Pre-compute Weighted Shield values if the setting is enabled
-    const displayWeighted = await plugin.settings.getSetting<boolean>(displayWeightedShieldId) ?? false;
+    const displayWeighted = await getIESetting(plugin, displayWeightedShieldId);
     if (displayWeighted && !(await shouldUseLightMode(plugin))) {
       const allIncRems_ws = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
       const seenRemIds_ws = (await plugin.storage.getSession<string[]>(seenRemInSessionKey)) || [];
@@ -622,12 +624,10 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
 
       // Mastery Drill: add AGAIN/HARD cards, remove on GOOD+.
       // Runs unconditionally (not gated by Light Mode).
-      // Gated by the 'skip_mastery_drill' setting.
+      // Gated by the 'enable-mastery-drill' setting.
       if (score !== undefined && remId) {
-        const skipMasteryDrill = Boolean(
-          await plugin.settings.getSetting('skip_mastery_drill')
-        );
-        if (!skipMasteryDrill) {
+        const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+        if (masteryDrillEnabled) {
           try {
             const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
             const currentKbId = kbData?._id;
@@ -712,8 +712,8 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       // settings read and the recentlyProcessedCards bookkeeping below.
       const clusterCardId = await plugin.storage.getSession<string>('clusterVisibleCardId');
       if (clusterCardId) {
-        const skipMasteryDrill = Boolean(await plugin.settings.getSetting('skip_mastery_drill'));
-        if (!skipMasteryDrill && !recentlyProcessedCards.has(data.remId)) {
+        const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+        if (masteryDrillEnabled && !recentlyProcessedCards.has(data.remId)) {
           // Claim this remId synchronously before the first await so concurrent GlobalRemChanged
           // fires for the same cluster rating don't both pass this guard and double-write.
           // We use a finally block (not a fixed TTL) to release the claim: the async work takes
@@ -1131,8 +1131,8 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
     const isFinalDrillActive = await plugin.storage.getSession<boolean>('finalDrillActive');
     if (!isFinalDrillActive) return;
 
-    const skipMasteryDrill = Boolean(await plugin.settings.getSetting('skip_mastery_drill'));
-    if (skipMasteryDrill) return;
+    const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+    if (!masteryDrillEnabled) return;
 
     const card = await plugin.card.findOne(prevDrillCardId);
     const history = card?.repetitionHistory;
@@ -1249,7 +1249,7 @@ function registerQueueDashboardRefocusListener(plugin: ReactRNPlugin) {
     // Always clear, even if stale/disabled, so it can't fire on a later card.
     await plugin.storage.setSession(pendingQueueDashboardRefocusKey, undefined);
     if (Date.now() - requestedAt > STALE_MS) return;
-    const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
+    const autoFocus = await getIESetting(plugin, autoFocusQueueDashboardId);
     if (!autoFocus) return;
     try {
       await plugin.window.openWidgetInRightSidebar('practiced_queues');

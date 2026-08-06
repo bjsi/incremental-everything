@@ -27,6 +27,7 @@ import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { getRemReadPoint } from '../lib/remReadPoint';
 import { startIncRemEngagement, endIncRemEngagement } from '../lib/queue_session';
+import { useIESettingOptional } from '../lib/settings';
 
 type ViewMode = 'isolated' | 'context';
 
@@ -63,13 +64,10 @@ export function QueueComponent() {
     [ctx?.remId]
   );
 
-  const isolatedMode = useTrackerPlugin(
-    async (rp) => {
-      const value = await rp.settings.getSetting<IsolatedQueueMode>(isolatedQueueModeId);
-      return (value || 'highlights') as IsolatedQueueMode;
-    },
-    []
-  );
+  // Optional form on purpose: the effect that turns this into `viewMode` runs
+  // once and never revisits (it bails on `viewMode !== undefined`), so seeing the
+  // default during the loading frame would lock in the wrong view.
+  const isolatedMode = useIESettingOptional(isolatedQueueModeId);
   const isolatedDefaultForHighlight = isolatedMode === 'highlights' || isolatedMode === 'both';
   const isolatedDefaultForRem = isolatedMode === 'rems' || isolatedMode === 'both';
 

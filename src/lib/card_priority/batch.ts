@@ -7,6 +7,7 @@ import {
   cardShieldCleanupBackupPrefix,
   cardShieldCleanupBackupIndexKey,
   orphanRemIdsKey,
+  flashcardResponseTimeLimitId,
 } from '../consts';
 import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { isPowerupPropertySafe } from '../powerupSlotFilter';
@@ -15,6 +16,7 @@ import { calculateNewPriority, setCardPriority } from './index';
 import * as _ from 'remeda';
 import { safeRemTextToString } from '../pdfUtils';
 import { formatDuration } from '../utils';
+import { getIESetting } from '../settings';
 
 export async function removeAllCardPriorityTags(plugin: RNPlugin) {
   const confirmed = confirm(
@@ -484,7 +486,7 @@ async function removeOrphanCards(plugin: RNPlugin, orphanRemIds: string[]): Prom
   // see exactly how much study data each deletion would destroy. Each rep's
   // responseTime is capped at the flashcard_response_time_limit setting — the
   // same convention the Study Dashboard / Practiced Queues use.
-  const capSetting = await plugin.settings.getSetting<number>('flashcard_response_time_limit');
+  const capSetting = await getIESetting(plugin, flashcardResponseTimeLimitId);
   const capSeconds = typeof capSetting === 'number' && capSetting > 0 ? capSetting : 180;
   const capMs = capSeconds * 1000;
   const statsOf = (card: (typeof confirmedOrphanCards)[number]) =>

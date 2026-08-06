@@ -9,6 +9,7 @@ import { withQueueMutex } from './mutex';
 import {
     getCurrentIncrementalRem,
 } from './incremental_rem';
+import { getIESetting } from './settings';
 
 // Module-level promise chain used as a mutex for the session-storage append.
 // All concurrent invocations of handleQuickPriorityChange chain onto this
@@ -35,7 +36,7 @@ export async function handleQuickPriorityChange(
     direction: 'increase' | 'decrease'
 ) {
     // 1. Get Step Size
-    const stepSize = await plugin.settings.getSetting<number>(priorityStepSizeId) || 10;
+    const stepSize = await getIESetting(plugin, priorityStepSizeId);
 
     // Up Arrow → Number Increase (+step) → Less Important
     // Down Arrow → Number Decrease (−step) → More Important

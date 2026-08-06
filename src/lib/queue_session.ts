@@ -5,15 +5,14 @@ import {
   RNPlugin,
 } from '@remnote/plugin-sdk';
 import { safeRemTextToString } from './pdfUtils';
-import { autoFocusQueueDashboardId, fsrsWeightsId } from './consts';
+import { autoFocusQueueDashboardId, fsrsWeightsId, flashcardResponseTimeLimitId } from './consts';
 import { isMobileDevice } from './mobileUtils';
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
 import { PRACTICED_QUEUES_HISTORY_KEY, rollOverOldSessions } from './queue_aggregates';
 import { computeFSRSState, parseWeightsString } from './fsrs';
+import { getIESetting } from './settings';
 
 const ACTIVE_SESSION_KEY = 'activeQueueSession';
-const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
-const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
 
 // Editor-only IncRem sessions auto-close after this much idle time so a row
 // is recorded for the burst of activity. Cleared/rescheduled on every
@@ -500,7 +499,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
       // Skip when triggered from the Mastery Drill: opening the right sidebar
       // resizes the popup which re-mounts the embedded Queue, fires QueueEnter
       // again, and creates a resize loop.
-      const autoFocus = await plugin.settings.getSetting<boolean>(autoFocusQueueDashboardId);
+      const autoFocus = await getIESetting(plugin, autoFocusQueueDashboardId);
       const isMobile = await isMobileDevice(plugin);
       const isMasteryDrill = scopeName === 'Mastery Drill';
       if (autoFocus && !isMobile && !isMasteryDrill) {
@@ -682,9 +681,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
           (isClusterSibling ? clusterLoadTime : undefined);
         if (startTime) {
           const rawTimeSpent = Date.now() - startTime;
-          const timeLimitSec =
-            (await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING)) ||
-            DEFAULT_RESPONSE_TIME_LIMIT_SEC;
+          const timeLimitSec = await getIESetting(plugin, flashcardResponseTimeLimitId);
           const timeSpent = Math.min(rawTimeSpent, timeLimitSec * 1000);
 
           currentSession.totalTime += timeSpent;
@@ -734,7 +731,7 @@ export function registerQueueSessionTracking(plugin: ReactRNPlugin) {
               currentSession.prevCardNextRepTime = card.nextRepetitionTime;
             }
             if (card.repetitionHistory && card.repetitionHistory.length > 0) {
-              const weightsRaw = await plugin.settings.getSetting<string>(fsrsWeightsId);
+              const weightsRaw = await getIESetting(plugin, fsrsWeightsId);
               const weights = parseWeightsString(weightsRaw);
               const fsrs = computeFSRSState(card.repetitionHistory, weights);
               if (fsrs) {

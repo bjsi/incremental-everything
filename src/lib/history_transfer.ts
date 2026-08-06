@@ -6,15 +6,15 @@ import {
   dismissedHistorySlotCode,
   dismissedDateSlotCode,
   preservedHistoryPowerupCode,
+  flashcardResponseTimeLimitId,
 } from './consts';
 import {
-  FLASHCARD_RESPONSE_TIME_LIMIT_SETTING,
-  DEFAULT_RESPONSE_TIME_LIMIT_SEC,
 } from './authoritative_aggregates';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { getDismissedHistoryFromRem } from './dismissed';
 import { safeRemTextToString } from './pdfUtils';
 import { getDailyDocReferenceForDate } from './utils';
+import { getIESetting } from './settings';
 
 const TOMBSTONE_TEXT = '🪦 Preserved history — content removed';
 
@@ -124,9 +124,7 @@ export async function planPreserveHistoryAndRemove(
   const allCards = (await plugin.card.getAll()) || [];
   const cards = allCards.filter((c) => subtreeIds.has(c.remId));
 
-  const capMs =
-    ((await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING)) ||
-      DEFAULT_RESPONSE_TIME_LIMIT_SEC) * 1000;
+  const capMs = (await getIESetting(plugin, flashcardResponseTimeLimitId)) * 1000;
 
   const merged: IncrementalRep[] = [];
 

@@ -27,6 +27,7 @@ import { updateIncrementalRemCache } from './cache';
 import { mergeHistoryFromDismissed } from '../dismissed';
 import { registerRemsAsPdfKnown, registerRemsAsHtmlKnown, isHtmlSource } from '../pdfUtils';
 import { syncPriorityBand } from '../priority_bands';
+import { getIESetting } from '../settings';
 
 type ReviewOverrideOptions = {
   /**
@@ -455,8 +456,8 @@ export async function initIncrementalRem(plugin: ReactRNPlugin, rem: PluginRem, 
       const [dismissedHistory, initialIntervalSetting, defaultPrioritySetting] = await Promise.all([
         // Check for dismissed history to import (merge from previous learning sessions)
         mergeHistoryFromDismissed(plugin, rem),
-        plugin.settings.getSetting<number>(initialIntervalId),
-        plugin.settings.getSetting<number>(defaultPriorityId),
+        getIESetting(plugin, initialIntervalId),
+        getIESetting(plugin, defaultPriorityId),
       ]);
       const hasExistingHistory = dismissedHistory && dismissedHistory.length > 0;
       const initialInterval = initialIntervalSetting || 0;

@@ -1,6 +1,7 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, enableFlashcardPrioritisationId } from '../lib/consts';
+import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
 // webpack chunk whose loader runtime references import.meta, which the RemNote index
@@ -128,11 +129,11 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   // upstream by the delta-queue watcher (atomic append + mutex + summed deltas), so
   // by the time a remId arrives here it already represents a deduplicated, net write.
   //
-  // PERF (why batched, not one-cascade-per-rem): recalculateTreeInheritance loads the
-  // entire card database to build its has-cards index. Bulk flows enqueue one root per
-  // modified rem — a 625-rem batch card-priority run therefore paid that multi-second
-  // full-DB load 625 times (~17 minutes of background cascades). recalculateTreeInheritanceBatch
-  // reads the card index once and deduplicates the union of all roots' descendants.
+  // PERF (why batched, not one-cascade-per-rem): bulk flows enqueue one root per
+  // modified rem, and a 625-rem batch card-priority run repeated the whole per-root
+  // setup 625 times (~17 minutes of background cascades) — back when that setup was
+  // a full plugin.card.getAll(). recalculateTreeInheritanceBatch resolves the
+  // has-cards index once and deduplicates the union of all roots' descendants.
   let cascadeRunning = false;
   let pendingCascadeRemIds = new Set<string>();
 
@@ -201,6 +202,21 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
     // Clear immediately to prevent re-trigger on the next track() tick
     await plugin.storage.setSession('pendingInheritanceCascade', null);
+
+    // Skip the whole walk when flashcard prioritisation is off. The cascade only
+    // ever writes 'inherited' and 'default' sources (IncRem descendants are
+    // skipped — an IncRem owns its own priority), and setCardPriority refuses
+    // both while the opt-in is off, so every write in the walk would be a no-op.
+    // Checking once here saves getDescendants + a has-cards lookup + an ancestor
+    // walk per descendant, rather than discovering it one refused write at a time.
+    //
+    // Gating here rather than at each trigger is deliberate — six sites enqueue
+    // cascades and only four of them ever checked light mode, so the other two
+    // leaked full cascades into Light Mode.
+    if (!(await getIESetting(plugin, enableFlashcardPrioritisationId))) {
+      console.log('[Tracker] Cascade skipped — flashcard prioritisation is off');
+      return;
+    }
 
     const remIds = Array.isArray(pending) ? pending : [pending];
 
@@ -307,15 +323,13 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         await flushCacheUpdatesNow(plugin as any);
 
         if (job.triggerCascade && cascadeRemIds.length) {
-          const isLight = await shouldUseLightMode(plugin as any);
-          if (!isLight) {
-            // The cascade watcher accepts an array, so all touched rems cascade
-            // in one pass rather than the last one winning.
-            await plugin.storage.setSession(
-              'pendingInheritanceCascade',
-              Array.from(new Set(cascadeRemIds))
-            );
-          }
+          // The cascade watcher accepts an array, so all touched rems cascade
+          // in one pass rather than the last one winning. It applies the
+          // flashcard-prioritisation gate itself.
+          await plugin.storage.setSession(
+            'pendingInheritanceCascade',
+            Array.from(new Set(cascadeRemIds))
+          );
         }
 
         console.log(`[Tracker] pendingPrioritySave (batch) complete for ${job.remIds.length} rems`);
@@ -366,12 +380,9 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
 
       // 3. Trigger inheritance cascade if requested (handled by existing cascade watcher)
       if (job.triggerCascade) {
-        const isLight = await shouldUseLightMode(plugin as any);
-        if (!isLight) {
-          // Set pendingInheritanceCascade BEFORE clearing incRemBatchActive/plugin_operation_active,
-          // so the cascade watcher can immediately re-set both flags when it fires.
-          await plugin.storage.setSession('pendingInheritanceCascade', job.remId);
-        }
+        // Set pendingInheritanceCascade BEFORE clearing incRemBatchActive/plugin_operation_active,
+        // so the cascade watcher can immediately re-set both flags when it fires.
+        await plugin.storage.setSession('pendingInheritanceCascade', job.remId);
       }
 
       console.log('[Tracker] pendingPrioritySave complete for remId:', job.remId);
@@ -473,12 +484,13 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
       // a single-rem (last only) trigger would leave the other batch rems
       // un-cascaded.
       //
-      // Gate on light mode, consistent with pendingPrioritySave / deltaQueue: the
-      // card-priority system (and its cache) is disabled in light mode, so the
-      // cascade would be pure wasted work — it was costing ~29s per save on large
-      // libraries because recalculateTreeInheritance loads the entire card DB.
-      const isLight = await shouldUseLightMode(plugin as any);
-      if (!isLight && job.remIds.length > 0) {
+      // No light-mode gate here any more. It existed because the cascade loaded
+      // the entire card DB (~29s per save on large libraries); it now resolves
+      // its has-cards index from the card-priority cache, or from per-rem
+      // rem.getCards() when that cache is absent — which is exactly the light-mode
+      // case. The watcher applies the flashcard-prioritisation gate for every
+      // trigger site, so the decision lives in one place.
+      if (job.remIds.length > 0) {
         await plugin.storage.setSession('pendingInheritanceCascade', job.remIds);
       }
 
@@ -683,10 +695,8 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
           const { cardPriorityCacheRefreshKey } = await import('../lib/consts');
           await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
 
-          // Trigger inheritance cascade (full mode only).
-          if (!isLight) {
-            await plugin.storage.setSession('pendingInheritanceCascade', remId);
-          }
+          // The watcher applies the flashcard-prioritisation gate.
+          await plugin.storage.setSession('pendingInheritanceCascade', remId);
 
           // Global-context survivor so the queue event-guard lets this through.
           try {

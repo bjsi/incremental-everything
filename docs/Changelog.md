@@ -2,6 +2,50 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.33 - August 5th, 2026
+
+### ✨ New: a settings popup of the plugin's own
+
+RemNote's plugin settings panel is one flat list, and this plugin had grown to more than thirty entries in it. **`Incremental Everything: Settings`** (quick code `ies`) opens a proper settings window instead: grouped by area, searchable, with a **?** beside entries that links straight to the section of this manual explaining them, and a *Reset* on anything you have changed from its default.
+
+It also hides what does not apply. The Beta Scheduler's *First Review Interval* and *Max Interval* appear only once that scheduler is on; the *Multiplier* disappears when it is, since the saturating curve ignores it; the Mastery Drill's parameters appear only when the drill is enabled. Each switch says which settings it reveals, so nothing vanishes without explanation.
+
+Your existing settings are carried over on first load — nothing to re-enter — and the ones that moved disappear from RemNote's panel afterwards.
+
+**Five settings deliberately stay in RemNote's panel**: *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches and *Enable Hide-in-Queue Powerups and Commands*. Those are the switches that make the plugin do **less**, and they have to stay reachable when the plugin itself is slow to load or failing — which a window drawn by the plugin cannot promise. They are shown in the popup too, read-only, pointing at where to change them.
+
+📖 [Plugin Settings Reference → Where the settings are](Plugin-Settings-Reference.md#where-the-settings-are)
+
+### ♻️ Changed: flashcard prioritisation is now opt-in, and off by default
+
+Per-flashcard priorities are the one part of this plugin that works across your **entire** knowledge base rather than on the Rems you are handling: it tags every flashcard-bearing Rem with the `cardPriority` powerup and keeps those tags in step as you edit. On a large library that is a long initial pass and continuous background work — and most people never needed it, because it exists to serve one feature: flashcards inside [Priority Review Documents](Priority-Review-Document.md).
+
+It now waits to be asked. **Settings → Plugins → Incremental Everything → Enable Flashcard Prioritisation**, off by default.
+
+With it off, **nothing else changes**. Extracts, incremental reading, PDF and video, the scheduler, the queue, the Mastery Drill and priorities on Incremental Rems themselves are untouched. A flashcard's inherited priority is still resolved and still displayed everywhere — the plugin walks up the ancestry on each read instead of storing the answer. Priorities you set yourself are still saved: `Alt+P` records `manual`, and dismissing an Incremental Rem still stamps `incremental` on the flashcards beneath it, because both are deliberate acts on identified Rems.
+
+What waits is the bulk index — the KB-wide tagging pass, the inheritance cascade over descendants, the priority cache, and what is built on them: the Priority Shield, relative percentiles, and flashcards in Priority Review Documents.
+
+📖 [Priorities for Flashcards → Switching it on](Priorities-for-Flashcards.md#the-opt-in)
+
+### ♻️ Changed: the Mastery Drill is opt-in too, and "Skip Mastery Drill" is now "Enable Mastery Drill"
+
+While the drill is active the plugin watches every flashcard rating and maintains the list of cards to drill, and registers the drill popup, its command and the sidebar notification. That is a reasonable cost if you use the workflow and pure overhead if you do not, so it now waits to be switched on: **Enable Mastery Drill**, in the settings popup under *Mastery Drill*.
+
+The old switch was a double negative that shipped on. If you had turned *Skip Mastery Drill* on, the drill stays off — the value is inverted and carried over for you. **If you use the Mastery Drill and never touched that setting, switch the new one on after upgrading.**
+
+📖 [History, Queue Dashboard & Mastery Drill → Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill)
+
+### ⚡ Improved: the plugin no longer reads your whole card database while you work
+
+Four separate operations answered small questions by loading every flashcard in the knowledge base. The worst ran on **every priority change**, cascading inherited priorities to descendants — around 29 seconds per save on a large library. Another ran each time the priority popup opened on an ordinary Rem, loading the entire card database to establish that the Rem has no flashcards. A third did it to render a count in a label; a fourth to check a single Rem.
+
+All four now read the priority cache that was already built for them, or ask about the specific Rems involved. Nothing of the kind remains on any path you touch while editing or reviewing; the remaining whole-database reads are one-off operations you start yourself, such as building a Priority Review Document on mobile, where no cache exists.
+
+Priority inheritance also propagates on **mobile and in the web browser** now. It used to be skipped there because it was too expensive to run — the cost was the database load, not the work itself.
+
+📖 [Full Mode × Light Mode](Full-Mode-x-Light-Mode.md)
+
 ## v1.0.32 - August 5th, 2026
 
 ### ✨ New: record study done outside RemNote, and correct the records you already have

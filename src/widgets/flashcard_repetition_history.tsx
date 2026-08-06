@@ -15,6 +15,7 @@ import { computeFSRSStatesPerReview, computeFSRSState, parseWeightsString, FSRSS
 import { formatStabilityDays, formatTimeAgo, getRetrievabilityColor } from '../lib/utils';
 import { safeRemTextToString } from '../lib/pdfUtils';
 import { displayFsrsDsrId, fsrsWeightsId } from '../lib/consts';
+import { useIESetting } from '../lib/settings';
 
 function scoreLabel(score: QueueInteractionScore): string {
     switch (score) {
@@ -73,15 +74,8 @@ const cellStyle: React.CSSProperties = { padding: '3px 6px', whiteSpace: 'nowrap
 function FlashcardRepetitionHistory() {
     const plugin = usePlugin();
 
-    const showFsrsDsr = useTrackerPlugin(
-        (rp) => rp.settings.getSetting<boolean>(displayFsrsDsrId),
-        []
-    ) ?? true;
-
-    const fsrsWeightsRaw = useTrackerPlugin(
-        (rp) => rp.settings.getSetting<string>(fsrsWeightsId),
-        []
-    );
+    const showFsrsDsr = useIESetting(displayFsrsDsrId);
+    const fsrsWeightsRaw = useIESetting(fsrsWeightsId);
 
     const data = useTrackerPlugin(async (rp) => {
         const ctx = await rp.widget.getWidgetContext<WidgetLocation.Popup>();

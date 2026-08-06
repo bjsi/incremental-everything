@@ -1,28 +1,21 @@
 import { ReactRNPlugin, PluginNumberSetting } from '@remnote/plugin-sdk';
 import {
-  initialIntervalId,
-  multiplierId,
-  betaSchedulerEnabledId,
-  betaFirstReviewIntervalId,
-  betaMaxIntervalId,
   collapseQueueTopBar,
   collapseTopBarCssId,
-  defaultPriorityId,
-  defaultCardPriorityId,
-  displayPriorityShieldId,
-  alwaysUseLightModeOnMobileId,
-  alwaysUseLightModeOnWebId,
-  remnoteEnvironmentId,
-  isolatedQueueModeId,
-  displayFsrsDsrId,
-  fsrsWeightsId,
-  displayQueueToolbarPriorityId,
-  displayWeightedShieldId,
-  autoFocusQueueDashboardId,
-  enableHideInQueueIntegrationId,
-  showPriorityBandsInTablesId,
+  hideCardPriorityTagSettingId,
+  showLeftBorderForIncRemsSettingId,
+  showDismissedIndicatorSettingId,
+  hideDismissedTagSettingId,
 } from '../lib/consts';
 import { PRIORITY_BAND_TAG_HIDE_CSS } from '../lib/priority_bands';
+import {
+  IE_SETTINGS_DEFAULTS,
+  IE_SETTINGS_SCHEMA,
+  IE_DOCS_BASE_URL,
+  IESettingId,
+  SettingSpec,
+  getIESetting,
+} from '../lib/settings';
 
 const hideCardPriorityTagId = 'hide-card-priority-tag';
 const HIDE_CARD_PRIORITY_CSS = `
@@ -65,462 +58,140 @@ const HIDE_DISMISSED_TAG_CSS = `
   }
 `;
 
+const COLLAPSE_TOP_BAR_CSS = `
+  /* Collapse the top bar only during IncRem (Plugin) turns.
+     Gated on the queue iframe so regular flashcard turns are unaffected.
+     Two fixes over the naive max-height:0 approach:
+     1. Use max-height: 3px instead of 0 — gives a thin visible strip as a hover target
+        (a 0-height element receives no hover events).
+     2. Hide .rn-queue__progress-bar — the progress bar sits immediately below and has
+        an invisible absolute overlay that steals hover events. It also shows flashcard
+        queue progress which is not meaningful during IncRem turns. */
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title {
+    max-height: 3px;
+    overflow: hidden;
+    /* collapse: wait 0.6s after mouse leaves, then animate over 0.4s */
+    transition: max-height 0.4s ease 0.6s;
+    cursor: pointer;
+  }
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title:hover {
+    max-height: 180px;
+    overflow: visible;
+    /* expand: start immediately, smooth over 0.25s */
+    transition: max-height 0.25s ease 0s;
+  }
+  .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .rn-queue__progress-bar {
+    display: none !important;
+  }
+`;
+
 /**
- * Registers every plugin setting (numbers, dropdowns, toggles) and applies startup defaults (e.g. hiding CardPriority tags).
- * Settings covered:
- * - `initialIntervalId`, `multiplierId`, `collapseQueueTopBar`
- * - `hideCardPriorityTag`, `defaultPriorityId`, `defaultCardPriority`
- * - `performanceMode`, `alwaysUseLightModeOnMobileId`, `alwaysUseLightModeOnWebId`
- * - `displayPriorityShieldId`, `priorityEditorDisplayMode`
- * - `remnoteEnvironmentId`, `pdfHighlightColorId`
- *
- * @param plugin RemNote plugin entry point used to register settings/CSS and read persisted values.
+ * Renders a schema entry's prose for RemNote's settings panel, which takes a
+ * single plain-text string: warning first, then the description, then the docs
+ * link and the reload note.
  */
+function panelDescription(spec: SettingSpec): string {
+  const parts: string[] = [];
+  if (spec.warning) parts.push(`⚠️ ${spec.warning}`);
+  parts.push(spec.description);
+  if (spec.helpPath) parts.push(`Documentation: ${IE_DOCS_BASE_URL}${spec.helpPath}`);
+  if (spec.reloadRequired) parts.push('Takes effect after reloading RemNote.');
+  return parts.join('\n\n');
+}
 
-// Scheduling settings
+/** Registers one schema entry with RemNote, picking the register* call by kind. */
+async function registerFromSchema(plugin: ReactRNPlugin, id: IESettingId) {
+  const spec = IE_SETTINGS_SCHEMA[id];
+  const common = { id, title: spec.title, description: panelDescription(spec) };
 
-export async function registerPluginSettings(plugin: ReactRNPlugin) {
-  plugin.settings.registerNumberSetting({
-    id: initialIntervalId,
-    title: 'Initial Interval',
-    description: 'Sets the number of days until the first repetition.',
-    defaultValue: 1,
-  });
-
-  plugin.settings.registerNumberSetting({
-    id: multiplierId,
-    title: 'Multiplier',
-    description:
-      'Sets the multiplier to calculate the next interval. Multiplier * previous interval = next interval.',
-    defaultValue: 1.5,
-  });
-
-  // --- Beta Scheduler Settings ---
-  plugin.settings.registerBooleanSetting({
-    id: betaSchedulerEnabledId,
-    title: 'Use Beta Scheduler (Saturating Curve)',
-    description:
-      'Enable the beta saturating scheduler. Intervals start at the First Review Interval and gradually approach the Max Interval, instead of growing exponentially. When enabled, the Multiplier setting above is ignored. See the IncRem Scheduler wiki page for details.',
-    defaultValue: false,
-  });
-
-  plugin.settings.registerNumberSetting({
-    id: betaFirstReviewIntervalId,
-    title: 'First Review Interval (Beta Scheduler)',
-    description:
-      'Interval in days assigned after completing the first review. Not to be confused with "Initial Interval", which controls when a new IncRem first appears in the queue (before any review). Only used when the Beta Scheduler is enabled. Default: 5 days.',
-    defaultValue: 5,
-  });
-
-  plugin.settings.registerNumberSetting({
-    id: betaMaxIntervalId,
-    title: 'Max Interval (Beta Scheduler)',
-    description:
-      'Upper bound in days the interval gradually approaches. The interval will never exceed this value. Only used when the Beta Scheduler is enabled. Default: 30 days.',
-    defaultValue: 30,
-  });
-
-  plugin.settings.registerBooleanSetting({
-    id: collapseQueueTopBar,
-    title: 'Collapse Queue Top Bar (IncRem Only)',
-    description:
-      'Creates extra vertical space during Incremental Rem review by collapsing the queue top bar to a thin strip. Hover over it to reveal the full bar. Has no effect on regular flashcard turns.',
-    defaultValue: false,
-  });
-
-  const COLLAPSE_TOP_BAR_CSS = `
-    /* Collapse the top bar only during IncRem (Plugin) turns.
-       Gated on the queue iframe so regular flashcard turns are unaffected.
-       Two fixes over the naive max-height:0 approach:
-       1. Use max-height: 3px instead of 0 — gives a thin visible strip as a hover target
-          (a 0-height element receives no hover events).
-       2. Hide .rn-queue__progress-bar — the progress bar sits immediately below and has
-          an invisible absolute overlay that steals hover events. It also shows flashcard
-          queue progress which is not meaningful during IncRem turns. */
-    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title {
-      max-height: 3px;
-      overflow: hidden;
-      /* collapse: wait 0.6s after mouse leaves, then animate over 0.4s */
-      transition: max-height 0.4s ease 0.6s;
-      cursor: pointer;
+  switch (spec.kind) {
+    case 'boolean':
+      await plugin.settings.registerBooleanSetting({
+        ...common,
+        defaultValue: IE_SETTINGS_DEFAULTS[id] as boolean,
+      });
+      return;
+    case 'number': {
+      const validators = [
+        ...(spec.integer ? [{ type: 'int' as const }] : []),
+        ...(spec.min !== undefined ? [{ type: 'gte' as const, arg: spec.min }] : []),
+        ...(spec.max !== undefined ? [{ type: 'lte' as const, arg: spec.max }] : []),
+      ];
+      await plugin.settings.registerNumberSetting({
+        ...common,
+        defaultValue: IE_SETTINGS_DEFAULTS[id] as number,
+        ...(validators.length ? { validators } : {}),
+      } as PluginNumberSetting);
+      return;
     }
-    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .queue__title:hover {
-      max-height: 180px;
-      overflow: visible;
-      /* expand: start immediately, smooth over 0.25s */
-      transition: max-height 0.25s ease 0s;
-    }
-    .rn-queue:has(iframe[data-plugin-id="incremental-everything"][src*="widgetName=queue&"]) .rn-queue__progress-bar {
-      display: none !important;
-    }
-  `;
+    case 'string':
+      await plugin.settings.registerStringSetting({
+        ...common,
+        defaultValue: IE_SETTINGS_DEFAULTS[id] as string,
+      });
+      return;
+    case 'dropdown':
+      await plugin.settings.registerDropdownSetting({
+        ...common,
+        defaultValue: IE_SETTINGS_DEFAULTS[id] as string,
+        options: spec.options.map((o) => ({ key: o.value, label: o.label, value: o.value })),
+      });
+      return;
+  }
+}
 
-  const shouldCollapseTopBar = await plugin.settings.getSetting<boolean>(collapseQueueTopBar);
-  if (shouldCollapseTopBar) {
+/**
+ * Registers plugin settings with RemNote and applies the startup CSS that some
+ * of them drive.
+ *
+ * Titles, descriptions, control types and defaults all come from
+ * IE_SETTINGS_SCHEMA / IE_SETTINGS_DEFAULTS in lib/settings.ts, so the panel and
+ * the IE Settings popup can never describe the same setting differently.
+ *
+ * @param plugin RemNote plugin entry point.
+ * @param opts.includePopupTier Also register the settings that have moved into
+ *   the IE Settings popup. True only while this knowledge base still needs
+ *   seeding: `getSetting` throws for an unregistered id, so the migration can
+ *   only read a value while its registration is live. Once seeded, these
+ *   disappear from RemNote's panel and the popup owns them.
+ */
+export async function registerPluginSettings(
+  plugin: ReactRNPlugin,
+  opts: { includePopupTier: boolean }
+) {
+  const ids = (Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[]).filter(
+    (id) => IE_SETTINGS_SCHEMA[id].tier === 'native' || opts.includePopupTier
+  );
+  for (const id of ids) {
+    await registerFromSchema(plugin, id);
+  }
+
+  // --- Startup CSS driven by the toggles above ---
+  // registerCSS is index-only (it silently no-ops from other iframes), and these
+  // read their setting through getIESetting, so they work whether the value
+  // comes from RemNote's panel or the plugin's own store.
+
+  if (await getIESetting(plugin, collapseQueueTopBar)) {
     await plugin.app.registerCSS(collapseTopBarCssId, COLLAPSE_TOP_BAR_CSS);
   }
-
-  // Priority settings
-
-  plugin.settings.registerNumberSetting({
-    id: defaultPriorityId,
-    title: 'Default IncRem Priority',
-    description: 'Sets the default priority for new incremental rem (0-100, Lower = more important). Default: 10',
-    defaultValue: 10,
-    validators: [
-      {
-        type: 'int' as const,
-      },
-      {
-        type: 'gte' as const,
-        arg: 0,
-      },
-      {
-        type: 'lte' as const,
-        arg: 100,
-      },
-    ],
-  } as PluginNumberSetting);
-
-  plugin.settings.registerNumberSetting({
-    id: defaultCardPriorityId,
-    title: 'Default Card Priority',
-    description: 'Default priority for flashcards without inherited priority (0-100, Lower = more important).  Default: 50',
-    defaultValue: 50,
-    validators: [
-      { type: 'int' as const },
-      { type: 'gte' as const, arg: 0 },
-      { type: 'lte' as const, arg: 100 },
-    ],
-  } as PluginNumberSetting);
-
-  plugin.settings.registerNumberSetting({
-    id: 'priority-step-size',
-    title: 'Priority Step Size',
-    description: 'Sets the step size for quick priority increase/decrease shortcuts (Ctrl+Shift+Up/Down). Default: 5',
-    defaultValue: 5,
-    validators: [
-      { type: 'int' as const },
-      { type: 'gte' as const, arg: 1 },
-      { type: 'lte' as const, arg: 50 },
-    ],
-  } as PluginNumberSetting);
-
-
-  plugin.settings.registerDropdownSetting({
-    id: 'priorityEditorDisplayMode',
-    title: 'Priority Widget in Editor',
-    description: 'Controls when to show the priority widget in the right-hand margin of each Rem in the editor.',
-    defaultValue: 'all',
-    options: [
-      {
-        key: 'all',
-        label: 'Show for IncRem and Cards',
-        value: 'all',
-      },
-      {
-        key: 'incRemOnly',
-        label: 'Show only for IncRem',
-        value: 'incRemOnly',
-      },
-      {
-        key: 'disable',
-        label: 'Disable',
-        value: 'disable',
-      },
-    ],
-  });
-
-  // Queue Display Settings
-
-  plugin.settings.registerBooleanSetting({
-    id: displayPriorityShieldId,
-    title: 'Display Priority Shield in Queue',
-    description:
-      'If enabled, shows a real-time status of your highest-priority due items in the queue (below the Answer Buttons for IncRems, and in the card priority widget under the flashcard in case of regular cards).',
-    defaultValue: true,
-  });
-
-  plugin.settings.registerBooleanSetting({
-    id: displayWeightedShieldId,
-    title: 'Display Weighted Priority Shield in Queue',
-    description:
-      'If enabled, shows what fraction of your total priority-weighted workload has been processed. ' +
-      'High-priority items carry exponentially more weight (~10× at the top vs bottom), so processing ' +
-      'them gives a bigger boost. Always increases as you review items.',
-    defaultValue: true,
-  });
-
-  plugin.settings.registerBooleanSetting({
-    id: displayQueueToolbarPriorityId,
-    title: 'Display Priority in Queue Toolbar',
-    description:
-      'If enabled, exhibits the PriorityBadge of the current flashcard or IncRem at the top right of the queue.',
-    defaultValue: true,
-  });
-
-  plugin.settings.registerDropdownSetting({
-    id: isolatedQueueModeId,
-    title: 'Use Isolated Card View in Queue for',
-    description:
-      'Choose which incremental items use the isolated card view as their default view in the queue. ' +
-      'Highlights that do NOT use the isolated card view will be shown inside the PDF/HTML reader instead, ' +
-      'and regular Rems that do NOT use it will be shown in the full document context. ' +
-      'You can always toggle between the two views with the button in the queue — this setting only determines the initial view.',
-    defaultValue: 'highlights',
-    options: [
-      {
-        key: 'highlights',
-        label: 'Highlights (PDF/HTML)',
-        value: 'highlights',
-      },
-      {
-        key: 'rems',
-        label: 'Regular Rems',
-        value: 'rems',
-      },
-      {
-        key: 'both',
-        label: 'Both',
-        value: 'both',
-      },
-      {
-        key: 'none',
-        label: 'None',
-        value: 'none',
-      },
-    ],
-  });
-
-  plugin.settings.registerBooleanSetting({
-    id: autoFocusQueueDashboardId,
-    title: 'Auto focus Queue Dashboard',
-    description:
-      'When enabled, opens the Practiced Queues dashboard in the Right Sidebar automatically on Queue Enter so you always have a live view of the current session. Note: PDF IncRems may temporarily steal focus to PDF-related tabs; the dashboard tab stays available for re-selection. (Does not apply to mobile)',
-    defaultValue: false,
-  });
-
-
-  // Visual Indicators in Editor
-
-  plugin.settings.registerBooleanSetting({
-    id: 'hideCardPriorityTag',
-    title: 'Hide CardPriority Tag in Editor',
-    description:
-      'If enabled, this will hide the "CardPriority" powerup tag in the editor to reduce clutter. You can still set priority with (Alt+P). After changing this setting, reload RemNote.',
-    defaultValue: true,
-  });
-
-  const shouldHide = await plugin.settings.getSetting('hideCardPriorityTag');
-  if (shouldHide) {
+  if (await getIESetting(plugin, hideCardPriorityTagSettingId)) {
     await plugin.app.registerCSS(hideCardPriorityTagId, HIDE_CARD_PRIORITY_CSS);
   }
-
-  plugin.settings.registerBooleanSetting({
-    id: 'showLeftBorderForIncRems',
-    title: 'Show a green left Border for IncRems in Editor',
-    description:
-      'If enabled, this will show a green left border for IncRems in Editor, to make it easier to identify your "extracts".',
-    defaultValue: true,
-  });
-
-  const shouldShowLeftBorderForIncRems = await plugin.settings.getSetting('showLeftBorderForIncRems');
-  if (shouldShowLeftBorderForIncRems) {
+  if (await getIESetting(plugin, showLeftBorderForIncRemsSettingId)) {
     await plugin.app.registerCSS(showLeftBorderForIncRemsId, SHOW_LEFT_BORDER_CSS);
   }
-
-  // Table-cell priority badges. RemNote renders no plugin widget inside a table
-  // cell, so `priority_editor` cannot follow the user into a table; this CSS
-  // draws a badge from the band powerup tags instead. See lib/priority_bands.ts.
-  //
-  // Registered here because registerPluginSettings runs from onActivate in
-  // widgets/index.tsx — registerCSS is index-only and silently no-ops elsewhere.
-  // Like the border/indicator toggles above, taking effect needs a reload.
-  plugin.settings.registerBooleanSetting({
-    id: showPriorityBandsInTablesId,
-    title: 'Show Priority Badges in Table Cells',
-    description:
-      'Tables are the one place the priority editor cannot render. Shows a coloured band badge (e.g. "70s") in the top-right of each table cell. Run "Refresh Priority Badges" once to fill in existing rems. Takes effect after a reload.',
-    defaultValue: true,
-  });
+  if (await getIESetting(plugin, showDismissedIndicatorSettingId)) {
+    await plugin.app.registerCSS(showDismissedIndicatorId, SHOW_DISMISSED_INDICATOR_CSS);
+  }
+  if (await getIESetting(plugin, hideDismissedTagSettingId)) {
+    await plugin.app.registerCSS(hideDismissedTagId, HIDE_DISMISSED_TAG_CSS);
+  }
 
   // Unconditional: the band tags are an implementation detail, so their tag-bar
   // chips stay hidden even when the badges themselves are switched off.
   await plugin.app.registerCSS('priority-band-tag-hide', PRIORITY_BAND_TAG_HIDE_CSS);
 
-  // The badge stylesheet itself is registered by registerTableBandBadgeCSS from
-  // index.tsx, which re-runs when the band→percentile colour mapping changes.
-
-  // Dismissed Rems settings
-  plugin.settings.registerBooleanSetting({
-    id: 'showDismissedIndicator',
-    title: 'Show Yellow Left Border for Dismissed Rems',
-    description:
-      'If enabled, Rems that have been dismissed from Incremental learning (via Dismiss button) will show a yellow left border to indicate they have preserved history.',
-    defaultValue: true,
-  });
-
-  const shouldShowDismissedIndicator = await plugin.settings.getSetting('showDismissedIndicator');
-  if (shouldShowDismissedIndicator) {
-    await plugin.app.registerCSS(showDismissedIndicatorId, SHOW_DISMISSED_INDICATOR_CSS);
-  }
-
-  // Hide dismissed powerup tag setting
-  plugin.settings.registerBooleanSetting({
-    id: 'hideDismissedTag',
-    title: 'Hide Dismissed Tag in Editor',
-    description:
-      'If enabled, this will hide the "Dismissed" powerup tag in the editor to reduce clutter. After changing this setting, reload RemNote.',
-    defaultValue: true,
-  });
-
-  const shouldHideDismissedTag = await plugin.settings.getSetting('hideDismissedTag');
-  if (shouldHideDismissedTag) {
-    await plugin.app.registerCSS(hideDismissedTagId, HIDE_DISMISSED_TAG_CSS);
-  }
-
-
-
-  // Hide-in-Queue integration (powerups + commands ported from the standalone
-  // "Hide in Queue" plugin). Excludes "Remove Parent" and "Remove Grandparent",
-  // which are always registered (the Cloze and Extract creators depend on them).
-
-  plugin.settings.registerBooleanSetting({
-    id: enableHideInQueueIntegrationId,
-    title: 'Enable Hide-in-Queue powerups and commands',
-    description:
-      'If enabled, registers the "Hide in Queue", "Remove from Queue", "No Hierarchy", "Hide Parent", and "Hide Grandparent" powerups and their commands directly inside Incremental Everything.\n\n' +
-      'WARNING: only enable this if you do NOT have the standalone "Hide in Queue" plugin installed — duplicate powerup registration throws a fatal error that breaks this plugin. If you currently have the standalone plugin, uninstall it first, then reload RemNote.\n\n' +
-      'The "Remove Parent" and "Remove Grandparent" powerups/commands (used internally by the Cloze and Extract creators) are always registered regardless of this setting.\n\n' +
-      'After changing this setting, reload RemNote.',
-    defaultValue: false,
-  });
-
-  // Performance Mode
-
-  plugin.settings.registerDropdownSetting({
-    id: 'performanceMode',
-    title: 'Performance Mode',
-    description:
-      'Choose performance level. "Light" is recommended for web/mobile. "Full" can bring significant computational overhead (best used in the Desktop App); it will also automatically start a pretagging process of all flashcards, that can make RemNote slow untill everything is tagged/synced/wired/cached!',
-    defaultValue: 'light',
-    options: [
-      {
-        key: 'full',
-        label: 'Full (All Features, High Resource Use)',
-        value: 'full',
-      },
-      {
-        key: 'light',
-        label: 'Light (Faster, No Relative Priority/Shield)',
-        value: 'light',
-      },
-    ],
-  });
-
-  plugin.settings.registerBooleanSetting({
-    id: alwaysUseLightModeOnMobileId,
-    title: 'Always use Light Mode on Mobile',
-    description:
-      'Automatically switch to Light performance mode when using RemNote on iOS or Android. This prevents crashes and improves performance on mobile devices. Recommended: enabled.',
-    defaultValue: true,
-  });
-
-  plugin.settings.registerBooleanSetting({
-    id: alwaysUseLightModeOnWebId,
-    title: 'Always use Light Mode on Web Browser',
-    description:
-      'Automatically switch to Light performance mode when using RemNote on the web browser. Full Mode can be slow or unstable on web browsers. Recommended: enabled.',
-    defaultValue: true,
-  });
-
-
-
-  // --- FSRS DSR Settings ---
-  plugin.settings.registerBooleanSetting({
-    id: displayFsrsDsrId,
-    title: 'Display FSRS DSR Stats (Flashcards)',
-    description:
-      'If enabled, shows calculated FSRS Difficulty / Stability / Retrievability for flashcards in the card info bar widget. Requires FSRS v6 scheduler.',
-    defaultValue: true,
-  });
-
-  plugin.settings.registerStringSetting({
-    id: fsrsWeightsId,
-    title: 'FSRS Global Weights',
-    description:
-      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler settings. Leave blank to use the official FSRS v6.1.1 defaults.',
-    defaultValue: '',
-  });
-
-
-  // Environment
-
-  plugin.settings.registerDropdownSetting({
-    id: remnoteEnvironmentId,
-    title: 'RemNote Environment',
-    description: 'Choose which RemNote environment to open documents in (beta.remnote.com or www.remnote.com)',
-    defaultValue: 'www',
-    options: [
-      {
-        key: 'beta',
-        label: 'Beta (beta.remnote.com)',
-        value: 'beta',
-      },
-      {
-        key: 'www',
-        label: 'Regular (www.remnote.com)',
-        value: 'www',
-      },
-    ],
-  });
-
-  // Practiced Queues Settings
-
-  plugin.settings.registerNumberSetting({
-    id: 'flashcard_response_time_limit',
-    title: 'Flashcard Response Time Limit (seconds)',
-    description:
-      "If you take longer to answer a flashcard than this (e.g. because you walked away), " +
-      "only this much time will be counted in Practiced Queues session statistics. " +
-      "Matches RemNote's native 'Flashcard Response Time Limit' setting. Default: 180s.",
-    defaultValue: 180,
-  });
-
-  // Mastery Drill Settings
-
-  plugin.settings.registerBooleanSetting({
-    id: 'skip_mastery_drill',
-    title: 'Skip Mastery Drill',
-    description:
-      'If enabled, all Mastery Drill features are turned off: the drill popup and sidebar ' +
-      'notification are hidden, the "Mastery Drill" command is not registered, and cards rated ' +
-      'Again or Hard are no longer tracked or added to the drill queue. Turn this on if you ' +
-      'do not want to use the Mastery Drill workflow at all.' +
-      'Requires reloading RemNote to take effect.',
-    defaultValue: false,
-  });
-
-  plugin.settings.registerNumberSetting({
-    id: 'old_item_threshold',
-    title: 'Old Items Threshold (Days) for Mastery Drill',
-    description: 'Items older than this number of days will trigger a warning in the Mastery Drill.',
-    defaultValue: 7,
-  });
-
-  plugin.settings.registerNumberSetting({
-    id: 'mastery_drill_min_delay_minutes',
-    title: 'Mastery Drill Minimum Delay (Minutes)',
-    description:
-      'A card rated Again or Hard will not appear in the Mastery Drill until at least this many minutes have passed since it was last reviewed. Prevents reviewing the same card again too soon. Default: 120 minutes.',
-    defaultValue: 120,
-  });
-
-  plugin.settings.registerBooleanSetting({
-    id: 'disable_final_drill_notification',
-    title: 'Disable Mastery Drill Notifications',
-    description: 'If enabled, the Mastery Drill sidebar notification will not appear.',
-    defaultValue: false,
-  });
-
+  // The table-cell badge stylesheet itself (gated on showPriorityBandsInTables)
+  // is registered by registerTableBandBadgeCSS from index.tsx, which re-runs
+  // when the band→percentile colour mapping changes.
 }

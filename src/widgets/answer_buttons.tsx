@@ -45,6 +45,7 @@ import { addToIncrementalHistory } from '../lib/history_utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
 
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
+import { getIESetting, useIESetting } from '../lib/settings';
 
 export function AnswerButtons() {
   const plugin = usePlugin();
@@ -60,15 +61,8 @@ export function AnswerButtons() {
     []
   ) || [];
 
-  const shouldDisplayShield = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
-    []
-  ) ?? true;
-
-  const shouldDisplayWeightedShield = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(displayWeightedShieldId),
-    []
-  ) ?? false;
+  const shouldDisplayShield = useIESetting(displayPriorityShieldId);
+  const shouldDisplayWeightedShield = useIESetting(displayWeightedShieldId);
 
   const activeHighlightId = useTrackerPlugin(
     (rp) => rp.storage.getSession<string | null>(activeHighlightIdKey),
@@ -569,7 +563,7 @@ export function AnswerButtons() {
         <Button
           onClick={async () => {
             try {
-              const environment = await plugin.settings.getSetting<string>(remnoteEnvironmentId) || 'beta';
+              const environment = await getIESetting(plugin, remnoteEnvironmentId);
               const remnoteDomain = environment === 'beta' ? 'https://beta.remnote.com' : 'https://www.remnote.com';
               const newUrl = `${remnoteDomain}/document/${rem._id}`;
               const newWindow = window.open(newUrl, '_blank');

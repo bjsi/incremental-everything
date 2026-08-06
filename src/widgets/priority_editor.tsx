@@ -7,7 +7,7 @@ import {
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { getIncrementalRemFromRem } from '../lib/incremental_rem';
 import { getCardPriority, CardPriorityInfo } from '../lib/card_priority';
-import { allIncrementalRemKey, allCardPriorityInfoKey, pageRangeWidgetId, pendingPriorityDeltaQueueKey } from '../lib/consts';
+import { allIncrementalRemKey, allCardPriorityInfoKey, pageRangeWidgetId, pendingPriorityDeltaQueueKey, priorityEditorDisplayModeId } from '../lib/consts';
 import { withQueueMutex } from '../lib/mutex';
 import { PriorityDeltaEntry } from '../lib/quick_priority';
 import { IncrementalRem } from '../lib/incremental_rem';
@@ -28,6 +28,7 @@ import {
   PageHistoryEntry,
 } from '../lib/pdfUtils';
 import { openAndScrollToHighlight } from '../lib/remHelpers';
+import { getIESetting } from '../lib/settings';
 
 // Move styles outside component to avoid recreation on every render
 const adjustButtonStyle: React.CSSProperties = {
@@ -184,7 +185,7 @@ export function PriorityEditor() {
         rem.hasPowerup('cardPriority'),
         plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
         plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey),
-        plugin.settings.getSetting<string>('priorityEditorDisplayMode'),
+        getIESetting(plugin, priorityEditorDisplayModeId),
       ]);
 
       // Calculate relative priorities inline
