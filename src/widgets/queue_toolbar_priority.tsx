@@ -16,14 +16,12 @@ import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem
 import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { calculateRelativePercentile } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
+import { useIESetting } from '../lib/settings';
 
 function QueueToolbarPriority() {
   const plugin = usePlugin();
 
-  const isEnabled = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(displayQueueToolbarPriorityId),
-    []
-  ) ?? true;
+  const isEnabled = useIESetting(displayQueueToolbarPriorityId);
 
   // We explicitly track currentIncRemKey to trigger re-renders at least when an IncRem changes
   const currentIncRemIdTracker = useTrackerPlugin(

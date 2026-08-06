@@ -3,6 +3,7 @@ import { defaultPriorityId, priorityStepSizeId } from './consts';
 import { findClosestAncestorWithAnyPriority } from './priority_inheritance';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from './card_priority/types';
+import { getIESetting } from './settings';
 
 // Cap on how many step-size decrements (= priority-number increments)
 // can be auto-applied to a new cloze. Even on the 12th cloze, we apply 10 steps.
@@ -57,8 +58,8 @@ export async function computeClozeAutoPriority(
   plugin: RNPlugin,
   parentRem: PluginRem
 ): Promise<ClozeAutoPriorityInfo> {
-  const defaultPriority = (await plugin.settings.getSetting<number>(defaultPriorityId)) || 50;
-  const stepSize = (await plugin.settings.getSetting<number>(priorityStepSizeId)) || 10;
+  const defaultPriority = await getIESetting(plugin, defaultPriorityId);
+  const stepSize = await getIESetting(plugin, priorityStepSizeId);
 
   let parentPriority: number;
   let parentPrioritySource: 'incremental' | 'card-or-inherited';

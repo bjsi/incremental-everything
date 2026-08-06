@@ -51,7 +51,7 @@ With the default scheduler:
 
 ---
 
-## Beta Scheduler — Saturating Curve ✨
+## Beta Scheduler — Saturating Curve ✨ { #beta-scheduler }
 
 > Enable this via **Settings → Use Beta Scheduler (Saturating Curve)**.
 
@@ -114,7 +114,7 @@ SuperMemo brings in its [documentation](https://help.supermemo.org/wiki/Incremen
 
 As we understand it, SuperMemo uses A-factor for topics (passive material, analogous to our IncRems) only because, when they implemented Topics and Incremental Reading, they decided to use the same frame already existing for items (flashcards), that, at that time, had this so called Absolute Difficult Factor governing the scheduling. But there is no theoretical ground to support an element-based (or IncRem based) multiplier. Science proved that spacing reviews of a given study subject improves learning and memory retention compared to massed practice. But the optimum interval theory is applicable only to active recall items (flashcards). Theoretically speaking, there is no such a thing as an "optimum interval" for passive reading. So, the aim to be achieved is a scheduler convenient enough to cope with the diverse learning situations and needs in a satisfactory way.
 
-We evaluated that implementing an IncRem level set multiplier would be too complex and bring few value, as we already have the [Reschedule](Reviewing-Items-in-the-Queue.md#Reschedule) feature, where the user can set an arbitrary interval length, and as we have implemented the Beta Scheduler aiming to achieve larger initial intervals and also cap intervals when they get too long (this way catering with the most commom and general needs).
+We evaluated that implementing an IncRem level set multiplier would be too complex and bring few value, as we already have the [Reschedule](Reviewing-Items-in-the-Queue.md#reschedule) feature, where the user can set an arbitrary interval length, and as we have implemented the Beta Scheduler aiming to achieve larger initial intervals and also cap intervals when they get too long (this way catering with the most commom and general needs).
 
 ---
 

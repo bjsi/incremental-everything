@@ -120,7 +120,7 @@ The change is saved immediately and the badge updates in place.
 
 ## Review in Editor Flow
 
-The **🔗 Review in Editor** icon (rightmost column) provides a powerful workflow for reviewing Incremental Rems without entering the queue. It combines elements of the queue's [Review & Open](Reviewing-Items-in-the-Queue.md#review--open) button and the [Execute Repetition Command](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) — opening the Rem in the editor with a running timer that records both the review and time spent — but launched directly from the IncRem List.
+The **🔗 Review in Editor** icon (rightmost column) provides a powerful workflow for reviewing Incremental Rems without entering the queue. It combines elements of the queue's [Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor) button and the [Execute Repetition Command](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) — opening the Rem in the editor with a running timer that records both the review and time spent — but launched directly from the IncRem List.
 
 ### How It Works
 

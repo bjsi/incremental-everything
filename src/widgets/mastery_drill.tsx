@@ -15,6 +15,8 @@ import '../App.css';
 import { PriorityBadge } from '../components';
 import { getCardPriority, setCardPriority } from '../lib/card_priority';
 import { InlinePriorityEditor } from '../components/InlineEditors';
+import { useIESetting } from '../lib/settings';
+import { masteryDrillMinDelayMinutesId, oldItemThresholdId } from '../lib/consts';
 
 export type FinalDrillItem = string | { cardId: string; kbId?: string; addedAt?: number };
 
@@ -28,13 +30,8 @@ function FinalDrill() {
   const [oldItemsCount, setOldItemsCount] = useState<number>(0);
   const recheckTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const oldItemThreshold = useTrackerPlugin(async (reactivePlugin) => {
-    return await reactivePlugin.settings.getSetting<number>("old_item_threshold");
-  }, [plugin]) ?? 7;
-
-  const minDelayMinutes = useTrackerPlugin(async (reactivePlugin) => {
-    return await reactivePlugin.settings.getSetting<number>("mastery_drill_min_delay_minutes");
-  }, [plugin]) ?? 120;
+  const oldItemThreshold = useIESetting(oldItemThresholdId);
+  const minDelayMinutes = useIESetting(masteryDrillMinDelayMinutesId);
 
   const [showClearOldConfirm, setShowClearOldConfirm] = useState(false);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);

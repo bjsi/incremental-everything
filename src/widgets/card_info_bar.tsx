@@ -31,6 +31,7 @@ import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
 import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
 import * as _ from 'remeda';
+import { useIESetting } from '../lib/settings';
 
 type ShieldSlice = {
   absolute: number;
@@ -122,16 +123,10 @@ export function CardInfoBar() {
   const useLightMode = effectiveMode === PERFORMANCE_MODE_LIGHT;
 
   // ✅ Get the display priority shield setting
-  const displayPriorityShield = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(displayPriorityShieldId),
-    []
-  ) ?? true;
+  const displayPriorityShield = useIESetting(displayPriorityShieldId);
 
   // ✅ Get the display weighted shield setting
-  const displayWeightedShield = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(displayWeightedShieldId),
-    []
-  ) ?? false;
+  const displayWeightedShield = useIESetting(displayWeightedShieldId);
 
   // 2. Add a new tracker to listen for the refresh signal.
   const refreshSignal = useTrackerPlugin(
@@ -253,15 +248,9 @@ export function CardInfoBar() {
   );
 
   // --- FSRS settings trackers ---
-  const showFsrsDsr = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<boolean>(displayFsrsDsrId),
-    []
-  ) ?? true;
+  const showFsrsDsr = useIESetting(displayFsrsDsrId);
 
-  const fsrsWeightsRaw = useTrackerPlugin(
-    (rp) => rp.settings.getSetting<string>(fsrsWeightsId),
-    []
-  );
+  const fsrsWeightsRaw = useIESetting(fsrsWeightsId);
 
   // --- Fetch card repetition history ---
   const cardRepData = useTrackerPlugin(async (rp) => {

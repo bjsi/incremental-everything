@@ -15,7 +15,7 @@ See the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page for default bindings.
 
 - **[Extract with Priority](Getting-Started.md#making-a-rem-incremental)** (`Opt+Shift+X` / `Alt+Shift+X`) — `quick: ep`
   Tags the target with the `#Incremental` powerup and immediately opens the **Priority & Interval Popup**.
-  **Text Selection:** Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Text-Extract.md)**, creating a new child Rem from the selected text. The source text is highlighted in **blue**, and a **reference pin** to the new extract is inserted immediately after. The new extract includes a back-reference to the parent. The source Rem is also hidden from queue display so its slot doesn't show redundantly during review of the extract — the mechanism depends on what's installed: **Remove from Queue** powerup on the parent (preferred, survives extract relocation) when the [Hide-in-Queue integration](Utilities.md#queue-display-utilities) is enabled or the standalone Hide in Queue plugin is installed; otherwise **Remove Parent** powerup on the extract itself (fallback — see [Create Extract behavior](Utilities.md#create-extract--source-rem-hiding-behavior)). If you extract from a PDF highlight, the new sub-extract will also automatically inherit a reference pin bridging directly back to the original PDF source!
+  **Text Selection:** Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Text-Extract.md)**, creating a new child Rem from the selected text. The source text is highlighted in **blue**, and a **reference pin** to the new extract is inserted immediately after. The new extract includes a back-reference to the parent. The source Rem is also hidden from queue display so its slot doesn't show redundantly during review of the extract — the mechanism depends on what's installed: **Remove from Queue** powerup on the parent (preferred, survives extract relocation) when the [Hide-in-Queue integration](Utilities.md#queue-display-utilities) is enabled or the standalone Hide in Queue plugin is installed; otherwise **Remove Parent** powerup on the extract itself (fallback — see [Create Extract behavior](Utilities.md#create-extract-source-rem-hiding-behavior)). If you extract from a PDF highlight, the new sub-extract will also automatically inherit a reference pin bridging directly back to the original PDF source!
   **Multi-rem selection:** When multiple Rems are selected, all are initialized as Incremental and the popup opens in **batch mode**.
 
 ![Extract Selection Demo](assets/extract-selected-text.gif)
@@ -31,7 +31,7 @@ See the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page for default bindings.
   Opens the **[Read Points popup](Plugin-Widgets-Reference.md#68-read-points-popup)** listing the read-point history for the current Rem-type IncRem (resolved from the focused rem or the active session). The most recent entry is the current reading position; click any entry to jump to that descendant.
 
 - **Create Cloze Deletion** (`Opt+Z` / `Alt+Z`)
-  Applies the native RemNote **Cloze Deletion** formatting to the selected text. Mimics the SuperMemo workflow for rapid creation of flashcards during incremental reading. Requires a selection — which can be plain text, a **Rem reference** (`[...](....md)`), or a mix of both; references anywhere in the selection (including on the front or back of a two-sided card) are clozed too, and the selected span is highlighted on the source Rem. The new cloze child is automatically tagged with the **Remove Parent** powerup, so the source Rem is hidden from queue display *only* while reviewing this specific cloze — sibling and descendant flashcards are unaffected. See [Remove Parent](Utilities.md#remove-parent-rp--new) in Queue Display Utilities.
+  Applies the native RemNote **Cloze Deletion** formatting to the selected text. Mimics the SuperMemo workflow for rapid creation of flashcards during incremental reading. Requires a selection — which can be plain text, a **Rem reference** (`[...](....md)`), or a mix of both; references anywhere in the selection (including on the front or back of a two-sided card) are clozed too, and the selected span is highlighted on the source Rem. The new cloze child is automatically tagged with the **Remove Parent** powerup, so the source Rem is hidden from queue display *only* while reviewing this specific cloze — sibling and descendant flashcards are unaffected. See [Remove Parent](Utilities.md#remove-parent-rp-new) in Queue Display Utilities.
 
 - **Create Cloze Deletion with Priority** (`Opt+Shift+Z` / `Alt+Shift+Z`)
   Identical to **Create Cloze Deletion**, but immediately opens the **[Prioritization-&-Sorting#set-priority-popup](Light-Priority-popup.md)** after creating the cloze child Rem. The popup is pre-filled with the auto-computed priority (see below) and shows a **parent extract context panel** — including the parent's text, its resolved priority with source label, the number of existing cloze children, and the suggested priority with its formula (e.g. `30 + 2×10`). Use this when you want to review and optionally override the computed value.
@@ -41,8 +41,8 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **[Dismiss Incremental Rem](Getting-Started.md#dismissing-and-re-activating-rems)** (`Ctrl+D`) — `quick: dis`
   Equivalent to clicking the "[Dismiss](Reviewing-Items-in-the-Queue.md#dismiss)" button. Removes the Incremental and transfers its history to the Dismissed powerup.
 
-- **[Open Repetition History](Getting-Started.md#repetition-history--statistics)** (`Ctrl+Shift+H`) — `quick: his`
-  Displays a comprehensive history popup. For Incremental Rems, opens the [IncRem Repetition History](Getting-Started.md#repetition-history--statistics). For regular flashcards, opens the [Flashcard Repetition History](Reviewing-Items-in-the-Queue.md#flashcard-repetition-history).
+- **[Open Repetition History](Getting-Started.md#repetition-history-statistics)** (`Ctrl+Shift+H`) — `quick: his`
+  Displays a comprehensive history popup. For Incremental Rems, opens the [IncRem Repetition History](Getting-Started.md#repetition-history-statistics). For regular flashcards, opens the [Flashcard Repetition History](Reviewing-Items-in-the-Queue.md#flashcard-repetition-history).
 
 - **[Open Study Dashboard](Study-Dashboard.md)** — `quick: sdb`
   Opens the [Study Dashboard](Study-Dashboard.md): a filterable summary of Incremental, Dismissed, and Flashcard activity (Global or Document scope, with multiple period presets and a custom date range), plus an expandable hierarchy of every rem with activity showing total time, reps, retention, and speed. Auto-detects the focused rem in the editor or the current card in the queue to use as the Document-mode root; falls back to Global mode otherwise.
@@ -63,10 +63,10 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   Opens the zero-lag Light Priority widget for immediate integer adjustments.
 
 - **Quick Increase Priority Number (Less Important)** (`Ctrl+Opt+Up` / `Ctrl+Alt+Up`)
-  Instantly increases the priority number (making the item *less* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `10`). No popup is shown.
+  Instantly increases the priority number (making the item *less* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `5`). No popup is shown.
 
 - **Quick Decrease Priority Number (More Important)** (`Ctrl+Opt+Down` / `Ctrl+Alt+Down`)
-  Instantly decreases the priority number (making the item *more* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `10`). No popup is shown.
+  Instantly decreases the priority number (making the item *more* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `5`). No popup is shown.
 
 - **[Batch Priority Change](Prioritization-&-Sorting.md#batch-priority-change-incremental-rems)**
   A powerful widget for managing the priorities of multiple Incremental Rems at once, designed for large documents with many nested items. (No quick code)
@@ -286,6 +286,9 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
 
 ## System & Maintenance Commands
 
+- **Incremental Everything: Settings** (`ies`)
+  Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
+
 - **Import Incremental Rems with History**
   Bulk-imports Incremental Rems from a **JSON payload** — including each rem's **full repetition history**, priority and next-repetition date. Built for migrating an external study log (e.g. a spreadsheet with years of study sessions) into the plugin's native history format.
   - **Input:** a version-1 JSON file following the format documented below. What matters is the JSON contract — how you produce the file is up to you. The repository ships `scripts/convert_study_log.py` **only as a sample** (an Excel → JSON converter tailored to one specific spreadsheet layout, with source-specific adjustments hardcoded); use it as a starting point, not as the reference.
@@ -390,7 +393,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   Stops system checks when queues are temporarily empty.
 
 - **Debug Incremental Everything** / **Debug Video Detection**
-  Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#-search--linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
+  Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
 
 - **Debug: Clear Flashcard History**
   Clears all entries from the Flashcard History sidebar widget. Use this if you encounter sync errors with the flashcard history data (e.g., after a corrupted sync). A confirmation toast is shown on completion.

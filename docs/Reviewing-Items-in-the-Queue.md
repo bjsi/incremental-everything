@@ -22,7 +22,7 @@ Each button is designed for a specific action to manage your learning flow effic
 
 Here is a breakdown of each button and its function, from left to right.
 
-* **[Next](#Next):** (Shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Windows/Linux)
+* **[Next](#next):** (Shortcut: `Cmd+Right` on Mac, `Ctrl+Right` on Windows/Linux)
 This is your primary action. Clicking "Next" marks the item as reviewed, calculates the next time you should see it based on the scheduling algorithm, and advances to the next item in your queue. The subtitle (e.g., "in 3 days") shows you the new interval that was just calculated.
 
   * **Swipe-to-Reschedule:** (New!) A new gesture for faster scheduling when reviewing Incremental Rems:
@@ -31,19 +31,19 @@ This is your primary action. Clicking "Next" marks the item as reviewed, calcula
 
   * **Pro-Tip:** This is particularly useful for content you're actively working through (like a book chapter). It keeps your momentum without opening the full Reschedule popup.
 
-* **[Reschedule](#Reschedule):** (Shortcut: `Ctrl+J`)
+* **[Reschedule](#reschedule):** (Shortcut: `Ctrl+J`)
 This button opens a popup that gives you manual control over the item's schedule and priority. You can set a custom interval in days and adjust the priority value at the same time.
 
-* **[Dismiss](#Dismiss):** (Shortcut: `Ctrl+D`)
+* **[Dismiss](#dismiss):** (Shortcut: `Ctrl+D`)
 When you have finished processing an item and no longer wish to see it in your queue, click "Dismiss" (or press `Ctrl+D`). This permanently finishes the item by removing its `Incremental` power-up. This shortcut also works in the Editor to dismiss the focused Incremental Rem.
 
-* **[Change Priority](#Change-Priority):** (Shortcut: `Ctrl+P` for full widget and `Ctrl+Alt+P` for light widget)
+* **[Change Priority](#change-priority):** (Shortcut: `Ctrl+P` for full widget and `Ctrl+Alt+P` for light widget)
 This opens the advanced priority popup. The label on the button itself provides rich, at-a-glance information:
   * **The Number:** The Rem's absolute priority value (0-100, lower is more important).
   * **The Percentiles:** The Rem's rank within your entire Knowledge Base (`% of KB`) and within the current document (`% of Doc`).
   * **The Color:** The background color shifts from red (high priority) to blue (low priority) for an instant visual cue of its importance.
 
-* **[Review in Editor](#Review-in-Editor):** (Shortcut: `Ctrl+Shift+J`) *(Previously called "Review & Open")*
+* **[Review in Editor](#review-in-editor):** (Shortcut: `Ctrl+Shift+J`) *(Previously called "Review & Open")*
 This is a powerful workflow tool. It performs a sequence of actions:
   1. It first **reviews** the item (rescheduling it) and **opens** the Rem in the editor, exiting the queue.
   2. It immediately starts an **Editor Review Timer**. When finished, clicking **"End Review"** stops the timer and routes you back to your queue document.
@@ -62,11 +62,11 @@ This button appears when a **PDF/HTML IncRem also has a [read point](Reviewing-I
 * **📑 View outline / 📄 Read document (hybrid toggle):**
 For the same hybrid IncRems (a **PDF/HTML reading source that also has a read point** on a descendant), a toggle appears in the **top-right corner** of the queue card. **📑 View outline** flips the card from the PDF/HTML reader to a **read-only outline view** of the IncRem — the same [ExtractViewer](#read-point-and-status-emphasis-in-rem-type-cards) used for Rem-type cards, where the read point is **emphasized and auto-scrolled into view** — *without leaving the queue*. **📄 Read document** flips back to the reader. This lets you read the document and consult your outline/notes in the same session. *(To instead make a chapter **always** open as an outline in the queue, add the **`#extractviewer`** tag — see [PDF-Incremental-Reading-Workflow#extractviewer-mode](PDF-Workflow-→-ExtractViewer-Mode.md).)*
 
-* **[Open Editor in New Tab](#Open-Editor-in-New-Tab)**:
+* **[Open Editor in New Tab](#open-editor-in-new-tab)**:
 Clicking this button instantly opens the full source document in a new browser tab, right at the location of your highlight/PDF document/Rem. Use it to take notes of what you are reading in a PDF section, to paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation), to have access to all of RemNote's formatting tools, and to link to other ideas.
 
 * **📝 Review Note** (compact icon, next to *Open Editor*):
-Toggles an inline text field to attach a short **observation to this repetition's history entry** — *"stopped mid-proof"*, *"re-read section 3 first"*, *"dismissing: superseded by newer source"*. The note is parked as you type and saved with whichever action ends the review: **Next**, **Reschedule** (`Ctrl+J`), or **Dismiss** (where it becomes the *dismissal reason*). The icon stays highlighted while a note is pending. Notes appear later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history--aggregated-view), the Aggregated view, and the [Study Dashboard](Study-Dashboard.md#hierarchy-section). Each entry also gets an **automatic reading-context snapshot** (current page, page range, PDF name, last bookmark) — no typing needed for that part.
+Toggles an inline text field to attach a short **observation to this repetition's history entry** — *"stopped mid-proof"*, *"re-read section 3 first"*, *"dismissing: superseded by newer source"*. The note is parked as you type and saved with whichever action ends the review: **Next**, **Reschedule** (`Ctrl+J`), or **Dismiss** (where it becomes the *dismissal reason*). The icon stays highlighted while a note is pending. Notes appear later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), the Aggregated view, and the [Study Dashboard](Study-Dashboard.md#hierarchy-section). Each entry also gets an **automatic reading-context snapshot** (current page, page range, PDF name, last bookmark) — no typing needed for that part.
 
 * **Open URL for Web Clipper 📎** (for HTML-type Incremental Rems): When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.
 
@@ -180,7 +180,7 @@ Instead of struggling or just clicking "Next" (a futile review), you can use "Re
 Using "Reschedule" is a **one-time override**. The custom interval you set applies only to the next review. After that, the "Next" button will resume its normal scheduling based on your total number of reviews, not the custom interval you previously set. If an interval feels off again in the future, simply use "Reschedule" again.
 
 **📝 Note field:**
-The popup includes an optional **Note** input — record *why* you postponed ("waiting for prerequisite chapter", "revisit after exam"). The note is stored on this reschedule's history entry and shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history--aggregated-view), so future-you knows what past-you was thinking.
+The popup includes an optional **Note** input — record *why* you postponed ("waiting for prerequisite chapter", "revisit after exam"). The note is stored on this reschedule's history entry and shown later in the [Repetition History popup](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view), so future-you knows what past-you was thinking.
 
 ![Reschedule Widget](assets/reschedule.png){ width="400" }
 
@@ -190,13 +190,13 @@ The plugin differentiates how repetition/reschedule events are tracked based on 
 
 | Event Type | Source | Counts for Interval? | UI Display |
 |------------|--------|---------------------|------------|
-| `rep` (default) | [Next](#Next) button in queue | ✅ Yes | Normal row |
+| `rep` (default) | [Next](#next) button in queue | ✅ Yes | Normal row |
 | `rescheduledInQueue` | Ctrl+J / Reschedule button in queue | ✅ Yes | Row with "📅" indicator |
 | `rescheduledInEditor` | Ctrl+J in editor | ❌ No | Event marker (purple) |
 | `manualDateReset` | User manually edits Next Rep Date slot | ❌ No | Event marker (gray) |
 | `executeRepetition` | [Execute Repetition command](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) | ✅ Yes | Row with "⌨️" indicator |
 | `madeIncremental` | Making rem incremental | ❌ No (boundary only) | Event marker (green) |
-| `dismissed` | [Dismiss](#Dismiss) button / tag removal | ❌ No | Event marker (orange) |
+| `dismissed` | [Dismiss](#dismiss) button / tag removal | ❌ No | Event marker (orange) |
 
 **Key distinction:**
 - **Review actions** (`rep`, `rescheduledInQueue`, `executeRepetition`) count for interval calculation because you engaged with and reviewed the content before scheduling the next review

@@ -67,7 +67,7 @@ When you enter the queue, your Incremental Rems appear alongside your flashcards
 | **[Reschedule](Reviewing-Items-in-the-Queue.md#reschedule)** | [Ctrl+J](Keyboard-Shortcuts.md#core-commands) | Manually set the next review date |
 | **[Dismiss](Reviewing-Items-in-the-Queue.md#dismiss)** | — | Finishes the item, removes Incremental tag |
 | **[Change Priority](Reviewing-Items-in-the-Queue.md#change-priority)** | [Alt+P](Keyboard-Shortcuts.md#priority-commands) | Opens priority popup |
-| **[Review & Open](Reviewing-Items-in-the-Queue.md#review--open)** | — | Reviews the item AND opens it in the editor |
+| **[Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor)** | — | Reviews the item AND opens it in the editor |
 
 ### The "One Memory, One Action" Principle
 
@@ -149,7 +149,7 @@ Gives you a high-level overview of progress stats for a Rem and **all its descen
 
 There is a single unified command: **Open IncRem Repetition History**.
 
-*   **Keyboard Shortcut:** [`Ctrl+Shift+H`](Keyboard-Shortcuts.md#view--navigation) (works in both Queue and Editor)
+*   **Keyboard Shortcut:** [`Ctrl+Shift+H`](Keyboard-Shortcuts.md#view-navigation) (works in both Queue and Editor)
 *   **In the Queue:** Click the 📊 icon in the Answer Buttons info bar
 
 **Smart Behavior:**

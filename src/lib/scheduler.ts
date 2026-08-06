@@ -15,6 +15,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getIncrementalRemFromRem } from './incremental_rem';
 import { getDailyDocReferenceForDate } from './utils';
+import { getIESetting } from './settings';
 dayjs.extend(relativeTime);
 
 function removeResponsesBeforeEarlyResponses(history: IncrementalRep[]) {
@@ -103,16 +104,16 @@ export function timeWhenCardAppearsInQueueFromScheduled(
 }
 
 export const getMultiplier = async (plugin: RNPlugin) => {
-  const multiplier = (await plugin.settings.getSetting<number>(multiplierId)) || 1.5;
+  const multiplier = await getIESetting(plugin, multiplierId);
   return multiplier;
 };
 
 export const getBetaSchedulerSettings = async (plugin: RNPlugin) => {
-  const enabled = await plugin.settings.getSetting<boolean>(betaSchedulerEnabledId);
+  const enabled = await getIESetting(plugin, betaSchedulerEnabledId);
   const firstReviewInterval =
-    (await plugin.settings.getSetting<number>(betaFirstReviewIntervalId)) || 5;
+    await getIESetting(plugin, betaFirstReviewIntervalId);
   const maxInterval =
-    (await plugin.settings.getSetting<number>(betaMaxIntervalId)) || 30;
+    await getIESetting(plugin, betaMaxIntervalId);
   return { enabled: !!enabled, firstReviewInterval, maxInterval };
 };
 

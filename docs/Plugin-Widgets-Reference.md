@@ -68,7 +68,7 @@ A compact PDF dropdown that appears in the Reader's top bar, just to the right o
 
 **When hidden:** for single-PDF Inc Rems (selector is unnecessary), and for `pdf-highlight` / `html-highlight` action types (the highlight is tied to a specific PDF; switching would orphan the queue card).
 
-📖 **Full documentation:** [Multiple PDF Sources](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf) — covers the full resolution chain (pin → `#preferthispdf` → first PDF) and every surface that exposes the switcher (queue Reader, Editor Review Timer, Execute Repetition popup, PDF Control Panel, Priority Editor).
+📖 **Full documentation:** [Multiple PDF Sources](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) — covers the full resolution chain (pin → `#preferthispdf` → first PDF) and every surface that exposes the switcher (queue Reader, Editor Review Timer, Execute Repetition popup, PDF Control Panel, Priority Editor).
 
 ---
 
@@ -92,7 +92,7 @@ A detailed popup for regular flashcards, enriched with FSRS analytics. Open it v
 - **History Table**: Every review with rating (color-coded), response time, target vs. practice date, delay, next interval, per-step D & S (in friendly units), SInc ratio, and pluginData.
 - **Color-Coded Markers**: Visual markers distinguish standard reviews, queue reschedules (📅), editor command reviews (⌨️), and manual date resets.
 
-📖 **Full documentation:** [Card Stats & FSRS Integration](Reviewing-Items-in-the-Queue.md#card-stats--fsrs-integration)
+📖 **Full documentation:** [Card Stats & FSRS Integration](Reviewing-Items-in-the-Queue.md#card-stats-fsrs-integration)
 
 #### 2.1.2. IncRem Repetition History & Aggregated View
 *(Incremental Rems only)*
@@ -272,7 +272,7 @@ Tracks every practice session with a real-time live view and a full history tabl
 - Click a session to open its source document in the Editor.
 - Export/Import session history to a local JSON file for backup.
 
-📖 **Full documentation:** [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history--live-dashboard)
+📖 **Full documentation:** [Practiced Queues History & Live Dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard)
 
 ![Practiced Queue History Live](assets/uploaded/da7c68_queue-history-live.png){ width="500" }
 
@@ -377,6 +377,15 @@ A feature-rich table of all your Incremental Rems with two entry points:
 
 ## 6. Utility Popups
 
+### 6.0. IE Settings
+**Command:** `Incremental Everything: Settings` (quick code `ies`)
+
+The plugin's own settings window: every setting it owns, grouped by area rather than listed flat, with a search box, a *Reset* on anything changed from its default, and a **?** beside entries that opens the section of this manual explaining them. Settings whose parent switch is off are hidden — the Beta Scheduler's parameters, the Mastery Drill's — and the switch that governs them says so. The five settings that stay in RemNote's own panel are shown here read-only, with a pointer to where they are changed.
+
+![The Incremental Everything settings popup](assets/settings-popup.png){ width="900" }
+
+📖 **Full documentation:** [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are)
+
 ### 6.1. Reschedule Widget
 **Shortcut:** `Ctrl+J` (works in both queue and editor)
 
@@ -424,7 +433,7 @@ A **floating** picker (it doesn't cover the editor like a popup) that finds Rems
 - **Accent-insensitive** (`navegacao interior` → `Navegação Interior`) and **selection-aware** (selected text seeds the box and is replaced by the reference on insert, like native `[[`).
 - Each result row shows a **type badge**, the Rem's **back text**, and a short **`root / … / parent` breadcrumb**; a **Concepts only** toggle narrows the list.
 
-📖 **Full documentation:** [Find Rem — Reference or Open](Utilities.md#find-rem--reference-or-open) · root-cause explainer: [Search / Linkage Diagnostics](Troubleshooting.md#-search--linkage-diagnostics-debug-widget)
+📖 **Full documentation:** [Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open) · root-cause explainer: [Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)
 
 ### 6.5. Source Popup (modal, queue-safe PDF/HTML viewer)
 **Trigger:** **Hover** a reference pin → press `Opt+O` / `Alt+O` (command: `Open Hovered Source in Popup`)
@@ -452,7 +461,7 @@ The **non-blocking** sibling of 6.5: the *same* reader, but opened as a **floati
 
 Shares the source-detection and 🔖 Scroll to Highlight behaviors with 6.5.
 
-📖 **Full documentation:** [Open Source in Popup → Floating window](Utilities.md#floating-window--interaction--closing)
+📖 **Full documentation:** [Open Source in Popup → Floating window](Utilities.md#floating-window-interaction-closing)
 
 ### 6.7. Restructure Outline Preview Popup
 **Command:** `Restructure Outline by Headings` (quick code `roh`)

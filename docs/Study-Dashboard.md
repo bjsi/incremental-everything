@@ -2,7 +2,7 @@
 
 The **Study Dashboard** is a filterable popup that summarizes your *Incremental*, *Dismissed*, and *Flashcard* activity across the whole knowledge base or scoped to a single document, with a fully expandable **hierarchy view** showing time, reps, retention, and speed at every level of your rem tree.
 
-It was inspired by the [Statistics Plugin](https://github.com/Justtolook/RemNote-Statistics-Plugin) (period filters and context selector) and combines those controls with data from the existing [Aggregated Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history--aggregated-view) and [Practiced Queues History](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history--live-dashboard) widgets.
+It was inspired by the [Statistics Plugin](https://github.com/Justtolook/RemNote-Statistics-Plugin) (period filters and context selector) and combines those controls with data from the existing [Aggregated Repetition History](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view) and [Practiced Queues History](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) widgets.
 
 ---
 

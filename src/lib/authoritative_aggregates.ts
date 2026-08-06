@@ -4,6 +4,7 @@ import {
   repHistorySlotCode,
   dismissedPowerupCode,
   dismissedHistorySlotCode,
+  flashcardResponseTimeLimitId,
 } from './consts';
 import { tryParseJson } from './utils';
 import {
@@ -15,6 +16,7 @@ import {
 import type { PracticedQueueSession } from '../widgets/practiced_queues';
 import type { IncrementalRep } from './incremental_rem/types';
 import { repCountsForStats } from './incremental_rem/types';
+import { getIESetting } from './settings';
 
 export const AUTHORITATIVE_AGGREGATES_KEY = 'authoritativeDailyAggregates';
 export const AUTHORITATIVE_LAST_COMPUTED_KEY = 'authoritativeAggregatesLastComputed';
@@ -154,7 +156,6 @@ export function encodeAuthoritativeAggregates(buckets: DailyAggregate[]): Compac
 // has always been the source of truth.
 export const INCREM_AUTHORITATIVE_CUTOFF_DATE = '2026-01-30';
 
-export const FLASHCARD_RESPONSE_TIME_LIMIT_SETTING = 'flashcard_response_time_limit';
 export const DEFAULT_RESPONSE_TIME_LIMIT_SEC = 180;
 const HISTORY_FETCH_CHUNK = 50;
 
@@ -273,8 +274,7 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
   // undercount IncRem time. Only flashcard responseTimes get clipped, since those
   // are quick-recall reviews where >180s usually indicates the user walked away.
   const flashcardResponseTimeCapMs =
-    ((await plugin.settings.getSetting<number>(FLASHCARD_RESPONSE_TIME_LIMIT_SETTING)) ||
-      DEFAULT_RESPONSE_TIME_LIMIT_SEC) * 1000;
+    (await getIESetting(plugin, flashcardResponseTimeLimitId)) * 1000;
 
   const buckets: DailyAggregate[] = [];
 

@@ -33,6 +33,8 @@ import {
   sourceFloatingActiveIdKey,
   preservedHistoryPowerupCode,
   priorityBandColorsReloadKey,
+  enableMasteryDrillId,
+  enableFlashcardPrioritisationId,
 } from '../lib/consts';
 import { computeWeightedShieldBreakdown, formatDuration } from '../lib/utils';
 import {
@@ -128,6 +130,7 @@ import {
 } from '../lib/priority_bands';
 import { CARD_PRIORITY_CODE } from '../lib/card_priority/types';
 import { batchPriorityTargetRemIdsKey } from '../lib/consts';
+import { getIESetting } from '../lib/settings';
 
 // Opens a priority popup against one or many rems. Single-rem calls behave
 // exactly as before; multi-rem calls hand the full id list to the widget through
@@ -1676,6 +1679,15 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     description: 'Update all inherited Card Priorities (and pre-compute and tag all card not yet prioritized)',
     quickCode: 'ucp',
     action: async () => {
+      // This command exists to materialise inherited/default tags KB-wide, which
+      // setCardPriority refuses while the opt-in is off. Without this check it
+      // would run its whole scan and report success having written nothing.
+      if (!(await getIESetting(plugin, enableFlashcardPrioritisationId))) {
+        await plugin.app.toast(
+          'Enable Flashcard Prioritisation first — inherited priorities are not tagged while it is off.'
+        );
+        return;
+      }
       await updateAllCardPriorities(plugin);
     },
   });
@@ -1862,8 +1874,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // Get settings
       const setting = await getPerformanceMode(plugin);
-      const autoSwitchMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
-      const autoSwitchWeb = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnWebId);
+      const autoSwitchMobile = await getIESetting(plugin, alwaysUseLightModeOnMobileId);
+      const autoSwitchWeb = await getIESetting(plugin, alwaysUseLightModeOnWebId);
 
       // Get friendly names
       const friendlyOS = getFriendlyOSName(os);
@@ -3064,10 +3076,8 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  const skipMasteryDrill = Boolean(
-    await plugin.settings.getSetting('skip_mastery_drill')
-  );
-  if (!skipMasteryDrill) {
+  const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+  if (masteryDrillEnabled) {
     plugin.app.registerCommand({
       id: 'open_mastery_drill',
       name: 'Mastery Drill: deliberately practice poorly rated cards',
@@ -3254,6 +3264,16 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     action: async () => {
       await plugin.storage.setSynced('flashcardHistoryData', []);
       await plugin.app.toast('Flashcard History cleared!');
+    },
+  });
+
+  plugin.app.registerCommand({
+    id: 'ie_open_settings',
+    name: 'Incremental Everything: Settings',
+    description: 'Open the Incremental Everything settings popup',
+    quickCode: 'ies',
+    action: async () => {
+      await plugin.widget.openPopup('ie_settings');
     },
   });
 

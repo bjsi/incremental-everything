@@ -16,6 +16,7 @@ import {
 import { PrioritySlider, PrioritySliderRef } from '../components';
 import { useAcceleratedKeyboardHandler } from '../lib/keyboard_utils';
 import dayjs from 'dayjs';
+import { getIESetting } from '../lib/settings';
 
 function PriorityInterval() {
     const plugin = usePlugin();
@@ -56,8 +57,8 @@ function PriorityInterval() {
 
         const [incPStr, defaultPriority, defaultInterval] = await Promise.all([
             rem.getPowerupProperty(powerupCode, prioritySlotCode),
-            rp.settings.getSetting<number>(defaultPriorityId),
-            rp.settings.getSetting<number>(initialIntervalId),
+            getIESetting(rp, defaultPriorityId),
+            getIESetting(rp, initialIntervalId),
         ]);
 
         const remContent = await getRemCardContent(rp, rem);

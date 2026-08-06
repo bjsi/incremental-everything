@@ -194,7 +194,7 @@ Happy learning! 📚✨
             * **[Reschedule](Reviewing-Items-in-the-Queue.md#reschedule):** How to manually set a new interval.
             * **[Dismiss](Reviewing-Items-in-the-Queue.md#dismiss):** How to finish an item and remove it from the queue.
             * **[Change Priority](Reviewing-Items-in-the-Queue.md#change-priority):** Its basic function of opening the priority menu.
-            * **[Review & Open](Reviewing-Items-in-the-Queue.md#review--open):** The workflow for moving from the queue to the editor.
+            * **[Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor):** The workflow for moving from the queue to the editor.
             * **[Scroll to Highlight](Reviewing-Items-in-the-Queue.md#scroll-to-highlight):** Its function for PDF extracts.
             * **[Strategic Guide to the Answer Buttons](Reviewing-Items-in-the-Queue.md#a-strategic-guide-to-the-answer-buttons):** In-depth explanation of when to use each action.
 
@@ -246,12 +246,12 @@ Happy learning! 📚✨
         * [Does the plugin prioritize items that are due today over older items?](Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F.md)
         * [How to hide card priorities?](How-to-hide-card-priorities%3F.md)
         * **[Troubleshooting](Troubleshooting.md)**: 
-          * [Jump to Rem by ID](Troubleshooting.md#-jump-to-rem-by-id---user-guide)
-          * [Pre-compute Card Priorities - Error Guide](Troubleshooting.md#-pre-compute-card-priorities---error-guide)
-          * [Rogue CardPriority Tags Sanitization](Troubleshooting.md#-rogue-cardpriority-tags-sanitization)
-          * [PDF Highlight Repair Tool](Troubleshooting.md#-pdf-highlight-repair-tool)
-          * [Page History Diagnostic & Cleanup](Troubleshooting.md#-page-history-diagnostic--cleanup-debug-widget)
-          * [Search / Linkage Diagnostics](Troubleshooting.md#-search--linkage-diagnostics-debug-widget)
+          * [Jump to Rem by ID](Troubleshooting.md#jump-to-rem-by-id-user-guide)
+          * [Pre-compute Card Priorities - Error Guide](Troubleshooting.md#pre-compute-card-priorities-error-guide)
+          * [Rogue CardPriority Tags Sanitization](Troubleshooting.md#rogue-cardpriority-tags-sanitization)
+          * [PDF Highlight Repair Tool](Troubleshooting.md#pdf-highlight-repair-tool)
+          * [Page History Diagnostic & Cleanup](Troubleshooting.md#page-history-diagnostic-cleanup-debug-widget)
+          * [Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)
 
 * **8. [Changelog](Changelog.md)**
     * **Purpose:** Detail the history of updates.

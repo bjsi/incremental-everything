@@ -1,10 +1,18 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId } from '../lib/consts';
+import { getIESetting } from '../lib/settings';
 
 export async function registerWidgets(plugin: ReactRNPlugin) {
-  const skipMasteryDrill = Boolean(
-    await plugin.settings.getSetting('skip_mastery_drill')
-  );
+  const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+
+  // IE Settings popup — the plugin's own settings UI (grouped and layered,
+  // unlike RemNote's flat plugin-settings list).
+  plugin.app.registerWidget('ie_settings', WidgetLocation.Popup, {
+    dimensions: {
+      width: 940,
+      height: 720,
+    },
+  });
 
   // NEW: Light Priority Widget
   plugin.app.registerWidget('priority_light', WidgetLocation.Popup, {
@@ -377,8 +385,8 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
-  // Mastery Drill widgets are gated behind the 'skip_mastery_drill' setting.
-  if (!skipMasteryDrill) {
+  // Mastery Drill widgets are gated behind the 'enable-mastery-drill' setting.
+  if (masteryDrillEnabled) {
     // Mastery Drill popup
     plugin.app.registerWidget('mastery_drill', WidgetLocation.Popup, {
       dimensions: {

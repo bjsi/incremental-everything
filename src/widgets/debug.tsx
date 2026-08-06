@@ -31,7 +31,16 @@ import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedD
   cardPriorityShieldHistoryKey, documentCardPriorityShieldHistoryKey,
   cardShieldCleanupBackupIndexKey, cardShieldCleanupBackupPrefix,
   allCardPriorityInfoKey, allIncrementalRemKey, debugHistoryBackupPrefix,
-  seenCardInSessionKey, seenRemInSessionKey } from '../lib/consts';
+  seenCardInSessionKey, seenRemInSessionKey,
+  defaultPriorityId, displayPriorityShieldId, remnoteEnvironmentId } from '../lib/consts';
+import {
+  getIESettingsMigrationReport,
+  getIESettingsValues,
+  formatMigrationReport,
+  migrateIESettings,
+  SettingsMigrationReport,
+} from '../lib/settings_migration';
+import { IE_SETTINGS_DEFAULTS } from '../lib/settings';
 import {
   auditSyncedKeys,
   probeWriteCapacity,
@@ -349,6 +358,22 @@ function Debug() {
         : null;
 
       const cardPriority = await getCardPriority(rp, rem);
+      // getCardPriority NEVER returns null: with no tag it resolves the value
+      // from the nearest ancestor (or the default) and reports lastUpdated: 0.
+      // So the section below renders for every rem, and its numbers say nothing
+      // about whether anything is actually stored on this one. Probe the powerup
+      // directly to tell "written here" from "resolved on read".
+      const hasCardPriorityTag = await rem.hasPowerup('cardPriority');
+      // The three slots, verbatim. hasPowerup alone is not enough: a rem can
+      // carry the powerup with an EMPTY priority slot, and getCardPriority then
+      // falls through to the ancestor branch — reporting source 'inherited' and
+      // lastUpdated 0 exactly as an untagged rem would. Only the raw slot values
+      // distinguish "written here" from "resolved on read".
+      const cardPrioritySlots = {
+        priority: await rem.getPowerupProperty('cardPriority', 'priority'),
+        source: await rem.getPowerupProperty('cardPriority', 'prioritySource'),
+        lastUpdated: await rem.getPowerupProperty('cardPriority', 'lastUpdated'),
+      };
       const dismissed = await getDismissedHistoryFromRem(rp, rem);
       
       const isCardDisabledLocally = await rem.hasPowerup(BuiltInPowerupCodes.DisableCards);
@@ -381,6 +406,8 @@ function Debug() {
         incrementalRem,
         rawSlotProbe,
         cardPriority,
+        hasCardPriorityTag,
+        cardPrioritySlots,
         dismissed,
         isCardDisabledLocally,
         isCardDisabledInAncestors,
@@ -551,6 +578,23 @@ function Debug() {
   }>(null);
 
   // On-screen copyable export text (mobile fallback when file/clipboard fail).
+  // Result of the settings-migration probe (see handleProbeSettingsPersistence).
+  const [isProbingSettings, setIsProbingSettings] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationReport, setMigrationReport] = useState<SettingsMigrationReport | null>(null);
+  const [storedSettings, setStoredSettings] = useState<Record<string, unknown> | null>(null);
+  const [settingsProbe, setSettingsProbe] = useState<null | {
+    rows: Array<{
+      group: 'control' | 'never-registered' | 'de-registered';
+      id: string;
+      note: string;
+      outcome: 'value' | 'undefined' | 'threw';
+      value: string;
+      error?: string;
+    }>;
+    anyThrew: boolean;
+  }>(null);
+
   const [shieldExport, setShieldExport] = useState<{ full: string; cardOnly: string } | null>(null);
 
   // Restore of shield history from a cleanup backup or a pasted export/backup JSON.
@@ -561,7 +605,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, rawSlotProbe, cardPriority, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
+  const { incrementalRem, rawSlotProbe, cardPriority, hasCardPriorityTag, cardPrioritySlots, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
 
   const handleCardCompare = async () => {
     if (!remId) return;
@@ -713,6 +757,139 @@ function Debug() {
 
     console.log(`===========================================\n`);
     await plugin.app.toast('Slot API probe done — open DevTools console to read results.');
+  };
+
+  // Settings-migration probe. Before moving settings out of RemNote's settings
+  // panel into a plugin-owned popup, we need to know how `getSetting` behaves
+  // for an id that is no longer registered — that decides whether a one-time
+  // seed can still read legacy values after the registrations are deleted.
+  //
+  // Three groups:
+  //  A. control      — currently registered ids, to prove the read path works.
+  //  B. never known  — ids this plugin has never registered: does the call
+  //                    return undefined, or throw?
+  //  C. de-registered — ids this plugin DID register in an earlier version and
+  //                    no longer does. A non-undefined answer here is direct
+  //                    evidence that stored values outlive their registration.
+  //                    Only conclusive if the value differs from the old
+  //                    default (otherwise "stored default" and "pruned, so
+  //                    undefined" are indistinguishable — see note below).
+  const handleProbeSettingsPersistence = async () => {
+    setIsProbingSettings(true);
+    try {
+      type Row = {
+        group: 'control' | 'never-registered' | 'de-registered';
+        id: string;
+        note: string;
+        outcome: 'value' | 'undefined' | 'threw';
+        value: string;
+        error?: string;
+      };
+
+      const cases: Array<{ group: Row['group']; id: string; note: string }> = [
+        // Notes read the live default out of the table — a hardcoded literal here
+        // goes stale the moment a default is edited.
+        { group: 'control', id: defaultPriorityId, note: `registered number, default ${JSON.stringify(IE_SETTINGS_DEFAULTS[defaultPriorityId])}` },
+        { group: 'control', id: displayPriorityShieldId, note: `registered boolean, default ${JSON.stringify(IE_SETTINGS_DEFAULTS[displayPriorityShieldId])}` },
+        { group: 'control', id: remnoteEnvironmentId, note: `registered dropdown, default ${JSON.stringify(IE_SETTINGS_DEFAULTS[remnoteEnvironmentId])}` },
+        { group: 'never-registered', id: 'ie-probe-never-registered', note: 'never registered by any version' },
+        { group: 'never-registered', id: 'ie-probe-' + Date.now(), note: 'fresh random id' },
+        // Dropped when the isolated-queue boolean became the `isolated-queue-view-mode`
+        // dropdown. Old default: false — so `true` is proof of survival.
+        { group: 'de-registered', id: 'show-rems-as-isolated-in-queue', note: "removed boolean, old default false → 'true' proves survival" },
+        // Dropped with the PDF highlight-colour feature. Old default: 'Blue' —
+        // so any other colour is proof of survival.
+        { group: 'de-registered', id: 'pdf-highlight-color', note: "removed dropdown, old default 'Blue' → any other colour proves survival" },
+      ];
+
+      const rows: Row[] = [];
+      for (const c of cases) {
+        try {
+          const v = await plugin.settings.getSetting<unknown>(c.id);
+          rows.push({
+            ...c,
+            outcome: v === undefined ? 'undefined' : 'value',
+            value: v === undefined ? '(undefined)' : JSON.stringify(v),
+          });
+        } catch (e) {
+          rows.push({ ...c, outcome: 'threw', value: '(threw)', error: String(e) });
+        }
+      }
+
+      const anyThrew = rows.some((r) => r.outcome === 'threw');
+      const deRegistered = rows.filter((r) => r.group === 'de-registered');
+      const survived = deRegistered.filter((r) => r.outcome === 'value');
+
+      console.log('\n========== SETTINGS MIGRATION PROBE ==========');
+      for (const g of ['control', 'never-registered', 'de-registered'] as const) {
+        console.log(`\n--- ${g} ---`);
+        for (const r of rows.filter((x) => x.group === g)) {
+          console.log(`  ${r.id} → ${r.outcome.toUpperCase()} ${r.value}${r.error ? ` :: ${r.error}` : ''}\n      (${r.note})`);
+        }
+      }
+      console.log('\n--- Verdict ---');
+      console.log(`  getSetting on an unknown id: ${anyThrew ? 'THROWS (seed needs per-id try/catch)' : 'returns undefined (safe to call)'}`);
+      console.log(`  de-registered ids returning a value: ${survived.length}/${deRegistered.length}`);
+      console.log('==============================================\n');
+
+      setSettingsProbe({ rows, anyThrew });
+      await plugin.app.toast('Settings migration probe done — see the report below.');
+    } finally {
+      setIsProbingSettings(false);
+    }
+  };
+
+  // Settings migration status. Reads the durable per-setting report written by
+  // lib/settings_migration.ts, so the state of the migration is inspectable
+  // long after the activation that ran it.
+  const loadMigrationReport = async () => {
+    const report = await getIESettingsMigrationReport(plugin);
+    setMigrationReport(report);
+    console.log(formatMigrationReport(report));
+    // The report says what the seed decided; the blob is what it actually left
+    // behind. Post-v2 these differ on purpose — settings equal to their default
+    // are not stored — so showing both is the only way to confirm the state.
+    const values = await getIESettingsValues(plugin);
+    setStoredSettings(values);
+    console.log('[IESettingsMigration] stored blob:', values);
+    return report;
+  };
+
+  const handleShowMigrationStatus = async () => {
+    setIsMigrating(true);
+    try {
+      const report = await loadMigrationReport();
+      await plugin.app.toast(
+        report
+          ? `Settings migration: ${report.complete ? 'COMPLETE' : 'INCOMPLETE'} — ${report.counts.failed} failed`
+          : 'Settings migration has never run on this KB.'
+      );
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  // Re-reads every setting and overwrites the stored blob. For recovering a
+  // migration that ran while some settings were unreadable — not part of the
+  // normal path, which is merge-only.
+  const handleForceRemigrate = async () => {
+    setIsMigrating(true);
+    try {
+      const report = await migrateIESettings(plugin, { force: true });
+      setMigrationReport(report);
+      setStoredSettings(await getIESettingsValues(plugin));
+      await plugin.app.toast(
+        `Re-migrated ${report.total} settings — ${report.counts.failed} failed.`
+      );
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  const handleCopyMigrationReport = async () => {
+    const report = migrationReport ?? (await loadMigrationReport());
+    copyTextFallback(formatMigrationReport(report));
+    await plugin.app.toast('Migration report copied.');
   };
 
   const handleEditHistory = async () => {
@@ -2836,6 +3013,144 @@ function Debug() {
       </h2>
       <Info className="rem-id" label="Rem ID" data={<code>{remId}</code>} />
 
+      {/* Durable status of the settings migration — which settings were carried
+          into the plugin's own store, which failed, and whether it is done. */}
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+          Settings Migration Status
+          <span style={{ display: 'flex', gap: '6px' }}>
+            <button onClick={handleShowMigrationStatus} disabled={isMigrating} style={{ ...smallBtnStyle, cursor: isMigrating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+              {isMigrating ? 'Working…' : 'Load status'}
+            </button>
+            <button onClick={handleCopyMigrationReport} style={{ ...smallBtnStyle, whiteSpace: 'nowrap' }}>Copy</button>
+            <button onClick={handleForceRemigrate} disabled={isMigrating} style={{ ...smallBtnStyle, cursor: isMigrating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }} title="Re-read every setting and overwrite the stored values. Use only to recover a migration that ran while settings were unreadable.">
+              Force re-run
+            </button>
+          </span>
+        </h2>
+        <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+          The migration copies each setting out of RemNote's settings panel into the plugin's own synced storage. It
+          runs once on load and records the outcome per setting, so this stays readable afterwards. Full detail also
+          goes to the DevTools console.
+        </div>
+        {migrationReport === null ? (
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
+            Press "Load status" — nothing loaded yet in this widget.
+          </div>
+        ) : (
+          <div style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
+            <div style={{ lineHeight: 1.6, marginBottom: '6px' }}>
+              <div>
+                Status:{' '}
+                <strong style={{ color: migrationReport.complete ? '#16a34a' : '#ef4444' }}>
+                  {migrationReport.complete
+                    ? 'COMPLETE'
+                    : migrationReport.gaveUp
+                      ? 'INCOMPLETE — retries exhausted'
+                      : 'INCOMPLETE — retries on next reload'}
+                </strong>
+              </div>
+              <div>Last run: {new Date(migrationReport.finishedAt).toLocaleString()} (attempt {migrationReport.attempt})</div>
+              <div>
+                {migrationReport.total} settings — <strong>{migrationReport.counts.migrated}</strong> carried over,{' '}
+                {migrationReport.counts.default} at default, {migrationReport.counts['already-present']} already stored,{' '}
+                <strong style={{ color: migrationReport.counts.failed ? '#ef4444' : 'inherit' }}>
+                  {migrationReport.counts.failed} failed
+                </strong>
+              </div>
+            </div>
+            {storedSettings && (
+              <div style={{ marginBottom: '6px', paddingBottom: '6px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>
+                  Stored blob — {Object.keys(storedSettings).length} key(s)
+                </div>
+                <div style={{ color: 'var(--rn-clr-content-tertiary)', marginBottom: '4px' }}>
+                  Only settings that differ from their default are stored; everything else resolves through the
+                  defaults table, so changing a default still reaches you.
+                </div>
+                {Object.keys(storedSettings).length === 0 ? (
+                  <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>(empty — every setting is at its default)</div>
+                ) : (
+                  Object.entries(storedSettings).map(([k, v]) => (
+                    <div key={k} style={{ lineHeight: 1.5, paddingLeft: '6px' }}>
+                      <code>{k}</code> → <strong>{JSON.stringify(v)}</strong>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+            <div style={{ maxHeight: '260px', overflowY: 'auto', paddingTop: '6px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+              {migrationReport.records.map((r) => (
+                <div key={r.id} style={{ lineHeight: 1.5 }}>
+                  <span style={{ color: r.status === 'failed' ? '#ef4444' : r.status === 'migrated' || r.status === 'converted' ? '#16a34a' : 'var(--rn-clr-content-tertiary)' }}>
+                    {r.status === 'failed' ? '✗' : r.status === 'converted' ? '~' : r.status === 'migrated' ? '●' : '·'}
+                  </span>{' '}
+                  <code>{r.id}</code> → <strong>{JSON.stringify(r.value)}</strong>{' '}
+                  <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>[{r.status}]</span>
+                  {r.error && <div style={{ paddingLeft: '14px', color: '#ef4444' }}>{r.error}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Settings-migration probe: how does getSetting behave for ids this
+          plugin no longer registers? Decides whether a one-time seed can read
+          legacy values after the old registrations are deleted. */}
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Settings Migration Probe
+          <button
+            onClick={handleProbeSettingsPersistence}
+            disabled={isProbingSettings}
+            style={{ ...smallBtnStyle, cursor: isProbingSettings ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+            title="Reads registered, never-registered and de-registered setting ids to see whether stored values outlive their registration"
+          >
+            {isProbingSettings ? 'Probing…' : 'Probe getSetting'}
+          </button>
+        </h2>
+        <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+          Checks whether <code>getSetting</code> returns <code>undefined</code> or throws for an unknown id, and whether
+          values stored for settings the plugin used to register are still readable now that it doesn't.
+        </div>
+        {settingsProbe && (
+          <div style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
+            {(['control', 'never-registered', 'de-registered'] as const).map((group) => (
+              <div key={group} style={{ marginBottom: '8px' }}>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>{group}</div>
+                {settingsProbe.rows.filter((r) => r.group === group).map((r) => (
+                  <div key={r.id} style={{ lineHeight: 1.5, paddingLeft: '6px' }}>
+                    <code>{r.id}</code> →{' '}
+                    <strong style={{ color: r.outcome === 'threw' ? '#ef4444' : r.outcome === 'value' ? '#16a34a' : '#d97706' }}>
+                      {r.value}
+                    </strong>
+                    {r.error && <div style={{ paddingLeft: '6px', color: '#ef4444' }}>{r.error}</div>}
+                    <div style={{ paddingLeft: '6px', color: 'var(--rn-clr-content-tertiary)' }}>{r.note}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div style={{ paddingTop: '6px', borderTop: '1px solid var(--rn-clr-background-tertiary)', lineHeight: 1.6 }}>
+              <div>
+                Unknown id: <strong>{settingsProbe.anyThrew ? 'THROWS — seed needs per-id try/catch' : 'returns undefined — safe to call'}</strong>
+              </div>
+              <div>
+                De-registered ids still holding a value:{' '}
+                <strong>
+                  {settingsProbe.rows.filter((r) => r.group === 'de-registered' && r.outcome === 'value').length}
+                  /{settingsProbe.rows.filter((r) => r.group === 'de-registered').length}
+                </strong>
+              </div>
+              <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                Only a value differing from the old default is conclusive — an unset setting and a pruned one both read
+                as <code>(undefined)</code>.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div style={{ marginTop: '16px' }}>
         <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           Priority Shield History (KB-wide)
@@ -3303,6 +3618,59 @@ function Debug() {
                ⚠️ <strong>Spurious Tags Detected:</strong> Rogue CardPriority tags were found on non-flashcard children. Please click "Sanitize Rogue Tags" to cure this rem.
              </div>
            )}
+           {/* Whether anything is stored on THIS rem. Without it the block below
+               reads as slot content, when for an untagged rem it is a value
+               resolved from the nearest ancestor at read time. */}
+           <div
+             style={{
+               marginBottom: '10px',
+               padding: '6px 8px',
+               borderRadius: '4px',
+               fontSize: '11px',
+               lineHeight: 1.5,
+               border: '1px solid var(--rn-clr-border)',
+               backgroundColor: 'var(--rn-clr-background-secondary)',
+             }}
+           >
+               {(() => {
+               const storedPriority = cardPrioritySlots.priority;
+               const stored = !!storedPriority;
+               return (
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                   <span>
+                     {stored ? (
+                       <>
+                         <strong style={{ color: '#16a34a' }}>Stored on this rem.</strong> The values
+                         below come from this rem's own CardPriority slots.
+                       </>
+                     ) : hasCardPriorityTag ? (
+                       <>
+                         <strong style={{ color: '#d97706' }}>Tagged, but the priority slot is
+                         empty.</strong> The powerup is applied to this rem, yet no value is stored
+                         in its priority slot — so the numbers below are resolved on read from the
+                         nearest ancestor, exactly as they would be for an untagged rem.{' '}
+                         {cardPriority.cardCount > 0
+                           ? '"Sanitize Rogue Tags" will NOT touch this: it only strips tags from rems that own no cards, and this one does. setCardPriority always writes priority, source and lastUpdated together, so a surviving source/lastUpdated with no priority means the value was lost after it was written, not that the write was partial. To drop tags wholesale while flashcard prioritisation is off, use the "Remove All CardPriority Tags" command.'
+                           : 'This rem owns no cards, so "Sanitize Rogue Tags" is the tool that removes it.'}
+                       </>
+                     ) : (
+                       <>
+                         <strong style={{ color: '#d97706' }}>Not tagged.</strong> No CardPriority
+                         powerup on this rem — the values below are resolved on read from the nearest
+                         ancestor (or the default).
+                       </>
+                     )}
+                   </span>
+                   <span style={{ fontFamily: 'monospace', color: 'var(--rn-clr-content-tertiary)' }}>
+                     hasPowerup={String(hasCardPriorityTag)} · slots: priority=
+                     {JSON.stringify(cardPrioritySlots.priority ?? null)} source=
+                     {JSON.stringify(cardPrioritySlots.source ?? null)} lastUpdated=
+                     {JSON.stringify(cardPrioritySlots.lastUpdated ?? null)}
+                   </span>
+                 </div>
+               );
+             })()}
+           </div>
            <div className="flex gap-4 mb-2">
              <Info className="cp-priority" label="Priority" data={cardPriority.priority} />
              <Info className="cp-source" label="Source" data={<span style={{ textTransform: 'capitalize' }}>{cardPriority.source}</span>} />
@@ -3311,7 +3679,15 @@ function Debug() {
              <Info className="cp-duecards" label="Due Cards" data={cardPriority.dueCards} />
              <Info className="cp-cardcount" label="Total Cards" data={cardPriority.cardCount} />
            </div>
-           <Info className="cp-updated" label="Last Updated" data={`${dayjs(cardPriority.lastUpdated).format('MMMM D, YYYY, h:mm a')} (${dayjs(cardPriority.lastUpdated).fromNow()})`} />
+           <Info
+             className="cp-updated"
+             label="Last Updated"
+             data={
+               cardPrioritySlots.lastUpdated
+                 ? `${dayjs(cardPriority.lastUpdated).format('MMMM D, YYYY, h:mm a')} (${dayjs(cardPriority.lastUpdated).fromNow()})`
+                 : '— (not stored)'
+             }
+           />
         </div>
       )}
 

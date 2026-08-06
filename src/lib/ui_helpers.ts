@@ -15,6 +15,7 @@ import {
   pdfHighlightBordersReloadKey,
   showPriorityBandsInTablesId,
 } from './consts';
+import { getIESetting } from './settings';
 
 /**
  * Whether the pdfextract/incremental marker borders are currently drawn over
@@ -261,7 +262,7 @@ export async function registerHighlightBandBadgeCSS(plugin: ReactRNPlugin) {
  * what gates it.
  */
 export async function registerTableBandBadgeCSS(plugin: ReactRNPlugin) {
-  const enabled = await plugin.settings.getSetting<boolean>(showPriorityBandsInTablesId);
+  const enabled = await getIESetting(plugin, showPriorityBandsInTablesId);
   // Both scales are emitted; the stylesheet picks per rem from the `incremental`
   // / `cardpriority` tags the rem already carries, so a table mixing IncRems and
   // flashcards colours each on the scale its own Priority Editor uses.

@@ -1,5 +1,7 @@
 import { RNPlugin, RemId } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
+import { getIESetting } from './settings';
+import { performanceModeId } from './consts';
 
 // Performance mode constants
 export const PERFORMANCE_MODE_FULL = 'full';
@@ -13,7 +15,7 @@ export type PerformanceMode = typeof PERFORMANCE_MODE_FULL | typeof PERFORMANCE_
  * @returns The current performance mode ('full' or 'light').
  */
 export async function getPerformanceMode(plugin: RNPlugin): Promise<PerformanceMode> {
-  return (await plugin.settings.getSetting<PerformanceMode>('performanceMode')) || DEFAULT_PERFORMANCE_MODE;
+  return await getIESetting(plugin, performanceModeId);
 }
 
 /**

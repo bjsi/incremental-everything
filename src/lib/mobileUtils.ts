@@ -1,6 +1,7 @@
 import { RNPlugin, Platform } from '@remnote/plugin-sdk';
 import { alwaysUseLightModeOnMobileId, lastDetectedOSKey, isMobileDeviceKey, alwaysUseLightModeOnWebId, isWebPlatformKey, lastDetectedPlatformKey } from './consts';
 import { getPerformanceMode, isLightPerformanceMode } from './utils';
+import { getIESetting } from './settings';
 
 /**
  * Get the operating system name
@@ -87,7 +88,7 @@ export async function shouldUseLightMode(plugin: RNPlugin): Promise<boolean> {
   // If setting is full, check if we should override for mobile or web
   // IMPORTANT: Call detection functions directly to ensure we have current values
   const isMobile = await isMobileDevice(plugin);
-  const alwaysUseLightOnMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
+  const alwaysUseLightOnMobile = await getIESetting(plugin, alwaysUseLightModeOnMobileId);
   
   // Override to light mode if on mobile and setting is enabled (default true)
   if (isMobile && alwaysUseLightOnMobile !== false) {
@@ -96,7 +97,7 @@ export async function shouldUseLightMode(plugin: RNPlugin): Promise<boolean> {
   
   // Check web platform override - call detection directly
   const isWeb = await isWebPlatform(plugin);
-  const alwaysUseLightOnWeb = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnWebId);
+  const alwaysUseLightOnWeb = await getIESetting(plugin, alwaysUseLightModeOnWebId);
   
   // Override to light mode if on web and setting is enabled (default true)
   if (isWeb && alwaysUseLightOnWeb !== false) {
@@ -131,8 +132,8 @@ export async function handleMobileDetectionOnStartup(plugin: RNPlugin): Promise<
   await plugin.storage.setSession(isWebPlatformKey, isWeb);
   
   // Get settings
-  const alwaysUseLightOnMobile = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnMobileId);
-  const alwaysUseLightOnWeb = await plugin.settings.getSetting<boolean>(alwaysUseLightModeOnWebId);
+  const alwaysUseLightOnMobile = await getIESetting(plugin, alwaysUseLightModeOnMobileId);
+  const alwaysUseLightOnWeb = await getIESetting(plugin, alwaysUseLightModeOnWebId);
   const performanceModeSetting = await getPerformanceMode(plugin);
   
   // Get last detected OS and platform (for tracking changes across sessions)

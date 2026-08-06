@@ -6,6 +6,24 @@ This page explains how the plugin allows you to layer a priority system on top o
 
 ---
 
+## Switching it on { #the-opt-in }
+
+Flashcard prioritisation is **off by default**. Turn it on at **Settings → Plugins → Incremental Everything → Enable Flashcard Prioritisation**, then reload RemNote.
+
+It is opt-in because it is the one part of the plugin that works across your **entire** knowledge base rather than on the Rems you are handling. While it is on, the plugin tags flashcard-bearing Rems with the `cardPriority` powerup and keeps those tags in step as you edit — on a large library that means a long initial pass and continuous background work, and RemNote can feel slow until it settles.
+
+**Only turn it on if you create [Priority Review Documents](Priority-Review-Document.md) for flashcards and review the queue there.** That is what the tags are for. If you are unsure, leave it off — you can switch it on later at any time and the plugin will build what it needs then.
+
+### What still works with it off
+
+- **Everything that is not about flashcard priority**: extracts, incremental reading, PDF and video, the scheduler, the queue, the Mastery Drill, and priorities on Incremental Rems themselves.
+- **A flashcard's inherited priority is still resolved and still displayed.** The plugin walks up the ancestry on each read, so the priority widgets, the queue badge and `Alt+P` all show the correct value — it simply is not written to the Rem.
+- **Priorities you set yourself are still saved.** Setting a priority on a flashcard (`Alt+P`, the batch tools) records it with source `manual`, and dismissing an Incremental Rem still stamps `incremental` on the flashcards beneath it. Those two are deliberate acts on identified Rems, so the switch does not block them.
+
+What is skipped is the **bulk index**: the KB-wide tagging pass, the inheritance cascade over descendants, the priority cache, and everything built on it — the [Priority Shield](Prioritization-&-Sorting.md#priority-shield), relative percentiles, and flashcards in Priority Review Documents.
+
+---
+
 ## How It Works
 
 
@@ -187,7 +205,7 @@ In **Full Mode**, the plugin **automatically cascades inheritance** whenever you
 
 *   The cascade runs silently in the background — the popup closes immediately with no delay.
 *   Descendants with `inherited` card priority (that haven't been manually overridden) update automatically.
-*   The cascade only touches descendants that **actually own flashcards** (and existing inheritance anchors). Non-flashcard nodes — tag slots, property values, list items — are never tagged; they still inherit the priority dynamically without a physical `cardPriority` tag. (Earlier versions tagged the whole subtree indiscriminately, which produced [rogue CardPriority tags](Troubleshooting.md#-rogue-cardpriority-tags-sanitization); fixed in v0.2.272.)
+*   The cascade only touches descendants that **actually own flashcards** (and existing inheritance anchors). Non-flashcard nodes — tag slots, property values, list items — are never tagged; they still inherit the priority dynamically without a physical `cardPriority` tag. (Earlier versions tagged the whole subtree indiscriminately, which produced [rogue CardPriority tags](Troubleshooting.md#rogue-cardpriority-tags-sanitization); fixed in v0.2.272.)
 *   This covers both **Flashcard priority** saves and **Incremental Rem priority** saves (for descendants whose inherited card priority traces back to that IncRem).
 *   **Requests are consolidated, not queued one-by-one.** Rapid consecutive saves and bulk operations accumulate into a single cascade pass: duplicate Rems are dropped, and where several changed Rems share a subtree that subtree is walked once rather than once per Rem. A cascade already in flight absorbs anything requested while it runs and sweeps it up at the end, still in one pass.
 

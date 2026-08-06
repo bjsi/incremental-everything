@@ -564,7 +564,7 @@ Results are session-cached so reopening the popup in the same session is instant
 > The Weighted Shield of Flashcards, the standard Priority Shield (cards), the relative percentile shown next to a card's priority, the document-scope percentile, and the percentiles attached to portals in a Priority Review Document are **all computed over the same per-card universe**. Each card is one item, inherits its owning Rem's priority, and its own `nextRepetitionTime` decides whether it counts as due. A Rem that owns 5 cards contributes 5 items at the same priority. A rem's effective percentile is the **mean rank of its cards** within the sorted card population — so the 5-card rem occupies 5 adjacent ranks and lands at the midpoint of its own cluster, while a 1-card rem at the same priority lands at a single rank within the same cluster. This means a rem with more cards weighs slightly more in the percentile ranking, but every shield, every badge and the PRD now read from a single consistent ranking. The PRD itself still produces one portal per due rem (deduplicated) — only the percentile metadata it attaches comes from this unified universe.
 
 > [!NOTE]
-> Both **Shields** can be toggled on and off the queue toolbar in the plugins [Settings](Plugin-Settings-Reference.md#queue-display).
+> Both **Shields** can be toggled on and off the queue toolbar in the plugins [Settings](Plugin-Settings-Reference.md#queue).
 
 ###  Priority Shield History
 
