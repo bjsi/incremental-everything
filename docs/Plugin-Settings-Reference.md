@@ -1,10 +1,33 @@
 # Plugin Settings Reference
 
-This page documents all configurable settings available in the **Incremental Everything (Plus)** plugin. Access them via **RemNote Settings → Plugins → Incremental Everything**.
+This page documents every configurable setting in the **Incremental Everything (Plus)** plugin.
+
+Settings live in **two places**, and the tables below say which.
+
+## Where the settings are { #where-the-settings-are }
+
+**Most settings are in the plugin's own settings popup.** Open it with the command **`Incremental Everything: Settings`** (quick code `ies`). It groups the settings by area, hides the ones that do not apply — the Beta Scheduler's parameters stay out of sight until you switch that scheduler on — and links each entry to the section of this manual that explains it.
+
+**Five settings stay in RemNote's panel**, at **Settings → Plugins → Incremental Everything**: *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches, and *Enable Hide-in-Queue Powerups and Commands*. These are the switches that make the plugin do **less**, so they must stay reachable when the plugin itself is slow to load or failing — which a popup drawn by the plugin cannot promise. They appear in the popup too, read-only, with a pointer to where they are changed.
+
+!!! note "Upgrading from an earlier version"
+    Your existing settings are carried over automatically the first time you load this version — nothing to re-enter. The settings that moved will disappear from RemNote's panel after that first load.
+
+---
+
+## Flashcard Prioritisation { #flashcard-prioritisation }
+
+*In RemNote's settings panel.*
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| **Enable Flashcard Prioritisation** | Boolean | `false` | Master switch for per-flashcard priorities. Off by default. See [Priorities for Flashcards](Priorities-for-Flashcards.md#the-opt-in) for what it turns on, what keeps working without it, and why it is opt-in. Requires a reload. |
 
 ---
 
 ## Scheduling
+
+*In the IE Settings popup.*
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -18,6 +41,8 @@ This page documents all configurable settings available in the **Incremental Eve
 
 ## Priority
 
+*In the IE Settings popup.*
+
 | Setting | Type | Default | Range | Description |
 |---------|------|---------|-------|-------------|
 | **Default Priority** | Number | `10` | 0–100 | Priority assigned to new Incremental Rems. Lower = more important. |
@@ -28,6 +53,8 @@ This page documents all configurable settings available in the **Incremental Eve
 ---
 
 ## Queue Display
+
+*In the IE Settings popup.*
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -42,6 +69,8 @@ This page documents all configurable settings available in the **Incremental Eve
 
 ## Visual Indicators in Editor
 
+*In the IE Settings popup.*
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | **Hide CardPriority Tag in Editor** | Boolean | `true` | Hides the `CardPriority` powerup tag in the editor to reduce visual clutter. Requires reload after changing. |
@@ -54,15 +83,19 @@ This page documents all configurable settings available in the **Incremental Eve
 
 ## Performance Mode
 
+*In RemNote's settings panel.*
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| **[Performance Mode](Full-Mode-x-Light-Mode.md)** | Dropdown | `Light` | Choose between *Full* (all features, high resource use — best on Desktop App) and *Light* (faster, no relative priority/shield). Full mode starts a background pretagging and caching process that may temporarily slow RemNote. |
+| **[Performance Mode](Full-Mode-x-Light-Mode.md)** | Dropdown | `Light` | Choose between *Full* (all features, high resource use — best on Desktop App) and *Light* (faster, no relative priority/shield). The background pretagging and caching pass this used to start now also requires *Enable Flashcard Prioritisation*; with that off, Full mode no longer tags anything across your knowledge base. |
 | **Always use Light Mode on Mobile** | Boolean | `true` | Auto-switches to Light mode on iOS/Android to prevent crashes and improve performance. |
 | **Always use Light Mode on Web Browser** | Boolean | `true` | Auto-switches to Light mode on web browsers where Full mode can be slow or unstable. |
 
 ---
 
 ## FSRS Integration
+
+*In the IE Settings popup.*
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -73,6 +106,8 @@ This page documents all configurable settings available in the **Incremental Eve
 
 ## Environment
 
+*In the IE Settings popup.*
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | **RemNote Environment** | Dropdown | `Regular` | Choose which RemNote environment documents open in when using the "Open Editor in New Tab" button. Options: *Regular (www.remnote.com)* or *Beta (beta.remnote.com)*. |
@@ -81,9 +116,12 @@ This page documents all configurable settings available in the **Incremental Eve
 
 ## History & Mastery Drill
 
+*In the IE Settings popup.*
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | **Flashcard Response Time Limit** | Number | `180` s | Caps the recorded study time per card. If you step away from your device mid-card, only up to this limit is counted toward speed and total time metrics, mirroring RemNote's native behavior. |
-| **Skip Mastery Drill** | Boolean | `false` | Master switch to disable all [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill) features. When enabled: the drill popup and sidebar notification widgets are not registered, the `Mastery Drill` command is not available, and cards rated *Again* or *Hard* are no longer tracked or added to the drill queue. Turn this on if you do not want to use the Mastery Drill workflow at all. Flashcard and Practiced Queue history are not affected. |
+| **Enable Mastery Drill** | Boolean | `false` | Master switch for the [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill). Off by default: while it is on, the plugin watches every flashcard rating and keeps a list of the ones to drill, and registers the drill popup, its command and the sidebar notification. Leave it off if you do not use the workflow and none of that work happens. Flashcard and Practiced Queue history are unaffected either way. Requires a reload. *(Replaces the former "Skip Mastery Drill", whose value is inverted and carried over automatically.)* |
+| **Mastery Drill Minimum Delay** | Number | `120` min | Cooldown after a card is rated *Again* or *Hard* before it appears in the drill, so the initial repetition has time to consolidate. See [Minimum Delay](History-Queue-Dashboard-and-Mastery-Drill.md#minimum-delay). |
 | **Old Items Threshold** | Number | `7` days | Number of days after which a card lingering in the [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill) queue is flagged as stale. A warning appears in the widget and you can clear these items with a single click. |
 | **Disable Mastery Drill Notification** | Boolean | `false` | Hides the periodic Left Sidebar notification widget that appears when ≥ 10 cards are pending in the Mastery Drill queue. |

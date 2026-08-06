@@ -6,6 +6,24 @@ This page explains how the plugin allows you to layer a priority system on top o
 
 ---
 
+## Switching it on { #the-opt-in }
+
+Flashcard prioritisation is **off by default**. Turn it on at **Settings → Plugins → Incremental Everything → Enable Flashcard Prioritisation**, then reload RemNote.
+
+It is opt-in because it is the one part of the plugin that works across your **entire** knowledge base rather than on the Rems you are handling. While it is on, the plugin tags flashcard-bearing Rems with the `cardPriority` powerup and keeps those tags in step as you edit — on a large library that means a long initial pass and continuous background work, and RemNote can feel slow until it settles.
+
+**Only turn it on if you create [Priority Review Documents](Priority-Review-Document.md) for flashcards and review the queue there.** That is what the tags are for. If you are unsure, leave it off — you can switch it on later at any time and the plugin will build what it needs then.
+
+### What still works with it off
+
+- **Everything that is not about flashcard priority**: extracts, incremental reading, PDF and video, the scheduler, the queue, the Mastery Drill, and priorities on Incremental Rems themselves.
+- **A flashcard's inherited priority is still resolved and still displayed.** The plugin walks up the ancestry on each read, so the priority widgets, the queue badge and `Alt+P` all show the correct value — it simply is not written to the Rem.
+- **Priorities you set yourself are still saved.** Setting a priority on a flashcard (`Alt+P`, the batch tools) records it with source `manual`, and dismissing an Incremental Rem still stamps `incremental` on the flashcards beneath it. Those two are deliberate acts on identified Rems, so the switch does not block them.
+
+What is skipped is the **bulk index**: the KB-wide tagging pass, the inheritance cascade over descendants, the priority cache, and everything built on it — the [Priority Shield](Prioritization-&-Sorting.md#priority-shield), relative percentiles, and flashcards in Priority Review Documents.
+
+---
+
 ## How It Works
 
 

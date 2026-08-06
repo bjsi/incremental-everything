@@ -377,6 +377,13 @@ A feature-rich table of all your Incremental Rems with two entry points:
 
 ## 6. Utility Popups
 
+### 6.0. IE Settings
+**Command:** `Incremental Everything: Settings` (quick code `ies`)
+
+The plugin's own settings window: every setting it owns, grouped by area rather than listed flat, with a search box, a *Reset* on anything changed from its default, and a **?** beside entries that opens the section of this manual explaining them. Settings whose parent switch is off are hidden — the Beta Scheduler's parameters, the Mastery Drill's — and the switch that governs them says so. The five settings that stay in RemNote's own panel are shown here read-only, with a pointer to where they are changed.
+
+📖 **Full documentation:** [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are)
+
 ### 6.1. Reschedule Widget
 **Shortcut:** `Ctrl+J` (works in both queue and editor)
 

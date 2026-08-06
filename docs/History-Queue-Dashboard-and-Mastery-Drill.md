@@ -155,6 +155,13 @@ Inspired by SuperMemo's *Final Drill*, the **Mastery Drill** creates a focused s
 
 ![Mastery Drill](assets/mastery-drill.png){ width="900" }
 
+!!! info "Off by default — switch it on to use it"
+    Turn on **Enable Mastery Drill** in the [IE Settings popup](Plugin-Settings-Reference.md#where-the-settings-are) (command `ies`, under *Mastery Drill*) and reload RemNote.
+
+    While the drill is on, the plugin listens to every flashcard rating and keeps a list of the cards that need drilling, and it registers the drill popup, its command and the sidebar notification. Off, none of that runs — which is why it is opt-in rather than always present. Your flashcard and Practiced Queue history are unaffected either way.
+
+    *Upgrading:* this replaces the old **Skip Mastery Drill** switch. If you had turned that on, the drill stays off; the value is inverted and carried over for you.
+
 ### How It Works
 
 - Any flashcard you rate **Forgot** or **Hard** is automatically added to the Mastery Drill queue.

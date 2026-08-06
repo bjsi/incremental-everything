@@ -286,6 +286,12 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
 
 ## System & Maintenance Commands
 
+- **Incremental Everything: Settings** (`ies`)
+  Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
+
+- **Debug: Settings Migration Status**
+  Reports whether your settings were carried over successfully when the plugin moved most of them into its own storage: a summary in a toast, and the full per-setting record in the developer console. Useful only if a setting appears to have reverted after an upgrade.
+
 - **Import Incremental Rems with History**
   Bulk-imports Incremental Rems from a **JSON payload** — including each rem's **full repetition history**, priority and next-repetition date. Built for migrating an external study log (e.g. a spreadsheet with years of study sessions) into the plugin's native history format.
   - **Input:** a version-1 JSON file following the format documented below. What matters is the JSON contract — how you produce the file is up to you. The repository ships `scripts/convert_study_log.py` **only as a sample** (an Excel → JSON converter tailored to one specific spreadsheet layout, with source-specific adjustments hardcoded); use it as a starting point, not as the reference.

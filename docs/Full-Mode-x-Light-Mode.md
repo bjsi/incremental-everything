@@ -8,6 +8,11 @@
 
 ---
 
+!!! important "Performance Mode is now the *second* switch to consider"
+    Since v1.0.33 the plugin's heaviest work — tagging flashcard-bearing Rems across your knowledge base and keeping those tags in step — is behind a separate opt-in, **Enable Flashcard Prioritisation**, which is **off by default**.
+
+    With that switch off, Full Mode no longer starts the startup pretagging pass and no longer cascades priorities down your document tree, so the gap between the two modes is far smaller than this page describes. Everything below applies once you have turned flashcard prioritisation on — see [Priorities for Flashcards](Priorities-for-Flashcards.md#the-opt-in).
+
 ## 📊 At a Glance
 
 ### Full Mode 🖥️
