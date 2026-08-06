@@ -178,7 +178,7 @@ Toggle behavior simply by adding or removing the `extractviewer` tag:
 
 ### Multiple PDF Sources — Active PDF, Switcher, and `#preferthispdf`
 
-An Incremental Rem can now have **as many PDF sources as you like**, and you can switch between them on the fly. The plugin tracks an **active PDF** per Inc Rem (a synced-storage pin under `active_pdf_for_<remId>`) and applies the same resolution chain everywhere a PDF is opened or displayed.
+An Incremental Rem can now have **as many PDF sources as you like**, and you can switch between them on the fly. The plugin tracks an **active PDF** per Inc Rem — pinned in the Rem's own hidden *Reading State* property, alongside its page position, page range and page history — and applies the same resolution chain everywhere a PDF is opened or displayed.
 
 **Resolution chain (applied uniformly across queue Reader, PDF Control Panel, Priority Editor, Editor Review Timer, Execute Repetition popup, bookmark popup, etc.):**
 

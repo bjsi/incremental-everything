@@ -1388,8 +1388,11 @@ function Debug() {
       console.log(`\n========== PAGE HISTORY DUMP: ${remId} ==========`);
       for (const { rem: pdfRem } of pdfs) {
         const pdfName = await safeRemTextToString(plugin, pdfRem.text);
+        // Reading state lives on the Rem now; the legacy key is only still read
+        // here to show whether this pair has migrated. `null` next to a populated
+        // parsed history means "migrated", not "data lost".
         const storageKey = getPageHistoryKey(remId, pdfRem._id);
-        const raw = await plugin.storage.getSynced(storageKey);
+        const legacyRaw = await plugin.storage.getSynced(storageKey);
         const parsed = await getPageHistory(plugin, remId, pdfRem._id);
         const stats = await getReadingStatistics(plugin, remId, pdfRem._id);
 
@@ -1408,7 +1411,10 @@ function Debug() {
         console.log(`Sum of sessionDurations: ${durationsSum}s = ${formatDuration(durationsSum)}`);
         console.log(`getReadingStatistics().totalTimeSeconds: ${stats.totalTimeSeconds}s = ${formatDuration(stats.totalTimeSeconds)}`);
         console.log(`Min duration: ${durationsMin}s   Max duration: ${durationsMax}s   Capped(>=14400): ${capped14400Count}`);
-        console.log(`Raw storage value:`, raw);
+        console.log(
+          `Legacy synced value (${legacyRaw == null ? 'none — migrated to the Rem' : 'still present'}):`,
+          legacyRaw
+        );
         console.log(`Parsed history (JSON):`);
         console.log(JSON.stringify(parsed, null, 2));
 

@@ -493,7 +493,7 @@ The visible symptom was that the **Total Time** on the [PDF Control panel](PDF-I
 
 ### When to Use
 
-- **Page History Dump** — anytime you want to inspect the raw per-entry contents of `incremental_page_history_<remId>_<pdfRemId>` storage for a given Incremental (or Dismissed) Rem, e.g. to investigate a discrepancy between PDF Control and Repetition History totals, or to confirm that recent reviews were recorded correctly.
+- **Page History Dump** — anytime you want to inspect the per-entry reading history of a given Incremental (or Dismissed) Rem, e.g. to investigate a discrepancy between PDF Control and Repetition History totals, or to confirm that recent reviews were recorded correctly.
 - **Clean Inflated Page-History Durations** — when the dump (or PDF Control vs Repetition History) shows that this rem has inflated entries to strip.
 - **Clean Inflated Page-History — Global Scan** — once, after upgrading to v0.2.258, to clean up every IncRem and Dismissed rem in the knowledge base in a single pass.
 
@@ -507,15 +507,18 @@ The visible symptom was that the **Total Time** on the [PDF Control panel](PDF-I
 
 Click **Dump Page History**. For every PDF source on the focused rem, the widget will:
 
-- Print the raw storage value and the parsed `PageHistoryEntry[]` to the console (F12 → Console).
+- Print the parsed `PageHistoryEntry[]` to the console (F12 → Console), along with the legacy synced value for that pair — see the note below on reading it.
 - Render a per-PDF summary card in the widget showing:
   - **Total entries** vs **entries with `sessionDuration > 0`**.
   - **Sum of durations** vs **`getReadingStatistics` total** (these should always match; mismatch indicates a parsing bug).
   - **Min/Max** duration and **count of entries hitting the 4h cap** (14400 s).
-  - The exact storage key (`incremental_page_history_<remId>_<pdfRemId>`).
+  - The legacy storage key for the pair (`incremental_page_history_<remId>_<pdfRemId>`), shown for reference.
 - A `<details>` toggle exposes the full raw JSON of every entry.
 
 This is purely diagnostic — nothing is mutated.
+
+> [!NOTE]
+> **Since v1.0.34, reading history lives on the Rem** (a hidden *Reading State* property) rather than in plugin storage. The dump still reports the old synced value so you can tell whether a given (Rem, PDF) pair has moved across yet: `none — migrated to the Rem` next to a populated history means the migration has happened, **not** that data was lost. Pairs migrate individually, the first time each is opened.
 
 ### 🧹 Clean Inflated Page-History Durations (per rem)
 
