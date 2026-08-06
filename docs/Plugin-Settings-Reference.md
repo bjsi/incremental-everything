@@ -8,7 +8,13 @@ Settings live in **two places**, and the tables below say which.
 
 **Most settings are in the plugin's own settings popup.** Open it with the command **`Incremental Everything: Settings`** (quick code `ies`). It groups the settings by area, hides the ones that do not apply — the Beta Scheduler's parameters stay out of sight until you switch that scheduler on — and links each entry to the section of this manual that explains it.
 
+![The Incremental Everything settings popup](assets/settings-popup.png){ width="900" }
+
+*Above: the Scheduling group with the Beta Scheduler on, so its two parameters are shown and the Multiplier is hidden. The **?** opens this manual at the matching section; **Reset** appears on anything changed from its default, next to a **modified** badge.*
+
 **Five settings stay in RemNote's panel**, at **Settings → Plugins → Incremental Everything**: *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches, and *Enable Hide-in-Queue Powerups and Commands*. These govern how much work the plugin is allowed to do — and RemNote's own panel is where you would go looking if the plugin ever felt heavy, quite possibly before you knew this popup existed. They appear in the popup too, read-only, with a pointer to where they are changed.
+
+![The five Incremental Everything settings in RemNote's plugin settings panel](assets/settings-native.png){ width="550" }
 
 !!! note "Upgrading from an earlier version"
     Your existing settings are carried over automatically the first time you load this version — nothing to re-enter. The settings that moved will disappear from RemNote's panel after that first load.

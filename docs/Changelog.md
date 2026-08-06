@@ -8,11 +8,15 @@ This page documents the major changes and improvements for each version of the I
 
 RemNote's plugin settings panel is one flat list, and this plugin had grown to more than thirty entries in it. **`Incremental Everything: Settings`** (quick code `ies`) opens a proper settings window instead: grouped by area, searchable, with a **?** beside entries that links straight to the section of this manual explaining them, and a *Reset* on anything you have changed from its default.
 
+![The Incremental Everything settings popup, showing the Scheduling group](assets/settings-popup.png){ width="900" }
+
 It also hides what does not apply. The Beta Scheduler's *First Review Interval* and *Max Interval* appear only once that scheduler is on; the *Multiplier* disappears when it is, since the saturating curve ignores it; the Mastery Drill's parameters appear only when the drill is enabled. Each switch says which settings it reveals, so nothing vanishes without explanation.
 
 Your existing settings are carried over on first load — nothing to re-enter — and the ones that moved disappear from RemNote's panel afterwards.
 
 **Five settings deliberately stay in RemNote's panel**: *Enable Flashcard Prioritisation*, *Performance Mode*, the two *Always Use Light Mode* switches and *Enable Hide-in-Queue Powerups and Commands*. Those govern how much work the plugin is allowed to do, and RemNote's own panel is where you would go looking if it ever felt heavy — quite possibly before you knew this popup existed. They are shown in the popup too, read-only, pointing at where to change them.
+
+![The five settings that stay in RemNote's own plugin settings panel](assets/settings-native.png){ width="550" }
 
 📖 [Plugin Settings Reference → Where the settings are](Plugin-Settings-Reference.md#where-the-settings-are)
 
