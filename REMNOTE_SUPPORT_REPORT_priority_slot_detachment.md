@@ -4,7 +4,67 @@
 **SDK:** `@remnote/plugin-sdk` ^0.0.46
 **RemNote build:** _(to be filled in — desktop build on which the dump below was taken)_
 **Date of evidence:** 2026-08-06
-**Severity:** Widespread. A full scan of this knowledge base finds **99.2% of Incremental Rems (5,390 / 5,434)** with a detached priority slot, **6.7% of CardPriority Rems (3,001 / 45,078)**, and **59.8% of scheduled dates (1,893 / 3,163)** pointing at Daily Documents that no longer exist. Values are recoverable in every category; none are silently correct.
+**Status:** Priority detachment **fixed in 1.27.24** and fully remediated on 2026-08-07; missing Daily Documents **outstanding**. See §0, and the follow-up `REMNOTE_SUPPORT_FOLLOWUP_1.27.24.md`.
+**Severity (as originally reported):** Widespread. A full scan of this knowledge base finds **99.2% of Incremental Rems (5,390 / 5,434)** with a detached priority slot, **6.7% of CardPriority Rems (3,001 / 45,078)**, and **59.8% of scheduled dates (1,893 / 3,163)** pointing at Daily Documents that no longer exist. Values are recoverable in every category; none are silently correct.
+
+---
+
+## 0. STATUS AFTER RemNote 1.27.24 — partially fixed
+
+Re-scanned on 2026-08-07 against the same knowledge base.
+
+| Defect | Before | After 1.27.24 | After remediation | Status |
+|---|---|---|---|---|
+| §3 Detached `Incremental` priority | 5,390 / 5,434 (99.2%) | 1 | **0** | ✅ resolved |
+| §3 Detached `CardPriority` priority | 3,001 / 45,078 (6.7%) | 1 | **0** | ✅ resolved |
+| §5 `Next Rep Date` slot reference | ~2,231 unresolvable | **0** | 0 | ✅ fixed by 1.27.24 |
+| CardPriority values unreadable (`missing`) | — | 376 | **0** | ✅ resolved by us |
+| Orphaned property Rems (litter) | — | 370 | **0** | ✅ deleted by us |
+| §5 Missing Daily Documents | 1,893 dangling | 2,033 dangling | **2,033 dangling** | ❌ **outstanding** |
+| §4 Orphan slot Rems on the definitions | 4 | 4 | **4** | ❌ not cleaned (inert) |
+| §6 Error message wording | — | corrected | corrected | ✅ fixed |
+
+**What the fix did:** it re-pointed the property→slot references, and it did so for `Next Rep Date` as well as for priority. The date figure needs care: before the fix only 3,163 Incremental Rems had a *findable* Next Rep Date property, because ~2,231 of them referenced something other than the registered slot and were invisible to the scan. All 5,394 are now correctly linked. So the reference-level defect is resolved across the board.
+
+**What remains:** the Daily Documents those date properties point at are still gone. **2,033 of 5,394 (37.7%)** reference a Rem that does not exist. This is now the only substantive defect, and it is unaffected by the fix because it is not a reference problem — the target was deleted.
+
+**Two residual cases, and they identify the mechanism precisely.** Both are Rems carrying **both** powerups, and on each one the two same-named `Priority` properties have been **collapsed into a single property**. The survivor is correctly linked to one powerup; the other powerup has no priority property at all:
+
+| Rem | Surviving property links to | Reads correctly | Has no property |
+|---|---|---|---|
+| `gJiSum4KOK8YRaCmU` | `6eUpUKWrfZdU4nrgc` (CardPriority) | CardPriority = 10 | **Incremental** → falls back to 50 |
+| `741rSQQHCazbKrttP` | `76Pb95h0XktNfDO7Y` (Incremental) | Incremental = 10 | **CardPriority** → resolves as inherited |
+
+Confirmed in the UI: `gJiSum4KOK8YRaCmU` shows Flashcard Priority **10** with `Source: incremental` while Incremental Rem shows **50** — the plugin's fallback, not a stored value; the outliner shows a single `# 10` row. `741rSQQHCazbKrttP` is the mirror image: Incremental **10**, Flashcard Priority **10** with `Source: inherited`.
+
+In both cases the two priorities were **numerically identical** before the merge — necessarily so for `gJiSum4KOK8YRaCmU`, whose card priority was derived from its incremental priority (`Source: incremental`). That points at a de-duplication step that collapsed two properties judged equivalent by name *and* value, on Rems where both powerups were present.
+
+This is the clearest confirmation of the mechanism proposed in §3.2: slots were matched by the display name "Priority" across powerup boundaries. The 1.27.24 migration repaired every property pointing at an *orphan* slot, but a collapsed pair looks entirely healthy from the surviving powerup's side, so nothing flags it.
+
+Only 2 remain (down from 250 Rems carrying both powerups with a detached property before the fix), and the practical damage is small — one Rem is showing 50 where 10 is correct — but the same de-duplication would silently destroy one of two *differing* priorities wherever the values were not equal.
+
+The four orphan slot Rems in §4 are still attached to the powerup definitions.
+
+The `getPowerupSlotByCode` message has been amended to "…although legacy slot Rem may still exist", which resolves the inaccuracy raised in §6.
+
+### Remediation completed 2026-08-07
+
+A further defect surfaced after the fix and is documented in the follow-up: **376 property Rems referencing slot Rem `JF0lnO7kCGbDrHRrt`, which does not exist.** Because that slot is not a child of either powerup definition, these did not register as "detached" — they were reported as `missing`, indistinguishable from a Rem that never had a priority. 21 of them carried `prioritySource: manual`.
+
+All of it is now resolved on this knowledge base:
+
+- 21 manual values recovered from their mis-pointed property Rems (verified read-back, 21/21);
+- 354 inherited values re-materialised via the plugin's own inheritance command (`missing` 376 → **0**);
+- 370 orphaned property Rems deleted in stages, each individually guarded — **370 deleted, 0 values disturbed**.
+
+```
+Incremental    5,434 total · detached 0 · missing 40
+CardPriority  45,078 total · detached 0 · missing 0
+Leftover priority properties: 0
+Next Rep Date: 2,033 dangling   ← the only outstanding data issue
+```
+
+Full detail, and the questions still open for RemNote, are in **`REMNOTE_SUPPORT_FOLLOWUP_1.27.24.md`**.
 
 ---
 

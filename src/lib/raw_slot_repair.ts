@@ -32,10 +32,10 @@
 
 import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
 import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT, LAST_UPDATED_SLOT, PrioritySource } from './card_priority/types';
-import { setCardPriority } from './card_priority';
-import { getPowerupSlotByCodeSafe } from './powerup_slot_compat';
+import { setCardPriority, getCardPriority } from './card_priority';
 import { safeRemTextToString } from './pdfUtils';
-import { refIdsIn, readRawText } from './raw_slot_dump';
+import { readRawText } from './raw_slot_dump';
+import { scanKbForDetachedSlots, LeftoverProperty } from './raw_slot_scan';
 import { getIESetting } from './settings';
 import { enableFlashcardPrioritisationId } from './consts';
 
@@ -72,11 +72,16 @@ export interface RepairReport {
    * `testDeleteOrphanProperties` — keep it; it is the only record of what to clean.
    */
   orphanPropertyRemIds: string[];
+  /**
+   * Orphan property Rems belonging to the SKIPPED derivable Rems. Also litter,
+   * but their values are reconstructible, which makes them the safe population to
+   * try the first deletions on — unlike the recovered manual values above.
+   */
+  derivableOrphanPropertyRemIds: string[];
   samples: RepairCandidate[];
   notes: string[];
 }
 
-const BATCH_SIZE = 50;
 const SAMPLE_CAP = 25;
 
 export interface RepairOptions {
@@ -107,182 +112,153 @@ export async function repairDetachedCardPriorities(
   const started = Date.now();
   const notes: string[] = [];
 
-  const registeredSlot = await getPowerupSlotByCodeSafe(plugin, CARD_PRIORITY_CODE, PRIORITY_SLOT);
-  const registeredId = registeredSlot?._id ?? null;
-  if (!registeredId) {
-    throw new Error(
-      'Could not resolve the registered CardPriority priority slot — refusing to run. ' +
-      'Without it, a healthy property is indistinguishable from a detached one.'
-    );
-  }
+  // ── Work list ─────────────────────────────────────────────────────────────
+  //
+  // The candidates come from the KB scan, NOT from a second walk of the Rem tree.
+  //
+  // This function used to re-derive "is this a stranded priority" itself, and its
+  // answer disagreed with the scan three times running (324 vs 375). Each round
+  // produced a plausible-looking cause — an early `break`, an empty linked
+  // property, an incomplete `taggedRem()` index — and each fix left the numbers
+  // unchanged, because the real problem was having two implementations of one
+  // predicate at all. The scan is the authority; this consumes its output.
+  //
+  // Cost: the scan runs first (~25s, read-only). Worth it for a one-shot repair.
+  const scan = await scanKbForDetachedSlots(plugin, (done: number, total: number) =>
+    onProgress?.(done, total)
+  );
 
-  // Every slot Rem on the CardPriority definition, so a detached property can be
-  // recognised by referencing one of them that is NOT the registered slot.
-  const powerup = await plugin.powerup.getPowerupByCode(CARD_PRIORITY_CODE);
-  const slotChildren = ((await powerup?.getChildrenRem().catch(() => [])) || []) as PluginRem[];
-  const knownSlotIds = new Set<string>();
-  for (const c of slotChildren) {
-    if (await c.isPowerupSlot().catch(() => false)) knownSlotIds.add(c._id);
-  }
+  const isDerivable = (s: PrioritySource | null) => s === 'inherited' || s === 'default';
+  const work = scan.strandedAll.filter(
+    (l: LeftoverProperty) => includeDerivable || !isDerivable(l.ownerSource)
+  );
+  const skippedDerivable = scan.strandedAll.length - work.length;
 
-  const rems = ((await powerup?.taggedRem().catch(() => [])) || []) as PluginRem[];
-
-  // setCardPriority refuses 'inherited'/'default' writes while flashcard
-  // prioritisation is off (mayWriteCardPrioritySource). Without this check the
-  // write would silently no-op, the verification below would fail, and after five
-  // of those the run would abort claiming the repair mechanism is broken — when
-  // in fact it is a setting. Fail loudly and early instead.
-  if (includeDerivable && !(await getIESetting(plugin, enableFlashcardPrioritisationId))) {
-    throw new Error(
-      "includeDerivable was requested but flashcard prioritisation is OFF, so " +
-      "'inherited'/'default' writes are refused by design. Enable the setting, or " +
-      'run without includeDerivable (the default) to repair only manual/incremental values.'
-    );
-  }
+  // The derivable ones are skipped for repair, but their orphan property Rems are
+  // still litter — and they are the RIGHT first target for the deletion test.
+  // Their values are reconstructible from the ancestor cascade, so a delete that
+  // goes wrong costs nothing, whereas the repaired manual values are the most
+  // expensive thing in the set to lose.
+  const derivableOrphanPropertyRemIds = scan.strandedAll
+    .filter((l: LeftoverProperty) => isDerivable(l.ownerSource))
+    .map((l: LeftoverProperty) => l.propertyRemId);
 
   const report: RepairReport = {
     exportedAt: new Date().toISOString(),
     dryRun,
     durationMs: 0,
-    scanned: rems.length,
+    scanned: scan.strandedAll.length,
     candidates: 0,
-    skippedDerivable: 0,
+    skippedDerivable,
     repaired: 0,
     failedVerification: 0,
     errors: [],
     orphanPropertyRemIds: [],
+    derivableOrphanPropertyRemIds,
     samples: [],
     notes,
   };
+  notes.push(
+    `Work list taken from the KB scan: ${scan.leftoverStranded} stranded, ` +
+    `${scan.strandedNeedsRecovery} needing recovery, ${scan.strandedDiscardable} derivable.`
+  );
 
   let stopped = false;
 
-  for (let i = 0; i < rems.length && !stopped; i += BATCH_SIZE) {
-    const batch = rems.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < work.length && !stopped; i++) {
+    if (limit !== undefined && report.repaired >= limit) {
+      stopped = true;
+      notes.push(`Stopped after reaching the limit of ${limit} repair(s).`);
+      break;
+    }
 
-    // Sequential within a batch: each repair is a multi-property write plus a
-    // band sync, and firing 50 of those concurrently saturates the IPC bridge.
-    for (const rem of batch) {
-      if (limit !== undefined && report.repaired >= limit) {
-        stopped = true;
-        notes.push(`Stopped after reaching the limit of ${limit} repair(s).`);
-        break;
+    const item = work[i];
+    try {
+      const rem = await plugin.rem.findOne(item.ownerRemId);
+      if (!rem) {
+        report.errors.push({ remId: item.ownerRemId, error: 'Rem not found' });
+        continue;
       }
 
+      // The scan already read the value off the orphan property; re-validate the
+      // range rather than trusting it, since this is the write path.
+      const storedValue = parseInt(item.value, 10);
+      if (isNaN(storedValue) || storedValue < 0 || storedValue > 100) {
+        report.errors.push({ remId: item.ownerRemId, error: `implausible value "${item.value}"` });
+        continue;
+      }
+
+      // Source and lastUpdated live in hidden slots, which survived the migration,
+      // so the original provenance is restored rather than stamping every repaired
+      // card as a fresh manual edit.
+      const source: PrioritySource = item.ownerSource ?? 'manual';
+      let lastUpdated: number | null = null;
       try {
-        const children = ((await rem.getChildrenRem().catch(() => [])) || []) as PluginRem[];
+        const lu = await rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT);
+        const parsed = lu ? parseInt(String(lu), 10) : NaN;
+        if (!isNaN(parsed)) lastUpdated = parsed;
+      } catch {
+        /* leave null — setCardPriority stamps now */
+      }
 
-        let linked = false;
-        let orphan: PluginRem | null = null;
-        let orphanSlotId: string | null = null;
-        for (const child of children) {
-          const refs = refIdsIn(child.text);
-          if (!refs.length) continue;
-          if (refs.includes(registeredId)) {
-            linked = true;
-            break;
-          }
-          const hit = refs.find((id) => knownSlotIds.has(id));
-          if (hit && !orphan) {
-            orphan = child;
-            orphanSlotId = hit;
-          }
-        }
-        // A healthy property wins outright — never touch a Rem that already reads.
-        if (linked || !orphan || !orphanSlotId) continue;
+      report.candidates++;
+      report.orphanPropertyRemIds.push(item.propertyRemId);
 
-        const raw = (await readRawText(plugin, (orphan as any).backText)).trim();
-        if (!/^\d{1,3}$/.test(raw)) continue;
-        const storedValue = Math.min(100, Math.max(0, parseInt(raw, 10)));
-
-        // prioritySource / lastUpdated are hidden slots — they survived the
-        // migration, so the original provenance can be restored rather than
-        // every repaired card being stamped as a fresh manual edit.
-        let source: PrioritySource = 'manual';
-        let lastUpdated: number | null = null;
-        try {
-          const s = await rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
-          if (s === 'manual' || s === 'inherited' || s === 'default' || s === 'incremental') {
-            source = s;
-          }
-          const lu = await rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT);
-          const parsed = lu ? parseInt(String(lu), 10) : NaN;
-          if (!isNaN(parsed)) lastUpdated = parsed;
-        } catch {
-          /* fall back to 'manual', the conservative choice: it is never suppressed
-             by mayWriteCardPrioritySource and never silently dropped. */
-        }
-
-        if (!includeDerivable && (source === 'inherited' || source === 'default')) {
-          report.skippedDerivable++;
-          continue;
-        }
-
-        report.candidates++;
-
-        // What the app is using right now, for the record. ONLY for the handful
-        // of rows that get sampled: getCardPriority walks the ancestor chain, and
-        // firing that for thousands of candidates saturates the IPC bridge for no
-        // benefit — the repair itself does not depend on this value.
+      if (report.samples.length < SAMPLE_CAP) {
         let currentValue: number | null = null;
-        if (report.samples.length < SAMPLE_CAP) {
-          try {
-            const { getCardPriority } = await import('./card_priority');
-            const info = await getCardPriority(plugin, rem);
-            currentValue = info?.priority ?? null;
-          } catch {
-            /* diagnostic only */
-          }
+        try {
+          const { getCardPriority } = await import('./card_priority');
+          currentValue = (await getCardPriority(plugin, rem))?.priority ?? null;
+        } catch {
+          /* diagnostic only */
         }
-
-        const candidate: RepairCandidate = {
-          remId: rem._id,
+        report.samples.push({
+          remId: item.ownerRemId,
           text: (await safeRemTextToString(plugin, rem.text)).slice(0, 120),
           storedValue,
           currentValue,
           source,
           lastUpdated,
-          orphanPropertyRemId: orphan._id,
-          orphanSlotId,
-        };
-        if (report.samples.length < SAMPLE_CAP) report.samples.push(candidate);
-        report.orphanPropertyRemIds.push(orphan._id);
-
-        if (dryRun) continue;
-
-        await setCardPriority(plugin, rem, storedValue, source, true);
-
-        // Restore the original timestamp: setCardPriority stamps Date.now(), but
-        // this is a repair, not an edit, and lastUpdated is how inheritance and
-        // the analytics decide precedence.
-        if (lastUpdated !== null) {
-          try {
-            await rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [String(lastUpdated)]);
-          } catch { /* non-fatal — the priority itself is what matters */ }
-        }
-
-        // Verify through the API that was broken. A write that does not read back
-        // means the repair does not work on this build and we must stop.
-        const check = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null);
-        if (check != null && String(check).trim() === String(storedValue)) {
-          report.repaired++;
-        } else {
-          report.failedVerification++;
-          if (report.failedVerification >= 5) {
-            stopped = true;
-            notes.push(
-              'ABORTED: 5 writes did not read back. The repair mechanism is not working ' +
-              'on this build — nothing further was attempted.'
-            );
-            break;
-          }
-        }
-      } catch (e: any) {
-        report.errors.push({ remId: rem._id, error: String(e?.message ?? e) });
+          orphanPropertyRemId: item.propertyRemId,
+          orphanSlotId: item.slotId,
+        });
       }
+
+      if (dryRun) continue;
+
+      await setCardPriority(plugin, rem, storedValue, source, true);
+
+      // Restore the original timestamp, but only when it is plausibly a
+      // millisecond value. Some Rems carry a lastUpdated of `2025` — the year —
+      // which parses to Jan 1970 and would make the card look older than the
+      // knowledge base. Faithfully restoring a broken value has no upside.
+      if (lastUpdated !== null && lastUpdated > 1_000_000_000_000) {
+        try {
+          await rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [String(lastUpdated)]);
+        } catch { /* non-fatal — the priority itself is what matters */ }
+      }
+
+      // Verify through the API that was broken. A write that does not read back
+      // means the repair does not work on this build and we must stop.
+      const check = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null);
+      if (check != null && String(check).trim() === String(storedValue)) {
+        report.repaired++;
+      } else {
+        report.failedVerification++;
+        if (report.failedVerification >= 5) {
+          stopped = true;
+          notes.push(
+            'ABORTED: 5 writes did not read back. The repair mechanism is not working ' +
+            'on this build — nothing further was attempted.'
+          );
+          break;
+        }
+      }
+    } catch (e: any) {
+      report.errors.push({ remId: item.ownerRemId, error: String(e?.message ?? e) });
     }
 
-    onProgress?.(Math.min(i + BATCH_SIZE, rems.length), rems.length);
+    onProgress?.(i + 1, work.length);
   }
 
   if (dryRun) {
@@ -316,6 +292,16 @@ export interface DeletionProbe {
   ownerText: string | null;
   /** Value the orphan was holding, captured before deletion so it can be restored by hand. */
   storedValue: string | null;
+  /** The owner's CardPriority source, read only when the raw value is empty. */
+  ownerSource: string | null;
+  /**
+   * The priority the app actually resolves for the owner (getCardPriority),
+   * either side of the deletion. For a derivable orphan the raw property reads
+   * empty both times, so this is the only check with any meaning: it follows the
+   * ancestor cascade exactly as the rest of the plugin does.
+   */
+  resolvedBefore: number | null;
+  resolvedAfter: number | null;
   ownerChildCountBefore: number | null;
   ownerChildCountAfter: number | null;
   /** The owner's CardPriority value read through the API, before and after. */
@@ -341,16 +327,37 @@ export interface DeletionProbe {
 export async function testDeleteOrphanProperties(
   plugin: RNPlugin,
   orphanPropertyRemIds: string[],
-  limit = 3
+  limit = 3,
+  onProgress?: (done: number, total: number) => void
 ): Promise<DeletionProbe[]> {
   const probes: DeletionProbe[] = [];
+  const targets = orphanPropertyRemIds.slice(0, limit);
+  let processed = 0;
 
-  for (const id of orphanPropertyRemIds.slice(0, limit)) {
+  for (const id of targets) {
+    // Abort the whole run the moment one deletion disturbs a value. At bulk
+    // scale, continuing past the first DANGER would turn a single recoverable
+    // mistake into hundreds.
+    if (probes.some((p) => p.verdict.startsWith('DANGER'))) {
+      probes.push({
+        orphanPropertyRemId: id,
+        ownerRemId: null, ownerText: null, storedValue: null, ownerSource: null,
+        resolvedBefore: null, resolvedAfter: null,
+        ownerChildCountBefore: null, ownerChildCountAfter: null,
+        apiValueBefore: null, apiValueAfter: null, deleted: false,
+        verdict: 'ABORTED — a previous deletion reported DANGER; nothing further was attempted.',
+      });
+      break;
+    }
+    onProgress?.(++processed, targets.length);
     const probe: DeletionProbe = {
       orphanPropertyRemId: id,
       ownerRemId: null,
       ownerText: null,
       storedValue: null,
+      ownerSource: null,
+      resolvedBefore: null,
+      resolvedAfter: null,
       ownerChildCountBefore: null,
       ownerChildCountAfter: null,
       apiValueBefore: null,
@@ -381,15 +388,35 @@ export async function testDeleteOrphanProperties(
       probe.apiValueBefore =
         (await owner.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null)) ?? null;
 
-      // Refuse if the good value is not in place — deleting would then be the only
-      // copy going away.
-      if (probe.apiValueBefore == null || String(probe.apiValueBefore).trim() === '') {
+      // Refuse unless the owner already has a readable priority in its own slot.
+      //
+      // An earlier version also accepted a derivable source ('inherited'/'default')
+      // on the theory that such a value is recomputed on demand and the orphan
+      // therefore holds nothing unique. That was WRONG: setCardPriority writes
+      // priority, source and lastUpdated together, so an inherited value is
+      // MATERIALISED into the Rem's own slot like any other. An empty slot with a
+      // surviving source is damage, and the orphan holds the only copy of that
+      // materialised value — deleting it forces every later read to walk the
+      // ancestor chain instead (see the ancestor-walk cost this plugin already
+      // fights) and leaves lastUpdated reporting 0.
+      //
+      // So the rule is simply: repair first, then delete. No exceptions by source.
+      const src = await owner.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT).catch(() => null);
+      probe.ownerSource = (src as string) ?? null;
+      const hasReadableValue =
+        probe.apiValueBefore != null && String(probe.apiValueBefore).trim() !== '';
+      if (!hasReadableValue) {
         probe.verdict =
-          'REFUSED: the owner has no readable CardPriority value, so this orphan may hold ' +
-          'the only copy. Repair the Rem first, then delete.';
+          `REFUSED: the owner's priority slot is empty (source "${probe.ownerSource ?? 'unknown'}"), ` +
+          'so this orphan holds the only materialised copy. Run the repair with ' +
+          'includeDerivable first, then delete.';
         probes.push(probe);
         continue;
       }
+
+      // The effective priority BEFORE — what the app shows the user. For a
+      // derivable orphan this comes from the ancestor cascade, not the property.
+      probe.resolvedBefore = (await getCardPriority(plugin, owner).catch(() => null))?.priority ?? null;
 
       await orphan.remove();
       probe.deleted = true;
@@ -397,14 +424,30 @@ export async function testDeleteOrphanProperties(
       probe.ownerChildCountAfter = ((await owner.getChildrenRem().catch(() => [])) || []).length;
       probe.apiValueAfter =
         (await owner.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null)) ?? null;
+      probe.resolvedAfter = (await getCardPriority(plugin, owner).catch(() => null))?.priority ?? null;
 
-      if (probe.apiValueAfter != null && probe.apiValueAfter === probe.apiValueBefore) {
-        probe.verdict = 'OK — orphan removed, the repaired priority still reads correctly.';
+      // The test is "did anything CHANGE", not "is there a value". An earlier
+      // version required apiValueAfter to be non-null, which reported every
+      // derivable orphan as DANGER with the self-refuting message "changed from
+      // null to null" — those read empty either side by definition.
+      const rawUnchanged = probe.apiValueBefore === probe.apiValueAfter;
+      const resolvedUnchanged = probe.resolvedBefore === probe.resolvedAfter;
+
+      if (rawUnchanged && resolvedUnchanged) {
+        probe.verdict =
+          `OK — orphan removed (children ${probe.ownerChildCountBefore} → ` +
+          `${probe.ownerChildCountAfter}); the priority the app resolves is unchanged ` +
+          `(${probe.resolvedBefore ?? 'none'}).`;
+      } else if (!rawUnchanged) {
+        probe.verdict =
+          `DANGER: the stored priority changed from ${probe.apiValueBefore} to ` +
+          `${probe.apiValueAfter}. Deleting the orphan disturbed the good property. ` +
+          `DO NOT run a bulk cleanup. Restore by setting this Rem's priority to ${probe.storedValue}.`;
       } else {
         probe.verdict =
-          `DANGER: the API value changed from ${probe.apiValueBefore} to ${probe.apiValueAfter}. ` +
-          'Deleting the orphan disturbed the good property. DO NOT run a bulk cleanup. ' +
-          `Restore by setting this Rem's priority back to ${probe.storedValue}.`;
+          `DANGER: the RESOLVED priority changed from ${probe.resolvedBefore} to ` +
+          `${probe.resolvedAfter} even though the stored property did not. The orphan was ` +
+          `contributing to inheritance. DO NOT run a bulk cleanup.`;
       }
     } catch (e: any) {
       probe.error = String(e?.message ?? e);
@@ -414,20 +457,35 @@ export async function testDeleteOrphanProperties(
     probes.push(probe);
   }
 
-  console.log('\n========== ORPHAN DELETION TEST ==========');
+  const deleted = probes.filter((p) => p.deleted).length;
+  const danger = probes.filter((p) => p.verdict.startsWith('DANGER')).length;
+  const refused = probes.filter((p) => p.verdict.startsWith('REFUSED')).length;
+  console.log('\n========== ORPHAN DELETION ==========');
+  console.log(
+    `deleted: ${deleted}   OK: ${deleted - danger}   DANGER: ${danger}   refused: ${refused}` +
+    `   (of ${probes.length} attempted)`
+  );
+  if (danger > 0) console.log('*** STOP — a deletion disturbed a value. Do not continue. ***');
+  // Cap the table: a bulk run produces hundreds of identical OK rows, and the
+  // summary above is what matters. Anything abnormal is printed in full below.
   console.table(
-    probes.map((p) => ({
+    probes.slice(0, 20).map((p) => ({
       orphan: p.orphanPropertyRemId,
       owner: p.ownerRemId ?? '(none)',
       held: p.storedValue ?? '',
       'children before': p.ownerChildCountBefore ?? '',
       'children after': p.ownerChildCountAfter ?? '',
-      'API before': p.apiValueBefore ?? '(empty)',
-      'API after': p.apiValueAfter ?? '(empty)',
+      'stored before': p.apiValueBefore ?? '(empty)',
+      'stored after': p.apiValueAfter ?? '(empty)',
+      'RESOLVED before': p.resolvedBefore ?? '(none)',
+      'RESOLVED after': p.resolvedAfter ?? '(none)',
       deleted: p.deleted,
     }))
   );
-  for (const p of probes) console.log(`${p.orphanPropertyRemId}: ${p.verdict}`);
+  for (const p of probes) {
+    if (p.verdict.startsWith('OK') && probes.length > 20) continue;
+    console.log(`${p.orphanPropertyRemId}: ${p.verdict}`);
+  }
   console.log('==========================================\n');
 
   return probes;

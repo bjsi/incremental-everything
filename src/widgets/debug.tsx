@@ -2168,19 +2168,41 @@ function Debug() {
   // attempted as part of a bulk pass. It refuses any Rem whose repaired priority
   // is not already readable, and reports the owner's state either side.
   const handleTestOrphanDeletion = async () => {
-    const ids = repairReport?.orphanPropertyRemIds ?? [];
-    if (!ids.length) {
-      await plugin.app.toast('Run the repair first — there are no recorded orphan property Rems.');
+    if (!repairReport) {
+      await plugin.app.toast('Run the repair first (a dry run is enough) so the orphan list exists.');
       return;
     }
-    if (repairReport?.dryRun) {
-      await plugin.app.toast('That report is a dry run, so nothing was repaired yet. Run the live repair first.');
+    // A dry run is sufficient when the targets are DERIVABLE orphans: that list
+    // is produced by the scan and does not depend on anything having been
+    // written. Only the repaired-manual targets require a live run first, since
+    // their safety depends on the value already being restored.
+    const derivableAvailable = (repairReport.derivableOrphanPropertyRemIds ?? []).length > 0;
+    if (repairReport.dryRun && !derivableAvailable) {
+      await plugin.app.toast(
+        'That report is a dry run and recorded no derivable orphans. Run the live repair first.'
+      );
+      return;
+    }
+    // Target only leftovers whose owner's slot ALREADY READS. The scan's
+    // safe-to-delete list is the authority: it is computed from current state, so
+    // it grows automatically once "Update all inherited Card Priorities" or a
+    // repair has materialised the values. Falling back to the repair's own output
+    // covers the case where no scan has been run this session.
+    const ids = (kbScan?.safeToDeleteAll ?? []).map((l) => l.propertyRemId);
+    if (!ids.length) ids.push(...repairReport.orphanPropertyRemIds);
+    if (!ids.length) {
+      await plugin.app.toast(
+        'No repaired Rems recorded. Run the repair (with "incl. inherited" if you want the ' +
+        'derivable ones fixed too) — the deletion only touches Rems whose value is already restored.'
+      );
       return;
     }
     const confirmed = confirm(
       `This DELETES 3 orphaned property Rems (of ${ids.length} recorded).\n\n` +
-      `Each one is only removed if the Rem's repaired priority already reads back correctly, ` +
-      `and the value it held is captured first so it can be restored by hand.\n\n` +
+      `Targets Rems this repair just restored, so the value already exists in the correct ` +
+      `property. Any Rem whose slot is still empty is REFUSED automatically — its orphan ` +
+      `would be the only copy.\n\n` +
+      `The value each orphan held is captured first and printed, so it can be restored by hand.\n\n` +
       `Purpose: find out whether deleting the stale property disturbs the good one, BEFORE ` +
       `any bulk cleanup. Continue?`
     );
@@ -2195,6 +2217,55 @@ function Debug() {
         ? `⚠ ${bad.length} deletion(s) disturbed the good value — DO NOT bulk clean. See console.`
         : `Deleted ${probes.filter((p) => p.deleted).length}. Priorities intact. See console.`
     );
+  };
+
+  // Bulk cleanup. Same per-Rem guard as the 3-Rem test — it is literally the same
+  // function with the cap lifted — plus an abort on the first DANGER so one bad
+  // deletion cannot become hundreds.
+  const handleBulkOrphanDeletion = async () => {
+    // Only Rems this repair restored. Un-repaired ones would be refused per-Rem
+    // anyway, but there is no reason to attempt them: their orphan is still the
+    // only materialised copy of the value.
+    const ids = (kbScan?.safeToDeleteAll ?? []).map((l) => l.propertyRemId);
+    if (!ids.length) ids.push(...(repairReport?.orphanPropertyRemIds ?? []));
+    if (!ids.length) {
+      await plugin.app.toast(
+        'Nothing safe to delete. Run the KB scan — only leftovers whose owner Rem already ' +
+        'reads a priority are eligible.'
+      );
+      return;
+    }
+    const confirmed = confirm(
+      `DELETE ALL ${ids.length} orphan property Rems belonging to Rems this repair restored.\n\n` +
+      `Run the 3-Rem test first and confirm it reported OK — this is the same code ` +
+      `with the cap removed.\n\n` +
+      `Each Rem is still checked individually: one is only deleted if its priority slot ` +
+      `already reads back, and the whole run aborts on the first DANGER.\n\n` +
+      `This cannot be undone. Continue?`
+    );
+    if (!confirmed) return;
+
+    setIsRepairingCP(true);
+    setRepairProgress('Deleting orphans…');
+    try {
+      const probes = await testDeleteOrphanProperties(plugin, ids, ids.length, (done, total) =>
+        setRepairProgress(`Deleting ${done} / ${total}`)
+      );
+      setDeletionProbes(probes.filter((p) => !p.verdict.startsWith('OK')).slice(0, 20));
+      const deleted = probes.filter((p) => p.deleted).length;
+      const bad = probes.filter((p) => p.verdict.startsWith('DANGER')).length;
+      await plugin.app.toast(
+        bad
+          ? `⚠ ABORTED after ${bad} DANGER — ${deleted} deleted. See console.`
+          : `Deleted ${deleted} orphan propert(ies). See console.`
+      );
+    } catch (e: any) {
+      console.error('[OrphanCleanup] Error:', e);
+      await plugin.app.toast(`Cleanup failed: ${e?.message ?? e}`);
+    } finally {
+      setIsRepairingCP(false);
+      setRepairProgress(null);
+    }
   };
 
   // Cross-KB import diagnostic. Answers ONE question: after importing rems from
@@ -4633,8 +4704,22 @@ function Debug() {
               3. Repair all (live)
             </button>
             <button
+              onClick={handleBulkOrphanDeletion}
+              disabled={isRepairingCP}
+              style={{ ...smallBtnStyle, cursor: isRepairingCP ? 'wait' : 'pointer', borderColor: '#ef4444', color: '#ef4444', fontWeight: 600 }}
+              title="Delete ALL recorded orphan property Rems. Each is individually guarded and the run aborts on the first DANGER. Only after the 3-Rem test passes."
+            >
+              5. Delete all orphans
+            </button>
+            <button
               onClick={handleTestOrphanDeletion}
-              disabled={isRepairingCP || !repairReport || repairReport.dryRun || repairReport.orphanPropertyRemIds.length === 0}
+              // Only disabled while busy. Every other precondition is checked in
+              // the handler, which toasts the reason — a disabled button that
+              // silently does nothing is indistinguishable from a broken one, and
+              // this one disabled itself precisely when it became useful: after a
+              // successful repair, `orphanPropertyRemIds` is empty because there
+              // was nothing left to repair.
+              disabled={isRepairingCP}
               style={{ ...smallBtnStyle, cursor: isRepairingCP ? 'wait' : 'pointer', borderColor: '#ef4444', color: '#ef4444' }}
               title="Deletes 3 orphaned property Rems and reports whether the repaired priority survived. Destructive — run only after a live repair."
             >
@@ -4678,7 +4763,7 @@ function Debug() {
                   key={p.orphanPropertyRemId}
                   style={{ marginBottom: '4px', color: p.verdict.startsWith('DANGER') ? '#ef4444' : 'var(--rn-clr-content-secondary)' }}
                 >
-                  <code>{p.orphanPropertyRemId}</code> — held {p.storedValue ?? '?'} · API {p.apiValueBefore ?? '(empty)'} → {p.apiValueAfter ?? '(empty)'} · children {p.ownerChildCountBefore ?? '?'} → {p.ownerChildCountAfter ?? '?'}
+                  <code>{p.orphanPropertyRemId}</code> — held {p.storedValue ?? '?'} · stored {p.apiValueBefore ?? '(empty)'} → {p.apiValueAfter ?? '(empty)'} · resolved {p.resolvedBefore ?? '(none)'} → {p.resolvedAfter ?? '(none)'} · children {p.ownerChildCountBefore ?? '?'} → {p.ownerChildCountAfter ?? '?'}
                   <div>{p.verdict}</div>
                 </div>
               ))}
@@ -4723,6 +4808,17 @@ function Debug() {
                   <td style={{ padding: '2px 4px' }}>{kbScan.nextRepDate.empty}</td>
                   <td style={{ padding: '2px 4px', color: kbScan.nextRepDate.danglingPct > 0 ? '#ef4444' : undefined, fontWeight: 600 }}>{kbScan.nextRepDate.danglingPct}%</td>
                 </tr>
+                {kbScan.nextRepDate.dangling > 0 && (
+                  <tr>
+                    <td style={{ padding: '2px 4px', paddingLeft: '12px', color: 'var(--rn-clr-content-secondary)' }} colSpan={6}>
+                      of those dangling: <strong style={{ color: '#22c55e' }}>{kbScan.nextRepDate.danglingRecoverable}</strong> repairable from history
+                      ({kbScan.nextRepDate.recoverablePct}%)
+                      {kbScan.nextRepDate.danglingUnrecoverable > 0 && (
+                        <> · <strong style={{ color: '#ef4444' }}>{kbScan.nextRepDate.danglingUnrecoverable} unrecoverable</strong></>
+                      )}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
 
@@ -4739,6 +4835,7 @@ function Debug() {
                       <th style={{ padding: '2px 4px' }}>Interval</th>
                       <th style={{ padding: '2px 4px' }}>Resolves</th>
                       <th style={{ padding: '2px 4px' }}>Dangling</th>
+                      <th style={{ padding: '2px 4px' }}>Repairable</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4747,12 +4844,45 @@ function Debug() {
                         <td style={{ padding: '2px 4px' }}>{row.bucket}</td>
                         <td style={{ padding: '2px 4px' }}>{row.ok}</td>
                         <td style={{ padding: '2px 4px', color: row.dangling > 0 ? '#ef4444' : undefined }}>{row.dangling}</td>
+                        <td style={{ padding: '2px 4px', color: '#22c55e' }}>{row.recoverable}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </>
             )}
+
+            {/* Litter, measured independently of readability — a Rem can read
+                correctly and still carry a leftover "Unnamed — N" row. */}
+            <div style={{ fontSize: '11px', marginBottom: '6px' }}>
+              Leftover priority properties:{' '}
+              <strong style={{ color: kbScan.leftoverCount > 0 ? '#f59e0b' : '#22c55e' }}>
+                {kbScan.leftoverCount}
+              </strong>
+              {kbScan.leftoverCount > 0 && (
+                <>
+                  {' '}(<span style={{ color: '#22c55e' }}>{kbScan.leftoverSafeToDelete} safe to delete</span>
+                  {kbScan.leftoverStranded > 0 && (
+                    <>, <strong style={{ color: '#ef4444' }}>{kbScan.leftoverStranded} stranded</strong></>
+                  )})
+                  {kbScan.leftoverStranded > 0 && (
+                    <div style={{ marginTop: '2px' }}>
+                      Of the stranded:{' '}
+                      <strong style={{ color: '#ef4444' }}>{kbScan.strandedNeedsRecovery} need recovery</strong>{' '}
+                      (manual/incremental) ·{' '}
+                      <strong style={{ color: '#22c55e' }}>{kbScan.strandedDiscardable} derivable</strong>, safe to delete
+                      <div style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                        {kbScan.strandedBySource.map((s) => `${s.source}: ${s.count} (${s.action})`).join(' · ')}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ color: 'var(--rn-clr-content-secondary)', marginTop: '2px' }}>
+                    Excluded as other powerups' own properties:{' '}
+                    {kbScan.leftoverSlots.filter((s) => s.category === 'foreign').map((s) => `${s.name} ×${s.count}`).join(', ') || 'none'}
+                  </div>
+                </>
+              )}
+            </div>
 
             {kbScan.notes.map((n, i) => (
               <div key={i} style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '4px' }}>

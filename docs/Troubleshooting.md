@@ -647,3 +647,52 @@ There is also a **Diagnose Read Path** button in the debug widget's Card Priorit
 - **Reapply in bulk instead.** Note the priorities before transferring (a [Priority Review Document](Priority-Review-Document.md) is a convenient snapshot) and use **[Batch Assign Card Priority](Priorities-for-Flashcards.md#assigning-priorities-in-bulk)** in the target knowledge base afterwards.
 - **Incremental Rem data is safe** to move as-is.
 - If you hit this, it is worth reporting to RemNote: the same export file succeeding in one knowledge base and failing in another, with the plugin disabled, is a precise reproduction.
+
+---
+
+## 🔧 Priorities Wrong or Empty After a RemNote Update
+
+**Symptom:** after a RemNote update, priorities you never touched show the wrong number — often the same number everywhere — or the priority row reads **Empty** while a stray `Unnamed — 42` line sits under the Rem.
+
+### What Happened
+
+Every powerup property is a small child Rem that points at its slot definition. RemNote's storage/sync overhaul re-pointed some of those references at slot definitions that were unnamed, belonged to the *other* powerup, or had been deleted outright. **The values were never lost** — they stayed on the Rem, in a property the plugin could no longer reach. What you saw instead was whatever the plugin falls back to.
+
+Both priority powerups use a slot displayed as "Priority", which is why they got crossed.
+
+RemNote fixed the bulk of this in **1.27.24**. Two kinds of residue could survive that fix:
+
+- properties pointing at a slot definition that had since been **deleted** — these read as though no priority was ever set;
+- on Rems carrying *both* Incremental and Card Priority, the two "Priority" properties **collapsed into one**, leaving the other powerup with nothing.
+
+### How To Check Your Own Knowledge Base
+
+The debug widget's **Raw Slot Diagnostics** section (at the bottom) has two read-only tools:
+
+- **Dump Raw Slots** — for the focused Rem and its descendants, reads the value stored on each property directly, bypassing the normal lookup, and shows it next to what the plugin actually reads. A value present in one column and empty in the other is the signature.
+- **Scan Whole KB** — counts how many Rems are affected across both priority powerups, and separately checks whether each `Next Rep Date` still points at a Daily Document that exists.
+
+Both are safe to run at any time and write nothing.
+
+### How It Was Fixed Here
+
+On the knowledge base where this was diagnosed, the sequence was:
+
+1. **Recover deliberate values.** The CardPriority repair reads the value off the unreachable property and rewrites it through the normal path, preserving the original source and timestamp. It skips inherited values, which are derived rather than authored.
+2. **Re-materialise inherited values** with **Update all inherited Card Priorities**, which recomputes them from the ancestor cascade and leaves manual priorities alone.
+3. **Delete the abandoned properties** — the stray `Unnamed — N` rows — once, and only once, the value is confirmed readable in its correct place. Each deletion is individually refused if the Rem's priority is not already restored.
+
+Incremental Rem priorities needed none of this: the plugin recovers them from the Rem's own repetition history, so they kept showing the right number throughout.
+
+### Still Outstanding
+
+A separate fault affects **Next Rep Date**: the property is healthy, but the Daily Document it references no longer exists, so RemNote's date row shows `Loading` forever. Scheduling is unaffected — the plugin stamps the next-repetition date into its own history and reads that instead — but the date chip cannot be edited by hand until it is rebuilt.
+
+### If You See This In Your Knowledge Base
+
+Please get in touch, via the [plugin's issue tracker](https://github.com/bjsi/incremental-everything/issues), with the JSON that **Scan Whole KB** produces. Two things make a report especially useful:
+
+- **it happened on a RemNote version after 1.27.24** — that would mean a path we have not seen;
+- **the numbers differ in shape from the ones above** — a different slot id, or a Rem where a *manual* priority disagrees with what is displayed.
+
+The diagnostic tools were built for exactly this, and the more knowledge bases they are run against, the more precisely the remaining cases can be described to RemNote.
