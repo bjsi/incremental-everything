@@ -17,6 +17,9 @@ import { isPowerupPropertySafe } from '../lib/powerupSlotFilter';
 import { getCardPriority } from '../lib/card_priority';
 import { findNonFlashcardDescendantsWithCardPriority, getSpuriousCardPriorityTags, removeCardPriorityFromSpecificRems, removeCardPriorityFromRem, dumpRemPriorityStructure, findRogueCardPriorityRemsInSubtree, findOrphanedImportedCardPriorities } from '../lib/card_priority/batch';
 import { diagnosePowerupReadPath } from '../lib/powerup_read_diagnostic';
+import { dumpRawPowerupSlots } from '../lib/raw_slot_dump';
+import { scanKbForDetachedSlots, SlotScanReport } from '../lib/raw_slot_scan';
+import { repairDetachedCardPriorities, testDeleteOrphanProperties, RepairReport } from '../lib/raw_slot_repair';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -27,7 +30,7 @@ import {
   getReadingStatistics,
 } from '../lib/pdfUtils';
 import { formatDuration } from '../lib/utils';
-import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode,
+import { powerupCode, dismissedPowerupCode, dismissedHistorySlotCode, dismissedDateSlotCode, nextRepDateSlotCode, originalIncrementalDateSlotCode, repHistorySlotCode, prioritySlotCode,
   priorityShieldHistoryKey, documentPriorityShieldHistoryKey,
   cardPriorityShieldHistoryKey, documentCardPriorityShieldHistoryKey,
   cardShieldCleanupBackupIndexKey, cardShieldCleanupBackupPrefix,
@@ -351,8 +354,30 @@ function Debug() {
         }
       };
 
+      // The Priority slot, verbatim. The "Priority" row in the section above is
+      // incrementalRem.priority, which has already passed through
+      // getIncrementalRemFromRem's `let priority = 10` fallback — so a displayed 10
+      // means either "10 is stored" or "the slot could not be read", and the two
+      // need completely different responses. Reading the slot directly separates
+      // them: `null` here with 10 above is a read failure, not a stored value.
+      const probePrioritySlot = async () => {
+        try {
+          const property = await rem.getPowerupProperty(powerupCode, prioritySlotCode);
+          const richText = await rem.getPowerupPropertyAsRichText(powerupCode, prioritySlotCode);
+          const asString = richText?.length ? await rp.richText.toString(richText) : '';
+          return {
+            getPowerupProperty: property === '' || property == null ? null : String(property),
+            richTextLength: Array.isArray(richText) ? richText.length : null,
+            richTextAsString: asString === '' ? null : asString,
+          };
+        } catch (e) {
+          return { error: String(e) };
+        }
+      };
+
       const rawSlotProbe = (await rem.hasPowerup(powerupCode))
         ? {
+            priority: await probePrioritySlot(),
             nextRepDate: await probeDateSlot(nextRepDateSlotCode),
             originalIncDate: await probeDateSlot(originalIncrementalDateSlotCode),
           }
@@ -579,6 +604,18 @@ function Debug() {
   }>(null);
 
   // On-screen copyable export text (mobile fallback when file/clipboard fail).
+  // Raw powerup-slot dump JSON, kept on screen so it can be copied by hand where
+  // the clipboard API and file download are both blocked (see handleDumpRawSlots).
+  const [rawSlotDumpText, setRawSlotDumpText] = useState<string | null>(null);
+  // KB-wide slot damage scan (see handleScanKb).
+  const [kbScan, setKbScan] = useState<SlotScanReport | null>(null);
+  const [isScanningKb, setIsScanningKb] = useState(false);
+  const [scanProgress, setScanProgress] = useState<string | null>(null);
+  // CardPriority repair + the staged orphan-deletion test (see handleRepairCardPriority).
+  const [repairReport, setRepairReport] = useState<RepairReport | null>(null);
+  const [isRepairingCP, setIsRepairingCP] = useState(false);
+  const [repairProgress, setRepairProgress] = useState<string | null>(null);
+  const [deletionProbes, setDeletionProbes] = useState<Awaited<ReturnType<typeof testDeleteOrphanProperties>> | null>(null);
   // Result of the settings-migration probe (see handleProbeSettingsPersistence).
   const [isProbingSettings, setIsProbingSettings] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -1984,6 +2021,253 @@ function Debug() {
     }
   };
 
+  // RAW slot dump — evidence for the RemNote support ticket about IncRems whose
+  // priority reverted to 10. The "Priority" row above shows the value AFTER
+  // getIncrementalRemFromRem's `let priority = 10` fallback, so it cannot tell a
+  // stored 10 from an unreadable slot. This bypasses getPowerupProperty and reads
+  // the property rems directly, for this rem and every descendant. Read-only.
+  const handleDumpRawSlots = async () => {
+    if (!rem) return;
+    await plugin.app.toast('Dumping raw powerup slots (rem + descendants)...');
+    try {
+      const report = await dumpRawPowerupSlots(plugin, rem);
+      const json = JSON.stringify(report, null, 2);
+      setRawSlotDumpText(json);
+
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(json);
+        copied = true;
+      } catch { /* clipboard is often blocked inside the plugin iframe */ }
+
+      let downloaded = false;
+      try {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `raw-slot-dump-${dayjs().format('YYYY-MM-DD-HHmmss')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        downloaded = true;
+      } catch (e) {
+        console.warn('[RawSlotDump] File download failed (iframe sandbox?):', e);
+      }
+
+      await plugin.app.toast(
+        `Raw dump: ${report.scannedRems} rem(s), ${report.properties.length} propert(ies), ` +
+        `${report.unreachable.length} unreadable. ` +
+        `${downloaded ? 'JSON downloaded. ' : ''}${copied ? 'Copied. ' : ''}See console.`
+      );
+    } catch (e) {
+      console.error('[RawSlotDump] Error:', e);
+      await plugin.app.toast('Raw slot dump failed — check console.');
+    }
+  };
+
+  // KB-wide sizing scan for the two post-overhaul slot defects. "Dump Raw Slots"
+  // explains ONE rem exhaustively; this counts how many are affected across the
+  // whole knowledge base, for both priority powerups, and breaks the dangling
+  // Daily Document references down by scheduling interval. Read-only, but it
+  // walks every tagged rem — hence the progress state and the explicit run button.
+  const handleScanKb = async () => {
+    setIsScanningKb(true);
+    setScanProgress('Gathering powerup populations…');
+    try {
+      const report = await scanKbForDetachedSlots(plugin, (done, total, phase) => {
+        setScanProgress(`${phase}: ${done} / ${total}`);
+      });
+      setKbScan(report);
+      const json = JSON.stringify(report, null, 2);
+      setRawSlotDumpText(json);
+
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(json);
+        copied = true;
+      } catch { /* clipboard is often blocked inside the plugin iframe */ }
+
+      try {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `slot-damage-scan-${dayjs().format('YYYY-MM-DD-HHmmss')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      } catch (e) {
+        console.warn('[SlotScan] File download failed (iframe sandbox?):', e);
+      }
+
+      await plugin.app.toast(
+        `Scan done: Incremental ${report.incremental.detachedPct}% detached, ` +
+        `CardPriority ${report.cardPriority.detachedPct}% detached, ` +
+        `dates ${report.nextRepDate.danglingPct}% dangling. ${copied ? 'Copied. ' : ''}See console.`
+      );
+    } catch (e) {
+      console.error('[SlotScan] Error:', e);
+      await plugin.app.toast('KB scan failed — check console.');
+    } finally {
+      setIsScanningKb(false);
+      setScanProgress(null);
+    }
+  };
+
+  // CardPriority repair. CardPriority is repaired before Incremental because it
+  // is the unmitigated case: getIncrementalRemFromRem recovers a detached
+  // priority from the Rem's history, getCardPriority has nothing to fall back on
+  // and silently serves an inherited value or the default instead.
+  //
+  // `limit` caps a live run so the first one can be small and inspected. The
+  // orphaned property Rems are deliberately NOT deleted here — see
+  // handleTestOrphanDeletion.
+  const runCardPriorityRepair = async (dryRun: boolean, limit?: number) => {
+    setIsRepairingCP(true);
+    setRepairProgress(dryRun ? 'Scanning…' : 'Repairing…');
+    try {
+      const report = await repairDetachedCardPriorities(plugin, {
+        dryRun,
+        limit,
+        onProgress: (done, total) => setRepairProgress(`${done} / ${total} Rems`),
+      });
+      setRepairReport(report);
+      setRawSlotDumpText(JSON.stringify(report, null, 2));
+      await plugin.app.toast(
+        dryRun
+          ? `Dry run: ${report.candidates} repairable, ${report.skippedDerivable} skipped as derivable. Nothing written.`
+          : `Repaired ${report.repaired}${report.failedVerification ? `, ${report.failedVerification} FAILED verification` : ''}. See console.`
+      );
+    } catch (e: any) {
+      console.error('[CPRepair] Error:', e);
+      await plugin.app.toast(`Repair failed: ${e?.message ?? e}`);
+    } finally {
+      setIsRepairingCP(false);
+      setRepairProgress(null);
+    }
+  };
+
+  const handleRepairLive = async (limit?: number) => {
+    const n = limit ?? repairReport?.candidates ?? 0;
+    const confirmed = confirm(
+      `This will WRITE to ${limit ? `up to ${limit}` : `all ${n}`} Rem(s), restoring each one's ` +
+      `stranded card priority through the normal write path.\n\n` +
+      `It does NOT delete the old detached property — each repaired Rem will keep a stray ` +
+      `"Unnamed — N" row until the deletion step is verified separately.\n\n` +
+      `Run a dry run first if you have not. Continue?`
+    );
+    if (!confirmed) return;
+    await runCardPriorityRepair(false, limit);
+  };
+
+  // Staged deletion test. Deliberately tiny and separate: this is the one action
+  // in the whole diagnostic set that destroys data, so it must never be first
+  // attempted as part of a bulk pass. It refuses any Rem whose repaired priority
+  // is not already readable, and reports the owner's state either side.
+  const handleTestOrphanDeletion = async () => {
+    if (!repairReport) {
+      await plugin.app.toast('Run the repair first (a dry run is enough) so the orphan list exists.');
+      return;
+    }
+    // A dry run is sufficient when the targets are DERIVABLE orphans: that list
+    // is produced by the scan and does not depend on anything having been
+    // written. Only the repaired-manual targets require a live run first, since
+    // their safety depends on the value already being restored.
+    const derivableAvailable = (repairReport.derivableOrphanPropertyRemIds ?? []).length > 0;
+    if (repairReport.dryRun && !derivableAvailable) {
+      await plugin.app.toast(
+        'That report is a dry run and recorded no derivable orphans. Run the live repair first.'
+      );
+      return;
+    }
+    // Target only leftovers whose owner's slot ALREADY READS. The scan's
+    // safe-to-delete list is the authority: it is computed from current state, so
+    // it grows automatically once "Update all inherited Card Priorities" or a
+    // repair has materialised the values. Falling back to the repair's own output
+    // covers the case where no scan has been run this session.
+    const ids = (kbScan?.safeToDeleteAll ?? []).map((l) => l.propertyRemId);
+    if (!ids.length) ids.push(...repairReport.orphanPropertyRemIds);
+    if (!ids.length) {
+      await plugin.app.toast(
+        'No repaired Rems recorded. Run the repair (with "incl. inherited" if you want the ' +
+        'derivable ones fixed too) — the deletion only touches Rems whose value is already restored.'
+      );
+      return;
+    }
+    const confirmed = confirm(
+      `This DELETES 3 orphaned property Rems (of ${ids.length} recorded).\n\n` +
+      `Targets Rems this repair just restored, so the value already exists in the correct ` +
+      `property. Any Rem whose slot is still empty is REFUSED automatically — its orphan ` +
+      `would be the only copy.\n\n` +
+      `The value each orphan held is captured first and printed, so it can be restored by hand.\n\n` +
+      `Purpose: find out whether deleting the stale property disturbs the good one, BEFORE ` +
+      `any bulk cleanup. Continue?`
+    );
+    if (!confirmed) return;
+
+    await plugin.app.toast('Deleting 3 orphan property Rems…');
+    const probes = await testDeleteOrphanProperties(plugin, ids, 3);
+    setDeletionProbes(probes);
+    const bad = probes.filter((p) => p.verdict.startsWith('DANGER'));
+    await plugin.app.toast(
+      bad.length
+        ? `⚠ ${bad.length} deletion(s) disturbed the good value — DO NOT bulk clean. See console.`
+        : `Deleted ${probes.filter((p) => p.deleted).length}. Priorities intact. See console.`
+    );
+  };
+
+  // Bulk cleanup. Same per-Rem guard as the 3-Rem test — it is literally the same
+  // function with the cap lifted — plus an abort on the first DANGER so one bad
+  // deletion cannot become hundreds.
+  const handleBulkOrphanDeletion = async () => {
+    // Only Rems this repair restored. Un-repaired ones would be refused per-Rem
+    // anyway, but there is no reason to attempt them: their orphan is still the
+    // only materialised copy of the value.
+    const ids = (kbScan?.safeToDeleteAll ?? []).map((l) => l.propertyRemId);
+    if (!ids.length) ids.push(...(repairReport?.orphanPropertyRemIds ?? []));
+    if (!ids.length) {
+      await plugin.app.toast(
+        'Nothing safe to delete. Run the KB scan — only leftovers whose owner Rem already ' +
+        'reads a priority are eligible.'
+      );
+      return;
+    }
+    const confirmed = confirm(
+      `DELETE ALL ${ids.length} orphan property Rems belonging to Rems this repair restored.\n\n` +
+      `Run the 3-Rem test first and confirm it reported OK — this is the same code ` +
+      `with the cap removed.\n\n` +
+      `Each Rem is still checked individually: one is only deleted if its priority slot ` +
+      `already reads back, and the whole run aborts on the first DANGER.\n\n` +
+      `This cannot be undone. Continue?`
+    );
+    if (!confirmed) return;
+
+    setIsRepairingCP(true);
+    setRepairProgress('Deleting orphans…');
+    try {
+      const probes = await testDeleteOrphanProperties(plugin, ids, ids.length, (done, total) =>
+        setRepairProgress(`Deleting ${done} / ${total}`)
+      );
+      setDeletionProbes(probes.filter((p) => !p.verdict.startsWith('OK')).slice(0, 20));
+      const deleted = probes.filter((p) => p.deleted).length;
+      const bad = probes.filter((p) => p.verdict.startsWith('DANGER')).length;
+      await plugin.app.toast(
+        bad
+          ? `⚠ ABORTED after ${bad} DANGER — ${deleted} deleted. See console.`
+          : `Deleted ${deleted} orphan propert(ies). See console.`
+      );
+    } catch (e: any) {
+      console.error('[OrphanCleanup] Error:', e);
+      await plugin.app.toast(`Cleanup failed: ${e?.message ?? e}`);
+    } finally {
+      setIsRepairingCP(false);
+      setRepairProgress(null);
+    }
+  };
+
   // Cross-KB import diagnostic. Answers ONE question: after importing rems from
   // another KB and finding their manual priorities replaced by the default, is the
   // original value still physically present (attached to the imported KB's own
@@ -2971,6 +3255,31 @@ function Debug() {
   const preStyle = { backgroundColor: 'var(--rn-clr-background-secondary)', padding: '8px', borderRadius: '4px', marginTop: '4px', fontSize: '11px', overflowX: 'auto' as 'auto' };
   const smallBtnStyle: CSSProperties = { fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: 'pointer' };
 
+  // ── SECTION ORDER — please preserve ──────────────────────────────────────
+  //
+  // This widget is opened to answer a question about ONE Rem, so the sections
+  // that describe the focused Rem come first and must stay there:
+  //
+  //   1. General Data              — Rem id and the top-level toggles
+  //   2. Incremental Powerup       ← KEEP AT TOP
+  //   3. Incremental Raw Slots
+  //   4. Card Priority Powerup     ← KEEP AT TOP
+  //   5. Dismissed Powerup
+  //   6. …other per-Rem readouts (cards, PDF structure, page history)…
+  //
+  // Everything that describes the KNOWLEDGE BASE rather than the focused Rem
+  // goes after those — settings migration, shield history, the CardPriority tag
+  // audit — and the whole-KB forensic tools go last, in "Raw Slot Diagnostics".
+  //
+  // Two ways this drifted before, both worth not repeating:
+  //   * "Dump Raw Slots" was bolted onto the *Card Priority* section header,
+  //     where it had nothing to do with card priority.
+  //   * The settings-migration and shield-history blocks sat directly under
+  //     General Data, pushing the Incremental / Card Priority readouts — the
+  //     reason this widget gets opened at all — below the fold.
+  //
+  // Rule of thumb: if a control does not describe the focused Rem, it does not
+  // belong above the per-Rem sections.
   return (
     <div className="incremental-everything-debug p-4 max-h-[80vh] overflow-y-auto" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box' }}>
       <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3022,381 +3331,6 @@ function Debug() {
       </h2>
       <Info className="rem-id" label="Rem ID" data={<code>{remId}</code>} />
 
-      {/* Durable status of the settings migration — which settings were carried
-          into the plugin's own store, which failed, and whether it is done. */}
-      <div style={{ marginTop: '16px' }}>
-        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-          Settings Migration Status
-          <span style={{ display: 'flex', gap: '6px' }}>
-            <button onClick={handleShowMigrationStatus} disabled={isMigrating} style={{ ...smallBtnStyle, cursor: isMigrating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
-              {isMigrating ? 'Working…' : 'Load status'}
-            </button>
-            <button onClick={handleCopyMigrationReport} style={{ ...smallBtnStyle, whiteSpace: 'nowrap' }}>Copy</button>
-            <button onClick={handleForceRemigrate} disabled={isMigrating} style={{ ...smallBtnStyle, cursor: isMigrating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }} title="Re-read every setting and overwrite the stored values. Use only to recover a migration that ran while settings were unreadable.">
-              Force re-run
-            </button>
-          </span>
-        </h2>
-        <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
-          The migration copies each setting out of RemNote's settings panel into the plugin's own synced storage. It
-          runs once on load and records the outcome per setting, so this stays readable afterwards. Full detail also
-          goes to the DevTools console.
-        </div>
-        {migrationReport === null ? (
-          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
-            Press "Load status" — nothing loaded yet in this widget.
-          </div>
-        ) : (
-          <div style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
-            <div style={{ lineHeight: 1.6, marginBottom: '6px' }}>
-              <div>
-                Status:{' '}
-                <strong style={{ color: migrationReport.complete ? '#16a34a' : '#ef4444' }}>
-                  {migrationReport.complete
-                    ? 'COMPLETE'
-                    : migrationReport.gaveUp
-                      ? 'INCOMPLETE — retries exhausted'
-                      : 'INCOMPLETE — retries on next reload'}
-                </strong>
-              </div>
-              <div>Last run: {new Date(migrationReport.finishedAt).toLocaleString()} (attempt {migrationReport.attempt})</div>
-              <div>
-                {migrationReport.total} settings — <strong>{migrationReport.counts.migrated}</strong> carried over,{' '}
-                {migrationReport.counts.default} at default, {migrationReport.counts['already-present']} already stored,{' '}
-                <strong style={{ color: migrationReport.counts.failed ? '#ef4444' : 'inherit' }}>
-                  {migrationReport.counts.failed} failed
-                </strong>
-              </div>
-            </div>
-            {storedSettings && (
-              <div style={{ marginBottom: '6px', paddingBottom: '6px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
-                <div style={{ fontWeight: 600, marginBottom: '2px' }}>
-                  Stored blob — {Object.keys(storedSettings).length} key(s)
-                </div>
-                <div style={{ color: 'var(--rn-clr-content-tertiary)', marginBottom: '4px' }}>
-                  Only settings that differ from their default are stored; everything else resolves through the
-                  defaults table, so changing a default still reaches you.
-                </div>
-                {Object.keys(storedSettings).length === 0 ? (
-                  <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>(empty — every setting is at its default)</div>
-                ) : (
-                  Object.entries(storedSettings).map(([k, v]) => (
-                    <div key={k} style={{ lineHeight: 1.5, paddingLeft: '6px' }}>
-                      <code>{k}</code> → <strong>{JSON.stringify(v)}</strong>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-            <div style={{ maxHeight: '260px', overflowY: 'auto', paddingTop: '6px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
-              {migrationReport.records.map((r) => (
-                <div key={r.id} style={{ lineHeight: 1.5 }}>
-                  <span style={{ color: r.status === 'failed' ? '#ef4444' : r.status === 'migrated' || r.status === 'converted' ? '#16a34a' : 'var(--rn-clr-content-tertiary)' }}>
-                    {r.status === 'failed' ? '✗' : r.status === 'converted' ? '~' : r.status === 'migrated' ? '●' : '·'}
-                  </span>{' '}
-                  <code>{r.id}</code> → <strong>{JSON.stringify(r.value)}</strong>{' '}
-                  <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>[{r.status}]</span>
-                  {r.error && <div style={{ paddingLeft: '14px', color: '#ef4444' }}>{r.error}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Settings-migration probe: how does getSetting behave for ids this
-          plugin no longer registers? Decides whether a one-time seed can read
-          legacy values after the old registrations are deleted. */}
-      <div style={{ marginTop: '16px' }}>
-        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Settings Migration Probe
-          <button
-            onClick={handleProbeSettingsPersistence}
-            disabled={isProbingSettings}
-            style={{ ...smallBtnStyle, cursor: isProbingSettings ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
-            title="Reads registered, never-registered and de-registered setting ids to see whether stored values outlive their registration"
-          >
-            {isProbingSettings ? 'Probing…' : 'Probe getSetting'}
-          </button>
-        </h2>
-        <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
-          Checks whether <code>getSetting</code> returns <code>undefined</code> or throws for an unknown id, and whether
-          values stored for settings the plugin used to register are still readable now that it doesn't.
-        </div>
-        {settingsProbe && (
-          <div style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
-            {(['control', 'never-registered', 'de-registered'] as const).map((group) => (
-              <div key={group} style={{ marginBottom: '8px' }}>
-                <div style={{ fontWeight: 600, marginBottom: '2px' }}>{group}</div>
-                {settingsProbe.rows.filter((r) => r.group === group).map((r) => (
-                  <div key={r.id} style={{ lineHeight: 1.5, paddingLeft: '6px' }}>
-                    <code>{r.id}</code> →{' '}
-                    <strong style={{ color: r.outcome === 'threw' ? '#ef4444' : r.outcome === 'value' ? '#16a34a' : '#d97706' }}>
-                      {r.value}
-                    </strong>
-                    {r.error && <div style={{ paddingLeft: '6px', color: '#ef4444' }}>{r.error}</div>}
-                    <div style={{ paddingLeft: '6px', color: 'var(--rn-clr-content-tertiary)' }}>{r.note}</div>
-                  </div>
-                ))}
-              </div>
-            ))}
-            <div style={{ paddingTop: '6px', borderTop: '1px solid var(--rn-clr-background-tertiary)', lineHeight: 1.6 }}>
-              <div>
-                Unknown id: <strong>{settingsProbe.anyThrew ? 'THROWS — seed needs per-id try/catch' : 'returns undefined — safe to call'}</strong>
-              </div>
-              <div>
-                De-registered ids still holding a value:{' '}
-                <strong>
-                  {settingsProbe.rows.filter((r) => r.group === 'de-registered' && r.outcome === 'value').length}
-                  /{settingsProbe.rows.filter((r) => r.group === 'de-registered').length}
-                </strong>
-              </div>
-              <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>
-                Only a value differing from the old default is conclusive — an unset setting and a pruned one both read
-                as <code>(undefined)</code>.
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginTop: '16px' }}>
-        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Priority Shield History (KB-wide)
-          <button
-            onClick={handleDumpShieldHistory}
-            disabled={isDumpingShield}
-            style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isDumpingShield ? 'wait' : 'pointer' }}
-          >
-            {isDumpingShield ? 'Dumping…' : 'Dump + Export Shield History'}
-          </button>
-        </h2>
-        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '8px' }}>
-          Reads all four shield-history synced keys (IncRem/Card × KB/Doc, plus weighted variants) and the live
-          write-side inputs used at QueueExit. Diagnoses whether Card shield history is <strong>empty</strong>,{' '}
-          <strong>orphaned</strong> under a stale KB id, or simply not being written because the cardPriority cache
-          is empty. Full raw JSON is logged to the console, copied to the clipboard, and downloaded as a file.
-        </div>
-        {shieldDump && (
-          <div style={{ marginTop: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)' }}>
-            <div style={{ fontSize: '11px', marginBottom: '8px' }}>
-              Current KB: <code>{shieldDump.currentKbId}</code> · isPrimary: <strong>{String(shieldDump.isPrimary)}</strong>
-            </div>
-            {shieldDump.stores.map((s) => {
-              const color =
-                s.status === 'ok' ? '#10b981'
-                : s.status === 'orphaned' ? '#ef4444'
-                : s.status === 'legacy' ? '#d97706'
-                : s.status === 'empty' ? '#ef4444'
-                : 'var(--rn-clr-content-tertiary)';
-              return (
-                <div key={s.key} style={{ marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600 }}>
-                    {s.label} <span style={{ color, textTransform: 'uppercase', fontSize: '10px' }}>[{s.status}]</span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '2px' }}>{s.verdict}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '2px' }}>
-                    current-KB: {s.currentKbDatedEntries} · orphaned: {s.otherKbPartitions.reduce((a, p) => a + p.entryCount, 0)} · legacy-root: {s.legacyRootDatedEntries}
-                  </div>
-                </div>
-              );
-            })}
-            <div style={{ fontSize: '11px', fontWeight: 600, marginTop: '8px', marginBottom: '4px' }}>Live write-side inputs</div>
-            <div style={{ fontSize: '11px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
-              <div>cardPriority cache: <strong style={{ color: shieldDump.live.allCardInfos === 0 ? '#ef4444' : 'inherit' }}>{shieldDump.live.allCardInfos}</strong></div>
-              <div>incRem cache: <strong>{shieldDump.live.allIncRems}</strong></div>
-              <div>cardPriority taggedRem(): <strong style={{ color: shieldDump.live.cardPriorityTaggedRems === 0 ? '#ef4444' : 'inherit' }}>{shieldDump.live.cardPriorityTaggedRems}</strong></div>
-              <div>with priority: <strong>{shieldDump.live.cardInfosWithPriority}</strong></div>
-              <div>with dueCardsOverdue field: <strong>{shieldDump.live.cardInfosWithDueOverdue}</strong></div>
-              <div>currently due-overdue: <strong>{shieldDump.live.cardInfosDueOverdue}</strong></div>
-              <div>card cache loaded flag: <strong>{String(shieldDump.live.cardCacheLoaded)}</strong></div>
-              <div>incRem cache loaded flag: <strong>{String(shieldDump.live.incRemCacheLoaded)}</strong></div>
-              <div>seen cards (session): <strong>{shieldDump.live.seenCardIds}</strong></div>
-              <div>seen rems (session): <strong>{shieldDump.live.seenRemIds}</strong></div>
-            </div>
-            <div style={{ fontSize: '11px', fontWeight: 600, marginTop: '8px', marginBottom: '4px' }}>Serialized size per key (sync-limit suspects)</div>
-            <div style={{ fontSize: '11px' }}>
-              {shieldDump.keySizes.map((k) => (
-                <div key={k.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                  <span style={{ color: 'var(--rn-clr-content-secondary)' }}>{k.label}</span>
-                  <strong style={{ color: k.approxKB >= 100 ? '#ef4444' : k.approxKB >= 50 ? '#d97706' : 'inherit' }}>
-                    {k.chars.toLocaleString()} chars (~{k.approxKB} KB)
-                  </strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Mobile-safe export: on Android the file download and clipboard API silently
-            fail, so render the JSON on-screen to select/copy manually. */}
-        {shieldExport && (
-          <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              Copyable export (for mobile / when the file didn't save)
-              <button onClick={handleSnapshotToSyncedBackup} style={smallBtnStyle} title="Save this device's card history to a synced backup key that syncs up on reconnect and appears under Restore → Load backups elsewhere">
-                Snapshot → synced backup
-              </button>
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
-              Tap a box to select all, or use its Copy button, then paste into the Restore box on another device.
-              The <strong>card-only</strong> export is smaller and is all you need to recover the lost card history.
-              Or use <strong>Snapshot → synced backup</strong>: it saves this device's card history under a new synced
-              key that pushes up when you reconnect (no copy/paste), then restore it elsewhere via "Load backups".
-            </div>
-            {([
-              { label: 'Card-only export', text: shieldExport.cardOnly },
-              { label: 'Full export', text: shieldExport.full },
-            ] as const).map(({ label, text }) => (
-              <div key={label} style={{ marginBottom: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600 }}>{label} <span style={{ color: 'var(--rn-clr-content-tertiary)', fontWeight: 400 }}>({(text.length / 1024).toFixed(1)} KB)</span></span>
-                  <button onClick={() => copyTextFallback(text)} style={smallBtnStyle}>Copy</button>
-                </div>
-                <textarea
-                  readOnly
-                  value={text}
-                  onFocus={(e) => e.currentTarget.select()}
-                  onClick={(e) => e.currentTarget.select()}
-                  style={{ width: '100%', minHeight: '54px', fontSize: '9px', fontFamily: 'monospace', padding: '6px', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box', whiteSpace: 'pre', overflowWrap: 'normal' }}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Locate the rem named in a "Diff for <remId> is too large to sync" error. */}
-        <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>Locate a "too large to sync" rem</div>
-          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
-            Paste the rem id from a <code>Diff for &lt;remId&gt; is too large to sync</code> error. Reports what that rem
-            is, its text size, and — if it holds JSON — its top-level keys, so we can tell whether the stranded
-            shield history lives inside it.
-          </div>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <input
-              value={syncRemIdInput}
-              onChange={(e) => setSyncRemIdInput(e.target.value)}
-              placeholder="remId"
-              style={{ flex: 1, fontSize: '11px', padding: '3px 6px', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', fontFamily: 'monospace' }}
-            />
-            <button onClick={handleProbeSyncRem} disabled={isProbingSyncRem} style={{ ...smallBtnStyle, cursor: isProbingSyncRem ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
-              {isProbingSyncRem ? 'Probing…' : 'Inspect Rem'}
-            </button>
-          </div>
-          {syncRemProbe && (
-            <div style={{ marginTop: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
-              {!syncRemProbe.found ? (
-                <div style={{ color: '#d97706' }}>
-                  <code>{syncRemProbe.remId}</code> — not readable via the plugin API (likely an internal storage doc
-                  owned by RemNote or another plugin). Use RemNote's own "resolve" flow for it.
-                </div>
-              ) : (
-                <div style={{ lineHeight: 1.6 }}>
-                  <div><code>{syncRemProbe.remId}</code></div>
-                  <div>Text size: <strong style={{ color: syncRemProbe.textChars >= 100 * 1024 ? '#ef4444' : 'inherit' }}>{syncRemProbe.textChars.toLocaleString()} chars</strong> (~{Math.round((syncRemProbe.textChars / 1024) * 10) / 10} KB)</div>
-                  <div>Powerups: <strong>{syncRemProbe.remType}</strong></div>
-                  <div>Looks like JSON: <strong>{String(syncRemProbe.looksLikeJson)}</strong></div>
-                  {syncRemProbe.jsonTopKeysPreview && (
-                    <div>JSON top keys: <span style={{ fontFamily: 'monospace', color: 'var(--rn-clr-content-secondary)' }}>{syncRemProbe.jsonTopKeysPreview.join(', ')}</span></div>
-                  )}
-                  <div>Parent: <span style={{ color: 'var(--rn-clr-content-secondary)' }}>{syncRemProbe.parentText ?? '(none)'}</span></div>
-                  {syncRemProbe.ancestorTexts.length > 0 && (
-                    <div>Ancestors: <span style={{ color: 'var(--rn-clr-content-secondary)' }}>{syncRemProbe.ancestorTexts.join(' › ')}</span></div>
-                  )}
-                  <div>Children: <strong>{syncRemProbe.childCount}</strong></div>
-                  {syncRemProbe.textPreview && (
-                    <pre style={preStyle}>{syncRemProbe.textPreview}</pre>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Restore shield history from a cleanup backup or a pasted export/backup JSON. */}
-        <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            Restore Shield History
-            <button onClick={handleLoadBackups} style={smallBtnStyle}>Load backups</button>
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
-            Merges history back into the live store. It is <strong>additive</strong> — an existing day is never
-            overwritten, so current data is safe. Source can be a cleanup backup (auto-saved before "Remove All
-            CardPriority Tags") or a JSON export from another device.
-          </div>
-
-          {backupList && (
-            backupList.length === 0 ? (
-              <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>No cleanup backups found on this account.</div>
-            ) : (
-              <div style={{ marginBottom: '8px' }}>
-                {backupList.map((b) => (
-                  <div key={b.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '11px', padding: '4px 0', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{b.backedUpAt ? dayjs(b.backedUpAt).format('MMM D, YYYY HH:mm') : '(undated)'} · {b.dateEntries} entr(ies)</div>
-                      <div style={{ color: 'var(--rn-clr-content-tertiary)', fontFamily: 'monospace', fontSize: '10px' }}>KB {b.kbId ?? '?'}</div>
-                    </div>
-                    <button onClick={() => handleRestoreFromBackupKey(b.key)} disabled={isRestoring} style={{ ...smallBtnStyle, cursor: isRestoring ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
-                      {isRestoring ? 'Restoring…' : 'Restore'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )
-          )}
-
-          <textarea
-            value={restoreJsonInput}
-            onChange={(e) => setRestoreJsonInput(e.target.value)}
-            placeholder="Paste a shield-dump export or backup JSON here…"
-            style={{ width: '100%', minHeight: '60px', fontSize: '10px', fontFamily: 'monospace', padding: '6px', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box' }}
-          />
-          <div style={{ marginTop: '6px' }}>
-            <button onClick={handleRestoreFromJson} disabled={isRestoring || !restoreJsonInput.trim()} style={{ ...smallBtnStyle, cursor: (isRestoring || !restoreJsonInput.trim()) ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: (isRestoring || !restoreJsonInput.trim()) ? 0.5 : 1 }}>
-              {isRestoring ? 'Restoring…' : 'Restore from JSON'}
-            </button>
-          </div>
-
-          {restoreResult && (
-            <div style={{ marginTop: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
-              <div style={{ fontWeight: 600, marginBottom: '4px' }}>Restored from {restoreResult.source}</div>
-              {restoreResult.perKey.map((p) => (
-                <div key={p.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                  <span style={{ color: 'var(--rn-clr-content-secondary)', fontFamily: 'monospace', fontSize: '10px' }}>{p.key}</span>
-                  <strong style={{ color: p.added > 0 ? '#10b981' : 'inherit' }}>+{p.added} added, {p.skipped} kept</strong>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {tagAudit && (
-        <div style={{ marginTop: '8px', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)' }}>
-          <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}>CardPriority Tag Audit (KB-wide)</div>
-          <div style={{ fontSize: '11px', lineHeight: 1.6 }}>
-            <div><code>taggedRem()</code>: <strong>{tagAudit.taggedRemCount}</strong> rems</div>
-            <div>card-bearing rems: <strong>{tagAudit.cardRemCount}</strong></div>
-            <div>direct <code>hasPowerup</code>=true: <strong>{tagAudit.hasPowerupCount}</strong> (of which in taggedRem: {tagAudit.inTaggedRemCount})</div>
-            <div>hasPowerup=true but <em>missing</em> from taggedRem: <strong style={{ color: tagAudit.powerupNotInTaggedRem > 0 ? '#ef4444' : 'inherit' }}>{tagAudit.powerupNotInTaggedRem}</strong></div>
-            <div>priority slot present but <em>no</em> powerup tag: <strong style={{ color: tagAudit.slotButNoPowerup > 0 ? '#ef4444' : 'inherit' }}>{tagAudit.slotButNoPowerup}</strong></div>
-          </div>
-          <div style={{ marginTop: '6px', fontSize: '11px' }}>
-            <div>distinct cardPriority definition rems: <strong style={{ color: tagAudit.distinctDefs.length > 1 ? '#ef4444' : 'inherit' }}>{tagAudit.distinctDefs.length}</strong></div>
-            {tagAudit.distinctDefs.map((d) => (
-              <div key={d.defId} style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-secondary)' }}>
-                • <code>{d.defId}</code> {d.isCanonical ? '(canonical)' : '(DUPLICATE)'} — {d.count} rems
-              </div>
-            ))}
-            {tagAudit.unknownDefCount > 0 && (
-              <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-secondary)' }}>• unresolved def on {tagAudit.unknownDefCount} rem(s)</div>
-            )}
-          </div>
-          <div style={{ marginTop: '6px', fontSize: '11px', fontWeight: 600 }}>{tagAudit.verdict}</div>
-          <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>Full breakdown + sample rems in the developer console.</div>
-        </div>
-      )}
       <div className="flex gap-4">
         <Info className="card-disabled" label="Cards Disabled (Locally)" data={isCardDisabledLocally ? <span style={{color: '#ef4444', fontWeight: 600}}>YES</span> : 'No'} />
         <Info className="card-disabled-ancestor" label="Cards Disabled (Inherited)" data={isCardDisabledInAncestors ? <span style={{color: '#ef4444', fontWeight: 600}}>YES</span> : 'No'} />
@@ -3411,7 +3345,27 @@ function Debug() {
             label="Next Rep (Human)"
             data={`${dayjs(incrementalRem.nextRepDate).format('MMMM D, YYYY')} (${dayjs(incrementalRem.nextRepDate).fromNow()})`}
           />
-          <Info className="priority" label="Priority" data={incrementalRem.priority} />
+          {/* Priority is no longer just a number: show where it came from, so a
+              recovered or placeholder value can never pass for a stored one. */}
+          <Info
+            className="priority"
+            label="Priority"
+            data={
+              <span>
+                {incrementalRem.priority}
+                {incrementalRem.prioritySource === 'history' && (
+                  <span style={{ marginLeft: '8px', fontSize: '11px', color: '#f59e0b', fontWeight: 600 }}>
+                    ⚠ recovered from history — the Priority slot is unreadable
+                  </span>
+                )}
+                {incrementalRem.prioritySource === 'fallback' && (
+                  <span style={{ marginLeft: '8px', fontSize: '11px', color: '#ef4444', fontWeight: 600 }}>
+                    ⚠ placeholder — neither the slot nor the history holds a priority
+                  </span>
+                )}
+              </span>
+            }
+          />
           <Info
             className="created-at-raw"
             label="Created At (Raw)"
@@ -3513,6 +3467,27 @@ function Debug() {
           <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
             Incremental Raw Slots (diagnostic)
           </h2>
+          {/* An empty raw slot while "Priority" above shows a number means the
+              number is getIncrementalRemFromRem's fallback, not stored data. */}
+          <Info
+            className="probe-priority"
+            label="Priority slot (raw)"
+            data={
+              <>
+                <pre style={preStyle}>{JSON.stringify(rawSlotProbe.priority, null, 2)}</pre>
+                {'error' in rawSlotProbe.priority ||
+                rawSlotProbe.priority.getPowerupProperty != null ||
+                rawSlotProbe.priority.richTextAsString != null ? null : (
+                  <div style={{ marginTop: '4px', padding: '6px', borderRadius: '4px', border: '1px solid #ef4444', backgroundColor: 'rgba(239, 68, 68, 0.08)', fontSize: '11px', color: 'var(--rn-clr-content-primary)' }}>
+                    ⚠ The Priority slot reads as empty, so the{' '}
+                    <strong>Priority {String(incrementalRem?.priority)}</strong> shown above is the
+                    plugin's read fallback, not a stored value. Use “Dump Raw Slots” to check
+                    whether the real value is still on the Rem under a detached slot.
+                  </div>
+                )}
+              </>
+            }
+          />
           <Info
             className="probe-next-rep"
             label="Next Rep reference"
@@ -3525,6 +3500,7 @@ function Debug() {
           />
         </div>
       )}
+
 
       {cardPriority && (
         <div style={{ marginTop: '16px' }}>
@@ -4290,6 +4266,657 @@ function Debug() {
               <pre style={preStyle}>{searchProbe.codePoints.map((c) => `${c.codePoint} ${JSON.stringify(c.char)}`).join('\n')}</pre>
             </details>
           </div>
+        )}
+      </div>
+
+      {/* ── KB-wide diagnostics — kept BELOW the per-Rem sections ─────────────
+          Settings migration, the shield history, and the CardPriority tag audit
+          all describe the knowledge base, not the focused Rem. They used to sit
+          directly under "General Data", pushing the Incremental / Card Priority
+          readouts — the reason this widget gets opened — below the fold. */}
+      {/* Durable status of the settings migration — which settings were carried
+          into the plugin's own store, which failed, and whether it is done. */}
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+          Settings Migration Status
+          <span style={{ display: 'flex', gap: '6px' }}>
+            <button onClick={handleShowMigrationStatus} disabled={isMigrating} style={{ ...smallBtnStyle, cursor: isMigrating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+              {isMigrating ? 'Working…' : 'Load status'}
+            </button>
+            <button onClick={handleCopyMigrationReport} style={{ ...smallBtnStyle, whiteSpace: 'nowrap' }}>Copy</button>
+            <button onClick={handleForceRemigrate} disabled={isMigrating} style={{ ...smallBtnStyle, cursor: isMigrating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }} title="Re-read every setting and overwrite the stored values. Use only to recover a migration that ran while settings were unreadable.">
+              Force re-run
+            </button>
+          </span>
+        </h2>
+        <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+          The migration copies each setting out of RemNote's settings panel into the plugin's own synced storage. It
+          runs once on load and records the outcome per setting, so this stays readable afterwards. Full detail also
+          goes to the DevTools console.
+        </div>
+        {migrationReport === null ? (
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>
+            Press "Load status" — nothing loaded yet in this widget.
+          </div>
+        ) : (
+          <div style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
+            <div style={{ lineHeight: 1.6, marginBottom: '6px' }}>
+              <div>
+                Status:{' '}
+                <strong style={{ color: migrationReport.complete ? '#16a34a' : '#ef4444' }}>
+                  {migrationReport.complete
+                    ? 'COMPLETE'
+                    : migrationReport.gaveUp
+                      ? 'INCOMPLETE — retries exhausted'
+                      : 'INCOMPLETE — retries on next reload'}
+                </strong>
+              </div>
+              <div>Last run: {new Date(migrationReport.finishedAt).toLocaleString()} (attempt {migrationReport.attempt})</div>
+              <div>
+                {migrationReport.total} settings — <strong>{migrationReport.counts.migrated}</strong> carried over,{' '}
+                {migrationReport.counts.default} at default, {migrationReport.counts['already-present']} already stored,{' '}
+                <strong style={{ color: migrationReport.counts.failed ? '#ef4444' : 'inherit' }}>
+                  {migrationReport.counts.failed} failed
+                </strong>
+              </div>
+            </div>
+            {storedSettings && (
+              <div style={{ marginBottom: '6px', paddingBottom: '6px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>
+                  Stored blob — {Object.keys(storedSettings).length} key(s)
+                </div>
+                <div style={{ color: 'var(--rn-clr-content-tertiary)', marginBottom: '4px' }}>
+                  Only settings that differ from their default are stored; everything else resolves through the
+                  defaults table, so changing a default still reaches you.
+                </div>
+                {Object.keys(storedSettings).length === 0 ? (
+                  <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>(empty — every setting is at its default)</div>
+                ) : (
+                  Object.entries(storedSettings).map(([k, v]) => (
+                    <div key={k} style={{ lineHeight: 1.5, paddingLeft: '6px' }}>
+                      <code>{k}</code> → <strong>{JSON.stringify(v)}</strong>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+            <div style={{ maxHeight: '260px', overflowY: 'auto', paddingTop: '6px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+              {migrationReport.records.map((r) => (
+                <div key={r.id} style={{ lineHeight: 1.5 }}>
+                  <span style={{ color: r.status === 'failed' ? '#ef4444' : r.status === 'migrated' || r.status === 'converted' ? '#16a34a' : 'var(--rn-clr-content-tertiary)' }}>
+                    {r.status === 'failed' ? '✗' : r.status === 'converted' ? '~' : r.status === 'migrated' ? '●' : '·'}
+                  </span>{' '}
+                  <code>{r.id}</code> → <strong>{JSON.stringify(r.value)}</strong>{' '}
+                  <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>[{r.status}]</span>
+                  {r.error && <div style={{ paddingLeft: '14px', color: '#ef4444' }}>{r.error}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Settings-migration probe: how does getSetting behave for ids this
+          plugin no longer registers? Decides whether a one-time seed can read
+          legacy values after the old registrations are deleted. */}
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Settings Migration Probe
+          <button
+            onClick={handleProbeSettingsPersistence}
+            disabled={isProbingSettings}
+            style={{ ...smallBtnStyle, cursor: isProbingSettings ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+            title="Reads registered, never-registered and de-registered setting ids to see whether stored values outlive their registration"
+          >
+            {isProbingSettings ? 'Probing…' : 'Probe getSetting'}
+          </button>
+        </h2>
+        <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+          Checks whether <code>getSetting</code> returns <code>undefined</code> or throws for an unknown id, and whether
+          values stored for settings the plugin used to register are still readable now that it doesn't.
+        </div>
+        {settingsProbe && (
+          <div style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
+            {(['control', 'never-registered', 'de-registered'] as const).map((group) => (
+              <div key={group} style={{ marginBottom: '8px' }}>
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>{group}</div>
+                {settingsProbe.rows.filter((r) => r.group === group).map((r) => (
+                  <div key={r.id} style={{ lineHeight: 1.5, paddingLeft: '6px' }}>
+                    <code>{r.id}</code> →{' '}
+                    <strong style={{ color: r.outcome === 'threw' ? '#ef4444' : r.outcome === 'value' ? '#16a34a' : '#d97706' }}>
+                      {r.value}
+                    </strong>
+                    {r.error && <div style={{ paddingLeft: '6px', color: '#ef4444' }}>{r.error}</div>}
+                    <div style={{ paddingLeft: '6px', color: 'var(--rn-clr-content-tertiary)' }}>{r.note}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div style={{ paddingTop: '6px', borderTop: '1px solid var(--rn-clr-background-tertiary)', lineHeight: 1.6 }}>
+              <div>
+                Unknown id: <strong>{settingsProbe.anyThrew ? 'THROWS — seed needs per-id try/catch' : 'returns undefined — safe to call'}</strong>
+              </div>
+              <div>
+                De-registered ids still holding a value:{' '}
+                <strong>
+                  {settingsProbe.rows.filter((r) => r.group === 'de-registered' && r.outcome === 'value').length}
+                  /{settingsProbe.rows.filter((r) => r.group === 'de-registered').length}
+                </strong>
+              </div>
+              <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                Only a value differing from the old default is conclusive — an unset setting and a pruned one both read
+                as <code>(undefined)</code>.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Priority Shield History (KB-wide)
+          <button
+            onClick={handleDumpShieldHistory}
+            disabled={isDumpingShield}
+            style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isDumpingShield ? 'wait' : 'pointer' }}
+          >
+            {isDumpingShield ? 'Dumping…' : 'Dump + Export Shield History'}
+          </button>
+        </h2>
+        <div style={{ fontSize: '12px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '8px' }}>
+          Reads all four shield-history synced keys (IncRem/Card × KB/Doc, plus weighted variants) and the live
+          write-side inputs used at QueueExit. Diagnoses whether Card shield history is <strong>empty</strong>,{' '}
+          <strong>orphaned</strong> under a stale KB id, or simply not being written because the cardPriority cache
+          is empty. Full raw JSON is logged to the console, copied to the clipboard, and downloaded as a file.
+        </div>
+        {shieldDump && (
+          <div style={{ marginTop: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)' }}>
+            <div style={{ fontSize: '11px', marginBottom: '8px' }}>
+              Current KB: <code>{shieldDump.currentKbId}</code> · isPrimary: <strong>{String(shieldDump.isPrimary)}</strong>
+            </div>
+            {shieldDump.stores.map((s) => {
+              const color =
+                s.status === 'ok' ? '#10b981'
+                : s.status === 'orphaned' ? '#ef4444'
+                : s.status === 'legacy' ? '#d97706'
+                : s.status === 'empty' ? '#ef4444'
+                : 'var(--rn-clr-content-tertiary)';
+              return (
+                <div key={s.key} style={{ marginBottom: '8px', paddingBottom: '6px', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600 }}>
+                    {s.label} <span style={{ color, textTransform: 'uppercase', fontSize: '10px' }}>[{s.status}]</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '2px' }}>{s.verdict}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '2px' }}>
+                    current-KB: {s.currentKbDatedEntries} · orphaned: {s.otherKbPartitions.reduce((a, p) => a + p.entryCount, 0)} · legacy-root: {s.legacyRootDatedEntries}
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: '11px', fontWeight: 600, marginTop: '8px', marginBottom: '4px' }}>Live write-side inputs</div>
+            <div style={{ fontSize: '11px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+              <div>cardPriority cache: <strong style={{ color: shieldDump.live.allCardInfos === 0 ? '#ef4444' : 'inherit' }}>{shieldDump.live.allCardInfos}</strong></div>
+              <div>incRem cache: <strong>{shieldDump.live.allIncRems}</strong></div>
+              <div>cardPriority taggedRem(): <strong style={{ color: shieldDump.live.cardPriorityTaggedRems === 0 ? '#ef4444' : 'inherit' }}>{shieldDump.live.cardPriorityTaggedRems}</strong></div>
+              <div>with priority: <strong>{shieldDump.live.cardInfosWithPriority}</strong></div>
+              <div>with dueCardsOverdue field: <strong>{shieldDump.live.cardInfosWithDueOverdue}</strong></div>
+              <div>currently due-overdue: <strong>{shieldDump.live.cardInfosDueOverdue}</strong></div>
+              <div>card cache loaded flag: <strong>{String(shieldDump.live.cardCacheLoaded)}</strong></div>
+              <div>incRem cache loaded flag: <strong>{String(shieldDump.live.incRemCacheLoaded)}</strong></div>
+              <div>seen cards (session): <strong>{shieldDump.live.seenCardIds}</strong></div>
+              <div>seen rems (session): <strong>{shieldDump.live.seenRemIds}</strong></div>
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginTop: '8px', marginBottom: '4px' }}>Serialized size per key (sync-limit suspects)</div>
+            <div style={{ fontSize: '11px' }}>
+              {shieldDump.keySizes.map((k) => (
+                <div key={k.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                  <span style={{ color: 'var(--rn-clr-content-secondary)' }}>{k.label}</span>
+                  <strong style={{ color: k.approxKB >= 100 ? '#ef4444' : k.approxKB >= 50 ? '#d97706' : 'inherit' }}>
+                    {k.chars.toLocaleString()} chars (~{k.approxKB} KB)
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mobile-safe export: on Android the file download and clipboard API silently
+            fail, so render the JSON on-screen to select/copy manually. */}
+        {shieldExport && (
+          <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              Copyable export (for mobile / when the file didn't save)
+              <button onClick={handleSnapshotToSyncedBackup} style={smallBtnStyle} title="Save this device's card history to a synced backup key that syncs up on reconnect and appears under Restore → Load backups elsewhere">
+                Snapshot → synced backup
+              </button>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+              Tap a box to select all, or use its Copy button, then paste into the Restore box on another device.
+              The <strong>card-only</strong> export is smaller and is all you need to recover the lost card history.
+              Or use <strong>Snapshot → synced backup</strong>: it saves this device's card history under a new synced
+              key that pushes up when you reconnect (no copy/paste), then restore it elsewhere via "Load backups".
+            </div>
+            {([
+              { label: 'Card-only export', text: shieldExport.cardOnly },
+              { label: 'Full export', text: shieldExport.full },
+            ] as const).map(({ label, text }) => (
+              <div key={label} style={{ marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600 }}>{label} <span style={{ color: 'var(--rn-clr-content-tertiary)', fontWeight: 400 }}>({(text.length / 1024).toFixed(1)} KB)</span></span>
+                  <button onClick={() => copyTextFallback(text)} style={smallBtnStyle}>Copy</button>
+                </div>
+                <textarea
+                  readOnly
+                  value={text}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onClick={(e) => e.currentTarget.select()}
+                  style={{ width: '100%', minHeight: '54px', fontSize: '9px', fontFamily: 'monospace', padding: '6px', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box', whiteSpace: 'pre', overflowWrap: 'normal' }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Locate the rem named in a "Diff for <remId> is too large to sync" error. */}
+        <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>Locate a "too large to sync" rem</div>
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+            Paste the rem id from a <code>Diff for &lt;remId&gt; is too large to sync</code> error. Reports what that rem
+            is, its text size, and — if it holds JSON — its top-level keys, so we can tell whether the stranded
+            shield history lives inside it.
+          </div>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <input
+              value={syncRemIdInput}
+              onChange={(e) => setSyncRemIdInput(e.target.value)}
+              placeholder="remId"
+              style={{ flex: 1, fontSize: '11px', padding: '3px 6px', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', fontFamily: 'monospace' }}
+            />
+            <button onClick={handleProbeSyncRem} disabled={isProbingSyncRem} style={{ ...smallBtnStyle, cursor: isProbingSyncRem ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+              {isProbingSyncRem ? 'Probing…' : 'Inspect Rem'}
+            </button>
+          </div>
+          {syncRemProbe && (
+            <div style={{ marginTop: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
+              {!syncRemProbe.found ? (
+                <div style={{ color: '#d97706' }}>
+                  <code>{syncRemProbe.remId}</code> — not readable via the plugin API (likely an internal storage doc
+                  owned by RemNote or another plugin). Use RemNote's own "resolve" flow for it.
+                </div>
+              ) : (
+                <div style={{ lineHeight: 1.6 }}>
+                  <div><code>{syncRemProbe.remId}</code></div>
+                  <div>Text size: <strong style={{ color: syncRemProbe.textChars >= 100 * 1024 ? '#ef4444' : 'inherit' }}>{syncRemProbe.textChars.toLocaleString()} chars</strong> (~{Math.round((syncRemProbe.textChars / 1024) * 10) / 10} KB)</div>
+                  <div>Powerups: <strong>{syncRemProbe.remType}</strong></div>
+                  <div>Looks like JSON: <strong>{String(syncRemProbe.looksLikeJson)}</strong></div>
+                  {syncRemProbe.jsonTopKeysPreview && (
+                    <div>JSON top keys: <span style={{ fontFamily: 'monospace', color: 'var(--rn-clr-content-secondary)' }}>{syncRemProbe.jsonTopKeysPreview.join(', ')}</span></div>
+                  )}
+                  <div>Parent: <span style={{ color: 'var(--rn-clr-content-secondary)' }}>{syncRemProbe.parentText ?? '(none)'}</span></div>
+                  {syncRemProbe.ancestorTexts.length > 0 && (
+                    <div>Ancestors: <span style={{ color: 'var(--rn-clr-content-secondary)' }}>{syncRemProbe.ancestorTexts.join(' › ')}</span></div>
+                  )}
+                  <div>Children: <strong>{syncRemProbe.childCount}</strong></div>
+                  {syncRemProbe.textPreview && (
+                    <pre style={preStyle}>{syncRemProbe.textPreview}</pre>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Restore shield history from a cleanup backup or a pasted export/backup JSON. */}
+        <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid var(--rn-clr-background-tertiary)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            Restore Shield History
+            <button onClick={handleLoadBackups} style={smallBtnStyle}>Load backups</button>
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+            Merges history back into the live store. It is <strong>additive</strong> — an existing day is never
+            overwritten, so current data is safe. Source can be a cleanup backup (auto-saved before "Remove All
+            CardPriority Tags") or a JSON export from another device.
+          </div>
+
+          {backupList && (
+            backupList.length === 0 ? (
+              <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>No cleanup backups found on this account.</div>
+            ) : (
+              <div style={{ marginBottom: '8px' }}>
+                {backupList.map((b) => (
+                  <div key={b.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '11px', padding: '4px 0', borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{b.backedUpAt ? dayjs(b.backedUpAt).format('MMM D, YYYY HH:mm') : '(undated)'} · {b.dateEntries} entr(ies)</div>
+                      <div style={{ color: 'var(--rn-clr-content-tertiary)', fontFamily: 'monospace', fontSize: '10px' }}>KB {b.kbId ?? '?'}</div>
+                    </div>
+                    <button onClick={() => handleRestoreFromBackupKey(b.key)} disabled={isRestoring} style={{ ...smallBtnStyle, cursor: isRestoring ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+                      {isRestoring ? 'Restoring…' : 'Restore'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          <textarea
+            value={restoreJsonInput}
+            onChange={(e) => setRestoreJsonInput(e.target.value)}
+            placeholder="Paste a shield-dump export or backup JSON here…"
+            style={{ width: '100%', minHeight: '60px', fontSize: '10px', fontFamily: 'monospace', padding: '6px', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', boxSizing: 'border-box' }}
+          />
+          <div style={{ marginTop: '6px' }}>
+            <button onClick={handleRestoreFromJson} disabled={isRestoring || !restoreJsonInput.trim()} style={{ ...smallBtnStyle, cursor: (isRestoring || !restoreJsonInput.trim()) ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: (isRestoring || !restoreJsonInput.trim()) ? 0.5 : 1 }}>
+              {isRestoring ? 'Restoring…' : 'Restore from JSON'}
+            </button>
+          </div>
+
+          {restoreResult && (
+            <div style={{ marginTop: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)', fontSize: '11px' }}>
+              <div style={{ fontWeight: 600, marginBottom: '4px' }}>Restored from {restoreResult.source}</div>
+              {restoreResult.perKey.map((p) => (
+                <div key={p.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                  <span style={{ color: 'var(--rn-clr-content-secondary)', fontFamily: 'monospace', fontSize: '10px' }}>{p.key}</span>
+                  <strong style={{ color: p.added > 0 ? '#10b981' : 'inherit' }}>+{p.added} added, {p.skipped} kept</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {tagAudit && (
+        <div style={{ marginTop: '8px', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)', backgroundColor: 'var(--rn-clr-background-secondary)' }}>
+          <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px' }}>CardPriority Tag Audit (KB-wide)</div>
+          <div style={{ fontSize: '11px', lineHeight: 1.6 }}>
+            <div><code>taggedRem()</code>: <strong>{tagAudit.taggedRemCount}</strong> rems</div>
+            <div>card-bearing rems: <strong>{tagAudit.cardRemCount}</strong></div>
+            <div>direct <code>hasPowerup</code>=true: <strong>{tagAudit.hasPowerupCount}</strong> (of which in taggedRem: {tagAudit.inTaggedRemCount})</div>
+            <div>hasPowerup=true but <em>missing</em> from taggedRem: <strong style={{ color: tagAudit.powerupNotInTaggedRem > 0 ? '#ef4444' : 'inherit' }}>{tagAudit.powerupNotInTaggedRem}</strong></div>
+            <div>priority slot present but <em>no</em> powerup tag: <strong style={{ color: tagAudit.slotButNoPowerup > 0 ? '#ef4444' : 'inherit' }}>{tagAudit.slotButNoPowerup}</strong></div>
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '11px' }}>
+            <div>distinct cardPriority definition rems: <strong style={{ color: tagAudit.distinctDefs.length > 1 ? '#ef4444' : 'inherit' }}>{tagAudit.distinctDefs.length}</strong></div>
+            {tagAudit.distinctDefs.map((d) => (
+              <div key={d.defId} style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-secondary)' }}>
+                • <code>{d.defId}</code> {d.isCanonical ? '(canonical)' : '(DUPLICATE)'} — {d.count} rems
+              </div>
+            ))}
+            {tagAudit.unknownDefCount > 0 && (
+              <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-secondary)' }}>• unresolved def on {tagAudit.unknownDefCount} rem(s)</div>
+            )}
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '11px', fontWeight: 600 }}>{tagAudit.verdict}</div>
+          <div style={{ marginTop: '4px', fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>Full breakdown + sample rems in the developer console.</div>
+        </div>
+      )}
+
+      {/* ── Raw slot diagnostics — KEEP LAST (see the section-order note above) ──
+          These are whole-KB / migration-forensics tools, not properties of the
+          focused Rem, which is why they live at the bottom rather than beside the
+          per-Rem powerup readouts. */}
+      <div style={{ marginTop: '16px' }}>
+        <h2 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', paddingBottom: '4px', borderBottom: '1px solid var(--rn-clr-background-tertiary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          Raw Slot Diagnostics
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={handleDumpRawSlots}
+              style={smallBtnStyle}
+              title="Read the RAW stored value of every powerup property on this Rem and its descendants, bypassing getPowerupProperty, and flag values that are stored but unreadable (read-only)"
+            >
+              Dump Raw Slots (this Rem)
+            </button>
+            <button
+              onClick={handleScanKb}
+              disabled={isScanningKb}
+              style={{ ...smallBtnStyle, cursor: isScanningKb ? 'wait' : 'pointer', fontWeight: 600 }}
+              title="Walk EVERY Rem carrying Incremental or CardPriority and count how many have a detached priority slot or a dangling Next Rep Date reference (read-only, slow)"
+            >
+              {isScanningKb ? 'Scanning…' : 'Scan Whole KB'}
+            </button>
+          </div>
+        </h2>
+
+        {scanProgress && (
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '8px' }}>
+            {scanProgress}
+          </div>
+        )}
+
+        {/* ── CardPriority repair ──────────────────────────────────────────────
+            Ordered dry-run → small live run → full run → staged deletion. The
+            deletion is last and separate on purpose: it is the only destructive
+            action here. */}
+        <div style={{ marginBottom: '12px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>CardPriority Repair</div>
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '8px' }}>
+            Restores priorities stranded on detached properties. CardPriority is repaired first
+            because it has no history fallback — those values are wrong in the app right now.
+            Repairing leaves the old property behind; clean it up only after the deletion test.
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button onClick={() => runCardPriorityRepair(true)} disabled={isRepairingCP} style={{ ...smallBtnStyle, cursor: isRepairingCP ? 'wait' : 'pointer' }}>
+              1. Dry run
+            </button>
+            <button onClick={() => handleRepairLive(25)} disabled={isRepairingCP || !repairReport} style={{ ...smallBtnStyle, cursor: isRepairingCP ? 'wait' : 'pointer' }}>
+              2. Repair 25 (live)
+            </button>
+            <button onClick={() => handleRepairLive()} disabled={isRepairingCP || !repairReport} style={{ ...smallBtnStyle, cursor: isRepairingCP ? 'wait' : 'pointer', fontWeight: 600 }}>
+              3. Repair all (live)
+            </button>
+            <button
+              onClick={handleBulkOrphanDeletion}
+              disabled={isRepairingCP}
+              style={{ ...smallBtnStyle, cursor: isRepairingCP ? 'wait' : 'pointer', borderColor: '#ef4444', color: '#ef4444', fontWeight: 600 }}
+              title="Delete ALL recorded orphan property Rems. Each is individually guarded and the run aborts on the first DANGER. Only after the 3-Rem test passes."
+            >
+              5. Delete all orphans
+            </button>
+            <button
+              onClick={handleTestOrphanDeletion}
+              // Only disabled while busy. Every other precondition is checked in
+              // the handler, which toasts the reason — a disabled button that
+              // silently does nothing is indistinguishable from a broken one, and
+              // this one disabled itself precisely when it became useful: after a
+              // successful repair, `orphanPropertyRemIds` is empty because there
+              // was nothing left to repair.
+              disabled={isRepairingCP}
+              style={{ ...smallBtnStyle, cursor: isRepairingCP ? 'wait' : 'pointer', borderColor: '#ef4444', color: '#ef4444' }}
+              title="Deletes 3 orphaned property Rems and reports whether the repaired priority survived. Destructive — run only after a live repair."
+            >
+              4. Test orphan deletion (3)
+            </button>
+          </div>
+
+          {repairProgress && (
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '6px' }}>{repairProgress}</div>
+          )}
+
+          {repairReport && (
+            <div style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.7 }}>
+              <div style={{ fontWeight: 600, color: repairReport.dryRun ? 'var(--rn-clr-content-secondary)' : '#22c55e' }}>
+                {repairReport.dryRun ? 'DRY RUN — nothing written' : 'LIVE RUN'}
+              </div>
+              <div>scanned: <strong>{repairReport.scanned}</strong> · repairable: <strong>{repairReport.candidates}</strong> · skipped as derivable: {repairReport.skippedDerivable}</div>
+              {!repairReport.dryRun && (
+                <div>
+                  repaired: <strong style={{ color: '#22c55e' }}>{repairReport.repaired}</strong>
+                  {repairReport.failedVerification > 0 && (
+                    <> · <strong style={{ color: '#ef4444' }}>failed verification: {repairReport.failedVerification}</strong></>
+                  )}
+                  {repairReport.errors.length > 0 && <> · errors: {repairReport.errors.length}</>}
+                </div>
+              )}
+              <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                orphan property Rems recorded: {repairReport.orphanPropertyRemIds.length}
+              </div>
+              {repairReport.notes.map((n, i) => (
+                <div key={i} style={{ color: 'var(--rn-clr-content-secondary)' }}>ⓘ {n}</div>
+              ))}
+            </div>
+          )}
+
+          {deletionProbes && (
+            <div style={{ marginTop: '8px', fontSize: '11px' }}>
+              <div style={{ fontWeight: 600, marginBottom: '4px' }}>Deletion test</div>
+              {deletionProbes.map((p) => (
+                <div
+                  key={p.orphanPropertyRemId}
+                  style={{ marginBottom: '4px', color: p.verdict.startsWith('DANGER') ? '#ef4444' : 'var(--rn-clr-content-secondary)' }}
+                >
+                  <code>{p.orphanPropertyRemId}</code> — held {p.storedValue ?? '?'} · stored {p.apiValueBefore ?? '(empty)'} → {p.apiValueAfter ?? '(empty)'} · resolved {p.resolvedBefore ?? '(none)'} → {p.resolvedAfter ?? '(none)'} · children {p.ownerChildCountBefore ?? '?'} → {p.ownerChildCountAfter ?? '?'}
+                  <div>{p.verdict}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {kbScan && (
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
+              Scanned in {(kbScan.durationMs / 1000).toFixed(1)}s
+            </div>
+            <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse', marginBottom: '10px' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: 'var(--rn-clr-content-tertiary)' }}>
+                  <th style={{ padding: '2px 4px' }}>Powerup</th>
+                  <th style={{ padding: '2px 4px' }}>Total</th>
+                  <th style={{ padding: '2px 4px' }}>OK</th>
+                  <th style={{ padding: '2px 4px' }}>Detached</th>
+                  <th style={{ padding: '2px 4px' }}>No value</th>
+                  <th style={{ padding: '2px 4px' }}>Affected</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[kbScan.incremental, kbScan.cardPriority].map((r) => (
+                  <tr key={r.code}>
+                    <td style={{ padding: '2px 4px', fontWeight: 600 }}>{r.label}</td>
+                    <td style={{ padding: '2px 4px' }}>{r.total}</td>
+                    <td style={{ padding: '2px 4px' }}>{r.ok}</td>
+                    <td style={{ padding: '2px 4px', color: r.detached > 0 ? '#ef4444' : undefined, fontWeight: r.detached > 0 ? 600 : undefined }}>{r.detached}</td>
+                    <td style={{ padding: '2px 4px' }}>{r.missing}</td>
+                    <td style={{ padding: '2px 4px', color: r.detachedPct > 0 ? '#ef4444' : undefined, fontWeight: 600 }}>{r.detachedPct}%</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ padding: '2px 4px', fontWeight: 600 }}>Next Rep Date</td>
+                  <td style={{ padding: '2px 4px' }}>{kbScan.nextRepDate.totalWithProperty}</td>
+                  <td style={{ padding: '2px 4px' }}>{kbScan.nextRepDate.ok}</td>
+                  <td style={{ padding: '2px 4px', color: kbScan.nextRepDate.dangling > 0 ? '#ef4444' : undefined, fontWeight: kbScan.nextRepDate.dangling > 0 ? 600 : undefined }}>
+                    {kbScan.nextRepDate.dangling} dangling
+                  </td>
+                  <td style={{ padding: '2px 4px' }}>{kbScan.nextRepDate.empty}</td>
+                  <td style={{ padding: '2px 4px', color: kbScan.nextRepDate.danglingPct > 0 ? '#ef4444' : undefined, fontWeight: 600 }}>{kbScan.nextRepDate.danglingPct}%</td>
+                </tr>
+                {kbScan.nextRepDate.dangling > 0 && (
+                  <tr>
+                    <td style={{ padding: '2px 4px', paddingLeft: '12px', color: 'var(--rn-clr-content-secondary)' }} colSpan={6}>
+                      of those dangling: <strong style={{ color: '#22c55e' }}>{kbScan.nextRepDate.danglingRecoverable}</strong> repairable from history
+                      ({kbScan.nextRepDate.recoverablePct}%)
+                      {kbScan.nextRepDate.danglingUnrecoverable > 0 && (
+                        <> · <strong style={{ color: '#ef4444' }}>{kbScan.nextRepDate.danglingUnrecoverable} unrecoverable</strong></>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {/* The hypothesis test: if dangling refs cluster in the long-interval
+                buckets, future-dated daily documents did not survive migration. */}
+            {kbScan.nextRepDate.byInterval.length > 0 && (
+              <>
+                <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px' }}>
+                  Dangling dates by scheduling interval
+                </div>
+                <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse', marginBottom: '10px' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', color: 'var(--rn-clr-content-tertiary)' }}>
+                      <th style={{ padding: '2px 4px' }}>Interval</th>
+                      <th style={{ padding: '2px 4px' }}>Resolves</th>
+                      <th style={{ padding: '2px 4px' }}>Dangling</th>
+                      <th style={{ padding: '2px 4px' }}>Repairable</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kbScan.nextRepDate.byInterval.map((row) => (
+                      <tr key={row.bucket}>
+                        <td style={{ padding: '2px 4px' }}>{row.bucket}</td>
+                        <td style={{ padding: '2px 4px' }}>{row.ok}</td>
+                        <td style={{ padding: '2px 4px', color: row.dangling > 0 ? '#ef4444' : undefined }}>{row.dangling}</td>
+                        <td style={{ padding: '2px 4px', color: '#22c55e' }}>{row.recoverable}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            {/* Litter, measured independently of readability — a Rem can read
+                correctly and still carry a leftover "Unnamed — N" row. */}
+            <div style={{ fontSize: '11px', marginBottom: '6px' }}>
+              Leftover priority properties:{' '}
+              <strong style={{ color: kbScan.leftoverCount > 0 ? '#f59e0b' : '#22c55e' }}>
+                {kbScan.leftoverCount}
+              </strong>
+              {kbScan.leftoverCount > 0 && (
+                <>
+                  {' '}(<span style={{ color: '#22c55e' }}>{kbScan.leftoverSafeToDelete} safe to delete</span>
+                  {kbScan.leftoverStranded > 0 && (
+                    <>, <strong style={{ color: '#ef4444' }}>{kbScan.leftoverStranded} stranded</strong></>
+                  )})
+                  {kbScan.leftoverStranded > 0 && (
+                    <div style={{ marginTop: '2px' }}>
+                      Of the stranded:{' '}
+                      <strong style={{ color: '#ef4444' }}>{kbScan.strandedNeedsRecovery} need recovery</strong>{' '}
+                      (manual/incremental) ·{' '}
+                      <strong style={{ color: '#22c55e' }}>{kbScan.strandedDiscardable} derivable</strong>, safe to delete
+                      <div style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                        {kbScan.strandedBySource.map((s) => `${s.source}: ${s.count} (${s.action})`).join(' · ')}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ color: 'var(--rn-clr-content-secondary)', marginTop: '2px' }}>
+                    Excluded as other powerups' own properties:{' '}
+                    {kbScan.leftoverSlots.filter((s) => s.category === 'foreign').map((s) => `${s.name} ×${s.count}`).join(', ') || 'none'}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {kbScan.notes.map((n, i) => (
+              <div key={i} style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '4px' }}>
+                ⓘ {n}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Result of either tool, kept on screen so it can be selected and copied
+            by hand where the clipboard API and file download are both blocked. */}
+        {rawSlotDumpText && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <div className="font-semibold text-xs text-[var(--rn-clr-content-tertiary)] uppercase tracking-wider">JSON</div>
+              <button onClick={() => setRawSlotDumpText(null)} style={smallBtnStyle}>Clear</button>
+            </div>
+            <textarea
+              readOnly
+              value={rawSlotDumpText}
+              onFocus={(e) => e.currentTarget.select()}
+              style={{
+                width: '100%',
+                height: '220px',
+                fontSize: '10px',
+                fontFamily: 'monospace',
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid var(--rn-clr-border)',
+                backgroundColor: 'var(--rn-clr-background-secondary)',
+                color: 'var(--rn-clr-content-primary)',
+              }}
+            />
+          </>
         )}
       </div>
     </div>

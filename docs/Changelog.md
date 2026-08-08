@@ -2,6 +2,25 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.35 - August 7th, 2026
+
+### 🐛 Fixed: priorities showing the wrong number after a RemNote update
+
+RemNote's storage/sync overhaul re-pointed some powerup properties at the wrong slot definition — unnamed ones, the *other* priority powerup's, or ones that had since been deleted. **No value was ever lost**: it stayed on the Rem, in a property the plugin could no longer reach. What you saw instead was the fallback. Because both priority powerups use a slot displayed as "Priority", they got crossed with each other.
+
+RemNote fixed the bulk of it in **1.27.24**. This release deals with what survived that fix, and with the reporting that hid it:
+
+- **Incremental priorities are recovered from the Rem's own history** when the slot cannot be read, instead of silently substituting a default. The displayed number now also says where it came from, so a recovered or placeholder value can never pass for a stored one.
+- **A repair for Card Priority**, which has no history to fall back on and so was the only case genuinely showing wrong values. It reads the value off the unreachable property and rewrites it through the normal path, keeping the original source and timestamp.
+- **Diagnostics to check your own knowledge base** — a raw dump for one Rem and a whole-KB scan — plus a guarded cleanup for the stray `Unnamed — 42` rows the repair leaves behind.
+
+> [!NOTE]
+> **If your priorities look wrong after a RemNote update, please get in touch.** The tools above will tell you whether your knowledge base is affected and by how much, and they write nothing. Reports are especially valuable if the damage appears on a RemNote version **after 1.27.24**, or looks different in shape from what is documented — that would point at a path not yet seen. Open an issue on the [plugin's issue tracker](https://github.com/bjsi/incremental-everything/issues) with the scan output.
+
+One related fault is still outstanding on RemNote's side: some **Next Rep Date** properties reference a Daily Document that no longer exists, so RemNote's date row shows `Loading` indefinitely. Scheduling is unaffected — the plugin keeps its own copy of the next-repetition date and reads that — but the date chip cannot be edited by hand until it is rebuilt.
+
+📖 See [Priorities Wrong or Empty After a RemNote Update](Troubleshooting.md#priorities-wrong-or-empty-after-a-remnote-update) for how to check your own knowledge base and what the repair does.
+
 ## v1.0.34 - August 5th, 2026
 
 ### 🐛 Fixed: a PDF could open the wrong chapter

@@ -42,6 +42,7 @@ import {
   executePreserveHistoryAndRemove,
 } from '../lib/history_transfer';
 import { resolvePowerupSlotDiagnostic } from '../lib/powerup_slot_compat';
+import { dumpRawPowerupSlots } from '../lib/raw_slot_dump';
 import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
@@ -1119,6 +1120,36 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       // Open the batch card priority widget
       await plugin.widget.openPopup('batch_card_priority');
+    },
+  });
+
+  // Diagnostic: print the RAW stored value of every powerup property on the
+  // focused rem and its descendants. Needed because every priority the plugin
+  // displays has already passed through getIncrementalRemFromRem's `priority = 10`
+  // read fallback, so a displayed 10 cannot be told apart from an unreadable slot.
+  // This reads the property rems directly instead. Read-only.
+  plugin.app.registerCommand({
+    id: 'dump-raw-powerup-slots',
+    name: 'Debug: Dump Raw Powerup Slots (console)',
+    description:
+      'Reads the raw stored value of every powerup property on the focused Rem and its descendants, bypassing getPowerupProperty, and flags values that are stored but unreadable.',
+    action: async () => {
+      const rem = await plugin.focus.getFocusedRem();
+      if (!rem) {
+        await plugin.app.toast('Focus a Rem first.');
+        return;
+      }
+      await plugin.app.toast('Dumping raw powerup slots — see the console.');
+      try {
+        const report = await dumpRawPowerupSlots(plugin, rem);
+        await plugin.app.toast(
+          `Raw dump: ${report.scannedRems} rem(s), ${report.properties.length} propert(ies), ` +
+          `${report.unreachable.length} unreadable. See console.`
+        );
+      } catch (e) {
+        console.error('[RawSlotDump] Error:', e);
+        await plugin.app.toast('Raw slot dump failed — check console.');
+      }
     },
   });
 
