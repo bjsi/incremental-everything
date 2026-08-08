@@ -1,0 +1,2687 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental Everything plugin for RemNote.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-everything/Reviewing-Items-in-the-Queue/">
+      
+      
+        <link rel="prev" href="../IR-Flow--Reading-Extracting-and-Clozing/">
+      
+      
+        <link rel="next" href="../Reviewing-Items-in-the-Editor/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Reviewing Items in the Queue - Incremental Everything for RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-core-loop-reviewing-items-in-the-queue" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental Everything for RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reviewing Items in the Queue
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental Everything for RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-answer-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Answer Buttons
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editing-a-rem-type-incremental-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing a Rem-type Incremental Rem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Editing a Rem-type Incremental Rem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-the-card-is-read-only-the-keyboard-conflict-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the card is read-only (the keyboard-conflict problem)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-editing-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The editing flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read-point-and-status-emphasis-in-rem-type-cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read-point and status emphasis in Rem-type cards
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-strategic-guide-to-the-answer-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Strategic Guide to the Answer Buttons
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A Strategic Guide to the Answer Buttons">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Next">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-scheduling-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Scheduling Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-one-memory-one-action-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "One Memory, One Action" Principle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reschedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reschedule
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reschedule">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#technical-note-reschedule-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Note: Reschedule Event Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dismiss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dismiss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change Priority
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#review-in-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review in Editor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review in Editor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-workflow-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Workflow Loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-use-this-instead-of-the-native-go-to-rem-shortcut-g" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why use this instead of the native "Go to Rem" (Shortcut: G)?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-editor-in-new-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Editor in New Tab
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Open Editor in New Tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem-it-solves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem It Solves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works-when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works &amp; When to Use It
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#related-setting-preferred-remnote-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚙️ Related Setting: Preferred RemNote Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-url-to-use-web-clipper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open URL to use Web Clipper 📎
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#card-stats-fsrs-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Card Stats &amp; FSRS Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Card Stats &amp; FSRS Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#whats-displayed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Displayed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flashcard-repetition-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flashcard Repetition History
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fsrs-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FSRS Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FSRS Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-setup-fsrs-weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required Setup: FSRS Weights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitation-global-weights-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitation: Global Weights Only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-settings-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin Settings Reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#incremental-rem-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Incremental Rem History
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-answer-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Answer Buttons
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editing-a-rem-type-incremental-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing a Rem-type Incremental Rem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Editing a Rem-type Incremental Rem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-the-card-is-read-only-the-keyboard-conflict-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the card is read-only (the keyboard-conflict problem)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-editing-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The editing flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#read-point-and-status-emphasis-in-rem-type-cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read-point and status emphasis in Rem-type cards
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-strategic-guide-to-the-answer-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A Strategic Guide to the Answer Buttons
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A Strategic Guide to the Answer Buttons">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Next">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-scheduling-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Scheduling Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-one-memory-one-action-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "One Memory, One Action" Principle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reschedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reschedule
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reschedule">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#technical-note-reschedule-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Note: Reschedule Event Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dismiss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dismiss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change Priority
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#review-in-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review in Editor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review in Editor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-workflow-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Workflow Loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-use-this-instead-of-the-native-go-to-rem-shortcut-g" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why use this instead of the native "Go to Rem" (Shortcut: G)?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-editor-in-new-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open Editor in New Tab
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Open Editor in New Tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem-it-solves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem It Solves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works-when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works &amp; When to Use It
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#related-setting-preferred-remnote-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚙️ Related Setting: Preferred RemNote Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-url-to-use-web-clipper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open URL to use Web Clipper 📎
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#card-stats-fsrs-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Card Stats &amp; FSRS Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Card Stats &amp; FSRS Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#whats-displayed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Displayed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flashcard-repetition-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flashcard Repetition History
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fsrs-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FSRS Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FSRS Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-setup-fsrs-weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required Setup: FSRS Weights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitation-global-weights-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitation: Global Weights Only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-settings-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin Settings Reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#incremental-rem-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Incremental Rem History
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="the-core-loop-reviewing-items-in-the-queue">The Core Loop: Reviewing Items in the Queue<a class="headerlink" href="#the-core-loop-reviewing-items-in-the-queue" title="Permanent link">&para;</a></h1>
+<p>This is where you'll spend most of your time with the plugin. </p>
+<p>The first important consideration the user has to have is that, from now on, his queue will have a dual nature, intermingling elements with different characters and purposes:</p>
+<table>
+<thead>
+<tr>
+<th>Rem Type</th>
+<th>Primary Purpose</th>
+<th>Typical Form</th>
+<th>Repetition Behavior</th>
+<th>Role in the Ecosystem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Incremental Rem</td>
+<td>Introduce new information for passive review and processing.</td>
+<td>Full articles, book chapters, paragraphs, web pages, notes, images, videos.</td>
+<td>Presented in increasing intervals for further reading; tag deleted once fully processed (Dismissed). User-controlled schedule.</td>
+<td><strong>Ingestion/Food:</strong> Raw material imported into the knowledge base to be broken down and learned.</td>
+</tr>
+<tr>
+<td>Flashcard Rem</td>
+<td>Test and strengthen memory of atomic knowledge through active recall.</td>
+<td>Question-Answer pairs, cloze deletions, multi-line sets/lists, multiple-choice tests.</td>
+<td>Presented in algorithmically determined intervals to ensure near-perfect long-term retention.</td>
+<td><strong>Functional Tissue:</strong> The durable, assimilated knowledge that constitutes the organism's long-term memory.</td>
+</tr>
+</tbody>
+</table>
+<p>(Table adapted from the <a href="https://www.youtube.com/watch?v=W9gZZ_UOJhg">Pleasurable Learning channel</a>)</p>
+<p>During a study session, Incremental Everything presents your Incremental Rems one by one (intermingled with your flashcards). To interact with them, you'll use the Answer Buttons bar at the bottom of the screen.</p>
+<p>Each button is designed for a specific action to manage your learning flow efficiently.</p>
+<hr />
+<h2 id="the-answer-buttons">The Answer Buttons<a class="headerlink" href="#the-answer-buttons" title="Permanent link">&para;</a></h2>
+<p>Here is a breakdown of each button and its function, from left to right.</p>
+<ul>
+<li>
+<p><strong><a href="#next">Next</a>:</strong> (Shortcut: <code>Cmd+Right</code> on Mac, <code>Ctrl+Right</code> on Windows/Linux)
+This is your primary action. Clicking "Next" marks the item as reviewed, calculates the next time you should see it based on the scheduling algorithm, and advances to the next item in your queue. The subtitle (e.g., "in 3 days") shows you the new interval that was just calculated.</p>
+</li>
+<li>
+<p><strong>Swipe-to-Reschedule:</strong> (New!) A new gesture for faster scheduling when reviewing Incremental Rems:</p>
+<ul>
+<li><strong>Click and slide UP:</strong> Automatically schedules for <strong>tomorrow</strong>.</li>
+<li><strong>Click and slide DOWN:</strong> Schedules for <strong>today</strong> (later in the same day).</li>
+</ul>
+</li>
+<li>
+<p><strong>Pro-Tip:</strong> This is particularly useful for content you're actively working through (like a book chapter). It keeps your momentum without opening the full Reschedule popup.</p>
+</li>
+<li>
+<p><strong><a href="#reschedule">Reschedule</a>:</strong> (Shortcut: <code>Ctrl+J</code>)
+This button opens a popup that gives you manual control over the item's schedule and priority. You can set a custom interval in days and adjust the priority value at the same time.</p>
+</li>
+<li>
+<p><strong><a href="#dismiss">Dismiss</a>:</strong> (Shortcut: <code>Ctrl+D</code>)
+When you have finished processing an item and no longer wish to see it in your queue, click "Dismiss" (or press <code>Ctrl+D</code>). This permanently finishes the item by removing its <code>Incremental</code> power-up. This shortcut also works in the Editor to dismiss the focused Incremental Rem.</p>
+</li>
+<li>
+<p><strong><a href="#change-priority">Change Priority</a>:</strong> (Shortcut: <code>Ctrl+P</code> for full widget and <code>Ctrl+Alt+P</code> for light widget)
+This opens the advanced priority popup. The label on the button itself provides rich, at-a-glance information:</p>
+</li>
+<li><strong>The Number:</strong> The Rem's absolute priority value (0-100, lower is more important).</li>
+<li><strong>The Percentiles:</strong> The Rem's rank within your entire Knowledge Base (<code>% of KB</code>) and within the current document (<code>% of Doc</code>).</li>
+<li>
+<p><strong>The Color:</strong> The background color shifts from red (high priority) to blue (low priority) for an instant visual cue of its importance.</p>
+</li>
+<li>
+<p><strong><a href="#review-in-editor">Review in Editor</a>:</strong> (Shortcut: <code>Ctrl+Shift+J</code>) <em>(Previously called "Review &amp; Open")</em>
+This is a powerful workflow tool. It performs a sequence of actions:</p>
+</li>
+<li>It first <strong>reviews</strong> the item (rescheduling it) and <strong>opens</strong> the Rem in the editor, exiting the queue.</li>
+<li>
+<p>It immediately starts an <strong>Editor Review Timer</strong>. When finished, clicking <strong>"End Review"</strong> stops the timer and routes you back to your queue document.
+This is perfect to avoid friction with the queue interface, and when an item inspires you to do more detailed work, like extensive note-taking or using other features like the AI assistant.</p>
+</li>
+<li>
+<p><strong>Scroll to Highlight / Scroll to Bookmark:</strong>
+This button appears for <strong>PDF highlights, HTML highlights, and Incremental Rems with PDF sources</strong>. </p>
+</li>
+<li>If you are reviewing a highlight, clicking this instantly snaps your view back to the highlight's position in the document.</li>
+<li>If you are reviewing a full PDF chapter (an Incremental Rem with a PDF source), this button acts as a <strong>Scroll to Bookmark</strong>. It jumps directly to your last recorded reading position within that chapter/PDF/IncRem.</li>
+<li><em>See the <a href="../PDF-Incremental-Reading-Workflow/">PDF-Incremental-Reading-Workflow#4-pdf-highlight-toolbar-utilities</a> guide to learn how bookmark positions are automatically tracked when extracting highlights.</em></li>
+<li>
+<p><em>See also: </em><em><a href="../Create-Incremental-Rem-from-PDF-Highlights/">Create-Incremental-Rem-from-PDF-Highlights</a></em><em> for how to turn highlights into active learning material.</em></p>
+</li>
+<li>
+<p><strong>🔖 Read point (hybrid PDF/HTML IncRems):</strong>
+This button appears when a <strong>PDF/HTML IncRem also has a <a href="../Reviewing-Items-in-the-Editor/#read-points-for-rem-type-incremental-rems">read point</a></strong> set on one of its own descendant rems (a "hybrid" — a reading source <em>and</em> its own outline content). Because the in-queue reader can't jump into the outline without leaving the queue, clicking it shows a <strong>confirmation dialog</strong> with the read point's rem name; on confirm it behaves like <strong><a href="#review-in-editor">Review in Editor</a></strong> — it records a review for the current IncRem and starts its timer — but opens the <strong>read-point descendant</strong> in the editor so you can resume reading there. A small <strong><code>• latest</code></strong> marker appears on whichever of <em>Scroll to Bookmark</em> / <em>Read point</em> was saved most recently. (Pure Rem-type cards don't need this button — their read point is shown directly in the <a href="#read-point-and-status-emphasis-in-rem-type-cards">read-only card</a>.)</p>
+</li>
+<li>
+<p><strong>📑 View outline / 📄 Read document (hybrid toggle):</strong>
+For the same hybrid IncRems (a <strong>PDF/HTML reading source that also has a read point</strong> on a descendant), a toggle appears in the <strong>top-right corner</strong> of the queue card. <strong>📑 View outline</strong> flips the card from the PDF/HTML reader to a <strong>read-only outline view</strong> of the IncRem — the same <a href="#read-point-and-status-emphasis-in-rem-type-cards">ExtractViewer</a> used for Rem-type cards, where the read point is <strong>emphasized and auto-scrolled into view</strong> — <em>without leaving the queue</em>. <strong>📄 Read document</strong> flips back to the reader. This lets you read the document and consult your outline/notes in the same session. <em>(To instead make a chapter </em><em>always</em><em> open as an outline in the queue, add the </em><em><code>#extractviewer</code></em><em> tag — see <a href="PDF-Workflow-→-ExtractViewer-Mode.md">PDF-Incremental-Reading-Workflow#extractviewer-mode</a>.)</em></p>
+</li>
+<li>
+<p><strong><a href="#open-editor-in-new-tab">Open Editor in New Tab</a></strong>:
+Clicking this button instantly opens the full source document in a new browser tab, right at the location of your highlight/PDF document/Rem. Use it to take notes of what you are reading in a PDF section, to paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation), to have access to all of RemNote's formatting tools, and to link to other ideas.</p>
+</li>
+<li>
+<p><strong>📝 Review Note</strong> (compact icon, next to <em>Open Editor</em>):
+Toggles an inline text field to attach a short <strong>observation to this repetition's history entry</strong> — <em>"stopped mid-proof"</em>, <em>"re-read section 3 first"</em>, <em>"dismissing: superseded by newer source"</em>. The note is parked as you type and saved with whichever action ends the review: <strong>Next</strong>, <strong>Reschedule</strong> (<code>Ctrl+J</code>), or <strong>Dismiss</strong> (where it becomes the <em>dismissal reason</em>). The icon stays highlighted while a note is pending. Notes appear later in the <a href="../Plugin-Widgets-Reference/#212-increm-repetition-history-aggregated-view">Repetition History popup</a>, the Aggregated view, and the <a href="../Study-Dashboard/#hierarchy-section">Study Dashboard</a>. Each entry also gets an <strong>automatic reading-context snapshot</strong> (current page, page range, PDF name, last bookmark) — no typing needed for that part.</p>
+</li>
+<li>
+<p><strong>Open URL for Web Clipper 📎</strong> (for HTML-type Incremental Rems): When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.</p>
+</li>
+<li>
+<p><strong>Document Notes (Sidebar):</strong>
+When reviewing PDF or HTML Incremental Rems (including <strong>PDF Highlights</strong> and <strong>HTML Highlights</strong>), a <strong>📝 Document Notes</strong> icon appears in the top bar. Clicking this opens the current document in a right-sidebar widget, allowing you to view and make notes and capture thoughts side-by-side with your reading material without leaving the queue. The sidebar syncs with the active queue item automatically. For highlight IncRems, the sidebar discovers all Incremental Rems sharing the same source document and lets you pick which one's notes to view (auto-selects if there is only one).</p>
+</li>
+</ul>
+<p>The same sidebar is also the <strong>editing surface for plain Rem-type Incremental Rems</strong> (text/note extracts). For these, the in-queue card is a <strong>read-only preview</strong> (see <em>Editing a Rem-type IncRem</em> below) and the Document Notes sidebar <strong>opens automatically</strong> when the item loads, so you can edit it there immediately — selecting text, formatting, and typing all behave normally in the sidebar pane.</p>
+<ul>
+<li>
+<p><strong>Editing a Rem-type IncRem (read-only card + "✎ Edit in sidebar"):</strong>
+When the current Incremental Rem is a plain <strong>Rem</strong> (a text/note extract, not a PDF/HTML/video source), the queue card is a <strong>read-only preview</strong> of the Rem and its descendants, with an <strong>"✎ Edit in sidebar →"</strong> button; editing is done in the auto-opened <strong>Document Notes sidebar</strong>. See <strong><a href="#editing-a-rem-type-incremental-rem">Editing a Rem-type Incremental Rem</a></strong> below for why the card is read-only and how the editing flow works.</p>
+</li>
+<li>
+<p><strong>PDF Switcher (multi-PDF Inc Rems):</strong>
+When the current Inc Rem has <strong>more than one PDF source</strong>, a small PDF dropdown appears in the top bar next to the 📝 Document Notes icon. Selecting a different PDF:</p>
+</li>
+<li><strong>Pins it as active</strong> for this Inc Rem (stored in synced storage as the new default for future queue opens, the Editor Review Timer, the PDF Control Panel, etc.),</li>
+<li><strong>Re-renders the Reader on the new PDF</strong> immediately — the queue card stays the same, just the PDF view swaps. The new PDF's bookmark auto-scroll, page controls, and reading-time writes all follow.</li>
+<li>The switcher is hidden for <strong>PDF highlights and HTML hosts</strong> (highlights are tied to a specific PDF; switching would orphan the queue card).</li>
+</ul>
+<p><em>See the <a href="PDF-Workflow-→-Multiple-PDF-Sources.md">PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf</a> section for the full resolution chain (pin → <code>#preferthispdf</code> → first PDF) and how it applies across every surface.</em></p>
+<ul>
+<li><strong>Press 'P' to Edit:</strong>
+This is a non-clickable hint that appears <strong>only for certain card types</strong> (like regular Rem or PDFs). It reminds you that you can press the "P" key to open the Rem in the pop-up "previewer" for quick edits — a fast alternative when you don't want to use the sidebar. (For Rem-type IncRems the primary editing path is the auto-opened <strong>Document Notes sidebar</strong>, since typing directly in the queue card is unreliable — which is exactly why that card is read-only; see <a href="#editing-a-rem-type-incremental-rem">Editing a Rem-type Incremental Rem</a> below.)</li>
+</ul>
+<p><img alt="Queue Shortcuts" src="../assets/queue-shortcuts.png" width="900" /></p>
+<p><img alt="answer buttons bar" src="../assets/uploaded/94b5bfab-4860-46f3-8997-bea085d8f595.png" width="900" /></p>
+<hr />
+<h2 id="editing-a-rem-type-incremental-rem">Editing a Rem-type Incremental Rem<a class="headerlink" href="#editing-a-rem-type-incremental-rem" title="Permanent link">&para;</a></h2>
+<p>When the current Incremental Rem is a plain <strong>Rem</strong> (a text/note extract, not a PDF, HTML, or video source), the queue card shows a <strong>read-only preview</strong> of the Rem and its descendant subtree, with an <strong>"✎ Edit in sidebar →"</strong> button. All actual editing is done in the <strong>Document Notes sidebar</strong>, which opens automatically when the item loads.</p>
+<h3 id="why-the-card-is-read-only-the-keyboard-conflict-problem">Why the card is read-only (the keyboard-conflict problem)<a class="headerlink" href="#why-the-card-is-read-only-the-keyboard-conflict-problem" title="Permanent link">&para;</a></h3>
+<p>Earlier versions embedded RemNote's <strong>editable</strong> editor for the Rem directly in the queue card. That turned out to be unreliable: the plugin runs in a sandboxed frame while the editor is a "fake embed" rendered in RemNote's <em>main</em> window, and the queue (Flashcard) pane keeps reclaiming the keyboard. In practice this meant:</p>
+<ul>
+<li>the <strong>text-selection toolbar flickered shut</strong> as soon as you selected text;</li>
+<li><strong>typed characters were dropped</strong> (the editor couldn't hold focus); and</li>
+<li><strong>stray keys</strong> (arrows, space, digits) fell through to the queue and could <strong>rate or advance the card by accident</strong>.</li>
+</ul>
+<p>A plugin cannot fully capture keyboard input inside the queue pane, so this could not be fixed there. The solution is to keep the in-queue card <strong>read-only</strong> (it never captures the keyboard — no collapsed selections, no accidental ratings) and route editing to a <strong>separate pane</strong> that holds focus correctly.</p>
+<h3 id="the-editing-flow">The editing flow<a class="headerlink" href="#the-editing-flow" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Read-only preview.</strong> The card renders the Rem and its descendants (reactively — it updates live as you edit them elsewhere). Descendants are shown indented under a guide line, separated from the Rem by a horizontal divider.</li>
+<li><strong>Edit in the sidebar.</strong> The <strong>Document Notes sidebar</strong> auto-opens on the Rem when the item loads (or click <strong>"✎ Edit in sidebar →"</strong>). It is a normal editor pane — selecting text, formatting, typing, and editing children/descendants all work as usual, and the changes flow back into the read-only preview.</li>
+<li><strong>Back to the dashboard on Next/Dismiss.</strong> When you press <strong>Next</strong> or <strong>Dismiss</strong> (leaving the rem), the <a href="Practiced-Queues-dashboard.md">History-Queue-Dashboard-and-Mastery-Drill#practiced-queues-history--live-dashboard</a> is restored in the Right Sidebar (if the <strong>Auto focus Queue Dashboard</strong> setting is on), so you return to your live session metrics for the next item.</li>
+<li><strong>Heavier-duty alternatives.</strong> For more space or a full editor you can also use <strong><a href="#review-in-editor">Review in Editor</a></strong> or <strong><a href="#open-editor-in-new-tab">Open Editor in New Tab</a></strong>, or press <strong><code>P</code></strong> for the pop-up previewer.</li>
+</ul>
+<h3 id="read-point-and-status-emphasis-in-rem-type-cards">Read-point and status emphasis in Rem-type cards<a class="headerlink" href="#read-point-and-status-emphasis-in-rem-type-cards" title="Permanent link">&para;</a></h3>
+<p>The read-only preview highlights important nodes with colored <strong>emphasis boxes</strong> (a left border + background tint — the same visual language as the editor's incremental/dismissed left borders), so you can orient yourself at a glance:</p>
+<ul>
+<li><strong>🎯 Target Incremental Rem</strong> — the <strong>root</strong> rem being reviewed gets the strongest box (thick green border) plus a badge, making it unmistakable which rem is the actual queue item.</li>
+<li><strong>🔖 Read point</strong> — if a <a href="../Reviewing-Items-in-the-Editor/#read-points-for-rem-type-incremental-rems">read point</a> is set, the bookmarked descendant gets a <strong>blue box + "🔖 Read point" badge</strong>, and the card <strong>auto-scrolls to center it</strong> when the item loads. A blue banner at the top of the card — <strong>🔖 Read point: "…"</strong> with a <strong>Scroll to it</strong> button — lets you re-center on demand (and is the fallback indicator when the read point sits deeper than the preview renders).</li>
+<li><strong>Incremental descendants</strong> — green box (mirrors the editor's incremental left border).</li>
+<li><strong>Dismissed descendants</strong> — amber box (mirrors the editor's dismissed indicator).</li>
+<li><strong>⬆️ Cloze extract</strong> — descendants tagged <code>#cloze-extract</code> (children created via <a href="../Plugin-Commands-Reference/#core-incremental-commands">Create Cloze Deletion</a>) get a <strong>violet "⬆️ Cloze extract" badge</strong>, mirroring the queue's cloze identifier.</li>
+<li><strong>🚫 Ignored</strong> — descendants tagged <code>#ignore</code> get a deliberately understated treatment (a thin <em>dashed</em> grey rule + faint tint and an italic "🚫 Ignored" label), so they read as muted/archived without competing with the emphasis boxes above.</li>
+</ul>
+<blockquote>
+<p>These last two are badged <strong>here</strong> because the embedded <code>RemViewer</code> renders outside this preview's stylesheet, so a child's normal cloze/ignore styling wouldn't otherwise show through.</p>
+</blockquote>
+<p>Read points are <strong>set</strong> with the <strong>Set Read Point (Bookmark)</strong> command (<code>Ctrl+F7</code>, <code>srp</code>) — place your cursor in the descendant and run it — and managed from the <strong><a href="../Plugin-Widgets-Reference/#68-read-points-popup">Read Points popup</a></strong> (<code>Ctrl+Shift+F7</code>, <code>vrp</code>). See <strong><a href="../Reviewing-Items-in-the-Editor/#read-points-for-rem-type-incremental-rems">Read Points for Rem-type Incremental Rems</a></strong> for the full workflow.</p>
+<blockquote>
+<p><strong>Tip:</strong> the in-queue preview can only emphasize/scroll to a read point that is actually rendered. If a descendant displays <em>flat</em> (un-nested) in the read-only card, check that the document's <strong>"Hide Bullets"</strong> option is <strong>off</strong> — with Hide Bullets on, RemNote renders the embed without its nested structure.</p>
+</blockquote>
+<hr />
+<h2 id="a-strategic-guide-to-the-answer-buttons">A Strategic Guide to the Answer Buttons<a class="headerlink" href="#a-strategic-guide-to-the-answer-buttons" title="Permanent link">&para;</a></h2>
+<p>Understanding the specific function of each button is key to a fluid and efficient incremental learning workflow. This guide covers the primary use cases for each option on the answer bar.</p>
+<h3 id="next">Next<a class="headerlink" href="#next" title="Permanent link">&para;</a></h3>
+<p>This is your most-used button (shortcut: <code>Cmd+Right</code> on Mac, <code>Ctrl+Right</code> on Windows/Linux). You click it after you have engaged with an item and are ready to schedule its next review.</p>
+<h4 id="the-scheduling-algorithm">The Scheduling Algorithm<a class="headerlink" href="#the-scheduling-algorithm" title="Permanent link">&para;</a></h4>
+<p>The "Next" button uses a simple but effective exponential scheduling algorithm. The interval for the next repetition is calculated with the formula:
+<code>newInterval = multiplier ** numberOfReviews</code></p>
+<p>In simple terms: each time you review an item, the plugin looks at how many times you've seen it before and raises a <strong>multiplier</strong> (a value you can set in the plugin settings, defaulting to 1.5) to that power. This causes the review intervals to grow exponentially (e.g., 2 days, 3 days, 5 days, 7 days, 11 days, and so on), ensuring you see familiar material less frequently over time.</p>
+<h4 id="the-one-memory-one-action-principle">The "One Memory, One Action" Principle<a class="headerlink" href="#the-one-memory-one-action-principle" title="Permanent link">&para;</a></h4>
+<p>The single most important rule in incremental learning is to <strong>always take meaningful action</strong> on an item before clicking "Next". Simply viewing an item and immediately dismissing it is a "futile review" that wastes time.</p>
+<p>The "<a href="https://help.supermemo.org/wiki/Incremental_learning#One_memory,_one_action">One memory, one action</a>" principle, first enunciated by Piotr Wozniak, author of SuperMemo, demands that <strong>every review should leave a trace in your memory</strong>. Before clicking "Next," you should <strong>always perform at least one small, productive step</strong>, such as:</p>
+<ul>
+<li><strong>Rephrasing</strong> a difficult sentence to make it clearer.</li>
+<li><strong>Creating</strong> a highlight on a key passage.</li>
+<li><strong><a href="Extracting.md">Reviewing-Items-in-the-Editor#extracting-text</a></strong> a "golden nugget" of information into its own Rem by selecting text and pressing <strong><code>Alt+X</code></strong> (this creates a linked child extract).</li>
+<li><strong>Importing</strong> to your knowledge base an article or page that will bring foundational knowledge that you will need to fully grasp the current incremental rem (and tagging this new article "Incremental", using <code>Alt+X</code> or <code>Alt+Shift+X</code>, to bring it into your learning flow).</li>
+<li><strong><a href="Creating-a-cloze-deletion.md">Reviewing-Items-in-the-Editor#creating-clozes</a></strong> or standard flashcard from a sentence using <strong><code>Alt+Z</code></strong>.</li>
+</ul>
+<p>Conversely, <strong>avoid "item perfectionism"</strong>—doing too much work on a single item in one session. It is highly inefficient to spend a long time formatting, adding images, and perfecting a single piece of information. Spread these actions over time. The goal is one meaningful interaction per review.</p>
+<h3 id="reschedule">Reschedule<a class="headerlink" href="#reschedule" title="Permanent link">&para;</a></h3>
+<p>This button (shortcut <code>Ctrl+J</code>) is your tool for strategic postponement.</p>
+<p><strong>When to use it:</strong>
+Use "Reschedule" when you encounter a complex topic that you're not mentally prepared for yet. For example, you might be reviewing an advanced physics paper but realize you need to brush up on a foundational concept first.</p>
+<p>Instead of struggling or just clicking "Next" (a futile review), you can use "Reschedule" to punt the advanced topic a month into the future. This gives you time to encounter and process first the more basic foundational material you have already imported to your knowledge base, so you'll be ready when the complex topic reappears.</p>
+<p><strong>A caveat:</strong>
+Using "Reschedule" is a <strong>one-time override</strong>. The custom interval you set applies only to the next review. After that, the "Next" button will resume its normal scheduling based on your total number of reviews, not the custom interval you previously set. If an interval feels off again in the future, simply use "Reschedule" again.</p>
+<p><strong>📝 Note field:</strong>
+The popup includes an optional <strong>Note</strong> input — record <em>why</em> you postponed ("waiting for prerequisite chapter", "revisit after exam"). The note is stored on this reschedule's history entry and shown later in the <a href="../Plugin-Widgets-Reference/#212-increm-repetition-history-aggregated-view">Repetition History popup</a>, so future-you knows what past-you was thinking.</p>
+<p><img alt="Reschedule Widget" src="../assets/reschedule.png" width="400" /></p>
+<h4 id="technical-note-reschedule-event-types">Technical Note: Reschedule Event Types<a class="headerlink" href="#technical-note-reschedule-event-types" title="Permanent link">&para;</a></h4>
+<p>The plugin differentiates how repetition/reschedule events are tracked based on their source, with different interval calculation behavior:</p>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Source</th>
+<th>Counts for Interval?</th>
+<th>UI Display</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rep</code> (default)</td>
+<td><a href="#next">Next</a> button in queue</td>
+<td>✅ Yes</td>
+<td>Normal row</td>
+</tr>
+<tr>
+<td><code>rescheduledInQueue</code></td>
+<td>Ctrl+J / Reschedule button in queue</td>
+<td>✅ Yes</td>
+<td>Row with "📅" indicator</td>
+</tr>
+<tr>
+<td><code>rescheduledInEditor</code></td>
+<td>Ctrl+J in editor</td>
+<td>❌ No</td>
+<td>Event marker (purple)</td>
+</tr>
+<tr>
+<td><code>manualDateReset</code></td>
+<td>User manually edits Next Rep Date slot</td>
+<td>❌ No</td>
+<td>Event marker (gray)</td>
+</tr>
+<tr>
+<td><code>executeRepetition</code></td>
+<td><a href="../Reviewing-Items-in-the-Editor/#1-execute-repetition-command">Execute Repetition command</a></td>
+<td>✅ Yes</td>
+<td>Row with "⌨️" indicator</td>
+</tr>
+<tr>
+<td><code>madeIncremental</code></td>
+<td>Making rem incremental</td>
+<td>❌ No (boundary only)</td>
+<td>Event marker (green)</td>
+</tr>
+<tr>
+<td><code>dismissed</code></td>
+<td><a href="#dismiss">Dismiss</a> button / tag removal</td>
+<td>❌ No</td>
+<td>Event marker (orange)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key distinction:</strong>
+- <strong>Review actions</strong> (<code>rep</code>, <code>rescheduledInQueue</code>, <code>executeRepetition</code>) count for interval calculation because you engaged with and reviewed the content before scheduling the next review
+- <strong>Administrative adjustments</strong> (<code>rescheduledInEditor</code>, <code>manualDateReset</code>) only change the schedule without confirming a review—useful for planning but don't advance the SRS algorithm</p>
+<h3 id="dismiss">Dismiss<a class="headerlink" href="#dismiss" title="Permanent link">&para;</a></h3>
+<p>This button (shortcut: <code>Ctrl+D</code>) signifies the end of a passive item's life cycle in your incremental reading queue. The <code>Ctrl+D</code> shortcut also works in the Editor context — when focused on an Incremental Rem, it will dismiss it directly (transferring its history to the Dismissed powerup and removing the Incremental tag).</p>
+<p><strong>When to use it:</strong>
+The primary goal of incremental reading is to process source materials (like articles, book chapters or paragraphs) and extract the most valuable, "golden nugget" pieces of information. You do this by turning them into active recall prompts (flashcards and clozes).</p>
+<p>Once you have reviewed the entire source and are confident you've extracted all the key knowledge into flashcards, the original passive material has served its purpose. Click "Dismiss" to remove the source text from your queue, leaving only the efficient, active-recall cards you created from it.</p>
+<h3 id="change-priority">Change Priority<a class="headerlink" href="#change-priority" title="Permanent link">&para;</a></h3>
+<p>Prioritization is essential for managing a large volume of learning material.</p>
+<p><strong>When to use it:</strong>
+As your collection grows, you'll naturally have items of varying importance. Use the "Change Priority" button to open the priority popup and adjust an item's importance on the fly, directly from the queue. This ensures you see your most critical material more often than less important topics.</p>
+<p>For a deep dive into how the priority system works, please see the <a href="../Prioritization-%26-Sorting/">Prioritization &amp; Sorting</a> page.</p>
+<h3 id="review-in-editor">Review in Editor<a class="headerlink" href="#review-in-editor" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><em>Previously called "Review &amp; Open".</em></p>
+</blockquote>
+<p>This button (shortcut <code>Ctrl+Shift+J</code>) provides a seamless bridge between the focused queue environment and the full-power RemNote editor.</p>
+<p>It performs a powerful sequence of actions:
+1. It registers the item as conceptually "reviewed" (rescheduling it for the future, just like the "Next" button).
+2. It instantly <strong>navigates you to the editor</strong> for that Rem, exiting the queue.
+3. It <strong>automatically starts the Editor Review Timer</strong> for that session.
+  * <em>Note for PDF Notes</em>: If the item is a <code>pdf-note</code>, this button carefully opens the Rem as a full page in the editor rather than triggering the PDF viewer, maintaining your note-taking context.</p>
+<h4 id="the-workflow-loop">The Workflow Loop<a class="headerlink" href="#the-workflow-loop" title="Permanent link">&para;</a></h4>
+<p>Once you are in the editor with the timer running, you can perform heavy editing, restructuring, or use AI tools. 
+When you are completely finished processing the item:
+1. Click <strong>"End Review"</strong> on the Timer Widget. 
+2. The timer will conclude, record your repetition (along with the time spent), and <strong>navigate you back to the original queue document</strong>.
+3. You must then press <code>Cmd+Shift+P</code> (or your Practice shortcut / the Practice button) to instantly dive back into the queue and continue.</p>
+<h4 id="when-to-use-it">When to use it<a class="headerlink" href="#when-to-use-it" title="Permanent link">&para;</a></h4>
+<p>Use "Review in Editor" whenever the queue interface feels too limited for the task at hand. This workflow is ideal for situations where you need to:
+* See the broader <strong>context</strong> of a Rem within your outliner.
+* Perform <strong>heavy editing</strong> or restructuring.
+* Use other features not fully available in the queue, like <strong>"Ask AI"</strong> or AI <strong>Create Flashcards</strong>.</p>
+<h4 id="why-use-this-instead-of-the-native-go-to-rem-shortcut-g">Why use this instead of the native "Go to Rem" (Shortcut: G)?<a class="headerlink" href="#why-use-this-instead-of-the-native-go-to-rem-shortcut-g" title="Permanent link">&para;</a></h4>
+<p>If you use RemNote's native "Go to Rem" command while in the queue, you will be taken to the editor, but your review of the card will <strong>not be logged</strong>, and the time-tracking timer will <strong>not start</strong>. This means the same card will likely reappear later in your session, which is inefficient.</p>
+<p>The <strong>"Review in Editor"</strong> button solves this problem by cleanly coupling the review, the navigation, and the time-tracking timer into one seamless action.</p>
+<h3 id="open-editor-in-new-tab">Open Editor in New Tab<a class="headerlink" href="#open-editor-in-new-tab" title="Permanent link">&para;</a></h3>
+<p>This button is a direct response to a recent RemNote UI change and serves as an essential workaround to restore a seamless PDF review workflow.</p>
+<h4 id="the-problem-it-solves">The Problem It Solves<a class="headerlink" href="#the-problem-it-solves" title="Permanent link">&para;</a></h4>
+<p>RemNote recently removed the ability to open an editor pane on the left side of the screen when reviewing a PDF highlight in the queue (PDFWebViewer). This made it impossible to take notes and paste extracts without exiting the queue entirely, breaking the review flow (not always the <em>Previewer</em> - pressing "P" - is sufficient to this flow, nor does it allow having the PDF and editor side by side).</p>
+<blockquote>
+<p>ℹ️ This is the same family of limitation that makes the in-queue card for Rem-type Incremental Rems <strong>read-only</strong> — a plugin can't reliably hold the keyboard inside the queue pane. For plain Rems the editing surface is the Document Notes sidebar; see <a href="#editing-a-rem-type-incremental-rem">Editing a Rem-type Incremental Rem</a>.</p>
+</blockquote>
+<h4 id="how-it-works-when-to-use-it">How It Works &amp; When to Use It<a class="headerlink" href="#how-it-works-when-to-use-it" title="Permanent link">&para;</a></h4>
+<p>This new button instantly opens the full source document in a new browser tab, right at the location of your highlight/PDF document/Rem.</p>
+<ul>
+<li><strong>Use Case: In-Depth Note-Taking During Review</strong>
+A highlight sparks a complex new idea that requires more space than a simple comment. Or you want to take notes of what you are reading in a PDF section, and paste highlighted extracts right there (tagging it "incremental" in the editor note rather than in the PDF highlight itself, for easier manipulation and future flashcard creation). Use the button to open the full editor, where you have access to all of RemNote's formatting tools, can link to other ideas, and can write extensive notes alongside the original PDF. This allows you to capture detailed thoughts without being constrained by the queue's limited interface.</li>
+</ul>
+<p><img alt="open editor new tab button" src="../assets/uploaded/138c8770-1786-41c8-87a5-2fb3c4e12979.png" width="900" /></p>
+<h4 id="related-setting-preferred-remnote-environment">⚙️  Related Setting: Preferred RemNote Environment<a class="headerlink" href="#related-setting-preferred-remnote-environment" title="Permanent link">&para;</a></h4>
+<p>For users who primarily work on the beta version of RemNote, a new "Preferred RemNote Environment" setting has been added. This dropdown menu in the plugin settings allows you to choose whether the "Open Editor in New Tab" button directs you to the stable (<code>www.remnote.com</code>) or beta (<code>beta.remnote.com</code>) environment. This ensures a seamless workflow by keeping you in your preferred version of RemNote.</p>
+<p><img alt="remnote-environment" src="../assets/uploaded/3f69d55a-75b4-4696-9a55-61969eabefa0.png" width="750" /></p>
+<h3 id="open-url-to-use-web-clipper">Open URL to use Web Clipper 📎<a class="headerlink" href="#open-url-to-use-web-clipper" title="Permanent link">&para;</a></h3>
+<p>This button only appears for HTML-type Incremental Rems. When reviewing IncRems with web pages sources, this button opens the original URL in a new browser tab, allowing you to use the Clipper's side panel for additional notes and extracts, improving the experience of Incremental Reading web pages. The button features an animated design to highlight when you're reviewing web content.</p>
+<p><img alt="open url use clipper button" src="../assets/uploaded/c4609bf8-4250-4b58-aa1c-933607599ed2.png" width="900" /></p>
+<p><img alt="Open html IncRem in browser for Clipper" src="../assets/uploaded/c6539d74-6b00-4e20-8d37-6fbe6bae2d03.png" width="800" /></p>
+<p><img alt="IR on RemNote Clipper" src="../assets/uploaded/842393b8-0787-47ef-9ad6-5a2304145efa.png" width="1000" /></p>
+<p>See also: <a href="https://help.remnote.com/en/articles/6030855-using-the-remnote-clipper">Using the RemNote Clipper</a>.</p>
+<hr />
+<h2 id="card-stats-fsrs-integration">Card Stats &amp; FSRS Integration<a class="headerlink" href="#card-stats-fsrs-integration" title="Permanent link">&para;</a></h2>
+<p>When reviewing flashcards in the queue, the <strong>Card Info Bar</strong> widget (formerly <em>Card Priority Display</em>) shows additional card statistics and FSRS memory state information alongside the priority and shield data.</p>
+<h3 id="whats-displayed">What's Displayed<a class="headerlink" href="#whats-displayed" title="Permanent link">&para;</a></h3>
+<p>The info bar includes (from left to right):</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(1) <strong>Priority</strong></td>
+<td>Absolute priority value with KB and Document percentiles</td>
+</tr>
+<tr>
+<td>(2) <strong>Card Shield</strong></td>
+<td>Shield status (if enabled)</td>
+</tr>
+<tr>
+<td>(3) <strong>Weighted Shield</strong></td>
+<td>Exponential priority-weighted workload percentage (if enabled)</td>
+</tr>
+<tr>
+<td>(4) <strong>Reps &amp; Time</strong></td>
+<td>Total number of reviews (with <strong>lapses</strong> in red parentheses), cumulative review time, <strong>card age</strong>, and <strong>cost</strong> (per year of age/coverage) for this card. Hover over it for an explanatory tooltip.</td>
+</tr>
+<tr>
+<td>(5)(6) <strong>D · S · R · SInc</strong></td>
+<td>FSRS Difficulty, Stability (and time passed since last review), Retrievability, and Stability Increase (if enabled)</td>
+</tr>
+<tr>
+<td>(7) <strong>🔬</strong></td>
+<td>Opens the Flashcard Repetition History popup</td>
+</tr>
+<tr>
+<td>(8) <strong>Incremental Rem Status Indicator</strong></td>
+<td>An icon displayed on the right border whenever the current card is also an Incremental Rem</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Card Info Bar" src="../assets/card-priority-display.png" width="900" /></p>
+<p><img alt="Card Toolbar in the Queue" src="../assets/card-priority-display-full-queue.png" width="900" /></p>
+<p><strong>Understanding D, S, and R:</strong></p>
+<ul>
+<li><strong>Difficulty (D):</strong> How hard it is to maintain a memory of something. The higher the difficulty, the harder it is to increase its Stability and maintain it in the long term. The larger the number, the greater the difficulty. Its value ranges from 1 (easiest) to 10 (hardest). Difficulty increases when you forget (rate "Again") and decreases when you recall easily. Hover over the DSR stats to see the projected <strong>Next Difficulty</strong> for each of the four grading options (Again, Hard, Good, Easy).</li>
+<li><strong>Stability (S):</strong> The expected interval (in days) at which your recall probability equals 90%. It is the <strong>storage strength</strong> of memory. A stability of 30d means you'd need to review the card in approximately 30 days to have a 90% chance of recalling it. The exact time passed since your last review of this card is shown in parentheses next to it (e.g., <code>(6.2 m passed)</code>).</li>
+<li><strong>Retrievability (R):</strong> Your estimated probability of recalling this card <em>right now</em> (memory's <strong>retrieval strength</strong>).The lower it is, the higher the probability that the memory will be forgotten. Shown as a percentage with color coding: 🟢 green (≥90%), 🟡 yellow (≥70%), 🔴 red (&lt;70%).</li>
+<li><strong>Stability Increase (SInc):</strong> How much your memory stability will grow after answering. Shown as a multiplier (e.g., <code>1.42×</code>) for the <strong>Good</strong> grade. Hover over it to see the SInc for all three recall grades (Hard / Good / Easy) along with the projected new stability after each. A value of <code>1.0×</code> means no growth; higher values mean faster learning. SInc is influenced by the card's current Difficulty, Stability, and Retrievability — reviewing at lower retrievability (closer to forgetting) produces a larger stability increase, reflecting the <a href="https://en.wikipedia.org/wiki/Desirable_difficulty">desirable difficulty</a> principle.</li>
+</ul>
+<h3 id="flashcard-repetition-history">Flashcard Repetition History<a class="headerlink" href="#flashcard-repetition-history" title="Permanent link">&para;</a></h3>
+<p>Clicking the 🔬 button (or pressing <code>Ctrl+Shift+H</code>) opens a detailed popup showing the card's full review history — similar to RemNote's built-in Practice History. You can close this popup anytime by pressing <code>Esc</code>.</p>
+<p><img alt="Flashcard Repetition History" src="../assets/flashcard-rep-history.png" width="900" /></p>
+<p><strong>Header &amp; Summary Information:</strong>
+*   <strong>Rem Name:</strong> The document's parent name is displayed bolded at the very top.
+*   <strong>Total Reviews &amp; Time:</strong> An aggregate sum of your historical effort, the <strong>card age</strong>, the <strong>coverage</strong> (time until next scheduled review), and the <strong>cost</strong> (ignoring any reviews that occurred before a manual Date Reset).
+*   <strong>Optimum Next Repetition Date:</strong> Calculates the optimal review date you <em>should</em> practice based directly on FSRS stability formulas (<code>Last practice date + Stability</code>). Hover for a tooltip explaining discrepancies with the scheduled date.
+*   <strong>Date Stale:</strong> When the card becomes overdue (Last practice + 2x Interval).
+*   <strong>Current Interval Ratio:</strong> Shows what percentage of the predicted Stability the current interval occupies.
+*   <strong>Retrievability Gradient:</strong> The <em>R</em> metric is color-coded using a dynamic gradient transitioning from pure red (≤ 70%) to green (100%).</p>
+<p><strong>Each row contains:</strong>
+*   <strong>Rating:</strong> The score given (Again, Hard, Good, Easy), color-coded.
+*   <strong>Response Time:</strong> How long you spent answering.
+*   <strong>Target Date:</strong> When the review was originally scheduled.
+*   <strong>Practice Date:</strong> When you actually reviewed it.
+*   <strong>Delay:</strong> How early or late you reviewed relative to the target ("On Target Day", "2 days late", "3 months late", etc.).
+*   <strong>Next Interval:</strong> The interval that was assigned after this review ("9 hours", "6 days", "1.3 months", etc.).
+*   <strong>D &amp; S:</strong> The FSRS Difficulty and Stability values <em>after</em> each review step, showing how memory state evolved over time. (Note: <code>RESET</code> events restart the learning state from scratch).
+*   <strong>SInc:</strong> The actual Stability Increase ratio applied at that step (<code>×1.35</code> = stability grew by 35%). Null (<code>—</code>) for the first review since there's no previous stability to compare against.
+*   <strong>pluginData:</strong> Any data recorded by plugins during that review (historical; only present for reviews performed via the plugin's custom scheduler).</p>
+<p>The heading summary also shows the current <strong>SInc</strong> for all three recall grades, color-coded: 🟠 Hard / 🟢 Good / 🔵 Easy. Hover for a tooltip with projected stability values.</p>
+<h3 id="fsrs-configuration">FSRS Configuration<a class="headerlink" href="#fsrs-configuration" title="Permanent link">&para;</a></h3>
+<p>The plugin includes a built-in implementation of the <a href="https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm">FSRS v6.1.1 algorithm</a> that replays each card's repetition history to compute D, S, and R. This is necessary because RemNote does not expose FSRS state through its plugin SDK.</p>
+<h4 id="required-setup-fsrs-weights">Required Setup: FSRS Weights<a class="headerlink" href="#required-setup-fsrs-weights" title="Permanent link">&para;</a></h4>
+<p>To get accurate D/S/R values that match RemNote's internal calculations, you need to provide your FSRS weights in the plugin settings:</p>
+<ol>
+<li>Go to <strong>RemNote Settings → Schedulers → Global Default Scheduler</strong>.</li>
+<li>Copy the weights array (19 or 21 comma-separated numbers).</li>
+<li>Go to <strong>Plugin Settings → Incremental Everything → FSRS Global Weights</strong>.</li>
+<li>Paste the weights string (e.g., <code>[1, 3, 10, 45, 7.011, 0.46, ...]</code>).</li>
+</ol>
+<p>If left empty, the official FSRS v6.1.1 default weights are used, which will produce approximate but likely inaccurate values for your specific study patterns.</p>
+<p><img alt="DSR Settings" src="../assets/DSR-settings.png" width="800" /></p>
+<h4 id="limitation-global-weights-only">Limitation: Global Weights Only<a class="headerlink" href="#limitation-global-weights-only" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>⚠️ <strong>Important:</strong> RemNote allows assigning different custom schedulers (with different FSRS weights) to different documents or folders. However, the plugin SDK does not expose which scheduler is assigned to a specific card. As a result, the plugin can only use a single set of <strong>global weights</strong> for all cards.</p>
+</blockquote>
+<p>If you use multiple custom schedulers with different weights (or with Anki_SM2 scheduler), the computed D/S/R values will only be accurate for cards using the scheduler whose weights you configured. Cards assigned to other schedulers may show slightly different values than what RemNote computes internally.</p>
+<p>For most users who use a single global scheduler, this is not an issue — just paste your global scheduler's weights and the values will match.</p>
+<h4 id="plugin-settings-reference">Plugin Settings Reference<a class="headerlink" href="#plugin-settings-reference" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Display FSRS DSR Stats</strong></td>
+<td>Boolean</td>
+<td>Toggle D/S/R display on or off (default: on)</td>
+</tr>
+<tr>
+<td><strong>FSRS Global Weights</strong></td>
+<td>String</td>
+<td>Your FSRS weights, comma-separated (accepts 19 or 21 values, with or without brackets)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="incremental-rem-history">Incremental Rem History<a class="headerlink" href="#incremental-rem-history" title="Permanent link">&para;</a></h2>
+<p>The <strong>Incremental Rem History</strong> widget automatically records and displays the Incremental Rems you have viewed in your queue.</p>
+<p><strong>Key Features:</strong>
+*   <strong>Searchable History:</strong> Easily find previously viewed items using the search bar.
+*   <strong>Context Aware:</strong> Shows history specific to the current Knowledge Base.
+*   <strong>Recency Tracking:</strong> Displays how long ago you viewed each item.
+*   <strong>Quick Navigation:</strong> Click any item to jump back to it.</p>
+<p>This widget helps you keep track of your reading session and backtrack if needed, complementing the queue's linear flow. It's also a good companion to the <strong><a href="https://www.remnote.com/plugins/final_drill_and_history">History and Final Drill</a></strong> plugin.</p>
+<p><img alt="Incremental Rem History Widget" src="../assets/incremental-history.png" width="400" /></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

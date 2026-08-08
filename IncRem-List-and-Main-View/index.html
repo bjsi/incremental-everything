@@ -1,0 +1,2354 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental Everything plugin for RemNote.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-everything/IncRem-List-and-Main-View/">
+      
+      
+        <link rel="prev" href="../Incremental-Video/">
+      
+      
+        <link rel="next" href="../History-Queue-Dashboard-and-Mastery-Drill/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>IncRem List & Main View - Incremental Everything for RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#increm-list-main-view" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental Everything for RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              IncRem List & Main View
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental Everything for RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-entry-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two Entry Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two Entry Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#increm-list-scoped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IncRem List (Scoped)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-inc-rems-main-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All Inc Rems (Main View)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#table-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filtering-sorting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtering &amp; Sorting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date-filters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Date Filters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Date Filters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#accepted-input-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accepted Input Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#practical-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practical Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inline-priority-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline Priority Editing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-in-editor-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review in Editor Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review in Editor Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#due-filter-warning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Due-Filter Warning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-preservation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Preservation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#differences-from-queues-review-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differences from Queue's "Review &amp; Open"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use It
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priority-distribution-graphs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Distribution Graphs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priority Distribution Graphs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#document-priority-distribution-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document Priority Distribution Graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kb-priority-distribution-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KB Priority Distribution Graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-theyre-useful" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why They're Useful
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-entry-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two Entry Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two Entry Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#increm-list-scoped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IncRem List (Scoped)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-inc-rems-main-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All Inc Rems (Main View)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#table-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filtering-sorting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filtering &amp; Sorting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#date-filters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Date Filters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Date Filters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#accepted-input-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accepted Input Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#practical-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practical Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inline-priority-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inline Priority Editing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-in-editor-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review in Editor Flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review in Editor Flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#due-filter-warning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Due-Filter Warning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-preservation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Preservation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#differences-from-queues-review-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differences from Queue's "Review &amp; Open"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use It
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priority-distribution-graphs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority Distribution Graphs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Priority Distribution Graphs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#document-priority-distribution-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Document Priority Distribution Graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kb-priority-distribution-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KB Priority Distribution Graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-theyre-useful" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why They're Useful
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="increm-list-main-view">IncRem List &amp; Main View<a class="headerlink" href="#increm-list-main-view" title="Permanent link">&para;</a></h1>
+<p>The <strong>IncRem List</strong> and <strong>All Inc Rems (Main View)</strong> are popup widgets that let you browse, filter, sort, and manage your Incremental Rems outside the queue. They provide a spreadsheet-like overview of your learning material with powerful inline controls.</p>
+<hr />
+<h2 id="two-entry-points">Two Entry Points<a class="headerlink" href="#two-entry-points" title="Permanent link">&para;</a></h2>
+<h3 id="increm-list-scoped">IncRem List (Scoped)<a class="headerlink" href="#increm-list-scoped" title="Permanent link">&para;</a></h3>
+<p>The <strong>IncRem List</strong> popup shows Incremental Rems scoped to the <strong>current document</strong>. It opens when you click the <strong>IncRem Counter</strong> badge (the small counter that appears below the title of a document containing Incremental Rems).</p>
+<ul>
+<li><strong>Heading format:</strong> <code>📚 Inc Rems · Document Name</code> — shows the scoped document name (truncated at 30 characters with a full-name tooltip on hover)</li>
+<li><strong>Scope:</strong> Only shows IncRems that are descendants of the current document</li>
+<li><strong>Use case:</strong> Quick access to all Incremental Rems within the document you're currently reading</li>
+</ul>
+<h3 id="all-inc-rems-main-view">All Inc Rems (Main View)<a class="headerlink" href="#all-inc-rems-main-view" title="Permanent link">&para;</a></h3>
+<p>The <strong>All Inc Rems</strong> popup shows every Incremental Rem in your entire Knowledge Base. You can open it via a command or clicking the "View All" icon at the right side of the IncRem Counter badge.</p>
+<ul>
+<li><strong>Heading format:</strong> <code>📊 All Inc Rems</code></li>
+<li><strong>Scope:</strong> Full Knowledge Base — all Incremental Rems across all documents</li>
+<li><strong>Extra features:</strong></li>
+<li><strong>Document filter dropdown</strong>: Filter by top-level document</li>
+<li><strong>KB Priority Distribution Graph</strong> (see <a href="#priority-distribution-graphs">below</a>)</li>
+</ul>
+<hr />
+<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
+<h3 id="table-overview">Table Overview<a class="headerlink" href="#table-overview" title="Permanent link">&para;</a></h3>
+<p>Both widgets share the same table interface, displaying each Incremental Rem as a row with:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Type badge</strong></td>
+<td>Color-coded badge indicating the type: PDF, PDF Extract, PDF Note, Web, Rem, etc.</td>
+</tr>
+<tr>
+<td><strong>Title</strong></td>
+<td>The Rem's text content, wrapping up to two lines. Pin references (📌) appear as an icon — hover to see the referenced content. Hover the title for a breadcrumb tooltip showing the Rem's location in the outline</td>
+</tr>
+<tr>
+<td><strong>Review stats</strong></td>
+<td>Number of reviews, total time spent, and last review date</td>
+</tr>
+<tr>
+<td><strong>Created</strong></td>
+<td>Date the Rem was first made Incremental (shown below the last review date)</td>
+</tr>
+<tr>
+<td><strong>Priority badge</strong></td>
+<td>Clickable priority value (P1–P100) with color gradient. Click to edit inline</td>
+</tr>
+<tr>
+<td><strong>Next rep date</strong></td>
+<td>Time until next scheduled review (e.g., "3 days ago", "in 2 weeks")</td>
+</tr>
+<tr>
+<td><strong>Review in Editor</strong></td>
+<td>🔗 icon to start a timed review session directly from the list</td>
+</tr>
+</tbody>
+</table>
+<h3 id="filtering-sorting">Filtering &amp; Sorting<a class="headerlink" href="#filtering-sorting" title="Permanent link">&para;</a></h3>
+<p>The table header provides several controls:</p>
+<ul>
+<li><strong>Document filter</strong> <em>(All Inc Rems only)</em>: Dropdown to filter by top-level document. Shows document name and item count. This filter is preserved across Review in Editor sessions</li>
+<li><strong>Status filter tabs:</strong> <code>All</code> | <code>Due</code> | <code>Scheduled</code> — filter by whether items are currently due</li>
+<li><strong>Type filter dropdown:</strong> Filter by IncRem type (PDF, Web, Rem, etc.)</li>
+<li><strong>Priority range:</strong> Star icon + min/max inputs to filter by absolute priority range</li>
+<li><strong>Search bar:</strong> Text search across Rem titles</li>
+<li><strong>Sort dropdown:</strong> Sort by Priority, Next Rep Date, Last Review Date, Created At, Total Time, or Review Count</li>
+<li><strong>Sort direction:</strong> Toggle ascending/descending with the arrow button</li>
+</ul>
+<h3 id="date-filters">Date Filters<a class="headerlink" href="#date-filters" title="Permanent link">&para;</a></h3>
+<p>A dedicated <strong>date filter bar</strong> sits below the main filter row. It provides three independent date fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Filters by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Due</strong></td>
+<td>The next scheduled review date</td>
+</tr>
+<tr>
+<td><strong>Last Review</strong></td>
+<td>The most recent review session date</td>
+</tr>
+<tr>
+<td><strong>Created</strong></td>
+<td>The date the Rem was first made Incremental</td>
+</tr>
+</tbody>
+</table>
+<p>Each field supports six comparison operators via a dropdown:</p>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>is</strong></td>
+<td>Exactly on that calendar day</td>
+</tr>
+<tr>
+<td><strong>is before</strong></td>
+<td>Strictly earlier than the date</td>
+</tr>
+<tr>
+<td><strong>is after</strong></td>
+<td>Strictly later than the date</td>
+</tr>
+<tr>
+<td><strong>is on/before</strong></td>
+<td>On or before the date</td>
+</tr>
+<tr>
+<td><strong>is on/after</strong></td>
+<td>On or after the date</td>
+</tr>
+<tr>
+<td><strong>is between</strong></td>
+<td>Within a range — a second date input appears for the end date</td>
+</tr>
+</tbody>
+</table>
+<h4 id="accepted-input-formats">Accepted Input Formats<a class="headerlink" href="#accepted-input-formats" title="Permanent link">&para;</a></h4>
+<p>Each input field accepts three formats:</p>
+<table>
+<thead>
+<tr>
+<th>Format</th>
+<th>Example</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MM/DD/YYYY</code></td>
+<td><code>4/15/2026</code></td>
+<td>A specific date</td>
+</tr>
+<tr>
+<td><code>MM/DD</code></td>
+<td><code>4/15</code></td>
+<td>That month and day in the <strong>current year</strong></td>
+</tr>
+<tr>
+<td><code>N</code> (integer)</td>
+<td><code>30</code></td>
+<td><strong>N days ago</strong> from today (e.g. <code>0</code> = today, <code>7</code> = one week ago)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>[!TIP]
+Use the <strong>calendar button</strong> (📅) next to each input to open the native date picker and select a date visually. The picked date is inserted in <code>M/D/YYYY</code> format. The calendar button can also be used even if the field already has a valid date — it will pre-select the current value.</p>
+<p>[!NOTE]
+If you type a value that is not recognized as a valid date or integer, the input border <strong>turns red</strong> and the background gets a subtle red tint, giving you immediate visual feedback. The filter is not applied for invalid values.</p>
+</blockquote>
+<p>A small hint line appears at the bottom of the date filter bar summarizing the accepted formats:</p>
+<blockquote>
+<p><em>Date formats: MM/DD/YYYY · MM/DD (current year) · N (days ago). Use the calendar button to pick from a calendar.</em></p>
+</blockquote>
+<h4 id="practical-examples">Practical Examples<a class="headerlink" href="#practical-examples" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Show only items due in the last 7 days:</strong> Set <strong>Due</strong> → <em>is on/after</em> → <code>7</code></li>
+<li><strong>Show items reviewed before a specific date:</strong> Set <strong>Last Review</strong> → <em>is before</em> → <code>1/1/2026</code></li>
+<li><strong>Show items created this month:</strong> Set <strong>Created</strong> → <em>is between</em> → <code>4/1</code> and <code>4/30</code></li>
+<li><strong>Show items never reviewed yet:</strong> Leave <strong>Last Review</strong> empty and sort by Last Review (ascending)</li>
+</ul>
+<p><img alt="IncRem List Date Filters row" src="../assets/increm-list-date-filters.png" width="800" /></p>
+<h3 id="inline-priority-editing">Inline Priority Editing<a class="headerlink" href="#inline-priority-editing" title="Permanent link">&para;</a></h3>
+<p>Click the <strong>Priority Badge</strong> on any row to open an inline editor directly below the row. This works exactly like the priority widgets in the queue:</p>
+<ul>
+<li><strong>Input field:</strong> Type a new priority value (0–100)</li>
+<li><strong>Arrow keys:</strong> Press ↑/↓ to increment/decrement the priority</li>
+<li><strong>Submit:</strong> Press <code>Enter</code> or click "Save"</li>
+<li><strong>Cancel:</strong> Press <code>Escape</code> or click outside</li>
+</ul>
+<p>The change is saved immediately and the badge updates in place.</p>
+<p><img alt="IncRem List Inline Priority and Review in Editor workflow" src="../assets/increm-list-priority-and-review.gif" width="800" /></p>
+<hr />
+<h2 id="review-in-editor-flow">Review in Editor Flow<a class="headerlink" href="#review-in-editor-flow" title="Permanent link">&para;</a></h2>
+<p>The <strong>🔗 Review in Editor</strong> icon (rightmost column) provides a powerful workflow for reviewing Incremental Rems without entering the queue. It combines elements of the queue's <a href="../Reviewing-Items-in-the-Queue/#review-in-editor">Review &amp; Open</a> button and the <a href="../Reviewing-Items-in-the-Editor/#1-execute-repetition-command">Execute Repetition Command</a> — opening the Rem in the editor with a running timer that records both the review and time spent — but launched directly from the IncRem List.</p>
+<h3 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Click the 🔗 icon</strong> next to any Incremental Rem in the list</li>
+<li>The plugin:</li>
+<li>Computes the scheduler's suggested next interval</li>
+<li>Starts the <strong>Editor Review Timer</strong></li>
+<li>Opens the Rem in the editor (or as a page for PDF Notes)</li>
+<li>Closes the IncRem List popup</li>
+<li><strong>Review the content</strong> in the editor — take notes, extract information, use AI tools</li>
+<li>When finished, click <strong>"End Review and Back to IncRem List"</strong> on the Timer Widget</li>
+<li>The timer:</li>
+<li>Records the repetition with the time spent reviewing</li>
+<li>Reschedules the Rem for the next review</li>
+<li><strong>Reopens the IncRem List popup</strong> with your previous filters, sorting, and scope restored</li>
+</ol>
+<h3 id="due-filter-warning">Due-Filter Warning<a class="headerlink" href="#due-filter-warning" title="Permanent link">&para;</a></h3>
+<p>To help you stay focused on your active learning schedule, the plugin includes a safety guard that checks if your current list is filtered to <strong>Due</strong> items only before launching a review.</p>
+<p>If you click "Review in Editor" while viewing your full backlog or a custom filter that includes non-due items, a warning will appear:</p>
+<ul>
+<li><strong>Header Level</strong>: If starting from the main top-level button, a yellow warning banner appears at the top of the table. It displays your current filtered count vs. the actual due count.</li>
+<li><strong>Row Level</strong>: If starting from a specific row, an inline warning box appears immediately below that row. It calculates the specific sub-queue from that point onwards and warns you if most of those items are not yet due.</li>
+</ul>
+<p>In both cases, you can click <strong>"Filter to Due Only"</strong> to instantly update your view, or click <strong>"Proceed As-Is"</strong> to continue with your current selection.</p>
+<p><img alt="Header-level Due warning banner" src="../assets/increm-list-warning.png" width="700" /></p>
+<p><img alt="Inline row-level Due warning" src="../assets/increm-list-warning-row.png" width="700" /></p>
+<h3 id="state-preservation">State Preservation<a class="headerlink" href="#state-preservation" title="Permanent link">&para;</a></h3>
+<p>When launching a review from the list, the plugin saves your current filter/sort state in session storage. This means when you return via "End Review and Back to IncRem List", you see the <strong>exact same view</strong> you had before — same filters, same sort order, same priority range. This makes it easy to work through a batch of items without losing your place.</p>
+<h3 id="differences-from-queues-review-open">Differences from Queue's "Review &amp; Open"<a class="headerlink" href="#differences-from-queues-review-open" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Queue "Review &amp; Open"</th>
+<th>IncRem List "Review in Editor"</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>When repetition is recorded</strong></td>
+<td>Immediately (before opening editor)</td>
+<td>On timer end (after review)</td>
+</tr>
+<tr>
+<td><strong>Rescheduling</strong></td>
+<td>Done immediately when clicking the button (timer only adds review time)</td>
+<td>Deferred to timer end — the scheduler's interval is pre-computed and the timer records the full repetition on "End Review"</td>
+</tr>
+<tr>
+<td><strong>Return destination</strong></td>
+<td>Back to queue document</td>
+<td>Back to IncRem List (with same filters)</td>
+</tr>
+<tr>
+<td><strong>End button text</strong></td>
+<td>"End Review and Back to Queue"</td>
+<td>"End Review and Back to IncRem List"</td>
+</tr>
+</tbody>
+</table>
+<h3 id="when-to-use-it">When to Use It<a class="headerlink" href="#when-to-use-it" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Batch reviewing</strong>: Work through your IncRem list systematically, reviewing items one by one</li>
+<li><strong>Targeted review</strong>: Filter to a specific type or priority range, then review only those items</li>
+<li><strong>Outside the queue</strong>: Review specific items without entering the full queue session</li>
+<li><strong>Document-scoped work</strong>: Focus on all IncRems within a single document</li>
+</ul>
+<hr />
+<h2 id="priority-distribution-graphs">Priority Distribution Graphs<a class="headerlink" href="#priority-distribution-graphs" title="Permanent link">&para;</a></h2>
+<p>The plugin provides two priority distribution graphs at different scopes, helping you visualize how your priorities are spread across your learning material.</p>
+<h3 id="document-priority-distribution-graph">Document Priority Distribution Graph<a class="headerlink" href="#document-priority-distribution-graph" title="Permanent link">&para;</a></h3>
+<p>The <strong>IncRem Counter badge</strong> includes a <strong>📊 button</strong> (to the left of "View All") that toggles an inline priority distribution graph for the <strong>current document</strong>.</p>
+<p><img alt="Priority Distribution Graph icon on the IncRem Counter badge" src="../assets/priority-graph-icon.png" width="600" /></p>
+<ul>
+<li><strong>How to view:</strong> Click the 📊 icon on the IncRem Counter badge below the document title</li>
+<li><strong>Scope:</strong> Only IncRems within the current document's scope</li>
+<li><strong>Display:</strong> Appears inline, directly below the counter badge</li>
+<li><strong>Toggle:</strong> Click again to hide it</li>
+<li><strong>Two views:</strong></li>
+<li><strong>Absolute Priority View</strong>: See how your items are distributed across the 0–100 priority scale</li>
+<li><strong>KB Percentile View</strong>: See how your document's items rank compared to the <em>entire Knowledge Base</em></li>
+</ul>
+<p>This is useful for quickly assessing how priorities are distributed within a specific document or project — for example, to see if you have too many low-priority items that need attention.</p>
+<p>Each bar is <strong>stacked</strong> to show the processing status within each priority bucket:</p>
+<table>
+<thead>
+<tr>
+<th>Sub-bar</th>
+<th>Color</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Due</strong> (top, saturated)</td>
+<td>🔵 Blue (IncRems) / 🔴 Red (Cards)</td>
+<td>Currently due for review</td>
+</tr>
+<tr>
+<td><strong>Processed</strong> (bottom, light)</td>
+<td>🩵 Light blue / 🩷 Light red</td>
+<td>Already reviewed and scheduled forward</td>
+</tr>
+</tbody>
+</table>
+<p>Hover over any bar for a tooltip showing total, due, processed counts, and <strong>% processed</strong> for both series.</p>
+<p><img alt="Document Priority Distribution Graph with stacked due/processed bars" src="../assets/priority-graph-doc-2.png" width="600" /></p>
+<p><img alt="Document Priority Distribution Graph (animated)" src="../assets/priority-graph-doc.gif" width="600" /></p>
+<h3 id="kb-priority-distribution-graph">KB Priority Distribution Graph<a class="headerlink" href="#kb-priority-distribution-graph" title="Permanent link">&para;</a></h3>
+<p>The <strong>All Inc Rems (Main View)</strong> includes a separate <strong>📊 KB Priority Graph</strong> button in the top bar that shows a larger, more detailed graph covering your <strong>entire Knowledge Base</strong>.</p>
+<ul>
+<li><strong>How to view:</strong> Open the All Inc Rems main view → click the "📊 KB Priority Graph" button in the top bar</li>
+<li><strong>Scope:</strong> Full Knowledge Base — all IncRems and all flashcard-bearing Rems</li>
+<li><strong>Display:</strong> Slides open above the table</li>
+</ul>
+<p>The KB graph displays two <strong>stacked</strong> bar series on a shared x-axis of priority bins (0–5, 5–10, ..., 95–100). Each bar splits its bucket into due (top, saturated) and processed (bottom, lighter) items:</p>
+<table>
+<thead>
+<tr>
+<th>Series</th>
+<th>Y-Axis</th>
+<th>Sub-bar</th>
+<th>Color</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Incremental Rems</strong></td>
+<td>Left</td>
+<td>Due</td>
+<td>🔵 Blue</td>
+<td>IncRems with <code>nextRepDate ≤ now</code></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>Processed</td>
+<td>🩵 Light blue</td>
+<td>IncRems scheduled forward</td>
+</tr>
+<tr>
+<td><strong>Rems with Cards</strong></td>
+<td>Right</td>
+<td>Due</td>
+<td>🔴 Red</td>
+<td>Rems with at least one due card</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>Processed</td>
+<td>🩷 Light red</td>
+<td>Rems with all cards scheduled forward</td>
+</tr>
+</tbody>
+</table>
+<p>Hover over any bar for a tooltip showing the full breakdown: total, due, processed, and <strong>% processed</strong> for both series.</p>
+<p><img alt="KB Priority Distribution Graph with stacked due/processed bars" src="../assets/priority-graph-KB-2.png" width="600" /></p>
+<p><img alt="KB Priority Distribution Graph (animated)" src="../assets/priority-graph-KB.gif" width="600" /></p>
+<h3 id="why-theyre-useful">Why They're Useful<a class="headerlink" href="#why-theyre-useful" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Processing status at a glance</strong>: The stacked bars immediately reveal how much of each priority bucket is still outstanding vs. already processed — no more guessing from totals alone</li>
+<li><strong>Priority balance</strong>: See whether your priorities are concentrated too heavily at one end or well-distributed</li>
+<li><strong>Content type comparison</strong> (KB graph): Compare how your reading material (IncRems) and flashcard material (Cards) are distributed across priority levels</li>
+<li><strong>Document-level focus</strong> (Document graph): Analyze priority distribution within a specific project or reading scope</li>
+<li><strong>Identifying outliers</strong>: Spot priority ranges that are over- or under-represented</li>
+<li><strong>Planning</strong>: Use the distribution to decide where to focus your next priority adjustments and reviews</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

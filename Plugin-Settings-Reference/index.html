@@ -1,0 +1,2103 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental Everything plugin for RemNote.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-everything/Plugin-Settings-Reference/">
+      
+      
+        <link rel="prev" href="../Plugin-Commands-Reference/">
+      
+      
+        <link rel="next" href="../IncRem-Scheduler/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Plugin Settings Reference - Incremental Everything for RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plugin-settings-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental Everything for RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plugin Settings Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental Everything for RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-settings-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the settings are
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flashcard-prioritisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flashcard Prioritisation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editor-indicators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor Indicators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fsrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FSRS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mastery-drill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mastery Drill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integrations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-settings-are" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the settings are
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flashcard-prioritisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flashcard Prioritisation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editor-indicators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor Indicators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fsrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FSRS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mastery-drill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mastery Drill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integrations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="plugin-settings-reference">Plugin Settings Reference<a class="headerlink" href="#plugin-settings-reference" title="Permanent link">&para;</a></h1>
+<p>This page documents every configurable setting in the <strong>Incremental Everything (Plus)</strong> plugin.</p>
+<p>Settings live in <strong>two places</strong>, and the tables below say which.</p>
+<h2 id="where-the-settings-are">Where the settings are<a class="headerlink" href="#where-the-settings-are" title="Permanent link">&para;</a></h2>
+<p><strong>Most settings are in the plugin's own settings popup.</strong> Open it with the command <strong><code>Incremental Everything: Settings</code></strong> (quick code <code>ies</code>). It groups the settings by area, hides the ones that do not apply — the Beta Scheduler's parameters stay out of sight until you switch that scheduler on — and links each entry to the section of this manual that explains it.</p>
+<p><img alt="The Incremental Everything settings popup" src="../assets/settings-popup.png" width="900" /></p>
+<p><em>Above: the Scheduling group with the Beta Scheduler on, so its two parameters are shown and the Multiplier is hidden. The </em><em>?</em><em> opens this manual at the matching section; </em><em>Reset</em><em> appears on anything changed from its default, next to a </em><em>modified</em><em> badge.</em></p>
+<p><strong>Five settings stay in RemNote's panel</strong>, at <strong>Settings → Plugins → Incremental Everything</strong>: <em>Enable Flashcard Prioritisation</em>, <em>Performance Mode</em>, the two <em>Always Use Light Mode</em> switches, and <em>Enable Hide-in-Queue Powerups and Commands</em>. These govern how much work the plugin is allowed to do — and RemNote's own panel is where you would go looking if the plugin ever felt heavy, quite possibly before you knew this popup existed. They appear in the popup too, read-only, with a pointer to where they are changed.</p>
+<p><img alt="The five Incremental Everything settings in RemNote's plugin settings panel" src="../assets/settings-native.png" width="550" /></p>
+<div class="admonition note">
+<p class="admonition-title">Upgrading from an earlier version</p>
+<p>Your existing settings are carried over automatically the first time you load this version — nothing to re-enter. The settings that moved will disappear from RemNote's panel after that first load.</p>
+</div>
+<hr />
+<h2 id="flashcard-prioritisation">Flashcard Prioritisation<a class="headerlink" href="#flashcard-prioritisation" title="Permanent link">&para;</a></h2>
+<p><em>In RemNote's settings panel.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Enable Flashcard Prioritisation</strong></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Master switch for per-flashcard priorities. Off by default. See <a href="../Priorities-for-Flashcards/#the-opt-in">Priorities for Flashcards</a> for what it turns on, what keeps working without it, and why it is opt-in. Requires a reload.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
+<p><em>In RemNote's settings panel.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><a href="../Full-Mode-x-Light-Mode/">Performance Mode</a></strong></td>
+<td>Dropdown</td>
+<td><code>Light</code></td>
+<td>Choose between <em>Full</em> (all features, high resource use — best on Desktop App) and <em>Light</em> (faster, no relative priority/shield). The background pretagging and caching pass this used to start now also requires <em>Enable Flashcard Prioritisation</em>; with that off, Full mode no longer tags anything across your knowledge base.</td>
+</tr>
+<tr>
+<td><strong>Always Use Light Mode on Mobile</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Auto-switches to Light mode on iOS/Android to prevent crashes and improve performance.</td>
+</tr>
+<tr>
+<td><strong>Always Use Light Mode on Web Browser</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Auto-switches to Light mode on web browsers where Full mode can be slow or unstable.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="scheduling">Scheduling<a class="headerlink" href="#scheduling" title="Permanent link">&para;</a></h2>
+<p><em>In the IE Settings popup.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Initial Interval</strong></td>
+<td>Number</td>
+<td><code>1</code></td>
+<td>Number of days until the first repetition of a new Incremental Rem.</td>
+</tr>
+<tr>
+<td><strong>Multiplier</strong></td>
+<td>Number</td>
+<td><code>1.5</code></td>
+<td>Base of the exponential spacing formula: after your Nth review, the next interval is <code>⌈Multiplier ^ N⌉</code> days. The interval depends only on how many reviews you have done, not on the previous interval. With the default <code>1.5</code>: 1st review → 2 days, 2nd → 3, 3rd → 4, 5th → 8, 6th → 12. <strong>Hidden while the Beta Scheduler is on</strong>, which ignores it. See <a href="../IncRem-Scheduler/">IncRem Scheduler</a>.</td>
+</tr>
+<tr>
+<td><strong>Use Beta Scheduler (Saturating Curve)</strong></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Enable the beta saturating scheduler. Intervals start at the First Review Interval and gradually approach the Max Interval, instead of growing exponentially. See <a href="../IncRem-Scheduler/#beta-scheduler">IncRem Scheduler</a> for full details.</td>
+</tr>
+<tr>
+<td><strong>First Review Interval (Beta Scheduler)</strong></td>
+<td>Number</td>
+<td><code>5</code></td>
+<td>Interval in days assigned after completing the first review. Different from <em>Initial Interval</em> above, which controls when a new IncRem first appears in the queue. <strong>Shown only while the Beta Scheduler is on.</strong></td>
+</tr>
+<tr>
+<td><strong>Max Interval (Beta Scheduler)</strong></td>
+<td>Number</td>
+<td><code>30</code></td>
+<td>Upper bound in days the interval gradually approaches. The interval will never exceed this value. <strong>Shown only while the Beta Scheduler is on.</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="priority">Priority<a class="headerlink" href="#priority" title="Permanent link">&para;</a></h2>
+<p><em>In the IE Settings popup.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Default IncRem Priority</strong></td>
+<td>Number</td>
+<td><code>50</code></td>
+<td>0–100</td>
+<td>Priority assigned to new Incremental Rems. Lower = more important.</td>
+</tr>
+<tr>
+<td><strong>Default Card Priority</strong></td>
+<td>Number</td>
+<td><code>50</code></td>
+<td>0–100</td>
+<td>Priority assigned to flashcards without inherited priority. Lower = more important.</td>
+</tr>
+<tr>
+<td><strong>Priority Step Size</strong></td>
+<td>Number</td>
+<td><code>5</code></td>
+<td>1–50</td>
+<td>Amount the priority number changes when using the <a href="../Plugin-Commands-Reference/#prioritization-commands">Quick Increase/Decrease Priority</a> shortcuts (<code>Ctrl+Opt+Up/Down</code>).</td>
+</tr>
+<tr>
+<td><strong>Priority Widget in Editor</strong></td>
+<td>Dropdown</td>
+<td><code>Show for IncRem and Cards</code></td>
+<td>—</td>
+<td>Controls when the priority widget appears in the right-hand margin of the editor. Options: <em>Show for IncRem and Cards</em>, <em>Show only for IncRem</em>, or <em>Disable</em>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="queue">Queue<a class="headerlink" href="#queue" title="Permanent link">&para;</a></h2>
+<p><em>In the IE Settings popup.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Collapse Queue Top Bar (IncRem only)</strong></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Frees vertical space during Incremental Rem review by collapsing the queue top bar to a thin strip; hover it to reveal the full bar. Regular flashcard turns are unaffected.</td>
+</tr>
+<tr>
+<td><strong>Display Priority Shield in Queue</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Shows a real-time count of your highest-priority due items in the queue. Appears below the Answer Buttons for IncRems and in the card priority widget for flashcards. 📖 <a href="../Prioritization-%26-Sorting/#priority-shield">Priority Shield</a>.</td>
+</tr>
+<tr>
+<td><strong>Display Weighted Priority Shield in Queue</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Shows what fraction of your total priority-weighted workload has been processed. High-priority items carry exponentially more weight (~10× at the top vs bottom), so processing them gives a bigger boost. Always increases as you review items. 📖 <a href="../Prioritization-%26-Sorting/#weighted-shield">Weighted Shield</a>.</td>
+</tr>
+<tr>
+<td><strong>Display Priority in Queue Toolbar</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Shows the priority badge of the current flashcard or IncRem at the top right of the queue.</td>
+</tr>
+<tr>
+<td><strong>Use Isolated Card View in Queue for</strong></td>
+<td>Dropdown</td>
+<td><code>Highlights (PDF/HTML)</code></td>
+<td>Chooses which incremental items use the <a href="../Plugin-Widgets-Reference/">Isolated Card Viewer</a> as their default view in the queue. Options: <em>Highlights (PDF/HTML)</em>, <em>Regular Rems</em>, <em>Both</em>, <em>None</em>. Highlights that do <strong>not</strong> use the isolated card view are shown inside the PDF/HTML reader; regular Rems that do <strong>not</strong> use it are shown in the full document context. The toggle button in the queue is <strong>always</strong> available regardless of this setting — it determines only the <em>initial</em> view for each item.</td>
+</tr>
+<tr>
+<td><strong>Auto-focus Queue Dashboard</strong></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Opens the <strong>Practiced Queues</strong> dashboard in the Right Sidebar automatically every time you enter a queue, <strong>and restores it after you press Next or Dismiss on an Incremental Rem</strong> (returning you to the live session metrics once the sidebar was used for editing a Rem, or after RemNote auto-focused its own Summary pane for a PDF/HTML). Useful if you always want the live session metrics visible without opening the sidebar manually. Does not apply to mobile, where it would be annoying and counterproductive. 📖 <a href="../History-Queue-Dashboard-and-Mastery-Drill/#practiced-queues-history-live-dashboard">Practiced Queues History &amp; Live Dashboard</a>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="editor-indicators">Editor Indicators<a class="headerlink" href="#editor-indicators" title="Permanent link">&para;</a></h2>
+<p><em>In the IE Settings popup. All of these require a RemNote reload after changing.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Green Left Border for IncRems</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Adds a green left border to IncRems in the editor, making your "extracts" easy to spot.</td>
+</tr>
+<tr>
+<td><strong>Yellow Left Border for Dismissed Rems</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Rems dismissed from Incremental learning (via the Dismiss button/command) display a yellow left border to indicate they have been already processed (and preserved history).</td>
+</tr>
+<tr>
+<td><strong>Hide CardPriority Tag in Editor</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Hides the <code>CardPriority</code> powerup tag in the editor to reduce visual clutter. Priority can still be set with <code>Alt+P</code>.</td>
+</tr>
+<tr>
+<td><strong>Hide Dismissed Tag in Editor</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Hides the <code>Dismissed</code> powerup tag in the editor to reduce clutter.</td>
+</tr>
+<tr>
+<td><strong>Show Priority Badges in Table Cells</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Draws a coloured band badge (e.g. <code>50s</code>) at the top-right of each table row's first cell — the one place the Priority Editor widget cannot render. Run <strong>Refresh Priority Badges (Tables)</strong> once to fill in existing Rems. Governs <strong>tables only</strong> — <a href="../Prioritization-%26-Sorting/#priorities-on-pdf-highlights">PDF highlight badges</a> are not affected by it. 📖 <a href="../Prioritization-%26-Sorting/#priorities-in-tables">Priorities in Tables</a>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="fsrs">FSRS<a class="headerlink" href="#fsrs" title="Permanent link">&para;</a></h2>
+<p><em>In the IE Settings popup.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Display FSRS DSR Stats (Flashcards)</strong></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Shows calculated FSRS Difficulty (D), Stability (S), and Retrievability (R) for flashcards in the <a href="../Plugin-Widgets-Reference/#11-card-info-bar">Card Info Bar</a> widget. Requires FSRS v6 scheduler. 📖 <a href="../Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration">Card Stats &amp; FSRS Integration</a>.</td>
+</tr>
+<tr>
+<td><strong>FSRS Global Weights</strong></td>
+<td>String</td>
+<td><em>(empty)</em></td>
+<td>Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste from your RemNote scheduler settings. If left blank, the official FSRS v6.1.1 defaults are used. See <a href="../Reviewing-Items-in-the-Queue/#fsrs-configuration">FSRS Configuration</a> for details.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="mastery-drill">Mastery Drill<a class="headerlink" href="#mastery-drill" title="Permanent link">&para;</a></h2>
+<p><em>In the IE Settings popup. The three parameters appear only while the drill is enabled.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Enable Mastery Drill</strong></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Master switch for the <a href="../History-Queue-Dashboard-and-Mastery-Drill/#mastery-drill">Mastery Drill</a>. Off by default: while it is on, the plugin watches every flashcard rating and keeps a list of the ones to drill, and registers the drill popup, its command and the sidebar notification. Leave it off if you do not use the workflow and none of that work happens. Flashcard and Practiced Queue history are unaffected either way. Requires a reload. <em>(Replaces the former "Skip Mastery Drill", whose value is inverted and carried over automatically.)</em></td>
+</tr>
+<tr>
+<td><strong>Old Items Threshold</strong></td>
+<td>Number</td>
+<td><code>7</code> days</td>
+<td>Number of days after which a card lingering in the Mastery Drill queue is flagged as stale. A warning appears in the widget and you can clear these items with a single click.</td>
+</tr>
+<tr>
+<td><strong>Mastery Drill Minimum Delay</strong></td>
+<td>Number</td>
+<td><code>120</code> min</td>
+<td>Cooldown after a card is rated <em>Again</em> or <em>Hard</em> before it appears in the drill, so the initial repetition has time to consolidate. 📖 <a href="../History-Queue-Dashboard-and-Mastery-Drill/#minimum-delay">Minimum Delay</a>.</td>
+</tr>
+<tr>
+<td><strong>Disable Mastery Drill Notifications</strong></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Hides the periodic Left Sidebar notification widget that appears when ≥ 10 cards are pending in the Mastery Drill queue.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="integrations">Integrations<a class="headerlink" href="#integrations" title="Permanent link">&para;</a></h2>
+<p><em>In RemNote's settings panel.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Enable Hide-in-Queue Powerups and Commands</strong></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Registers five additional <a href="../Utilities/#queue-display-utilities">Queue Display</a> powerups and their commands — <strong>Hide in Queue</strong>, <strong>Remove from Queue</strong>, <strong>No Hierarchy</strong>, <strong>Hide Parent</strong>, and <strong>Hide Grandparent</strong> — that were originally part of the standalone Hide in Queue plugin. These powerup codes are identical to those in that plugin; enabling this setting while the standalone plugin is still installed causes a fatal <code>Duplicated powerup</code> error and prevents Incremental Everything from loading. <strong>Uninstall the standalone Hide in Queue plugin before enabling this.</strong> The two powerups added by Incremental Everything itself — <strong>Remove Parent</strong> and <strong>Remove Grandparent</strong> — are always registered regardless of this setting. A RemNote reload is required after changing. 📖 <a href="../Utilities/#hide-in-queue">Hide in Queue</a>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="other">Other<a class="headerlink" href="#other" title="Permanent link">&para;</a></h2>
+<p><em>In the IE Settings popup.</em></p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>RemNote Environment</strong></td>
+<td>Dropdown</td>
+<td><code>Regular</code></td>
+<td>Choose which RemNote environment documents open in when using the "Open Editor in New Tab" button. Options: <em>Regular (www.remnote.com)</em> or <em>Beta (beta.remnote.com)</em>.</td>
+</tr>
+<tr>
+<td><strong>Flashcard Response Time Limit</strong></td>
+<td>Number</td>
+<td><code>180</code> s</td>
+<td>Caps the recorded study time per card. If you step away from your device mid-card, only up to this limit is counted toward speed and total time metrics, mirroring RemNote's native behavior.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

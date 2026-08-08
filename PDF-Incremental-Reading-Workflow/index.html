@@ -1,0 +1,2483 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental Everything plugin for RemNote.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-everything/PDF-Incremental-Reading-Workflow/">
+      
+      
+        <link rel="prev" href="../Priority-Review-Document/">
+      
+      
+        <link rel="next" href="../Create-Incremental-Rem-from-PDF-Highlights/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>PDF Incremental Reading Workflow - Incremental Everything for RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pdf-incremental-reading-workflow" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental Everything for RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              PDF Incremental Reading Workflow
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental Everything for RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview-the-full-incremental-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview: The Full Incremental Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-pdf-structure-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. PDF Structure Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-copying-and-pasting-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Copying and Pasting Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Copying and Pasting Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-pdf-control-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. PDF Control Panel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. PDF Control Panel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hierarchical-tree-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hierarchical Tree View
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-pdf-highlight-toolbar-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. PDF Highlight Toolbar Utilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. PDF Highlight Toolbar Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#visual-recognition-extract-incremental-markers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Recognition: Extract &amp; Incremental Markers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#automatic-position-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic Position Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set-bookmark-position-queue-behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔖 Set Bookmark Position — Queue Behaviour
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-document-notes-side-by-side-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Document Notes (Side-by-Side Reading)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-flexible-processing-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Flexible Processing Modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Flexible Processing Modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#default-mode-pdf-reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default Mode (PDF Reader)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extractviewer-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExtractViewer Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple PDF Sources — Active PDF, Switcher, and #preferthispdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-inline-pdf-range-management-priority-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Inline PDF Range Management (Priority Editor)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-rem-not-appearing-in-the-pdf-control-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting: Rem Not Appearing in the PDF Control Panel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting: Rem Not Appearing in the PDF Control Panel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-this-happens-an-sdk-limitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this happens — an SDK limitation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-plugin-searches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the plugin searches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-to-do-if-a-rem-is-still-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to do if a rem is still missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview-the-full-incremental-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview: The Full Incremental Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-by-step-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step-by-Step Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-pdf-structure-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. PDF Structure Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-copying-and-pasting-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Copying and Pasting Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Copying and Pasting Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-pdf-control-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. PDF Control Panel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. PDF Control Panel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hierarchical-tree-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hierarchical Tree View
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-pdf-highlight-toolbar-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. PDF Highlight Toolbar Utilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. PDF Highlight Toolbar Utilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#visual-recognition-extract-incremental-markers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Recognition: Extract &amp; Incremental Markers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#automatic-position-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic Position Tracking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set-bookmark-position-queue-behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔖 Set Bookmark Position — Queue Behaviour
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-document-notes-side-by-side-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Document Notes (Side-by-Side Reading)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-flexible-processing-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Flexible Processing Modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Flexible Processing Modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#default-mode-pdf-reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default Mode (PDF Reader)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extractviewer-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ExtractViewer Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple PDF Sources — Active PDF, Switcher, and #preferthispdf
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-inline-pdf-range-management-priority-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Inline PDF Range Management (Priority Editor)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-rem-not-appearing-in-the-pdf-control-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting: Rem Not Appearing in the PDF Control Panel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting: Rem Not Appearing in the PDF Control Panel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-this-happens-an-sdk-limitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this happens — an SDK limitation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-the-plugin-searches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the plugin searches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-to-do-if-a-rem-is-still-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to do if a rem is still missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="pdf-incremental-reading-workflow">PDF Incremental Reading Workflow<a class="headerlink" href="#pdf-incremental-reading-workflow" title="Permanent link">&para;</a></h1>
+<p>This page documents how to use the <strong>Incremental Everything</strong> plugin to incrementally read long PDFs by breaking them into chapters or sections, each managed as a separate Incremental Rem.</p>
+<hr />
+<h2 id="overview-the-full-incremental-workflow">Overview: The Full Incremental Workflow<a class="headerlink" href="#overview-the-full-incremental-workflow" title="Permanent link">&para;</a></h2>
+<p>The <strong>Incremental Everything</strong> approach to PDFs is designed to support deep reading without feeling overwhelmed. The workflow typically looks like this:</p>
+<ol>
+<li><strong>Split &amp; Prioritize</strong>: Instead of one massive PDF to read, you create multiple Incremental Rems for the PDF (e.g., one per chapter or section) and assign each a priority.</li>
+<li><strong>Read in the Queue</strong>: When a chapter is due, it appears in your Queue. The PDF Reader automatically opens at your last saved reading position.</li>
+<li><strong>Extract &amp; Organize</strong>: As you encounter important information, you use PDF highlights. With the PDF Highlight Toolbar utilities, you can easily turn these highlights into their own Incremental Rems, seamlessly organizing them into your Knowledge Base structure.</li>
+<li><strong>Track Position &amp; Deep Link</strong>: When you extract information (or toggle a highlight as incremental), the plugin <strong>automatically saves that highlight's page as your current reading position</strong>. Furthermore, if you extract sub-text from those Incremental Rems later, the new sub-extracts will smartly inherit a reference pin bridging directly back to the original PDF highlight!</li>
+<li><strong>Manage Globally</strong>: Use the <strong>PDF Control Panel</strong> to manage all chapters from a single interface.</li>
+</ol>
+<hr />
+<h2 id="step-by-step-setup">Step-by-Step Setup<a class="headerlink" href="#step-by-step-setup" title="Permanent link">&para;</a></h2>
+<p>The core idea is to <strong>link multiple Incremental Rems to the same PDF</strong>, each covering a different page range. This lets you:</p>
+<ul>
+<li>Queue chapters independently with their own priorities and schedules</li>
+<li>Use the <strong>PDF Control Panel</strong> to manage all chapters from a single interface</li>
+<li>Switch between reading the PDF and processing your notes per chapter</li>
+</ul>
+<h3 id="1-pdf-structure-setup">1. PDF Structure Setup<a class="headerlink" href="#1-pdf-structure-setup" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>📁 Book Title (folder rem, contains the PDF)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  ├── Chapter 1  ← Incremental Rem, PDF source, pages 1–50
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  ├── Chapter 2  ← Incremental Rem, PDF source, pages 51–120
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  └── Chapter 3  ← Incremental Rem, PDF source, pages 121–200
+</code></pre></div>
+<ol>
+<li>Create a parent folder rem for the book and add the PDF as its source (or as a direct child rem).</li>
+<li>Create child rems for each chapter.</li>
+<li>Tag the first chapter as Incremental (<code>Alt+X</code>) and add the PDF as its source.</li>
+<li>Use <strong>Copy &amp; Paste Rem Sources</strong> (below) to efficiently propagate the PDF source to all other chapters.</li>
+<li>Open <strong>PDF Control Panel</strong> (<code>Command Palette → PDF Control Panel</code>) on any of the rems with that PDF source to assign the page range to all chapters.</li>
+</ol>
+<hr />
+<h2 id="2-copying-and-pasting-sources">2. Copying and Pasting Sources<a class="headerlink" href="#2-copying-and-pasting-sources" title="Permanent link">&para;</a></h2>
+<p>When you have many chapters, manually adding the PDF source to each one would be tedious. Two commands automate this:</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Shortcut</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Copy Rem Sources</strong></td>
+<td><code>Ctrl+Shift+F1</code></td>
+<td>Copies all sources from the <strong>focused Rem</strong> into a session clipboard</td>
+</tr>
+<tr>
+<td><strong>Paste Rem Sources</strong></td>
+<td><code>Opt+Shift+V</code> / <code>Alt+Shift+V</code></td>
+<td>Adds the copied sources to <strong>all selected Rems</strong> (or the focused Rem if nothing is selected)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workflow">Workflow<a class="headerlink" href="#workflow" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Focus</strong> your template chapter (the one already linked to the PDF).</li>
+<li>Press <code>Ctrl+Shift+F1</code> → a toast confirms how many sources were copied (e.g., <em>"📋 1 source copied"</em>).</li>
+<li><strong>Select</strong> all remaining chapter rems in the outliner (hold <code>Shift</code> and click, or use <code>Shift+↑/↓</code>).</li>
+<li>Press <code>Alt+Shift+V</code> → each selected rem receives the same PDF source. A summary toast reports how many sources were added and how many were already present.</li>
+<li>Open <strong>PDF Control Panel</strong> on any chapter to set page ranges.</li>
+</ol>
+<blockquote>
+<p>[!TIP]
+The paste operation is <strong>idempotent</strong> — sources already present on a target rem are silently skipped. You can safely run paste multiple times or on a mix of rems that already have the source and rems that don't.</p>
+<p>[!NOTE]
+The clipboard is <strong>session-scoped</strong> — copied source IDs are stored in session storage and discarded when you close the tab. There is no cross-session contamination.</p>
+</blockquote>
+<p><img alt="Copy and Paste source" src="../assets/copy-paste-source.gif" width="900" /></p>
+<hr />
+<h2 id="3-pdf-control-panel">3. PDF Control Panel<a class="headerlink" href="#3-pdf-control-panel" title="Permanent link">&para;</a></h2>
+<p>The <strong>PDF Control Panel</strong> (<code>Command Palette → PDF Control Panel</code>) is the central hub for managing all rems that share the same PDF.</p>
+<p><strong>Features:</strong>
+- Set and adjust the page range for each chapter
+- Edit priorities inline with visual feedback
+- View reading histories and time spent
+- Make rems Incremental without leaving the panel
+- Sort chapters by page range for logical reading progression</p>
+<h3 id="hierarchical-tree-view">Hierarchical Tree View<a class="headerlink" href="#hierarchical-tree-view" title="Permanent link">&para;</a></h3>
+<p>The <strong>All Rems Using This PDF</strong> list builds a <strong>containment tree</strong> based on page ranges:</p>
+<ul>
+<li>If a rem's range is <strong>fully contained</strong> within another's (e.g. a sub-section inside a chapter), it appears <strong>indented</strong> below the parent.</li>
+<li>Depth-based indentation (16 px/level) makes nesting visible at a glance.</li>
+<li>Rems without an assigned page range float below the tree at depth 0.</li>
+</ul>
+<p>This is useful when you split a chapter into sub-sections during incremental reading — you can see the exact hierarchy without any manual tagging.</p>
+<p><strong>Overlap detection:</strong> If two siblings have genuinely overlapping ranges, an inline <strong>⚠ overlap</strong> badge appears on both. Shared boundary pages (one chapter ends on page 265, the next starts on page 265) are <strong>not</strong> flagged.</p>
+<p><strong>Coverage badge:</strong> Parent rows show an <strong>X/Ypp</strong> badge with a tiny fill bar indicating how many pages are already covered by child rems. Hover to see the percentage (e.g. <code>"25 of 30 pages covered by sub-rems (83%)"</code>). This tells you at a glance how much of a chapter still needs to be sub-divided.</p>
+<p><img alt="PDF Control Panel" src="../assets/pdf-control-panel.png" width="650" /></p>
+<hr />
+<h2 id="4-pdf-highlight-toolbar-utilities">4. PDF Highlight Toolbar Utilities<a class="headerlink" href="#4-pdf-highlight-toolbar-utilities" title="Permanent link">&para;</a></h2>
+<p>When you select text in the PDF Reader and create a highlight, the native RemNote popup toolbar appears. The plugin injects four widgets into this toolbar to help you process and organize information on the fly:</p>
+<table>
+<thead>
+<tr>
+<th>Icon</th>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🔖</td>
+<td><strong>Set Bookmark Position</strong></td>
+<td>Manually records your current reading position at this highlight's exact page. <em>(Note: Using the extraction tools below will also do this automatically).</em></td>
+</tr>
+<tr>
+<td><img alt="" src="https://cdn-icons-png.flaticon.com/512/8365/8365483.png" width="16" /></td>
+<td><strong>Create Incremental Rem</strong></td>
+<td>Extracts the highlight into a standalone Incremental Rem and lets you choose precisely where it should live in your Knowledge Base hierarchy. See the <a href="dedicated-guide-here.md">Create-Incremental-Rem-from-PDF-Highlights</a> for full details.</td>
+</tr>
+<tr>
+<td><img alt="" src="https://cdn-icons-png.flaticon.com/512/1504/1504044.png" width="16" /></td>
+<td><strong>Toggle Incremental Rem</strong></td>
+<td>Quick-tags the highlight itself as an Incremental Rem without moving it. The button background turns blue to indicate the highlight is now actively tracked in your queue.</td>
+</tr>
+<tr>
+<td>👁️ / 🙈</td>
+<td><strong>Toggle Marker Borders (Peek)</strong></td>
+<td>Shows/hides the extract &amp; incremental <strong>marker borders</strong> (see below) over all PDF highlights, so you can read a busy page cleanly. Turns amber while markers are hidden. Also available as the <strong>Toggle PDF Highlight Marker Borders</strong> command (quick code <code>tb</code>), and remembered per device (default: on).</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="Pdf highlight menu buttons" src="../assets/pdfhighlight-toolbar-2.png" width="700" /></p>
+<h3 id="visual-recognition-extract-incremental-markers">Visual Recognition: Extract &amp; Incremental Markers<a class="headerlink" href="#visual-recognition-extract-incremental-markers" title="Permanent link">&para;</a></h3>
+<p>Once you've processed a highlight, it's marked <strong>directly in the PDF</strong> so you can recognize its state at a glance — <strong>without changing the highlight's original color</strong>. Each processed highlight gets a subtle <strong>dashed underline + a thin colored right bar</strong> drawn on top of it, in the tag's colour:</p>
+<ul>
+<li>🔵 <strong>Blue</strong> — the highlight has been <strong>extracted</strong> into a standalone Incremental Rem (via <strong>Create Incremental Rem</strong>).</li>
+<li>🟢 <strong>Green</strong> — the highlight has been <strong>toggled incremental</strong> in-place (via <strong>Toggle Incremental Rem</strong>).</li>
+</ul>
+<p>The original background is preserved (the markers sit over it), so recognition never fights with RemNote's own highlight colors. The right bar sits in the free right margin as the reliable block marker; the dashed underline reinforces it at block edges.</p>
+<blockquote>
+<p><strong>Peek to read cleanly.</strong> If the markers ever get in the way, use the <strong>👁️ / 🙈 button</strong> in the toolbar (or the <em>Toggle PDF Highlight Marker Borders</em> command, quick code <code>tb</code>) to hide them all at once, then toggle back. The setting is remembered per device.</p>
+</blockquote>
+<p><img alt="PDF highlight visual recognition markers" src="../assets/pdf-highlights-recognition.png" width="800" /></p>
+<p><img alt="PDF marker borders peek toggle button" src="../assets/pdf-borders-toggle-button.png" width="800" /></p>
+<h3 id="automatic-position-tracking">Automatic Position Tracking<a class="headerlink" href="#automatic-position-tracking" title="Permanent link">&para;</a></h3>
+<p>A major benefit of using the <strong>Create Incremental Rem</strong> or <strong>Toggle Incremental Rem</strong> tools while you are reviewing a chapter in the Queue is that the plugin <strong>automatically assumes you have read up to that highlight's page</strong>.</p>
+<p>It will seamlessly update the bookmark/reading position for the current chapter, so the next time the item is due, you will be taken right back to where you left off — no need to manually click the 🔖 button.</p>
+<h3 id="set-bookmark-position-queue-behaviour">🔖 Set Bookmark Position — Queue Behaviour<a class="headerlink" href="#set-bookmark-position-queue-behaviour" title="Permanent link">&para;</a></h3>
+<p>When you click 🔖 while reviewing in the Queue, the popup opens instantly (no search overhead) and shows a single <strong>"Update Current Queue Reading"</strong> button pre-targeted at the active chapter. Clicking it saves the bookmark and <strong>closes the popup automatically</strong> so you can continue reading without an extra click.</p>
+<ul>
+<li>Outside the Queue, the popup falls back to showing all Incremental Rems linked to this PDF (the full list), letting you choose which chapter should receive the bookmark.</li>
+</ul>
+<hr />
+<h2 id="5-document-notes-side-by-side-reading">5. Document Notes (Side-by-Side Reading)<a class="headerlink" href="#5-document-notes-side-by-side-reading" title="Permanent link">&para;</a></h2>
+<p>When reading a PDF or HTML Incremental Rem in the queue, you can easily pull up the document's notes in the right sidebar. This lets you read the source material and write notes simultaneously without constantly switching contexts.</p>
+<ul>
+<li>Click the <strong>📝 Document Notes</strong> icon in the document's top bar (next to the breadcrumbs).</li>
+<li>The document's own Rem opens in the Right Sidebar.</li>
+<li>You can write notes, organize extracts, or add new child rems directly into the document's hierarchy while the PDF remains visible on the left.</li>
+<li>The sidebar dynamically syncs with the queue: it shows the notes when you are reviewing an applicable IncRem, and gracefully shows an empty state during flashcard turns.</li>
+</ul>
+<p><strong>Highlight IncRems:</strong> The sidebar also works when reviewing <strong>PDF Highlight</strong> or <strong>HTML Highlight</strong> Incremental Rems. Since highlights are linked to the source PDF/HTML document (not directly to the reading IncRem that created them), the sidebar automatically discovers all Incremental Rems that read the same source. If multiple are found, a selector is shown so you can choose which IncRem's notes to view. If only one exists, it is auto-selected.</p>
+<p><img alt="PDF Side Notes" src="../assets/pdf-side-notes.gif" /></p>
+<p><img alt="Document Notes Sidebar — Highlight IncRem Selector" src="../assets/side-notes-highlights.png" width="800" /></p>
+<hr />
+<h2 id="6-flexible-processing-modes">6. Flexible Processing Modes<a class="headerlink" href="#6-flexible-processing-modes" title="Permanent link">&para;</a></h2>
+<p>Each chapter rem can be opened in two modes, controlled by tags:</p>
+<h3 id="default-mode-pdf-reader">Default Mode (PDF Reader)<a class="headerlink" href="#default-mode-pdf-reader" title="Permanent link">&para;</a></h3>
+<p>Without any special tag, selecting a chapter in the queue opens the PDF Reader at the configured page range. This is the standard reading mode.</p>
+<h3 id="extractviewer-mode">ExtractViewer Mode<a class="headerlink" href="#extractviewer-mode" title="Permanent link">&para;</a></h3>
+<p>Add the <strong><code>extractviewer</code></strong> tag to a chapter rem to open it in the ExtractViewer instead. This lets you see your notes and children, process highlights, and work with your extracted material — all without losing the PDF source connection needed for the PDF Control Panel.</p>
+<p>Toggle behavior simply by adding or removing the <code>extractviewer</code> tag:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Opens in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No tag</td>
+<td>PDF Reader (configured page range)</td>
+</tr>
+<tr>
+<td><code>#extractviewer</code> tag</td>
+<td>ExtractViewer (notes and children)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>[!TIP]
+If the chapter has a <strong><a href="../Reviewing-Items-in-the-Editor/#read-points-for-rem-type-incremental-rems">read point</a></strong> set on a descendant, you don't need the tag to peek at the outline: a <strong>📑 View outline / 📄 Read document</strong> toggle appears in the top-right of the queue card, letting you flip between the PDF reader and the outline view <strong>per session</strong> without re-tagging. The <code>#extractviewer</code> tag is for making the outline the <strong>permanent default</strong> for that chapter. See <a href="Reviewing-in-the-Queue-→-hybrid-toggle.md">Reviewing-Items-in-the-Queue#the-answer-buttons</a>.</p>
+</blockquote>
+<h3 id="multiple-pdf-sources-active-pdf-switcher-and-preferthispdf">Multiple PDF Sources — Active PDF, Switcher, and <code>#preferthispdf</code><a class="headerlink" href="#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf" title="Permanent link">&para;</a></h3>
+<p>An Incremental Rem can now have <strong>as many PDF sources as you like</strong>, and you can switch between them on the fly. The plugin tracks an <strong>active PDF</strong> per Inc Rem — pinned in the Rem's own hidden <em>Reading State</em> property, alongside its page position, page range and page history — and applies the same resolution chain everywhere a PDF is opened or displayed.</p>
+<p><strong>Resolution chain (applied uniformly across queue Reader, PDF Control Panel, Priority Editor, Editor Review Timer, Execute Repetition popup, bookmark popup, etc.):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What's checked</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Explicit <strong>active pin</strong> (set via the switcher UIs below)</td>
+<td>Wins if the pinned PDF is still a source. Stale pins auto-clear.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>A PDF tagged <strong><code>#preferthispdf</code></strong></td>
+<td>Used when no pin is set. If multiple PDFs carry the tag, the first one wins (graceful — no blocking toast).</td>
+</tr>
+<tr>
+<td>3</td>
+<td>First PDF source on the rem</td>
+<td>Final fallback.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>[!NOTE]
+Previously, an IncRem with 2+ PDF sources and no <code>#preferthispdf</code> tag fell through to the <strong>ExtractViewer</strong> instead of opening any PDF in the Reader. That's no longer the case — the Reader opens on the first PDF and lets you switch from there. (Adding the <code>#extractviewer</code> tag remains the explicit way to opt back into ExtractViewer behaviour.)</p>
+</blockquote>
+<p><strong>Where the switcher appears:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Switcher style</th>
+<th>Pin behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Reader</strong> (queue) — next to the 📝 Document Notes icon</td>
+<td>Dropdown of all PDFs</td>
+<td>Pins on switch (you're reading this one now)</td>
+</tr>
+<tr>
+<td><strong>Editor Review Timer</strong> widget — next to the page controls</td>
+<td>Compact dropdown</td>
+<td>Pins on switch</td>
+</tr>
+<tr>
+<td><strong>Execute Repetition</strong> popup (<code>Ctrl+Shift+J</code> in editor) — above the Page Controls</td>
+<td>Dropdown picks the PDF "Start Timer" will open</td>
+<td>Pins on switch</td>
+</tr>
+<tr>
+<td><strong>PDF Control Panel</strong> — header row</td>
+<td>Full dropdown with <strong>★ #preferthispdf</strong> and <strong>📌 active</strong> markers</td>
+<td>Selecting changes the panel's <em>view only</em>; a separate <strong>📌 Set as active</strong> button (only visible while inspecting a non-active PDF) commits the pin</td>
+</tr>
+<tr>
+<td><strong>Editor Toolbar</strong> (rem sidebar) — inside the PDF Range section</td>
+<td>Same dropdown + markers</td>
+<td>Same view/pin split as the PDF Control Panel</td>
+</tr>
+</tbody>
+</table>
+<p>The selector only appears when the Inc Rem has <strong>two or more</strong> PDF sources. Single-PDF Inc Rems look exactly as before.</p>
+<p><strong>Why two flavours of pin behaviour?</strong>
+- In <strong>active-reading surfaces</strong> (Reader, Timer, Execute Repetition popup), switching the dropdown is the same gesture as "I'm reading this PDF now" — so it pins immediately and the rest of the UI re-targets the new PDF.
+- In <strong>management surfaces</strong> (PDF Control Panel, Editor Toolbar), you often want to <em>inspect</em> a different PDF's data (range, history, stats) without changing the queue default. The dropdown changes the view only; the <strong>📌 Set as active</strong> button is the explicit commit.</p>
+<hr />
+<h2 id="7-inline-pdf-range-management-priority-editor">7. Inline PDF Range Management (Priority Editor)<a class="headerlink" href="#7-inline-pdf-range-management-priority-editor" title="Permanent link">&para;</a></h2>
+<p>For a faster workflow when the PDF is open on the right side of the screen, you can manage a rem's page range <strong>directly from the Priority Editor</strong> sidebar widget — without opening any popup.</p>
+<p>The Priority Editor (shown to the right of every Incremental Rem in the editor) gains a <strong>📄 PDF Range</strong> section whenever the current rem has a PDF source:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>What you see</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No range set yet</td>
+<td>Dim <code>📄 —</code> indicator in collapsed view; "No range" label in expanded view</td>
+</tr>
+<tr>
+<td>Range set</td>
+<td><code>📄 p.X–Y</code> pill in collapsed (includes the current reading position in green parenthesis, e.g. <code>(Z)</code>, if history exists); range badge + action buttons in expanded</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Available actions in expanded view:</strong></p>
+<ul>
+<li><strong>📄 Range — Inline range editor</strong></li>
+<li>Tab cycles between Start → End fields; Enter saves.</li>
+<li>Both fields auto-select their value on focus so you can just type the new number.</li>
+<li><strong>📖 Position — Record reading position</strong></li>
+<li>Defaults to the last recorded page, or the first page of the range the first time.</li>
+<li>Validates the entry: if the page is outside the rem’s assigned range, the border turns red and Save is disabled.</li>
+<li>Enter saves when valid.</li>
+<li><strong>Reading stats</strong> — Total reading time (⏱️) and last recorded page appear below the buttons.</li>
+<li><strong>PDF Control Panel ↗</strong> — Opens the full PDF Control Panel popup for deeper management.</li>
+</ul>
+<p><img alt="Setting PDF range inline in Editor" src="../assets/pdf-range-inline.png" width="800" /></p>
+<blockquote>
+<p>[!TIP]
+Open a document, keep the PDF visible on the right side, and expand the Priority Editor on the left. You can then set and adjust page ranges for each chapter rem without ever leaving the document view.</p>
+</blockquote>
+<h2 id="_1"><img alt="Setting PDF range inline in Editor" src="../assets/page-range-inline-flow.gif" width="900" /><a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Link chapters to a PDF</td>
+<td>Add PDF as source to each chapter rem</td>
+</tr>
+<tr>
+<td>Quickly propagate sources</td>
+<td><strong>Copy Rem Sources</strong> (<code>Ctrl+Shift+F1</code>) → select chapters → <strong>Paste Rem Sources</strong> (<code>Alt+Shift+V</code>)</td>
+</tr>
+<tr>
+<td>Assign page ranges</td>
+<td>PDF Control Panel (<code>Command Palette → PDF Control Panel</code>) or inline via the <strong>Priority Editor</strong></td>
+</tr>
+<tr>
+<td>Read a chapter</td>
+<td>Queue the chapter — opens PDF Reader at its configured pages</td>
+</tr>
+<tr>
+<td>Process notes</td>
+<td>Add <code>#extractviewer</code> tag to open in ExtractViewer</td>
+</tr>
+<tr>
+<td>Multiple PDF sources</td>
+<td>Use the PDF switcher (Reader / Timer / Execute Rep popup / PDF Control Panel / Editor Toolbar) to switch and pin an active PDF. Optional: tag one source with <code>#preferthispdf</code> as the default.</td>
+</tr>
+<tr>
+<td>See sub-section hierarchy</td>
+<td>Containment tree in the PDF Control Panel (depth-based indentation)</td>
+</tr>
+<tr>
+<td>See chapter coverage</td>
+<td>Coverage badge (X/Ypp + fill bar) on parent rows in the PDF Control Panel</td>
+</tr>
+<tr>
+<td>Record reading position</td>
+<td><strong>📖 Position</strong> button in Priority Editor, or History button in PDF Control Panel</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="troubleshooting-rem-not-appearing-in-the-pdf-control-panel">Troubleshooting: Rem Not Appearing in the PDF Control Panel<a class="headerlink" href="#troubleshooting-rem-not-appearing-in-the-pdf-control-panel" title="Permanent link">&para;</a></h2>
+<h3 id="why-this-happens-an-sdk-limitation">Why this happens — an SDK limitation<a class="headerlink" href="#why-this-happens-an-sdk-limitation" title="Permanent link">&para;</a></h3>
+<p>The RemNote plugin SDK does not expose a query equivalent to <em>"find all rems that have this rem as a source"</em>. There is no <code>remsHavingThisAsSource()</code> call the way there is <code>remsReferencingThis()</code> or <code>taggedRem()</code>. This means the plugin has no direct way to enumerate every rem that shares a given PDF source.</p>
+<h3 id="how-the-plugin-searches">How the plugin searches<a class="headerlink" href="#how-the-plugin-searches" title="Permanent link">&para;</a></h3>
+<p>When you open the PDF Control Panel, <code>getAllIncrementsForPDF</code> discovers rems through three strategies executed in order:</p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>What it covers</th>
+<th>Speed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1. Local tree scan</strong></td>
+<td>Parent rem, all siblings, and descendants up to 3 levels deep — the most common case for chapter rems nested under the same book folder</td>
+<td>Fast</td>
+</tr>
+<tr>
+<td><strong>2. IncRem cache scan</strong></td>
+<td>All rems currently tagged as Incremental — covers any IncRem anywhere in your KB that already went through the queue</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td><strong>3. Persistent index</strong> (<code>known_pdf_rems_*</code>)</td>
+<td>A synced-storage list of rem IDs explicitly registered as users of this PDF — covers rems discovered in previous sessions or registered via the Copy/Paste commands</td>
+<td>Fast</td>
+</tr>
+</tbody>
+</table>
+<p>The persistent index is updated in the following situations:
+- When a rem is <strong>found</strong> by strategies 1 or 2 (it gets added to the index automatically)
+- When you run <strong>Copy Rem Sources</strong> (the template rem is registered immediately for all its PDF sources)
+- When you run <strong>Paste Rem Sources</strong> (each target rem is registered for each PDF source that was added)</p>
+<h3 id="what-to-do-if-a-rem-is-still-missing">What to do if a rem is still missing<a class="headerlink" href="#what-to-do-if-a-rem-is-still-missing" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>[!NOTE]
+If a rem you assigned the PDF source to does not appear in the PDF Control Panel list, it simply means the plugin has not "seen" it yet through any of the three strategies above.</p>
+</blockquote>
+<p><strong>Try these steps in order:</strong></p>
+<ol>
+<li>
+<p><strong>Open the PDF Control Panel from the missing rem itself.</strong>
+   Focus the rem, open the Command Palette, and run <em>PDF Control Panel</em>. The plugin will discover the rem via widget context detection and add it to the persistent index. The next time you open the panel from any other chapter, this rem will appear.</p>
+</li>
+<li>
+<p><strong>Use Copy &amp; Paste Rem Sources.</strong>
+   Even if you already assigned the PDF manually, running <em>Copy Rem Sources</em> (<code>Ctrl+Shift+F1</code>) on the rem and then <em>Paste Rem Sources</em> (<code>Alt+Shift+V</code>) back onto it (i.e., target = itself) will write it into the index.</p>
+</li>
+<li>
+<p><strong>Tag the rem as Incremental and queue it once.</strong>
+   The IncRem cache scan (strategy 2) runs every time the panel opens and covers all rems tagged with <code>#Incremental</code>. Once the rem passes through the queue at least once, it will always be discoverable.</p>
+</li>
+<li>
+<p><strong>Wait for the next full panel open from another chapter.</strong>
+   Strategy 1 (local tree scan) searches siblings and cousins up to 3 levels. If all your chapters share the same parent folder, they will all be found the first time any one of them opens the Control Panel.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

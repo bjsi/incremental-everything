@@ -1,0 +1,2120 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental Everything plugin for RemNote.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-everything/IR-Flow--Reading-Extracting-and-Clozing/">
+      
+      
+        <link rel="prev" href="../What-is-Incrementalism%3F/">
+      
+      
+        <link rel="next" href="../Reviewing-Items-in-the-Queue/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>IR Flow — Reading, Extracting & Clozing - Incremental Everything for RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ir-flow-reading-extracting-and-clozing" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental Everything for RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              IR Flow — Reading, Extracting & Clozing
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental Everything for RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-0-splitting-breaking-complexity-before-extracting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 0: Splitting — Breaking Complexity Before Extracting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 0: Splitting — Breaking Complexity Before Extracting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-splitting-cascade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Splitting Cascade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#you-do-not-need-to-get-it-right-on-the-first-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        You Do Not Need to Get It Right on the First Pass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-split-a-long-pdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Split a Long PDF
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#splitting-text-based-material-articles-web-pages-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Splitting Text-Based Material (Articles, Web Pages, Notes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tips-for-sustainable-splitting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips for Sustainable Splitting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-extract-altx-altshiftx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create Extract (Alt+X / Alt+Shift+X)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-cloze-altz-altshiftz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create Cloze (Alt+Z / Alt+Shift+Z)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Create Cloze (Alt+Z / Alt+Shift+Z)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#auto-priority-graduation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auto-Priority Graduation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-happens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What happens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visual-result-in-the-child-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual result in the child Rem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparing-altz-supermemo-style-with-native-remnote-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing Alt+Z (SuperMemo-style) with Native RemNote Clozes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Comparing Alt+Z (SuperMemo-style) with Native RemNote Clozes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#native-remnote-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native RemNote Clozes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#altz-supermemo-style-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alt+Z SuperMemo-style Clozes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-0-splitting-breaking-complexity-before-extracting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 0: Splitting — Breaking Complexity Before Extracting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 0: Splitting — Breaking Complexity Before Extracting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-splitting-cascade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Splitting Cascade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#you-do-not-need-to-get-it-right-on-the-first-pass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        You Do Not Need to Get It Right on the First Pass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-split-a-long-pdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Split a Long PDF
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#splitting-text-based-material-articles-web-pages-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Splitting Text-Based Material (Articles, Web Pages, Notes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tips-for-sustainable-splitting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tips for Sustainable Splitting
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-extract-altx-altshiftx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create Extract (Alt+X / Alt+Shift+X)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-cloze-altz-altshiftz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create Cloze (Alt+Z / Alt+Shift+Z)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Create Cloze (Alt+Z / Alt+Shift+Z)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#auto-priority-graduation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auto-Priority Graduation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-happens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What happens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#visual-result-in-the-child-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual result in the child Rem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparing-altz-supermemo-style-with-native-remnote-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing Alt+Z (SuperMemo-style) with Native RemNote Clozes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Comparing Alt+Z (SuperMemo-style) with Native RemNote Clozes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#native-remnote-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native RemNote Clozes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#altz-supermemo-style-clozes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alt+Z SuperMemo-style Clozes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="ir-flow-reading-extracting-and-clozing">IR Flow: Reading, Extracting, and Clozing<a class="headerlink" href="#ir-flow-reading-extracting-and-clozing" title="Permanent link">&para;</a></h1>
+<p>This page describes the <strong>Incremental Reading workflow</strong> supported by the plugin — a SuperMemo-inspired loop for breaking down large documents into smaller, reviewable pieces and converting key passages into flashcards, all without leaving the editor.</p>
+<p>The three commands that drive this workflow are:</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Shortcut</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Create Extract</strong></td>
+<td><code>Alt+X</code> / <code>Alt+Shift+X</code></td>
+<td>Pulls selected text into a new child Rem and initializes it as an Incremental Rem</td>
+</tr>
+<tr>
+<td><strong>Create Cloze</strong></td>
+<td><code>Alt+Z</code></td>
+<td>Creates a standalone cloze-deletion child Rem from the selected text</td>
+</tr>
+<tr>
+<td><strong>Create Cloze with Priority</strong></td>
+<td><code>Alt+Shift+Z</code></td>
+<td>Same as above, then opens the Light Priority popup to set a Card Priority</td>
+</tr>
+<tr>
+<td><strong>PDF Control Panel</strong></td>
+<td>Command Palette → <em>PDF Control Panel</em></td>
+<td>Central hub for splitting a PDF into chapters/sections, assigning page ranges, and tracking reading progress</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="step-0-splitting-breaking-complexity-before-extracting">Step 0: Splitting — Breaking Complexity Before Extracting<a class="headerlink" href="#step-0-splitting-breaking-complexity-before-extracting" title="Permanent link">&para;</a></h2>
+<p>Before you extract sentences or cloze individual words, there is a more fundamental step: <strong>breaking the material itself into manageable pieces</strong>. This is what separates sustainable incremental reading from the exhausting attempt to process a 300-page book in one sitting.</p>
+<p>The core principle is simple: <strong>you cannot review what you cannot schedule</strong>. A single Incremental Rem pointing at an entire book will appear in your queue as one monolithic item. You will open it, skim a few pages, feel overwhelmed, and hit "Next" — making no real progress. The solution is to split the material into units small enough to meaningfully review in a single session.</p>
+<h3 id="the-splitting-cascade">The Splitting Cascade<a class="headerlink" href="#the-splitting-cascade" title="Permanent link">&para;</a></h3>
+<p>Incremental Reading works as a <strong>top-down cascade of decreasing granularity</strong>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Book (folder rem)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  └── Chapter 1                ← Incremental Rem, pages 1–50
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        └── Key passage A      ← Extract (Alt+X): a paragraph worth returning to
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>              └── &quot;X is Y&quot;     ← Cloze (Alt+Z): the atomic testable fact
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        └── Key passage B
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  └── Chapter 2
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  └── Chapter 3
+</code></pre></div>
+<p>At each level, you only go deeper on the material that <strong>deserves</strong> it. Most of a chapter may be skipped entirely on the first pass; a few dense paragraphs will generate multiple extracts; a handful of those will generate clozes. The queue handles each piece on its own schedule.</p>
+<h3 id="you-do-not-need-to-get-it-right-on-the-first-pass">You Do Not Need to Get It Right on the First Pass<a class="headerlink" href="#you-do-not-need-to-get-it-right-on-the-first-pass" title="Permanent link">&para;</a></h3>
+<p>This is the most important thing to internalize: <strong>the split does not need to be perfect</strong>. You do not need to identify every chapter, section, and sub-section before you start reading. The process is iterative and self-correcting:</p>
+<ul>
+<li>Start with a rough split (e.g., one Rem per chapter, even without correct page ranges).</li>
+<li>As you read Chapter 1 and encounter a natural section break, split it into two children on the spot.</li>
+<li>The next time Chapter 1's sub-sections come up in the queue, one of them may itself be subdivided further.</li>
+<li>After a few passes, the hierarchy naturally reflects the structure of the material — not because you planned it, but because the queue kept bringing you back to what mattered.</li>
+</ul>
+<p>The PDF Control Panel's <strong>coverage badge</strong> (visible on parent rows) helps you see at a glance how much of a chapter has already been sub-divided, so you always know where more granularity is needed.</p>
+<h3 id="how-to-split-a-long-pdf">How to Split a Long PDF<a class="headerlink" href="#how-to-split-a-long-pdf" title="Permanent link">&para;</a></h3>
+<p>For a full, step-by-step setup guide see the <strong><a href="../PDF-Incremental-Reading-Workflow/">PDF Incremental Reading Workflow</a></strong> page. In summary:</p>
+<ol>
+<li><strong>Create a parent rem</strong> for the book and add the PDF as its source.</li>
+<li><strong>Create one child rem per chapter</strong> (or per rough section if the book has no clear chapters). Do not worry about exact page boundaries yet.</li>
+<li><strong>Tag the first chapter as Incremental</strong> (<code>Alt+X</code>) and add the PDF as its source. Use <strong>Copy &amp; Paste Rem Sources</strong> (<code>Ctrl+Shift+F1</code> then <code>Alt+Shift+V</code>) to propagate the PDF to all other chapters without repetition.</li>
+<li><strong>Open the PDF Control Panel</strong> (Command Palette → <em>PDF Control Panel</em>) on any chapter to assign page ranges to all of them in one place.</li>
+<li><strong>Start reading</strong>. When Chapter 1 appears in the queue, read until a natural break, then split by extracting the sub-section as a child rem with its own page range. Dismiss or schedule Chapter 1 for later.</li>
+</ol>
+<blockquote>
+<p>[!TIP]
+You do not need to split every chapter before you start. Queue only the chapters you are ready to engage with now and leave the rest at low priority. The queue will bring them forward when their turn comes.</p>
+</blockquote>
+<h3 id="splitting-text-based-material-articles-web-pages-notes">Splitting Text-Based Material (Articles, Web Pages, Notes)<a class="headerlink" href="#splitting-text-based-material-articles-web-pages-notes" title="Permanent link">&para;</a></h3>
+<p>Not all incremental reading involves PDFs. For articles pasted into RemNote, long notes, or imported web content, the same cascade applies — but splitting is even simpler:</p>
+<ul>
+<li>Use <strong><code>Alt+X</code></strong> on a paragraph or section heading to extract it as a child Incremental Rem.</li>
+<li>The parent (the full article) becomes a coarse-grained item you will eventually dismiss once all its important sub-sections have been extracted.</li>
+<li>There is no need to pre-structure the document before you start. One pass through the material with <code>Alt+X</code> creates the structure organically.</li>
+</ul>
+<h3 id="tips-for-sustainable-splitting">Tips for Sustainable Splitting<a class="headerlink" href="#tips-for-sustainable-splitting" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Err on the side of larger chunks first.</strong> It is always easier to split a large rem into two than to merge two overly-granular ones. Start with chapters; refine into sections only when the chapter proves too long to read in one session.</li>
+<li><strong>Use the Priority System to sequence your splits.</strong> Assign the most important chapter the highest priority. You will naturally split it more finely because you encounter it more often.</li>
+<li><strong>A rem that is "too long" is a signal, not a problem.</strong> When you open a rem in the queue and feel you cannot make progress in one session, that is the cue to split it — right there, immediately, before hitting Next. Create two or three child rems from the headings you see, schedule the first, and dismiss the parent.</li>
+<li><strong>The parent rem is not wasted after splitting.</strong> After its children are created and queued, apply the <strong>Remove from Queue</strong> powerup to the parent (via the <code>/rfq</code> command, or the editor command palette) to suppress it from the queue. Its children are now doing the work. <em>Requires the <a href="../Utilities/#queue-display-utilities">Hide-in-Queue integration</a> enabled or the standalone Hide in Queue plugin installed.</em></li>
+</ul>
+<hr />
+<h2 id="create-extract-altx-altshiftx">Create Extract (<code>Alt+X</code> / <code>Alt+Shift+X</code>)<a class="headerlink" href="#create-extract-altx-altshiftx" title="Permanent link">&para;</a></h2>
+<p>When reading a long Incremental Rem (a chapter, article, or section), you isolate the most important passage and turn it into its own Incremental Rem for deeper review later.</p>
+<p><strong>How it works:</strong></p>
+<ol>
+<li>Select the text you want to extract.</li>
+<li>Press <code>Alt+X</code> (or <code>Alt+Shift+X</code> to set a specific priority immediately).</li>
+<li>The plugin:</li>
+<li>Creates a <strong>child Rem</strong> containing the selected text.</li>
+<li>Highlights the original selection in <strong>blue</strong> in the parent Rem and inserts a <strong>reference pin</strong> (↗) next to it — clicking the pin navigates to the new child.</li>
+<li>Adds a <strong>back-reference pin</strong> at the end of the child Rem pointing back to the parent, maintaining full traceability.</li>
+<li>If the parent Rem was itself extracted from a <strong>PDF highlight</strong>, the child inherits a direct pin to the original PDF source as well.</li>
+<li><strong>Hides the parent Rem from queue display</strong> so its original slot is suppressed — the children take over. The mechanism depends on what's installed: if the <strong>Remove from Queue</strong> powerup is registered (via the <a href="../Utilities/#queue-display-utilities">Hide-in-Queue integration</a> setting <em>or</em> the standalone Hide in Queue plugin), it's applied to the parent directly (survives extract relocation cleanly); otherwise the <strong>Remove Parent</strong> powerup is applied to the extract itself as a fallback (works for normal review, but if you later move the extract under a different parent, that new parent will be hidden too — see <a href="../Utilities/#create-extract-source-rem-hiding-behavior">Create Extract behavior</a>).</li>
+<li>Initializes the new Rem as an <strong>Incremental Rem</strong> (with <code>Alt+X</code>: inherited or default priority; with <code>Alt+Shift+X</code>: opens the Priority popup).</li>
+</ol>
+<p>This process is called <strong>"shredding"</strong> a document: you pass through it incrementally, pulling out what matters and leaving the rest behind.</p>
+<p><img alt="Extract Selection Demo" src="../assets/extract-selected-text.gif" /></p>
+<hr />
+<h2 id="create-cloze-altz-altshiftz">Create Cloze (<code>Alt+Z</code> / <code>Alt+Shift+Z</code>)<a class="headerlink" href="#create-cloze-altz-altshiftz" title="Permanent link">&para;</a></h2>
+<p>While reading, you often encounter a key term, definition, or fact that you want to memorize — not just re-read. <code>Alt+Z</code> converts the selected text into a <strong>cloze deletion flashcard</strong> in the SuperMemo style.</p>
+<blockquote>
+<p><strong><code>Alt+Shift+Z</code> — Create Cloze with Priority:</strong> Identical to <code>Alt+Z</code>, but immediately opens the <strong>Light Priority popup</strong> after creating the cloze child Rem so you can review and optionally adjust the auto-computed Card Priority before saving.</p>
+</blockquote>
+<h3 id="auto-priority-graduation">Auto-Priority Graduation<a class="headerlink" href="#auto-priority-graduation" title="Permanent link">&para;</a></h3>
+<p>Both commands automatically assign a <strong>Card Priority</strong> to every new cloze, implementing the standard incremental reading workflow: the first fact you extract from a passage is the most important, so it should get the highest scheduling priority (lowest priority number). Each successive cloze from the same extract is inherently less critical, so it gets a slightly lower scheduling priority.</p>
+<p><strong>Formula:</strong></p>
+<blockquote>
+<p><code>Card Priority = clamp(parentPriority + min(existingCount, 10) × stepSize, 0, 100)</code></p>
+</blockquote>
+<ul>
+<li><strong><code>parentPriority</code></strong> — resolved from the parent extract in order: IncRem priority → own Card Priority → ancestor IncRem/Card Priority → plugin default.</li>
+<li><strong><code>existingCount</code></strong> — sum of two live counts read <strong>before</strong> the new cloze is created:</li>
+<li>the parent's <code>#cloze-extract</code> children (clozes previously extracted from it as siblings of the new one), plus</li>
+<li>the cards the parent rem owns itself — native cloze markers inside its text and front/back-direction cards if it is a flashcard.
+  A first cloze from a plain text extract sees <code>existingCount = 0</code> and inherits the parent's priority exactly. A first cloze from a Concept/Descriptor extract (which already has 2 own cards) or from a rem that already contains native clozes starts with a non-zero count, reflecting that the material is already partially cardified.</li>
+<li><strong><code>stepSize</code></strong> — configured in Plugin Settings → Priority Step Size (default: 10).</li>
+<li>Decrements are <strong>capped at 10</strong>, so even the 15th cloze from the same extract receives at most 10 extra steps.</li>
+</ul>
+<p><strong>Example</strong> — parent extract at priority 30, step size 5:</p>
+<table>
+<thead>
+<tr>
+<th>Cloze #</th>
+<th>Existing clozes</th>
+<th>Formula</th>
+<th>Assigned priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1st (most important)</td>
+<td>0</td>
+<td>30 + 0×5</td>
+<td><strong>30</strong></td>
+</tr>
+<tr>
+<td>2nd</td>
+<td>1</td>
+<td>30 + 1×5</td>
+<td><strong>35</strong></td>
+</tr>
+<tr>
+<td>3rd</td>
+<td>2</td>
+<td>30 + 2×5</td>
+<td><strong>40</strong></td>
+</tr>
+<tr>
+<td>11th and beyond</td>
+<td>10 (cap)</td>
+<td>30 + 10×5</td>
+<td><strong>80</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Choosing between the two variants:</strong></p>
+<ul>
+<li><strong><code>Alt+Z</code></strong> — Applies the auto-priority silently and returns focus to the editor immediately. Best when you trust the computed value and want to stay in reading flow.</li>
+<li><strong><code>Alt+Shift+Z</code></strong> — Opens the Light Priority popup pre-filled with the computed value. The popup shows a <strong>parent extract context panel</strong> (parent text, its priority with source label, existing cloze count, and the formula breakdown), so you can verify the calculation and override if needed. Best when the extract has an unusual priority or when you want deliberate control over the card's rank.</li>
+</ul>
+<h3 id="what-happens">What happens<a class="headerlink" href="#what-happens" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Select the word or phrase to test yourself on.</li>
+<li>Press <code>Alt+Z</code>.</li>
+<li>The plugin:</li>
+<li>Creates a <strong>child Rem</strong> as a standalone cloze flashcard.</li>
+<li>The child's text contains the <strong>full content of the parent Rem</strong> (front and back, if it is a flashcard), with the card delimiter replaced by a directional arrow (<code>⇒</code>, <code>⇐</code>, or <code>⇔</code> — derived from the card's practice direction).</li>
+<li>Any <strong>existing cloze marks</strong> in the parent's text are stripped from the child copy and re-marked with <strong>yellow highlight + red font</strong>, so you can see where other holes existed without them interfering with the new cloze.</li>
+<li>The <strong>selected text</strong> is marked as the new <strong>cloze deletion</strong> in the child.</li>
+<li>If the parent is a <strong>Concept rem</strong>, the front portion of the child is rendered in <strong>bold</strong>. If it is a <strong>Descriptor</strong>, it is rendered in <strong>italic</strong> — matching RemNote's native UI conventions.</li>
+<li>A <strong>back-reference pin</strong> to the parent Rem is appended at the end of the child's text.</li>
+<li>The parent's selection is marked with <strong>yellow highlight + red font</strong> to signal that this passage has already been cloze-extracted.</li>
+<li>The new <strong>cloze child Rem</strong> is tagged with the <strong>Remove Parent</strong> powerup, so the parent (the extract) is hidden from queue display <em>only</em> while reviewing this specific cloze. Other flashcard descendants of the same parent (e.g. Descriptor children) still see the parent normally — see <a href="../Utilities/#remove-parent-rp-new">Remove Parent</a> in Queue Display Utilities.</li>
+<li>The child Rem receives a <strong><code>cloze-extract</code> tag</strong>. In the Queue, this tag renders a small violet <strong>↑</strong> badge (hover for a tooltip) to identify its origin. <strong>In the Editor</strong>, these tagged clozes deliberately appear <strong>less conspicuous</strong> (faded, grayscaled, and zoomed out). This visual cue signals that the Rem merely contains material copied from a parent Rem for priority scheduling purposes, so you can safely skip past it when reviewing your notes.</li>
+</ol>
+<h3 id="visual-result-in-the-child-rem">Visual result in the child Rem<a class="headerlink" href="#visual-result-in-the-child-rem" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><em>The child inherits the full context.</em> If the parent says:</p>
+<p><code>Navigation systems :: GPS cannot be relied upon alone</code></p>
+<p>and you select "GPS", the child becomes:</p>
+<p><code>Navigation systems ⇒ [GPS] cannot be relied upon alone ↗</code></p>
+<p>where <code>[GPS]</code> is the cloze deletion and <code>↗</code> is the back-reference pin.</p>
+</blockquote>
+<hr />
+<h2 id="comparing-altz-supermemo-style-with-native-remnote-clozes">Comparing <code>Alt+Z</code> (SuperMemo-style) with Native RemNote Clozes<a class="headerlink" href="#comparing-altz-supermemo-style-with-native-remnote-clozes" title="Permanent link">&para;</a></h2>
+<p>RemNote has its own built-in cloze system — marking text with <code>{curly braces}</code> or via the cloze toolbar. The two approaches have distinct advantages:</p>
+<h3 id="native-remnote-clozes">Native RemNote Clozes<a class="headerlink" href="#native-remnote-clozes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Spoiler protection</strong>: RemNote's scheduler automatically <strong>buries</strong> (hides for ~1 hour) other cloze cards from the same Rem after one is reviewed. This prevents you from accidentally getting spoiled on a related answer you haven't been tested on yet.</li>
+<li><strong>Compact</strong>: Multiple clozes live inside a single Rem. No extra Rems are created.</li>
+<li><strong>Simpler workflow</strong>: Just highlight and mark — no child Rem is generated.</li>
+<li><strong>Best for</strong>: Dense material where multiple facts in a single sentence all need to be tested, and you trust RemNote's bury logic to prevent spoilers.</li>
+</ul>
+<h3 id="altz-supermemo-style-clozes"><code>Alt+Z</code> SuperMemo-style Clozes<a class="headerlink" href="#altz-supermemo-style-clozes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Standalone Rem</strong>: Each cloze becomes its <strong>own independent Rem</strong> in the knowledge base. This means it has its own scheduling history, its own priority, and can be edited, simplified, or reorganized entirely independently of the parent.</li>
+<li><strong>Atomic by design</strong>: Because the child is a separate Rem, you are naturally encouraged to make each card as atomic as possible. Over time, you can simplify the child's wording — removing irrelevant context — making it faster to review and easier to memorize.</li>
+<li><strong>Incrementally refineable</strong>: The child can itself be extracted further or restructured. Native clozes inside a parent Rem cannot be individually promoted or separated.</li>
+<li><strong>Full context preserved</strong>: The child always carries the full front-and-back of the parent, so you never lose the context in which you learned the fact.</li>
+<li><strong>Best for</strong>: Key terms, definitions, and facts you want to make truly independent, atomic, and long-term durable — especially during the first read of a new document.</li>
+</ul>
+<h3 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Native RemNote Cloze</th>
+<th><code>Alt+Z</code> SuperMemo-style Cloze</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Spoiler protection (bury)</td>
+<td>Yes</td>
+<td>No (each card is independent)</td>
+</tr>
+<tr>
+<td>Standalone Rem</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Individually schedulable</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Can be simplified over time</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Atomic card design</td>
+<td>Encouraged by discipline</td>
+<td>Structurally enforced</td>
+</tr>
+<tr>
+<td>Number of Rems created</td>
+<td>0 (inline)</td>
+<td>1 per cloze</td>
+</tr>
+<tr>
+<td>Back-reference to source</td>
+<td>No</td>
+<td>Yes (pin appended)</td>
+</tr>
+<tr>
+<td>Visual queue badge</td>
+<td>No</td>
+<td>Yes (violet ↑ badge)</td>
+</tr>
+</tbody>
+</table>
+<p>The two approaches are <strong>complementary</strong>. Use native clozes for quick, spoiler-safe multi-cloze sentences. Use <code>Alt+Z</code> when a concept is important enough to deserve its own card and its own long-term refinement path.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

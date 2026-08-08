@@ -1,0 +1,3902 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental Everything plugin for RemNote.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-everything/Troubleshooting/">
+      
+      
+        <link rel="prev" href="../How-to-hide-card-priorities%3F/">
+      
+      
+        <link rel="next" href="../Changelog/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Troubleshooting - Incremental Everything for RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting-error-guides" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental Everything for RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental Everything for RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#jump-to-rem-by-id-user-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Jump to Rem by ID - User Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Jump to Rem by ID - User Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📖 Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚡ Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚡ Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-plugin-command-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Plugin Command (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Common Use Cases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Common Use Cases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-investigating-pre-computation-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Investigating Pre-computation Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-checking-multiple-failed-rems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Checking Multiple Failed Rems
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-verifying-orphaned-cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Verifying Orphaned Cards
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-popup-dialog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎨 The Popup Dialog
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎨 The Popup Dialog">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#understanding-remids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔍 Understanding RemIds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔍 Understanding RemIds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-remid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a RemId?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-to-find-remids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to Find RemIds:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#success-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Success Messages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="✅ Success Messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-rem-is-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When rem is found:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-rem-is-not-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When rem is not found:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-messages-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚨 Error Messages &amp; Solutions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚨 Error Messages &amp; Solutions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#error-remid-cannot-be-empty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error: "RemId cannot be empty"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-rem-not-found-remid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error: "Rem not found: [RemId]"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-error-technical-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error: "Error: [technical message]"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-compute-card-priorities-error-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🛠 Pre-compute Card Priorities - Error Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛠 Pre-compute Card Priorities - Error Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#understanding-the-error-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding the Error Report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-types-explained" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Types Explained
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Error Types Explained">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rem-not-found-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. "Rem not found" Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-processing-exceptions-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. "Processing exceptions" Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-investigate-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Investigate Errors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to Investigate Errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-check-the-console" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Check the Console
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-get-the-list-of-failed-remids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Get the List of Failed RemIds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-re-run-pre-computation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Re-run Pre-computation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important Notes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Important Notes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#error-count-vs-failed-tagging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Count vs Failed Tagging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-worry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Worry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rogue-cardpriority-tags-sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧹 Rogue CardPriority Tags Sanitization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🧹 Rogue CardPriority Tags Sanitization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-run-the-sanitizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to run the Sanitizer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to run the Sanitizer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#for-the-entire-knowledge-base-batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For the Entire Knowledge Base (Batch)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-a-specific-rem-debug-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For a Specific Rem (Debug Widget)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-a-tag-is-classified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a tag is classified
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safety-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safety Guarantees
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pdf-highlight-repair-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📄 PDF Highlight Repair Tool
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📄 PDF Highlight Repair Tool">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-causes-broken-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Causes Broken Highlights?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnosing-with-debug-pdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnosing with "Debug PDF"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repairing-with-repair-pdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repairing with "Repair PDF"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step-complete-repair-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step: Complete Repair Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-tool-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the Tool Does Not Do
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#page-history-diagnostic-cleanup-debug-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Page History Diagnostic &amp; Cleanup (Debug Widget)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Page History Diagnostic &amp; Cleanup (Debug Widget)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-these-tools-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why These Tools Exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-open-the-debug-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Open the Debug Widget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#page-history-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📥 Page History Dump
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clean-inflated-page-history-durations-per-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧹 Clean Inflated Page-History Durations (per rem)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clean-inflated-page-history-global-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🌐 Clean Inflated Page-History — Global Scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-cleanup-does-not-touch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the Cleanup Does Not Touch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verifying-after-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying After Cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#search-linkage-diagnostics-debug-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔎 Search / Linkage Diagnostics (Debug Widget)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔎 Search / Linkage Diagnostics (Debug Widget)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-open-the-debug-widget_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Open the Debug Widget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What It Reports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorities-lost-when-importing-between-knowledge-bases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📦 Priorities Lost When Importing Between Knowledge Bases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📦 Priorities Lost When Importing Between Knowledge Bases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-symptom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Symptom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-causes-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Causes It
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-what-actually-happened" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking What Actually Happened
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What To Do
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorities-wrong-or-empty-after-a-remnote-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 Priorities Wrong or Empty After a RemNote Update
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Priorities Wrong or Empty After a RemNote Update">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-happened" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Happened
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-check-your-own-knowledge-base" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How To Check Your Own Knowledge Base
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-was-fixed-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Was Fixed Here
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#still-outstanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Still Outstanding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#if-you-see-this-in-your-knowledge-base" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If You See This In Your Knowledge Base
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#jump-to-rem-by-id-user-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚀 Jump to Rem by ID - User Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚀 Jump to Rem by ID - User Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📖 Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚡ Quick Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚡ Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-plugin-command-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Plugin Command (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#common-use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Common Use Cases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Common Use Cases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-investigating-pre-computation-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Investigating Pre-computation Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-checking-multiple-failed-rems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Checking Multiple Failed Rems
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-verifying-orphaned-cards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Verifying Orphaned Cards
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-popup-dialog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎨 The Popup Dialog
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎨 The Popup Dialog">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#understanding-remids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔍 Understanding RemIds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔍 Understanding RemIds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-remid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a RemId?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-to-find-remids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to Find RemIds:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#success-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✅ Success Messages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="✅ Success Messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-rem-is-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When rem is found:
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-rem-is-not-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When rem is not found:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-messages-solutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚨 Error Messages &amp; Solutions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🚨 Error Messages &amp; Solutions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#error-remid-cannot-be-empty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error: "RemId cannot be empty"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-rem-not-found-remid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error: "Rem not found: [RemId]"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-error-technical-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error: "Error: [technical message]"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-compute-card-priorities-error-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🛠 Pre-compute Card Priorities - Error Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🛠 Pre-compute Card Priorities - Error Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#understanding-the-error-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Understanding the Error Report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-types-explained" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Types Explained
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Error Types Explained">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rem-not-found-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. "Rem not found" Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-processing-exceptions-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. "Processing exceptions" Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-investigate-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Investigate Errors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to Investigate Errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-check-the-console" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Check the Console
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-get-the-list-of-failed-remids" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Get the List of Failed RemIds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-re-run-pre-computation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Re-run Pre-computation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important Notes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Important Notes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#error-count-vs-failed-tagging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Count vs Failed Tagging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-worry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Worry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rogue-cardpriority-tags-sanitization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧹 Rogue CardPriority Tags Sanitization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🧹 Rogue CardPriority Tags Sanitization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-run-the-sanitizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to run the Sanitizer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to run the Sanitizer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#for-the-entire-knowledge-base-batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For the Entire Knowledge Base (Batch)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#for-a-specific-rem-debug-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        For a Specific Rem (Debug Widget)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-a-tag-is-classified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a tag is classified
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safety-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safety Guarantees
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pdf-highlight-repair-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📄 PDF Highlight Repair Tool
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📄 PDF Highlight Repair Tool">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-causes-broken-highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Causes Broken Highlights?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnosing-with-debug-pdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnosing with "Debug PDF"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repairing-with-repair-pdf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repairing with "Repair PDF"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step-complete-repair-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-Step: Complete Repair Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-tool-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the Tool Does Not Do
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#page-history-diagnostic-cleanup-debug-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 Page History Diagnostic &amp; Cleanup (Debug Widget)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 Page History Diagnostic &amp; Cleanup (Debug Widget)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-these-tools-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why These Tools Exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to Use
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-open-the-debug-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Open the Debug Widget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#page-history-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📥 Page History Dump
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clean-inflated-page-history-durations-per-rem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🧹 Clean Inflated Page-History Durations (per rem)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clean-inflated-page-history-global-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🌐 Clean Inflated Page-History — Global Scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-cleanup-does-not-touch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the Cleanup Does Not Touch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verifying-after-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying After Cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#search-linkage-diagnostics-debug-widget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔎 Search / Linkage Diagnostics (Debug Widget)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔎 Search / Linkage Diagnostics (Debug Widget)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-open-the-debug-widget_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Open the Debug Widget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-it-reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What It Reports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorities-lost-when-importing-between-knowledge-bases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📦 Priorities Lost When Importing Between Knowledge Bases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📦 Priorities Lost When Importing Between Knowledge Bases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-symptom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Symptom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-causes-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Causes It
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-what-actually-happened" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking What Actually Happened
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What To Do
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorities-wrong-or-empty-after-a-remnote-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 Priorities Wrong or Empty After a RemNote Update
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 Priorities Wrong or Empty After a RemNote Update">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-happened" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Happened
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-check-your-own-knowledge-base" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How To Check Your Own Knowledge Base
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-was-fixed-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Was Fixed Here
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#still-outstanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Still Outstanding
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#if-you-see-this-in-your-knowledge-base" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If You See This In Your Knowledge Base
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="troubleshooting-error-guides">Troubleshooting &amp; Error Guides<a class="headerlink" href="#troubleshooting-error-guides" title="Permanent link">&para;</a></h1>
+<p>This page contains guides for troubleshooting common issues and using diagnostic tools.</p>
+<hr />
+<h2 id="jump-to-rem-by-id-user-guide">🚀 Jump to Rem by ID - User Guide<a class="headerlink" href="#jump-to-rem-by-id-user-guide" title="Permanent link">&para;</a></h2>
+<h3 id="overview">📖 Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h3>
+<p>The "Jump to Rem by ID" feature allows you to quickly navigate to any rem in your knowledge base using its RemId. This is especially useful when investigating errors from the pre-computation process or debugging issues with specific rems.</p>
+<h3 id="quick-start">⚡ Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h3>
+<h4 id="using-the-plugin-command-recommended">Using the Plugin Command (Recommended)<a class="headerlink" href="#using-the-plugin-command-recommended" title="Permanent link">&para;</a></h4>
+<ol>
+<li><strong>Press <code>Ctrl+/</code></strong> (or <code>Cmd+/</code> on Mac)</li>
+<li><strong>Type:</strong> <code>Jump to Rem by ID</code></li>
+<li><strong>Enter the RemId</strong> in the popup dialog</li>
+<li><strong>Press Enter</strong> or click "Jump to Rem"</li>
+<li><strong>Done!</strong> The rem opens automatically</li>
+</ol>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Ctrl+P → &quot;Jump to Rem&quot; → tfhQYD3Q2wDw4VWUH → Enter → ✅
+</code></pre></div></p>
+<h3 id="common-use-cases">🎯 Common Use Cases<a class="headerlink" href="#common-use-cases" title="Permanent link">&para;</a></h3>
+<h4 id="1-investigating-pre-computation-errors">1. Investigating Pre-computation Errors<a class="headerlink" href="#1-investigating-pre-computation-errors" title="Permanent link">&para;</a></h4>
+<p>When you run "Pre-compute Card Priorities" and see errors:</p>
+<p><strong>Step 1:</strong> Check the console for error details
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Error 15/268:
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  RemId: tfhQYD3Q2wDw4VWUH  ← Copy this
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  Reason: Processing exception
+</code></pre></div></p>
+<p><strong>Step 2:</strong> Jump to the rem
+- <code>Ctrl+/</code> → "Jump to Rem by ID"
+- Paste: <code>tfhQYD3Q2wDw4VWUH</code>
+- Press Enter</p>
+<p><strong>Step 3:</strong> Investigate
+- View the rem's content
+- Check if it's corrupted
+- Fix any issues
+- Re-run pre-computation</p>
+<h4 id="2-checking-multiple-failed-rems">2. Checking Multiple Failed Rems<a class="headerlink" href="#2-checking-multiple-failed-rems" title="Permanent link">&para;</a></h4>
+<p>When you have a list of failed RemIds:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>=== FAILED REM IDs ===
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>abc123xyz
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>def456uvw
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>ghi789rst
+</code></pre></div>
+<p><strong>Quick workflow:</strong>
+1. <code>Ctrl+/</code> → "Jump to Rem by ID"
+2. Paste first RemId → Enter
+3. Investigate the rem
+4. Repeat for next RemId (command stays in recent commands)</p>
+<p><strong>Pro tip:</strong> The command stays in your command history, so just press <code>Ctrl+P</code> and it will be at the top of your recent commands!</p>
+<h4 id="3-verifying-orphaned-cards">3. Verifying Orphaned Cards<a class="headerlink" href="#3-verifying-orphaned-cards" title="Permanent link">&para;</a></h4>
+<p>When you see "Rem not found" errors:</p>
+<p><strong>Use Jump to Rem to confirm:</strong>
+- If popup shows "Rem not found" → The rem was deleted (orphaned)
+- If rem opens → The rem exists (error was temporary)</p>
+<h3 id="the-popup-dialog">🎨 The Popup Dialog<a class="headerlink" href="#the-popup-dialog" title="Permanent link">&para;</a></h3>
+<p>When you run the command, a popup appears with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>┌─────────────────────────────────────┐
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>│  Jump to Rem by ID                  │
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>│                                     │
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>│  Enter RemId:                       │
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>│  ┌─────────────────────────────┐   │
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>│  │ e.g., tfhQYD3Q2wDw4VWUH    │   │
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>│  └─────────────────────────────┘   │
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│                                     │
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│          [Cancel]  [Jump to Rem]   │
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>│                                     │
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│  💡 Tip: Find RemIds in the         │
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>│     pre-computation error log       │
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>└─────────────────────────────────────┘
+</code></pre></div>
+<h4 id="features">Features:<a class="headerlink" href="#features" title="Permanent link">&para;</a></h4>
+<ul>
+<li>✅ <strong>Auto-focused input</strong> - Start typing immediately</li>
+<li>✅ <strong>Enter key support</strong> - Press Enter to submit</li>
+<li>✅ <strong>Error messages</strong> - Clear feedback if RemId is invalid</li>
+<li>✅ <strong>Cancel button</strong> - Close without action</li>
+<li>✅ <strong>Dark mode</strong> - Adapts to your theme</li>
+</ul>
+<h3 id="understanding-remids">🔍 Understanding RemIds<a class="headerlink" href="#understanding-remids" title="Permanent link">&para;</a></h3>
+<h4 id="what-is-a-remid">What is a RemId?<a class="headerlink" href="#what-is-a-remid" title="Permanent link">&para;</a></h4>
+<p>A RemId is a unique identifier for every rem in RemNote. It looks like this:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tfhQYD3Q2wDw4VWUH
+</code></pre></div></p>
+<h4 id="where-to-find-remids">Where to Find RemIds:<a class="headerlink" href="#where-to-find-remids" title="Permanent link">&para;</a></h4>
+<ol>
+<li>
+<p><strong>Pre-computation error logs</strong> (Console, F12)
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Error 15/268:
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  RemId: tfhQYD3Q2wDw4VWUH
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>URL bar</strong> when viewing a rem
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>https://www.remnote.com/document/tfhQYD3Q2wDw4VWUH
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Developer tools</strong> (for debugging)
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">rem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">plugin</span><span class="p">.</span><span class="nx">focus</span><span class="p">.</span><span class="nx">getFocusedRem</span><span class="p">();</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">rem</span><span class="p">.</span><span class="nx">_id</span><span class="p">);</span><span class="w"> </span><span class="c1">// Prints RemId</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h3 id="success-messages">✅ Success Messages<a class="headerlink" href="#success-messages" title="Permanent link">&para;</a></h3>
+<h4 id="when-rem-is-found">When rem is found:<a class="headerlink" href="#when-rem-is-found" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>🔍 Searching for rem: tfhQYD3Q2wDw4VWUH...
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>✅ Found rem: &quot;What is the capital of France?&quot;
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>📍 Opening rem in RemNote...
+</code></pre></div>
+<p><strong>Result:</strong> 
+- Popup closes automatically
+- Rem opens in RemNote
+- Toast notification: "✅ Found: What is the capital..."</p>
+<h4 id="when-rem-is-not-found">When rem is not found:<a class="headerlink" href="#when-rem-is-not-found" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>🔍 Searching for rem: tfhQYD3Q2wDw4VWUH...
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>❌ Rem not found: tfhQYD3Q2wDw4VWUH
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>💡 Possible reasons:
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>   • The rem was deleted
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>   • The RemId is incorrect
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>   • The rem is from a different knowledge base
+</code></pre></div>
+<p><strong>Result:</strong>
+- Error message shown in popup: "Rem not found: tfhQYD3Q2wDw4VWUH"
+- Popup stays open so you can try again
+- Toast notification: "❌ Rem not found"</p>
+<h3 id="error-messages-solutions">🚨 Error Messages &amp; Solutions<a class="headerlink" href="#error-messages-solutions" title="Permanent link">&para;</a></h3>
+<h4 id="error-remid-cannot-be-empty">Error: "RemId cannot be empty"<a class="headerlink" href="#error-remid-cannot-be-empty" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> You clicked "Jump to Rem" without entering anything</p>
+<p><strong>Solution:</strong> Enter a RemId in the input field</p>
+<hr />
+<h4 id="error-rem-not-found-remid">Error: "Rem not found: [RemId]"<a class="headerlink" href="#error-rem-not-found-remid" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> The rem with this ID doesn't exist in your knowledge base</p>
+<p><strong>Possible reasons:</strong>
+1. The rem was deleted
+2. You copied the RemId incorrectly
+3. The rem is in a different knowledge base
+4. Typo in the RemId</p>
+<p><strong>Solutions:</strong>
+- Double-check you copied the full RemId
+- Verify you're in the correct knowledge base
+- Check if the rem was recently deleted
+- Try another RemId from your error list</p>
+<hr />
+<h4 id="error-error-technical-message">Error: "Error: [technical message]"<a class="headerlink" href="#error-error-technical-message" title="Permanent link">&para;</a></h4>
+<p><strong>Cause:</strong> Unexpected error during processing</p>
+<p><strong>Solutions:</strong>
+1. Try again (might be temporary)
+2. Reload the plugin (Settings → Plugins → Toggle off/on)
+3. Check console for detailed error (F12)
+4. Report bug if error persists</p>
+<hr />
+<h2 id="pre-compute-card-priorities-error-guide">🛠 Pre-compute Card Priorities - Error Guide<a class="headerlink" href="#pre-compute-card-priorities-error-guide" title="Permanent link">&para;</a></h2>
+<h3 id="understanding-the-error-report">Understanding the Error Report<a class="headerlink" href="#understanding-the-error-report" title="Permanent link">&para;</a></h3>
+<p>When you run the pre-computation, you'll now see an enhanced error report like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>✅ Pre-computation complete!
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>• Total rems processed: 41010
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>• Newly tagged: 40948
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>• Preserved manual priorities: 62
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>• Errors: 268
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>• Error breakdown:
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>  - Rem not found: 245
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>  - Processing exceptions: 23
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>• Total time: 443s
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>• Cache build time: 142s
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>Check console for detailed error log.
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>Future startups will be much faster!
+</code></pre></div>
+<h3 id="error-types-explained">Error Types Explained<a class="headerlink" href="#error-types-explained" title="Permanent link">&para;</a></h3>
+<h4 id="1-rem-not-found-errors">1. "Rem not found" Errors<a class="headerlink" href="#1-rem-not-found-errors" title="Permanent link">&para;</a></h4>
+<p><strong>What it means:</strong> The card references a Rem that no longer exists in your knowledge base.</p>
+<p><strong>Why this happens:</strong>
+- The Rem was deleted but the card still exists
+- Database inconsistency
+- The card's parent Rem was removed</p>
+<p><strong>Impact:</strong> 
+- ❌ The card was <strong>NOT</strong> tagged with cardPriority
+- ❌ No priority was assigned
+- The card may not appear correctly in the queue</p>
+<p><strong>How to fix:</strong></p>
+<p>The plugin now handles this automatically! When you run <strong>"Update all inherited Card Priorities"</strong>, if any "Rem not found" errors are found, it will immediately offer to clean them up:</p>
+<ol>
+<li>A summary confirms how many orphan cards were found and across how many missing Rems.</li>
+<li><strong>You choose whether to preserve reviewed cards.</strong> If some orphans carry a review history (past reps and time-spent records, which still show up in some RemNote statistics), the cleanup asks whether to <strong>delete only the cards without history</strong> (keeping the reviewed ones so their stats stay retrievable) or <strong>delete all</strong> (a second confirmation warns you'll lose those records). When no orphan has any history, this step is skipped.</li>
+<li>The list of cards to be removed is shown in pages of 25 (so the dialog always fits on screen).</li>
+<li>Each page asks for your confirmation before proceeding — you can cancel at any point.</li>
+<li>The chosen set is removed in parallel batches of 25 with live progress toasts, and the final summary reports how many were removed and how many were <strong>preserved</strong>.</li>
+</ol>
+<p>Each candidate is <strong>double-checked</strong> with a fresh live lookup before removal, so cards belonging to Rems that were only transiently unavailable are never deleted.</p>
+<blockquote>
+<p>[!NOTE]
+Orphan cards are also detected at <strong>startup</strong>. When the Card Priority cache finishes its background pass, it counts any Rem whose cards exist but which can't be found, and shows a toast suggesting you run <strong>"Update all inherited Card Priorities"</strong>. <strong>Nothing is deleted automatically at startup</strong> — a Rem can briefly appear missing before sync finishes hydrating, so removal always stays behind the confirmed, on-demand cleanup above.</p>
+<p>[!TIP]
+If you prefer to investigate manually first, you can cancel the cleanup dialog and use the <strong>"Jump to Rem by ID"</strong> command (<code>Ctrl+/</code>) to inspect individual RemIds from the console log.</p>
+</blockquote>
+<h4 id="2-processing-exceptions-errors">2. "Processing exceptions" Errors<a class="headerlink" href="#2-processing-exceptions-errors" title="Permanent link">&para;</a></h4>
+<p><strong>What it means:</strong> An unexpected error occurred while processing the Rem.</p>
+<p><strong>Common causes:</strong>
+- Permission issues
+- Corrupted Rem data
+- Network timeout during processing
+- Bug in the code logic</p>
+<p><strong>Impact:</strong>
+- ❌ The card was <strong>NOT</strong> tagged with cardPriority
+- ❌ No priority was assigned
+- The Rem needs manual investigation</p>
+<p><strong>How to fix:</strong>
+1. Check the detailed error log in console
+2. Look for the specific error message
+3. Try to open the Rem manually in RemNote
+4. If the Rem is accessible, you can manually set priority using <a href="../Keyboard-Shortcuts/#priority-commands"><code>Alt+P</code></a>
+5. Report the error details if it seems like a plugin bug</p>
+<h3 id="how-to-investigate-errors">How to Investigate Errors<a class="headerlink" href="#how-to-investigate-errors" title="Permanent link">&para;</a></h3>
+<h4 id="step-1-check-the-console">Step 1: Check the Console<a class="headerlink" href="#step-1-check-the-console" title="Permanent link">&para;</a></h4>
+<p>After pre-computation, open your browser's Developer Console (F12) and look for:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>=== DETAILED ERROR LOG ===
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>Total errors: 268
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>Error 1/268:
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>  RemId: abc123xyz
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>  Reason: Rem not found - may have been deleted
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>Error 2/268:
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>  RemId: def456uvw
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>  Reason: Exception during processing: Cannot read property &#39;text&#39; of undefined
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>  Details: [error object]
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>...
+</code></pre></div>
+<h4 id="step-2-get-the-list-of-failed-remids">Step 2: Get the List of Failed RemIds<a class="headerlink" href="#step-2-get-the-list-of-failed-remids" title="Permanent link">&para;</a></h4>
+<p>At the end of the error log, you'll find:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>=== FAILED REM IDs (for investigation) ===
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>abc123xyz
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>def456uvw
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>ghi789rst
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>...
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>=== END FAILED REM IDS ===
+</code></pre></div>
+<p>You can copy this list and:
+1. Search for these Rems in RemNote
+2. Check if they still exist
+3. Manually assign priorities if needed</p>
+<h4 id="step-3-re-run-pre-computation">Step 3: Re-run Pre-computation<a class="headerlink" href="#step-3-re-run-pre-computation" title="Permanent link">&para;</a></h4>
+<p>After fixing issues:
+1. Run pre-computation again
+2. Check if error count decreased
+3. Most "Rem not found" errors should auto-resolve after card cleanup</p>
+<h3 id="important-notes">Important Notes<a class="headerlink" href="#important-notes" title="Permanent link">&para;</a></h3>
+<h4 id="error-count-vs-failed-tagging">Error Count vs Failed Tagging<a class="headerlink" href="#error-count-vs-failed-tagging" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Error count</strong> = Rems that failed to process</li>
+<li><strong>Newly tagged</strong> = Rems that were successfully tagged</li>
+</ul>
+<h4 id="when-to-worry">When to Worry<a class="headerlink" href="#when-to-worry" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>&lt; 100 errors out of 10,000+ rems:</strong> Normal, likely deleted/orphaned cards</li>
+<li><strong>&gt; 1,000 errors:</strong> May indicate a systemic issue, investigate</li>
+<li><strong>All errors are "exceptions":</strong> Likely a plugin bug, report it</li>
+</ul>
+<hr />
+<h2 id="rogue-cardpriority-tags-sanitization">🧹 Rogue CardPriority Tags Sanitization<a class="headerlink" href="#rogue-cardpriority-tags-sanitization" title="Permanent link">&para;</a></h2>
+<h3 id="overview_1">Overview<a class="headerlink" href="#overview_1" title="Permanent link">&para;</a></h3>
+<p>A "rogue" <code>CardPriority</code> tag is the powerup sitting on a rem that is <strong>not</strong> a flashcard — a tag slot (<code>Subtítulo</code>, <code>Autor</code>, …), a property value, a reading-log entry, a chapter heading, or a plain list item. Rogue tags don't affect your real flashcards, but they clutter the knowledge base and inflate the "rems processed" counts.</p>
+<p><strong>Where they came from (fixed in v0.2.272).</strong> The inheritance cascade used to walk <em>every</em> descendant of a rem whose priority changed and tag all of them, regardless of whether they had cards. As of v0.2.272 the cascade only touches descendants that genuinely own flashcards, so <strong>no new rogue tags are created</strong>. The sanitizer below cleans up tags created by older versions.</p>
+<h3 id="how-to-run-the-sanitizer">How to run the Sanitizer<a class="headerlink" href="#how-to-run-the-sanitizer" title="Permanent link">&para;</a></h3>
+<h4 id="for-the-entire-knowledge-base-batch">For the Entire Knowledge Base (Batch)<a class="headerlink" href="#for-the-entire-knowledge-base-batch" title="Permanent link">&para;</a></h4>
+<p>Use the global command to scan your entire knowledge base and remove rogue tags in bulk:
+1. <strong>Press <code>Ctrl+/</code></strong> (or <code>Cmd+/</code> on Mac)
+2. <strong>Type:</strong> <code>Sanitize Rogue CardPriority Tags</code>
+3. <strong>Press Enter</strong></p>
+<p>You'll get a batch confirmation dialog (in chunks of 20) listing the rems about to be cleaned, then a summary toast — including how many legitimate anchors were <strong>preserved</strong>.</p>
+<h4 id="for-a-specific-rem-debug-widget">For a Specific Rem (Debug Widget)<a class="headerlink" href="#for-a-specific-rem-debug-widget" title="Permanent link">&para;</a></h4>
+<p>To inspect and clean a single rem and its descendants:
+1. Navigate to the rem in the editor.
+2. Type <code>/debug</code> to open the <strong>Debug Widget</strong> below the rem.
+3. Under <strong>Card Priority Powerup</strong>, click <strong>Sanitize Rogue Tags</strong>. This runs the <em>same</em> authoritative scan as the global command, scoped to this rem's subtree.</p>
+<blockquote>
+<p>[!TIP]
+Before cleaning, click <strong>Dump Slot Structure</strong> (same section of the Debug Widget) to print a <code>console.table</code> of every node carrying <code>CardPriority</code> and/or cards — with card counts, source, and a per-node classification (<code>ok-card</code> / <code>inheritance-anchor</code> / <code>rogue-no-card</code>). This lets you confirm exactly what will be removed and what will be kept.</p>
+</blockquote>
+<h3 id="how-a-tag-is-classified">How a tag is classified<a class="headerlink" href="#how-a-tag-is-classified" title="Permanent link">&para;</a></h3>
+<p>Detection is <strong>authoritative</strong>: it uses the global card index (<code>plugin.card.getAll()</code>) — not <code>rem.getCards()</code>, which under-reports cards on paused/disabled rems — to decide whether a tagged rem owns any flashcards. A rem with cards is always left alone. A rem with <strong>no cards</strong> is then classified by the powerup's <strong>source</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Meaning</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inherited</code> / <code>default</code> / <em>(empty)</em></td>
+<td>A cascade artifact — the tag was propagated/defaulted, not set on purpose.</td>
+<td><strong>Rogue</strong> → offered for bulk removal.</td>
+</tr>
+<tr>
+<td><code>manual</code></td>
+<td>You set this priority yourself (e.g. a priority anchor on a folder/document).</td>
+<td><strong>Preserved</strong> — never offered for deletion.</td>
+</tr>
+<tr>
+<td><code>incremental</code></td>
+<td>Left behind when an IncRem was dismissed, so its descendants keep inheriting its priority (second only to <code>manual</code> in importance).</td>
+<td><strong>Preserved</strong> — never offered for deletion.</td>
+</tr>
+</tbody>
+</table>
+<p>Card-less <code>manual</code> and <code>incremental</code> tags are legitimate <strong>inheritance anchors</strong>. The sanitizer reports how many it preserved (and lists them in the console) but <strong>never deletes them</strong>. To remove one deliberately, use the <strong>Clear Card Priority</strong> button in the <a href="../Priorities-for-Flashcards/#setting-managing-priorities">Priority widget</a>.</p>
+<h3 id="safety-guarantees">Safety Guarantees<a class="headerlink" href="#safety-guarantees" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The sanitizer <strong>never</strong> touches a rem that owns flashcards (verified against the global card index, which counts cards on paused and disabled rems too).</li>
+<li>Legitimate inheritance anchors (<code>manual</code> / <code>incremental</code> source, no cards) are preserved and are not offered for deletion.</li>
+<li>Detection is read-only; nothing is written until you confirm a removal batch.</li>
+</ul>
+<hr />
+<h2 id="pdf-highlight-repair-tool">📄 PDF Highlight Repair Tool<a class="headerlink" href="#pdf-highlight-repair-tool" title="Permanent link">&para;</a></h2>
+<h3 id="overview_2">Overview<a class="headerlink" href="#overview_2" title="Permanent link">&para;</a></h3>
+<p>In some cases, clicking a PDF highlight pin in RemNote does not scroll the PDF to the correct page — it either does nothing or jumps to the wrong location. This section explains why that happens and how to use the plugin's built-in <strong>Debug PDF</strong> and <strong>Repair PDF</strong> tools to diagnose and fix it.</p>
+<h3 id="what-causes-broken-highlights">What Causes Broken Highlights?<a class="headerlink" href="#what-causes-broken-highlights" title="Permanent link">&para;</a></h3>
+<p>Every PDF highlight in RemNote is stored as a rem with a <strong>PDFHighlight</strong> powerup and a <code>PdfId</code> slot that points back to the PDF document rem. Navigation works by looking up this slot to find the PDF, then reading the highlight's position data.</p>
+<p>The structure under a healthy PDF looks like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>PDF Document [UploadedFile, Document, Automatically Sort]
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>└── Highlights [Automatically Sort]          ← canonical container
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    └── Page 08 [PDFPageNumber]
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>        └── &quot;Some highlighted text...&quot; [PDFHighlight]
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>            ├── PDF           ← internal slot rem (PdfId)
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>            └── Data          ← internal slot rem (position JSON)
+</code></pre></div>
+<blockquote>
+<p>[!NOTE]
+After RemNote's mid-2026 storage/sync overhaul, the <code>Highlights</code> container is no longer marked by a <code>PDF Highlight Section</code> tag (or any other tag, property, or slot). It is now identifiable <strong>only by its name</strong> (<code>Highlights</code>) and its <strong>position</strong> — a direct child of the PDF/<code>UploadedFile</code> rem. It carries just the <code>Automatically Sort</code> powerup, the same one the PDF root has, so there is no unique powerup to key off either.</p>
+</blockquote>
+<p>Highlights can break in two ways:</p>
+<ol>
+<li>
+<p><strong>Wrong tree structure</strong> — Page nodes (<code>PDFPageNumber</code>) end up directly under the PDF root instead of under the <code>Highlights</code> container. RemNote cannot resolve the highlight → PDF path when pages sit outside the container.</p>
+</li>
+<li>
+<p><strong>Wrong <code>PdfId</code> slot</strong> — The <code>PdfId</code> slot on a <code>PDFHighlight</code> rem points to a stale or incorrect rem ID. This is the root cause of pin navigation failures even when the tree structure looks correct.</p>
+</li>
+</ol>
+<p>Both issues can be introduced by manual reorganization of a PDF rem, restoring from a backup, merging knowledge bases, or the storage/sync overhaul leaving older highlights stranded under the PDF root while new ones go into the <code>Highlights</code> container.</p>
+<h3 id="diagnosing-with-debug-pdf">Diagnosing with "Debug PDF"<a class="headerlink" href="#diagnosing-with-debug-pdf" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Open the rem you want to inspect in the RemNote editor (the PDF document rem itself, or any rem that has the PDF as a source).</li>
+<li>Type <code>/debug</code> in the editor to open the <strong>Debug Widget</strong> below the rem.</li>
+<li>Scroll to the <strong>PDF Structure Debug</strong> section at the bottom of the widget.</li>
+<li>Click <strong>Debug PDF</strong>.</li>
+</ol>
+<p>This scans every descendant of the PDF rem and prints a full annotated tree to the browser console (F12 → Console tab). For each <strong>PDFHighlight</strong> rem, it shows:</p>
+<ul>
+<li>Its <code>PdfId</code> value — should match the PDF document rem's ID.</li>
+<li>Its <code>Data</code> slot (abbreviated) — contains the page number and position.</li>
+<li>All powerups and tags — lets you spot misclassified or missing nodes.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>• &quot;IMO AIS PDF&quot; (6BAhWRZ…) [AutoSort, Document, UploadedFile]
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  • &quot;Page 05&quot; (82oKTS…) [PDFPageNumber]          ← ⚠️ orphaned directly under the PDF root
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    • &quot;10 The AIS is able to detect…&quot; (gQpiEc…) [PDFHighlight] PdfId:6BAhWRZ…
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  • &quot;Highlights&quot; (vxiCdI…) [AutoSort]              ← ✅ canonical container (name + direct child of PDF)
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    • &quot;Page 05&quot; (QXN8ZE…) [PDFPageNumber]
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>      • &quot;10 The AIS is able to detect…&quot; (2XXvJB…) [PDFHighlight] PdfId:6BAhWRZ…
+</code></pre></div>
+<h3 id="repairing-with-repair-pdf">Repairing with "Repair PDF"<a class="headerlink" href="#repairing-with-repair-pdf" title="Permanent link">&para;</a></h3>
+<p>After diagnosing, click <strong>Repair PDF</strong>. The tool runs several independent checks and lists any issues it finds before asking for confirmation:</p>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>What the tool does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Page nodes (<code>PDFPageNumber</code>) sitting directly under the PDF root</td>
+<td>Merges/moves them into the <code>Highlights</code> container (see merge note below)</td>
+</tr>
+<tr>
+<td>Duplicate <code>Highlights</code> containers</td>
+<td>Folds their pages into the main container and removes the emptied duplicates</td>
+</tr>
+<tr>
+<td><code>PdfId</code> slots pointing to the wrong rem</td>
+<td>Updates each to the correct PDF rem ID</td>
+</tr>
+<tr>
+<td>PDF root missing the <code>Document</code> powerup</td>
+<td>Adds the <code>Document</code> powerup</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Merge, not just move:</strong> when an orphaned page has the same page number as a page already inside the <code>Highlights</code> container (e.g. both have a <code>Page 05</code>), the tool moves the orphan's highlights into the existing page and <strong>deletes the emptied orphan</strong>, so you never end up with two <code>Page 05</code> nodes side by side.</p>
+<blockquote>
+<p>[!IMPORTANT]
+The <strong>Repair PDF</strong> tool needs a <code>Highlights</code> container to move pages into. RemNote creates this container automatically the first time you highlight anything in the PDF viewer. If the PDF has never had a highlight (no <code>Highlights</code> child at all in the Debug output), the tool will tell you to create one first.</p>
+</blockquote>
+<h3 id="step-by-step-complete-repair-workflow">Step-by-Step: Complete Repair Workflow<a class="headerlink" href="#step-by-step-complete-repair-workflow" title="Permanent link">&para;</a></h3>
+<p><strong>Scenario:</strong> You have a PDF with broken highlight pins.</p>
+<p><strong>Step 1 — Create one new highlight (only if there is no <code>Highlights</code> container yet)</strong></p>
+<p>Open the PDF in RemNote's PDF viewer and make <strong>any single highlight</strong> anywhere. This forces RemNote to create the <code>Highlights</code> container. You can delete this test highlight afterwards if you like.</p>
+<blockquote>
+<p>[!TIP]
+Skip this step if the <strong>Debug PDF</strong> output already shows a <code>Highlights</code> container (any child literally named <code>Highlights</code> directly under the PDF). The container already exists.</p>
+</blockquote>
+<p><strong>Step 2 — Run Repair PDF</strong></p>
+<ol>
+<li>Navigate to the PDF rem (or any rem that has it as a source).</li>
+<li>Type <code>/debug</code> → open the <strong>Debug Widget</strong>.</li>
+<li>Click <strong>Repair PDF</strong>.</li>
+<li>Review the list of detected issues in the confirmation dialog.</li>
+<li>Click <strong>OK</strong> to proceed.</li>
+</ol>
+<p>The tool merges/moves all misplaced page nodes into the <code>Highlights</code> container and fixes any <code>PdfId</code> slots in a single pass. A toast reports the result (pages re-parented, duplicates merged, highlights folded in, PdfIds fixed), and the console log shows each move, merge, and PdfId fix for auditing.</p>
+<p><strong>Step 3 — Verify</strong></p>
+<p>Click <strong>Debug PDF</strong> again and confirm:
+- All page nodes now sit <strong>under</strong> the <code>Highlights</code> container, with one page per page number (no duplicates).
+- All <code>PDFHighlight</code> rems show the correct <code>PdfId</code> (matching the PDF document rem ID).
+- Clicking a highlight pin in the PDF viewer navigates to the right page.</p>
+<h3 id="what-the-tool-does-not-do">What the Tool Does Not Do<a class="headerlink" href="#what-the-tool-does-not-do" title="Permanent link">&para;</a></h3>
+<ul>
+<li>It does not alter the position data stored in each highlight's <code>Data</code> slot.</li>
+<li>It does not touch unrelated children of the PDF root (e.g. search-portal rems).</li>
+<li>Detection is by the container's <strong>name</strong> (<code>Highlights</code>); if you run RemNote in a non-English UI where the container is localized, the tool may not recognize it.</li>
+</ul>
+<hr />
+<h2 id="page-history-diagnostic-cleanup-debug-widget">📊 Page History Diagnostic &amp; Cleanup (Debug Widget)<a class="headerlink" href="#page-history-diagnostic-cleanup-debug-widget" title="Permanent link">&para;</a></h2>
+<h3 id="why-these-tools-exist">Why These Tools Exist<a class="headerlink" href="#why-these-tools-exist" title="Permanent link">&para;</a></h3>
+<p>Up to v0.2.257, <code>addPageToHistory</code> — the function that records reading sessions into the per-(IncRem, PDF) page-history storage — had an "auto-compute" code path that read the queue's review start-time anchor (<code>incremReviewStartTimeKey</code>) and stamped a duration onto every page-history entry it wrote, even when the caller was a bookmark or highlight event rather than a session boundary. The anchor was set when the queue picked an IncRem and only cleared on manual reschedule, so every subsequent bookmark in the same review compounded a longer and longer duration from the same starting point.</p>
+<p>The visible symptom was that the <strong>Total Time</strong> on the <a href="../PDF-Incremental-Reading-Workflow/">PDF Control panel</a> drifted away from the authoritative <strong>Total Time</strong> in <a href="../IncRem-List-and-Main-View/">Repetition History</a> — in extreme cases by more than 5× (e.g. 9h 58m vs 1h 47m on the same rem). The fix in v0.2.258 stops new entries from being inflated; the tools below let you inspect and clean up the historical data already written under the old behavior.</p>
+<h3 id="when-to-use">When to Use<a class="headerlink" href="#when-to-use" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Page History Dump</strong> — anytime you want to inspect the per-entry reading history of a given Incremental (or Dismissed) Rem, e.g. to investigate a discrepancy between PDF Control and Repetition History totals, or to confirm that recent reviews were recorded correctly.</li>
+<li><strong>Clean Inflated Page-History Durations</strong> — when the dump (or PDF Control vs Repetition History) shows that this rem has inflated entries to strip.</li>
+<li><strong>Clean Inflated Page-History — Global Scan</strong> — once, after upgrading to v0.2.258, to clean up every IncRem and Dismissed rem in the knowledge base in a single pass.</li>
+</ul>
+<h3 id="how-to-open-the-debug-widget">How to Open the Debug Widget<a class="headerlink" href="#how-to-open-the-debug-widget" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Navigate to the rem you want to inspect (any Incremental or Dismissed rem with PDF sources).</li>
+<li>Type <code>/debug</code> in the editor to insert the <strong>Debug Widget</strong> below the rem.</li>
+<li>Scroll to the relevant section.</li>
+</ol>
+<h3 id="page-history-dump">📥 Page History Dump<a class="headerlink" href="#page-history-dump" title="Permanent link">&para;</a></h3>
+<p>Click <strong>Dump Page History</strong>. For every PDF source on the focused rem, the widget will:</p>
+<ul>
+<li>Print the parsed <code>PageHistoryEntry[]</code> to the console (F12 → Console), along with the legacy synced value for that pair — see the note below on reading it.</li>
+<li>Render a per-PDF summary card in the widget showing:</li>
+<li><strong>Total entries</strong> vs <strong>entries with <code>sessionDuration &gt; 0</code></strong>.</li>
+<li><strong>Sum of durations</strong> vs <strong><code>getReadingStatistics</code> total</strong> (these should always match; mismatch indicates a parsing bug).</li>
+<li><strong>Min/Max</strong> duration and <strong>count of entries hitting the 4h cap</strong> (14400 s).</li>
+<li>The legacy storage key for the pair (<code>incremental_page_history_&lt;remId&gt;_&lt;pdfRemId&gt;</code>), shown for reference.</li>
+<li>A <code>&lt;details&gt;</code> toggle exposes the full raw JSON of every entry.</li>
+</ul>
+<p>This is purely diagnostic — nothing is mutated.</p>
+<blockquote>
+<p>[!NOTE]
+<strong>Since v1.0.34, reading history lives on the Rem</strong> (a hidden <em>Reading State</em> property) rather than in plugin storage. The dump still reports the old synced value so you can tell whether a given (Rem, PDF) pair has moved across yet: <code>none — migrated to the Rem</code> next to a populated history means the migration has happened, <strong>not</strong> that data was lost. Pairs migrate individually, the first time each is opened.</p>
+</blockquote>
+<h3 id="clean-inflated-page-history-durations-per-rem">🧹 Clean Inflated Page-History Durations (per rem)<a class="headerlink" href="#clean-inflated-page-history-durations-per-rem" title="Permanent link">&para;</a></h3>
+<p>The detection rule applied to every entry in the focused rem's page-history:</p>
+<table>
+<thead>
+<tr>
+<th>Entry timestamp</th>
+<th>Has matching rep in <code>incRem.history</code>?</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 2026-02-04 UTC</td>
+<td>—</td>
+<td><strong>Keep</strong> (always)</td>
+</tr>
+<tr>
+<td>≥ 2026-02-04 UTC</td>
+<td>yes (±5 s timestamp, ±2 s duration)</td>
+<td><strong>Keep</strong></td>
+</tr>
+<tr>
+<td>≥ 2026-02-04 UTC</td>
+<td>no</td>
+<td><strong>Strip</strong> <code>sessionDuration</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>[!IMPORTANT]
+The <strong>2026-02-04 cutoff</strong> is the date when the Dismissed powerup started preserving <code>reviewTimeSeconds</code> on its History slot. Reps recorded <em>before</em> that date may have lost their <code>reviewTimeSeconds</code> value on dismissal — meaning page-history is sometimes the only surviving record of legitimate review time. Entries with timestamps before the cutoff are therefore always preserved, even if no matching rep can be found.</p>
+</blockquote>
+<p><strong>Workflow:</strong></p>
+<ol>
+<li>Click <strong>Preview</strong>. The widget shows per-PDF before/after totals, count of entries to strip vs keep, and collapsible lists of each entry with its decision reason. The same data is logged to the console.</li>
+<li>Verify the proposed changes — pay particular attention to any PDF where the <strong>After total</strong> drops to zero (this is correct when the rem only has bookmark-event entries with no actual reps recorded).</li>
+<li>Click <strong>Apply</strong>. The widget rewrites the affected <code>incremental_page_history_*</code> keys, leaving every other field on each entry (<code>page</code>, <code>timestamp</code>, <code>highlightId</code>) intact so bookmark navigation continues to work.</li>
+</ol>
+<p>Only <code>sessionDuration</code> is modified. The IncRem/Dismissed History slot — which is authoritative for review time — is never touched.</p>
+<h3 id="clean-inflated-page-history-global-scan">🌐 Clean Inflated Page-History — Global Scan<a class="headerlink" href="#clean-inflated-page-history-global-scan" title="Permanent link">&para;</a></h3>
+<p>This variant enumerates every IncRem and Dismissed rem in the knowledge base via the powerup tag lookup and runs the same per-rem analysis on each. Designed to be run once, immediately after upgrading.</p>
+<p><strong>Workflow:</strong></p>
+<ol>
+<li>Click <strong>Scan All</strong>. Progress is shown in the widget; the console prints a full per-rem breakdown of detected inflation. For a knowledge base with a few thousand IncRems the scan typically takes 30–90 seconds.</li>
+<li>Review the summary card: scanned rems, affected rems, total entries to strip, total inflated time. Each affected rem expands to show its PDFs and per-PDF before/after totals.</li>
+<li>(Recommended) Spot-check one or two affected rems by opening Debug on them individually and running the per-rem <strong>Preview</strong> — confirm the global scan's numbers match.</li>
+<li>Click <strong>Apply to All</strong>. A confirmation dialog summarizes the total impact before any writes happen.</li>
+</ol>
+<h3 id="what-the-cleanup-does-not-touch">What the Cleanup Does Not Touch<a class="headerlink" href="#what-the-cleanup-does-not-touch" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The <code>IncrementalRep[]</code> History slot on the Incremental or Dismissed powerup — Repetition History continues to display the same <code>reviewTimeSeconds</code> it always did.</li>
+<li><code>highlightId</code>, <code>page</code>, or <code>timestamp</code> fields on page-history entries — bookmark pin navigation and the Reading History list view are unaffected.</li>
+<li>Entries with timestamps before the 2026-02-04 cutoff.</li>
+<li>Entries whose <code>sessionDuration</code> matches a rep's <code>reviewTimeSeconds</code> (within ±2 s) at a matching timestamp (within ±5 s) — these are legitimate end-of-session records written by the queue <strong>Next</strong> button or the Editor Review Timer.</li>
+</ul>
+<h3 id="verifying-after-cleanup">Verifying After Cleanup<a class="headerlink" href="#verifying-after-cleanup" title="Permanent link">&para;</a></h3>
+<p>For a given rem, the <strong>Total Time</strong> in PDF Control and the <strong>Total Time</strong> in Repetition History should now agree (or PDF Control should be a strict subset, in cases where some legitimate sessions were recorded against a different PDF source on the same IncRem). If they still diverge significantly, run <strong>Page History Dump</strong> on the rem and inspect the remaining entries against the History slot to identify the discrepancy.</p>
+<hr />
+<h2 id="search-linkage-diagnostics-debug-widget">🔎 Search / Linkage Diagnostics (Debug Widget)<a class="headerlink" href="#search-linkage-diagnostics-debug-widget" title="Permanent link">&para;</a></h2>
+<h3 id="the-problem">The Problem<a class="headerlink" href="#the-problem" title="Permanent link">&para;</a></h3>
+<p>Sometimes a perfectly normal Rem — even a <strong>Concept</strong> referenced dozens of times — <strong>cannot be found by typing its name</strong> in RemNote's <code>[[</code> reference search. You end up opening its source document to copy/paste it every time you want to reference it. The most common trigger is a name made entirely of <strong>high-frequency words</strong> (e.g. <code>Navegação Interior</code>, <code>mar territorial</code>): RemNote's search builds its candidate list <strong>per token, with a cap</strong>, so when no word in the name is distinctive enough, the exact-name Rem never makes any token's candidate cut and is buried under a flood of partial matches.</p>
+<p>This is a property of the <strong>search ranking</strong>, not a corruption of the Rem — which is why <strong>"Reload Search Cache", retyping the name, toggling the Rem's type, or deleting an alias do <em>not</em> fix it.</strong></p>
+<h3 id="how-to-open-the-debug-widget_1">How to Open the Debug Widget<a class="headerlink" href="#how-to-open-the-debug-widget_1" title="Permanent link">&para;</a></h3>
+<p>The Debug Widget now opens on <strong>any</strong> focused Rem (not just IncRem/CardPriority/Dismissed ones):</p>
+<ol>
+<li>Focus the Rem you want to inspect.</li>
+<li>Run <strong><code>Debug Incremental Everything</code></strong> from the command palette.</li>
+<li>Scroll to the <strong>Search / Linkage Diagnostics</strong> section (at the bottom of the widget) and click <strong>Probe Searchability</strong>.</li>
+</ol>
+<h3 id="what-it-reports">What It Reports<a class="headerlink" href="#what-it-reports" title="Permanent link">&para;</a></h3>
+<p>The probe reproduces the editor's search via <code>plugin.search.search()</code> and dumps a full report to the widget and the console (F12 → Console), including:</p>
+<ul>
+<li><strong>Verdict</strong> — a plain-language summary of the likely cause.</li>
+<li><strong>Own-text search rank</strong> (top 50) and <strong>Deep search rank</strong> (top 1000) — whether the Rem appears in its <em>own</em> name search and at what position. "NOT FOUND" with many partial matches above it is the signature of common-token saturation.</li>
+<li><strong>Found under alias? / Found under prefix?</strong> — whether a distinctive word <em>does</em> surface the Rem (it usually does — which is exactly what the <a href="../Utilities/#find-rem-reference-or-open">Find Rem picker</a> exploits).</li>
+<li><strong>Type &amp; flags</strong> (Concept/Descriptor, isProperty/isSlot/isPowerup…), <strong>literal character count</strong>, <strong>Unicode normalization</strong> (NFC vs NFD), <strong>hidden/zero-width characters</strong>, <strong>leading/trailing whitespace</strong> — rarer causes of invisibility, each ruled in or out.</li>
+<li><strong>Aliases</strong>, <strong>duplicate same-name Rems</strong>, and the <strong>ancestor chain</strong> (flagging search-excluding powerups such as <code>SuperPrivate</code>, <code>SearchPortal</code>, <code>ImportedDocument</code>, <code>RestoredFromTrash</code>).</li>
+<li><strong><code>timesSelectedInSearch</code></strong> and reference counts.</li>
+</ul>
+<p>Run it on a Rem that <em>works</em> and one that <em>doesn't</em> to compare — the difference (e.g. a distinctive vs. all-common-word name) makes the cause obvious.</p>
+<h3 id="the-fix">The Fix<a class="headerlink" href="#the-fix" title="Permanent link">&para;</a></h3>
+<p>There is <strong>no API to boost a Rem's search ranking</strong>, and the Rem itself is healthy — so the solution is to bypass RemNote's ranking. Use the <strong><a href="../Utilities/#find-rem-reference-or-open">Find Rem — Reference or Open</a></strong> picker (<code>Opt+Shift+F</code>): it searches each word separately and floats the exact-name match to the top, so you can insert a reference or open the otherwise-invisible Rem.</p>
+<hr />
+<h2 id="priorities-lost-when-importing-between-knowledge-bases">📦 Priorities Lost When Importing Between Knowledge Bases<a class="headerlink" href="#priorities-lost-when-importing-between-knowledge-bases" title="Permanent link">&para;</a></h2>
+<h3 id="the-symptom">The Symptom<a class="headerlink" href="#the-symptom" title="Permanent link">&para;</a></h3>
+<p>You export a document from one knowledge base and import it into another. The flashcards arrive at the <strong>default</strong> priority instead of the ones you set. Incremental Rems usually come through untouched — priority <em>and</em> full review history — which makes the loss look arbitrary.</p>
+<p>It is not consistent: the <strong>same export file</strong> can import perfectly into one knowledge base and lose every card priority in another.</p>
+<h3 id="what-causes-it">What Causes It<a class="headerlink" href="#what-causes-it" title="Permanent link">&para;</a></h3>
+<p><strong>This is a defect in RemNote's importer, not in the plugin.</strong> It reproduces with the plugin completely disabled.</p>
+<p>A powerup is an ordinary Rem, and the import has to connect incoming tags to the powerup already registered in the target knowledge base. In the affected knowledge bases it does not manage that in one step. It first attaches a <strong>transient CardPriority powerup</strong> — a freshly generated Rem that does not resolve to anything — and roughly 250 milliseconds later corrects itself: it tags the Rem with the real registered CardPriority, discards the transient one, and <strong>loses the slot values in the swap</strong>.</p>
+<p>Reading the raw export files makes the sequence visible. In a knowledge base where the import succeeds, a card's tag and its values are written together, eight milliseconds apart, and the values are intact. In one where it fails, the tag is swapped and all three priority fields are blanked in the <em>same millisecond</em>.</p>
+<p><strong>Incremental Rems escape this</strong> because their powerup is matched correctly on the importer's first pass, so no swap ever happens. That asymmetry — same import, same document, one powerup preserved and the other destroyed — is the clearest fingerprint of the problem.</p>
+<p>The failure appears to correlate with how much the target knowledge base already uses card priorities: it was reproducible in a knowledge base with over 2,000 prioritised Rems and not in one with 18.</p>
+<blockquote>
+<p>[!IMPORTANT]
+The values are <strong>destroyed, not hidden</strong>. Nothing is left behind to recover, and no plugin setting or command can prevent it. The priorities the plugin then displays — 50 for flashcards, 10 for Incremental Rems — are fallbacks shown when nothing can be read, not values that were written over your data.</p>
+</blockquote>
+<h3 id="checking-what-actually-happened">Checking What Actually Happened<a class="headerlink" href="#checking-what-actually-happened" title="Permanent link">&para;</a></h3>
+<p>The plugin ships a script that reads a <code>.rem</code> export directly. It involves neither RemNote nor the plugin, so nothing can have altered the data before you look:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>node scripts/analyze_rem_export.js path/to/export.rem
+</code></pre></div>
+<p>It lists, per Rem, the Incremental and CardPriority values the file carries. Export the <strong>same document from both knowledge bases</strong> and compare:</p>
+<table>
+<thead>
+<tr>
+<th>Source export</th>
+<th>Target export</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>values present</td>
+<td>values present</td>
+<td>The transfer worked.</td>
+</tr>
+<tr>
+<td>values present</td>
+<td>values blank</td>
+<td>RemNote's importer lost them. Nothing to recover in the target.</td>
+</tr>
+<tr>
+<td>values absent</td>
+<td>—</td>
+<td>They never left the source knowledge base.</td>
+</tr>
+</tbody>
+</table>
+<p>There is also a <strong>Diagnose Read Path</strong> button in the debug widget's Card Priority section. For the focused Rem it compares the powerup the plugin resolves by code against the tags the Rem actually carries, and probes every slot of both powerups. Use it to confirm that a Rem is correctly tagged and still reads empty — the signature of this bug. Both tools are read-only.</p>
+<h3 id="what-to-do">What To Do<a class="headerlink" href="#what-to-do" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Re-import does not help</strong> — it fails the same way each time.</li>
+<li><strong>Reapply in bulk instead.</strong> Note the priorities before transferring (a <a href="../Priority-Review-Document/">Priority Review Document</a> is a convenient snapshot) and use <strong><a href="../Priorities-for-Flashcards/#assigning-priorities-in-bulk">Batch Assign Card Priority</a></strong> in the target knowledge base afterwards.</li>
+<li><strong>Incremental Rem data is safe</strong> to move as-is.</li>
+<li>If you hit this, it is worth reporting to RemNote: the same export file succeeding in one knowledge base and failing in another, with the plugin disabled, is a precise reproduction.</li>
+</ul>
+<hr />
+<h2 id="priorities-wrong-or-empty-after-a-remnote-update">🔧 Priorities Wrong or Empty After a RemNote Update<a class="headerlink" href="#priorities-wrong-or-empty-after-a-remnote-update" title="Permanent link">&para;</a></h2>
+<p><strong>Symptom:</strong> after a RemNote update, priorities you never touched show the wrong number — often the same number everywhere — or the priority row reads <strong>Empty</strong> while a stray <code>Unnamed — 42</code> line sits under the Rem.</p>
+<h3 id="what-happened">What Happened<a class="headerlink" href="#what-happened" title="Permanent link">&para;</a></h3>
+<p>Every powerup property is a small child Rem that points at its slot definition. RemNote's storage/sync overhaul re-pointed some of those references at slot definitions that were unnamed, belonged to the <em>other</em> powerup, or had been deleted outright. <strong>The values were never lost</strong> — they stayed on the Rem, in a property the plugin could no longer reach. What you saw instead was whatever the plugin falls back to.</p>
+<p>Both priority powerups use a slot displayed as "Priority", which is why they got crossed.</p>
+<p>RemNote fixed the bulk of this in <strong>1.27.24</strong>. Two kinds of residue could survive that fix:</p>
+<ul>
+<li>properties pointing at a slot definition that had since been <strong>deleted</strong> — these read as though no priority was ever set;</li>
+<li>on Rems carrying <em>both</em> Incremental and Card Priority, the two "Priority" properties <strong>collapsed into one</strong>, leaving the other powerup with nothing.</li>
+</ul>
+<h3 id="how-to-check-your-own-knowledge-base">How To Check Your Own Knowledge Base<a class="headerlink" href="#how-to-check-your-own-knowledge-base" title="Permanent link">&para;</a></h3>
+<p>The debug widget's <strong>Raw Slot Diagnostics</strong> section (at the bottom) has two read-only tools:</p>
+<ul>
+<li><strong>Dump Raw Slots</strong> — for the focused Rem and its descendants, reads the value stored on each property directly, bypassing the normal lookup, and shows it next to what the plugin actually reads. A value present in one column and empty in the other is the signature.</li>
+<li><strong>Scan Whole KB</strong> — counts how many Rems are affected across both priority powerups, and separately checks whether each <code>Next Rep Date</code> still points at a Daily Document that exists.</li>
+</ul>
+<p>Both are safe to run at any time and write nothing.</p>
+<h3 id="how-it-was-fixed-here">How It Was Fixed Here<a class="headerlink" href="#how-it-was-fixed-here" title="Permanent link">&para;</a></h3>
+<p>On the knowledge base where this was diagnosed, the sequence was:</p>
+<ol>
+<li><strong>Recover deliberate values.</strong> The CardPriority repair reads the value off the unreachable property and rewrites it through the normal path, preserving the original source and timestamp. It skips inherited values, which are derived rather than authored.</li>
+<li><strong>Re-materialise inherited values</strong> with <strong>Update all inherited Card Priorities</strong>, which recomputes them from the ancestor cascade and leaves manual priorities alone.</li>
+<li><strong>Delete the abandoned properties</strong> — the stray <code>Unnamed — N</code> rows — once, and only once, the value is confirmed readable in its correct place. Each deletion is individually refused if the Rem's priority is not already restored.</li>
+</ol>
+<p>Incremental Rem priorities needed none of this: the plugin recovers them from the Rem's own repetition history, so they kept showing the right number throughout.</p>
+<h3 id="still-outstanding">Still Outstanding<a class="headerlink" href="#still-outstanding" title="Permanent link">&para;</a></h3>
+<p>A separate fault affects <strong>Next Rep Date</strong>: the property is healthy, but the Daily Document it references no longer exists, so RemNote's date row shows <code>Loading</code> forever. Scheduling is unaffected — the plugin stamps the next-repetition date into its own history and reads that instead — but the date chip cannot be edited by hand until it is rebuilt.</p>
+<h3 id="if-you-see-this-in-your-knowledge-base">If You See This In Your Knowledge Base<a class="headerlink" href="#if-you-see-this-in-your-knowledge-base" title="Permanent link">&para;</a></h3>
+<p>Please get in touch, via the <a href="https://github.com/bjsi/incremental-everything/issues">plugin's issue tracker</a>, with the JSON that <strong>Scan Whole KB</strong> produces. Two things make a report especially useful:</p>
+<ul>
+<li><strong>it happened on a RemNote version after 1.27.24</strong> — that would mean a path we have not seen;</li>
+<li><strong>the numbers differ in shape from the ones above</strong> — a different slot id, or a Rem where a <em>manual</em> priority disagrees with what is displayed.</li>
+</ul>
+<p>The diagnostic tools were built for exactly this, and the more knowledge bases they are run against, the more precisely the remaining cases can be described to RemNote.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

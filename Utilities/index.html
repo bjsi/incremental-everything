@@ -1,0 +1,2326 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental Everything plugin for RemNote.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-everything/Utilities/">
+      
+      
+        <link rel="prev" href="../Keyboard-Shortcuts/">
+      
+      
+        <link rel="next" href="../Full-Mode-x-Light-Mode/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Utilities - Incremental Everything for RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#queue-display-utilities" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental Everything for RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Utilities
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental Everything for RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#activation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hide-in-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hide in Queue (hiq)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remove-from-queue-rfq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remove from Queue (rfq)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Remove from Queue (rfq)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hide-in-queue-vs-remove-from-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hide in Queue vs. Remove from Queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#no-hierarchy-nh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No Hierarchy (nh)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hide-parent-hp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hide Parent (hp)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hide-grandparent-hgp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hide Grandparent (hgp)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remove-parent-rp-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remove Parent (rp) — New
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remove-grandparent-rgp-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remove Grandparent (rgp) — New
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-extract-source-rem-hiding-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create Extract — Source Rem Hiding Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#queue-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Full-Mode-x-Light-Mode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#activation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hide-in-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hide in Queue (hiq)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remove-from-queue-rfq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remove from Queue (rfq)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Remove from Queue (rfq)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hide-in-queue-vs-remove-from-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hide in Queue vs. Remove from Queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#no-hierarchy-nh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No Hierarchy (nh)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hide-parent-hp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hide Parent (hp)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hide-grandparent-hgp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hide Grandparent (hgp)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remove-parent-rp-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remove Parent (rp) — New
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remove-grandparent-rgp-new" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remove Grandparent (rgp) — New
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-extract-source-rem-hiding-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create Extract — Source Rem Hiding Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#queue-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queue Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<hr />
+<h1 id="queue-display-utilities">Queue Display Utilities<a class="headerlink" href="#queue-display-utilities" title="Permanent link">&para;</a></h1>
+<p>A collection of powerups and commands incorporated into Incremental Everything (originally from the standalone <strong>Hide in Queue</strong> plugin), plus two new powerups — <strong>Remove Parent</strong> and <strong>Remove Grandparent</strong> — that improve how parent/ancestor Rems are rendered during queue review.</p>
+<h2 id="activation">Activation<a class="headerlink" href="#activation" title="Permanent link">&para;</a></h2>
+<p>The 5 powerups originally from the Hide in Queue plugin (Hide in Queue, Remove from Queue, No Hierarchy, Hide Parent, Hide Grandparent) are gated by the <strong>Enable Hide-in-Queue powerups and commands</strong> setting in Plugin Settings.</p>
+<blockquote>
+<p>⚠️ <strong>Important.</strong> Only enable this setting if you do <strong>NOT</strong> have the standalone Hide in Queue plugin installed. The powerup codes are identical, and RemNote throws a fatal <code>Duplicated powerup</code> error if both plugins try to register the same code — Incremental Everything will fail to load. If you currently use the standalone plugin, uninstall it first, then enable the setting and reload RemNote.</p>
+</blockquote>
+<p>The two new powerups — <strong>Remove Parent</strong> and <strong>Remove Grandparent</strong> — are always registered regardless of the setting, because the <a href="../IR-Flow--Reading-Extracting-and-Clozing/">Cloze</a> and <a href="../IR-Flow--Reading-Extracting-and-Clozing/">Extract</a> creators apply Remove Parent automatically to newly-created Rems.</p>
+<hr />
+<h2 id="hide-in-queue">Hide in Queue (<code>hiq</code>)<a class="headerlink" href="#hide-in-queue" title="Permanent link">&para;</a></h2>
+<p>Tag any Rem with <strong>Hide in Queue</strong> (using the command). Its content will be replaced on the front of descendant flashcards with "Hidden in queue":</p>
+<ul>
+<li>The content of the tagged Rem is hidden, but <em>the bullet point itself remains visible</em>.</li>
+<li>Instead of the text, a ghosted/faded label saying <strong>"Hidden in queue"</strong> appears next to the bullet.</li>
+<li><strong>Visual result:</strong> The user still sees the structural indentation and knows that something is there, but the actual information is obscured during the question phase. Good for hiding hints, spoilers, or context that would make retrieving the answer trivial.</li>
+</ul>
+<p><strong>Editor:</strong></p>
+<p><img alt="" src="https://i.imgur.com/06IHTFp.png" /></p>
+<p><strong>Queue:</strong></p>
+<p><img alt="" src="https://i.imgur.com/nntgSw1.png" /></p>
+<hr />
+<h2 id="remove-from-queue-rfq">Remove from Queue (<code>rfq</code>)<a class="headerlink" href="#remove-from-queue-rfq" title="Permanent link">&para;</a></h2>
+<p>Tag any Rem with <strong>Remove from Queue</strong> (using the command). Its content will be completely removed from the flashcard's visual hierarchy of its descendants.</p>
+<ul>
+<li>Not only is the text gone, but any child Rems underneath it are pulled to the left, essentially collapsing the space.</li>
+<li><strong>Visual result:</strong> It looks exactly as if that intermediate Rem never existed in your document hierarchy at all.</li>
+</ul>
+<p><strong>Editor:</strong></p>
+<p><img alt="" src="../assets/uploaded/bf66f3_editor.png" /></p>
+<p><strong>Queue:</strong></p>
+<p><img alt="" src="../assets/uploaded/dace24_queue.png" /></p>
+<h3 id="hide-in-queue-vs-remove-from-queue">Hide in Queue vs. Remove from Queue<a class="headerlink" href="#hide-in-queue-vs-remove-from-queue" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Hide in Queue (<code>hiq</code>):</strong> content is hidden, but the bullet point structure remains visible with a "Hidden in queue" ghosted label. Use when you want to acknowledge the structural presence of a parent but obscure its text.</li>
+<li><strong>Remove from Queue (<code>rfq</code>):</strong> the Rem is completely removed from the visual hierarchy (<code>display: none</code>), and any children are shifted left to fill its space. Use to erase an intermediate parent level entirely as if it never existed.</li>
+</ul>
+<hr />
+<h2 id="no-hierarchy-nh">No Hierarchy (<code>nh</code>)<a class="headerlink" href="#no-hierarchy-nh" title="Permanent link">&para;</a></h2>
+<p>Tag any Rem with <strong>No Hierarchy</strong> (using the command). Any ancestors will be hidden on the front and back of the flashcard.</p>
+<p><strong>Editor:</strong></p>
+<p><img alt="" src="../assets/uploaded/03b82b_no-hier-ed.png" /></p>
+<p><strong>Queue:</strong></p>
+<p><img alt="" src="../assets/uploaded/691337_no-hier-queue.png" /></p>
+<hr />
+<h2 id="hide-parent-hp">Hide Parent (<code>hp</code>)<a class="headerlink" href="#hide-parent-hp" title="Permanent link">&para;</a></h2>
+<p>Tag any Rem with <strong>Hide Parent</strong> (using the command <code>Hide Parent</code> or <code>/hp</code>). Its immediate parent will be hidden on the front of the flashcard, but revealed on the back.</p>
+<p>Similar to <strong>Hide in Queue</strong>, but instead of tagging the parent Rem, the user tags the specific flashcard Rem — so other flashcard descendants of the same parent Rem are <em>not</em> affected.</p>
+<p><strong>Editor:</strong></p>
+<p><img alt="" src="../assets/uploaded/291e8e_hide-parent-editor.png" /></p>
+<p><strong>Queue:</strong></p>
+<p><img alt="" src="../assets/uploaded/af5b9a_hide-parent-queue-question.png" /></p>
+<p><img alt="" src="../assets/uploaded/5b566c_hide-parent-queue-answer.png" /></p>
+<hr />
+<h2 id="hide-grandparent-hgp">Hide Grandparent (<code>hgp</code>)<a class="headerlink" href="#hide-grandparent-hgp" title="Permanent link">&para;</a></h2>
+<p>Tag any Rem with <strong>Hide Grandparent</strong> (using the command <code>Hide Grandparent</code> or <code>/hgp</code>). Its grandparent will be hidden on the front of the flashcard, but revealed on the back.</p>
+<p><strong>Editor:</strong></p>
+<p><img alt="" src="../assets/uploaded/f9b3c0_hide-grandparent-editor.png" /></p>
+<p><strong>Queue:</strong></p>
+<p><img alt="" src="../assets/uploaded/962e5f_hide-grandparent-queue-question.png" /></p>
+<p><img alt="" src="../assets/uploaded/5cc63d_hide-grandparent-queue-answer.png" /></p>
+<hr />
+<h2 id="remove-parent-rp-new">Remove Parent (<code>rp</code>) — New<a class="headerlink" href="#remove-parent-rp-new" title="Permanent link">&para;</a></h2>
+<p>Like <strong>Hide Parent</strong>, but more aggressive: the immediate parent is <strong>completely removed</strong> from the queue display on <strong>both the front and back</strong> of the card — no "Hidden in queue" placeholder, no indented blank space.</p>
+<p>The cloze creator (<code>Alt+Z</code>) applies this powerup automatically to the newly-created cloze Rem, so the source Rem isn't shown redundantly during review <strong>without</strong> also affecting other descendant flashcards (e.g. Descriptor children) that need the parent visible for context.</p>
+<p>The extract creator (<code>Alt+Shift+X</code>) uses Remove Parent only as a <strong>fallback</strong>, when the <strong>Remove from Queue</strong> powerup isn't available. See <a href="#create-extract-source-rem-hiding-behavior">Create Extract behavior</a> below for the full rule.</p>
+<p>You can also apply Remove Parent manually to any flashcard via the <strong>Remove Parent</strong> command or <code>/rp</code>.</p>
+<hr />
+<h2 id="remove-grandparent-rgp-new">Remove Grandparent (<code>rgp</code>) — New<a class="headerlink" href="#remove-grandparent-rgp-new" title="Permanent link">&para;</a></h2>
+<p>Same as Remove Parent, but one level higher: the grandparent is fully removed from the queue display on both front and back of the card.</p>
+<p>Apply via the <strong>Remove Grandparent</strong> command or <code>/rgp</code>.</p>
+<hr />
+<h2 id="create-extract-source-rem-hiding-behavior">Create Extract — Source Rem Hiding Behavior<a class="headerlink" href="#create-extract-source-rem-hiding-behavior" title="Permanent link">&para;</a></h2>
+<p>When you create an Extract (<code>Alt+Shift+X</code>), the source Rem is automatically tagged so it doesn't show up redundantly during review of the extract. The plugin picks one of two strategies depending on what's available:</p>
+<ul>
+<li><strong>Preferred path — Remove from Queue on the source.</strong> If the Remove from Queue powerup is registered (either via the <strong>Enable Hide-in-Queue powerups and commands</strong> setting above or via the standalone Hide in Queue plugin), it's applied directly to the source Rem. This survives extract relocation cleanly: if you later delete the source and let extracts stand on their own, the powerup goes with the source.</li>
+<li><strong>Fallback path — Remove Parent on the extract.</strong> If Remove from Queue isn't registered (neither integration enabled nor standalone plugin installed), Remove Parent is applied to the <em>extract</em> instead. This works for normal review, but has a caveat: if you later move the extract under a different parent, that new parent will also be hidden. To recover, remove the powerup manually from the extract — or enable the Hide-in-Queue integration so future extracts land in the preferred path.</li>
+</ul>
+<p>The cloze creator (<code>Alt+Z</code>) does <strong>not</strong> branch like this — it always applies Remove Parent to the newly-created cloze Rem, because clozes are tightly bound to their source via the pinned reference and aren't typically relocated independently.</p>
+<hr />
+<h2 id="queue-support">Queue Support<a class="headerlink" href="#queue-support" title="Permanent link">&para;</a></h2>
+<p>All commands above can be triggered directly while reviewing a flashcard in the Queue, without needing to switch to the editor:</p>
+<ul>
+<li><strong>No Hierarchy, Hide Parent, Hide Grandparent, Remove Parent, Remove Grandparent:</strong> automatically apply the powerup directly to the current card.</li>
+<li><strong>Hide in Queue and Remove from Queue:</strong> since these are designed to be applied to <em>parent/ancestor</em> Rems rather than the flashcard itself (applying them to the current card would make the card vanish), triggering them in the queue opens a confirmation prompt offering to apply the powerup to the card's parent instead.</li>
+</ul>
+<hr />
+<h1 id="text-case-converter">Text Case Converter<a class="headerlink" href="#text-case-converter" title="Permanent link">&para;</a></h1>
+<p>This incorportated utility cycles selected text through three case styles with a single shortcut — just like <strong>Shift+F3</strong> in Microsoft Word.</p>
+<p><img alt="Text Case Converter demo" src="../assets/text-case-converter.gif" /></p>
+<hr />
+<h2 id="how-it-works-como-funciona">How it works / Como funciona<a class="headerlink" href="#how-it-works-como-funciona" title="Permanent link">&para;</a></h2>
+<p>Press <strong>Shift+F3</strong> with text selected to cycle through:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Style</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1st press</td>
+<td><strong>Title Case</strong></td>
+<td><em>Cyclone in Tropical Latitudes</em></td>
+</tr>
+<tr>
+<td>2nd press</td>
+<td><strong>UPPERCASE</strong></td>
+<td><em>CYCLONE IN TROPICAL LATITUDES</em></td>
+</tr>
+<tr>
+<td>3rd press</td>
+<td><strong>lowercase</strong></td>
+<td><em>cyclone in tropical latitudes</em></td>
+</tr>
+</tbody>
+</table>
+<p>The plugin <strong>auto-detects</strong> the current case of the selection and always advances to the next stage, so you never have to think about where you are in the cycle.</p>
+<hr />
+<h2 id="english-title-case-rules-regras-do-english-title-case">English Title Case rules / Regras do English Title Case<a class="headerlink" href="#english-title-case-rules-regras-do-english-title-case" title="Permanent link">&para;</a></h2>
+<p>Title Case follows <strong>Chicago/APA style</strong>:</p>
+<ul>
+<li><strong>Always capitalised / Sempre maiúsculas:</strong></li>
+<li>The first and last word of the selection.</li>
+<li>
+<p>All nouns, verbs, adjectives and adverbs.</p>
+</li>
+<li>
+<p><strong>Kept lowercase / Mantidas em minúsculas</strong> (unless first or last word):</p>
+</li>
+<li><strong>Articles / Artigos:</strong> <em>a, an, the</em> · <em>o, a, os, as, um, uma…</em></li>
+<li><strong>Prepositions / Preposições:</strong> <em>at, by, in, of, on, to, up, as, via</em> · <em>de, em, por, para, com, sem, sob, sobre…</em></li>
+<li><strong>Conjunctions / Conjunções:</strong> <em>and, or, nor, but, for, yet, so</em> · <em>e, ou, mas, nem, que, se, como, pois, logo…</em></li>
+<li><strong>Portuguese contractions / Contrações portuguesas:</strong> <em>do, da, dos, das, no, na, nos, nas, ao, aos, pelo, pela, pelos, pelas…</em></li>
+</ul>
+<h3 id="examples-exemplos">Examples / Exemplos<a class="headerlink" href="#examples-exemplos" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><code>cyclone in tropical or subtropical latitudes</code>
+→ <strong>Cyclone in Tropical or Subtropical Latitudes</strong></p>
+<p><code>princípios das radiocomunicações marítimas</code>
+→ <strong>Princípios das Radiocomunicações Marítimas</strong></p>
+</blockquote>
+<hr />
+<h2 id="other-features-outras-funcionalidades">Other features / Outras funcionalidades<a class="headerlink" href="#other-features-outras-funcionalidades" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Formatting preserved / Formatação preservada:</strong> bold, italic, highlight and all other rich-text styles are kept intact through every transformation.</li>
+<li><strong>Cross-element word boundaries / Palavras com formatação mista:</strong> words split across formatting runs (e.g. a bold first letter) are handled correctly — only the true first letter of each word is capitalised.</li>
+<li><strong>Multi-rem selections / Seleção de múltiplos rems:</strong> select one or more whole rems in the outline (instead of a text range) and <code>Shift+F3</code> will cycle the case of each rem's text — and the <strong>back text</strong> of concept/descriptor rems — in a single shot. The current cycle stage is detected from the combined text of the batch so all rems advance together (Title → UPPER → lower), while Title Case is still computed per rem so each one's first/last-word rule is respected.</li>
+</ul>
+<hr />
+<h1 id="restructure-outline-by-headings">Restructure Outline by Headings<a class="headerlink" href="#restructure-outline-by-headings" title="Permanent link">&para;</a></h1>
+<p>Re-nests a flat or mis-pasted document so that paragraphs and lower-level headings sit under their preceding higher-level heading. Built for the common case of pasting structured web content (with H1/H2/H3 headers) into RemNote, which often arrives either as a flat list of siblings or with mis-indented nesting (e.g. an H2 ending up under a paragraph instead of under its H1).</p>
+<p><img alt="Restructure Outline by Headings demo" src="../assets/restructure-outline-by-headings.png" /></p>
+<h2 id="how-to-invoke">How to invoke<a class="headerlink" href="#how-to-invoke" title="Permanent link">&para;</a></h2>
+<p>Run <strong><code>Restructure Outline by Headings</code></strong> (quick code <code>roh</code>) with one of the following selections:</p>
+<ul>
+<li><strong>Single rem selected</strong> → operates on <strong>all descendants</strong> of that rem. The selected rem stays in place as the container root.</li>
+<li><strong>Multiple rems selected</strong> (Shift+click in the outline) → operates on the selected rems <strong>plus all their descendants</strong>. The restructured subtree slots back into the selection's original position, preserving unselected sibling rems above and below it.</li>
+<li><strong>No selection / cursor inside a rem</strong> → falls back to the focused rem and operates on its descendants (same as single-rem case).</li>
+</ul>
+<p>The command is also fully Omnibar-friendly: press <code>Cmd+/</code> → search <code>roh</code> → Enter, and the selection you had before opening the palette is preserved (see <a href="#omnibar-selection-recovery">Omnibar Selection Recovery</a> below).</p>
+<h2 id="preview-popup">Preview popup<a class="headerlink" href="#preview-popup" title="Permanent link">&para;</a></h2>
+<p>A side-by-side popup opens before any change is applied:</p>
+<ul>
+<li><strong>Left panel (Before):</strong> the current state of the selected subtree, exactly as it appears in RemNote.</li>
+<li><strong>Right panel (After):</strong> the proposed restructured tree. Each row that would move is marked with an amber left-border and tinted background so you can scan at a glance what's changing.</li>
+</ul>
+<p>Each rem row is labelled with a colored heading badge (<code>H1</code> through <code>H6</code>) or a <code>¶</code> paragraph marker. The status bar at the top reports counts: <em>"N headings · M paragraphs · K would move"</em>.</p>
+<h3 id="per-rem-preserve-flatten-toggle">Per-rem Preserve / Flatten toggle<a class="headerlink" href="#per-rem-preserve-flatten-toggle" title="Permanent link">&para;</a></h3>
+<p>Non-heading rems that already have children (lists, sub-paragraphs, etc.) get an inline button in the <strong>After</strong> panel:</p>
+<ul>
+<li><strong>⏷ Preserve</strong> <em>(default)</em> — the rem keeps its existing children as an opaque subtree; they move with it when re-nested under a heading. Use this for legitimate nested content (e.g. bullet-list items that belong together).</li>
+<li><strong>⏵ Flatten</strong> — the rem's children are pulled into the candidate flow as independent items and get re-organized by the heading rules along with everything else. Use this for mis-pasted nesting where children ended up under a non-heading rem by accident.</li>
+</ul>
+<p>Toggling this button re-runs the algorithm and re-renders the After tree in place, so you can experiment before committing.</p>
+<h3 id="apply-cancel">Apply / Cancel<a class="headerlink" href="#apply-cancel" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Apply</strong> (bottom-right): runs the reparenting and captures an undo snapshot.</li>
+<li><strong>Cancel</strong> (or close the popup): no changes are made.</li>
+</ul>
+<h2 id="algorithm">Algorithm<a class="headerlink" href="#algorithm" title="Permanent link">&para;</a></h2>
+<p>The restructure walks the candidate list in document order and tracks a heading stack:</p>
+<ol>
+<li>The smallest heading level present (e.g. <code>H2</code> if there is no <code>H1</code>) becomes the implicit "top" — selections that don't start at <code>H1</code> are not broken.</li>
+<li>Each heading <code>Hn</code> pops the stack until the top has a strictly lower level, then becomes a child of that heading (or the container root if the stack is empty), and is pushed onto the stack.</li>
+<li>Each paragraph attaches to whatever heading is currently on top of the stack (or the container root if no heading has been seen yet — "orphan paragraphs" before the first heading remain at the top level).</li>
+<li><strong>Heading level skips are handled:</strong> an <code>H1 → H3</code> jump (no <code>H2</code> between) nests the <code>H3</code> directly under the <code>H1</code>.</li>
+</ol>
+<h2 id="heading-levels-supported">Heading levels supported<a class="headerlink" href="#heading-levels-supported" title="Permanent link">&para;</a></h2>
+<p>All six RemNote heading levels are recognized: <strong>H1, H2, H3, H4, H5, H6</strong>.</p>
+<h2 id="undo">Undo<a class="headerlink" href="#undo" title="Permanent link">&para;</a></h2>
+<p>After applying, an <strong>Outline Restructured</strong> notification appears in the <strong>sidebar</strong> (left side, in the SidebarEnd region) with the affected scope name, the count of moved rems, and a red <strong>Undo Restructure</strong> button.</p>
+<ul>
+<li>The Undo button restores every moved rem to its exact prior parent and position.</li>
+<li>The notification stays visible until you click Undo or dismiss it with <code>✕</code>.</li>
+<li>A second invocation is available as a command: <strong><code>Revert Last Outline Restructure</code></strong> (quick code <code>rolr</code>) — identical effect, same single snapshot slot.</li>
+</ul>
+<p>The snapshot is session-scoped and <strong>single-slot</strong>: starting a new restructure overwrites the previous undo. (Multi-step undo isn't supported; for that, rely on RemNote's native history.)</p>
+<h2 id="edge-cases">Edge cases<a class="headerlink" href="#edge-cases" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>No headings in the scope</strong> → the command shows the popup with an explanatory message ("no changes — no headings to anchor on") and disables the Apply button.</li>
+<li><strong>Powerup property rems</strong> (e.g. the auto-created <code>Size</code> rem RemNote attaches to every heading) are filtered out from both the walk and the preview, so they don't clutter the tree and aren't accidentally moved.</li>
+<li><strong>Portals, references, queries</strong> are treated as opaque paragraph candidates: they never get restructured internally and never get flattened.</li>
+</ul>
+<hr />
+<h1 id="set-next-heading-level">Set Next Heading Level<a class="headerlink" href="#set-next-heading-level" title="Permanent link">&para;</a></h1>
+<p>Styles the selected rem(s) as <strong>one heading level deeper than their parent</strong> — a quick way to keep an outline's heading hierarchy consistent as you add content under an existing heading, without manually picking H1…H6 each time. If the parent is an <code>H3</code>, the selected rem becomes an <code>H4</code>; under an <code>H4</code> it becomes <code>H5</code>, and so on, clamped at the deepest level RemNote supports.</p>
+<p>It reuses the same heading detection and application logic as <a href="#restructure-outline-by-headings">Restructure Outline by Headings</a>, so it understands the <strong>full H1–H6 range</strong> — including H4/H5/H6, which RemNote stores in the Header powerup's <code>Size</code> slot rather than the H1–H3 font-size API.</p>
+<h2 id="invocation">Invocation<a class="headerlink" href="#invocation" title="Permanent link">&para;</a></h2>
+<p>Run <strong><code>Set Next Heading Level</code></strong> (quick code <code>hn</code>) with one of the following:</p>
+<ul>
+<li><strong>One or more whole rems selected</strong> in the outline (Shift+click) → each selected rem is styled relative to <strong>its own</strong> parent.</li>
+<li><strong>Cursor inside a rem</strong> (text selection or collapsed caret) → operates on that rem.</li>
+<li><strong>No selection</strong> → falls back to the focused rem.</li>
+</ul>
+<p>Like the other outline commands, it's Omnibar-friendly: <code>Cmd+/</code> → search <code>hn</code> → Enter preserves the multi-rem selection you had before opening the palette (see <a href="#omnibar-selection-recovery">Omnibar Selection Recovery</a>).</p>
+<h2 id="behavior">Behavior<a class="headerlink" href="#behavior" title="Permanent link">&para;</a></h2>
+<p>For each target rem, the command looks at its <strong>parent's</strong> heading level:</p>
+<ul>
+<li><strong>Parent is a heading <code>Hn</code></strong> → the rem is set to <code>H(n+1)</code>. (An <code>H6</code> parent keeps the child at <code>H6</code> — there's no <code>H7</code>.)</li>
+<li><strong>Parent is <em>not</em> a heading</strong> → see <a href="#grandparent-fallback">Grandparent fallback</a> below.</li>
+<li><strong>Neither parent nor grandparent is a heading</strong> (or the rem is top-level with no parent) → the rem is skipped, and a toast reports how many were skipped for lack of an ancestor heading.</li>
+</ul>
+<h2 id="grandparent-fallback">Grandparent fallback<a class="headerlink" href="#grandparent-fallback" title="Permanent link">&para;</a></h2>
+<p>If the immediate parent isn't a heading but the <strong>grandparent is</strong>, the command can't simply nest one level under a non-heading. Instead it offers to fix both levels at once via a <strong>confirmation dialog</strong>:</p>
+<ul>
+<li><strong>Cancel</strong> → nothing changes.</li>
+<li><strong>OK</strong> → the <strong>parent</strong> is promoted to <code>H(n+1)</code> and the <strong>selected rem</strong> to <code>H(n+2)</code>, where <code>Hn</code> is the grandparent's level.</li>
+</ul>
+<blockquote>
+<p><strong>Example.</strong> Grandparent is <code>H2</code>, parent is plain text, selected rem is plain text → on confirm, the parent becomes <code>H3</code> and the selected rem becomes <code>H4</code>.</p>
+</blockquote>
+<h2 id="multi-rem-selections">Multi-rem selections<a class="headerlink" href="#multi-rem-selections" title="Permanent link">&para;</a></h2>
+<p>When several rems are selected at once:</p>
+<ul>
+<li>Each rem with a heading parent is styled immediately (direct case).</li>
+<li>All grandparent-fallback cases are gathered and covered by a <strong>single</strong> confirmation dialog (not one prompt per rem). On confirm, every affected rem and its parent is styled; a parent shared by several selected siblings is promoted <strong>only once</strong>.</li>
+</ul>
+<h2 id="notes-edge-cases">Notes &amp; edge cases<a class="headerlink" href="#notes-edge-cases" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>H4–H6 are fully supported</strong> on both detection and application — the command writes the deeper levels through the Header powerup's <code>Size</code> slot, exactly as RemNote does internally.</li>
+<li><strong>Heading styling never aborts on a single failure:</strong> if applying a level throws, the command logs a warning and continues with the rest of the batch.</li>
+<li>A toast summarizes the result, e.g. <em>"Set heading on 3 rem(s). 1 skipped (no ancestor heading)."</em></li>
+</ul>
+<hr />
+<h1 id="apply-heading-levels-by-hierarchy-table-of-contents">Apply Heading Levels by Hierarchy (Table of Contents)<a class="headerlink" href="#apply-heading-levels-by-hierarchy-table-of-contents" title="Permanent link">&para;</a></h1>
+<p>Turns a ready-made outline into a properly-leveled <strong>table of contents in one shot</strong>: select the rems and the command assigns heading levels (H1–H6) according to each rem's <strong>depth in the hierarchy</strong>, to a level range you choose (e.g. H1–H3, or H2–H4). Built for the moment when you've drafted the structure of a document as plain bullets and want it to <em>look</em> like a structured document without setting every heading by hand.</p>
+<p>It shares its heading detection/application (and so the <strong>full H1–H6 range</strong>, including the H4/H5/H6 levels RemNote keeps in the Header powerup's <code>Size</code> slot) with <a href="#restructure-outline-by-headings">Restructure Outline by Headings</a> and <a href="#set-next-heading-level">Set Next Heading Level</a>. Unlike <em>Restructure</em>, it <strong>never moves rems</strong> — it only changes their heading level.</p>
+<h2 id="invoking-the-toc-command">Invoking the ToC command<a class="headerlink" href="#invoking-the-toc-command" title="Permanent link">&para;</a></h2>
+<p>Run <strong><code>Apply Heading Levels by Hierarchy (Table of Contents)</code></strong> (quick code <code>htoc</code>) with the outline rems selected:</p>
+<ul>
+<li><strong>Select the outline's rems</strong> (Shift+click) — typically the whole subtree you want leveled. The selection is reduced to its <strong>forest roots</strong> (the topmost selected rems), which become the top level; everything beneath them is leveled by depth. Selecting a parent <em>and</em> its descendants is fine — the descendants aren't double-counted.</li>
+<li><strong>Single rem / cursor inside a rem</strong> — that rem becomes the top level and its descendants are leveled beneath it.</li>
+<li>Omnibar-friendly (<code>Cmd+/</code> → <code>htoc</code>), preserving the multi-rem selection (see <a href="#omnibar-selection-recovery">Omnibar Selection Recovery</a>).</li>
+</ul>
+<h2 id="depth-level-mapping">Depth → level mapping<a class="headerlink" href="#depth-level-mapping" title="Permanent link">&para;</a></h2>
+<p>You pick two bounds in the preview: a <strong>Top level</strong> and a <strong>Deepest level</strong>.</p>
+<ul>
+<li>The topmost selected rems get the <strong>Top level</strong> (e.g. <code>H1</code>).</li>
+<li>Each level deeper adds one (<code>H2</code>, <code>H3</code>, …), up to the <strong>Deepest level</strong>.</li>
+<li>Rems nested <strong>deeper than the range keep their current level</strong> — they're left untouched, not forced into a heading or stripped.</li>
+</ul>
+<blockquote>
+<p><strong>Example (Top = H1, Deepest = H3).</strong> <code>CAPÍTULO 1</code> → <code>H1</code>, its <code>1.1</code> child → <code>H2</code>, the <code>1.1.1</code> grandchild → <code>H3</code>. Anything below that depth is left as-is.</p>
+</blockquote>
+<h2 id="promote-demote-shift-one-level">Promote / Demote (shift one level)<a class="headerlink" href="#promote-demote-shift-one-level" title="Permanent link">&para;</a></h2>
+<p>Two companion commands shift the heading level of the <strong>selected subtree</strong> by one step. Because RemNote's outline selection reports only the top-level rems of a subtree, these (like the ToC command) walk the <strong>whole selected subtree</strong> and shift every heading within it; non-heading rems inside the subtree are left untouched (there's nothing to shift):</p>
+<ul>
+<li><strong><code>Demote Heading Level (one level deeper)</code></strong> (quick <code>hdmt</code>) — <code>H2 → H3</code> (bigger H number, visually smaller).</li>
+<li><strong><code>Promote Heading Level (one level shallower)</code></strong> (quick <code>hpmt</code>) — <code>H2 → H1</code>.</li>
+</ul>
+<p>Levels are clamped to H1–H6. These open the <strong>same preview</strong> as the ToC command.</p>
+<h2 id="preview-apply">Preview &amp; apply<a class="headerlink" href="#preview-apply" title="Permanent link">&para;</a></h2>
+<p>Both flows open a side-by-side <strong>Before | After</strong> popup before anything changes:</p>
+<ul>
+<li><strong>Before</strong> shows each rem with its current level badge (<code>H1</code>–<code>H6</code>, or <code>¶</code> for a paragraph).</li>
+<li><strong>After</strong> shows the proposed result; rows whose level changes are marked with an amber border and an <code>old → new</code> badge transition.</li>
+<li>The ToC variant adds <strong>Top level</strong> / <strong>Deepest level</strong> dropdowns that re-derive the preview live. The status bar reports <em>"N of M rems would change"</em>.</li>
+<li><strong>Apply</strong> commits the level changes; <strong>Cancel</strong> (or closing the popup) makes none. Apply is disabled when nothing would change.</li>
+</ul>
+<h2 id="undo-heading-levels">Undo (heading levels)<a class="headerlink" href="#undo-heading-levels" title="Permanent link">&para;</a></h2>
+<p>After applying, a <strong>Heading Levels Applied</strong> banner appears in the <strong>sidebar</strong> (SidebarEnd) with the count of changed rems and a red <strong>Undo Heading Changes</strong> button that restores every rem's prior level (including reverting rems back to plain paragraphs). It uses its <strong>own</strong> snapshot slot, separate from the <a href="#undo">Restructure undo</a>, so the two banners never clobber each other. The same revert is available as the <strong><code>Revert Last Heading Level Change</code></strong> command (quick code <code>rlh</code>). Single-slot and session-scoped: a new apply overwrites the previous undo.</p>
+<h2 id="notes-heading-levels">Notes (heading levels)<a class="headerlink" href="#notes-heading-levels" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Full H1–H6</strong>, on both detection and application — deeper levels are written through the Header powerup's <code>Size</code> slot, exactly as RemNote does internally.</li>
+<li><strong>Never reparents.</strong> Only the heading level changes; the outline's structure (parents, positions) is untouched.</li>
+<li>The quick code is <code>htoc</code> (not <code>toc</code>, which is RemNote's built-in <em>Table of Contents</em> reference).</li>
+</ul>
+<hr />
+<h1 id="bulletize-inline-selected-text">Bulletize Inline Selected Text<a class="headerlink" href="#bulletize-inline-selected-text" title="Permanent link">&para;</a></h1>
+<p>Toggles a <code>•</code> (bullet glyph + space) prefix at the start of each line <strong>within a single rem</strong>, across a multi-line selection. Built for the common case where a <strong>PDF highlight flattens a real bullet list into soft-wrapped text</strong> — RemNote keeps the visual lines inside one rem (joined by <code>Shift+Enter</code> soft line breaks) but drops the original bullet markers. Re-adding <code>•</code> by hand at every line start is tedious, especially when you're prepping a highlight to become an <a href="../Create-Incremental-Rem-from-PDF-Highlights/">Incremental Rem</a>.</p>
+<p><img alt="Bulletize Inline Selected Text demo" src="../assets/bulletize-text.gif" /></p>
+<h2 id="how-to-invoke_1">How to invoke<a class="headerlink" href="#how-to-invoke_1" title="Permanent link">&para;</a></h2>
+<p>Run <strong><code>Bulletize Inline Selected Text</code></strong> (quick code <code>bul</code>) or press <strong><code>Shift+F8</code></strong>.</p>
+<blockquote>
+<p>The default binding is <code>Shift+F8</code> because the plainer combos are all taken: on macOS <code>Opt+8</code> types the <code>•</code> glyph itself and <code>Opt+Shift+8</code> types the degree symbol (<code>°</code>), and <code>Ctrl+Opt+Shift+8</code> (the previous default) is used by RemNote to apply the <strong>blue highlight</strong> to inline text. <code>Shift+F8</code> avoids all of these and is identical across macOS/Windows/Linux. You can rebind it in RemNote's keyboard-shortcut settings.</p>
+</blockquote>
+<h2 id="what-it-does">What it does<a class="headerlink" href="#what-it-does" title="Permanent link">&para;</a></h2>
+<p>It is a <strong>toggle</strong>, evaluated over the lines your selection touches:</p>
+<ul>
+<li>If <strong>every non-empty selected line already starts with <code>•</code></strong>, the prefix is <strong>stripped</strong> from all of them.</li>
+<li>Otherwise, <code>•</code> is <strong>added</strong> to the selected lines that don't already have it (lines already bulleted are left as-is, so you never get a double bullet).</li>
+</ul>
+<p>Empty lines (e.g. the blank line a <code>\n\n</code> produces between a heading and its list) are skipped.</p>
+<h3 id="selection-modes">Selection modes<a class="headerlink" href="#selection-modes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Multi-line text selection</strong> → operates on every line the selection intersects. A partial selection still bulletizes whole lines: the start is expanded back to the beginning of its line, so you don't have to select from the exact line start.</li>
+<li><strong>Collapsed cursor (no selection) or a whole-rem selection</strong> → bulletizes the rem's <strong>entire front text</strong> in one shot. Handy for "bulletize this whole rem" — click into it and hit the shortcut.</li>
+</ul>
+<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
+<p>Before (one rem, soft line breaks; the first four lines were bulleted manually, the rest weren't):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>a. Engine characteristics
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>• Type of engine and its BHP.
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>• Type of propeller – RH, LH or CPP.
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>• Critical RPM,
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>• Minimum number of consecutive start,
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>Astern power is %age of ahead power
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>Emergency full ahead to full astern time
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>...
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>RPM indicators in the bridge and outside bridge.
+</code></pre></div>
+<p>Select the list and press <code>Shift+F8</code> → the un-bulleted lines gain <code>•</code>, so the whole list is uniform. Press it again on the same selection → all bullets are stripped.</p>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Formatting preserved.</strong> The toggle rebuilds the rem's rich text by character offset, so highlights, colors, bold/italic, references and other inline nodes are left intact. The bullet itself is inserted as a <strong>plain</strong> node, so on a PDF-highlight rem (where the line text is highlighted yellow) the <code>•</code> glyph is <em>not</em> highlighted. If you'd prefer the bullet to match the line's highlight/color, that's a small change — open an issue.</li>
+<li><strong>Front text only for the whole-rem gesture.</strong> A multi-line selection works in either the front or the back text (the plugin detects which contains the selection), but the collapsed-cursor "bulletize the whole rem" path acts on the front text.</li>
+<li><strong>Why <code>•</code> and not a native bullet:</strong> native RemNote bullets require <em>separate rems</em>. Inside a single rem (which is what a PDF highlight produces), the only way to simulate a list is the literal <code>•</code> prefix on each soft-wrapped line — which is exactly what this command automates.</li>
+</ul>
+<hr />
+<h1 id="inlinize-break-lists-from-pdf-highlights">Inlinize &amp; Break Lists (from PDF Highlights)<a class="headerlink" href="#inlinize-break-lists-from-pdf-highlights" title="Permanent link">&para;</a></h1>
+<p>Where <a href="#bulletize-inline-selected-text">Bulletize Inline Selected Text</a> re-bullets lines that <strong>already exist</strong>, these commands handle the harder case: a PDF highlight that captured a whole enumerated list as <strong>one rem, flattened onto a single line</strong> with the numbers left inline and every line break dropped:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>As seguintes medidas podem contribuir para evitá-las: 1 Aumentar, em certas
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>circunstâncias, o número de pessoal qualificado… 2 Deixar claro em que situações
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>&quot;chamar o Comandante ao passadiço&quot;. 3 O Oficial de quarto… 11 Garantir que…
+</code></pre></div>
+<p>There are no line breaks to bulletize — the only structure is in the <strong>markers</strong>: <strong>enumerators</strong> (<code>1</code>, <code>2</code>, <code>3</code>… / <code>a)</code> <code>b)</code> / <code>i.</code> <code>ii.</code>), <strong>depth/compound numbers</strong> (<code>1.1</code>, <code>1.2</code>… or mixed <code>1.a</code>, <code>1.b</code>…), or <strong>inline bullet/dash glyphs</strong> (<code>•</code>, <code>-</code>, <code>*</code>) that a highlight ran together onto one line. These commands detect that structure and rebuild the list, first inline (for review) and then as proper child rems, with a full undo.</p>
+<p>Unlike Bulletize, all three act on the <strong>focused rem</strong> — just click into the rem, no text selection required.</p>
+<h2 id="the-workflow">The workflow<a class="headerlink" href="#the-workflow" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Highlight the list in the PDF and <strong>Create IncRem</strong> from it (one rem, flattened).</li>
+<li>Run <strong><code>Inlinize Detected List</code></strong> — the numbers become soft-wrapped <code>•</code> lines in the same rem. <strong>Review the split</strong>; if it's wrong, <code>Ctrl+Z</code> and you're back to the original.</li>
+<li>Run <strong><code>Break Inline List Into Children</code></strong> — the caput/title stays on the parent, each item becomes a child rem.</li>
+<li>If the break went wrong, run <strong><code>Restore List Rem</code></strong> to undo it exactly.</li>
+</ol>
+<h2 id="inlinize-detected-list-inl">Inlinize Detected List (<code>inl</code>)<a class="headerlink" href="#inlinize-detected-list-inl" title="Permanent link">&para;</a></h2>
+<p>Detects the list and inserts a line break + <code>•</code> before each item, so the flattened text becomes soft-wrapped bulleted lines:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>As seguintes medidas podem contribuir para evitá-las:
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>• 1 Aumentar, em certas circunstâncias, o número de pessoal qualificado…
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>• 2 Deixar claro em que situações &quot;chamar o Comandante ao passadiço&quot;.
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>• 3 O Oficial de quarto…
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>• 11 Garantir que…
+</code></pre></div>
+<ul>
+<li><strong>Enumerated lists keep their number:</strong> <code>1 Aumentar</code> → <code>• 1 Aumentar</code>.</li>
+<li><strong>Bullet/dash lists have their marker normalized:</strong> an existing <code>•</code>, <code>-</code> or <code>*</code> is <strong>replaced</strong> by a single <code>•</code> (so <code>- calado</code> and <code>* item</code> both become <code>• …</code>) — no duplicate bullet is added.</li>
+</ul>
+<p>The text before the first marker becomes the <strong>caput</strong> (title line); the whitespace before each marker is collapsed into the <code>•</code> prefix. This stays a <strong>single rem</strong> and is fully <code>Ctrl+Z</code>-able — it's the review checkpoint before the destructive step. If no list is detected, a toast says so and nothing changes.</p>
+<h2 id="break-inline-list-into-children-brl">Break Inline List Into Children (<code>brl</code>)<a class="headerlink" href="#break-inline-list-into-children-brl" title="Permanent link">&para;</a></h2>
+<p>Splits the inline-bulletized rem on its <code>\n</code> lines: the <strong>first line (caput) stays on the parent</strong>, and each <code>•</code> line becomes a <strong>child rem</strong> (order preserved). The <code>•</code> prefix is stripped from each child.</p>
+<ul>
+<li><strong>Keeps the PDF-highlight pin on the caput.</strong> A list rem made from a PDF highlight carries a <strong>pin</strong> back to that highlight — which sits at the end of the text and would otherwise ride along with the <em>last</em> item. The break detects that pin (any reference whose target rem is a <strong>PDF Highlight</strong> — the <code>#pdfextract</code> tag is also accepted but <strong>not</strong> required) and <strong>moves it to the end of the caput/parent</strong>, so every child stays clean and the source link stays on the title. This covers both the <strong>Create IncRem</strong> highlight-toolbar flow <em>and</em> directly pasting a highlight into your notes (text + pin), where no <code>#pdfextract</code> tag is present.</li>
+<li><strong>Images and other pins survive too.</strong> A highlight that ends with a <strong>figure</strong> (soft line break + image) gets that image split into its own <strong>child rem, appended as the last item</strong>; any other <strong>trailing references</strong> (e.g. a pin to a regular rem) join the caput alongside the highlight pin. Mid-text images stay attached to the line/item they end, and an image sitting alone on its own line becomes its own item rather than being dropped.</li>
+<li><strong>Snapshot first.</strong> Before mutating, it saves the original front text <strong>and the IDs of the children it creates</strong> to synced storage, keyed by the rem — so <a href="#restore-list-rem-rlr">Restore List Rem</a> can reverse it exactly.</li>
+<li><strong>Won't touch flashcards.</strong> If the rem has <strong>back text</strong> (i.e. it's a flashcard), the command refuses with a toast rather than risk scrambling the card.</li>
+<li><strong>Prerequisite.</strong> Run <a href="#inlinize-detected-list-inl">Inlinize Detected List</a> first — if there are no <code>•</code> item lines, a toast tells you.</li>
+</ul>
+<h2 id="restore-list-rem-rlr">Restore List Rem (<code>rlr</code>)<a class="headerlink" href="#restore-list-rem-rlr" title="Permanent link">&para;</a></h2>
+<p>Reads the snapshot saved by the break, <strong>deletes exactly the children it created</strong> (skipping any you've since re-parented away), rewrites the original front text, and clears the snapshot. Use it whenever a break didn't split the way you wanted.</p>
+<h2 id="how-detection-works">How detection works<a class="headerlink" href="#how-detection-works" title="Permanent link">&para;</a></h2>
+<p>Detection runs two paths and takes whichever finds the longer list (enumerated wins ties).</p>
+<p><strong>Enumerated lists — an ascending chain.</strong> The core problem is disambiguation: a lone <code>2</code> in prose (<em>"reduzir para 2 nós"</em>) is <strong>not</strong> a marker, but <code>1 … 2 … 3</code> in order almost certainly is. So it doesn't split on every number:</p>
+<ul>
+<li>It finds a start marker (<code>1</code> / <code>a</code> / <code>i</code>), then searches forward for the <strong>next expected value</strong> (<code>prev + 1</code>) at a word boundary, allowing arbitrary text (which may itself contain other numbers) in between.</li>
+<li>When the expected value appears more than once, it <strong>prefers the occurrence that sits after sentence punctuation</strong> (<code>.</code>, <code>;</code>, <code>:</code>, <code>)</code>, <code>"</code>). This is what stops <em>"reduzir de 3 para </em><em>2</em><em> nós"</em> inside item 1 from being mistaken for marker <code>2</code> — the real <code>. 2 Manter…</code> wins.</li>
+<li>Plain prose with scattered numbers forms no chain, so nothing is detected.</li>
+</ul>
+<p>Supported enumerator styles: <strong>decimal</strong> (<code>1</code>, <code>1.</code>, <code>1-</code>, <code>1)</code>), <strong>lettered</strong> (<code>a)</code>, <code>b.</code>) and <strong>roman</strong> (<code>i.</code>, <code>ii.</code>). Bare decimals like <code>1 Aumentar</code> work with no delimiter; <strong>letters and roman numerals require a delimiter</strong> (<code>.</code>, <code>)</code>, <code>-</code>) because bare <code>a</code>/<code>i</code>/<code>o</code>/<code>v</code> collide with common words.</p>
+<p><strong>Depth / compound markers — a fixed prefix with an ascending tail.</strong> Dotted markers where a constant prefix identifies the group and the <strong>last component ascends</strong> are detected too: <code>1.1</code>, <code>1.2</code>, <code>1.3…</code> (numeric tail) and mixed <code>1.a</code>, <code>1.b</code>, <code>1.c…</code> (letter tail), as well as sub-lists under any prefix (<code>3.1</code>, <code>3.2…</code>). The full label is kept (<code>1.1 Falha…</code> → <code>• 1.1 Falha…</code>). Because bare <code>1.1</code>/<code>5.2</code> also read as version numbers or ratios in prose, a compound list is only recognized when the <strong>first item opens after a clause boundary</strong> (<code>:</code>, <code>;</code>, <code>.</code>, or the start) — so <em>"atualize para 2.1 e depois 2.2"</em> is left alone. Items become <strong>flat siblings</strong> (see limitations); the compound path does not (yet) build a nested outline from <code>1</code>, <code>1.1</code>, <code>1.2</code>, <code>2</code>, <code>2.1…</code>.</p>
+<p><strong>Bullet/dash lists — a consistent standalone marker.</strong> When there's no enumeration, it looks for one repeated marker glyph (<code>•</code>, <code>▪</code>, <code>◦</code>, <code>*</code>, <code>-</code>, <code>–</code>, <code>—</code>) that stands alone — preceded by a separator and followed by a space + a letter (so <code>bem-vindo</code>, <code>10-20</code> and <code>*bold*</code> are rejected). At least two such markers are needed.</p>
+<ul>
+<li><strong>Glyph bullets</strong> (<code>•</code>, <code>*</code>, …) are safe and used as-is.</li>
+<li><strong>Dashes</strong> also appear in prose (parenthetical <em>"o navio – já antigo – foi rebocado"</em>), so a dash list is only recognized when the <strong>first item opens after a clause boundary</strong> (<code>:</code>, <code>;</code>, <code>.</code>, or the start of the text) — as in <em>"Requisitos: - calado…; - reboque…"</em>. Later items may be dash-separated freely. A dash used mid-sentence with no such boundary is left alone.</li>
+</ul>
+<p><strong>Formatting is preserved</strong> throughout — the rewrite operates by character offset, and the <code>•</code> bullet is inserted as a plain node (same approach as Bulletize).</p>
+<h2 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Chains must start at <code>1</code> / <code>a</code> / <code>i</code></strong> (and, for compound markers, the ascending tail must start at <code>.1</code> / <code>.a</code>). A highlight that begins <em>mid-list</em> isn't detected (much riskier to guess).</li>
+<li><strong>A gap stops the chain.</strong> If the PDF extraction dropped an item (e.g. the <code>7</code> is missing), detection stops at <code>6</code>. This is deliberate — safe over clever.</li>
+<li><strong>Compound markers produce flat siblings, not a nested outline.</strong> <code>1.1</code>, <code>1.2</code>, <code>1.3</code> all become siblings under the caput; a full multi-level hierarchy (<code>1</code> → <code>1.1</code>/<code>1.2</code> → <code>2</code> → <code>2.1</code>…) isn't nested, and only one prefix group is captured per run.</li>
+<li><strong>Dash lists need a clause boundary before the first item</strong> (<code>:</code>, <code>;</code>, <code>.</code>, or start). A dash list buried mid-sentence with no such cue is skipped, to avoid mistaking parenthetical dashes for a list. Glyph bullets (<code>•</code>, <code>*</code>) have no such restriction.</li>
+<li><strong>The last item runs to the end of the text.</strong> If prose follows the final list item in the same highlight, it stays attached to that item — there's no reliable signal for where the list ends.</li>
+<li><strong>No default keyboard shortcut</strong> is bound (quick codes <code>inl</code> / <code>brl</code> / <code>rlr</code> only), to avoid clashing with existing bindings. You can add your own in RemNote's settings.</li>
+</ul>
+<hr />
+<h1 id="find-rem-reference-or-open">Find Rem — Reference or Open<a class="headerlink" href="#find-rem-reference-or-open" title="Permanent link">&para;</a></h1>
+<p>A floating picker that finds a Rem <strong>by name even when RemNote's own reference search can't</strong>, then either inserts a reference to it at your cursor or opens it in a new pane. Built for the frustrating case where a perfectly normal Rem — even a Concept referenced dozens of times — simply never appears when you type its name in the <code>[[</code> reference search.</p>
+<p><img alt="The Find Rem — Reference or Open picker" src="../assets/find-rem-widget-2.png" /></p>
+<h2 id="how-to-invoke_2">How to invoke<a class="headerlink" href="#how-to-invoke_2" title="Permanent link">&para;</a></h2>
+<p>Run <strong><code>Find Rem (insert reference / open in pane)</code></strong> (quick code <code>fir</code>) or press <strong><code>Opt+Shift+F</code> / <code>Alt+Shift+F</code></strong>. A compact box opens <strong>at your cursor</strong>.</p>
+<ul>
+<li><strong>Type a name</strong> → results appear as you type, with the best matches floated to the top (an <code>EXACT</code> badge marks an exact-name match; an <code>ALIAS</code> badge marks a match found through one of the Rem's <a href="#find-by-alias">aliases</a>). Each row shows the Rem's <strong>type badge</strong>, its <strong>back text</strong> (the definition side of a Concept↔definition card), and a short <strong>breadcrumb</strong> (<code>root / … / parent</code>) so you can tell which document it lives in when names collide.</li>
+<li><strong>Enter</strong> or <strong>click</strong> → inserts a reference to the selected Rem at your cursor.</li>
+<li><strong>Ctrl+Enter / Cmd+Enter</strong> or <strong>Ctrl/Cmd+click</strong> → inserts the reference as a <strong>pin</strong> (the link chip <em>without</em> the referenced text). See <a href="#insert-as-a-pin">Insert as a pin</a> below.</li>
+<li><strong>Opt+Enter / Alt+Enter</strong> or <strong>Opt/Alt+click</strong> → inserts the Rem's <strong>text followed by a pin</strong> — the readable text plus a link chip (RemNote's paste "Text with Pin"). See <a href="#insert-text-with-a-pin">Insert text with a pin</a> below.</li>
+<li><strong>Shift+Enter</strong> or <strong>Shift+click</strong> → opens the selected Rem in a <strong>new pane</strong> beside your current one (without inserting anything).</li>
+<li><strong>↑/↓</strong> navigate · <strong>Esc</strong> closes.</li>
+<li><strong>Concepts only</strong> checkbox narrows results to Concept-type Rems.</li>
+</ul>
+<p>The Rem you triggered the picker from is <strong>excluded from results</strong> — a Rem can't reference itself.</p>
+<h2 id="why-it-finds-rems-the-normal-search-cant">Why it finds Rems the normal search can't<a class="headerlink" href="#why-it-finds-rems-the-normal-search-cant" title="Permanent link">&para;</a></h2>
+<p>RemNote's reference search builds its candidate list <strong>per token, with a cap</strong>. When <em>every</em> word in a Rem's name is high-frequency in your knowledge base (e.g. <code>Navegação Interior</code>, <code>mar territorial</code> — where both <code>navegação</code>/<code>interior</code> and <code>mar</code>/<code>territorial</code> appear in hundreds of Rems), the exact-name Concept never makes any token's candidate cut, so typing its full name returns a flood of partial matches but <strong>not the Rem itself</strong>. This is a property of the search ranking — not a corruption of the Rem — so "Reload Search Cache", retyping the name, or changing its type do <strong>not</strong> fix it. (You can confirm all of this on a specific Rem with the <strong><a href="../Troubleshooting/#search-linkage-diagnostics-debug-widget">Search / Linkage Diagnostics</a></strong> tool in the Debug Widget.)</p>
+<p>This picker sidesteps the limitation: it searches <strong>each word of your query separately</strong>, unions the results, keeps only the Rems whose name contains <strong>all</strong> your words, and floats exact-name matches to the top. Because a distinctive word (e.g. <code>interior</code>) <em>does</em> return the Rem, it reliably surfaces — then ranking puts the exact match first.</p>
+<p><img alt="Find Rem — surfacing a Rem that RemNote's own [[ reference search can't find" src="../assets/find-rem-finds-rems-normal-search-cannot.gif" /></p>
+<h2 id="find-by-alias">Find by alias<a class="headerlink" href="#find-by-alias" title="Permanent link">&para;</a></h2>
+<p>Like RemNote's native <code>[[</code> search, this picker also matches a Rem by its <strong>aliases</strong> (the built-in <strong>Aliases</strong> powerup — the alternate names you add via <em>Edit or Add Alias</em>). Earlier versions only matched the Rem's <em>primary</em> name, so a Rem named <strong>Via navegável</strong> with an alias <strong>vias navegáveis</strong> would not appear when you typed the alias.</p>
+<p>When a result's primary name doesn't contain every word you typed, the picker consults that Rem's aliases and matches against them too. An alias match is shown with the <strong>alias text</strong> as the row's title, an <strong><code>ALIAS</code></strong> badge, and the Rem's real name underneath (<code>↳ Via navegável</code>) so you know which Concept it links to.</p>
+<p>Picking an alias match inserts a reference to the <strong>owning Rem</strong> that <strong>renders the alias text</strong> — exactly the shape RemNote uses for its own alias references (the reference's <code>aliasId</code> points at the matched alias). So inserting the <strong>vias navegáveis</strong> result links to the <strong>Via navegável</strong> Concept while displaying "vias navegáveis". Alias matches work with every insertion mode — normal reference, <a href="#insert-as-a-pin">pin</a>, and <a href="#cloze-aware-insertion">cloze-aware</a> insertion.</p>
+<p><img alt="Find Rem — inserting a reference via a Rem's alias" src="../assets/find-rem-alias-insertion.gif" /></p>
+<h2 id="recommended-use-cases">Recommended use cases<a class="headerlink" href="#recommended-use-cases" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>When RemNote's <code>[[</code> search won't find a Rem</strong> you know exists (common-word names, heavily-referenced Concepts). Use <code>Opt+Shift+F</code> instead of <code>[[</code> to insert the reference.</li>
+<li><strong>To open an "invisible" Rem.</strong> Shift+Enter / Shift+click jumps to the Rem in a new pane — the practical way to reach Rems the normal search buries.</li>
+<li><strong>To reference a Rem inside a cloze deletion</strong> (see below).</li>
+</ul>
+<h2 id="insert-as-a-pin">Insert as a pin<a class="headerlink" href="#insert-as-a-pin" title="Permanent link">&para;</a></h2>
+<p>A <strong>pin</strong> is a Rem reference that renders as just the link chip <strong>without</strong> the referenced Rem's text. In native RemNote, creating one is fiddly: you insert the reference with <code>[[</code>, then right-click it → <strong>Edit or Add Alias</strong>, clear the text, and press Enter. This picker does it in <strong>one keystroke</strong> — press <strong>Ctrl+Enter / Cmd+Enter</strong> (or <strong>Ctrl/Cmd+click</strong> a result) instead of plain Enter, and the reference is inserted with <code>pin: true</code>.</p>
+<p>Pins are cloze-aware and selection-aware just like normal references: inside a cloze the pin stays inside the cloze, and a pin can replace selected text.</p>
+<h2 id="insert-text-with-a-pin">Insert text with a pin<a class="headerlink" href="#insert-text-with-a-pin" title="Permanent link">&para;</a></h2>
+<p>Press <strong>Opt+Enter / Alt+Enter</strong> (or <strong>Opt/Alt+click</strong> a result) to insert the Rem's <strong>text spelled out, followed by a pin</strong> — the same result as RemNote's paste dialog option <strong>"Text with Pin"</strong>, but in one keystroke and without copying first. Use it when you want the reference to read as normal prose <em>and</em> carry a link back to the source — a flow that's handy when you're weaving a referenced Rem into a sentence.</p>
+<p>It brings across the source's <strong>full rich text</strong>, not just a plain label:</p>
+<ul>
+<li><strong>Formatting and images are preserved</strong> — bold, italic, inline colours, LaTeX, embedded images, and so on come along exactly as they appear in the source Rem.</li>
+<li><strong>Front/back cards bring the back too.</strong> If the source is a Concept↔definition (or any front/back) card, the back text is included after the front, joined by a <strong>practice-direction arrow</strong> (<code>⇒</code>, <code>⇐</code>, or <code>⇔</code>) instead of RemNote's card delimiter.</li>
+<li><strong>The source's clozes are marked, not re-clozed.</strong> Any cloze deletions in the source are inserted as <strong>highlighted text (yellow background + reference-coloured font)</strong> — the same visual mark the plugin's cloze command (<code>Opt+Z</code>) leaves behind — so they still <em>read</em> as clozes without becoming functional clozes in your target (no "clozes out of clozes").</li>
+</ul>
+<p>Alias matches use the alias Rem's text; the trailing pin still links to the owning Rem.</p>
+<h2 id="cloze-aware-insertion">Cloze-aware insertion<a class="headerlink" href="#cloze-aware-insertion" title="Permanent link">&para;</a></h2>
+<p>Both RemNote's native <code>[[</code> and this picker would normally <strong>break a cloze deletion</strong> if you inserted a reference inside it — the new reference would land <em>outside</em> the cloze. This picker is <strong>cloze-aware</strong>: when your cursor (or selected text) sits inside a cloze, the inserted reference is stamped with that cloze's id, so it stays <strong>inside</strong> the cloze instead of splitting it.</p>
+<p><img alt="Find Rem — cloze-aware reference insertion (reference stays inside the cloze)" src="../assets/find-rem-cloze-aware-insertion.gif" /></p>
+<h2 id="accent-insensitive-selection-aware">Accent-insensitive &amp; selection-aware<a class="headerlink" href="#accent-insensitive-selection-aware" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Accent/diacritic-insensitive:</strong> typing <code>navegacao interior</code> matches <code>Navegação Interior</code>.</li>
+<li><strong><code>Figure</code> = <code>Fig</code> = <code>Fig.</code>:</strong> figure abbreviations are treated interchangeably, so typing <code>fig 4.3</code> lists a Rem named <code>Figure 4.3</code>, and typing <code>figure 4.3</code> finds one named <code>Fig. 4.3</code> or <code>Fig 4.3</code>. Any capitalisation works and the trailing dot is optional. It's folded the same way accents are — the standalone word <code>fig</code>/<code>fig.</code> is canonicalised to <code>figure</code> in both your query and each Rem's name (and alias) before matching, so an exact match still ranks first with its <code>EXACT</code> badge. Only the whole word is affected: <code>figs</code>, <code>configure</code>, etc. are left alone.</li>
+<li><strong>Selected text seeds the search:</strong> if you select text before invoking, the box opens pre-filled with it (and selected, so you can refine or overwrite). On insert, the selected text is <strong>replaced</strong> by the reference — exactly like RemNote's <code>[[</code> behaviour where selected text becomes the link.</li>
+</ul>
+<blockquote>
+<p>The reference is inserted into the editor that was focused when you opened the picker. In the rare case RemNote has no active editor caret at insertion time, the picker copies the reference to your clipboard instead and tells you to paste it.</p>
+</blockquote>
+<h2 id="stays-on-screen-near-the-edges">Stays on-screen near the edges<a class="headerlink" href="#stays-on-screen-near-the-edges" title="Permanent link">&para;</a></h2>
+<p>The picker opens <strong>at your cursor</strong>, but it now keeps itself fully visible instead of being clipped by the window edge:</p>
+<ul>
+<li><strong>Near the right edge</strong> it flips to open to the <strong>left</strong> of the cursor.</li>
+<li><strong>Past the vertical midpoint</strong> it flips to open <strong>above</strong> the cursor (like RemNote's own selection search), and the results list is capped to the space available on whichever side it opens, so a long list <strong>scrolls</strong> rather than running off-screen.</li>
+</ul>
+<p>This all happens before the box appears, so you never see it jump.</p>
+<hr />
+<h1 id="open-source-in-popup">Open Source in Popup<a class="headerlink" href="#open-source-in-popup" title="Permanent link">&para;</a></h1>
+<p>Opens the <strong>PDF or web article behind a reference pin</strong> <em>without leaving the queue</em>. Built for the moment in review when a flashcard (or any Rem) carries a pin to a PDF highlight and you want to glance at the surrounding source — clicking the pin directly <strong>navigates away and tears down the queue</strong> (you lose your position and the ability to rate the card). This shows the source on top of (or beside) the queue instead, so you read it and dismiss it without interrupting the session.</p>
+<p>It comes in <strong>two variants</strong> — a centered <strong>modal popup</strong> and a non-blocking <strong>floating window</strong> — that share the same reader; pick whichever fits the moment.</p>
+<h2 id="two-ways-to-open-it">Two ways to open it<a class="headerlink" href="#two-ways-to-open-it" title="Permanent link">&para;</a></h2>
+<p>Both are triggered the same way — <strong>hover</strong> the reference pin, then press a shortcut — and both only act on genuine <strong>Reader sources</strong> (see <a href="#what-it-opens">What it opens</a>).</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>Modal popup</strong></th>
+<th><strong>Floating window</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Command</td>
+<td><code>Open Hovered Source in Popup</code></td>
+<td><code>Open Hovered Source in Floating Window</code></td>
+</tr>
+<tr>
+<td>Shortcut</td>
+<td><strong><code>Opt+O</code> / <code>Alt+O</code></strong></td>
+<td><strong><code>Opt+Shift+O</code> / <code>Alt+Shift+O</code></strong></td>
+</tr>
+<tr>
+<td>Placement</td>
+<td>Centered, large</td>
+<td>Right portion of the screen (≈48% width)</td>
+</tr>
+<tr>
+<td>Blocks the UI behind it</td>
+<td><strong>Yes</strong> — a backdrop covers/dims the card</td>
+<td><strong>No</strong> — the card/editor stays visible beside it</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>"Open → read → close → rate" in one focused glance</td>
+<td><strong>Peeking back and forth</strong> between source and card without close/reopen</td>
+</tr>
+<tr>
+<td>Closes on</td>
+<td><code>✕</code>, Esc, or clicking outside</td>
+<td><code>✕</code>, Esc, or advancing to the next card (does <strong>not</strong> close on outside click, so you can highlight/select in the PDF)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why hover + a shortcut, instead of right-click?</strong> RemNote exposes a <em>hover</em> event for references to plugins but <strong>no right-click/context-menu event</strong>, and the plain left-click navigation can't be intercepted. So the queue-safe path is: hover to identify the reference, then a shortcut you own to open it. The plugin tracks only the last-hovered reference and resolves it when you press the key.</p>
+<h2 id="how-to-invoke_3">How to invoke<a class="headerlink" href="#how-to-invoke_3" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Hover</strong> the reference pin (the link chip) you want to open. <em>Hovering</em> is the signal the plugin listens to — no click needed.</li>
+<li>With the pin still hovered, press <strong><code>Opt+O</code></strong> for the modal popup, or <strong><code>Opt+Shift+O</code></strong> for the floating window.</li>
+<li>The source renders inside RemNote's own PDF/web reader. The queue stays live; close it to return exactly where you were.</li>
+</ol>
+<h2 id="what-it-opens">What it opens<a class="headerlink" href="#what-it-opens" title="Permanent link">&para;</a></h2>
+<p>The command inspects the hovered reference's target and only acts on <strong>Reader sources</strong> (identical for both variants):</p>
+<table>
+<thead>
+<tr>
+<th>Hovered reference points to…</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>PDF highlight</strong></td>
+<td>Opens the host PDF and auto-scrolls to the highlight</td>
+</tr>
+<tr>
+<td><strong>HTML / web-article highlight</strong></td>
+<td>Opens the article (Reader Mode) at the highlight</td>
+</tr>
+<tr>
+<td><strong>PDF source document</strong> (the uploaded file Rem)</td>
+<td>Opens the PDF at the top</td>
+</tr>
+<tr>
+<td><strong>HTML source</strong> (a non-YouTube Link Rem)</td>
+<td>Opens the article</td>
+</tr>
+<tr>
+<td><strong>A plain Rem</strong> (no PDF/HTML source)</td>
+<td><strong>Nothing happens</strong> — you get a toast and default behavior is left untouched</td>
+</tr>
+</tbody>
+</table>
+<p>So you can hover <em>any</em> pin and press the shortcut safely; only genuine sources open a viewer.</p>
+<h2 id="scroll-to-highlight">Scroll to Highlight<a class="headerlink" href="#scroll-to-highlight" title="Permanent link">&para;</a></h2>
+<p>For PDF/HTML <strong>highlights</strong>, the viewer auto-scrolls to the highlighted passage once the reader finishes mounting (the embedded PDF engine takes a few seconds to initialize, so the scroll is retried a few times). If you then scroll around the document and want to jump back, click the <strong>🔖 Scroll to Highlight</strong> button in the header to re-center on the highlight at any time.</p>
+<h2 id="floating-window-interaction-closing">Floating window — interaction &amp; closing<a class="headerlink" href="#floating-window-interaction-closing" title="Permanent link">&para;</a></h2>
+<p>The floating variant is designed so the source sits <strong>beside</strong> your card while you study, which is why it behaves a little differently from the modal:</p>
+<ul>
+<li><strong>Stays open while you use the PDF.</strong> Unlike a modal, clicking into the reader to highlight, select text, or click existing highlights will <strong>not</strong> dismiss it.</li>
+<li><strong>Closes itself when you advance the card,</strong> so a previous card's source never lingers over the next one.</li>
+<li><strong>Esc closes it</strong> — without closing the queue. The plugin "steals" the Esc key while the float is open, so RemNote's queue doesn't act on it; Esc closes the float instead. (When focus is inside the PDF itself, the browser handles Esc within the reader; use the <code>✕</code> button there.)</li>
+<li><strong>Not user-resizable.</strong> RemNote floating widgets have a fixed registered size; the window opens at ≈48% of the screen width on the right.</li>
+</ul>
+<h2 id="recommended-use-cases_1">Recommended use cases<a class="headerlink" href="#recommended-use-cases_1" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Mid-review context check.</strong> While rating a flashcard that references a PDF highlight, open the source to re-read the paragraph it came from — then close and rate, without losing your queue position. <em>(Modal is ideal for a quick look; floating if you need to glance repeatedly.)</em></li>
+<li><strong>"What was I trying to recall?"</strong> Keep the <strong>floating</strong> window open beside the card so you can look from the source back to the card and forth, without the close/reopen churn a modal forces.</li>
+<li><strong>Reviewing extracts and clozes</strong> that carry a <a href="../Create-Incremental-Rem-from-PDF-Highlights/">bridging pin back to the original PDF source</a> — see the figure or surrounding text without navigating into the document.</li>
+<li><strong>Any pin to a long source</strong> where the inline hover-preview is too small but opening the full document in a pane is too disruptive.</li>
+</ul>
+<blockquote>
+<p>Implemented as the Source Popup widgets — <a href="../Plugin-Widgets-Reference/#65-source-popup-modal-queue-safe-pdfhtml-viewer">modal</a> and <a href="../Plugin-Widgets-Reference/#66-source-popup-floating-non-blocking">floating</a> — triggered by the <strong>Open Hovered Source in Popup / Floating Window</strong> commands. The default shortcuts <code>Opt+O</code> and <code>Opt+Shift+O</code> can be rebound in RemNote's keyboard settings.</p>
+</blockquote>
+<hr />
+<h1 id="omnibar-selection-recovery">Omnibar Selection Recovery<a class="headerlink" href="#omnibar-selection-recovery" title="Permanent link">&para;</a></h1>
+<p>Internally, the plugin runs a small editor-selection cache so that commands invoked via the <code>Cmd+/</code> Omnibar can still access the multi-rem selection you had before opening the palette. (Without this, RemNote blurs the editor when the Omnibar opens, and a plugin command's <code>getSelection()</code> call comes back empty — <code>Add Tag</code>-style internal commands sidestep this by capturing the selection synchronously when the palette opens, but plugins have no equivalent hook.)</p>
+<p>Commands that benefit from this recovery:</p>
+<ul>
+<li><strong>Make Incremental (Extract)</strong> / <strong>Extract with Priority</strong> — multi-rem <code>Make Incremental</code> works from <code>Cmd+/</code>.</li>
+<li><strong>Dismiss Incremental Rem</strong> — multi-rem dismissal works from <code>Cmd+/</code>.</li>
+<li><strong>Paste Rem Sources</strong> — pasting onto multiple target rems works from <code>Cmd+/</code>.</li>
+<li><strong>Text Case Converter</strong> — multi-rem case cycling works from <code>Cmd+/</code>.</li>
+<li><strong>Restructure Outline by Headings</strong> — multi-rem restructure works from <code>Cmd+/</code>.</li>
+</ul>
+<p>The cache has a 30-second TTL and is only written on positive selection events, so opening the Omnibar (which fires a clear-selection event) doesn't wipe what you just selected.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

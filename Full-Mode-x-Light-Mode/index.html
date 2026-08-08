@@ -1,0 +1,2468 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The official User's Manual for the Incremental Everything plugin for RemNote.">
+      
+      
+        <meta name="author" content="bjsi">
+      
+      
+        <link rel="canonical" href="https://hugomarins.github.io/incremental-everything/Full-Mode-x-Light-Mode/">
+      
+      
+        <link rel="prev" href="../Utilities/">
+      
+      
+        <link rel="next" href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Full Mode vs Light Mode - Incremental Everything for RemNote — User's Manual</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#performance-modes-quick-reference-card" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-header__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Incremental Everything for RemNote — User's Manual
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Full Mode vs Light Mode
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Incremental Everything for RemNote — User&#39;s Manual" class="md-nav__button md-logo" aria-label="Incremental Everything for RemNote — User's Manual" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    Incremental Everything for RemNote — User's Manual
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/bjsi/incremental-everything" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    bjsi/incremental-everything
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's Manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's Manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1. Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../What-is-Incrementalism%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2. What is Incrementalism?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    3. The Core Loop
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    3. The Core Loop
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IR-Flow--Reading-Extracting-and-Clozing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IR Flow — Reading, Extracting & Clozing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Reviewing-Items-in-the-Editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reviewing Items in the Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Prioritization-%26-Sorting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4. Prioritization & Sorting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priorities-for-Flashcards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4a. Priorities for Flashcards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Priority-Review-Document/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    4b. Priority Review Document
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_7" id="__nav_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    5. Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    5. Advanced Workflows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PDF-Incremental-Reading-Workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PDF Incremental Reading Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Create-Incremental-Rem-from-PDF-Highlights/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Incremental Rem from PDF Highlights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Incremental-Video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incremental Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-List-and-Main-View/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem List & Main View
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../History-Queue-Dashboard-and-Mastery-Drill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History, Queue Dashboard & Mastery Drill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Study-Dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Study Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    6. Essential References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    6. Essential References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Widgets-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Widgets Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Commands-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Commands Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Plugin-Settings-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Settings Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IncRem-Scheduler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IncRem Scheduler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Keyboard-Shortcuts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keyboard Shortcuts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full Mode vs Light Mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#choose-your-mode-in-30-seconds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Choose Your Mode in 30 Seconds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Choose Your Mode in 30 Seconds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#do-you-have-an-extremely-overloaded-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Do you have an extremely overloaded workflow?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 At a Glance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 At a Glance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Mode 🖥️
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#light-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Light Mode ⚡
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚦 Platform Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        💡 Common Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="💡 Common Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i-study-on-my-phone-during-commute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I study on my phone during commute"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-process-5-articles-a-week-on-web-browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I process 5 articles a week on web browser"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#im-researching-my-phd-with-100-papers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I'm researching my PhD with 100+ papers"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-have-500-cards-use-desktop-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I have 500 cards, use desktop app"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-have-20k-cards-a-large-backlog-a-huge-inflow-of-information-and-a-use-desktop-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I have 20K+ cards, a large backlog, a huge inflow of information, and a use desktop app"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-switch-between-web-and-desktop-daily" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I switch between web and desktop daily"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-change-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 How to Change Modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 How to Change Modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-override" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual Override
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#warning-signs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Warning Signs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚠️ Warning Signs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-full-mode-on-wrong-platform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Full Mode on Wrong Platform
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎓 Feature Availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#if-you-regularly-uses-remnote-in-the-desktop-app-dont-fear-the-full-mode-shoulduselightmode-decision-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If you regularly uses RemNote in the Desktop App, don't fear the FULL MODE: shouldUseLightMode() Decision Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-detection-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup Detection Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-combinations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform Combinations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-usage-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Usage Pattern
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-world-example-answer_buttonstsx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real-World Example: answer_buttons.tsx
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    7. FAQ & Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    7. FAQ & Troubleshooting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Does-the-plugin-prioritize-items-that-are-due-today-over-older-items%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the plugin prioritize due-today items?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-the-Incremental-Queue-takes-priority-and-due-date-in-consideration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How priority and due date interact
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../How-to-hide-card-priorities%3F/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How to hide card priorities?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    8. Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Contributing-to-the-Wiki/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    9. Contributing to the Wiki
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#choose-your-mode-in-30-seconds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎯 Choose Your Mode in 30 Seconds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🎯 Choose Your Mode in 30 Seconds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#do-you-have-an-extremely-overloaded-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Do you have an extremely overloaded workflow?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 At a Glance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="📊 At a Glance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Mode 🖥️
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#light-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Light Mode ⚡
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🚦 Platform Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-scenarios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        💡 Common Scenarios
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="💡 Common Scenarios">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i-study-on-my-phone-during-commute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I study on my phone during commute"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-process-5-articles-a-week-on-web-browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I process 5 articles a week on web browser"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#im-researching-my-phd-with-100-papers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I'm researching my PhD with 100+ papers"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-have-500-cards-use-desktop-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I have 500 cards, use desktop app"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-have-20k-cards-a-large-backlog-a-huge-inflow-of-information-and-a-use-desktop-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I have 20K+ cards, a large backlog, a huge inflow of information, and a use desktop app"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-switch-between-web-and-desktop-daily" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "I switch between web and desktop daily"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-change-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🔧 How to Change Modes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="🔧 How to Change Modes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatic-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-override" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual Override
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#warning-signs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⚠️ Warning Signs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="⚠️ Warning Signs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-full-mode-on-wrong-platform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Full Mode on Wrong Platform
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        🎓 Feature Availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#if-you-regularly-uses-remnote-in-the-desktop-app-dont-fear-the-full-mode-shoulduselightmode-decision-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If you regularly uses RemNote in the Desktop App, don't fear the FULL MODE: shouldUseLightMode() Decision Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-detection-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup Detection Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-combinations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform Combinations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-usage-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Usage Pattern
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-world-example-answer_buttonstsx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real-World Example: answer_buttons.tsx
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="performance-modes-quick-reference-card">Performance Modes: Quick Reference Card<a class="headerlink" href="#performance-modes-quick-reference-card" title="Permanent link">&para;</a></h1>
+<h2 id="choose-your-mode-in-30-seconds">🎯 Choose Your Mode in 30 Seconds<a class="headerlink" href="#choose-your-mode-in-30-seconds" title="Permanent link">&para;</a></h2>
+<h3 id="do-you-have-an-extremely-overloaded-workflow">Do you have an extremely overloaded workflow?<a class="headerlink" href="#do-you-have-an-extremely-overloaded-workflow" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>YES</strong> (50+ articles, 10k+ cards, complex hierarchies) → <strong>Full Mode</strong> 🖥️</li>
+<li><strong>NO</strong> (Standard learning / Beginner) → <strong>Light Mode</strong> ⚡</li>
+</ul>
+<hr />
+<div class="admonition important">
+<p class="admonition-title">Performance Mode is now the <em>second</em> switch to consider</p>
+<p>Since v1.0.33 the plugin's heaviest work — tagging flashcard-bearing Rems across your knowledge base and keeping those tags in step — is behind a separate opt-in, <strong>Enable Flashcard Prioritisation</strong>, which is <strong>off by default</strong>.</p>
+<p>With that switch off, Full Mode no longer starts the startup pretagging pass and no longer cascades priorities down your document tree, so the gap between the two modes is far smaller than this page describes. Everything below applies once you have turned flashcard prioritisation on — see <a href="../Priorities-for-Flashcards/#the-opt-in">Priorities for Flashcards</a>.</p>
+</div>
+<h2 id="at-a-glance">📊 At a Glance<a class="headerlink" href="#at-a-glance" title="Permanent link">&para;</a></h2>
+<h3 id="full-mode">Full Mode 🖥️<a class="headerlink" href="#full-mode" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Platform:    💻 Desktop App ONLY
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Performance: 🐢 Slower but feature-rich
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Features:    🎛️ All advanced features
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>Startup:     ⏱️ up to 3 min (depending on KB size)
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>Best For:    🔬 Overloaded Students, Power Users
+</code></pre></div>
+<p><strong>Key Features:</strong>
+- KB-scoped and Document-scoped relative priority percentiles
+- <a href="../Prioritization-%26-Sorting/#priority-shield">Priority Shield</a> (KB and Document scope)
+- <a href="../Prioritization-%26-Sorting/#priority-shield">Priority Shield</a> stats are stored for historical comparison used the Priority Shield Graph
+- Complex hierarchy support</p>
+<h3 id="light-mode">Light Mode ⚡<a class="headerlink" href="#light-mode" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Platform:    🌐 Web, 📱 Mobile, 💻 Desktop
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Performance: 🚀 Fast and responsive
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Features:    ⚡ Essential features
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>Startup:     ⚡ &lt;10 seconds
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>Best For:    🎓 Beginner and eventual users, Mobile and Web-browser users, users with few flashcards
+</code></pre></div>
+<p><strong>Key Features:</strong>
+- Absolute Priorities (flashcards and IncRems)
+- No need for cache mounting of the startup / queue Enter
+- Universal platform support</p>
+<hr />
+<h2 id="platform-recommendations">🚦 Platform Recommendations<a class="headerlink" href="#platform-recommendations" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Default</th>
+<th>Recommended</th>
+<th>Can Override?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🌐 <strong>Web Browser</strong></td>
+<td>Light</td>
+<td>Light ✅</td>
+<td>Yes (not recommended)</td>
+</tr>
+<tr>
+<td>📱 <strong>Mobile</strong></td>
+<td>Light</td>
+<td>Light ✅</td>
+<td>Yes (not recommended)</td>
+</tr>
+<tr>
+<td>💻 <strong>Desktop App</strong></td>
+<td>Light</td>
+<td>Full/Light ⚡</td>
+<td>Yes (configurable)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="common-scenarios">💡 Common Scenarios<a class="headerlink" href="#common-scenarios" title="Permanent link">&para;</a></h2>
+<h3 id="i-study-on-my-phone-during-commute">"I study on my phone during commute"<a class="headerlink" href="#i-study-on-my-phone-during-commute" title="Permanent link">&para;</a></h3>
+<p>→ <strong>Light Mode</strong> ✅ (automatic)<br />
+Optimized for mobile, won't make the app heavy</p>
+<h3 id="i-process-5-articles-a-week-on-web-browser">"I process 5 articles a week on web browser"<a class="headerlink" href="#i-process-5-articles-a-week-on-web-browser" title="Permanent link">&para;</a></h3>
+<p>→ <strong>Light Mode</strong> ✅ (automatic)<br />
+Fast, stable, perfect for standard IR</p>
+<h3 id="im-researching-my-phd-with-100-papers">"I'm researching my PhD with 100+ papers"<a class="headerlink" href="#im-researching-my-phd-with-100-papers" title="Permanent link">&para;</a></h3>
+<p>→ <strong>Full Mode</strong> on Desktop App<br />
+Need document percentiles and advanced features</p>
+<h3 id="i-have-500-cards-use-desktop-app">"I have 500 cards, use desktop app"<a class="headerlink" href="#i-have-500-cards-use-desktop-app" title="Permanent link">&para;</a></h3>
+<p>→ <strong>Light Mode</strong> works great! ⚡<br />
+Unless you want document-level analytics</p>
+<h3 id="i-have-20k-cards-a-large-backlog-a-huge-inflow-of-information-and-a-use-desktop-app">"I have 20K+ cards, a large backlog, a huge inflow of information, and a use desktop app"<a class="headerlink" href="#i-have-20k-cards-a-large-backlog-a-huge-inflow-of-information-and-a-use-desktop-app" title="Permanent link">&para;</a></h3>
+<p>→ <strong>Full Mode</strong> ! ⚡<br />
+You need the full power of relative priorities and <a href="../Prioritization-%26-Sorting/#priority-shield">priority shield</a>.</p>
+<h3 id="i-switch-between-web-and-desktop-daily">"I switch between web and desktop daily"<a class="headerlink" href="#i-switch-between-web-and-desktop-daily" title="Permanent link">&para;</a></h3>
+<p>→ <strong>Hybrid</strong>: Full on Desktop, Light on Web<br />
+Automatic switching, best of both worlds</p>
+<hr />
+<h2 id="how-to-change-modes">🔧 How to Change Modes<a class="headerlink" href="#how-to-change-modes" title="Permanent link">&para;</a></h2>
+<h3 id="automatic-recommended">Automatic (Recommended)<a class="headerlink" href="#automatic-recommended" title="Permanent link">&para;</a></h3>
+<p>The plugin auto-detects your platform (if you chose Full Mode):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>✅ Web → Light Mode
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>✅ Mobile → Light Mode  
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>✅ Desktop → Full Mode
+</code></pre></div></p>
+<h3 id="manual-override">Manual Override<a class="headerlink" href="#manual-override" title="Permanent link">&para;</a></h3>
+<p><strong>Settings → Performance Mode</strong>
+- Choose "Light Mode" or "Full Mode"</p>
+<p><strong>Platform-Specific Settings:</strong>
+- "Always use Light Mode on Mobile" (default: ON)
+- "Always use Light Mode on Web Browser" (default: ON)</p>
+<hr />
+<h2 id="warning-signs">⚠️ Warning Signs<a class="headerlink" href="#warning-signs" title="Permanent link">&para;</a></h2>
+<h3 id="using-full-mode-on-wrong-platform">Using Full Mode on Wrong Platform<a class="headerlink" href="#using-full-mode-on-wrong-platform" title="Permanent link">&para;</a></h3>
+<p><strong>Web Browser + Full Mode:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>❌ Slow loading
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>❌ Browser freezing
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>❌ High memory usage
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>→ Solution: Enable &quot;Light Mode on Web&quot; setting
+</code></pre></div></p>
+<p><strong>Mobile + Full Mode:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>❌ App crashes
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>❌ Battery drain
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>❌ Sluggish interface
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>→ Solution: Enable &quot;Light Mode on Mobile&quot; setting
+</code></pre></div></p>
+<hr />
+<h2 id="feature-availability">🎓 Feature Availability<a class="headerlink" href="#feature-availability" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th style="text-align: center;">Full Mode</th>
+<th style="text-align: center;">Light Mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Flashcard Review</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Incremental Reading</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Priority System</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Absolute Priority Number (IncRems and Cards)</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>KB Relative Priorities Percentiles</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Document Relative Priorities Percentiles</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>KB Priority Shield (IncRems and Cards)</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td>Doc Priority Shield (IncRems and Cards)</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">❌</td>
+</tr>
+<tr>
+<td><a href="../Priority-Review-Document/">Priority Review Docs</a></td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Card Priority Tagging</td>
+<td style="text-align: center;">✅ Deep</td>
+<td style="text-align: center;">✅ Instant</td>
+</tr>
+<tr>
+<td>Fast Startup</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Mobile Stability</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="if-you-regularly-uses-remnote-in-the-desktop-app-dont-fear-the-full-mode-shoulduselightmode-decision-flow">If you regularly uses RemNote in the Desktop App, don't fear the FULL MODE: shouldUseLightMode() Decision Flow<a class="headerlink" href="#if-you-regularly-uses-remnote-in-the-desktop-app-dont-fear-the-full-mode-shoulduselightmode-decision-flow" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>┌─────────────────────────────────────────────────────────────┐
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>│         User Opens RemNote Plugin / Component Loads         │
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>└────────────────────────┬────────────────────────────────────┘
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>                         │
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>                         ▼
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>            ┌────────────────────────┐
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>            │ Call shouldUseLightMode│
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>            │      (plugin)          │
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>            └────────────┬───────────┘
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>                         │
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>                         ▼
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>            ┌────────────────────────┐
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>            │ Check: Performance     │
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>            │ setting === &#39;light&#39;?   │
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>            └──────┬─────────────┬───┘
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>                   │ YES         │ NO
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>                   ▼             ▼
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>            [USE LIGHT MODE]     │
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>                                 │
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>                    ┌────────────▼──────────────┐
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>                    │ Check: Is Mobile Device?  │
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>                    │ (iOS or Android)          │
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>                    └──────┬─────────────┬──────┘
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>                           │ YES         │ NO
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>                           ▼             │
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>            ┌──────────────────────┐    │
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>            │ Check: alwaysUseLight│    │
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>            │ ModeOnMobile enabled?│    │
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>            └──────┬───────────┬───┘    │
+<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>                   │ YES       │ NO     │
+<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>                   ▼           │        │
+<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>            [USE LIGHT MODE]   │        │
+<a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>                               │        │
+<a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>                    ┌──────────▼────────▼──────────┐
+<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>                    │ Check: Is Web Platform?      │
+<a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a>                    │ (browser vs desktop app)     │
+<a id="__codelineno-5-37" name="__codelineno-5-37" href="#__codelineno-5-37"></a>                    └──────┬─────────────┬─────────┘
+<a id="__codelineno-5-38" name="__codelineno-5-38" href="#__codelineno-5-38"></a>                           │ YES         │ NO
+<a id="__codelineno-5-39" name="__codelineno-5-39" href="#__codelineno-5-39"></a>                           ▼             │
+<a id="__codelineno-5-40" name="__codelineno-5-40" href="#__codelineno-5-40"></a>            ┌──────────────────────┐    │
+<a id="__codelineno-5-41" name="__codelineno-5-41" href="#__codelineno-5-41"></a>            │ Check: alwaysUseLight│    │
+<a id="__codelineno-5-42" name="__codelineno-5-42" href="#__codelineno-5-42"></a>            │ ModeOnWeb enabled?   │    │
+<a id="__codelineno-5-43" name="__codelineno-5-43" href="#__codelineno-5-43"></a>            └──────┬───────────┬───┘    │
+<a id="__codelineno-5-44" name="__codelineno-5-44" href="#__codelineno-5-44"></a>                   │ YES       │ NO     │
+<a id="__codelineno-5-45" name="__codelineno-5-45" href="#__codelineno-5-45"></a>                   ▼           │        │
+<a id="__codelineno-5-46" name="__codelineno-5-46" href="#__codelineno-5-46"></a>            [USE LIGHT MODE]   │        │
+<a id="__codelineno-5-47" name="__codelineno-5-47" href="#__codelineno-5-47"></a>                               │        │
+<a id="__codelineno-5-48" name="__codelineno-5-48" href="#__codelineno-5-48"></a>                    ┌──────────▼────────▼──────────┐
+<a id="__codelineno-5-49" name="__codelineno-5-49" href="#__codelineno-5-49"></a>                    │      USE FULL MODE           │
+<a id="__codelineno-5-50" name="__codelineno-5-50" href="#__codelineno-5-50"></a>                    └──────────────────────────────┘
+</code></pre></div>
+<h2 id="startup-detection-flow">Startup Detection Flow<a class="headerlink" href="#startup-detection-flow" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>┌────────────────────────────────────────────────┐
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>│        Plugin Activates (onActivate)           │
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>└───────────────────┬────────────────────────────┘
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>                    │
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>                    ▼
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>┌─────────────────────────────────────────────────────────┐
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>│     handleMobileDetectionOnStartup(plugin)              │
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>├─────────────────────────────────────────────────────────┤
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>│  1. Detect OS (iOS/Android/Windows/Mac/Linux)          │
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>│  2. Detect Platform (web/app)                          │
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>│  3. Store in SESSION storage (device-specific):        │
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>│     - isMobileDeviceKey = true/false                   │
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>│     - isWebPlatformKey = true/false                    │
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>│  4. Store in SYNCED storage (for history):             │
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>│     - lastDetectedOSKey = current OS                   │
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>│     - lastDetectedPlatformKey = current platform       │
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>└───────────────────┬─────────────────────────────────────┘
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>                    │
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>        ┌───────────┴───────────┐
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>        │                       │
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>        ▼                       ▼
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>┌──────────────┐    ┌───────────────────┐
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>│ Mobile?      │    │ Web Platform?     │
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>│ (iOS/Android)│    │ (browser)         │
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>└──────┬───────┘    └────────┬──────────┘
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>       │ YES                  │ YES
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>       ▼                      ▼
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>┌──────────────────┐  ┌──────────────────────┐
+<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>│ Show toast:      │  │ Show toast:          │
+<a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>│ &quot;📱 iOS detected&quot;│  │ &quot;🌐 Web Browser on   │
+<a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a>│ with mode info   │  │  Windows&quot; + mode     │
+<a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>└──────────────────┘  └──────────────────────┘
+</code></pre></div>
+<h2 id="storage-architecture">Storage Architecture<a class="headerlink" href="#storage-architecture" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>SESSION STORAGE (per-device, doesn&#39;t sync)
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>┌────────────────────────────────────────┐
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>│  isMobileDeviceKey: boolean            │  ← Used by shouldUseLightMode()
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>│  isWebPlatformKey: boolean             │  ← Used by shouldUseLightMode()
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>└────────────────────────────────────────┘
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>SYNCED STORAGE (cross-device)
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>┌────────────────────────────────────────┐
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>│  lastDetectedOSKey: string             │  ← For tracking changes
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>│  lastDetectedPlatformKey: Platform     │  ← For tracking changes
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>└────────────────────────────────────────┘
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>SETTINGS (user preferences)
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>┌────────────────────────────────────────┐
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>│  performanceMode: &#39;light&#39; | &#39;full&#39;     │  ← Master setting
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>│  alwaysUseLightModeOnMobileId: bool    │  ← Mobile override
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>│  alwaysUseLightModeOnWebId: bool       │  ← Web override (NEW)
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>└────────────────────────────────────────┘
+</code></pre></div>
+<h2 id="platform-combinations">Platform Combinations<a class="headerlink" href="#platform-combinations" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>╔═══════════════════╦════════════╦═══════════╦═════════════════╗
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>║   Operating       ║  Platform  ║  Device   ║  Default Mode   ║
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>║   System          ║            ║  Type     ║  (recommended)  ║
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>╠═══════════════════╬════════════╬═══════════╬═════════════════╣
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>║ iOS               ║  app       ║  Mobile   ║  Light          ║
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>║ Android           ║  app       ║  Mobile   ║  Light          ║
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>║ Windows           ║  web       ║  Desktop  ║  Light (NEW)    ║
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>║ Mac               ║  web       ║  Desktop  ║  Light (NEW)    ║
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>║ Linux             ║  web       ║  Desktop  ║  Light (NEW)    ║
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>║ Windows           ║  app       ║  Desktop  ║  Full           ║
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>║ Mac               ║  app       ║  Desktop  ║  Full           ║
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>║ Linux             ║  app       ║  Desktop  ║  Full           ║
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>╚═══════════════════╩════════════╩═══════════╩═════════════════╝
+</code></pre></div>
+<h2 id="component-usage-pattern">Component Usage Pattern<a class="headerlink" href="#component-usage-pattern" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>┌─────────────────────────────────────────────────────┐
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>│  Any Component (Widget/Popup/Command)               │
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>├─────────────────────────────────────────────────────┤
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>│                                                     │
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>│  const useLightMode = await shouldUseLightMode(    │
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>│    plugin                                           │
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>│  );                                                 │
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>│                                                     │
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>│  if (useLightMode) {                                │
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>│    // Use optimized, fast path                     │
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>│    // Skip expensive operations                    │
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>│    // Use lighter caching                          │
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>│  } else {                                           │
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>│    // Use full-featured path                       │
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>│    // Run comprehensive operations                 │
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>│    // Use full caching                             │
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>│  }                                                  │
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>│                                                     │
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>└─────────────────────────────────────────────────────┘
+</code></pre></div>
+<h2 id="real-world-example-answer_buttonstsx">Real-World Example: answer_buttons.tsx<a class="headerlink" href="#real-world-example-answer_buttonstsx" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>User clicks &quot;Dismiss (untag)&quot; button
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>           │
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>           ▼
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>┌──────────────────────────────┐
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>│ handleCardPriorityInheritance│
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>├──────────────────────────────┤
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>│ Check existing priority      │
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>│          │                   │
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>│          ▼                   │
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>│ const useLightMode =         │
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>│   await shouldUseLightMode() │
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>│          │                   │
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>│     ┌────┴────┐              │
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>│     │ Light?  │              │
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>│     └─┬─────┬─┘              │
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>│ YES   │     │  NO            │
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>│   ┌───▼─┐   ▼────────┐       │
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>│   │Skip │   │ Check  │       │
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>│   │card │   │ cards  │       │
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>│   │check│   │ in Rem │       │
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>│   │     │   │ and    │       │
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a>│   │Set  │   │ 3 level│       │
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a>│   │prio │   │ descend│       │
+<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a>│   │NOW  │   │        │       │
+<a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a>│   └─────┘   └────────┘       │
+<a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a>│   ⚡Fast     🔍 Thorough      │
+<a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a>└──────────────────────────────┘
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
