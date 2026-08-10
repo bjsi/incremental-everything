@@ -6,7 +6,7 @@ Video is one of the richest sources of knowledge available today. Lectures, tuto
 
 However, watching a full video in a single sitting often leads to the same problem as traditional reading: **massive input with poor retention**. Most of what we watch is forgotten within days. Even worse, we tend to re-watch entire videos just to find a single passage that mattered.
 
-**Incremental Video** applies the principles of [incrementalism](What-is-Incrementalism?.md) to video content. Instead of watching a video from start to finish, you:
+**Incremental Video** applies the principles of [incrementalism](What-is-Incrementalism%3F.md) to video content. Instead of watching a video from start to finish, you:
 
 1. **Watch in segments** — process a video gradually across multiple review sessions
 2. **Extract key passages** — mark important segments with precise start/end times

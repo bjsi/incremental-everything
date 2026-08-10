@@ -49,7 +49,7 @@ To streamline workflow and make priority management more intuitive, new items au
 
 This system is particularly useful for hierarchically organized notes. For example, if you have an important book summary with a high priority (e.g., 5), any new extracts or notes you create within that summary will automatically inherit the same priority, saving you from setting it manually each time.
 
-The "[Set Priority](#set-priority)" and "Reschedule" popups also display the ancestor's priority, giving you immediate context when you decide to manually override the inherited value.
+The "[Set Priority](#main-priority-popup)" and "Reschedule" popups also display the ancestor's priority, giving you immediate context when you decide to manually override the inherited value.
 
 ### Use Cases
 
@@ -463,7 +463,7 @@ The Shield metric for Incremental Rems is separate of that for Flashcards; each 
 The core purpose of the Priority Shield is to move beyond guessing and provide you with concrete data to build a sustainable and effective study strategy. By knowing the exact priority of the most important Incremental Rem you have yet to review, you can answer critical questions about your learning habits:
 
 -   **Am I creating new material faster than I can review it?** If you consistently see a low Priority Shield value (e.g., your Relative Priority Shield is only protecting 4% of your top priority Incremental Rems), it's a strong indicator that the inflow of new Incremental Rems is too high, and your most important knowledge is at risk of being forgotten.
--   **Is my "[Sorting Criteria](#sorting-criteria)" [Randomness](#randomness) setting right for me?** The Priority Shield gives you direct feedback on your randomness setting. If your shield value is too low, you might want to decrease the randomness to focus more strictly on high-priority items. Conversely, if you feel your reviews are too rigid, you can increase randomness and watch how it affects your shield value over time.
+-   **Is my "[Sorting Criteria](#sorting-criteria)" [Randomness](#1-incremental-rem-randomness) setting right for me?** The Priority Shield gives you direct feedback on your randomness setting. If your shield value is too low, you might want to decrease the randomness to focus more strictly on high-priority items. Conversely, if you feel your reviews are too rigid, you can increase randomness and watch how it affects your shield value over time.
 -   **Am I at risk of burnout?** The history graph allows you to see trends. If you notice your Priority Shield value steadily declining over days or weeks, it may be a sign that your workload is becoming unmanageable, allowing you to adjust your strategy *before* you feel overwhelmed.
 
 ### Weighted Shield

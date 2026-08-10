@@ -83,7 +83,7 @@ If you previously used tags like `#HighPriority` or `#P1` to organise your cards
 
 ### 3. Unified Batch Priority Change
 
-While the tool above is specialized for migrations, the **[Prioritization-&-Sorting#batch-priority-change-increms--flashcards](Batch-Priority-Change.md)** widget provides a unified interface for managing existing priorities across an entire document tree.
+While the tool above is specialized for migrations, the **[Prioritization-&-Sorting#batch-priority-change-increms--flashcards](Prioritization-&-Sorting.md#batch-priority-change-increms-flashcards)** widget provides a unified interface for managing existing priorities across an entire document tree.
 
 - **Unified Interface:** Shows both Incremental Rems and Flashcard priorities in a single table.
 - **Bulk Adjustment:** Increase or decrease all selected card priorities by a specific amount or percentage.
@@ -181,7 +181,7 @@ This means cards that became due *during* the current session — for example, a
 
 When the session ends, before writing the shield value to the history graph, the plugin performs a **live `rem.getCards()` check** on the highest-priority candidate from the cache. If the cache entry turns out to be stale (e.g., the card was reviewed or rescheduled since the cache was last built), the plugin escalates to the next priority tier and retries — up to **20 API calls total**, grouped by priority level. This prevents phantom low-shield readings in the history caused by stale cache data.
 
-You can view the history of your Card Shield in the "[Prioritization-&-Sorting#priority-shield-history](Priority-Shield-History.md)" graph to track your retention discipline over time.
+You can view the history of your Card Shield in the "[Prioritization-&-Sorting#priority-shield-history](Prioritization-&-Sorting.md#priority-shield-history)" graph to track your retention discipline over time.
 
 ![Card Priority Shield history](assets/uploaded/d082cc01-a089-41c0-a6c0-24ece4662400.png){ width="800" }
 

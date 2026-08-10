@@ -42,7 +42,7 @@ Unlike the *Card Info Bar*, which lives at the bottom of flashcards and can be e
 
 ### 1.3. Answer Buttons Info Bar
 *(Incremental Rems only)*
-An info bar shown below the answer buttons when reviewing an Incremental Rem in the queue. It displays review stats, the [Priority Shield](Prioritization-&-Sorting.md#priority-shield) counter, and a **📊** button to open the [IncRem Repetition History](Getting-Started.md#repetition-history-widget).
+An info bar shown below the answer buttons when reviewing an Incremental Rem in the queue. It displays review stats, the [Priority Shield](Prioritization-&-Sorting.md#priority-shield) counter, and a **📊** button to open the [IncRem Repetition History](Getting-Started.md#repetition-history-statistics).
 
 ![Answer Buttons Info Bar](assets/reps-info-bar.png){ width="600" }
 
@@ -113,7 +113,7 @@ Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`
 
 ![Aggregated Repetition History](assets/aggregated-repetition-history.gif){ width="600" }
 
-The `Ctrl+Shift+H` command **intelligently routes** to the right view: Single for individual items, Aggregated for folders. If triggered on a flashcard, it opens the [Flashcard Repetition History](#flashcard-repetition-history) instead.
+The `Ctrl+Shift+H` command **intelligently routes** to the right view: Single for individual items, Aggregated for folders. If triggered on a flashcard, it opens the [Flashcard Repetition History](Reviewing-Items-in-the-Queue.md#flashcard-repetition-history) instead.
 
 ##### Recording and correcting records
 

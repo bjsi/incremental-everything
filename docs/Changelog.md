@@ -285,7 +285,7 @@ That last change also fixes a quieter bug: Batch Card Priority stored each Rem's
 > [!NOTE]
 > Badges only exist for Rems that can appear as a table row, so most knowledge bases will see no visible difference. If yours has stale badges from before this release, one run of **Refresh Priority Badges (Tables)** clears the backlog.
 
-📖 See [Priorities for Flashcards → Bulk operations and cascade cost](Priorities-for-Flashcards.md#bulk-cascade-performance).
+📖 See [Priorities for Flashcards → Bulk operations and cascade cost](Priorities-for-Flashcards.md#bulk-operations-and-cascade-cost).
 
 ### 🔍 Investigated: Card priorities lost when importing between knowledge bases
 
@@ -1725,9 +1725,9 @@ The integration adds fixes not present in the standalone plugin, leveraging IE's
 
 The Mastery Drill is entirely optional — you can disable all its features (popup, notification widget, command, and AGAIN/HARD tracking) via the **Skip Mastery Drill** toggle in plugin settings. Flashcard and Practiced Queue history are unaffected by this toggle.
 
-📖 See [History-Queue-Dashboard-and-Mastery-Drill](History,-Queue-Dashboard-&-Mastery-Drill.md) for full documentation.
+📖 See [History-Queue-Dashboard-and-Mastery-Drill](History-Queue-Dashboard-and-Mastery-Drill.md) for full documentation.
 
-> **⚠️ Migrating from the standalone plugin?** If you were previously using the *History, Queue Dashboard and Mastery Drill* plugin, follow the steps in [the migration guide](History-Queue-Dashboard-and-Mastery-Drill#migrating-from-the-standalone-plugin.md) before uninstalling it. Brief summary:
+> **⚠️ Migrating from the standalone plugin?** If you were previously using the *History, Queue Dashboard and Mastery Drill* plugin, follow the steps in [the migration guide](History-Queue-Dashboard-and-Mastery-Drill.md#migrating-from-the-standalone-plugin) before uninstalling it. Brief summary:
 >
 > 1. **Enable *Skip Mastery Drill* in IE settings and reload RemNote.** This disables IE's drill entirely, preventing duplicate Command Palette entries and double AGAIN/HARD tracking while both plugins coexist.
 > 2. **Complete your old Mastery Drill queue** *(optional — skip if you don't mind losing pending items; they will repopulate naturally).*
@@ -1932,7 +1932,7 @@ We've improved how PDFs are handled to support deep, structured reading. This up
 * **Hierarchical Management:** Use the **PDF Control Panel** to split long PDFs into chapters, manage page ranges, and view reading statistics in a containment tree.
 * **Inline Management:** Manage PDF page ranges and record positions directly from the **Priority Editor** sidebar without leaving your document.
 
-📖 **Learn more:** See the full [PDF Incremental Reading Workflow](PDF-Incremental-Reading-Workflow.md) and the guide on [Create-Incremental-Rem-from-PDF-Highlights](Creating-IncRems-from-PDF-Highlights.md).
+📖 **Learn more:** See the full [PDF Incremental Reading Workflow](PDF-Incremental-Reading-Workflow.md) and the guide on [Create-Incremental-Rem-from-PDF-Highlights](Create-Incremental-Rem-from-PDF-Highlights.md).
 
 ![Pdf highlight menu buttons](assets/pdfhighlight-toolbar.png){ width="700" }
 
@@ -2122,10 +2122,10 @@ A brand-new **Weighted Shield** metric has been introduced to give you a macro-l
 
 *   **Exponential Weighting:** Items are weighted exponentially by priority (top-priority items carry ~10× the weight of bottom-priority items). Processing high-priority items gives a much larger boost to your shield percentage.
 *   **Breakdown Popup:** Clicking on the Weighted Shield metric in the queue toolbar opens a detailed breakdown popup that divides your knowledge base into ten percentile buckets (e.g., 0-10%, 10-20%), showing exactly how much volume within each bucket is due versus processed.
-*   **Global Graph Toggle:** The [Prioritization-&-Sorting#priority-shield-history](Priority-Shield-History.md) widget now features a global checkbox at the top to toggle the Weighted Shield line across all charts simultaneously.
+*   **Global Graph Toggle:** The [Prioritization-&-Sorting#priority-shield-history](Prioritization-&-Sorting.md#priority-shield-history) widget now features a global checkbox at the top to toggle the Weighted Shield line across all charts simultaneously.
 *   **Settings Integration:** The display of the Weighted Shield in the queue can be toggled on/off in the plugin settings.
 
-📖 **Learn more:** See the [Prioritization-&-Sorting#weighted-shield](Weighted-Shield.md) documentation and the updated [Plugin-Settings-Reference#queue-display](Plugin-Settings.md) for more details.
+📖 **Learn more:** See the [Prioritization-&-Sorting#weighted-shield](Prioritization-&-Sorting.md#weighted-shield) documentation and the updated [Plugin-Settings-Reference#queue-display](Plugin-Settings-Reference.md#queue) for more details.
 
 ![Weighted Shield](assets/shield-weighted-card.png){ width="1000" }
 
@@ -2141,7 +2141,7 @@ A brand-new **Weighted Shield** metric has been introduced to give you a macro-l
 
 *   **Reliable Auto-Scroll:** The **Parent Selector** widget now reliably and perfectly centers the last selected parent node upon opening, even when dealing with extremely long trees. This eliminates the need to manually scroll down to locate your previous context.
 
-📖 **Learn more:** See the [Plugin-Widgets-Reference#parent-selector](Parent-Selector.md) section in the Widgets Reference and the [Create-Incremental-Rem-from-PDF-Highlights](Creating-IncRems-from-PDF-Highlights.md) guide for context on how this widget manages your reading hierarchy.
+📖 **Learn more:** See the [Plugin-Widgets-Reference#parent-selector](Plugin-Widgets-Reference.md#62-parent-selector) section in the Widgets Reference and the [Create-Incremental-Rem-from-PDF-Highlights](Create-Incremental-Rem-from-PDF-Highlights.md) guide for context on how this widget manages your reading hierarchy.
 
 ---
 
@@ -2433,7 +2433,7 @@ To prevent accidentally reviewing large numbers of items that aren't actually du
 *   **Inline Row Warning:** If you launch a review from a specific row in an unfiltered list, an inline warning box appears immediately below that row, showing how many items are in the resulting sub-queue and how many of those are actually due.
 *   **Smart Actions:** Both warning types let you instantly toggle the **"Filter to Due Only"** state or chose to **"Proceed As-Is"** with your current selection.
 
-📖 **Full documentation:** See the [Reviewing-Items-in-the-Editor#2-sequential-review-via-increm-lists](Sequential-Review.md) and [IncRem-List-and-Main-View#due-filter-warning](Due-Filter-Warnings.md) sections in the wiki.
+📖 **Full documentation:** See the [Reviewing-Items-in-the-Editor#2-sequential-review-via-increm-lists](Reviewing-Items-in-the-Editor.md#2-sequential-review-via-increm-lists) and [IncRem-List-and-Main-View#due-filter-warning](IncRem-List-and-Main-View.md#due-filter-warning) sections in the wiki.
 
 ![Header-level Due warning banner](assets/increm-list-warning.png){ width="700" }
 
@@ -2581,7 +2581,7 @@ Both the anchor rem name and each scoped rem's name now show `Front → Back` wh
 ![Batch Card Priority widget](assets/batch-card-assign-priority-referencingrems.png){ width="900" }
 
 
-📖 See [Priorities-for-Flashcards#2-batch-assignment-for-tag-or-reference-migration](Batch-Assignment.md) in the wiki for step-by-step instructions and full feature details.
+📖 See [Priorities-for-Flashcards#2-batch-assignment-for-tag-or-reference-migration](Priorities-for-Flashcards.md#2-batch-assignment-for-tag-or-reference-migration) in the wiki for step-by-step instructions and full feature details.
 
 ---
 
@@ -2798,7 +2798,7 @@ We have overhauled the Randomness sliders in the **Sorting Criteria** widget to 
     *   **Parallelized Data Fetching:** Descendant data is now aggressively fetched concurrently in background chunks rather than one-by-one.
 *   **Open Rem Navigation:** Added a subtle `↗` link icon to the far right of every row in the hierarchy tree. While clicking anywhere on the row safely expands/collapses the branch, clicking this icon instantly teleports you to that specific Rem in the editor and closes the widget out of your way.
 
-📖 **Full documentation:** See the [Getting-Started#2-aggregated-history-view](Aggregated-Repetition-History.md) section in the Getting Started guide.
+📖 **Full documentation:** See the [Getting-Started#2-aggregated-history-view](Getting-Started.md#2-aggregated-history-view) section in the Getting Started guide.
 
 ---
 ## v0.2.126 - March 5th, 2026
@@ -2825,7 +2825,7 @@ We've fundamentally improved the **Priority Shield History** widget with better 
 
 ![Priority Shield Graph Zoom](assets/priority-shield-graph-zoom.gif){ width="800" }
 
-📖 **Full documentation:** See the [Prioritization-&-Sorting#priority-shield-history](Priority-Shield-History.md) and [Plugin-Widgets-Reference#priority-shield-graph](Plugin-Widgets-Reference.md) pages.
+📖 **Full documentation:** See the [Prioritization-&-Sorting#priority-shield-history](Prioritization-&-Sorting.md#priority-shield-history) and [Plugin-Widgets-Reference#priority-shield-graph](Plugin-Widgets-Reference.md) pages.
 
 
 ---
@@ -2929,7 +2929,7 @@ The **Collapse Queue Top Bar** setting has been temporarily disabled as it was n
 *   **New:** [Plugin Settings Reference](Plugin-Settings-Reference.md) — comprehensive page documenting all 18 configurable settings, organized by category.
 *   **New:** [Plugin Widgets Reference](Plugin-Widgets-Reference.md) — visual manual covering every widget in the plugin with descriptions, features, and screenshots.
 *   **New:** [Plugin Commands Reference](Plugin-Commands-Reference.md) — complete reference with default keybindings on every command, expanded descriptions with use cases, features, and images from the changelog.
-*   **Sidebar:** Now there is a [_Sidebar](_Sidebar.md) to easily navigate the user's manual page.
+*   **Sidebar:** Now there is a **sidebar** to easily navigate the user's manual page.
 
 ---
 ## v0.2.119 - March 4th, 2026
@@ -2959,7 +2959,7 @@ We've packed several new insights and usability improvements into the Flashcard 
 
 The IncRem List and All Inc Rems widgets now support powerful new workflows that bring queue-like features directly into your overview lists:
 
-*   **Review in Editor (🔗)**: A new icon on each row lets you launch a timed review session directly from the list. This opens the Rem in the editor, starts the Editor Review Timer, and defers the actual SRS rescheduling until you click "End Review" — matching the true behavior of the [Execute Repetition Command](Reviewing-Items-in-the-Queue.md#execute-repetition-command-editor-review). When you finish, the list automatically reopens and restores your exact same document filter and sorting state.
+*   **Review in Editor (🔗)**: A new icon on each row lets you launch a timed review session directly from the list. This opens the Rem in the editor, starts the Editor Review Timer, and defers the actual SRS rescheduling until you click "End Review" — matching the true behavior of the [Execute Repetition Command](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command). When you finish, the list automatically reopens and restores your exact same document filter and sorting state.
 *   **Inline Priority Editing**: Clicking the Priority badge on any row now opens a fully-featured inline editor. You can rapidly adjust priorities using ↑/↓ arrow keys with acceleration (tap faster for bigger jumps), exactly like the priority widgets in the queue.
 
 ![IncRem List Inline Priority and Review in Editor workflow](assets/increm-list-priority-and-review.gif){ width="800" }
@@ -2972,7 +2972,7 @@ Fixed a race condition where programmatic SRS updates (via `updateSRSDataForRem`
 
 **Fix:** Increased the flag clear timeout to 3000ms, safely outlasting the debounce window.
 
-### 📖 New Wiki Page: [IncRem-List-and-Main-View](IncRem-List-&-Main-View.md)
+### 📖 New Wiki Page: [IncRem-List-and-Main-View](IncRem-List-and-Main-View.md)
 
 Added comprehensive documentation for the IncRem List and All Inc Rems widgets, covering:
 *   Two entry points (scoped list vs. KB-wide main view)
@@ -3054,7 +3054,7 @@ Added multiple safety nets to proactively reset the `incremental-queue-active` f
 
 ![Flashcard Repetition History with SInc](assets/flashcard-rep-history.png){ width="900" }
 
-📖 **Full documentation:** [Reviewing Items in the Queue#card-stats--fsrs-integration](Reviewing-Items-in-the-Queue#card-stats--fsrs-integration.md)
+📖 **Full documentation:** [Reviewing Items in the Queue#card-stats--fsrs-integration](Reviewing-Items-in-the-Queue.md#card-stats-fsrs-integration)
 
 ---
 ## v0.2.112 - March 3rd, 2026
@@ -3093,7 +3093,7 @@ The plugin includes a pure TypeScript implementation of the **FSRS v6.1.1** algo
 *   **Display FSRS DSR Stats** (boolean): Toggle the DSR line on/off.
 *   **FSRS Global Weights** (string): Paste your FSRS weights here (comma-separated, 19 or 21 values). To find your weights: go to RemNote Settings → Spaced Repetition → your scheduler → copy the weights array. If left empty, the official FSRS v6.1.1 default weights are used.
 
-📖 **Full documentation:** [Reviewing Items in the Queue#card-stats--fsrs-integration](Reviewing-Items-in-the-Queue#card-stats--fsrs-integration.md)
+📖 **Full documentation:** [Reviewing Items in the Queue#card-stats--fsrs-integration](Reviewing-Items-in-the-Queue.md#card-stats-fsrs-integration)
 
 ---
 ## v0.2.111 - March 3rd, 2026
@@ -3406,7 +3406,7 @@ Significantly improved the calculation and display of the **Priority Shield** to
 *   **Increased Precision:** The shield now displays **1 decimal place** (e.g., `45.2%`) for granular tracking.
 *   **Performance Optimization:** The calculation logic was rewritten to use `O(N)` linear scans instead of `O(N log N)` sorting. It also uses efficient `Set` lookups during reviews. This means **zero lag** even when reviewing large documents with thousands of cards.
 *   **Accuracy Fix for Priority Review Documents:** Fixed an issue where the Document Shield would show 0% for Priority Review Documents. It now correctly scopes to the original source document to calculate the universe size.
-*   **Consistent History:** The [Prioritization-&-Sorting#priority-shield-history](Priority-Shield-History.md) graph now also uses this improved volume-based calculation, ensuring your historical data matches what you see during review.
+*   **Consistent History:** The [Prioritization-&-Sorting#priority-shield-history](Prioritization-&-Sorting.md#priority-shield-history) graph now also uses this improved volume-based calculation, ensuring your historical data matches what you see during review.
 
 ## v0.2.87 - January 31st, 2026
 
@@ -3465,14 +3465,14 @@ The plugin now **differentiates reschedule and repetition events** based on thei
 | `rescheduledInQueue` | Ctrl+J in queue | ✅ Yes |
 | `rescheduledInEditor` | Ctrl+J in editor | ❌ No |
 | `manualDateReset` | Manual edit of Next Rep Date | ❌ No |
-| `executeRepetition` | [Execute Repetition command](Reviewing-Items-in-the-Queue.md#execute-repetition-command-editor-review) | ✅ Yes |
+| `executeRepetition` | [Execute Repetition command](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) | ✅ Yes |
 
 **Why this matters:**
-- **Review actions** ([Next](Reviewing-Items-in-the-Queue.md#next), [Reschedule in queue](Reviewing-Items-in-the-Queue.md#reschedule), [Execute Repetition command](Reviewing-Items-in-the-Queue.md#execute-repetition-command-editor-review) in editor) count for interval calculation because you engaged with and reviewed the content
+- **Review actions** ([Next](Reviewing-Items-in-the-Queue.md#next), [Reschedule in queue](Reviewing-Items-in-the-Queue.md#reschedule), [Execute Repetition command](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) in editor) count for interval calculation because you engaged with and reviewed the content
 - **Administrative adjustments** (Ctrl+J in editor, manual date edits) don't count — they change the schedule without confirming a review took place
-- The **[Repetition History widget](Getting-Started.md#repetition-history-widget)** displays visual indicators for each event type (📅 for queue reschedules, ⌨️ for editor command reviews, colored markers for administrative events)
+- The **[Repetition History widget](Getting-Started.md#repetition-history-statistics)** displays visual indicators for each event type (📅 for queue reschedules, ⌨️ for editor command reviews, colored markers for administrative events)
 
-See [Reviewing Items in the Queue#reschedule-event-types](Reviewing-Items-in-the-Queue#reschedule-event-types.md) for the complete event type reference.
+See [Reviewing Items in the Queue#reschedule-event-types](Reviewing-Items-in-the-Queue.md#technical-note-reschedule-event-types) for the complete event type reference.
 
 ---
 
@@ -3527,7 +3527,7 @@ Added a new **Repetition History** popup that provides detailed insights into yo
 
 ## v0.2.81 - January 24th, 2026
 
-* Remapped **Quick Priority shortcuts**. See [Prioritization-&-Sorting#quick-priority-shortcuts](Prioritization-&-Sorting#quick-priority-shortcuts.md) for details.
+* Remapped **Quick Priority shortcuts**. See [Prioritization-&-Sorting#quick-priority-shortcuts](Prioritization-&-Sorting.md#quick-priority-shortcuts) for details.
 
 ## v0.2.79 - January 23rd, 2026
 
@@ -3574,7 +3574,7 @@ This release brings a significant refactoring of how priorities are handled, foc
 
 ## v0.2.65 - January 21st, 2026
 
-**Fix:** Resolved an issue where [Prioritization-&-Sorting#priority-shield-history](Priority-Shield-history.md) was recorded with incorrect data if the queue was exited before the cache fully loaded. This eliminates spurious "humps" in the history graph caused by partial universe sizes, ensuring history is only saved when the cache is complete.
+**Fix:** Resolved an issue where [Prioritization-&-Sorting#priority-shield-history](Prioritization-&-Sorting.md#priority-shield-history) was recorded with incorrect data if the queue was exited before the cache fully loaded. This eliminates spurious "humps" in the history graph caused by partial universe sizes, ensuring history is only saved when the cache is complete.
 
 
 
@@ -3595,7 +3595,7 @@ This release brings a significant refactoring of how priorities are handled, foc
 ### 📆 Enhanced Reschedule Widget
 - Added advanced keyboard navigation:
   - Use `Arrow Up`/`Arrow Down` to adjust Days and Priority values with acceleration (hold for faster changes).
-  - Use [Tab](cci:1://file:///Users/hugomarins/incremental-everything/src/widgets/reschedule.tsx:146:2-158:4.md) to cycle focus between Days and Priority inputs.
+  - Use `Tab` to cycle focus between Days and Priority inputs.
   - Press `Esc` to close the popup without saving.
 
 ## v0.2.60 - January 8th, 2026
@@ -3635,16 +3635,16 @@ We've completely overhauled how PDF highlights are styled to give you immediate 
 *   **Future Priority Support**: Enabled setting priority for descendant cards even if count is 0 (supports future cards), removing the "neither Incremental nor has flashcards" fallback state.
 
 ## v0.2.55 - January 3rd, 2026
-* Moved the **Summary** and [Priority-Review-Document#priority-review-document-graph-view](Priority-Distribution-Graph.md) to the top of [Priority Review Document](Priority-Review-Document.md)s (instead of the bottom).
+* Moved the **Summary** and [Priority-Review-Document#priority-review-document-graph-view](Priority-Review-Document.md#priority-review-document-graph-view) to the top of [Priority Review Document](Priority-Review-Document.md)s (instead of the bottom).
 
 ![priority-review-doc-graphattop](assets/uploaded/4cbed8d9-dda8-4120-a3d9-06df42d4695a.png){ width="800" }
 
 
-* Changed the name of the "**Pre-compute all card priorities**" command to "**[Priorities-for-Flashcards#maintenance-the-update-all-inherited-card-priorities-command](Update-all-inherited-Card-Priorities.md)**".
+* Changed the name of the "**Pre-compute all card priorities**" command to "**[Priorities-for-Flashcards#maintenance-the-update-all-inherited-card-priorities-command](Priorities-for-Flashcards.md#manual-full-kb-sweep-update-all-inherited-card-priorities)**".
 
 ![CleanShot 2026-01-03 at 16 06 53@2x](assets/uploaded/c04bec93-9af1-4de3-946c-959601f97d34.png){ width="700" }
 
-## v0.2.54 - December 31th, 2025 - Improved [Priority-Review-Document#priority-review-document-graph-view](Priority-Review-Document-Graph-View.md) and Metadata for Summary
+## v0.2.54 - December 31th, 2025 - Improved [Priority-Review-Document#priority-review-document-graph-view](Priority-Review-Document.md#priority-review-document-graph-view) and Metadata for Summary
 
 Graph View now can also show distributions by relative priority percentile.
 
@@ -3657,7 +3657,7 @@ Summary now shows scope size data (total number of IncRems, Rems with Cards and 
 
 ### 📊 Feature: [Priority Review Document](Priority-Review-Document.md) Graph View
 
-Implemented a visual distribution graph for Priority Review Documents. This feature appends a bar chart to the end of newly created review documents, visualizing the priority distribution of the included Incremental Rems and Flashcards. This helps users verify the effect of the requested randomness parameters in their [Prioritization-&-Sorting#sorting-criteria](Sorting-Criteria.md), and that the "[Prioritization-&-Sorting#priority-shield](Priority-Shield.md)" logic is correctly prioritizing high-value items.
+Implemented a visual distribution graph for Priority Review Documents. This feature appends a bar chart to the end of newly created review documents, visualizing the priority distribution of the included Incremental Rems and Flashcards. This helps users verify the effect of the requested randomness parameters in their [Prioritization-&-Sorting#sorting-criteria](Prioritization-&-Sorting.md#sorting-criteria), and that the "[Prioritization-&-Sorting#priority-shield](Prioritization-&-Sorting.md#priority-shield)" logic is correctly prioritizing high-value items.
 
 ![Sorting Criteria randomness](assets/uploaded/544ec922-131d-4017-95dd-df6a6798b8c1.png){ width="500" }
 
@@ -4838,14 +4838,14 @@ This update introduces four powerful new features designed to make your workflow
 ![pdf-control-panel-command-in-editor](assets/uploaded/945be4b9-edf6-43e6-aa58-30026d431f0f.png){ width="871" }
 
 
-### ✨ New Feature: [Prioritization-&-Sorting#priority-shield](Priority-Shield.md) & History Graph (= Priority Protection)
+### ✨ New Feature: [Prioritization-&-Sorting#priority-shield](Prioritization-&-Sorting.md#priority-shield) & History Graph (= Priority Protection)
 
 Inspired by advanced metrics in SuperMemo, this update introduces the **Priority Shield**, a powerful diagnostic tool to help you understand and manage your learning process. This feature gives you a clear, numerical value for your "Priority Protection"—your capacity to process high-priority material on any given day.
 
 The core purpose of the Priority Shield is to move beyond guessing and provide you with concrete data to build a sustainable and effective study strategy. By knowing the exact priority of the most important Incremental Rem you have yet to review, you can answer critical questions about your learning habits:
 
 -   **Am I creating new material faster than I can review it?** If you consistently see a low Priority Shield value (e.g., your Relative Priority Shield is only protecting 4% of your top priority Incremental Rems), it's a strong indicator that the inflow of new Incremental Rems is too high, and your most important knowledge is at risk of being forgotten.
--   **Is my "[Prioritization-&-Sorting#sorting-criteria](Sorting-Criteria.md)" setting right for me?** The Priority Shield gives you direct feedback on your randomness setting. If your shield value is too low, you might want to decrease the randomness to focus more strictly on high-priority material. Conversely, if you feel your reviews are too rigid, you can increase randomness and watch how it affects your shield value over time.
+-   **Is my "[Prioritization-&-Sorting#sorting-criteria](Prioritization-&-Sorting.md#sorting-criteria)" setting right for me?** The Priority Shield gives you direct feedback on your randomness setting. If your shield value is too low, you might want to decrease the randomness to focus more strictly on high-priority material. Conversely, if you feel your reviews are too rigid, you can increase randomness and watch how it affects your shield value over time.
 -   **Am I at risk of burnout?** The history graph allows you to see trends. If you notice your Priority Shield value steadily declining over days or weeks, it may be a sign that your workload is becoming unmanageable, allowing you to adjust your strategy *before* you feel overwhelmed.
 
 This new feature includes:
@@ -4862,7 +4862,7 @@ This new feature includes:
 ![image](assets/uploaded/462f56e5-c179-4e5e-a3b9-fd8ce6469886.png){ width="700" }
 
 
-### ✨ New Feature: [Prioritization-&-Sorting#priority-inheritance-system](Priority-Inheritance-System.md)
+### ✨ New Feature: [Prioritization-&-Sorting#priority-inheritance-system](Prioritization-&-Sorting.md#priority-inheritance-system)
 
 This feature mimics SuperMemo's hierarchical priority system, making the management of complex topics effortless.
 
@@ -4888,7 +4888,7 @@ The "Set Priority" and "Reschedule" popups have also been updated to display the
 
 
 
-### ✨ New Feature:  "[Reviewing-Items-in-the-Queue#open-editor-in-new-tab-for-pdfs](Open-Editor-in-New-Tab.md)" Button for PDFs
+### ✨ New Feature:  "[Reviewing-Items-in-the-Queue#open-editor-in-new-tab-for-pdfs](Reviewing-Items-in-the-Queue.md#open-editor-in-new-tab)" Button for PDFs
 
 This button is a direct response to a recent RemNote UI change and serves as an essential workaround to restore a seamless PDF review workflow.
 

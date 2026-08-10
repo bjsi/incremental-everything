@@ -644,7 +644,7 @@ There is also a **Diagnose Read Path** button in the debug widget's Card Priorit
 ### What To Do
 
 - **Re-import does not help** — it fails the same way each time.
-- **Reapply in bulk instead.** Note the priorities before transferring (a [Priority Review Document](Priority-Review-Document.md) is a convenient snapshot) and use **[Batch Assign Card Priority](Priorities-for-Flashcards.md#assigning-priorities-in-bulk)** in the target knowledge base afterwards.
+- **Reapply in bulk instead.** Note the priorities before transferring (a [Priority Review Document](Priority-Review-Document.md) is a convenient snapshot) and use **[Batch Assign Card Priority](Priorities-for-Flashcards.md#3-unified-batch-priority-change)** in the target knowledge base afterwards.
 - **Incremental Rem data is safe** to move as-is.
 - If you hit this, it is worth reporting to RemNote: the same export file succeeding in one knowledge base and failing in another, with the plugin disabled, is a precise reproduction.
 

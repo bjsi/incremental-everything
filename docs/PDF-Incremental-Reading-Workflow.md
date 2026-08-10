@@ -130,7 +130,7 @@ When you select text in the PDF Reader and create a highlight, the native RemNot
 | Icon | Tool | Description |
 |------|------|-------------|
 | 🔖 | **Set Bookmark Position** | Manually records your current reading position at this highlight's exact page. *(Note: Using the extraction tools below will also do this automatically).* |
-| ![](https://cdn-icons-png.flaticon.com/512/8365/8365483.png){ width="16" } | **Create Incremental Rem** | Extracts the highlight into a standalone Incremental Rem and lets you choose precisely where it should live in your Knowledge Base hierarchy. See the [Create-Incremental-Rem-from-PDF-Highlights](dedicated-guide-here.md) for full details. |
+| ![](https://cdn-icons-png.flaticon.com/512/8365/8365483.png){ width="16" } | **Create Incremental Rem** | Extracts the highlight into a standalone Incremental Rem and lets you choose precisely where it should live in your Knowledge Base hierarchy. See the [Create-Incremental-Rem-from-PDF-Highlights](Create-Incremental-Rem-from-PDF-Highlights.md) for full details. |
 | ![](https://cdn-icons-png.flaticon.com/512/1504/1504044.png){ width="16" } | **Toggle Incremental Rem** | Quick-tags the highlight itself as an Incremental Rem without moving it. The button background turns blue to indicate the highlight is now actively tracked in your queue. |
 | 👁️ / 🙈 | **Toggle Marker Borders (Peek)** | Shows/hides the extract & incremental **marker borders** (see below) over all PDF highlights, so you can read a busy page cleanly. Turns amber while markers are hidden. Also available as the **Toggle PDF Highlight Marker Borders** command (quick code `tb`), and remembered per device (default: on). |
 
@@ -199,7 +199,7 @@ Toggle behavior simply by adding or removing the `extractviewer` tag:
 | `#extractviewer` tag | ExtractViewer (notes and children) |
 
 > [!TIP]
-> If the chapter has a **[read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems)** set on a descendant, you don't need the tag to peek at the outline: a **📑 View outline / 📄 Read document** toggle appears in the top-right of the queue card, letting you flip between the PDF reader and the outline view **per session** without re-tagging. The `#extractviewer` tag is for making the outline the **permanent default** for that chapter. See [Reviewing-Items-in-the-Queue#the-answer-buttons](Reviewing-in-the-Queue-→-hybrid-toggle.md).
+> If the chapter has a **[read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems)** set on a descendant, you don't need the tag to peek at the outline: a **📑 View outline / 📄 Read document** toggle appears in the top-right of the queue card, letting you flip between the PDF reader and the outline view **per session** without re-tagging. The `#extractviewer` tag is for making the outline the **permanent default** for that chapter. See [Reviewing-Items-in-the-Queue#the-answer-buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons).
 
 ### Multiple PDF Sources — Active PDF, Switcher, and `#preferthispdf`
 
