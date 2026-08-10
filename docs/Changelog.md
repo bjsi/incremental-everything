@@ -2,6 +2,33 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.36 - August 10th, 2026
+
+### 🐛 Fixed: chapters indented under the wrong chapter in the PDF Control Panel
+
+The **All Rems Using This PDF** tree could show a sub-section nested under a chapter whose pages don't contain it — *2.4 Cavitation* (p.59–62) sitting under *6 Ship Maneuvering* (p.242–299), for instance.
+
+The nesting itself was right; the **order** was not. The list is drawn flat and indented by depth, so a row reads as a child of whatever precedes it — and dismissed chapters were sorted to the bottom of the list, away from the parent they belonged to. They landed one indent below the last chapter on the list and appeared to belong to it. The list is now emitted so that **every chapter is followed immediately by its own sub-sections**.
+
+This surfaced with [v1.0.34](#v1034-august-5th-2026): once page ranges moved onto the Rem, dismissed chapters kept theirs and so gained a place in the tree. Before that they had no range and simply sat flush-left at the bottom, where nothing looked out of place.
+
+Two related fixes came with it:
+
+- **A chapter and its first sub-section usually start on the same page** (Chapter 4 opens on p.30, and so does 4.1). That tie was previously broken arbitrarily, and when the sub-section came out first the chapter was never recognised as its container — so it did not nest at all. The wider range now always comes first.
+- **A dismissed chapter can now be the parent of a live one.** Sorting dismissed rems to the bottom had also hidden them from the containment search, so an Incremental sub-section under a dismissed chapter was flattened to the top level.
+
+The current rem is no longer pulled to the top of the list — that was what displaced it from its own position in the book. It is marked by its highlighted border and **Current** chip, and the panel scrolls it into view when it opens.
+
+### ✨ New: page range and history are editable on dismissed chapters
+
+A dismissed chapter keeps its page range and reading history, but the panel offered it only **Make Incremental** — the same as a rem that had never been Incremental, and the two were indistinguishable on screen.
+
+Dismissed chapters now carry a **Dismissed** chip, and expanding one gives **📄 Range**, **📖 History** and **⚡ Restore**. So you can correct a chapter's page range while tidying up a book without having to bring it back into your queue first. **★ Priority** stays hidden, since a dismissed rem has no schedule for a priority to act on.
+
+Rems that are neither Incremental nor dismissed are unchanged: they still offer only **Make Incremental**, because they have nowhere to store a page range yet.
+
+📖 See [Hierarchical Tree View](PDF-Incremental-Reading-Workflow.md#hierarchical-tree-view) for how the containment tree is built, and [Dismissed Chapters in the Panel](PDF-Incremental-Reading-Workflow.md#dismissed-chapters-in-the-panel) for what each row offers.
+
 ## v1.0.35 - August 7th, 2026
 
 ### 🐛 Fixed: priorities showing the wrong number after a RemNote update
