@@ -1,6 +1,6 @@
 // lib/pdfUtils.ts
 import { RNPlugin, PluginRem, RemId, BuiltInPowerupCodes } from '@remnote/plugin-sdk';
-import { powerupCode, allIncrementalRemKey } from './consts';
+import { powerupCode, dismissedPowerupCode, allIncrementalRemKey } from './consts';
 import { IncrementalRem } from './incremental_rem/types';
 import { resolveRemTextToString, resolveRemTextForBreadcrumb } from './richTextRemRefs';
 import {
@@ -887,6 +887,14 @@ export type PdfRemEntry = {
   range: { start: number, end: number } | null;
   currentPage: number | null;
   isIncremental: boolean;
+  /**
+   * Carries the Dismissed powerup. Distinct from `!isIncremental`, which also
+   * covers rems that were never incremental: a dismissed Rem still hosts the
+   * pdfState slot (see resolveStateHost), so its range and history remain
+   * editable, while a Rem with neither powerup cannot hold state at all and
+   * would silently discard such an edit.
+   */
+  isDismissed: boolean;
 };
 
 /** Shared sort for PdfRemEntry arrays: incremental first, then alphabetical. */
@@ -929,12 +937,13 @@ export const getInstantRemsForPDF = async (
       const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
       if (foundPDF && foundPDF._id === pdfRemId) {
         const isIncremental = await rem.hasPowerup(powerupCode);
+        const isDismissed = !isIncremental && (await rem.hasPowerup(dismissedPowerupCode));
         const remText = await safeRemTextToString(plugin, rem.text);
         const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
         const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
-        results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental });
+        results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental, isDismissed });
         processedIds.add(rem._id);
-        console.log(`✓ INSTANT ADDED: "${remText}" (Incremental: ${isIncremental})`);
+        console.log(`✓ INSTANT ADDED: "${remText}" (Incremental: ${isIncremental}${isDismissed ? ', Dismissed' : ''})`);
       }
     }
     // Self-heal: trim the stored index to only the IDs that still have this PDF.
@@ -983,7 +992,8 @@ export const getCacheRemsForPDF = async (
         const remText = await safeRemTextToString(plugin, rem.text);
         const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
         const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
-        results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental: true });
+        // Sourced from the incremental-rem cache, so these are live by construction.
+        results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental: true, isDismissed: false });
         processedIds.add(rem._id);
         console.log(`✓ CACHE ADDED: "${remText}" (Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
       }
@@ -1080,11 +1090,12 @@ export const getLocalRemsForPDF = async (
       const foundPDF = await findPDFinRem(plugin, rem, pdfRemId);
       if (foundPDF && foundPDF._id === pdfRemId) {
         const isIncremental = await rem.hasPowerup(powerupCode);
+        const isDismissed = !isIncremental && (await rem.hasPowerup(dismissedPowerupCode));
         const remText = await safeRemTextToString(plugin, rem.text);
         const range = await getIncrementalPageRange(plugin, rem._id, pdfRemId);
         const currentPage = await getIncrementalReadingPosition(plugin, rem._id, pdfRemId);
-        results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental });
-        console.log(`✓ SLOW ADDED: "${remText}" (Incremental: ${isIncremental}, Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
+        results.push({ remId: rem._id, name: remText, range, currentPage, isIncremental, isDismissed });
+        console.log(`✓ SLOW ADDED: "${remText}" (Incremental: ${isIncremental}${isDismissed ? ', Dismissed' : ''}, Range: ${range ? `${range.start}-${range.end}` : 'none'})`);
       }
     }
 
