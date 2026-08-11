@@ -60,7 +60,7 @@ import {
   PerKeyLimitReport,
   ArrayKeyAnatomy,
 } from '../lib/synced_key_audit';
-import { AUTHORITATIVE_AGGREGATES_KEY } from '../lib/authoritative_aggregates';
+import { AUTHORITATIVE_AGGREGATES_KEY, authoritativeShardKey } from '../lib/authoritative_aggregates';
 import { flashcardHistorySpec, remHistorySpec, shardKey } from '../lib/history_shards';
 import { CardPriorityInfo } from '../lib/card_priority';
 import dayjs from 'dayjs';
@@ -4272,6 +4272,7 @@ function Debug() {
               {[
                 { label: 'Flashcard history', key: shardKey(flashcardHistorySpec, currentKbId) },
                 { label: 'Visited rems', key: shardKey(remHistorySpec, currentKbId) },
+                { label: 'Study aggregates', key: authoritativeShardKey(currentKbId) },
               ].map(({ label, key }) => (
                 <button
                   key={key}

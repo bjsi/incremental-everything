@@ -25,14 +25,22 @@ Your existing history is split across your knowledge bases automatically, withou
 
 The same treatment, for the same reason: its list was at 27% of the ceiling and growing with every knowledge base you visit. It keeps the 500 most recent visits per KB, with the same 400-character preview — twice what it stored before, since its old limit was 200 characters per side but is now 400 for the whole preview.
 
+### ♻️ Changed: study statistics are stored per knowledge base
+
+The **Refresh Statistics** recompute writes your daily study totals — every day you have ever practised — into the plugin's storage. All knowledge bases shared one item, so each Refresh rewrote and re-synced the lot. Measured on one knowledge base, **half of every write belonged to KBs that had not been studied in for months.**
+
+Each knowledge base now owns its totals. A Refresh writes only what it computed, dormant knowledge bases are never touched again, and the item that was at 67% of RemNote's ceiling drops to 33% — roughly doubling the years of daily records it can hold.
+
+**No history is dropped.** These records go back to 2016 for imported study logs, and the Summary's **Ever** row depends on every one of them. Splitting the storage is what keeps all of it affordable; the alternative would have been discarding old days. The split happens automatically on first load, without a recompute, and an installation still holding the oldest storage format is converted and split in the same pass.
+
 ### 🔧 Debug: the synced-storage audit now measures against the real ceiling
 
 The **Synced Storage Key Audit** in the debug widget reported sizes in UTF-8 bytes, which understated every key by half against a limit counted in UTF-16. It now shows each key in all three plausible units with a **% worst** column, and two new tools sit beside it:
 
 - **Calibrate size ceiling** — writes a scratch key up to the point RemNote refuses it, using three different alphabets, and reads off which unit the limit is actually counted in. This is what identified UTF-16.
-- **Key anatomy** — breaks one key down into where its bytes go: entry count, cost per field, the fattest entries, how a low-cardinality field (such as the knowledge base id) splits the total, and what capping entries or preview text would save.
+- **Key anatomy** — breaks one key down into where its bytes go. For a list: entry count, cost per field, the fattest entries, and what capping entries or preview text would save. For a partitioned store such as the study statistics: one row per knowledge base with its size, share and date span, plus what sharding it or applying a retention window would actually save — measured rather than estimated.
 
-📖 See [How the history lists are stored](History-Queue-Dashboard-and-Mastery-Drill.md#how-the-history-lists-are-stored) for the limits that now apply and what happens to your existing entries.
+📖 See [How the history lists are stored](History-Queue-Dashboard-and-Mastery-Drill.md#how-the-history-lists-are-stored) for the limits that now apply, and [Refresh Statistics](History-Queue-Dashboard-and-Mastery-Drill.md#refresh-statistics-authoritative-summary-recompute) for where study totals are kept.
 
 ## v1.0.36 - August 10th, 2026
 

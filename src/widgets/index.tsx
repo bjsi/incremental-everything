@@ -24,7 +24,7 @@ import {
 import { enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
-import { compactAuthoritativeAggregatesIfNeeded } from '../lib/authoritative_aggregates';
+import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS } from '../lib/ui_helpers';
 import { getIESetting } from '../lib/settings';
@@ -81,11 +81,11 @@ async function onActivate(plugin: ReactRNPlugin) {
   // must not block activation.
   void cleanupOrphanedReviewGraphs(plugin);
 
-  // Fire-and-forget: shrink the authoritative-aggregates key into its compact
-  // form if it is still the legacy array. Needs no card/rem enumeration, so it
-  // works while those APIs are unavailable — and until it runs, that key sits
-  // over RemNote's 900KB per-key ceiling and every write to it is rejected.
-  void compactAuthoritativeAggregatesIfNeeded(plugin);
+  // Fire-and-forget: split the authoritative-aggregates key into one shard per
+  // knowledge base, compacting the legacy array shape on the way through. Needs
+  // no card/rem enumeration, so it works while those APIs are unavailable. Costs
+  // one read per session once the legacy key is drained.
+  void migrateAuthoritativeAggregatesToShards(plugin);
 
   registerCallbacks(plugin);
   await registerWidgets(plugin);

@@ -29,7 +29,11 @@ import {
 import { getLastDestinationKey } from './hierarchical_parent_selector/types';
 import { snapshotKey } from './listify';
 import { PRACTICED_QUEUES_HISTORY_KEY, DAILY_AGGREGATES_KEY } from './queue_aggregates';
-import { AUTHORITATIVE_AGGREGATES_KEY, AUTHORITATIVE_LAST_COMPUTED_KEY } from './authoritative_aggregates';
+import {
+  AUTHORITATIVE_AGGREGATES_KEY,
+  AUTHORITATIVE_LAST_COMPUTED_KEY,
+  authoritativeShardKey,
+} from './authoritative_aggregates';
 import { flashcardHistorySpec, remHistorySpec, shardKey } from './history_shards';
 
 // ---------------------------------------------------------------------------
@@ -519,6 +523,16 @@ async function buildCandidates(
       shardKey(flashcardHistorySpec, kbId),
       shardKey(remHistorySpec, kbId),
     ]),
+  });
+
+  // 3c. Authoritative study aggregates — one key per KB, holding every day that
+  //     KB has ever been studied.
+  families.push({
+    family: 'Authoritative aggregates (per KB)',
+    pattern: `${AUTHORITATIVE_AGGREGATES_KEY}_{kbId}`,
+    coverage: 'partial',
+    note: 'Same kbId discovery limits as the sorting settings above.',
+    keys: kbIds.map((kbId) => authoritativeShardKey(kbId)),
   });
 
   // 4. Rem universes.
@@ -1192,17 +1206,17 @@ function findBranchRoot(value: Record<string, unknown>): { root: Record<string, 
   let root = value;
   let path: string | undefined;
   for (let depth = 0; depth < 3; depth++) {
-    const objectProps = Object.entries(root).filter(([, v]) => isPlainObject(v));
-    // A wrapper is a small object whose only non-scalar member holds everything.
-    if (Object.keys(root).length <= 2 && objectProps.length === 1) {
-      const [name, child] = objectProps[0];
-      if (Object.keys(child as Record<string, unknown>).length > 1) {
-        root = child as Record<string, unknown>;
-        path = path ? `${path}.${name}` : name;
-        continue;
-      }
-    }
-    break;
+    const entries = Object.entries(root);
+    const objectProps = entries.filter(([, v]) => isPlainObject(v));
+    const scalarProps = entries.length - objectProps.length;
+    // A wrapper carries metadata alongside the payload — `{v: 2, kbs: {…}}`. The
+    // presence of a scalar sibling is what identifies it, NOT how many partitions
+    // the payload holds: a single-KB shard has exactly one, and descending on
+    // size alone would then walk straight past the partitions into the dates.
+    if (objectProps.length !== 1 || scalarProps === 0) break;
+    const [name, child] = objectProps[0];
+    root = child as Record<string, unknown>;
+    path = path ? `${path}.${name}` : name;
   }
   return { root, path };
 }

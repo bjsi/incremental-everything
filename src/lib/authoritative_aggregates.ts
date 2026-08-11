@@ -21,6 +21,23 @@ import { getIESetting } from './settings';
 export const AUTHORITATIVE_AGGREGATES_KEY = 'authoritativeDailyAggregates';
 export const AUTHORITATIVE_LAST_COMPUTED_KEY = 'authoritativeAggregatesLastComputed';
 
+/** Per-KB shard of the store above. Holds the same compact shape with a single
+ *  partition in it, so every decoder here works on a shard unchanged. */
+export function authoritativeShardKey(kbId: string): string {
+  return `${AUTHORITATIVE_AGGREGATES_KEY}_${kbId}`;
+}
+
+/** Measured per-key ceiling, in UTF-16 bytes — the unit RemNote counts in.
+ *  See `calibratePerKeyLimit` in synced_key_audit.ts. */
+const PER_KEY_UTF16_LIMIT = 896 * 1024;
+
+/** UTF-16 bytes of a value's JSON. `String.length` counts UTF-16 code units, so
+ *  the byte figure is twice that — the earlier size warnings here compared the
+ *  raw length against a byte limit and so under-reported by half. */
+function utf16Bytes(value: unknown): number {
+  return (JSON.stringify(value) ?? '').length * 2;
+}
+
 // ---------------------------------------------------------------------------
 // Storage format
 //
@@ -88,42 +105,98 @@ export function decodeAuthoritativeAggregates(raw: unknown): DailyAggregate[] {
   return [];
 }
 
+// ---------------------------------------------------------------------------
+// Per-KB sharding
+//
+// The single key held every knowledge base's buckets. The dashboard only ever
+// displays the current KB's, so the rest were read, rewritten and re-synced on
+// every recompute purely to be filtered out — 51% of the key when this was
+// measured, all of it belonging to KBs that had not been studied in for months.
+//
+// Each KB now owns `authoritativeDailyAggregates_<kbId>`, holding the same
+// compact store with one partition in it. Keeping the shape identical means
+// `decodeAuthoritativeAggregates` and `filterAuthoritativeForKb` work on a shard
+// with no changes, and a shard read back by an older build still decodes.
+//
+// This does NOT trim history: buckets go back to 2016 here and the dashboard's
+// "Ever" row depends on them. Sharding is what makes keeping all of it cheap.
+// ---------------------------------------------------------------------------
+
+/** Per-session guard, as in history_shards.ts: once the legacy key is drained,
+ *  confirming that should cost one read per session and no more. */
+let aggregatesMigrated = false;
+let aggregatesMigrationInFlight: Promise<void> | null = null;
+
 /**
- * Rewrite the stored value in the compact form if it is still the legacy array.
+ * Split the single aggregates key into per-KB shards.
  *
- * This is deliberately independent of the recompute: recomputing walks every
- * card (`plugin.card.getAll`, removed in RemNote 1.27.16) and cannot run at all
- * right now, whereas this only reads the key and writes it back in a smaller
- * shape — no card data, no rem enumeration, nothing the platform took away.
- * That matters because the legacy value is over the 900KB per-key ceiling, so
- * until it shrinks, EVERY write to this key is rejected.
+ * Subsumes the old v2 compaction pass: the legacy value is decoded whatever its
+ * shape (v2 store or the original `DailyAggregate[]`), so an installation that
+ * never compacted is migrated straight to sharded-and-compact in one step.
  *
- * Idempotent: a value already in v2 form is left alone, so this is safe to run
- * on every activation. Also safe at the 1000-key cap — the key already exists,
- * and overwrites of existing keys are still accepted.
+ * Shards are written before the source is dropped, so an interruption leaves
+ * duplicate data rather than missing data — the next run overwrites the shards
+ * from the legacy key again.
  */
-export async function compactAuthoritativeAggregatesIfNeeded(plugin: RNPlugin): Promise<boolean> {
+export async function migrateAuthoritativeAggregatesToShards(plugin: RNPlugin): Promise<void> {
+  if (aggregatesMigrated) return;
+  if (aggregatesMigrationInFlight) return aggregatesMigrationInFlight;
+  aggregatesMigrationInFlight = runAggregatesMigration(plugin).finally(() => {
+    aggregatesMigrationInFlight = null;
+  });
+  return aggregatesMigrationInFlight;
+}
+
+async function runAggregatesMigration(plugin: RNPlugin): Promise<void> {
   try {
     const raw = await plugin.storage.getSynced(AUTHORITATIVE_AGGREGATES_KEY);
-    if (!raw || isCompactStore(raw)) return false; // nothing stored, or already compact
-    if (!Array.isArray(raw) || raw.length === 0) return false;
+    const buckets = decodeAuthoritativeAggregates(raw);
+    if (buckets.length === 0) {
+      aggregatesMigrated = true;
+      return;
+    }
 
-    const beforeBytes = JSON.stringify(raw).length;
-    const payload = encodeAuthoritativeAggregates(decodeAuthoritativeAggregates(raw));
-    const afterBytes = JSON.stringify(payload).length;
+    const byKb = new Map<string, DailyAggregate[]>();
+    for (const bucket of buckets) {
+      const kbId = bucket.kbId || UNKNOWN_KB_ID;
+      const list = byKb.get(kbId);
+      if (list) list.push(bucket);
+      else byKb.set(kbId, [bucket]);
+    }
 
-    await plugin.storage.setSynced(AUTHORITATIVE_AGGREGATES_KEY, payload);
+    const sizes: string[] = [];
+    for (const [kbId, kbBuckets] of byKb) {
+      const payload = encodeAuthoritativeAggregates(kbBuckets);
+      await plugin.storage.setSynced(authoritativeShardKey(kbId), payload);
+      sizes.push(`${kbId.substring(0, 8)}…=${(utf16Bytes(payload) / 1024).toFixed(0)}KB`);
+    }
+
+    await plugin.storage.setSynced(AUTHORITATIVE_AGGREGATES_KEY, null);
+    aggregatesMigrated = true;
+    // Naming the source shape matters for support: an installation still holding
+    // the original array was compacted AND sharded by this one pass, so a ~5x
+    // drop in the totals below is expected rather than suspicious.
+    const sourceShape = Array.isArray(raw) ? 'legacy array (never compacted)' : 'compact v2 store';
     console.log(
-      `[AuthoritativeAggregates] Compacted ${raw.length} buckets: ` +
-        `${(beforeBytes / 1024).toFixed(1)}KB → ${(afterBytes / 1024).toFixed(1)}KB ` +
-        `(${(beforeBytes / afterBytes).toFixed(1)}x smaller, now ` +
-        `${((afterBytes / (900 * 1024)) * 100).toFixed(0)}% of the 900KB per-key limit).`
+      `[AuthoritativeAggregates] Sharded ${buckets.length} buckets across ${byKb.size} KB(s): ` +
+        `${sizes.join(', ')} — from a ${sourceShape} of ${(utf16Bytes(raw) / 1024).toFixed(0)}KB in one key.`
     );
-    return true;
   } catch (err) {
-    console.warn('[AuthoritativeAggregates] Compaction failed', err);
-    return false;
+    console.warn('[AuthoritativeAggregates] Sharding migration failed', err);
   }
+}
+
+/**
+ * This KB's stored aggregates, in whatever shape they are on disk. Returned raw
+ * so callers keep using `filterAuthoritativeForKb` / `decodeAuthoritativeAggregates`
+ * exactly as before.
+ */
+export async function readAuthoritativeAggregates(
+  plugin: RNPlugin,
+  kbId: string
+): Promise<unknown> {
+  await migrateAuthoritativeAggregatesToShards(plugin);
+  return plugin.storage.getSynced(authoritativeShardKey(kbId));
 }
 
 export function encodeAuthoritativeAggregates(buckets: DailyAggregate[]): CompactAggregateStore {
@@ -361,39 +434,45 @@ export async function computeAuthoritativeAggregatesForCurrentKb(
 }
 
 /**
- * Replace only the current KB's buckets in synced storage; preserve other KBs.
- * Stamps the last-computed timestamp.
+ * Write the current KB's buckets to its own shard and stamp the last-computed
+ * timestamp.
+ *
+ * Other knowledge bases are no longer this function's problem: they live in their
+ * own keys, so the read-merge-preserve dance that used to guard them is gone, and
+ * a recompute now writes only what it computed.
  */
 export async function saveAuthoritativeAggregates(
   plugin: RNPlugin,
   currentKbBuckets: DailyAggregate[]
 ): Promise<void> {
   const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())._id;
-  const existing = decodeAuthoritativeAggregates(
-    await plugin.storage.getSynced(AUTHORITATIVE_AGGREGATES_KEY)
-  );
-  const otherKbs = existing.filter((b) => !!b && b.kbId !== kbId && b.kbId !== UNKNOWN_KB_ID);
-  const payload = encodeAuthoritativeAggregates([...otherKbs, ...currentKbBuckets]);
+  // Drain the legacy key first, or a later migration would resurrect this KB's
+  // pre-recompute buckets over the ones being written now.
+  await migrateAuthoritativeAggregatesToShards(plugin);
 
-  // This key outgrew RemNote's 900KB per-key ceiling once already, and a write
-  // over it is rejected rather than truncated — which is silent unless we look.
-  // Log the size so a regression shows up in the console instead of as a
-  // dashboard that mysteriously stops updating.
-  const bytes = JSON.stringify(payload).length;
-  const pctOfLimit = (bytes / (900 * 1024)) * 100;
+  const payload = encodeAuthoritativeAggregates(currentKbBuckets);
+
+  // This key outgrew the per-key ceiling once already, and a write over it is
+  // rejected rather than truncated — which is silent unless we look. Log the size
+  // so a regression shows up in the console instead of as a dashboard that
+  // mysteriously stops updating.
+  const bytes = utf16Bytes(payload);
+  const pctOfLimit = (bytes / PER_KEY_UTF16_LIMIT) * 100;
   if (pctOfLimit >= 50) {
     console.warn(
-      `[AuthoritativeAggregates] Payload is ${(bytes / 1024).toFixed(1)}KB — ` +
-        `${pctOfLimit.toFixed(0)}% of the 900KB per-key limit. Consider rolling old days up into months.`
+      `[AuthoritativeAggregates] ${kbId.substring(0, 8)}… shard is ${(bytes / 1024).toFixed(1)}KB — ` +
+        `${pctOfLimit.toFixed(0)}% of the ${PER_KEY_UTF16_LIMIT / 1024}KB per-key limit (UTF-16). ` +
+        'Consider rolling old days up into months.'
     );
   } else {
     console.log(
-      `[AuthoritativeAggregates] Saving ${otherKbs.length + currentKbBuckets.length} buckets, ` +
-        `${(bytes / 1024).toFixed(1)}KB (${pctOfLimit.toFixed(1)}% of the per-key limit).`
+      `[AuthoritativeAggregates] Saving ${currentKbBuckets.length} buckets to the ` +
+        `${kbId.substring(0, 8)}… shard, ${(bytes / 1024).toFixed(1)}KB ` +
+        `(${pctOfLimit.toFixed(1)}% of the per-key limit).`
     );
   }
 
-  await plugin.storage.setSynced(AUTHORITATIVE_AGGREGATES_KEY, payload);
+  await plugin.storage.setSynced(authoritativeShardKey(kbId), payload);
   await plugin.storage.setSynced(AUTHORITATIVE_LAST_COMPUTED_KEY, Date.now());
 }
 

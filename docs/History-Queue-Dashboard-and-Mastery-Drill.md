@@ -178,6 +178,10 @@ Above the Sessions Summary table you'll find a **Refresh Statistics** button alo
 
 **When to use it:** click Refresh whenever you want to confirm the Summary numbers match RemNote's view of your practice — for example, if a session was interrupted, after restoring a backup, or simply to validate at the end of a study day. For knowledge bases with many IncRems, the recompute may take 30 s–2 min and surfaces real-time progress.
 
+**Where the results are stored:** since v1.0.37, in one synced item **per knowledge base**. Previously every KB's daily totals shared a single item, so a Refresh rewrote and re-synced all of them — for one measured knowledge base, half of what was written on every Refresh belonged to KBs that had not been studied in for months. Each KB's history is now written on its own, and knowledge bases you are not studying are never touched.
+
+**No history is discarded.** These totals go back as far as your records do — over a decade, if you imported an older study log — and the **Ever** row of the Sessions Summary depends on all of it. Splitting the storage per knowledge base is precisely what keeps holding all of it affordable, rather than having to drop old days to stay under RemNote's per-item ceiling. Your existing totals are split automatically, without a recompute, the first time the plugin loads after updating.
+
 ![Practiced Queue History](assets/uploaded/b6f15b_queue-history.png){ width="700" }
 
 ---
