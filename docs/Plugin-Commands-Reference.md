@@ -398,4 +398,4 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
   Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
 
 - **Debug: Clear Flashcard History**
-  Clears all entries from the Flashcard History sidebar widget. Use this if you encounter sync errors with the flashcard history data (e.g., after a corrupted sync). A confirmation toast is shown on completion.
+  Clears the Flashcard History sidebar's entries **for the knowledge base you are currently in** — since v1.0.37 each KB keeps its own list. Use this if you encounter sync errors with the flashcard history data (e.g., after a corrupted sync). A confirmation toast is shown on completion. See [How the history lists are stored](History-Queue-Dashboard-and-Mastery-Drill.md#how-the-history-lists-are-stored).

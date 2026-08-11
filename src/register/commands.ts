@@ -53,6 +53,7 @@ import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { safeRemTextToString, getIncrementalReadingPosition, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
 import { getHoveredReference } from './events';
+import { flashcardHistorySpec, clearHistoryShard } from '../lib/history_shards';
 import { transferToDismissed } from '../lib/dismissed';
 import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
@@ -3292,8 +3293,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'debug_clear_flashcard_history',
     name: 'Debug: Clear Flashcard History (Fix Sync Error)',
     action: async () => {
-      await plugin.storage.setSynced('flashcardHistoryData', []);
-      await plugin.app.toast('Flashcard History cleared!');
+      // Clears this KB's shard and the pre-shard global key, which may still hold
+      // entries this KB could not claim during migration.
+      const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())?._id;
+      await clearHistoryShard(plugin, flashcardHistorySpec, kbId);
+      await plugin.storage.setSynced(flashcardHistorySpec.legacyKey, []);
+      await plugin.app.toast('Flashcard History cleared for this knowledge base!');
     },
   });
 

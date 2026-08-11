@@ -1,4 +1,4 @@
-import { AppEvents, ReactRNPlugin, RemId, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
+import { AppEvents, ReactRNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
@@ -59,8 +59,13 @@ import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../l
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import type { RemHistoryData } from '../widgets/rem_history';
-import type { FlashcardHistoryData } from '../widgets/flashcard_history';
+import {
+  flashcardHistorySpec,
+  remHistorySpec,
+  prependHistoryEntry,
+  readHistoryShard,
+  writeHistoryShard,
+} from '../lib/history_shards';
 import { registerQueueSessionTracking, saveCurrentSession, hasActiveSession } from '../lib/queue_session';
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import dayjs from 'dayjs';
@@ -500,6 +505,65 @@ export function registerQueueEnterListener(
 const recentlyProcessedCards = new Set<string>();
 
 /**
+ * Record one rated card in the Flashcard History sidebar's list for the current KB.
+ *
+ * Three events feed that list — normal completion, cluster cards and drill cards,
+ * the latter two because QueueCompleteCard does not fire for them — and they used
+ * to carry three copies of this logic. They now differ only in what they can hand
+ * over. Writes go through the shard helpers, which cap the entry count, truncate
+ * the preview text and enforce a byte budget, so a write can no longer be rejected
+ * for exceeding RemNote's per-item ceiling.
+ */
+async function recordFlashcardHistory(
+  plugin: ReactRNPlugin,
+  args: {
+    remId?: RemId;
+    cardId: string;
+    /** Already-loaded rem, when the caller has one; otherwise it is looked up,
+     *  but only if the entry actually needs writing. */
+    rem?: PluginRem | null;
+    kbId?: string;
+    score?: QueueInteractionScore;
+    /** Names the caller in the error log. */
+    context: string;
+  }
+): Promise<void> {
+  try {
+    const kbId = args.kbId ?? (await plugin.kb.getCurrentKnowledgeBaseData())?._id;
+
+    await prependHistoryEntry(plugin, flashcardHistorySpec, kbId, args.cardId, async () => {
+      const rem = args.rem ?? (args.remId ? await plugin.rem.findOne(args.remId) : undefined);
+
+      let text = '';
+      try {
+        const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
+        const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+        const front = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw : '';
+        const back = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw : '';
+        // The limit is on the combined preview. writeHistoryShard applies it again,
+        // so this is belt and braces rather than the only guard.
+        text = `${front} ${back}`.trim().substring(0, flashcardHistoryTextLimit);
+      } catch (error) {
+        console.warn('Error parsing Rem text for flashcard history:', error);
+        text = '[Complex Media Rem]';
+      }
+
+      return {
+        remId: args.remId as RemId,
+        cardId: args.cardId,
+        time: Date.now(),
+        kbId,
+        text,
+        _v: 1,
+        score: args.score,
+      };
+    });
+  } catch (error) {
+    console.error(`Failed to record flashcard history for ${args.context}:`, error);
+  }
+}
+
+/**
  * Hooks into card completion events to keep the card priority cache fresh in full-performance mode.
  *
  * @param plugin Plugin instance for card/rem lookups and settings access.
@@ -551,48 +615,13 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
       // Flashcard History: record the completed card for the sidebar widget.
       // This block runs unconditionally (regardless of Light Mode) so the history
       // sidebar always receives entries with a score badge.
-      try {
-        const historyData =
-          ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-
-        if (historyData[0]?.cardId !== effectiveCardId) {
-          const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-          const currentKbId = kbData._id;
-
-          let frontText = '';
-          let backText = '';
-          try {
-            const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
-            const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
-            frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
-            backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
-          } catch (error) {
-            console.warn('Error parsing Rem text for flashcard history:', error);
-            frontText = '[Complex Media Rem]';
-          }
-
-          const text = `${frontText} ${backText}`.trim();
-
-          // Actively remove any existing entries with the same cardId before prepending.
-          const deduped = historyData.filter((entry) => entry.cardId !== effectiveCardId);
-
-          await plugin.storage.setSynced('flashcardHistoryData', [
-            {
-              key: Math.random(),
-              remId,
-              cardId: effectiveCardId,
-              time: new Date().getTime(),
-              kbId: currentKbId,
-              text,
-              _v: 1,
-              score,
-            },
-            ...deduped.slice(0, 999),
-          ]);
-        }
-      } catch (error) {
-        console.error('Failed to record flashcard history entry:', error);
-      }
+      await recordFlashcardHistory(plugin, {
+        remId,
+        cardId: effectiveCardId,
+        rem,
+        score,
+        context: 'entry',
+      });
 
       // --- Light Mode gate: priority cache and shield updates only ---
       if (!(await shouldUseLightMode(plugin))) {
@@ -758,40 +787,13 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
               }
 
               // Flashcard History: record cluster card rating (QueueCompleteCard doesn't fire for clusters)
-              try {
-                const historyData =
-                  ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-                if (historyData[0]?.cardId !== clusterCardId) {
-                  const clusterRem = card?.remId ? await plugin.rem.findOne(card.remId) : undefined;
-                  let frontText = '';
-                  let backText = '';
-                  try {
-                    const frontRaw = clusterRem?.text ? await safeRemTextToString(plugin, clusterRem.text) : '';
-                    const backRaw = clusterRem?.backText ? await safeRemTextToString(plugin, clusterRem.backText) : '';
-                    frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
-                    backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
-                  } catch (_e) {
-                    frontText = '[Complex Media Rem]';
-                  }
-                  const text = `${frontText} ${backText}`.trim();
-                  const deduped = historyData.filter((entry) => entry.cardId !== clusterCardId);
-                  await plugin.storage.setSynced('flashcardHistoryData', [
-                    {
-                      key: Math.random(),
-                      remId: card?.remId,
-                      cardId: clusterCardId,
-                      time: new Date().getTime(),
-                      kbId: currentKbId,
-                      text,
-                      _v: 1,
-                      score,
-                    },
-                    ...deduped.slice(0, 999),
-                  ]);
-                }
-              } catch (error) {
-                console.error('Failed to record flashcard history for cluster card:', error);
-              }
+              await recordFlashcardHistory(plugin, {
+                remId: card?.remId,
+                cardId: clusterCardId,
+                kbId: currentKbId,
+                score,
+                context: 'cluster card',
+              });
             }
           } catch (error) {
             console.error('Failed to update Mastery Drill for cluster card:', error);
@@ -1064,47 +1066,38 @@ export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
       await saveCurrentSession(plugin, 'GlobalOpenRem Navigation');
     }
 
-    const currentRemData =
-      ((await plugin.storage.getSynced('remData')) as RemHistoryData[]) || [];
-
-    if (currentRemData[0]?.remId === currentRemId) return;
-
     const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
     const currentKbId = kbData._id;
 
+    const currentRemData = await readHistoryShard(plugin, remHistorySpec, currentKbId);
+    if (currentRemData[0]?.remId === currentRemId) return;
+
     const rem = await plugin.rem.findOne(currentRemId);
 
-    let frontText = '';
-    let backText = '';
+    let text = '';
     try {
       const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
       const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+      const front = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw : '';
+      const back = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw : '';
       // Capped to match the widget's own backfill: this writer had no limit at
       // all, so visiting a Rem with a long body stored the whole thing.
-      frontText =
-        typeof frontRaw === 'string' && frontRaw !== 'Untitled'
-          ? frontRaw.substring(0, remHistoryTextLimit)
-          : '';
-      backText =
-        typeof backRaw === 'string' && backRaw !== 'Untitled'
-          ? backRaw.substring(0, remHistoryTextLimit)
-          : '';
+      text = `${front} ${back}`.trim().substring(0, remHistoryTextLimit);
     } catch (error) {
       console.warn('Error parsing Rem text for visited history:', error);
     }
 
-    const text = `${frontText} ${backText}`.trim();
-
-    await plugin.storage.setSynced('remData', [
+    // The same rem can be revisited, so this list does not dedupe by remId the way
+    // the flashcard list dedupes by cardId — each visit is its own entry.
+    await writeHistoryShard(plugin, remHistorySpec, currentKbId, [
       {
-        key: Math.random(),
         remId: currentRemId,
-        time: new Date().getTime(),
+        time: Date.now(),
         kbId: currentKbId,
         text,
         _v: 1,
       },
-      ...currentRemData.slice(0, 500),
+      ...currentRemData,
     ]);
   });
 }
@@ -1166,40 +1159,13 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
     }
 
     // Flashcard History: record drill card rating (QueueCompleteCard doesn't fire in the drill popup)
-    try {
-      const historyData =
-        ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-      if (historyData[0]?.cardId !== cardId) {
-        const drillRem = card?.remId ? await plugin.rem.findOne(card.remId) : undefined;
-        let frontText = '';
-        let backText = '';
-        try {
-          const frontRaw = drillRem?.text ? await safeRemTextToString(plugin, drillRem.text) : '';
-          const backRaw = drillRem?.backText ? await safeRemTextToString(plugin, drillRem.backText) : '';
-          frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
-          backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
-        } catch (_e) {
-          frontText = '[Complex Media Rem]';
-        }
-        const text = `${frontText} ${backText}`.trim();
-        const deduped = historyData.filter((entry) => entry.cardId !== cardId);
-        await plugin.storage.setSynced('flashcardHistoryData', [
-          {
-            key: Math.random(),
-            remId: card?.remId,
-            cardId,
-            time: new Date().getTime(),
-            kbId: currentKbId,
-            text,
-            _v: 1,
-            score,
-          },
-          ...deduped.slice(0, 999),
-        ]);
-      }
-    } catch (error) {
-      console.error('Failed to record flashcard history for drill card:', error);
-    }
+    await recordFlashcardHistory(plugin, {
+      remId: card?.remId,
+      cardId,
+      kbId: currentKbId,
+      score,
+      context: 'drill card',
+    });
   };
 
   plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async (data: any) => {

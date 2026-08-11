@@ -30,6 +30,7 @@ import { getLastDestinationKey } from './hierarchical_parent_selector/types';
 import { snapshotKey } from './listify';
 import { PRACTICED_QUEUES_HISTORY_KEY, DAILY_AGGREGATES_KEY } from './queue_aggregates';
 import { AUTHORITATIVE_AGGREGATES_KEY, AUTHORITATIVE_LAST_COMPUTED_KEY } from './authoritative_aggregates';
+import { flashcardHistorySpec, remHistorySpec, shardKey } from './history_shards';
 
 // ---------------------------------------------------------------------------
 // Synced-storage key audit
@@ -432,8 +433,10 @@ async function buildCandidates(
     coverage: 'full',
     keys: [
       'finalDrillIds',
-      'flashcardHistoryData',
-      'remData',
+      // Pre-shard globals. Drained into per-KB shards on first read; they linger
+      // holding [] (or the entries no session could place yet).
+      flashcardHistorySpec.legacyKey,
+      remHistorySpec.legacyKey,
       'incrementalHistoryData', // HISTORY_KEY in history_utils.ts (not exported)
       PRACTICED_QUEUES_HISTORY_KEY,
       DAILY_AGGREGATES_KEY,
@@ -474,6 +477,18 @@ async function buildCandidates(
       `cardRandomness_${kbId}`,
       `sortingPresets_${kbId}`,
       `weightSelectionK_${kbId}`,
+    ]),
+  });
+
+  // 3b. History shards — one key per KB for each of the two jump-lists.
+  families.push({
+    family: 'History shards (per KB)',
+    pattern: '{flashcardHistoryData|remData}_{kbId}',
+    coverage: 'partial',
+    note: 'Same kbId discovery limits as the sorting settings above.',
+    keys: kbIds.flatMap((kbId) => [
+      shardKey(flashcardHistorySpec, kbId),
+      shardKey(remHistorySpec, kbId),
     ]),
   });
 
@@ -1125,9 +1140,11 @@ function truncateStrings<T>(entry: T, limit: number, dropFields: string[]): T {
 }
 
 const DEFAULT_TRIM_OPTIONS: TrimOption[] = [
-  { label: 'Cap at 500 entries, text ≤ 500 chars (today’s text limit)', maxEntries: 500 },
-  { label: 'Cap at 500 entries, text ≤ 200 chars', maxEntries: 500, stringLimit: 200 },
-  { label: 'Cap at 300 entries, text ≤ 120 chars', maxEntries: 300, stringLimit: 120 },
+  // The first row is what the history shards actually ship with, so an oversized
+  // key can be compared against the current policy rather than only hypotheticals.
+  { label: 'Shipped history-shard limits: 500 entries, text ≤ 400 chars', maxEntries: 500, stringLimit: 400 },
+  { label: 'Cap at 500 entries, text ≤ 250 chars', maxEntries: 500, stringLimit: 250 },
+  { label: 'Cap at 300 entries, text ≤ 250 chars', maxEntries: 300, stringLimit: 250 },
   { label: 'Cap at 300 entries, drop stored text entirely', maxEntries: 300, dropFields: ['text'] },
 ];
 

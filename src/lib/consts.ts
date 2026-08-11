@@ -171,14 +171,21 @@ export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shie
 // clears this KB's shield partition, plus an index listing them for restore.
 export const cardShieldCleanupBackupPrefix = 'card-shield-cleanup-backup-';
 export const cardShieldCleanupBackupIndexKey = 'card-shield-cleanup-backup-index';
-// Characters kept per side (front / back) in the history jump-lists. The stored
-// `text` field is "front back", so one entry holds at most 2×limit + 1 chars.
+// Characters kept in the `text` preview of the history jump-lists. The stored
+// field is "front back" and the limit applies to that COMBINED string — it used
+// to be per side, which let a single entry hold 2×limit + 1 characters.
 // These lists are searched by substring and shown as one-line previews — they are
 // caches for navigation, not a copy of the card, and they live in synced storage
-// where a 900KB per-key ceiling applies. Keep the writer and the widget backfill
-// on the same constant so they cannot drift apart.
-export const flashcardHistoryTextLimit = 500;
-export const remHistoryTextLimit = 200;
+// where a 900KB per-key ceiling applies (896KB in practice, counted in UTF-16
+// bytes, i.e. HALF the character count our audit reports as UTF-8). Keep the
+// writer and the widget backfill on the same constant so they cannot drift apart.
+export const flashcardHistoryTextLimit = 400;
+export const remHistoryTextLimit = 400;
+// Entries kept per knowledge base. `text` dominates an entry, so these caps and
+// the limits above are what actually bound the key; see history_shards.ts for
+// the byte budget that backstops both.
+export const flashcardHistoryMaxEntries = 500;
+export const remHistoryMaxEntries = 500;
 
 // Restore point of a rem's Incremental history, captured by the debug tools
 // before a hand-edit. One synced key per backed-up rem — lives here (not in

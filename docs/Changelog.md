@@ -2,6 +2,38 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.37 - August 11th, 2026
+
+### 🐛 Fixed: the Flashcard History sidebar had stopped recording
+
+Everything you practised was still being scheduled and counted correctly, but the **Flashcard History** sidebar had quietly stopped adding new cards. Nothing on screen said so — the list simply stayed as it was.
+
+The list is stored as a single item in the plugin's synced storage, which RemNote caps at **900 KB**. It held every knowledge base's cards in one array, up to 1000 of them, each with a text preview of up to 1000 characters. That array had reached the ceiling, so every attempt to add a card to it was refused — including the ones written from the [Mastery Drill](History-Queue-Dashboard-and-Mastery-Drill.md#mastery-drill) popup and from card clusters, which record through the same list.
+
+A detail worth recording, because it also affects how full other keys really are: the ceiling is counted in **UTF-16 bytes**, which is *twice* the size the plugin's own diagnostics reported. A list measuring 512 KB was in fact 1009 KB against the limit.
+
+The fix has four parts:
+
+- **Each knowledge base now has its own list.** Both sidebars already showed only the KB you were in, so all the other KBs' entries were being stored and synced just to be discarded on screen.
+- **The preview text is capped at 400 characters**, applied to the whole preview rather than to the front and the back separately — previously an entry could hold 1000 characters, since 500 was allowed on each side.
+- **A byte budget** trims a list further whenever its entries are unusually long, so a write can no longer be rejected — a count limit alone could never guarantee that.
+- **Two fields are no longer stored:** a random row id, now derived from the card itself, and a leftover expand/collapse flag that nothing has read since row state moved into the sidebar.
+
+Your existing history is split across your knowledge bases automatically, without losing entries, the first time each list is read or written.
+
+### ♻️ Changed: Visited Rem History is also per knowledge base
+
+The same treatment, for the same reason: its list was at 27% of the ceiling and growing with every knowledge base you visit. It keeps the 500 most recent visits per KB, with the same 400-character preview — twice what it stored before, since its old limit was 200 characters per side but is now 400 for the whole preview.
+
+### 🔧 Debug: the synced-storage audit now measures against the real ceiling
+
+The **Synced Storage Key Audit** in the debug widget reported sizes in UTF-8 bytes, which understated every key by half against a limit counted in UTF-16. It now shows each key in all three plausible units with a **% worst** column, and two new tools sit beside it:
+
+- **Calibrate size ceiling** — writes a scratch key up to the point RemNote refuses it, using three different alphabets, and reads off which unit the limit is actually counted in. This is what identified UTF-16.
+- **Key anatomy** — breaks one key down into where its bytes go: entry count, cost per field, the fattest entries, how a low-cardinality field (such as the knowledge base id) splits the total, and what capping entries or preview text would save.
+
+📖 See [How the history lists are stored](History-Queue-Dashboard-and-Mastery-Drill.md#how-the-history-lists-are-stored) for the limits that now apply and what happens to your existing entries.
+
 ## v1.0.36 - August 10th, 2026
 
 ### 🐛 Fixed: chapters indented under the wrong chapter in the PDF Control Panel

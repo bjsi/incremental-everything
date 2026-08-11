@@ -58,6 +58,8 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Search:** Includes a search bar to instantly filter your history. Supports multi-word queries (e.g., "Biology Exam") and deep text search across all recorded items.
 
+**Retention:** The list keeps the **500 most recent** visits for the knowledge base you are in. See [How the history lists are stored](#how-the-history-lists-are-stored).
+
 ![Visited Rem History](assets/uploaded/5d52f2_rem-history-editing.gif){ width="500" }
 
 ---
@@ -76,11 +78,42 @@ In IE's *Practiced Queues History* sidebar tab, click the **Import** button and 
 
 **Priority Badge & inline editing:** Each entry also shows a priority badge, right-aligned in the badge row. Click it to open an inline slider editor directly in the row — adjust with the number field or the drag slider, then Save. No popup is opened, so editing a priority here never conflicts with the queue's target-rem selection. The change is written by the plugin's persistent background tracker, so it is saved reliably and still triggers the priority-inheritance cascade. The Incremental Rem History sidebar has the same badge, showing the IncRem priority (colored by its KB-wide percentile).
 
-**Cluster-aware recording:** Inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters), each sibling card is recorded individually as it becomes visible — not just the cluster anchor. This ensures your history accurately reflects every card you actually reviewed.
+**Cluster-aware recording:** Inside [Card Clusters](https://help.remnote.com/en/articles/10104223-card-clusters), each sibling card is recorded individually as it becomes visible — not just the cluster anchor. This ensures your history accurately reflects every card you actually reviewed. Cards rated inside the [Mastery Drill](#mastery-drill) popup are recorded here too, for the same reason.
+
+**Retention:** The list keeps the **500 most recent** cards for the knowledge base you are in. See [How the history lists are stored](#how-the-history-lists-are-stored).
 
 ![Flashcard History](assets/flashcard-history-sidebar.png){ width="600" }
 
 ![Flashcard History Filter](assets/uploaded/3edb13_filter.gif){ width="500" }
+
+---
+
+## How the history lists are stored
+
+Both jump-lists above — **Visited Rem History** and **Flashcard History** — live in the plugin's synced storage, which RemNote caps at **900 KB per item**. Each list keeps a short text preview of every entry so the search bar can work offline, and that preview is what makes the lists grow.
+
+Since **v1.0.37** each knowledge base gets its own list, and three limits keep it comfortably inside the cap:
+
+| Limit | Flashcard History | Visited Rem History |
+|---|---|---|
+| Entries kept, per knowledge base | 500 | 500 |
+| Preview text stored per entry | 400 characters | 400 characters |
+| Hard byte budget per knowledge base | 550 KB | 550 KB |
+
+The preview limit applies to the **whole** preview — the front and the back together for a flashcard. It used to be applied to each side separately, so an entry could store twice the stated number.
+
+The byte budget is the one that actually guarantees the cap is never hit: if your entries happen to be unusually long, the list is trimmed further until it fits, rather than being rejected on write. In normal use the 500-entry cap is what binds first.
+
+**What this means for you**
+
+- **Nothing to do.** Your existing history is split across your knowledge bases automatically the first time each list is read or written after updating. No entries are lost, and entries recorded before the plugin tracked knowledge bases are claimed by your primary one.
+- **Each knowledge base now has its own history.** Previously all of them shared one list and the sidebar filtered it down to the KB you were in, so the behaviour on screen is unchanged — but a busy KB can no longer crowd out the others.
+- **Older entries fall off sooner** than they used to, because the previous limit was 1000 entries shared across every knowledge base.
+
+> [!NOTE]
+> If the Flashcard History sidebar stopped recording anything before you updated, this is why: the shared list had grown past RemNote's ceiling, and every attempt to add to it was refused. The update repairs it on the first write — no manual clearing needed.
+
+The **Debug: Clear Flashcard History** command clears the list for the knowledge base you are currently in.
 
 ---
 
@@ -260,6 +293,6 @@ Three tabs are added to the right sidebar:
 | Command | Quick Code | Description |
 |---|---|---|
 | `Mastery Drill` | `dri` | Opens the Mastery Drill popup. |
-| `Debug: Clear Flashcard History` | — | Clears all flashcard history data (useful if sync errors occur). |
+| `Debug: Clear Flashcard History` | — | Clears this knowledge base's flashcard history (useful if sync errors occur). |
 
 📖 See [Plugin Commands Reference](Plugin-Commands-Reference.md) for the full command list.

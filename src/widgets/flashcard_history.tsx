@@ -7,6 +7,7 @@ import {
     renderWidget,
     usePlugin,
     useSyncedStorageState,
+    useTrackerPlugin,
 } from "@remnote/plugin-sdk";
 import '../style.css';
 import '../App.css';
@@ -16,11 +17,19 @@ import { PriorityBadge } from "../components";
 import { InlinePriorityEditor } from "../components/InlineEditors";
 import { getCardPriority, CardPriorityInfo, CARD_PRIORITY_CODE } from "../lib/card_priority";
 import { pendingPrioritySaveKey, flashcardHistoryTextLimit } from "../lib/consts";
+import {
+    flashcardHistorySpec,
+    shardKey,
+    writeHistoryShard,
+    migrateLegacyHistory,
+} from "../lib/history_shards";
 
 const NUM_TO_LOAD_IN_BATCH = 30;
 
 export interface FlashcardHistoryData {
-    key: number;
+    /** @deprecated Was a `Math.random()` row identity. Identity is derived from
+     *  cardId now; old entries still carry it and it is ignored. */
+    key?: number;
     remId: RemId;
     cardId: string;
     time: number;
@@ -33,11 +42,35 @@ export interface FlashcardHistoryData {
     score?: QueueInteractionScore;
 }
 
+const entryId = flashcardHistorySpec.getId;
+
 function FlashcardHistory() {
     const plugin = usePlugin();
-    const [historyDataRaw, setHistoryData] = useSyncedStorageState<FlashcardHistoryData[]>(
-        "flashcardHistoryData",
+    // One shard per knowledge base: this widget only ever showed the current KB's
+    // entries, so the other KBs' rows were read and synced only to be discarded.
+    const kbId = useTrackerPlugin(
+        async (rp) => (await rp.kb.getCurrentKnowledgeBaseData())?._id,
         []
+    );
+    const [historyDataRaw] = useSyncedStorageState<FlashcardHistoryData[]>(
+        kbId ? shardKey(flashcardHistorySpec, kbId) : "",
+        []
+    );
+
+    // Drain the pre-shard global key on first mount. Writers do the same, so this
+    // only matters for a KB the user reads but never practises in.
+    useEffect(() => {
+        migrateLegacyHistory(plugin, flashcardHistorySpec);
+    }, [plugin]);
+
+    const setHistoryData = React.useCallback(
+        async (entries: FlashcardHistoryData[]) => {
+            // Never write before the KB resolves, or the entries would land in the
+            // unpartitioned shard and disappear from this list.
+            if (!kbId) return;
+            await writeHistoryShard(plugin, flashcardHistorySpec, kbId, entries);
+        },
+        [plugin, kbId]
     );
 
     const [filteredData, setFilteredData] = useState<FlashcardHistoryData[]>([]);
@@ -54,17 +87,19 @@ function FlashcardHistory() {
 
             if (needsBackfill.length === 0) return;
 
-            const updates = new Map<number, string>();
+            const updates = new Map<string, string>();
 
             for (const item of needsBackfill) {
                 try {
                     const rem = await plugin.rem.findOne(item.remId);
                     const frontText = await safeRemTextToString(plugin, rem?.text);
                     const backText = await safeRemTextToString(plugin, rem?.backText);
-                    const cleanFront = frontText === 'Untitled' && (!rem?.text || rem.text.length === 0) ? '' : frontText.substring(0, flashcardHistoryTextLimit);
-                    const cleanBack = backText === 'Untitled' && (!rem?.backText || rem.backText.length === 0) ? '' : backText.substring(0, flashcardHistoryTextLimit);
-                    const text = `${cleanFront} ${cleanBack}`.trim();
-                    updates.set(item.key, text);
+                    const cleanFront = frontText === 'Untitled' && (!rem?.text || rem.text.length === 0) ? '' : frontText;
+                    const cleanBack = backText === 'Untitled' && (!rem?.backText || rem.backText.length === 0) ? '' : backText;
+                    // The limit applies to the combined preview; writeHistoryShard
+                    // enforces it again, so the two cannot drift.
+                    const text = `${cleanFront} ${cleanBack}`.trim().substring(0, flashcardHistoryTextLimit);
+                    updates.set(entryId(item), text);
                 } catch (e) {
                     console.error("Error processing flashcard history backfill", item.remId, e);
                 }
@@ -74,8 +109,9 @@ function FlashcardHistory() {
 
             setHistoryData(
                 historyDataRaw.map(item => {
-                    if (updates.has(item.key)) {
-                        return { ...item, text: updates.get(item.key), _v: 1 };
+                    const id = entryId(item);
+                    if (updates.has(id)) {
+                        return { ...item, text: updates.get(id), _v: 1 };
                     }
                     return item;
                 })
@@ -88,19 +124,11 @@ function FlashcardHistory() {
         }
     }, [historyDataRaw, plugin]);
 
-    // Filter by KB and search text
+    // Filter by score and search text. The KB filter that used to live here is
+    // gone: the shard we read IS the current KB's, so every entry qualifies.
     useEffect(() => {
         async function filterData() {
-            const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
-            const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-            const currentKbId = currentKb._id;
-
-            let filtered = historyDataRaw.filter((item) => {
-                if (!item.kbId) {
-                    return isPrimary;
-                }
-                return item.kbId === currentKbId;
-            });
+            let filtered = historyDataRaw;
 
             if (filterScore !== "ALL") {
                 filtered = filtered.filter(item => item.score === filterScore);
@@ -134,11 +162,10 @@ function FlashcardHistory() {
         filterData();
     }, [historyDataRaw, plugin, searchText, filterScore]);
 
-    const closeIndex = (itemKey: number) => {
-        const originalIndex = historyDataRaw.findIndex(x => x.key === itemKey);
-        if (originalIndex !== -1) {
-            historyDataRaw.splice(originalIndex, 1);
-            setHistoryData([...historyDataRaw]);
+    const closeIndex = (itemKey: string) => {
+        const remaining = historyDataRaw.filter(x => entryId(x) !== itemKey);
+        if (remaining.length !== historyDataRaw.length) {
+            setHistoryData(remaining);
         }
     };
 
@@ -147,8 +174,8 @@ function FlashcardHistory() {
     // chevron rewrote the whole history array — half a megabyte of synced storage
     // per expand/collapse. Keeping it in component state costs nothing and removes
     // that write entirely.
-    const [openKeys, setOpenKeys] = useState<Set<number>>(new Set());
-    const toggleOpen = (itemKey: number) => {
+    const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
+    const toggleOpen = (itemKey: string) => {
         setOpenKeys((prev) => {
             const next = new Set(prev);
             if (next.has(itemKey)) next.delete(itemKey);
@@ -204,16 +231,22 @@ function FlashcardHistory() {
                     Practice some flashcards to see your history here.
                 </div>
             )}
-            {filteredData.slice(0, NUM_TO_LOAD_IN_BATCH * numLoaded).map((data) => (
-                <HistoryItem
-                    data={data}
-                    remId={data.remId}
-                    key={data.key || Math.random()}
-                    open={openKeys.has(data.key)}
-                    toggleOpen={() => toggleOpen(data.key)}
-                    closeIndex={() => closeIndex(data.key)}
-                />
-            ))}
+            {filteredData.slice(0, NUM_TO_LOAD_IN_BATCH * numLoaded).map((data) => {
+                // Derived, stable identity. The old `data.key || Math.random()`
+                // remounted any row missing a key on every single render, which
+                // reset its expansion state.
+                const id = entryId(data);
+                return (
+                    <HistoryItem
+                        data={data}
+                        remId={data.remId}
+                        key={id}
+                        open={openKeys.has(id)}
+                        toggleOpen={() => toggleOpen(id)}
+                        closeIndex={() => closeIndex(id)}
+                    />
+                );
+            })}
             {numUnloaded > 0 && (
                 <div
                     onMouseOver={() => setNumLoaded((i) => i + 1)}
@@ -344,7 +377,7 @@ function HistoryItem({
     };
 
     return (
-        <div className="px-1 py-4" style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }} key={data.key}>
+        <div className="px-1 py-4" style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
             <div className="flex gap-2 mb-2">
                 <div
                     className="flex items-center justify-center flex-shrink-0 w-6 h-6 rounded-md cursor-pointer hover:bg-gray-200"
