@@ -2242,7 +2242,15 @@ function Debug() {
     setSlotMigNote(null);
     try {
       const result = await captureCardPrioritySnapshot(plugin, setSlotMigProgress);
-      console.log('[slot migration] snapshot', result.meta);
+      // Log the whole result, not just meta: storedLocally and any storeError
+      // are the point of the run, and they are not on meta.
+      console.log('[CardPriority snapshot]', {
+        ...result.meta,
+        approxMB: +(result.approxBytes / 1024 / 1024).toFixed(2),
+        storedLocally: result.storedLocally,
+        storeError: result.storeError,
+        perChunkApproxKB: +(result.approxBytes / 1024 / Math.max(1, result.meta.chunkCount)).toFixed(0),
+      });
 
       // The downloaded file is the copy that matters. Local storage is convenient
       // for the in-app verify/restore, but it is the same storage layer the
@@ -5269,7 +5277,13 @@ function Debug() {
             snapshot:{' '}
             {snapshotMeta ? (
               <strong style={{ color: '#22c55e' }}>
-                {snapshotMeta.count} rows, {dayjs(snapshotMeta.capturedAt).format('MMM D HH:mm')}
+                {snapshotMeta.count} rows
+                {/* Guarded: snapshots captured before approxBytes was persisted
+                    have no size to show, and NaN MB reads as a bug. */}
+                {typeof snapshotMeta.approxBytes === 'number'
+                  ? `, ${(snapshotMeta.approxBytes / 1024 / 1024).toFixed(1)}MB`
+                  : ''}
+                {' '}across {snapshotMeta.chunkCount} chunks, {dayjs(snapshotMeta.capturedAt).format('MMM D HH:mm')}
               </strong>
             ) : (
               <strong style={{ color: 'var(--rn-clr-content-tertiary)' }}>none for this KB</strong>

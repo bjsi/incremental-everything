@@ -47,6 +47,11 @@ export interface SnapshotMeta {
   capturedAt: number;
   count: number;
   chunkCount: number;
+  /** Approximate stored size in UTF-16 bytes. Persisted rather than merely
+   *  reported, because it is the number that decides whether a derived store
+   *  (the persisted card-priority cache) fits, and it should still be readable
+   *  long after the popup that captured it was closed. */
+  approxBytes: number;
 }
 
 async function currentKbId(plugin: RNPlugin): Promise<string | null> {
@@ -106,14 +111,15 @@ export async function captureCardPrioritySnapshot(
     }
   }
 
+  const approxBytes = JSON.stringify(rows).length * 2; // UTF-16
+
   const meta: SnapshotMeta = {
     kbId,
     capturedAt: Date.now(),
     count: rows.length,
     chunkCount: Math.ceil(rows.length / CHUNK_SIZE),
+    approxBytes,
   };
-
-  const approxBytes = JSON.stringify(rows).length * 2; // UTF-16
 
   let storedLocally = false;
   let storeError: string | undefined;
