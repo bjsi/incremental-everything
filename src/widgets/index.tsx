@@ -163,11 +163,11 @@ async function onActivate(plugin: ReactRNPlugin) {
     console.log(
       `CACHE: Skipping card priority cache build (${useLightMode ? 'light mode' : 'flashcard prioritisation off'}).`
     );
-    // persist:false — an empty cache here means "not built in this context",
-    // not "there are no priorities". Mirroring it would wipe a good blob every
-    // time the plugin opened in light mode or with the opt-in off, and the next
-    // full-mode launch would pay a cold build for it.
-    await writeCardPriorityCache(plugin, [], { persist: false });
+    // Session only, deliberately. An empty cache here means "not built in this
+    // context" (light mode, or the opt-in off), not "there are no priorities" —
+    // persisting it would wipe a good copy on every mobile session and make the
+    // next full-mode launch pay a cold build for it.
+    await writeCardPriorityCache(plugin, []);
   }
 }
 

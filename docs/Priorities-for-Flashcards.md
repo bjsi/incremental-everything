@@ -255,7 +255,7 @@ On a large knowledge base that index is expensive. Building it from scratch mean
 
 The plugin now keeps a copy of the index on your device and starts from it, re-reading only what has actually changed since the copy was saved.
 
-The saving is automatic. Every change to a priority updates the copy, so it stays current as you work; bulk rebuilds save it immediately, and ordinary edits save a few seconds later so that a long queue session is not writing megabytes after every answer.
+The copy is written once, straight after the index is built. While you work, the plugin notes only the *identifiers* of flashcards whose priority changed — a few bytes each — and the next start re-reads just those before saving the copy again. There is no reason to keep the copy itself current during a session, since nothing reads it until the next start.
 
 **Measured on a 45,085-rem knowledge base: 108 seconds to build from scratch, 14 seconds starting from the saved copy.** Most of what remains is loading the flashcards themselves, which has to happen every time — whether a card is due changes with the clock, so those counts are always recomputed.
 
@@ -267,7 +267,7 @@ The saved copy is used only when it can be trusted. The plugin falls back to a f
 
 * there is no saved copy yet — the first start after installing or updating;
 * it belongs to a different knowledge base, or was written by an older version of the plugin;
-* **it is more than seven days old**;
+* **it is more than seven days since the last full rebuild** — starting quickly from the copy does not reset that clock, or the rebuild would be postponed forever;
 * a spot-check disagrees with what is actually stored.
 
 The spot-check reads a couple of hundred priorities at random and compares them against the saved copy before trusting the rest. It costs a fraction of a second and catches the copy being wrong in bulk — after restoring a backup, or an import that rewrote priorities.

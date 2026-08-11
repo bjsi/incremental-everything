@@ -5393,8 +5393,9 @@ function Debug() {
                 <strong style={{ color: warmStore.version === CARD_PRIORITY_STORE_VERSION ? '#22c55e' : '#ef4444' }}>
                   {warmStore.count} rows
                 </strong>{' '}
-                in {warmStore.chunkCount} chunks · saved {dayjs(warmStore.savedAt).format('MMM D HH:mm:ss')}{' '}
-                ({dayjs(warmStore.savedAt).fromNow()}) · schema v{warmStore.version}
+                in one key · synced {dayjs(warmStore.syncedAt).format('MMM D HH:mm:ss')}{' '}
+                ({dayjs(warmStore.syncedAt).fromNow()}) · last full rebuild{' '}
+                {dayjs(warmStore.builtAt).fromNow()} · schema v{warmStore.version}
                 {warmStore.version !== CARD_PRIORITY_STORE_VERSION && (
                   <span style={{ color: '#ef4444' }}> (expected v{CARD_PRIORITY_STORE_VERSION} — will cold build)</span>
                 )}

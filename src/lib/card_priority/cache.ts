@@ -8,7 +8,14 @@ import {
   PRIORITY_SLOT,
 } from './types';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
-import { writeCardPriorityCache, loadPersistedCardPriorities } from './persistence';
+import {
+  writeCardPriorityCache,
+  loadPersistedCardPriorities,
+  persistCardPriorityStore,
+  markCardPriorityDirty,
+  loadDirtySet,
+  flushDirtySet,
+} from './persistence';
 import dayjs from 'dayjs';
 import * as _ from 'remeda';
 
@@ -99,6 +106,13 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
         if (priorityChanged) {
           needsHeavyRecalc = true;
         }
+      }
+
+      // Record the changed ids for the next startup to re-read. The persisted
+      // copy is no longer rewritten here — it is read only at startup, so
+      // keeping it live was ~3.2MB of work per flush that nothing consumed.
+      for (const remId of updatesToProcess.keys()) {
+        markCardPriorityDirty(plugin, remId);
       }
 
       // Convert map back to array.
@@ -247,7 +261,8 @@ export async function buildOptimizedCardPriorityCache(plugin: RNPlugin) {
     console.log('[Card Priority Cache] No cards or cardPriority tags found. Setting empty cache.');
     // Genuinely empty: this KB has no cards and no tags, so an empty mirror is
     // the truth, not an absence of data.
-    await writeCardPriorityCache(plugin, [], { immediate: true });
+    await writeCardPriorityCache(plugin, []);
+    await persistCardPriorityStore(plugin, [], Date.now(), Date.now());
     return;
   }
 
@@ -317,7 +332,10 @@ export async function buildOptimizedCardPriorityCache(plugin: RNPlugin) {
 
   // Full rebuild (the 'Update all inherited Card Priorities' command): mirror it
   // immediately rather than five seconds later.
-  await writeCardPriorityCache(plugin, enrichedInfos, { immediate: true });
+  await writeCardPriorityCache(plugin, enrichedInfos);
+  // 'Update all inherited Card Priorities' reads every priority from the DB, so
+  // it is a cold build by any other name and may advance builtAt.
+  await persistCardPriorityStore(plugin, enrichedInfos, startTime, startTime);
   const totalTime = Math.round((Date.now() - startTime) / 1000);
   console.log(`[Card Priority Cache] Successfully built and enriched cache with ${enrichedInfos.length} entries in ${totalTime}s.`);
 }
@@ -399,18 +417,32 @@ async function tryWarmPhase1(
   plugin: RNPlugin,
   taggedRems: PluginRem[],
   cardsByRem: Map<RemId, Card[]>
-): Promise<CardPriorityInfo[] | null> {
+): Promise<{ infos: CardPriorityInfo[]; builtAt: number } | null> {
   const store = await loadPersistedCardPriorities(plugin);
   if (!store) return null;
 
-  const age = Date.now() - store.meta.savedAt;
+  // Staleness is measured from builtAt — the last FULL read of the database —
+  // never from syncedAt. A warm start advances syncedAt, so using that here
+  // would push the deadline forward on every launch and the rebuild this guard
+  // exists to force would never happen.
+  const age = Date.now() - store.meta.builtAt;
   if (age > MAX_WARM_STORE_AGE_MS) {
     console.log(
-      `[Card Priority Cache] Stored cache is ${Math.round(age / 86400000)}d old ` +
+      `[Card Priority Cache] Stored cache was last fully rebuilt ${Math.round(age / 86400000)}d ago ` +
         `(max ${MAX_WARM_STORE_AGE_MS / 86400000}d) — cold build to pick up any off-device hand edits.`
     );
     return null;
   }
+
+  // Anything changed while the plugin was running, recorded as it happened. This
+  // is what covers hand edits, which move a child rem and so never show up in
+  // the updatedAt comparison below.
+  //
+  // Flushed first: the in-memory set is written on a 10s throttle, so a change
+  // made moments before this build would still be sitting in memory and would be
+  // read back as absent.
+  await flushDirtySet(plugin);
+  const dirty = await loadDirtySet(plugin);
 
   // Partition on the free `updatedAt` already present in the taggedRem payload:
   // no call is made to decide whether a rem needs re-reading.
@@ -419,9 +451,11 @@ async function tryWarmPhase1(
   for (const rem of taggedRems) {
     const stored = store.byRem.get(rem._id);
     if (!stored) {
-      mustRead.push(rem); // newly tagged since the blob was written
-    } else if (typeof rem.updatedAt === 'number' && rem.updatedAt > store.meta.savedAt) {
-      mustRead.push(rem); // touched since the blob was written
+      mustRead.push(rem); // newly tagged since the copy was written
+    } else if (dirty.has(rem._id)) {
+      mustRead.push(rem); // changed in a previous session, recorded at the time
+    } else if (typeof rem.updatedAt === 'number' && rem.updatedAt > store.meta.syncedAt) {
+      mustRead.push(rem); // touched since the copy was written
     } else {
       reusable.push(rem);
     }
@@ -429,7 +463,8 @@ async function tryWarmPhase1(
 
   console.log(
     `[Card Priority Cache] Warm start: ${reusable.length} rems from store, ` +
-      `${mustRead.length} to re-read (blob ${Math.round(age / 60000)}min old).`
+      `${mustRead.length} to re-read (${dirty.size} from the dirty set; ` +
+      `last full rebuild ${Math.round(age / 60000)}min ago).`
   );
 
   // Spot-check before trusting the reused majority.
@@ -476,7 +511,7 @@ async function tryWarmPhase1(
     for (const info of results) if (info) infos.push(info);
   }
 
-  return infos;
+  return { infos, builtAt: store.meta.builtAt };
 }
 
 /**
@@ -535,11 +570,16 @@ export async function loadCardPriorityCache(
 
   if (totalUnique === 0) {
     console.log('[Card Priority Cache] No cards or cardPriority tags found. Setting empty cache.');
-    await writeCardPriorityCache(plugin, [], { immediate: true });
+    await writeCardPriorityCache(plugin, []);
+    await persistCardPriorityStore(plugin, [], Date.now(), Date.now());
     return;
   }
 
   const phase1Start = Date.now();
+  // Baseline for the NEXT startup's updatedAt delta. Taken before any reading
+  // starts, so anything changed while this build runs is re-read next time
+  // instead of falling into the gap between the read and the write.
+  const syncStartedAt = Date.now();
 
   // Warm path first. It returns null for anything that makes the stored blob
   // untrustworthy — absent, wrong version, wrong KB, too old, or a self-check
@@ -558,12 +598,16 @@ export async function loadCardPriorityCache(
     : await tryWarmPhase1(plugin, taggedForInheritanceRems, cardsByRem);
 
   if (warmPriorities) {
-    const percentileByRemWarm = calculateCardRemPercentilesFromCards(warmPriorities);
-    const enrichedWarm = warmPriorities.map((info) => ({
+    const percentileByRemWarm = calculateCardRemPercentilesFromCards(warmPriorities.infos);
+    const enrichedWarm = warmPriorities.infos.map((info) => ({
       ...info,
       kbPercentile: percentileByRemWarm[info.remId] ?? 0,
     }));
-    await writeCardPriorityCache(plugin, enrichedWarm, { immediate: true });
+    await writeCardPriorityCache(plugin, enrichedWarm);
+    // builtAt is CARRIED OVER, not refreshed: this build reused stored values for
+    // most rems rather than reading them, so it is not a full verification and
+    // must not reset the staleness deadline.
+    await persistCardPriorityStore(plugin, enrichedWarm, warmPriorities.builtAt, syncStartedAt);
 
     const warmTime = Math.round((Date.now() - phase1Start) / 1000);
     const totalWarmTime = Math.round((Date.now() - startTime) / 1000);
@@ -638,7 +682,10 @@ export async function loadCardPriorityCache(
   }));
 
   // Cold build: the mirror must land with it, so the next launch can start warm.
-  await writeCardPriorityCache(plugin, enrichedTaggedPriorities, { immediate: true });
+  await writeCardPriorityCache(plugin, enrichedTaggedPriorities);
+  // Cold build: every priority came from the database, so this DOES advance
+  // builtAt and restarts the staleness clock.
+  await persistCardPriorityStore(plugin, enrichedTaggedPriorities, syncStartedAt, syncStartedAt);
 
   const phase1Ms = Date.now() - phase1Start;
   const phase1Time = Math.round(phase1Ms / 1000);

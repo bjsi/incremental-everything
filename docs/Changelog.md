@@ -2,6 +2,24 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.39 - August 11th, 2026
+
+### ⚡ Improved: the saved priority copy is no longer rewritten while you work
+
+v1.0.38 introduced a saved copy of the flashcard-priority index so that starting the plugin does not have to re-read every priority from scratch. It kept that copy continuously up to date — rewriting all of it, a few seconds after every priority change.
+
+That was work whose result nothing used. The copy is read at exactly one moment: the next time the plugin starts. Keeping it current during the session meant rewriting **about 3 MB every five seconds** through a queue session, to record a handful of changed rows the next start would have re-read for itself in well under a second.
+
+Now the copy is written **once**, straight after the index is built. While you work, only the *identifiers* of changed flashcards are noted — a few bytes each — and the next start re-reads just those before rebuilding the copy.
+
+It is also stored as a single item rather than 23 pieces. The pieces existed because the only size limit anyone had measured was RemNote's 900 KB cap on **synced** storage, and this copy is not synced — it is per-device, since each device can rebuild it for itself. Measuring the real limit found none up to **128 MB**, so the split was never needed.
+
+Nothing changes in what you see: priorities, percentiles and the Card Shield still update the instant you change a priority. That has always come from a separate in-memory index, which is untouched by this.
+
+The weekly full rebuild described in v1.0.38 is unaffected — and is now measured from the last full rebuild rather than the last save, so that starting quickly can no longer keep postponing it indefinitely.
+
+📖 [Startup: how the priority cache is built](Priorities-for-Flashcards.md#startup-cache)
+
 ## v1.0.38 - August 11th, 2026
 
 ### ⚡ Improved: the flashcard priority cache now starts from a saved copy
