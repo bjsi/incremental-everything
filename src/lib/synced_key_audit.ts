@@ -56,11 +56,20 @@ import { flashcardHistorySpec, remHistorySpec, shardKey } from './history_shards
 
 export const SYNCED_KEY_CAP = 1000;
 
-/** RemNote's documented ceilings: 900KB for a single synced value, 10MB for a
- *  plugin's whole synced footprint. Measured sizes here are the UTF-8 length of
- *  `JSON.stringify(value)` — a close proxy for what gets synced, not the exact
- *  on-disk figure, which we have no way to read. */
-export const PER_KEY_BYTE_LIMIT = 900 * 1024;
+/**
+ * RemNote's ceilings: one synced value is documented at 900KB, and a plugin's
+ * whole synced footprint at 10MB.
+ *
+ * The per-key figure is measured rather than assumed. `calibratePerKeyLimit`
+ * bisected a scratch key to the rejection point on 2026-08-11 and got **458,752
+ * characters accepted, identical for 1-, 2- and 3-byte UTF-8 alphabets** — so the
+ * limit is counted in UTF-16 bytes (`JSON.stringify(v).length * 2`) and lands at
+ * 896KB, not 900KB of UTF-8. Every UTF-8 size in this report is therefore HALF of
+ * what the limit sees, which is why `worstCaseBytes` exists and why the report
+ * compares against that. Re-run the calibration if RemNote changes its storage
+ * layer again; it is the only way to know.
+ */
+export const PER_KEY_BYTE_LIMIT = 896 * 1024;
 export const TOTAL_BYTE_BUDGET = 10 * 1024 * 1024;
 /** Flag a key once it passes half of the per-key ceiling — enough runway to act. */
 const SIZE_WARN_RATIO = 0.5;
@@ -73,10 +82,11 @@ const PROBE_CONCURRENCY = 12;
 
 export type ProbeState = 'live' | 'nulled' | 'absent';
 
-/** The same value measured every way RemNote could plausibly be counting it.
- *  We do not know which unit the 900 KB ceiling is expressed in, and the units
- *  differ by up to 2× — a key that looks like 57% of the limit in UTF-8 is over
- *  the limit in UTF-16. `calibratePerKeyLimit` settles it empirically. */
+/** The same value measured every way RemNote could plausibly be counting it. The
+ *  units differ by up to 2×, and `calibratePerKeyLimit` showed the live one is
+ *  UTF-16 — a key reading 57% of the limit in UTF-8 was in fact over it. The
+ *  other columns are kept so a future change of unit shows up as a discrepancy
+ *  rather than as a mystery. */
 export interface SizeBreakdown {
   /** `JSON.stringify(value).length` — UTF-16 code units. */
   chars: number;
@@ -827,9 +837,9 @@ export function logAuditResult(result: AuditResult): void {
   );
   if (result.largestKeys.length > 0) {
     console.log(
-      `Largest keys (per-key ceiling ${formatBytes(result.perKeyLimit)}). ` +
-        'The unit RemNote counts in is unknown, so each key is shown in all three; ' +
-        '"% worst" is the one to trust. Run the per-key limit calibration to find out which is real.'
+      `Largest keys. The ceiling is ${formatBytes(result.perKeyLimit)} counted in UTF-16 bytes ` +
+        '(measured, not assumed — see calibratePerKeyLimit), so the UTF-8 column is half of what ' +
+        'the limit sees. "% worst" is the figure to act on.'
     );
     console.table(
       result.largestKeys.map((k) => ({

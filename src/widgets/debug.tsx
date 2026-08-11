@@ -60,6 +60,8 @@ import {
   PerKeyLimitReport,
   ArrayKeyAnatomy,
 } from '../lib/synced_key_audit';
+import { AUTHORITATIVE_AGGREGATES_KEY } from '../lib/authoritative_aggregates';
+import { flashcardHistorySpec, remHistorySpec, shardKey } from '../lib/history_shards';
 import { CardPriorityInfo } from '../lib/card_priority';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -316,10 +318,17 @@ function Debug() {
   const [capacityReport, setCapacityReport] = useState<CapacityReport | null>(null);
   const [nullTestReport, setNullTestReport] = useState<NullFreesSlotReport | null>(null);
   const [limitReport, setLimitReport] = useState<PerKeyLimitReport | null>(null);
-  // Per-key anatomy: which key's bytes to break down. Defaults to the one that
-  // rejects writes today.
-  const [anatomyKey, setAnatomyKey] = useState('flashcardHistoryData');
+  // Per-key anatomy: which key's bytes to break down. Defaults to the largest key
+  // in the KB — the pre-shard `flashcardHistoryData` holds [] since it was drained
+  // into per-KB shards, so naming it would only ever report an empty array.
+  const [anatomyKey, setAnatomyKey] = useState(AUTHORITATIVE_AGGREGATES_KEY);
   const [anatomy, setAnatomy] = useState<ArrayKeyAnatomy | null>(null);
+  // Shard names embed a 24-character kbId, so offer them as one click rather than
+  // asking for them to be typed.
+  const currentKbId = useTrackerPlugin(
+    async (rp) => (await rp.kb.getCurrentKnowledgeBaseData())?._id,
+    []
+  );
 
   const debugData = useTrackerPlugin(
     async (rp) => {
@@ -4062,8 +4071,8 @@ function Debug() {
           videos, …) and probes each with <code>getSynced</code>. <strong>live</strong> = holds a value,{' '}
           <strong>nulled</strong> = the key exists holding <code>null</code> (our "delete" pattern — still occupying a
           slot). Orphan keys whose rem was deleted can't be named; they show up as <em>unaccounted</em>. Sizes are the
-          UTF-8 length of each value's JSON — a close proxy for what syncs, measured against RemNote's{' '}
-          {formatBytes(900 * 1024)} per-key and {formatBytes(10 * 1024 * 1024)} total ceilings. Every candidate costs
+          UTF-8 length of each value's JSON, measured against the {formatBytes(896 * 1024)} per-key ceiling (UTF-16, so
+          double the UTF-8 figure) and the {formatBytes(10 * 1024 * 1024)} total budget. Every candidate costs
           one IPC read, so a large KB can take a few minutes and will feel sluggish while it runs. Full dump in console.
         </div>
         {keyAuditProgress && (
@@ -4171,9 +4180,10 @@ function Debug() {
                   Largest keys ({keyAudit.largestKeys.length}) — per-key ceiling {formatBytes(keyAudit.perKeyLimit)}
                 </summary>
                 <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', margin: '4px 0' }}>
-                  UTF-8 / UTF-16 / re-escaped are the same value counted three ways. RemNote does not say which one its
-                  900 KB ceiling uses and they differ by up to 2×, so <strong>worst</strong> is the column to act on
-                  until "Calibrate size ceiling" settles it.
+                  UTF-8 / UTF-16 / re-escaped are the same value counted three ways. The ceiling was <em>measured</em> at{' '}
+                  {formatBytes(896 * 1024)} counted in <strong>UTF-16</strong> bytes, so the UTF-8 column is half of what
+                  the limit sees — <strong>% worst</strong> is the figure to act on. Re-run "Calibrate size ceiling" if
+                  RemNote changes its storage layer again.
                 </div>
                 <table style={{ fontSize: '11px', width: '100%', borderCollapse: 'collapse', marginTop: '4px' }}>
                   <thead>
@@ -4256,6 +4266,23 @@ function Debug() {
             Reads one array-valued key and reports where its bytes go — entries, cost per field, fattest entries, and
             what capping the entry count or the stored text would save.
           </div>
+          {currentKbId && (
+            <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>This KB’s shards:</span>
+              {[
+                { label: 'Flashcard history', key: shardKey(flashcardHistorySpec, currentKbId) },
+                { label: 'Visited rems', key: shardKey(remHistorySpec, currentKbId) },
+              ].map(({ label, key }) => (
+                <button
+                  key={key}
+                  onClick={() => setAnatomyKey(key)}
+                  style={{ fontSize: '10px', padding: '1px 6px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {anatomy && (
             <div style={{ marginTop: '8px' }}>
               {!anatomy.exists ? (
