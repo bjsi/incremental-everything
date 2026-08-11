@@ -41,6 +41,7 @@ import {
   VerifyReport,
   RestoreReport,
 } from '../lib/card_priority_snapshot';
+import { probeLocalPerKeyLimit, LocalLimitReport } from '../lib/local_storage_probe';
 import {
   readCardPriorityStoreMeta,
   clearPersistedCardPriorities,
@@ -722,6 +723,9 @@ function Debug() {
     async (rp) => (await readCardPriorityStoreMeta(rp)) as StoreMeta | null,
     [refreshKey]
   );
+  const [localLimitBusy, setLocalLimitBusy] = useState(false);
+  const [localLimitProgress, setLocalLimitProgress] = useState<string | null>(null);
+  const [localLimit, setLocalLimit] = useState<LocalLimitReport | null>(null);
   // Result of the settings-migration probe (see handleProbeSettingsPersistence).
   const [isProbingSettings, setIsProbingSettings] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -2345,6 +2349,26 @@ function Debug() {
       console.log('[rem change tape]', enriched);
     } finally {
       setTapeBusy(false);
+    }
+  };
+
+  const handleProbeLocalLimit = async () => {
+    setLocalLimitBusy(true);
+    setLocalLimit(null);
+    try {
+      const report = await probeLocalPerKeyLimit(
+        plugin,
+        warmStore?.count ?? 45000,
+        setLocalLimitProgress
+      );
+      setLocalLimit(report);
+      console.log('[Local storage limit]', report);
+    } catch (err) {
+      console.error('[Local storage limit] probe failed', err);
+      await plugin.app.toast(`Probe failed: ${err}`);
+    } finally {
+      setLocalLimitBusy(false);
+      setLocalLimitProgress(null);
     }
   };
 
@@ -5391,6 +5415,48 @@ function Debug() {
           <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '4px' }}>
             Non-destructive — this is a derived index, and the cold build rewrites it. It is not the
             CardPriority Snapshot above, which is your backup of the actual slot values.
+          </div>
+
+          {/* Local per-key ceiling. The 896KB UTF-16 figure this codebase uses was
+              measured against setSynced only; local storage has never been probed,
+              and the mirror was chunked against the synced number for want of a
+              better one. */}
+          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--rn-clr-border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
+              Local storage per-key ceiling
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '6px', lineHeight: 1.5 }}>
+              The known 896KB limit was measured on <code>setSynced</code>. <code>setLocal</code> is a
+              different, unsynced backend and has never been probed — the mirror is chunked against the
+              synced number only because it was the one available. Doubles a scratch key until a write
+              fails <em>or reads back corrupted</em>, then bisects. Writes megabytes; costs no sync traffic.
+            </div>
+            <button
+              onClick={handleProbeLocalLimit}
+              disabled={localLimitBusy}
+              style={{ ...smallBtnStyle, cursor: localLimitBusy ? 'wait' : 'pointer' }}
+            >
+              {localLimitBusy ? 'Probing…' : 'Probe local per-key ceiling'}
+            </button>
+            {localLimitProgress && (
+              <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '4px' }}>
+                {localLimitProgress}
+              </div>
+            )}
+            {localLimit && (
+              <div style={{ fontSize: '10px', marginTop: '6px', lineHeight: 1.6 }}>
+                {localLimit.steps.map((st, i) => (
+                  <div key={i} style={{ paddingLeft: '8px', color: 'var(--rn-clr-content-tertiary)' }}>
+                    <span style={{ color: st.ok ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                      {st.ok ? 'ok  ' : 'FAIL'}
+                    </span>{' '}
+                    {st.approxMB.toFixed(2)}MB ({st.chars.toLocaleString()} chars) · {st.ms}ms
+                    {st.corruption && <span style={{ color: '#f59e0b' }}> · {st.corruption}</span>}
+                  </div>
+                ))}
+                <div style={{ marginTop: '6px', fontWeight: 600, fontSize: '11px' }}>{localLimit.verdict}</div>
+              </div>
+            )}
           </div>
         </div>
 
