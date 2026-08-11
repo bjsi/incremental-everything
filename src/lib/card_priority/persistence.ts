@@ -51,6 +51,22 @@ import { CardPriorityInfo, PrioritySource } from './types';
 /** Bump to invalidate every stored blob after a shape change. */
 export const CARD_PRIORITY_STORE_VERSION = 1;
 
+// CHUNKING NOTE — read before changing CHUNK_SIZE, or before adding chunking to
+// anything else that uses setLocal.
+//
+// These rows were originally split across 23 keys because the only per-key
+// ceiling anyone had measured was ~896 KB UTF-16, and that figure comes from
+// calibratePerKeyLimit in lib/synced_key_audit.ts, which probes `setSynced`
+// exclusively. It was never a measurement of local storage.
+//
+// Local storage was then probed directly (lib/local_storage_probe.ts, 2026-08-11)
+// and accepted a single key of 128 MB — the probe's own cap, not a discovered
+// limit — reading it back intact, in 174ms. The ~3.2 MB this store needs is not
+// remotely near any boundary.
+//
+// So do not size local keys against the synced limit. They are different
+// backends with different constraints, and conflating them is what produced 23
+// keys and 25 IPC calls where one would have done.
 const META_KEY_PREFIX = 'card-priority-store-meta';
 const CHUNK_KEY_PREFIX = 'card-priority-store-chunk';
 /** Rows per chunk. 2000 measured at ~211KB UTF-16, well clear of the 896KB

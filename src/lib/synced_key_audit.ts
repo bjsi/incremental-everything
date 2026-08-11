@@ -999,6 +999,10 @@ export async function testNullFreesSlot(
 //   • If it lands at ~460 K characters regardless of alphabet, it counts UTF-16
 //     bytes (string length × 2) and every audit figure must be doubled.
 
+// SCOPE: this calibration measures `setSynced` and nothing else. Local storage
+// is a separate backend and does NOT share this ceiling — it was probed at
+// 128 MB in one key without failing (lib/local_storage_probe.ts). Do not apply
+// the number below to a setLocal key.
 const SIZE_PROBE_KEY = '__ie_size_probe__';
 
 /** Stop bisecting once the bracket is this tight — one more halving costs a

@@ -25,6 +25,30 @@
 // The probe is deliberately manual. It writes megabytes repeatedly, and unlike
 // the synced version it costs no sync traffic, but there is no reason to run it
 // on a schedule.
+//
+// ── RESULT, measured 2026-08-11 on a desktop build ────────────────────────────
+//
+//   0.5MB    8ms      16MB    21ms
+//   1MB      4ms      32MB    42ms
+//   2MB      7ms      64MB   101ms
+//   4MB     10ms     128MB   174ms
+//   8MB     11ms
+//
+// NO CEILING FOUND up to 128 MB (UTF-16), the probe's own cap — every write was
+// accepted and read back with its length and tail marker intact. So `setLocal`
+// does not share the ~896 KB per-key limit that `setSynced` enforces, and the
+// two must not be sized against the same number. The card-priority mirror (~3.2
+// MB) was consequently un-chunked into a single key.
+//
+// Two caveats on those figures, so they are not over-read:
+//
+//  * 128 MB in 174ms is ~735 MB/s, which is not a disk write. The backend is
+//    almost certainly buffering, so these times measure acceptance and immediate
+//    read-back, NOT durability. What we know about surviving a restart comes from
+//    the mirror actually working across reloads, not from this probe.
+//  * 128 MB is where the probe stops, not where the backend does. If something
+//    ever needs to store more than that, re-run with a higher MAX_PROBE_CHARS
+//    rather than assuming the limit is unbounded.
 
 import { RNPlugin } from '@remnote/plugin-sdk';
 
