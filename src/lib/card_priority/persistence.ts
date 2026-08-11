@@ -244,6 +244,20 @@ export async function loadPersistedCardPriorities(
   return { meta, byRem };
 }
 
+/**
+ * Reads just the meta key — no chunks.
+ *
+ * Separate from loadPersistedCardPriorities because that one pulls all 23 chunks
+ * and materialises 45k rows, which is far too much work to render a status line.
+ */
+export async function readCardPriorityStoreMeta(
+  plugin: RNPlugin
+): Promise<StoreMeta | null> {
+  const kbId = await currentKbId(plugin);
+  if (!kbId) return null;
+  return (await plugin.storage.getLocal<StoreMeta>(metaKey(kbId))) ?? null;
+}
+
 export async function clearPersistedCardPriorities(plugin: RNPlugin): Promise<void> {
   const kbId = await currentKbId(plugin);
   if (!kbId) return;

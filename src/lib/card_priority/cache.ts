@@ -1,8 +1,15 @@
-import { Card, RNPlugin, RemId } from '@remnote/plugin-sdk';
+import { Card, PluginRem, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey, orphanRemIdsKey } from '../consts';
-import { CardPriorityInfo, PrioritySource, calculateCardRemPercentilesFromCards } from './types';
+import {
+  CardPriorityInfo,
+  PrioritySource,
+  calculateCardRemPercentilesFromCards,
+  CARD_PRIORITY_CODE,
+  PRIORITY_SLOT,
+} from './types';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
-import { writeCardPriorityCache } from './persistence';
+import { writeCardPriorityCache, loadPersistedCardPriorities } from './persistence';
+import dayjs from 'dayjs';
 import * as _ from 'remeda';
 
 let cacheUpdateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -315,6 +322,163 @@ export async function buildOptimizedCardPriorityCache(plugin: RNPlugin) {
   console.log(`[Card Priority Cache] Successfully built and enriched cache with ${enrichedInfos.length} entries in ${totalTime}s.`);
 }
 
+
+/**
+ * Maximum age of a persisted blob that may still be used for a warm start.
+ *
+ * This is the backstop for the one change the warm path cannot see. A priority
+ * hand-edited in the editor moves a CHILD rem and leaves the tagged rem's
+ * `updatedAt` untouched (measured — lib/updated_at_probe.ts). While the plugin is
+ * running that does not matter, because the GlobalRemChanged listener catches it
+ * and the mirror is rewritten. But a hand edit made on ANOTHER DEVICE, or with
+ * the plugin disabled, arrives with no signal the warm path can detect.
+ *
+ * A periodic cold rebuild bounds how long such an edit can stay wrong, turning an
+ * unbounded silent staleness into "at most a week". Cheap: one cold build every
+ * seven days instead of every launch.
+ */
+const MAX_WARM_STORE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * How many reused entries to spot-check against the database before trusting the
+ * blob. Any mismatch aborts the warm start and falls back to a cold build.
+ *
+ * The sample is not looking for the hand-edit case above (a sample of 200 in
+ * 45,000 would usually miss a single edited rem). It is looking for the blob
+ * being wrong in bulk — a botched write, a KB restored from backup, an import
+ * that rewrote priorities wholesale — where even a small sample hits it. It costs
+ * one slot read each, so ~200 calls against the ~135,000 a cold build would pay.
+ */
+const WARM_SELF_CHECK_SAMPLE = 200;
+
+/**
+ * Builds a CardPriorityInfo from a stored priority/source plus the rem's cards,
+ * with NO database access at all.
+ *
+ * This is what makes the warm path worth having: the card-derived fields are the
+ * bulk of a CardPriorityInfo, and every one of them is computable locally from
+ * the single card.getAll() the build already does. Only priority and source ever
+ * needed a slot read, and those are what the blob holds.
+ *
+ * Kept deliberately in step with getCardPriority's arithmetic — the `?? Infinity`
+ * on nextRepetitionTime is what implicitly excludes disabled cards from due
+ * counts, and diverging here would give warm and cold builds different due counts.
+ */
+function buildInfoFromStore(
+  remId: RemId,
+  stored: { priority: number; source: PrioritySource },
+  cards: Card[]
+): CardPriorityInfo {
+  const now = Date.now();
+  const startOfToday = dayjs().startOf('day').valueOf();
+  return {
+    remId,
+    priority: stored.priority,
+    source: stored.source,
+    // The blob does not carry lastUpdated (dropping it is a third of its bytes,
+    // and only one comparison reads it). Zero means "unknown", which makes
+    // flushCacheUpdates treat any incoming update as newer — the DB-wins
+    // direction, which is the safe one for a value we did not read.
+    lastUpdated: 0,
+    cardCount: cards.length,
+    dueCards: cards.filter((c) => (c.nextRepetitionTime ?? Infinity) <= now).length,
+    dueCardsOverdue: cards.filter((c) => (c.nextRepetitionTime ?? Infinity) <= startOfToday).length,
+    cardsNextRep: cards.map((c) => c.nextRepetitionTime ?? null),
+  };
+}
+
+/**
+ * Attempts Phase 1 from the persisted blob, reading slots only for rems that
+ * changed.
+ *
+ * Returns null to mean "do a cold build" — for a missing/invalid blob, an
+ * expired one, or a self-check that disagrees with the database. Never returns a
+ * partially-trusted result: the caller should not have to reason about degrees.
+ */
+async function tryWarmPhase1(
+  plugin: RNPlugin,
+  taggedRems: PluginRem[],
+  cardsByRem: Map<RemId, Card[]>
+): Promise<CardPriorityInfo[] | null> {
+  const store = await loadPersistedCardPriorities(plugin);
+  if (!store) return null;
+
+  const age = Date.now() - store.meta.savedAt;
+  if (age > MAX_WARM_STORE_AGE_MS) {
+    console.log(
+      `[Card Priority Cache] Stored cache is ${Math.round(age / 86400000)}d old ` +
+        `(max ${MAX_WARM_STORE_AGE_MS / 86400000}d) — cold build to pick up any off-device hand edits.`
+    );
+    return null;
+  }
+
+  // Partition on the free `updatedAt` already present in the taggedRem payload:
+  // no call is made to decide whether a rem needs re-reading.
+  const reusable: PluginRem[] = [];
+  const mustRead: PluginRem[] = [];
+  for (const rem of taggedRems) {
+    const stored = store.byRem.get(rem._id);
+    if (!stored) {
+      mustRead.push(rem); // newly tagged since the blob was written
+    } else if (typeof rem.updatedAt === 'number' && rem.updatedAt > store.meta.savedAt) {
+      mustRead.push(rem); // touched since the blob was written
+    } else {
+      reusable.push(rem);
+    }
+  }
+
+  console.log(
+    `[Card Priority Cache] Warm start: ${reusable.length} rems from store, ` +
+      `${mustRead.length} to re-read (blob ${Math.round(age / 60000)}min old).`
+  );
+
+  // Spot-check before trusting the reused majority.
+  if (reusable.length > 0) {
+    const step = Math.max(1, Math.floor(reusable.length / WARM_SELF_CHECK_SAMPLE));
+    const sample: PluginRem[] = [];
+    for (let i = 0; i < reusable.length && sample.length < WARM_SELF_CHECK_SAMPLE; i += step) {
+      sample.push(reusable[i]);
+    }
+
+    const mismatches = (
+      await Promise.all(
+        sample.map(async (rem) => {
+          const live = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+          const stored = store.byRem.get(rem._id)!;
+          const liveNum = parseInt(live);
+          return !isNaN(liveNum) && liveNum === stored.priority ? null : rem._id;
+        })
+      )
+    ).filter(Boolean);
+
+    if (mismatches.length > 0) {
+      console.warn(
+        `[Card Priority Cache] Warm start self-check failed: ${mismatches.length}/${sample.length} ` +
+          `sampled rems disagree with the store (e.g. ${mismatches.slice(0, 3).join(', ')}). Cold build.`
+      );
+      return null;
+    }
+  }
+
+  const infos: CardPriorityInfo[] = [];
+  for (const rem of reusable) {
+    infos.push(buildInfoFromStore(rem._id, store.byRem.get(rem._id)!, cardsByRem.get(rem._id) || []));
+  }
+
+  const batchSize = 100;
+  for (let i = 0; i < mustRead.length; i += batchSize) {
+    const batch = mustRead.slice(i, i + batchSize);
+    const results = await Promise.all(
+      batch.map((rem) =>
+        getCardPriority(plugin, rem, { preloadedCards: cardsByRem.get(rem._id) || [] })
+      )
+    );
+    for (const info of results) if (info) infos.push(info);
+  }
+
+  return infos;
+}
+
 /**
  * Builds the Card Priority Cache (distinct from the IncRem cache).
  *
@@ -370,32 +534,60 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   }
 
   const phase1Start = Date.now();
-  console.log(`[Card Priority Cache] Phase 1 - Loading ${taggedForInheritanceRems.length} pre-tagged rems...`);
+
+  // Warm path first. It returns null for anything that makes the stored blob
+  // untrustworthy — absent, wrong version, wrong KB, too old, or a self-check
+  // that disagrees with the database — and the cold build below runs unchanged.
+  // The cold build is not a degraded mode; it is what writes the blob the next
+  // warm start depends on.
+  const warmPriorities = await tryWarmPhase1(plugin, taggedForInheritanceRems, cardsByRem);
+
+  if (warmPriorities) {
+    const percentileByRemWarm = calculateCardRemPercentilesFromCards(warmPriorities);
+    const enrichedWarm = warmPriorities.map((info) => ({
+      ...info,
+      kbPercentile: percentileByRemWarm[info.remId] ?? 0,
+    }));
+    await writeCardPriorityCache(plugin, enrichedWarm, { immediate: true });
+
+    const warmTime = Math.round((Date.now() - phase1Start) / 1000);
+    const totalWarmTime = Math.round((Date.now() - startTime) / 1000);
+    console.log(
+      `[Card Priority Cache] Phase 1 complete (WARM). ${enrichedWarm.length} rems in ${warmTime}s ` +
+      `(total ${totalWarmTime}s including ${totalWarmTime - warmTime}s setup)`
+    );
+    if (enrichedWarm.length > 0) {
+      await plugin.app.toast(`✅ Loaded ${enrichedWarm.length} card priorities in ${totalWarmTime}s`);
+    }
+    await schedulePhase2(plugin, untaggedRemIds, totalUnique);
+    return;
+  }
+
+  console.log(`[Card Priority Cache] Phase 1 (COLD) - Loading ${taggedForInheritanceRems.length} pre-tagged rems...`);
   const taggedPriorities: CardPriorityInfo[] = [];
 
-  // DO NOT try to speed this up by rescheduling the calls — it has been measured
-  // and there is nothing there.
+  // Rescheduling these calls was tried and did nothing: replacing the batch
+  // barrier with a sliding window of workers moved throughput 465 -> 489 rem/s,
+  // while the IncRem cache load and the card.getAll() setup — neither of them
+  // touched — got 5.7% and 14% faster in the same run. That was machine variance,
+  // not the change, so the batching below was kept for being simpler.
   //
-  // The obvious suspicion is the barrier at the end of each batch: 100 rems are
-  // issued, then the loop waits for the slowest of them before issuing the next
-  // 100, 451 times over a 45k-rem library. Replacing that with a sliding window
-  // of workers (constant rems in flight, no barrier at all) moved throughput from
-  // 465 to 489 rem/s — and in the same run the IncRem cache load and the
-  // card.getAll() setup, neither of which was touched, got 5.7% and 14% faster.
-  // It was machine variance, not the change.
+  // What that experiment did NOT establish, despite an earlier note here claiming
+  // it did, is a fixed IPC ceiling. Most runs sit at ~465-490 rem/s (~1,400 slot
+  // reads/s), but one hit 2,972 rem/s — six times faster, same code. It was not
+  // cold-start versus plugin-reload, as first guessed: the 97s run was a reload
+  // too. What the fast run had just done was a full CardPriority snapshot, which
+  // reads the very same three slots on the very same 45k rems, leaving RemNote's
+  // own store hot for exactly this loop's next pass.
   //
-  // The reason is that the IPC bridge is a fixed-rate pipe at roughly 1,800-2,000
-  // calls/s. That holds whether Phase 1 runs alone or shares the bridge with the
-  // concurrent IncRem cache load (which is why this phase visibly speeds up in
-  // the logs the moment that load finishes), and it holds under either scheduling
-  // strategy. There was no idle time to reclaim.
+  // So the number to plan against is the cold one. Never benchmark this
+  // immediately after a snapshot capture or another full build.
   //
-  // So the only lever is FEWER calls. Phase 1 issues three per rem — the priority,
-  // source and lastUpdated slots read in getCardPriority — for ~135,000 total.
-  // Dropping the lastUpdated read is a third of that; persisting the cache across
-  // sessions (storage.setLocal) and re-reading only what changed would remove
-  // almost all of it, but needs a change signal that rem.updatedAt cannot provide
-  // on its own: see lib/updated_at_probe.ts for what was measured and why.
+  // The durable lever is still FEWER calls. Phase 1 issues three per rem — the
+  // priority, source and lastUpdated slots read in getCardPriority. The warm path
+  // above removes nearly all of them; see lib/card_priority/persistence.ts, and
+  // lib/updated_at_probe.ts for why rem.updatedAt alone cannot be trusted as the
+  // change signal.
   const checkBatchSize = 100;
   let lastProgressLogged = -1;
   for (let i = 0; i < taggedForInheritanceRems.length; i += checkBatchSize) {
@@ -446,28 +638,43 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
     `in ${phase1Time}s (${remsPerSec} rem/s, batch ${checkBatchSize}; ` +
     `total ${totalTime}s including ${totalTime - phase1Time}s setup)`
   );
-  console.log(`[Card Priority Cache] Found ${untaggedRemIds.length} untagged rems with cards for deferred processing`);
 
   if (enrichedTaggedPriorities.length > 0) {
     await plugin.app.toast(`✅ Loaded ${enrichedTaggedPriorities.length} pre-tagged card priorities in ${totalTime}s`);
   }
 
-  if (untaggedRemIds.length > 0) {
-    const untaggedPercentage = Math.round((untaggedRemIds.length / totalUnique) * 100);
-    if (untaggedPercentage > 20) {
-      await plugin.app.toast(
-        `⏳ Processing ${untaggedRemIds.length} untagged rems in background... `
-      );
-    }
+  await schedulePhase2(plugin, untaggedRemIds, totalUnique);
+}
 
-    setTimeout(async () => {
-      await processDeferredCardPriorityCache(plugin, untaggedRemIds);
-    }, 3000);
-  } else {
+/**
+ * Kicks off the deferred phase, or closes out the build when there is nothing
+ * deferred. Shared by the warm and cold paths so they cannot drift on what
+ * "finished" means — notably the card_priority_cache_fully_loaded flag, which
+ * the inheritance cascade reads to decide whether the cache can be trusted as a
+ * has-cards index.
+ */
+async function schedulePhase2(
+  plugin: RNPlugin,
+  untaggedRemIds: string[],
+  totalUnique: number
+) {
+  console.log(`[Card Priority Cache] Found ${untaggedRemIds.length} untagged rems with cards for deferred processing`);
+
+  if (untaggedRemIds.length === 0) {
     console.log('[Card Priority Cache] All rems with cards are pre-tagged! No deferred processing needed.');
     await plugin.app.toast('✅ All card priorities loaded!');
     await plugin.storage.setSession('card_priority_cache_fully_loaded', true);
+    return;
   }
+
+  const untaggedPercentage = Math.round((untaggedRemIds.length / totalUnique) * 100);
+  if (untaggedPercentage > 20) {
+    await plugin.app.toast(`⏳ Processing ${untaggedRemIds.length} untagged rems in background... `);
+  }
+
+  setTimeout(async () => {
+    await processDeferredCardPriorityCache(plugin, untaggedRemIds);
+  }, 3000);
 }
 
 /**

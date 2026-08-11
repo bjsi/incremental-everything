@@ -244,6 +244,39 @@ For large-scale reorganizations or after running bulk operations (Batch Priority
 
 ![CleanShot 2026-01-03 at 16 06 53@2x](assets/uploaded/c04bec93-9af1-4de3-946c-959601f97d34.png){ width="700" }
 
+
+## Startup: how the priority cache is built { #startup-cache }
+
+Everything on this page — the Card Shield, relative percentiles, [Priority Review Documents](Priority-Review-Document.md), the priority badges — reads from one in-memory index of every prioritised flashcard, built when the plugin starts.
+
+On a large knowledge base that index is expensive. Building it from scratch means reading three stored values for every tagged rem: on a 45,000-rem library that is roughly **135,000 separate reads, and about 100 seconds**. It runs in the background and nothing blocks on it, but until it finishes the shield and the percentile colours have nothing to work from.
+
+### The saved copy
+
+The plugin now keeps a copy of the index on your device and starts from it, re-reading only what has actually changed since the copy was saved.
+
+The saving is automatic. Every change to a priority updates the copy, so it stays current as you work; bulk rebuilds save it immediately, and ordinary edits save a few seconds later so that a long queue session is not writing megabytes after every answer.
+
+**Measured on a 45,085-rem knowledge base: 108 seconds to build from scratch, 14 seconds starting from the saved copy.** Most of what remains is loading the flashcards themselves, which has to happen every time — whether a card is due changes with the clock, so those counts are always recomputed.
+
+The copy lives only on the device that wrote it. It is never synced, because it is derived data that each device can rebuild for itself, and syncing several megabytes of it would be wasteful.
+
+### When it rebuilds from scratch anyway
+
+The saved copy is used only when it can be trusted. The plugin falls back to a full rebuild when:
+
+* there is no saved copy yet — the first start after installing or updating;
+* it belongs to a different knowledge base, or was written by an older version of the plugin;
+* **it is more than seven days old**;
+* a spot-check disagrees with what is actually stored.
+
+The spot-check reads a couple of hundred priorities at random and compares them against the saved copy before trusting the rest. It costs a fraction of a second and catches the copy being wrong in bulk — after restoring a backup, or an import that rewrote priorities.
+
+The seven-day limit covers the one change that cannot be detected. If you edit a **Priority** property row by hand while the plugin is running, the change is noticed and saved as normal. If you do it **on another device**, or with the plugin disabled, nothing marks the rem as changed, and the saved copy would keep the old value indefinitely. Rebuilding weekly puts a bound on how long such an edit can stay wrong.
+
+!!! tip "Forcing a rebuild"
+    The debug widget's **Warm-Start Store** panel shows the saved copy and clears it, which makes the next start rebuild from scratch. Clearing it is harmless — it is derived data, and the rebuild writes it again.
+
 ## See also
 
 * [Priority Review Document](Priority-Review-Document.md)

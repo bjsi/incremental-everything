@@ -42,6 +42,12 @@ import {
   RestoreReport,
 } from '../lib/card_priority_snapshot';
 import {
+  readCardPriorityStoreMeta,
+  clearPersistedCardPriorities,
+  CARD_PRIORITY_STORE_VERSION,
+  StoreMeta,
+} from '../lib/card_priority/persistence';
+import {
   readRemChangeTape,
   clearRemChangeTape,
   enrichRemChangeTape,
@@ -710,6 +716,12 @@ function Debug() {
   // Dirty-set probe: raw GlobalRemChanged remIds, enriched on demand.
   const [tapeRows, setTapeRows] = useState<EnrichedRemChange[] | null>(null);
   const [tapeBusy, setTapeBusy] = useState(false);
+  // Warm-start store status. Reads only the meta key — pulling the chunks here
+  // would materialise 45k rows just to draw a status line.
+  const warmStore = useTrackerPlugin(
+    async (rp) => (await readCardPriorityStoreMeta(rp)) as StoreMeta | null,
+    [refreshKey]
+  );
   // Result of the settings-migration probe (see handleProbeSettingsPersistence).
   const [isProbingSettings, setIsProbingSettings] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -2334,6 +2346,15 @@ function Debug() {
     } finally {
       setTapeBusy(false);
     }
+  };
+
+  const handleClearWarmStore = async () => {
+    await clearPersistedCardPriorities(plugin);
+    setRefreshKey((k) => k + 1);
+    await plugin.app.toast(
+      'Warm-start store cleared. The next build will be COLD. For a true cold-start ' +
+      'measurement, fully restart RemNote rather than reloading the plugin.'
+    );
   };
 
   const handleClearTape = async () => {
@@ -5335,6 +5356,42 @@ function Debug() {
           {restoreReport && (
             <div style={{ fontSize: '11px', marginTop: '8px', fontWeight: 600 }}>{restoreReport.verdict}</div>
           )}
+        </div>
+
+        {/* ── Warm-start store ────────────────────────────────────────────────
+            The persisted mirror the cache starts from. Clearing it is the only
+            way to force a cold build, which is what makes the two comparable. */}
+        <div style={{ marginBottom: '12px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>Warm-Start Store</div>
+          <div style={{ fontSize: '11px', marginBottom: '6px' }}>
+            {warmStore ? (
+              <>
+                <strong style={{ color: warmStore.version === CARD_PRIORITY_STORE_VERSION ? '#22c55e' : '#ef4444' }}>
+                  {warmStore.count} rows
+                </strong>{' '}
+                in {warmStore.chunkCount} chunks · saved {dayjs(warmStore.savedAt).format('MMM D HH:mm:ss')}{' '}
+                ({dayjs(warmStore.savedAt).fromNow()}) · schema v{warmStore.version}
+                {warmStore.version !== CARD_PRIORITY_STORE_VERSION && (
+                  <span style={{ color: '#ef4444' }}> (expected v{CARD_PRIORITY_STORE_VERSION} — will cold build)</span>
+                )}
+              </>
+            ) : (
+              <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                empty — the next build will be cold
+              </span>
+            )}
+          </div>
+          <button
+            onClick={handleClearWarmStore}
+            style={{ ...smallBtnStyle, borderColor: '#f59e0b', color: '#f59e0b' }}
+            title="Deletes the persisted mirror so the next build runs cold. Non-destructive: the cold build rewrites it."
+          >
+            Clear store (force cold build)
+          </button>
+          <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '4px' }}>
+            Non-destructive — this is a derived index, and the cold build rewrites it. It is not the
+            CardPriority Snapshot above, which is your backup of the actual slot values.
+          </div>
         </div>
 
         {/* ── Warm-start viability ────────────────────────────────────────────

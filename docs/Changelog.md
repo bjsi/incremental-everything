@@ -2,6 +2,38 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.38 - August 11th, 2026
+
+### ⚡ Improved: the flashcard priority cache now starts from a saved copy
+
+Everything that reads flashcard priorities — the Card Shield, the relative percentiles, the priority badges, [Priority Review Documents](Priority-Review-Document.md) — works from one index built when the plugin starts. Building it means reading three stored values for every prioritised rem, which on a 45,000-rem knowledge base is about **135,000 reads and 100 seconds**. It never blocked anything, but for that first minute and a half the shield had nothing to show.
+
+The plugin now keeps a copy of that index on your device and starts from it, re-reading only the rems that changed since it was saved.
+
+**Measured on a 45,085-rem knowledge base: 108 seconds to build from scratch, 14 seconds from the saved copy.** Most of the remaining time is loading the flashcards, which happens every start regardless — whether a card is due changes with the clock, so those counts are never reused.
+
+Keeping the copy current is automatic and is enforced in one place: every write to the priority index now goes through a single function that updates the saved copy alongside it, so a copy that drifts from the index is not something a future change can reintroduce by forgetting. Bulk rebuilds save immediately; ordinary edits save a few seconds later, so a queue session is not writing megabytes after every answer.
+
+The copy is never synced. It is derived data each device can rebuild for itself, and syncing several megabytes of it would be wasteful.
+
+It is also used only where it can be trusted. The plugin rebuilds from scratch when there is no copy yet, when it came from another knowledge base or an older version, when it is **more than seven days old**, or when a spot-check of a couple of hundred priorities disagrees with what is actually stored.
+
+That seven-day limit exists for one specific gap. Editing a **Priority** property row by hand is noticed and saved while the plugin is running — but doing it on **another device**, or with the plugin disabled, leaves nothing to detect, because that edit changes a hidden child of the rem rather than the rem itself. Rebuilding weekly bounds how long such an edit can stay stale.
+
+📖 [Startup: how the priority cache is built](Priorities-for-Flashcards.md#startup-cache)
+
+### 🎨 Changed: the Priority property row no longer clutters new knowledge bases
+
+The **CardPriority** powerup's Priority slot is now registered to show only in the document view rather than under every tagged rem in the outline. This affects **newly created knowledge bases only** — RemNote fixes a slot's display position when the slot is first created, so existing knowledge bases keep theirs. You can change it yourself from RemNote's own property settings.
+
+### 🔧 Debug: snapshot, restore and cache tooling
+
+Three additions to the debug widget, all under **Raw Slot Diagnostics**:
+
+- **CardPriority Snapshot / Restore** — captures every rem's priority, source and last-updated values to a downloaded JSON file (and to local storage), verifies the current state against a capture, and restores from it. Worth running before any bulk re-prioritisation, repair pass or import. On a 45,085-rem knowledge base the capture is about 4.7 MB.
+- **Warm-Start Store** — shows the saved copy described above, and clears it to force a rebuild from scratch.
+- **Cache freshness readout** — the Card Priority Powerup section now shows the cached priority next to the stored one, so a stale cache is visible rather than inferred.
+
 ## v1.0.37 - August 11th, 2026
 
 ### 🐛 Fixed: the Flashcard History sidebar had stopped recording
