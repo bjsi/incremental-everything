@@ -49,11 +49,16 @@ import {
   auditSyncedKeys,
   probeWriteCapacity,
   testNullFreesSlot,
+  calibratePerKeyLimit,
+  analyzeArrayKey,
+  worstCaseBytes,
   SYNCED_KEY_CAP,
   formatBytes,
   AuditResult,
   CapacityReport,
   NullFreesSlotReport,
+  PerKeyLimitReport,
+  ArrayKeyAnatomy,
 } from '../lib/synced_key_audit';
 import { CardPriorityInfo } from '../lib/card_priority';
 import dayjs from 'dayjs';
@@ -310,6 +315,11 @@ function Debug() {
   const [isAuditingKeys, setIsAuditingKeys] = useState(false);
   const [capacityReport, setCapacityReport] = useState<CapacityReport | null>(null);
   const [nullTestReport, setNullTestReport] = useState<NullFreesSlotReport | null>(null);
+  const [limitReport, setLimitReport] = useState<PerKeyLimitReport | null>(null);
+  // Per-key anatomy: which key's bytes to break down. Defaults to the one that
+  // rejects writes today.
+  const [anatomyKey, setAnatomyKey] = useState('flashcardHistoryData');
+  const [anatomy, setAnatomy] = useState<ArrayKeyAnatomy | null>(null);
 
   const debugData = useTrackerPlugin(
     async (rp) => {
@@ -1836,6 +1846,53 @@ function Debug() {
       await plugin.app.toast(
         report.atCap ? 'At cap — no new synced key can be written.' : 'Free capacity — a new key was accepted.'
       );
+    } finally {
+      setIsAuditingKeys(false);
+    }
+  };
+
+  const handleCalibrateLimit = async () => {
+    const confirmed = confirm(
+      'Find the real per-key size ceiling?\n\n' +
+        'This writes a scratch key repeatedly, up to a few MB per attempt, until RemNote refuses it — ' +
+        'roughly 30 large writes and the sync traffic that implies. It leaves one extra key behind ' +
+        '(nulled at the end). Continue?'
+    );
+    if (!confirmed) return;
+    setIsAuditingKeys(true);
+    setLimitReport(null);
+    try {
+      const report = await calibratePerKeyLimit(plugin, setKeyAuditProgress);
+      setLimitReport(report);
+      setKeyAuditProgress('');
+      await plugin.app.toast(
+        report.unit === 'unknown' ? 'Calibration inconclusive — see console.' : report.verdict
+      );
+    } catch (e) {
+      console.error('[KeyAudit] Calibration failed', e);
+      setKeyAuditProgress('');
+      await plugin.app.toast('Calibration failed — check console.');
+    } finally {
+      setIsAuditingKeys(false);
+    }
+  };
+
+  const handleAnalyzeKey = async () => {
+    const key = anatomyKey.trim();
+    if (!key) return;
+    setIsAuditingKeys(true);
+    setAnatomy(null);
+    try {
+      const result = await analyzeArrayKey(plugin, key);
+      setAnatomy(result);
+      await plugin.app.toast(
+        result.exists
+          ? `${key}: ${result.entries} entries, worst case ${formatBytes(result.worst)}.`
+          : `${key} is absent or null.`
+      );
+    } catch (e) {
+      console.error('[KeyAudit] Key anatomy failed', e);
+      await plugin.app.toast('Key anatomy failed — check console.');
     } finally {
       setIsAuditingKeys(false);
     }
@@ -3984,6 +4041,13 @@ function Debug() {
               Test Capacity
             </button>
             <button
+              onClick={handleCalibrateLimit}
+              disabled={isAuditingKeys}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isAuditingKeys ? 'wait' : 'pointer' }}
+            >
+              Calibrate size ceiling
+            </button>
+            <button
               onClick={handleTestNullFreesSlot}
               disabled={isAuditingKeys || !keyAudit?.disposable?.length}
               style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', border: '1px solid var(--rn-clr-border-warning)', borderRadius: '4px', cursor: (isAuditingKeys || !keyAudit?.disposable?.length) ? 'not-allowed' : 'pointer' }}
@@ -4106,15 +4170,31 @@ function Debug() {
                 <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>
                   Largest keys ({keyAudit.largestKeys.length}) — per-key ceiling {formatBytes(keyAudit.perKeyLimit)}
                 </summary>
+                <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', margin: '4px 0' }}>
+                  UTF-8 / UTF-16 / re-escaped are the same value counted three ways. RemNote does not say which one its
+                  900 KB ceiling uses and they differ by up to 2×, so <strong>worst</strong> is the column to act on
+                  until "Calibrate size ceiling" settles it.
+                </div>
                 <table style={{ fontSize: '11px', width: '100%', borderCollapse: 'collapse', marginTop: '4px' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>
+                      <th style={{ padding: '3px 4px', textAlign: 'left' }}>Key</th>
+                      <th style={{ padding: '3px 4px' }}>UTF-8</th>
+                      <th style={{ padding: '3px 4px' }}>UTF-16</th>
+                      <th style={{ padding: '3px 4px' }}>Escaped</th>
+                      <th style={{ padding: '3px 4px' }}>% worst</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {keyAudit.largestKeys.map((k) => {
-                      const pct = (k.bytes / keyAudit.perKeyLimit) * 100;
+                      const pct = (worstCaseBytes(k) / keyAudit.perKeyLimit) * 100;
                       return (
                         <tr key={k.key} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
                           <td style={{ padding: '3px 4px', wordBreak: 'break-all' }}><code style={{ fontSize: '10px' }}>{k.key}</code></td>
                           <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{formatBytes(k.bytes)}</td>
-                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: pct >= 50 ? '#ef4444' : 'var(--rn-clr-content-tertiary)' }}>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{k.utf16 != null ? formatBytes(k.utf16) : '—'}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{k.escaped != null ? formatBytes(k.escaped) : '—'}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: pct >= 100 ? '#ef4444' : pct >= 50 ? '#f59e0b' : 'var(--rn-clr-content-tertiary)' }}>
                             {pct.toFixed(1)}%
                           </td>
                         </tr>
@@ -4126,6 +4206,123 @@ function Debug() {
             )}
           </div>
         )}
+        {limitReport && (
+          <div style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px', fontSize: '11px' }}>
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+              Per-key ceiling calibration — documented limit {formatBytes(limitReport.documentedLimit)}
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
+              <thead>
+                <tr style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>
+                  <th style={{ padding: '3px 4px', textAlign: 'left' }}>Alphabet</th>
+                  <th style={{ padding: '3px 4px' }}>Largest accepted</th>
+                  <th style={{ padding: '3px 4px' }}>as UTF-8</th>
+                  <th style={{ padding: '3px 4px' }}>as UTF-16</th>
+                </tr>
+              </thead>
+              <tbody>
+                {limitReport.probes.map((p) => (
+                  <tr key={p.label} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                    <td style={{ padding: '3px 4px' }}>{p.label}</td>
+                    <td style={{ padding: '3px 4px', textAlign: 'right' }}>{p.acceptedChars.toLocaleString()} chars</td>
+                    <td style={{ padding: '3px 4px', textAlign: 'right' }}>{formatBytes(p.acceptedUtf8)}</td>
+                    <td style={{ padding: '3px 4px', textAlign: 'right' }}>{formatBytes(p.acceptedUtf16)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ padding: '6px', borderRadius: '4px', backgroundColor: limitReport.unit === 'unknown' ? 'var(--rn-clr-background-warning)' : 'var(--rn-clr-background-secondary)', color: limitReport.unit === 'unknown' ? 'var(--rn-clr-content-warning)' : 'inherit' }}>
+              {limitReport.verdict}
+            </div>
+          </div>
+        )}
+        <div style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px', fontSize: '11px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <strong>Key anatomy:</strong>
+            <input
+              value={anatomyKey}
+              onChange={(e) => setAnatomyKey(e.target.value)}
+              style={{ fontSize: '11px', padding: '2px 6px', flex: '1 1 220px', minWidth: '160px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px' }}
+            />
+            <button
+              onClick={handleAnalyzeKey}
+              disabled={isAuditingKeys}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isAuditingKeys ? 'wait' : 'pointer' }}
+            >
+              Break it down
+            </button>
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '4px' }}>
+            Reads one array-valued key and reports where its bytes go — entries, cost per field, fattest entries, and
+            what capping the entry count or the stored text would save.
+          </div>
+          {anatomy && (
+            <div style={{ marginTop: '8px' }}>
+              {!anatomy.exists ? (
+                <div>Key is absent or null.</div>
+              ) : !anatomy.isArray ? (
+                <div>
+                  Not an array — {formatBytes(anatomy.size.utf8)} UTF-8 / {formatBytes(anatomy.size.utf16)} UTF-16 /{' '}
+                  {formatBytes(anatomy.size.escaped)} re-escaped.
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>{anatomy.entries}</strong> entries · {formatBytes(anatomy.size.utf8)} UTF-8 ·{' '}
+                    {formatBytes(anatomy.size.utf16)} UTF-16 ·{' '}
+                    <span style={{ color: anatomy.worst >= anatomy.perKeyLimit ? '#ef4444' : anatomy.worst >= anatomy.perKeyLimit * 0.5 ? '#f59e0b' : 'inherit', fontWeight: 600 }}>
+                      worst case {formatBytes(anatomy.worst)} ({((anatomy.worst / anatomy.perKeyLimit) * 100).toFixed(0)}% of ceiling)
+                    </span>
+                    {anatomy.oldest && anatomy.newest && (
+                      <> · spans {Math.round((anatomy.newest - anatomy.oldest) / 86400000)} days</>
+                    )}
+                  </div>
+                  <div style={{ marginBottom: '6px', color: 'var(--rn-clr-content-secondary)' }}>
+                    Per entry — avg {formatBytes(anatomy.entryBytes.avg)}, median {formatBytes(anatomy.entryBytes.median)},
+                    p95 {formatBytes(anatomy.entryBytes.p95)}, max {formatBytes(anatomy.entryBytes.max)}
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>
+                        <th style={{ padding: '3px 4px', textAlign: 'left' }}>Field</th>
+                        <th style={{ padding: '3px 4px' }}>Total</th>
+                        <th style={{ padding: '3px 4px' }}>Share</th>
+                        <th style={{ padding: '3px 4px' }}>Present</th>
+                        <th style={{ padding: '3px 4px' }}>Fattest</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {anatomy.fields.map((f) => (
+                        <tr key={f.field} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                          <td style={{ padding: '3px 4px' }}><code style={{ fontSize: '10px' }}>{f.field}</code></td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right' }}>{formatBytes(f.bytes)}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: f.share >= 0.3 ? 600 : 400 }}>{(f.share * 100).toFixed(1)}%</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{f.present}/{anatomy.entries}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{formatBytes(f.longest)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ fontWeight: 600, marginBottom: '2px' }}>If we trimmed it</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {anatomy.projections.map((p) => (
+                        <tr key={p.label} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                          <td style={{ padding: '3px 4px' }}>{p.label}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatBytes(p.utf8)} UTF-8</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            worst {formatBytes(p.worst)} ({((p.worst / anatomy.perKeyLimit) * 100).toFixed(0)}%)
+                          </td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: '#10b981' }}>−{(p.savedPct * 100).toFixed(0)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         {nullTestReport && (
           <div style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px', fontSize: '11px' }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>

@@ -72,9 +72,35 @@ const PROBE_CONCURRENCY = 12;
 
 export type ProbeState = 'live' | 'nulled' | 'absent';
 
+/** The same value measured every way RemNote could plausibly be counting it.
+ *  We do not know which unit the 900 KB ceiling is expressed in, and the units
+ *  differ by up to 2× — a key that looks like 57% of the limit in UTF-8 is over
+ *  the limit in UTF-16. `calibratePerKeyLimit` settles it empirically. */
+export interface SizeBreakdown {
+  /** `JSON.stringify(value).length` — UTF-16 code units. */
+  chars: number;
+  /** UTF-8 bytes of the JSON. What every earlier audit reported. */
+  utf8: number;
+  /** UTF-16 bytes (chars × 2): what a host measuring JS string memory sees. */
+  utf16: number;
+  /** UTF-8 bytes of the JSON escaped once more, as when a value is stored as a
+   *  string field inside another JSON document. */
+  escaped: number;
+}
+
 export interface KeySize {
   key: string;
+  /** UTF-8 bytes — kept as the primary figure so totals stay comparable. */
   bytes: number;
+  chars?: number;
+  utf16?: number;
+  escaped?: number;
+}
+
+/** The largest of the measurements we have for a key: the only figure safe to
+ *  compare against the per-key ceiling while the accounting unit is unknown. */
+export function worstCaseBytes(size: KeySize): number {
+  return Math.max(size.bytes, size.utf16 ?? 0, size.escaped ?? 0);
 }
 
 export interface FamilyReport {
@@ -103,6 +129,73 @@ export interface CapacityReport {
   atCap: boolean;
   probeKey: string;
   error?: string;
+}
+
+/** One filler alphabet's answer to "how big a value does RemNote actually take?" */
+export interface LimitProbe {
+  label: string;
+  utf8PerChar: number;
+  /** Largest payload the write accepted, and the smallest one it rejected. */
+  acceptedChars: number;
+  rejectedChars: number | null;
+  /** The accepted payload expressed in each candidate accounting unit. */
+  acceptedUtf8: number;
+  acceptedUtf16: number;
+  writes: number;
+}
+
+export interface PerKeyLimitReport {
+  probes: LimitProbe[];
+  documentedLimit: number;
+  /** Which unit best explains the measured ceilings, and how confident we are. */
+  verdict: string;
+  /** The unit whose measured ceiling is most consistent across alphabets. */
+  unit: 'utf8' | 'utf16' | 'chars' | 'unknown';
+  /** Ceiling in that unit, averaged over the probes. */
+  measuredLimit: number;
+  error?: string;
+}
+
+export interface FieldCost {
+  field: string;
+  /** UTF-8 bytes this field contributes across every entry, key name included. */
+  bytes: number;
+  share: number;
+  present: number;
+  longest: number;
+}
+
+export interface TrimOption {
+  label: string;
+  maxEntries?: number;
+  stringLimit?: number;
+  dropFields?: string[];
+}
+
+export interface Projection {
+  label: string;
+  utf8: number;
+  worst: number;
+  savedPct: number;
+  entries: number;
+}
+
+export interface ArrayKeyAnatomy {
+  key: string;
+  exists: boolean;
+  isArray: boolean;
+  entries: number;
+  size: SizeBreakdown;
+  worst: number;
+  perKeyLimit: number;
+  fields: FieldCost[];
+  entryBytes: { avg: number; median: number; p95: number; max: number };
+  largestEntries: { index: number; bytes: number; preview: string }[];
+  /** Running UTF-8 total over the first N entries — what a retention cap buys. */
+  cumulative: { entries: number; utf8: number }[];
+  oldest?: number;
+  newest?: number;
+  projections: Projection[];
 }
 
 export interface NullFreesSlotReport {
@@ -169,7 +262,28 @@ function measureBytes(value: unknown): number {
   } catch {
     return 0; // circular or otherwise unserializable — should not happen for stored data
   }
+  return utf8Bytes(json);
+}
+
+function utf8Bytes(json: string): number {
   return textEncoder ? textEncoder.encode(json).length : json.length;
+}
+
+/** Escaping a 500 KB string allocates another copy of it; only worth doing for
+ *  values big enough that the distinction can matter. */
+const ESCAPE_MEASURE_THRESHOLD = 16 * 1024;
+
+export function measureSizes(value: unknown): SizeBreakdown {
+  let json: string;
+  try {
+    json = JSON.stringify(value) ?? '';
+  } catch {
+    return { chars: 0, utf8: 0, utf16: 0, escaped: 0 };
+  }
+  const utf8 = utf8Bytes(json);
+  const escaped =
+    utf8 >= ESCAPE_MEASURE_THRESHOLD ? utf8Bytes(JSON.stringify(json)) : utf8 + 2;
+  return { chars: json.length, utf8, utf16: json.length * 2, escaped };
 }
 
 export function formatBytes(bytes: number): string {
@@ -178,18 +292,22 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-async function probeKey(plugin: RNPlugin, key: string): Promise<{ state: ProbeState; bytes: number }> {
+async function probeKey(
+  plugin: RNPlugin,
+  key: string
+): Promise<{ state: ProbeState; size: SizeBreakdown }> {
+  const empty: SizeBreakdown = { chars: 0, utf8: 0, utf16: 0, escaped: 0 };
   try {
     const value = await plugin.storage.getSynced(key);
-    if (value === undefined) return { state: 'absent', bytes: 0 };
-    if (value === null) return { state: 'nulled', bytes: 0 };
+    if (value === undefined) return { state: 'absent', size: empty };
+    if (value === null) return { state: 'nulled', size: empty };
     // Measure and drop the value immediately — holding thousands of them would
     // cost more memory than the storage we're auditing.
-    return { state: 'live', bytes: measureBytes(value) };
+    return { state: 'live', size: measureSizes(value) };
   } catch {
     // A read that throws tells us nothing about existence; treat as absent so we
     // never over-count, and let the unaccounted figure absorb it.
-    return { state: 'absent', bytes: 0 };
+    return { state: 'absent', size: empty };
   }
 }
 
@@ -219,13 +337,21 @@ async function probeFamily(
   for (let i = 0; i < keys.length; i += PROBE_CONCURRENCY) {
     const chunk = keys.slice(i, i + PROBE_CONCURRENCY);
     const results = await Promise.all(chunk.map((k) => probeKey(plugin, k)));
-    results.forEach(({ state, bytes }, j) => {
+    results.forEach(({ state, size }, j) => {
       const key = chunk[j];
+      const bytes = size.utf8;
       if (state === 'live') {
+        const entry: KeySize = {
+          key,
+          bytes,
+          chars: size.chars,
+          utf16: size.utf16,
+          escaped: size.escaped,
+        };
         report.live++;
         report.bytes += bytes;
-        if (!report.largest || bytes > report.largest.bytes) report.largest = { key, bytes };
-        onLiveKey?.({ key, bytes });
+        if (!report.largest || bytes > report.largest.bytes) report.largest = entry;
+        onLiveKey?.(entry);
         if (report.sample.length < 5) report.sample.push(key);
         if (candidates.disposable) report.disposable!.push(key);
       } else if (state === 'nulled') {
@@ -630,7 +756,9 @@ export async function auditSyncedKeys(
     perKeyLimit: PER_KEY_BYTE_LIMIT,
     totalBudget: TOTAL_BYTE_BUDGET,
     largestKeys,
-    sizeWarnings: largestKeys.filter((k) => k.bytes >= PER_KEY_BYTE_LIMIT * SIZE_WARN_RATIO),
+    sizeWarnings: largestKeys.filter(
+      (k) => worstCaseBytes(k) >= PER_KEY_BYTE_LIMIT * SIZE_WARN_RATIO
+    ),
     totals,
     cap: SYNCED_KEY_CAP,
     occupied,
@@ -675,19 +803,27 @@ export function logAuditResult(result: AuditResult): void {
       `(${((result.totalBytes / result.totalBudget) * 100).toFixed(1)}% of the plugin budget)`
   );
   if (result.largestKeys.length > 0) {
-    console.log(`Largest keys (per-key ceiling ${formatBytes(result.perKeyLimit)}):`);
+    console.log(
+      `Largest keys (per-key ceiling ${formatBytes(result.perKeyLimit)}). ` +
+        'The unit RemNote counts in is unknown, so each key is shown in all three; ' +
+        '"% worst" is the one to trust. Run the per-key limit calibration to find out which is real.'
+    );
     console.table(
       result.largestKeys.map((k) => ({
         key: k.key,
-        size: formatBytes(k.bytes),
-        '% of per-key limit': `${((k.bytes / result.perKeyLimit) * 100).toFixed(1)}%`,
+        utf8: formatBytes(k.bytes),
+        utf16: k.utf16 != null ? formatBytes(k.utf16) : '—',
+        escaped: k.escaped != null ? formatBytes(k.escaped) : '—',
+        '% utf8': `${((k.bytes / result.perKeyLimit) * 100).toFixed(1)}%`,
+        '% worst': `${((worstCaseBytes(k) / result.perKeyLimit) * 100).toFixed(1)}%`,
       }))
     );
   }
   for (const warn of result.sizeWarnings) {
+    const worst = worstCaseBytes(warn);
     console.warn(
-      `[KeyAudit] "${warn.key}" is ${formatBytes(warn.bytes)} — ` +
-        `${((warn.bytes / result.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(result.perKeyLimit)} per-key ceiling.`
+      `[KeyAudit] "${warn.key}" is ${formatBytes(warn.bytes)} UTF-8 / ${formatBytes(worst)} worst-case — ` +
+        `${((worst / result.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(result.perKeyLimit)} per-key ceiling.`
     );
   }
   console.log(`Unaccounted (orphans we cannot name): ~${result.unaccounted}`);
@@ -781,4 +917,381 @@ export async function testNullFreesSlot(
   }
 
   return report;
+}
+
+// --- per-key size ceiling: what does RemNote actually count? ----------------
+//
+// The audit can only measure what a value weighs in JS. RemNote rejects writes
+// against a 900 KB "per-item" ceiling without telling us the unit, and the
+// candidate units differ by 2× (a 512 KB UTF-8 value is 1.02 MB in UTF-16).
+// That gap is exactly the band flashcardHistoryData sits in, so guessing is not
+// good enough: this walks a scratch key up to the rejection point with three
+// different alphabets and reads the unit off the results.
+//
+//   • If the ceiling lands at ~900 KB of UTF-8 for all three alphabets, RemNote
+//     counts UTF-8 bytes and our audit figures were already right.
+//   • If it lands at ~460 K characters regardless of alphabet, it counts UTF-16
+//     bytes (string length × 2) and every audit figure must be doubled.
+
+const SIZE_PROBE_KEY = '__ie_size_probe__';
+
+/** Stop bisecting once the bracket is this tight — one more halving costs a
+ *  multi-hundred-KB IPC write and buys nothing we would act on. */
+const LIMIT_PROBE_TOLERANCE_CHARS = 4096;
+/** Never write more than this in one probe, whatever the doubling suggests. */
+const LIMIT_PROBE_MAX_CHARS = 4 * 1024 * 1024;
+
+const LIMIT_PROBE_FILLERS: Array<{ label: string; char: string; utf8PerChar: number }> = [
+  { label: 'ASCII (1 UTF-8 byte/char)', char: 'x', utf8PerChar: 1 },
+  { label: 'Accented Latin (2 UTF-8 bytes/char)', char: 'é', utf8PerChar: 2 },
+  { label: 'CJK (3 UTF-8 bytes/char)', char: '漢', utf8PerChar: 3 },
+];
+
+async function scratchWriteSucceeds(plugin: RNPlugin, payload: string): Promise<boolean> {
+  try {
+    await plugin.storage.setSynced(SIZE_PROBE_KEY, payload);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Find the real per-key ceiling by bisection on a single scratch key.
+ *
+ * Writes several hundred KB repeatedly, so it is deliberately a manual, opt-in
+ * action: it costs sync traffic and it leaves one extra key behind (nulled at
+ * the end — nulling does not free the slot, see testNullFreesSlot).
+ */
+export async function calibratePerKeyLimit(
+  plugin: RNPlugin,
+  onProgress?: (message: string) => void
+): Promise<PerKeyLimitReport> {
+  const probes: LimitProbe[] = [];
+  const report: PerKeyLimitReport = {
+    probes,
+    documentedLimit: PER_KEY_BYTE_LIMIT,
+    verdict: '',
+    unit: 'unknown',
+    measuredLimit: 0,
+  };
+
+  try {
+    for (const filler of LIMIT_PROBE_FILLERS) {
+      let writes = 0;
+      const attempt = async (chars: number) => {
+        writes++;
+        onProgress?.(
+          `${filler.label}: testing ${chars.toLocaleString()} chars ` +
+            `(${formatBytes(chars * filler.utf8PerChar)} UTF-8)…`
+        );
+        return scratchWriteSucceeds(plugin, filler.char.repeat(chars));
+      };
+
+      // Bracket: double from a value we are confident fits until one is refused.
+      let lo = 1024; // known-good floor; if even this fails we report it as such
+      let hi = 0;
+      if (!(await attempt(lo))) {
+        probes.push({
+          label: filler.label,
+          utf8PerChar: filler.utf8PerChar,
+          acceptedChars: 0,
+          rejectedChars: lo,
+          acceptedUtf8: 0,
+          acceptedUtf16: 0,
+          writes,
+        });
+        continue;
+      }
+      let candidate = lo * 2;
+      while (candidate <= LIMIT_PROBE_MAX_CHARS) {
+        if (await attempt(candidate)) {
+          lo = candidate;
+          candidate *= 2;
+        } else {
+          hi = candidate;
+          break;
+        }
+      }
+
+      // Bisect the [accepted, rejected] bracket.
+      if (hi > 0) {
+        while (hi - lo > LIMIT_PROBE_TOLERANCE_CHARS) {
+          const mid = Math.floor((lo + hi) / 2);
+          if (await attempt(mid)) lo = mid;
+          else hi = mid;
+        }
+      }
+
+      probes.push({
+        label: filler.label,
+        utf8PerChar: filler.utf8PerChar,
+        acceptedChars: lo,
+        rejectedChars: hi > 0 ? hi : null,
+        // The stored JSON is the string plus its two quote characters.
+        acceptedUtf8: lo * filler.utf8PerChar + 2,
+        acceptedUtf16: (lo + 2) * 2,
+        writes,
+      });
+    }
+
+    // Hand the bytes back. The slot stays taken either way, but a 1 MB scratch
+    // value left behind would eat 10% of the plugin's whole budget.
+    onProgress?.('Releasing the scratch key…');
+    await plugin.storage.setSynced(SIZE_PROBE_KEY, null);
+
+    const usable = probes.filter((p) => p.acceptedChars > 0 && p.rejectedChars !== null);
+    if (usable.length >= 2) {
+      // Whichever unit gives the most consistent ceiling across alphabets is the
+      // unit RemNote counts in: the other two vary with bytes-per-char.
+      const candidates: Array<{ unit: PerKeyLimitReport['unit']; values: number[] }> = [
+        { unit: 'utf8', values: usable.map((p) => p.acceptedUtf8) },
+        { unit: 'utf16', values: usable.map((p) => p.acceptedUtf16) },
+        { unit: 'chars', values: usable.map((p) => p.acceptedChars) },
+      ];
+      const scored = candidates.map((c) => {
+        const min = Math.min(...c.values);
+        const max = Math.max(...c.values);
+        const mean = c.values.reduce((s, v) => s + v, 0) / c.values.length;
+        return { ...c, spread: max / Math.max(1, min), mean };
+      });
+      scored.sort((a, b) => a.spread - b.spread);
+      const best = scored[0];
+      report.unit = best.spread <= 1.1 ? best.unit : 'unknown';
+      report.measuredLimit = Math.round(best.mean);
+      const pct = ((report.measuredLimit / PER_KEY_BYTE_LIMIT) * 100).toFixed(0);
+      report.verdict =
+        report.unit === 'unknown'
+          ? `No unit explains all three alphabets (best spread ${best.spread.toFixed(2)}×) — the ceiling is not a plain size check. Treat the worst-case column as the budget.`
+          : `RemNote counts ${best.unit === 'chars' ? 'JSON characters' : best.unit === 'utf16' ? 'UTF-16 bytes (string length × 2)' : 'UTF-8 bytes'}: ` +
+            `ceiling measured at ${formatBytes(report.measuredLimit)} (${pct}% of the documented 900 KB), consistent within ${((best.spread - 1) * 100).toFixed(1)}% across alphabets.` +
+            (best.unit === 'utf16'
+              ? ' Every UTF-8 figure in the key audit must be doubled before comparing it to the limit.'
+              : '');
+    } else {
+      report.verdict =
+        'Inconclusive — the probe never found a rejection point (or every write failed). Check the console for the raw results.';
+    }
+  } catch (e) {
+    report.error = String(e);
+    console.error('[KeyAudit] per-key limit calibration failed', e);
+  }
+
+  logPerKeyLimitReport(report);
+  return report;
+}
+
+export function logPerKeyLimitReport(report: PerKeyLimitReport): void {
+  console.log('\n===== PER-KEY SIZE CEILING CALIBRATION =====');
+  console.table(
+    report.probes.map((p) => ({
+      alphabet: p.label,
+      'largest accepted': `${p.acceptedChars.toLocaleString()} chars`,
+      'smallest rejected': p.rejectedChars ? `${p.rejectedChars.toLocaleString()} chars` : '—',
+      'accepted UTF-8': formatBytes(p.acceptedUtf8),
+      'accepted UTF-16': formatBytes(p.acceptedUtf16),
+      writes: p.writes,
+    }))
+  );
+  console.log(`Documented limit: ${formatBytes(report.documentedLimit)}`);
+  console.log(`Verdict: ${report.verdict}`);
+  if (report.error) console.warn(`Error: ${report.error}`);
+  console.log('============================================\n');
+}
+
+// --- anatomy of one oversized key ------------------------------------------
+
+/** Approximate UTF-8 cost of one `"field":value,` pair inside an object. */
+function fieldCostBytes(field: string, value: unknown): number {
+  return measureBytes(field) + 1 + measureBytes(value) + 1;
+}
+
+function truncateStrings<T>(entry: T, limit: number, dropFields: string[]): T {
+  if (!entry || typeof entry !== 'object') return entry;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(entry as Record<string, unknown>)) {
+    if (dropFields.includes(k)) continue;
+    out[k] = typeof v === 'string' && v.length > limit ? v.substring(0, limit) : v;
+  }
+  return out as unknown as T;
+}
+
+const DEFAULT_TRIM_OPTIONS: TrimOption[] = [
+  { label: 'Cap at 500 entries, text ≤ 500 chars (today’s text limit)', maxEntries: 500 },
+  { label: 'Cap at 500 entries, text ≤ 200 chars', maxEntries: 500, stringLimit: 200 },
+  { label: 'Cap at 300 entries, text ≤ 120 chars', maxEntries: 300, stringLimit: 120 },
+  { label: 'Cap at 300 entries, drop stored text entirely', maxEntries: 300, dropFields: ['text'] },
+];
+
+/**
+ * Break one array-valued synced key down into where its bytes actually go.
+ *
+ * Answers the questions the size number alone cannot: how many entries, which
+ * field dominates, what a retention cap would save, and how close the value is
+ * to the ceiling under each candidate accounting unit.
+ */
+export async function analyzeArrayKey(
+  plugin: RNPlugin,
+  key: string,
+  trimOptions: TrimOption[] = DEFAULT_TRIM_OPTIONS
+): Promise<ArrayKeyAnatomy> {
+  const value = await plugin.storage.getSynced(key);
+  const size = measureSizes(value);
+  const anatomy: ArrayKeyAnatomy = {
+    key,
+    exists: value !== undefined && value !== null,
+    isArray: Array.isArray(value),
+    entries: Array.isArray(value) ? value.length : 0,
+    size,
+    worst: Math.max(size.utf8, size.utf16, size.escaped),
+    perKeyLimit: PER_KEY_BYTE_LIMIT,
+    fields: [],
+    entryBytes: { avg: 0, median: 0, p95: 0, max: 0 },
+    largestEntries: [],
+    cumulative: [],
+    projections: [],
+  };
+
+  if (!Array.isArray(value) || value.length === 0) {
+    logArrayKeyAnatomy(anatomy);
+    return anatomy;
+  }
+
+  const rows = value as Record<string, unknown>[];
+  const fieldTotals = new Map<string, { bytes: number; present: number; longest: number }>();
+  const perEntry: number[] = [];
+  let running = 0;
+
+  rows.forEach((row, index) => {
+    const bytes = measureBytes(row);
+    perEntry.push(bytes);
+    running += bytes;
+    if (index < 25 || index % 50 === 0 || index === rows.length - 1) {
+      anatomy.cumulative.push({ entries: index + 1, utf8: running });
+    }
+    if (row && typeof row === 'object') {
+      for (const [field, v] of Object.entries(row)) {
+        const cost = fieldCostBytes(field, v);
+        const acc = fieldTotals.get(field) || { bytes: 0, present: 0, longest: 0 };
+        acc.bytes += cost;
+        acc.present++;
+        acc.longest = Math.max(acc.longest, cost);
+        fieldTotals.set(field, acc);
+      }
+    }
+  });
+
+  const totalFieldBytes = Array.from(fieldTotals.values()).reduce((s, f) => s + f.bytes, 0) || 1;
+  anatomy.fields = Array.from(fieldTotals.entries())
+    .map(([field, acc]) => ({
+      field,
+      bytes: acc.bytes,
+      share: acc.bytes / totalFieldBytes,
+      present: acc.present,
+      longest: acc.longest,
+    }))
+    .sort((a, b) => b.bytes - a.bytes);
+
+  const sorted = [...perEntry].sort((a, b) => a - b);
+  anatomy.entryBytes = {
+    avg: Math.round(perEntry.reduce((s, v) => s + v, 0) / perEntry.length),
+    median: sorted[Math.floor(sorted.length / 2)],
+    p95: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))],
+    max: sorted[sorted.length - 1],
+  };
+
+  anatomy.largestEntries = perEntry
+    .map((bytes, index) => ({ bytes, index }))
+    .sort((a, b) => b.bytes - a.bytes)
+    .slice(0, 10)
+    .map(({ bytes, index }) => ({
+      bytes,
+      index,
+      preview: JSON.stringify(rows[index]).substring(0, 160),
+    }));
+
+  const times = rows
+    .map((r) => (typeof r.time === 'number' ? (r.time as number) : undefined))
+    .filter((t): t is number => t !== undefined);
+  if (times.length > 0) {
+    anatomy.oldest = Math.min(...times);
+    anatomy.newest = Math.max(...times);
+  }
+
+  anatomy.projections = trimOptions.map((opt) => {
+    const capped = opt.maxEntries ? rows.slice(0, opt.maxEntries) : rows;
+    const projected =
+      opt.stringLimit !== undefined || opt.dropFields
+        ? capped.map((r) => truncateStrings(r, opt.stringLimit ?? Infinity, opt.dropFields ?? []))
+        : capped;
+    const projSize = measureSizes(projected);
+    return {
+      label: opt.label,
+      utf8: projSize.utf8,
+      worst: Math.max(projSize.utf8, projSize.utf16, projSize.escaped),
+      savedPct: 1 - projSize.utf8 / Math.max(1, size.utf8),
+      entries: projected.length,
+    };
+  });
+
+  logArrayKeyAnatomy(anatomy);
+  return anatomy;
+}
+
+export function logArrayKeyAnatomy(a: ArrayKeyAnatomy): void {
+  console.log(`\n===== KEY ANATOMY: "${a.key}" =====`);
+  if (!a.exists) {
+    console.log('Key is absent or null — nothing to measure.');
+    console.log('===================================\n');
+    return;
+  }
+  if (!a.isArray) {
+    console.log(
+      `Value is not an array — size only: ${formatBytes(a.size.utf8)} UTF-8 / ` +
+        `${formatBytes(a.size.utf16)} UTF-16 / ${formatBytes(a.size.escaped)} re-escaped.`
+    );
+    console.log('===================================\n');
+    return;
+  }
+  console.log(
+    `${a.entries} entries · ${formatBytes(a.size.utf8)} UTF-8 · ${formatBytes(a.size.utf16)} UTF-16 · ` +
+      `${formatBytes(a.size.escaped)} re-escaped → worst case ${formatBytes(a.worst)} ` +
+      `(${((a.worst / a.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(a.perKeyLimit)} ceiling)`
+  );
+  if (a.oldest && a.newest) {
+    console.log(
+      `Spans ${new Date(a.oldest).toISOString().slice(0, 10)} → ${new Date(a.newest).toISOString().slice(0, 10)} ` +
+        `(${Math.round((a.newest - a.oldest) / 86400000)} days)`
+    );
+  }
+  console.log(
+    `Per entry — avg ${formatBytes(a.entryBytes.avg)}, median ${formatBytes(a.entryBytes.median)}, ` +
+      `p95 ${formatBytes(a.entryBytes.p95)}, max ${formatBytes(a.entryBytes.max)}`
+  );
+  console.log('Where the bytes go:');
+  console.table(
+    a.fields.map((f) => ({
+      field: f.field,
+      total: formatBytes(f.bytes),
+      share: `${(f.share * 100).toFixed(1)}%`,
+      'present in': `${f.present}/${a.entries}`,
+      'fattest instance': formatBytes(f.longest),
+    }))
+  );
+  console.log('If we trimmed it:');
+  console.table(
+    a.projections.map((p) => ({
+      option: p.label,
+      entries: p.entries,
+      utf8: formatBytes(p.utf8),
+      'worst case': formatBytes(p.worst),
+      'saves': `${(p.savedPct * 100).toFixed(0)}%`,
+      'vs ceiling': `${((p.worst / a.perKeyLimit) * 100).toFixed(0)}%`,
+    }))
+  );
+  console.log('Fattest entries:');
+  console.table(
+    a.largestEntries.map((e) => ({ index: e.index, size: formatBytes(e.bytes), preview: e.preview }))
+  );
+  console.log('===================================\n');
 }
