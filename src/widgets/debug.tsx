@@ -4287,10 +4287,64 @@ function Debug() {
             <div style={{ marginTop: '8px' }}>
               {!anatomy.exists ? (
                 <div>Key is absent or null.</div>
+              ) : anatomy.shape === 'object' ? (
+                <>
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>{anatomy.branches.length}</strong> branch(es)
+                    {anatomy.branchRoot && <> under <code style={{ fontSize: '10px' }}>{anatomy.branchRoot}</code></>}{' '}
+                    holding <strong>{anatomy.entries}</strong> rows · {formatBytes(anatomy.size.utf8)} UTF-8 ·{' '}
+                    <span style={{ color: anatomy.worst >= anatomy.perKeyLimit ? '#ef4444' : anatomy.worst >= anatomy.perKeyLimit * 0.5 ? '#f59e0b' : 'inherit', fontWeight: 600 }}>
+                      worst case {formatBytes(anatomy.worst)} ({((anatomy.worst / anatomy.perKeyLimit) * 100).toFixed(0)}% of ceiling)
+                    </span>
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>
+                        <th style={{ padding: '3px 4px', textAlign: 'left' }}>Branch</th>
+                        <th style={{ padding: '3px 4px' }}>Rows</th>
+                        <th style={{ padding: '3px 4px' }}>Size</th>
+                        <th style={{ padding: '3px 4px' }}>Share</th>
+                        <th style={{ padding: '3px 4px' }}>Span</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {anatomy.branches.map((b) => (
+                        <tr key={b.path} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                          <td style={{ padding: '3px 4px', wordBreak: 'break-all' }}><code style={{ fontSize: '10px' }}>{b.path}</code></td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{b.children}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatBytes(b.bytes)}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: b.share >= 0.5 ? 600 : 400 }}>{(b.share * 100).toFixed(1)}%</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--rn-clr-content-tertiary)' }}>
+                            {b.firstChildKey ? `${b.firstChildKey} → ${b.lastChildKey}` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {anatomy.projections.length > 0 && (
+                    <>
+                      <div style={{ fontWeight: 600, marginBottom: '2px' }}>What would shrink it</div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {anatomy.projections.map((p) => (
+                            <tr key={p.label} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                              <td style={{ padding: '3px 4px' }}>{p.label}</td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatBytes(p.utf8)} UTF-8</td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                worst {formatBytes(p.worst)} ({((p.worst / anatomy.perKeyLimit) * 100).toFixed(0)}%)
+                              </td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: '#10b981' }}>−{(p.savedPct * 100).toFixed(0)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
+                </>
               ) : !anatomy.isArray ? (
                 <div>
-                  Not an array — {formatBytes(anatomy.size.utf8)} UTF-8 / {formatBytes(anatomy.size.utf16)} UTF-16 /{' '}
-                  {formatBytes(anatomy.size.escaped)} re-escaped.
+                  Neither an array nor an object map — {formatBytes(anatomy.size.utf8)} UTF-8 /{' '}
+                  {formatBytes(anatomy.size.utf16)} UTF-16 / {formatBytes(anatomy.size.escaped)} re-escaped.
                 </div>
               ) : (
                 <>

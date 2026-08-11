@@ -198,10 +198,29 @@ export interface ValueDistribution {
   values: { value: string; count: number; bytes: number; share: number }[];
 }
 
+/** One top-level branch of an object-shaped key — a kbId in the aggregate and
+ *  shield-history stores. Its size is what sharding on that level would move out
+ *  of the hot key. */
+export interface ObjectBranch {
+  path: string;
+  bytes: number;
+  share: number;
+  /** Depth-2 keys under this branch (dates, in every store we have). */
+  children: number;
+  firstChildKey?: string;
+  lastChildKey?: string;
+}
+
 export interface ArrayKeyAnatomy {
   key: string;
   exists: boolean;
   isArray: boolean;
+  /** How the value is organised. Object maps get `branches` instead of `fields`. */
+  shape: 'array' | 'object' | 'other';
+  /** Where the branches were found, when the analyser descended through a
+   *  wrapper (`{v: 2, kbs: {…}}` reports `kbs`). */
+  branchRoot?: string;
+  branches: ObjectBranch[];
   entries: number;
   size: SizeBreakdown;
   worst: number;
@@ -1158,12 +1177,132 @@ const DEFAULT_TRIM_OPTIONS: TrimOption[] = [
   { label: 'Cap at 300 entries, drop stored text entirely', maxEntries: 300, dropFields: ['text'] },
 ];
 
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
 /**
- * Break one array-valued synced key down into where its bytes actually go.
+ * Find the level that actually holds the data. `authoritativeDailyAggregates` is
+ * `{v: 2, kbs: {kbId: …}}`, so the interesting branches are one level down; the
+ * shield-history stores are already `{kbId: …}` and need no descent.
+ */
+function findBranchRoot(value: Record<string, unknown>): { root: Record<string, unknown>; path?: string } {
+  let root = value;
+  let path: string | undefined;
+  for (let depth = 0; depth < 3; depth++) {
+    const objectProps = Object.entries(root).filter(([, v]) => isPlainObject(v));
+    // A wrapper is a small object whose only non-scalar member holds everything.
+    if (Object.keys(root).length <= 2 && objectProps.length === 1) {
+      const [name, child] = objectProps[0];
+      if (Object.keys(child as Record<string, unknown>).length > 1) {
+        root = child as Record<string, unknown>;
+        path = path ? `${path}.${name}` : name;
+        continue;
+      }
+    }
+    break;
+  }
+  return { root, path };
+}
+
+/**
+ * Break one object-shaped key into its top-level branches, and project what
+ * sharding or a retention window would do to it.
  *
- * Answers the questions the size number alone cannot: how many entries, which
- * field dominates, what a retention cap would save, and how close the value is
- * to the ceiling under each candidate accounting unit.
+ * The stores that reach this path are all `{partition: {date: row}}`, so the two
+ * levers are the same two every time: split the partitions into separate keys, or
+ * stop keeping every date forever. This measures both instead of guessing.
+ */
+function analyzeObjectShape(
+  anatomy: ArrayKeyAnatomy,
+  value: Record<string, unknown>
+): void {
+  const { root, path } = findBranchRoot(value);
+  anatomy.branchRoot = path;
+
+  const totalBytes = measureBytes(root) || 1;
+  const allChildKeys: string[] = [];
+
+  anatomy.branches = Object.entries(root)
+    .map(([branchKey, branchValue]) => {
+      const childKeys = isPlainObject(branchValue) ? Object.keys(branchValue).sort() : [];
+      allChildKeys.push(...childKeys);
+      return {
+        path: branchKey,
+        bytes: measureBytes(branchValue),
+        share: measureBytes(branchValue) / totalBytes,
+        children: childKeys.length,
+        firstChildKey: childKeys[0],
+        lastChildKey: childKeys[childKeys.length - 1],
+      };
+    })
+    .sort((a, b) => b.bytes - a.bytes);
+
+  anatomy.entries = anatomy.branches.reduce((s, b) => s + b.children, 0);
+
+  // Sharding: the hot key keeps only its own branch, so the largest branch IS the
+  // post-shard size. Worth stating as a projection rather than left to arithmetic.
+  const largest = anatomy.branches[0];
+  if (largest && anatomy.branches.length > 1) {
+    const shardSize = measureSizes(root[largest.path]);
+    anatomy.projections.push({
+      label: `Shard by ${anatomy.branchRoot ? `${anatomy.branchRoot} ` : ''}partition (largest: ${largest.path.substring(0, 12)}…)`,
+      utf8: shardSize.utf8,
+      worst: Math.max(shardSize.utf8, shardSize.utf16, shardSize.escaped),
+      savedPct: 1 - shardSize.utf8 / Math.max(1, anatomy.size.utf8),
+      entries: largest.children,
+    });
+  }
+
+  // Retention: only meaningful when the second level is dated, which is how every
+  // one of these stores is keyed.
+  const dated = allChildKeys.filter((k) => DATE_KEY.test(k));
+  if (dated.length >= allChildKeys.length * 0.8 && dated.length > 0) {
+    const newest = dated.sort()[dated.length - 1];
+    const newestMs = Date.parse(newest);
+    for (const days of [730, 365, 180]) {
+      const cutoff = new Date(newestMs - days * 86400000).toISOString().slice(0, 10);
+      const pruned: Record<string, unknown> = {};
+      let kept = 0;
+      for (const [branchKey, branchValue] of Object.entries(root)) {
+        if (!isPlainObject(branchValue)) {
+          pruned[branchKey] = branchValue;
+          continue;
+        }
+        const keptChildren: Record<string, unknown> = {};
+        for (const [childKey, childValue] of Object.entries(branchValue)) {
+          if (!DATE_KEY.test(childKey) || childKey >= cutoff) {
+            keptChildren[childKey] = childValue;
+            kept++;
+          }
+        }
+        if (Object.keys(keptChildren).length > 0) pruned[branchKey] = keptChildren;
+      }
+      const prunedSize = measureSizes(pruned);
+      // A window wider than the data on file saves nothing; the 1% margin also
+      // absorbs the wrapper (`{v: 2, …}`) that `pruned` does not carry.
+      if (prunedSize.utf8 >= anatomy.size.utf8 * 0.99) continue;
+      anatomy.projections.push({
+        label: `Keep the last ${days} days only (from ${newest})`,
+        utf8: prunedSize.utf8,
+        worst: Math.max(prunedSize.utf8, prunedSize.utf16, prunedSize.escaped),
+        savedPct: 1 - prunedSize.utf8 / Math.max(1, anatomy.size.utf8),
+        entries: kept,
+      });
+    }
+  }
+}
+
+/**
+ * Break one synced key down into where its bytes actually go.
+ *
+ * Handles the two shapes the plugin stores: an array of entries (the history
+ * lists) and a `{partition: {date: row}}` map (the aggregate and shield-history
+ * stores). Answers what the size number alone cannot — how many entries, which
+ * field or partition dominates, and what a cap, a shard or a retention window
+ * would actually save.
  */
 export async function analyzeArrayKey(
   plugin: RNPlugin,
@@ -1176,6 +1315,8 @@ export async function analyzeArrayKey(
     key,
     exists: value !== undefined && value !== null,
     isArray: Array.isArray(value),
+    shape: Array.isArray(value) ? 'array' : isPlainObject(value) ? 'object' : 'other',
+    branches: [],
     entries: Array.isArray(value) ? value.length : 0,
     size,
     worst: Math.max(size.utf8, size.utf16, size.escaped),
@@ -1187,6 +1328,12 @@ export async function analyzeArrayKey(
     cumulative: [],
     projections: [],
   };
+
+  if (anatomy.shape === 'object') {
+    analyzeObjectShape(anatomy, value as Record<string, unknown>);
+    logArrayKeyAnatomy(anatomy);
+    return anatomy;
+  }
 
   if (!Array.isArray(value) || value.length === 0) {
     logArrayKeyAnatomy(anatomy);
@@ -1321,9 +1468,46 @@ export function logArrayKeyAnatomy(a: ArrayKeyAnatomy): void {
     console.log('===================================\n');
     return;
   }
+  const sizeLine =
+    `${formatBytes(a.size.utf8)} UTF-8 · ${formatBytes(a.size.utf16)} UTF-16 · ` +
+    `${formatBytes(a.size.escaped)} re-escaped → worst case ${formatBytes(a.worst)} ` +
+    `(${((a.worst / a.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(a.perKeyLimit)} ceiling)`;
+
+  if (a.shape === 'object') {
+    console.log(
+      `Object map: ${a.branches.length} branch(es)` +
+        (a.branchRoot ? ` under "${a.branchRoot}"` : '') +
+        ` holding ${a.entries} rows · ${sizeLine}`
+    );
+    console.table(
+      a.branches.map((b) => ({
+        branch: b.path,
+        rows: b.children,
+        size: formatBytes(b.bytes),
+        share: `${(b.share * 100).toFixed(1)}%`,
+        span: b.firstChildKey ? `${b.firstChildKey} → ${b.lastChildKey}` : '—',
+      }))
+    );
+    if (a.projections.length > 0) {
+      console.log('What would shrink it:');
+      console.table(
+        a.projections.map((p) => ({
+          option: p.label,
+          rows: p.entries,
+          utf8: formatBytes(p.utf8),
+          'worst case': formatBytes(p.worst),
+          saves: `${(p.savedPct * 100).toFixed(0)}%`,
+          'vs ceiling': `${((p.worst / a.perKeyLimit) * 100).toFixed(0)}%`,
+        }))
+      );
+    }
+    console.log('===================================\n');
+    return;
+  }
+
   if (!a.isArray) {
     console.log(
-      `Value is not an array — size only: ${formatBytes(a.size.utf8)} UTF-8 / ` +
+      `Value is not an array or object map — size only: ${formatBytes(a.size.utf8)} UTF-8 / ` +
         `${formatBytes(a.size.utf16)} UTF-16 / ${formatBytes(a.size.escaped)} re-escaped.`
     );
     console.log('===================================\n');
