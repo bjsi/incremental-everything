@@ -2,6 +2,7 @@ import { Card, RNPlugin, RemId } from '@remnote/plugin-sdk';
 import { allCardPriorityInfoKey, cardPriorityCacheRefreshKey, orphanRemIdsKey } from '../consts';
 import { CardPriorityInfo, PrioritySource, calculateCardRemPercentilesFromCards } from './types';
 import { getCardPriority, calculateNewPriority, setCardPriority } from './index';
+import { writeCardPriorityCache } from './persistence';
 import * as _ from 'remeda';
 
 let cacheUpdateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -104,9 +105,9 @@ async function flushCacheUpdates(plugin: RNPlugin, forceHeavyRecalc = false) {
           ...info,
           kbPercentile: percentileByRem[info.remId] ?? 0,
         }));
-        await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
+        await writeCardPriorityCache(plugin, enrichedCache);
       } else {
-        await plugin.storage.setSession(allCardPriorityInfoKey, updatedCache);
+        await writeCardPriorityCache(plugin, updatedCache);
       }
 
       // Signal all listeners that the cache has been updated
@@ -237,7 +238,9 @@ export async function buildOptimizedCardPriorityCache(plugin: RNPlugin) {
 
   if (totalUnique === 0) {
     console.log('[Card Priority Cache] No cards or cardPriority tags found. Setting empty cache.');
-    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    // Genuinely empty: this KB has no cards and no tags, so an empty mirror is
+    // the truth, not an absence of data.
+    await writeCardPriorityCache(plugin, [], { immediate: true });
     return;
   }
 
@@ -305,7 +308,9 @@ export async function buildOptimizedCardPriorityCache(plugin: RNPlugin) {
     kbPercentile: percentileByRem[info.remId] ?? 0,
   }));
 
-  await plugin.storage.setSession(allCardPriorityInfoKey, enrichedInfos);
+  // Full rebuild (the 'Update all inherited Card Priorities' command): mirror it
+  // immediately rather than five seconds later.
+  await writeCardPriorityCache(plugin, enrichedInfos, { immediate: true });
   const totalTime = Math.round((Date.now() - startTime) / 1000);
   console.log(`[Card Priority Cache] Successfully built and enriched cache with ${enrichedInfos.length} entries in ${totalTime}s.`);
 }
@@ -360,7 +365,7 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
 
   if (totalUnique === 0) {
     console.log('[Card Priority Cache] No cards or cardPriority tags found. Setting empty cache.');
-    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    await writeCardPriorityCache(plugin, [], { immediate: true });
     return;
   }
 
@@ -425,7 +430,8 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
     kbPercentile: percentileByRemPhase1[info.remId] ?? 0,
   }));
 
-  await plugin.storage.setSession(allCardPriorityInfoKey, enrichedTaggedPriorities);
+  // Cold build: the mirror must land with it, so the next launch can start warm.
+  await writeCardPriorityCache(plugin, enrichedTaggedPriorities, { immediate: true });
 
   const phase1Ms = Date.now() - phase1Start;
   const phase1Time = Math.round(phase1Ms / 1000);
@@ -556,7 +562,7 @@ async function processDeferredCardPriorityCache(plugin: RNPlugin, untaggedRemIds
           kbPercentile: percentileByRemDeferred[info.remId] ?? 0,
         }));
 
-        await plugin.storage.setSession(allCardPriorityInfoKey, enrichedCache);
+        await writeCardPriorityCache(plugin, enrichedCache);
         await plugin.storage.setSession(cardPriorityCacheRefreshKey, Date.now());
       }
 

@@ -1,4 +1,5 @@
 import { RNPlugin, PluginRem } from '@remnote/plugin-sdk';
+import { writeCardPriorityCache } from './persistence';
 import {
   allCardPriorityInfoKey,
   cardPriorityShieldHistoryKey,
@@ -84,7 +85,10 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
     }
 
     console.log('Clearing session storage...');
-    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    // Real removal: this cleanup strips CardPriority from every rem, so an empty
+    // mirror is the truth. Immediate, so a launch right after cannot come back
+    // warm with priorities that no longer exist.
+    await writeCardPriorityCache(plugin, [], { immediate: true });
     await plugin.storage.setSession(seenCardInSessionKey, []);
 
     // Clear ONLY the current KB's shield-history partition. These synced keys are

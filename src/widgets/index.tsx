@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
+import { writeCardPriorityCache } from '../lib/card_priority/persistence';
 import { registerEventListeners } from '../register/events';
 import { registerPluginPowerups } from '../register/powerups';
 import { registerPluginSettings } from '../register/settings';
@@ -162,7 +163,11 @@ async function onActivate(plugin: ReactRNPlugin) {
     console.log(
       `CACHE: Skipping card priority cache build (${useLightMode ? 'light mode' : 'flashcard prioritisation off'}).`
     );
-    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    // persist:false — an empty cache here means "not built in this context",
+    // not "there are no priorities". Mirroring it would wipe a good blob every
+    // time the plugin opened in light mode or with the opt-in off, and the next
+    // full-mode launch would pay a cold build for it.
+    await writeCardPriorityCache(plugin, [], { persist: false });
   }
 }
 
