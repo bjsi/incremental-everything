@@ -4303,6 +4303,26 @@ function Debug() {
                       ))}
                     </tbody>
                   </table>
+                  {anatomy.distributions.map((dist) => (
+                    <details key={dist.field} style={{ marginBottom: '6px' }}>
+                      <summary style={{ cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>
+                        Split by <code style={{ fontSize: '10px' }}>{dist.field}</code> ({dist.values.length} distinct) —
+                        would sharding on it help?
+                      </summary>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '4px' }}>
+                        <tbody>
+                          {dist.values.slice(0, 25).map((v) => (
+                            <tr key={v.value} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                              <td style={{ padding: '3px 4px', wordBreak: 'break-all' }}><code style={{ fontSize: '10px' }}>{v.value}</code></td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{v.count} entries</td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatBytes(v.bytes)}</td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: v.share >= 0.5 ? 600 : 400 }}>{(v.share * 100).toFixed(1)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </details>
+                  ))}
                   <div style={{ fontWeight: 600, marginBottom: '2px' }}>If we trimmed it</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>

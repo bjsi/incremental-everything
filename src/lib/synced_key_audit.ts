@@ -180,6 +180,13 @@ export interface Projection {
   entries: number;
 }
 
+/** How a low-cardinality field's values split the array — the measurement that
+ *  says whether sharding the key on that field would actually buy anything. */
+export interface ValueDistribution {
+  field: string;
+  values: { value: string; count: number; bytes: number; share: number }[];
+}
+
 export interface ArrayKeyAnatomy {
   key: string;
   exists: boolean;
@@ -189,6 +196,7 @@ export interface ArrayKeyAnatomy {
   worst: number;
   perKeyLimit: number;
   fields: FieldCost[];
+  distributions: ValueDistribution[];
   entryBytes: { avg: number; median: number; p95: number; max: number };
   largestEntries: { index: number; bytes: number; preview: string }[];
   /** Running UTF-8 total over the first N entries — what a retention cap buys. */
@@ -1146,6 +1154,7 @@ export async function analyzeArrayKey(
     worst: Math.max(size.utf8, size.utf16, size.escaped),
     perKeyLimit: PER_KEY_BYTE_LIMIT,
     fields: [],
+    distributions: [],
     entryBytes: { avg: 0, median: 0, p95: 0, max: 0 },
     largestEntries: [],
     cumulative: [],
@@ -1161,6 +1170,10 @@ export async function analyzeArrayKey(
   const fieldTotals = new Map<string, { bytes: number; present: number; longest: number }>();
   const perEntry: number[] = [];
   let running = 0;
+  // Candidate shard keys: fields whose values repeat. A field that exceeds this
+  // many distinct values is an id, not a category, and is dropped from the tally.
+  const MAX_DISTINCT = 25;
+  const valueTotals = new Map<string, Map<string, { count: number; bytes: number }> | null>();
 
   rows.forEach((row, index) => {
     const bytes = measureBytes(row);
@@ -1177,9 +1190,45 @@ export async function analyzeArrayKey(
         acc.present++;
         acc.longest = Math.max(acc.longest, cost);
         fieldTotals.set(field, acc);
+
+        // Tally the whole entry's weight against this field's value, so the
+        // report reads "sharding on kbId would move N KB out of the hot shard".
+        if (v === null || (typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean')) {
+          continue;
+        }
+        if (!valueTotals.has(field)) valueTotals.set(field, new Map());
+        const buckets = valueTotals.get(field);
+        if (!buckets) continue; // already disqualified as an id-like field
+        const label = String(v);
+        const bucket = buckets.get(label);
+        if (bucket) {
+          bucket.count++;
+          bucket.bytes += bytes;
+        } else if (buckets.size >= MAX_DISTINCT) {
+          valueTotals.set(field, null);
+        } else {
+          buckets.set(label, { count: 1, bytes });
+        }
       }
     }
   });
+
+  anatomy.distributions = Array.from(valueTotals.entries())
+    .filter((entry): entry is [string, Map<string, { count: number; bytes: number }>] =>
+      entry[1] !== null && entry[1].size > 1
+    )
+    .map(([field, buckets]) => ({
+      field,
+      values: Array.from(buckets.entries())
+        .map(([label, b]) => ({
+          value: label,
+          count: b.count,
+          bytes: b.bytes,
+          share: b.bytes / Math.max(1, size.utf8),
+        }))
+        .sort((a, b) => b.bytes - a.bytes),
+    }))
+    .sort((a, b) => a.values.length - b.values.length);
 
   const totalFieldBytes = Array.from(fieldTotals.values()).reduce((s, f) => s + f.bytes, 0) || 1;
   anatomy.fields = Array.from(fieldTotals.entries())
@@ -1278,6 +1327,17 @@ export function logArrayKeyAnatomy(a: ArrayKeyAnatomy): void {
       'fattest instance': formatBytes(f.longest),
     }))
   );
+  for (const dist of a.distributions) {
+    console.log(`Split by "${dist.field}" (${dist.values.length} distinct) — would sharding on it help?`);
+    console.table(
+      dist.values.slice(0, 25).map((v) => ({
+        value: v.value,
+        entries: v.count,
+        utf8: formatBytes(v.bytes),
+        'share of key': `${(v.share * 100).toFixed(1)}%`,
+      }))
+    );
+  }
   console.log('If we trimmed it:');
   console.table(
     a.projections.map((p) => ({
