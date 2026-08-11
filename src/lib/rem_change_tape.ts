@@ -57,20 +57,31 @@ let flushPending = false;
 export function recordRemChangeEvent(plugin: RNPlugin, remId: string): void {
   tape.push({ remId, at: Date.now() });
   if (tape.length > MAX_ENTRIES) tape = tape.slice(-MAX_ENTRIES);
+  scheduleFlush(plugin);
+}
 
-  const now = Date.now();
-  if (flushPending || now - lastFlush < FLUSH_INTERVAL_MS) return;
+/**
+ * Throttled flush WITH a trailing edge.
+ *
+ * The leading-edge-only version of this dropped the tail: it flushed when a new
+ * event arrived and the interval had expired, so the last event of a burst — the
+ * one a hand edit produces, and the one the probe is actually about — sat in the
+ * buffer until some unrelated event happened to come along. A probe that
+ * silently loses its final event reports "1 event" for two and sends you off
+ * concluding the wrong thing.
+ */
+function scheduleFlush(plugin: RNPlugin): void {
+  if (flushPending) return;
 
+  const wait = Math.max(0, FLUSH_INTERVAL_MS - (Date.now() - lastFlush));
   flushPending = true;
-  lastFlush = now;
-  // Fire and forget. A failed flush costs a stale tape in a debug panel, which
-  // is not worth propagating an error into the event handler for.
-  plugin.storage
-    .setSession(REM_CHANGE_TAPE_KEY, tape)
-    .catch(() => { })
-    .finally(() => {
-      flushPending = false;
-    });
+  setTimeout(() => {
+    lastFlush = Date.now();
+    flushPending = false;
+    // Fire and forget. A failed flush costs a stale tape in a debug panel, which
+    // is not worth propagating an error into the event handler for.
+    plugin.storage.setSession(REM_CHANGE_TAPE_KEY, [...tape]).catch(() => { });
+  }, wait);
 }
 
 export async function readRemChangeTape(plugin: RNPlugin): Promise<RemChangeEntry[]> {

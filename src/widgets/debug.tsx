@@ -446,6 +446,22 @@ function Debug() {
         source: await rem.getPowerupProperty('cardPriority', 'prioritySource'),
         lastUpdated: await rem.getPowerupProperty('cardPriority', 'lastUpdated'),
       };
+
+      // What the session cache believes about this rem, next to what the DB
+      // actually says. Widgets differ in which one they read — priority_editor
+      // resolves the value live via getCardPriority, card_info_bar reads only
+      // the cache — so "the number looked right in the UI" does not establish
+      // that the cache is current. This is the direct observation.
+      const cachedEntry =
+        ((await rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [])
+          .find((info) => info.remId === rem._id) ?? null;
+      const cacheDrift = {
+        cached: cachedEntry ? String(cachedEntry.priority) : null,
+        live: cardPrioritySlots.priority ?? null,
+        inCache: Boolean(cachedEntry),
+        cachedSource: cachedEntry?.source ?? null,
+        liveSource: cardPrioritySlots.source ?? null,
+      };
       const dismissed = await getDismissedHistoryFromRem(rp, rem);
       
       const isCardDisabledLocally = await rem.hasPowerup(BuiltInPowerupCodes.DisableCards);
@@ -480,6 +496,7 @@ function Debug() {
         cardPriority,
         hasCardPriorityTag,
         cardPrioritySlots,
+        cacheDrift,
         dismissed,
         isCardDisabledLocally,
         isCardDisabledInAncestors,
@@ -720,7 +737,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, rawSlotProbe, cardPriority, hasCardPriorityTag, cardPrioritySlots, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
+  const { incrementalRem, rawSlotProbe, cardPriority, hasCardPriorityTag, cardPrioritySlots, cacheDrift, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
 
   const handleCardCompare = async () => {
     if (!remId) return;
@@ -3949,6 +3966,27 @@ function Debug() {
                      {JSON.stringify(cardPrioritySlots.priority ?? null)} source=
                      {JSON.stringify(cardPrioritySlots.source ?? null)} lastUpdated=
                      {JSON.stringify(cardPrioritySlots.lastUpdated ?? null)}
+                   </span>
+                   {/* Cache vs DB. Which one a widget shows depends on the widget
+                       — priority_editor reads the value live, card_info_bar reads
+                       only the cache — so a correct-looking number in the UI does
+                       not tell you the cache is current. This line does. */}
+                   <span style={{ fontFamily: 'monospace' }}>
+                     {!cacheDrift.inCache ? (
+                       <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                         cache: no entry for this rem
+                       </span>
+                     ) : cacheDrift.cached === cacheDrift.live ? (
+                       <span style={{ color: '#22c55e' }}>
+                         cache in sync (priority={cacheDrift.cached})
+                       </span>
+                     ) : (
+                       <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                         CACHE STALE — cache says {JSON.stringify(cacheDrift.cached)} /{' '}
+                         {JSON.stringify(cacheDrift.cachedSource)}, DB says{' '}
+                         {JSON.stringify(cacheDrift.live)} / {JSON.stringify(cacheDrift.liveSource)}
+                       </span>
+                     )}
                    </span>
                  </div>
                );
