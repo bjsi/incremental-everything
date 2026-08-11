@@ -253,7 +253,7 @@ On a large knowledge base that index is expensive. Building it from scratch mean
 
 ### The saved copy
 
-The plugin now keeps a copy of the index on your device and starts from it, re-reading only what has actually changed since the copy was saved.
+The plugin keeps a copy of the index on your device and starts from it, re-reading only what has actually changed since the copy was saved.
 
 The copy is written once, straight after the index is built. While you work, the plugin notes only the *identifiers* of flashcards whose priority changed — a few bytes each — and the next start re-reads just those before saving the copy again. There is no reason to keep the copy itself current during a session, since nothing reads it until the next start.
 

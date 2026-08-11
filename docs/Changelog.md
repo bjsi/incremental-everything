@@ -2,24 +2,6 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
-## v1.0.39 - August 11th, 2026
-
-### ⚡ Improved: the saved priority copy is no longer rewritten while you work
-
-v1.0.38 introduced a saved copy of the flashcard-priority index so that starting the plugin does not have to re-read every priority from scratch. It kept that copy continuously up to date — rewriting all of it, a few seconds after every priority change.
-
-That was work whose result nothing used. The copy is read at exactly one moment: the next time the plugin starts. Keeping it current during the session meant rewriting **about 3 MB every five seconds** through a queue session, to record a handful of changed rows the next start would have re-read for itself in well under a second.
-
-Now the copy is written **once**, straight after the index is built. While you work, only the *identifiers* of changed flashcards are noted — a few bytes each — and the next start re-reads just those before rebuilding the copy.
-
-It is also stored as a single item rather than 23 pieces. The pieces existed because the only size limit anyone had measured was RemNote's 900 KB cap on **synced** storage, and this copy is not synced — it is per-device, since each device can rebuild it for itself. Measuring the real limit found none up to **128 MB**, so the split was never needed.
-
-Nothing changes in what you see: priorities, percentiles and the Card Shield still update the instant you change a priority. That has always come from a separate in-memory index, which is untouched by this.
-
-The weekly full rebuild described in v1.0.38 is unaffected — and is now measured from the last full rebuild rather than the last save, so that starting quickly can no longer keep postponing it indefinitely.
-
-📖 [Startup: how the priority cache is built](Priorities-for-Flashcards.md#startup-cache)
-
 ## v1.0.38 - August 11th, 2026
 
 ### ⚡ Improved: the flashcard priority cache now starts from a saved copy
@@ -30,13 +12,15 @@ The plugin now keeps a copy of that index on your device and starts from it, re-
 
 **Measured on a 45,085-rem knowledge base: 108 seconds to build from scratch, 14 seconds from the saved copy.** Most of the remaining time is loading the flashcards, which happens every start regardless — whether a card is due changes with the clock, so those counts are never reused.
 
-Keeping the copy current is automatic and is enforced in one place: every write to the priority index now goes through a single function that updates the saved copy alongside it, so a copy that drifts from the index is not something a future change can reintroduce by forgetting. Bulk rebuilds save immediately; ordinary edits save a few seconds later, so a queue session is not writing megabytes after every answer.
+The copy is written **once**, straight after the index is built. Nothing rewrites it while you work: it is read at exactly one moment, the next time the plugin starts, so keeping it current during a session would be several megabytes of writing that nothing reads. Instead the plugin notes only the *identifiers* of flashcards whose priority changed — a few bytes each — and the next start re-reads just those.
 
-The copy is never synced. It is derived data each device can rebuild for itself, and syncing several megabytes of it would be wasteful.
+None of this affects what you see. Priorities, percentiles and the Card Shield still update the instant you change a priority; those come from a separate in-memory index that is written immediately, every time.
 
-It is also used only where it can be trusted. The plugin rebuilds from scratch when there is no copy yet, when it came from another knowledge base or an older version, when it is **more than seven days old**, or when a spot-check of a couple of hundred priorities disagrees with what is actually stored.
+The copy is never synced. It is derived data each device can rebuild for itself, and syncing several megabytes of it would be wasteful — so it is stored as a single item, unconstrained by the 900 KB cap that applies to synced storage.
 
-That seven-day limit exists for one specific gap. Editing a **Priority** property row by hand is noticed and saved while the plugin is running — but doing it on **another device**, or with the plugin disabled, leaves nothing to detect, because that edit changes a hidden child of the rem rather than the rem itself. Rebuilding weekly bounds how long such an edit can stay stale.
+It is also used only where it can be trusted. The plugin rebuilds from scratch when there is no copy yet, when it came from another knowledge base or an older version, when **more than seven days have passed since the last full rebuild**, or when a spot-check of a couple of hundred priorities disagrees with what is actually stored. Starting quickly from the copy does not reset that seven-day clock — otherwise the rebuild could be postponed forever.
+
+That limit exists for one specific gap. Editing a **Priority** property row by hand is noticed and recorded while the plugin is running — but doing it on **another device**, or with the plugin disabled, leaves nothing to detect, because that edit changes a hidden child of the rem rather than the rem itself. Rebuilding weekly bounds how long such an edit can stay stale.
 
 The command **Refresh Card Priority Cache** deliberately ignores the saved copy: it re-reads every priority from the database and rebuilds the copy from what it finds. It is what you run when you suspect a priority is wrong, and answering that with a copy derived from the same suspect state would make it useless in the one case anyone runs it.
 
@@ -48,10 +32,11 @@ The **CardPriority** powerup's Priority slot is now registered to show only in t
 
 ### 🔧 Debug: snapshot, restore and cache tooling
 
-Three additions to the debug widget, all under **Raw Slot Diagnostics**:
+Four additions to the debug widget, all under **Raw Slot Diagnostics**:
 
 - **CardPriority Snapshot / Restore** — captures every rem's priority, source and last-updated values to a downloaded JSON file (and to local storage), verifies the current state against a capture, and restores from it. Worth running before any bulk re-prioritisation, repair pass or import. On a 45,085-rem knowledge base the capture is about 4.7 MB.
 - **Warm-Start Store** — shows the saved copy described above, and clears it to force a rebuild from scratch.
+- **Local storage per-key ceiling** — measures how large a single stored item may be. RemNote's documented 900 KB cap applies to *synced* storage; this found no limit up to 128 MB for unsynced local storage, which is what allowed the saved copy to be one item rather than 23 pieces.
 - **Cache freshness readout** — the Card Priority Powerup section now shows the cached priority next to the stored one, so a stale cache is visible rather than inferred.
 
 ## v1.0.37 - August 11th, 2026
