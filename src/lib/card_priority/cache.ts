@@ -368,6 +368,29 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   console.log(`[Card Priority Cache] Phase 1 - Loading ${taggedForInheritanceRems.length} pre-tagged rems...`);
   const taggedPriorities: CardPriorityInfo[] = [];
 
+  // DO NOT try to speed this up by rescheduling the calls — it has been measured
+  // and there is nothing there.
+  //
+  // The obvious suspicion is the barrier at the end of each batch: 100 rems are
+  // issued, then the loop waits for the slowest of them before issuing the next
+  // 100, 451 times over a 45k-rem library. Replacing that with a sliding window
+  // of workers (constant rems in flight, no barrier at all) moved throughput from
+  // 465 to 489 rem/s — and in the same run the IncRem cache load and the
+  // card.getAll() setup, neither of which was touched, got 5.7% and 14% faster.
+  // It was machine variance, not the change.
+  //
+  // The reason is that the IPC bridge is a fixed-rate pipe at roughly 1,800-2,000
+  // calls/s. That holds whether Phase 1 runs alone or shares the bridge with the
+  // concurrent IncRem cache load (which is why this phase visibly speeds up in
+  // the logs the moment that load finishes), and it holds under either scheduling
+  // strategy. There was no idle time to reclaim.
+  //
+  // So the only lever is FEWER calls. Phase 1 issues three per rem — the priority,
+  // source and lastUpdated slots read in getCardPriority — for ~135,000 total.
+  // Dropping the lastUpdated read is a third of that; persisting the cache across
+  // sessions (storage.setLocal) and re-reading only what changed would remove
+  // almost all of it, but needs a change signal that rem.updatedAt cannot provide
+  // on its own: see lib/updated_at_probe.ts for what was measured and why.
   const checkBatchSize = 100;
   let lastProgressLogged = -1;
   for (let i = 0; i < taggedForInheritanceRems.length; i += checkBatchSize) {
@@ -404,10 +427,18 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
 
   await plugin.storage.setSession(allCardPriorityInfoKey, enrichedTaggedPriorities);
 
-  const phase1Time = Math.round((Date.now() - phase1Start) / 1000);
+  const phase1Ms = Date.now() - phase1Start;
+  const phase1Time = Math.round(phase1Ms / 1000);
   const totalTime = Math.round((Date.now() - startTime) / 1000);
+  // Throughput and concurrency are logged, not just the wall clock, so a pasted
+  // log is comparable across runs on different-sized libraries and says which
+  // scheduling strategy produced it. Setup is broken out because it is a fixed
+  // card.getAll() + taggedRem() cost that no change to the loop below can move.
+  const remsPerSec = phase1Ms > 0 ? Math.round((enrichedTaggedPriorities.length / phase1Ms) * 1000) : 0;
   console.log(
-    `[Card Priority Cache] Phase 1 complete. Loaded and enriched ${enrichedTaggedPriorities.length} tagged rems in ${phase1Time}s (total ${totalTime}s including setup)`
+    `[Card Priority Cache] Phase 1 complete. Loaded and enriched ${enrichedTaggedPriorities.length} tagged rems ` +
+    `in ${phase1Time}s (${remsPerSec} rem/s, batch ${checkBatchSize}; ` +
+    `total ${totalTime}s including ${totalTime - phase1Time}s setup)`
   );
   console.log(`[Card Priority Cache] Found ${untaggedRemIds.length} untagged rems with cards for deferred processing`);
 

@@ -70,6 +70,7 @@ import { registerQueueSessionTracking, saveCurrentSession, hasActiveSession } fr
 import { shouldUseLightMode } from '../lib/mobileUtils';
 import dayjs from 'dayjs';
 import { getIESetting } from '../lib/settings';
+import { recordRemChangeEvent } from '../lib/rem_change_tape';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -714,6 +715,17 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
     AppEvents.GlobalRemChanged,
     undefined,
     async (data) => {
+      // Raw event tape for the debug widget's dirty-set probe. Recorded here, at
+      // the very top, BEFORE the plugin_operation_active early return and before
+      // the debounce below — the probe's question is which remIds this event
+      // actually reports for a hand edit (the tagged rem, its property child, or
+      // both), and anything filtered downstream would answer a different one.
+      //
+      // Costs no IPC per event: recordRemChangeEvent pushes to a module-level
+      // ring buffer and flushes to session storage on a time throttle, so this
+      // hot path (which is known to fire in the thousands) pays an array push.
+      recordRemChangeEvent(plugin, data.remId);
+
       const isBatchActive = await plugin.storage.getSession<boolean>('plugin_operation_active');
       if (isBatchActive) {
         return;

@@ -20,6 +20,33 @@ import { diagnosePowerupReadPath } from '../lib/powerup_read_diagnostic';
 import { dumpRawPowerupSlots } from '../lib/raw_slot_dump';
 import { scanKbForDetachedSlots, SlotScanReport } from '../lib/raw_slot_scan';
 import { repairDetachedCardPriorities, testDeleteOrphanProperties, RepairReport } from '../lib/raw_slot_repair';
+import {
+  probeUpdatedAtSensitivity,
+  probeTaggedRemPayload,
+  snapshotRemTimes,
+  compareRemTimes,
+  saveHandEditBaseline,
+  loadHandEditBaseline,
+  HAND_EDIT_BASELINE_KEY,
+  UpdatedAtProbeReport,
+  TaggedRemPayloadReport,
+  RemTimesComparison,
+} from '../lib/updated_at_probe';
+import {
+  captureCardPrioritySnapshot,
+  verifyCardPrioritySnapshot,
+  restoreCardPrioritySnapshot,
+  loadSnapshot,
+  SnapshotMeta,
+  VerifyReport,
+  RestoreReport,
+} from '../lib/card_priority_snapshot';
+import {
+  readRemChangeTape,
+  clearRemChangeTape,
+  enrichRemChangeTape,
+  EnrichedRemChange,
+} from '../lib/rem_change_tape';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -635,6 +662,37 @@ function Debug() {
   const [isRepairingCP, setIsRepairingCP] = useState(false);
   const [repairProgress, setRepairProgress] = useState<string | null>(null);
   const [deletionProbes, setDeletionProbes] = useState<Awaited<ReturnType<typeof testDeleteOrphanProperties>> | null>(null);
+  // Warm-start viability probes (lib/updated_at_probe.ts): can the card-priority
+  // cache be persisted and invalidated by rem.updatedAt instead of rebuilt from
+  // 135k slot reads on every launch?
+  const [isProbingUpdatedAt, setIsProbingUpdatedAt] = useState(false);
+  const [updatedAtProbe, setUpdatedAtProbe] = useState<UpdatedAtProbeReport | null>(null);
+  const [isProbingPayload, setIsProbingPayload] = useState(false);
+  const [payloadProbe, setPayloadProbe] = useState<TaggedRemPayloadReport | null>(null);
+  // NOT useState: taking the baseline, closing the popup to make the hand edit,
+  // and reopening it is the whole point of this test, and the popup's teardown
+  // would discard component state in the middle of it.
+  const handEditBaseline = useTrackerPlugin(
+    async (rp) => {
+      await rp.storage.getSession(HAND_EDIT_BASELINE_KEY); // reactive dependency
+      return await loadHandEditBaseline(rp);
+    },
+    []
+  );
+  const [handEditResult, setHandEditResult] = useState<RemTimesComparison | null>(null);
+  // Card-priority slot visibility experiment (lib/card_priority_slot_migration.ts).
+  const [slotMigBusy, setSlotMigBusy] = useState(false);
+  const [slotMigProgress, setSlotMigProgress] = useState<string | null>(null);
+  const [slotMigNote, setSlotMigNote] = useState<string | null>(null);
+  const [verifyReport, setVerifyReport] = useState<VerifyReport | null>(null);
+  const [restoreReport, setRestoreReport] = useState<RestoreReport | null>(null);
+  const snapshotMeta = useTrackerPlugin(
+    async (rp) => ((await loadSnapshot(rp))?.meta ?? null) as SnapshotMeta | null,
+    [refreshKey]
+  );
+  // Dirty-set probe: raw GlobalRemChanged remIds, enriched on demand.
+  const [tapeRows, setTapeRows] = useState<EnrichedRemChange[] | null>(null);
+  const [tapeBusy, setTapeBusy] = useState(false);
   // Result of the settings-migration probe (see handleProbeSettingsPersistence).
   const [isProbingSettings, setIsProbingSettings] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -2091,6 +2149,180 @@ function Debug() {
   // priority reverted to 10. The "Priority" row above shows the value AFTER
   // getIncrementalRemFromRem's `let priority = 10` fallback, so it cannot tell a
   // stored 10 from an unreadable slot. This bypasses getPowerupProperty and reads
+  // ── Warm-start viability probes ────────────────────────────────────────────
+  // See lib/updated_at_probe.ts for what these are deciding and why.
+
+  const handleProbeUpdatedAt = async () => {
+    if (!remId) return;
+    setIsProbingUpdatedAt(true);
+    setUpdatedAtProbe(null);
+    try {
+      const report = await probeUpdatedAtSensitivity(plugin, remId);
+      setUpdatedAtProbe(report);
+      console.log('[updatedAt probe]', report);
+      if (report.error) {
+        await plugin.app.toast(`Probe could not run: ${report.error}`);
+      } else if (!report.restored) {
+        // Loud, because the probe writes to a real rem: a silent restore failure
+        // would leave a bogus priority behind on a rem the user cares about.
+        await plugin.app.toast(
+          '⚠️ Probe finished but could NOT restore the original slot values — see the report.'
+        );
+      }
+    } catch (err) {
+      console.error('[updatedAt probe] failed', err);
+      await plugin.app.toast(`Probe failed: ${err}`);
+    } finally {
+      setIsProbingUpdatedAt(false);
+    }
+  };
+
+  const handleProbeTaggedRemPayload = async () => {
+    setIsProbingPayload(true);
+    setPayloadProbe(null);
+    try {
+      const report = await probeTaggedRemPayload(plugin);
+      setPayloadProbe(report);
+      console.log('[taggedRem payload probe]', report);
+    } catch (err) {
+      console.error('[taggedRem payload probe] failed', err);
+      await plugin.app.toast(`Probe failed: ${err}`);
+    } finally {
+      setIsProbingPayload(false);
+    }
+  };
+
+  const handleSnapshotForHandEdit = async () => {
+    if (!remId) return;
+    const snap = await snapshotRemTimes(plugin, remId);
+    await saveHandEditBaseline(plugin, snap);
+    setHandEditResult(null);
+    await plugin.app.toast(
+      snap
+        ? 'Baseline saved. Close this popup, edit the Priority property row by hand, then reopen and click Compare.'
+        : 'Could not read this rem.'
+    );
+  };
+
+  const handleCompareAfterHandEdit = async () => {
+    // Read from storage rather than the tracked value: the tracker may not have
+    // re-run yet on a freshly reopened popup, and a stale null here would look
+    // like the baseline was lost again.
+    const baseline = await loadHandEditBaseline(plugin);
+    if (!baseline) {
+      await plugin.app.toast('No baseline saved — click "Snapshot now" first.');
+      return;
+    }
+    const result = await compareRemTimes(plugin, baseline);
+    setHandEditResult(result);
+    console.log('[hand-edit comparison]', result);
+  };
+
+  // ── Card-priority slot visibility experiment ───────────────────────────────
+
+  const handleCaptureSlotSnapshot = async () => {
+    setSlotMigBusy(true);
+    setSlotMigNote(null);
+    try {
+      const result = await captureCardPrioritySnapshot(plugin, setSlotMigProgress);
+      console.log('[slot migration] snapshot', result.meta);
+
+      // The downloaded file is the copy that matters. Local storage is convenient
+      // for the in-app verify/restore, but it is the same storage layer the
+      // experiment is poking at, and it has limits we have not measured at 45k
+      // rows — so the snapshot is not considered taken until a file exists.
+      let downloaded = false;
+      try {
+        const blob = new Blob([JSON.stringify({ meta: result.meta, rows: result.rows })], {
+          type: 'application/json',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `card-priority-snapshot-${dayjs().format('YYYY-MM-DD-HHmmss')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        downloaded = true;
+      } catch (err) {
+        console.error('[slot migration] download failed', err);
+      }
+
+      setSlotMigNote(
+        `Captured ${result.meta.count} priorities (~${(result.approxBytes / 1024 / 1024).toFixed(1)}MB). ` +
+        `Local storage: ${result.storedLocally ? 'written' : `FAILED — ${result.storeError}`}. ` +
+        `File download: ${downloaded ? 'saved' : 'FAILED — do not flip the slot without it'}.`
+      );
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setSlotMigNote(`Capture failed: ${err}`);
+    } finally {
+      setSlotMigBusy(false);
+      setSlotMigProgress(null);
+    }
+  };
+
+  const handleVerifySlotSnapshot = async () => {
+    setSlotMigBusy(true);
+    setVerifyReport(null);
+    try {
+      const report = await verifyCardPrioritySnapshot(plugin, setSlotMigProgress);
+      if (!report) {
+        setSlotMigNote('No snapshot found for this KB.');
+        return;
+      }
+      setVerifyReport(report);
+      console.log('[slot migration] verify', report);
+    } catch (err) {
+      setSlotMigNote(`Verify failed: ${err}`);
+    } finally {
+      setSlotMigBusy(false);
+      setSlotMigProgress(null);
+    }
+  };
+
+  const handleRestoreSlotSnapshot = async () => {
+    setSlotMigBusy(true);
+    setRestoreReport(null);
+    try {
+      const report = await restoreCardPrioritySnapshot(plugin, setSlotMigProgress);
+      if (!report) {
+        setSlotMigNote('No snapshot found for this KB.');
+        return;
+      }
+      setRestoreReport(report);
+      console.log('[slot migration] restore', report);
+    } catch (err) {
+      setSlotMigNote(`Restore failed: ${err}`);
+    } finally {
+      setSlotMigBusy(false);
+      setSlotMigProgress(null);
+    }
+  };
+
+  const handleReadTape = async () => {
+    setTapeBusy(true);
+    try {
+      const raw = await readRemChangeTape(plugin);
+      const enriched = await enrichRemChangeTape(plugin, raw.slice(-40));
+      setTapeRows(enriched);
+      console.log('[rem change tape]', enriched);
+    } finally {
+      setTapeBusy(false);
+    }
+  };
+
+  const handleClearTape = async () => {
+    await clearRemChangeTape(plugin);
+    setTapeRows(null);
+    await plugin.app.toast('Tape cleared. Now hand-edit a Priority, then Read tape.');
+  };
+
+  const handleClearHandEditBaseline = async () => {
+    await saveHandEditBaseline(plugin, null);
+    setHandEditResult(null);
+    await plugin.app.toast('Baseline cleared.');
+  };
+
   // the property rems directly, for this rem and every descendant. Read-only.
   const handleDumpRawSlots = async () => {
     if (!rem) return;
@@ -4980,6 +5212,285 @@ function Debug() {
             {scanProgress}
           </div>
         )}
+
+        {/* ── CardPriority snapshot / restore ─────────────────────────────────
+            A way back from any bulk operation that touches priorities. Built for
+            a slot-visibility migration that was abandoned; kept because the
+            capability outlives it. */}
+        <div style={{ marginBottom: '12px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>CardPriority Snapshot / Restore</div>
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '8px', lineHeight: 1.5 }}>
+            Captures every tagged rem's priority, source and lastUpdated to local storage
+            <strong> and a downloaded JSON file</strong> — the file being the copy that survives a
+            storage limit or the very bug you are guarding against. Verify re-reads and classifies
+            what changed; Restore writes the snapshot back. Capture costs about as much as a full
+            cache build. Worth running before any bulk re-prioritisation, repair pass or import.
+          </div>
+
+          <div style={{ fontSize: '11px', marginBottom: '8px' }}>
+            snapshot:{' '}
+            {snapshotMeta ? (
+              <strong style={{ color: '#22c55e' }}>
+                {snapshotMeta.count} rows, {dayjs(snapshotMeta.capturedAt).format('MMM D HH:mm')}
+              </strong>
+            ) : (
+              <strong style={{ color: 'var(--rn-clr-content-tertiary)' }}>none for this KB</strong>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button onClick={handleCaptureSlotSnapshot} disabled={slotMigBusy} style={{ ...smallBtnStyle, cursor: slotMigBusy ? 'wait' : 'pointer', fontWeight: 600 }} title="Read every tagged rem's three CardPriority slots and save them to local storage AND a downloaded JSON file. Same cost as a cache build.">
+              1. Capture full snapshot
+            </button>
+            <button onClick={handleVerifySlotSnapshot} disabled={slotMigBusy} style={{ ...smallBtnStyle, cursor: slotMigBusy ? 'wait' : 'pointer' }}>
+              2. Verify against snapshot
+            </button>
+            <button onClick={handleRestoreSlotSnapshot} disabled={slotMigBusy || !snapshotMeta} style={{ ...smallBtnStyle, cursor: slotMigBusy ? 'wait' : 'pointer', borderColor: '#ef4444', color: '#ef4444' }} title="Write the snapshotted values back onto any rem whose priority no longer matches.">
+              3. Restore from snapshot
+            </button>
+          </div>
+
+          {slotMigProgress && (
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '6px' }}>{slotMigProgress}</div>
+          )}
+          {slotMigNote && (
+            <div style={{ fontSize: '11px', marginTop: '6px', lineHeight: 1.5 }}>{slotMigNote}</div>
+          )}
+
+          {verifyReport && (
+            <div style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.7 }}>
+              <div>snapshot {verifyReport.total} rows</div>
+              <div style={{ paddingLeft: '10px' }}>
+                • unchanged: <strong style={{ color: '#22c55e' }}>{verifyReport.matched}</strong><br />
+                • <strong style={{ color: verifyReport.stranded > 0 ? '#ef4444' : 'inherit' }}>lost (value gone): {verifyReport.stranded}</strong><br />
+                • changed value: <strong style={{ color: verifyReport.changed > 0 ? '#f59e0b' : 'inherit' }}>{verifyReport.changed}</strong><br />
+                • rem no longer exists: {verifyReport.missingRem}
+              </div>
+              {verifyReport.strandedSamples.length > 0 && (
+                <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                  lost samples: {verifyReport.strandedSamples.join(', ')}
+                </div>
+              )}
+              {verifyReport.changedSamples.length > 0 && (
+                <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                  changed samples: {verifyReport.changedSamples.join(' · ')}
+                </div>
+              )}
+              <div style={{ marginTop: '6px', fontWeight: 600, color: verifyReport.stranded > 0 ? '#ef4444' : '#22c55e' }}>{verifyReport.verdict}</div>
+            </div>
+          )}
+
+          {restoreReport && (
+            <div style={{ fontSize: '11px', marginTop: '8px', fontWeight: 600 }}>{restoreReport.verdict}</div>
+          )}
+        </div>
+
+        {/* ── Warm-start viability ────────────────────────────────────────────
+            Decides whether the card-priority cache can be persisted across
+            sessions (storage.setLocal) and invalidated by rem.updatedAt, instead
+            of rebuilt from ~135,000 slot reads on every launch. See
+            lib/updated_at_probe.ts for the full reasoning. */}
+        <div style={{ marginBottom: '12px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>Warm-Start Viability (rem.updatedAt)</div>
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '8px', lineHeight: 1.5 }}>
+            Phase 1 of the cache build costs three slot reads per tagged rem and the IPC bridge is a
+            fixed-rate pipe, so the only real speed-up is not making the calls. <code>RemObject.updatedAt</code>{' '}
+            comes free in the <code>taggedRem()</code> payload — <em>if</em> it actually moves when a
+            priority changes. The <code>priority</code> slot is VISIBLE, so its value lives in a child
+            rem; a hand edit of that property row writes no hidden slot and may leave the parent's{' '}
+            <code>updatedAt</code> untouched. Test 3 is the one that decides it.
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleProbeTaggedRemPayload}
+              disabled={isProbingPayload}
+              style={{ ...smallBtnStyle, cursor: isProbingPayload ? 'wait' : 'pointer' }}
+              title="Read-only, KB-wide. Is updatedAt populated in the bulk taggedRem() payload, and how many rems would a warm start actually have to re-read?"
+            >
+              {isProbingPayload ? 'Scanning…' : '1. Probe taggedRem payload (read-only)'}
+            </button>
+            <button
+              onClick={handleProbeUpdatedAt}
+              disabled={isProbingUpdatedAt || !remId}
+              style={{ ...smallBtnStyle, cursor: isProbingUpdatedAt ? 'wait' : 'pointer', borderColor: '#f59e0b', color: '#f59e0b' }}
+              title="WRITES to this rem: sets each cardPriority slot in isolation and reports whether rem.updatedAt moved. All three slots are restored afterwards and the restore is verified."
+            >
+              {isProbingUpdatedAt ? 'Probing…' : '2. Probe slot sensitivity (WRITES to this rem)'}
+            </button>
+          </div>
+
+          {payloadProbe && (
+            <div style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.7 }}>
+              <div><code>taggedRem()</code>: <strong>{payloadProbe.taggedCount}</strong> rems in {(payloadProbe.elapsedMs / 1000).toFixed(1)}s</div>
+              <div>
+                carry a usable <code>updatedAt</code>:{' '}
+                <strong style={{ color: payloadProbe.withUpdatedAt === payloadProbe.taggedCount ? '#22c55e' : '#ef4444' }}>
+                  {payloadProbe.withUpdatedAt}
+                </strong>{' '}
+                · <code>localUpdatedAt</code>: <strong>{payloadProbe.withLocalUpdatedAt}</strong>
+              </div>
+              {payloadProbe.oldest !== null && payloadProbe.newest !== null && (
+                <div style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                  range: {dayjs(payloadProbe.oldest).format('YYYY-MM-DD')} → {dayjs(payloadProbe.newest).format('YYYY-MM-DD HH:mm')}
+                </div>
+              )}
+              <div style={{ marginTop: '4px', fontWeight: 600 }}>Rems a warm start would re-read:</div>
+              <div style={{ paddingLeft: '10px' }}>
+                • last hour: <strong>{payloadProbe.changedLastHour}</strong><br />
+                • last 24h: <strong>{payloadProbe.changedLast24h}</strong><br />
+                • last 7d: <strong>{payloadProbe.changedLast7d}</strong><br />
+                • last 30d: <strong>{payloadProbe.changedLast30d}</strong>
+              </div>
+              <div style={{ marginTop: '6px', fontWeight: 600 }}>{payloadProbe.verdict}</div>
+            </div>
+          )}
+
+          {updatedAtProbe && (
+            <div style={{ fontSize: '11px', marginTop: '10px', lineHeight: 1.6 }}>
+              {updatedAtProbe.error && (
+                <div style={{ color: '#ef4444' }}>{updatedAtProbe.error}</div>
+              )}
+              {updatedAtProbe.probes.map((p) => (
+                <div key={p.label} style={{ marginBottom: '4px', paddingLeft: '10px' }}>
+                  <span style={{ color: p.moved ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                    {p.moved ? 'MOVED' : 'no change'}
+                  </span>{' '}
+                  — <code>{p.label}</code>
+                  {p.neededRetry && <span style={{ color: '#f59e0b' }}> (only after a retry)</span>}
+                  <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                    updatedAt {p.remUpdatedAtBefore} → {p.remUpdatedAtAfter}
+                    {' · '}localUpdatedAt {p.localMoved ? 'moved' : 'unchanged'}
+                    {p.propertyChildId && (
+                      <> · property child {p.propertyChildMoved ? 'MOVED' : 'unchanged'}</>
+                    )}
+                    {p.error && <span style={{ color: '#ef4444' }}> · {p.error}</span>}
+                  </div>
+                </div>
+              ))}
+              {updatedAtProbe.ok && (
+                <div style={{ marginTop: '4px', color: updatedAtProbe.restored ? 'var(--rn-clr-content-secondary)' : '#ef4444' }}>
+                  {updatedAtProbe.restored
+                    ? 'Original slot values restored and verified.'
+                    : `RESTORE FAILED — this rem may be left with probe values. ${updatedAtProbe.restoreError ?? ''}`}
+                </div>
+              )}
+              <div style={{ marginTop: '6px', fontWeight: 600 }}>{updatedAtProbe.verdict}</div>
+            </div>
+          )}
+
+          {/* Test 4 — the dirty-set probe.
+              updatedAt is out as a sole invalidation key (test 3 proved a hand
+              edit does not move it). The fallback is recording changed remIds
+              from GlobalRemChanged as they happen. That only works if the event
+              names the TAGGED rem — directly, or via a child's free `parent`
+              field. This reads the raw event tape and says which. */}
+          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--rn-clr-border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
+              4. Dirty-set probe — can GlobalRemChanged name the tagged rem?
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '6px', lineHeight: 1.5 }}>
+              Clear the tape → <strong>close this popup</strong> → hand-edit a Priority row → reopen →
+              Read tape. Every event is classified by what a dirty-set could derive from it:{' '}
+              <code>self</code> (the rem is tagged — trivial), <code>parent</code> (it is a property
+              child, and its free <code>parent</code> field reaches the tagged rem — one hop, no extra
+              call), or <code>none</code> (the event cannot name a tagged rem, and this approach fails).
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button onClick={handleClearTape} style={smallBtnStyle}>Clear tape</button>
+              <button onClick={handleReadTape} disabled={tapeBusy} style={{ ...smallBtnStyle, cursor: tapeBusy ? 'wait' : 'pointer' }}>
+                {tapeBusy ? 'Reading…' : 'Read tape'}
+              </button>
+            </div>
+            {tapeRows && (
+              <div style={{ fontSize: '10px', marginTop: '6px', lineHeight: 1.6 }}>
+                {tapeRows.length === 0 && (
+                  <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                    Tape is empty — no GlobalRemChanged events since it was cleared. Note the listener
+                    skips events while <code>plugin_operation_active</code> is set, but the tape is
+                    written before that check, so an empty tape means no events fired at all.
+                  </div>
+                )}
+                {tapeRows.length > 0 && (
+                  <div style={{ marginBottom: '4px', fontWeight: 600, fontSize: '11px' }}>
+                    {tapeRows.length} events ·{' '}
+                    self: {tapeRows.filter((r) => r.via === 'self').length} ·{' '}
+                    parent: {tapeRows.filter((r) => r.via === 'parent').length} ·{' '}
+                    none: {tapeRows.filter((r) => r.via === 'none').length}
+                  </div>
+                )}
+                {tapeRows.map((r, i) => (
+                  <div key={`${r.remId}-${i}`} style={{ paddingLeft: '8px', color: 'var(--rn-clr-content-tertiary)' }}>
+                    <span style={{ color: r.via === 'none' ? '#ef4444' : '#22c55e', fontWeight: 600 }}>{r.via}</span>
+                    {' · '}{dayjs(r.at).format('HH:mm:ss')}
+                    {' · '}<code>{r.remId}</code>
+                    {r.isPowerupProperty && ' · isProperty'}
+                    {r.isTagged && ' · tagged'}
+                    {r.text && ` · "${r.text}"`}
+                    {r.via === 'parent' && <> · → parent <code>{r.wouldMark}</code> "{r.parentText}"</>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Test 3 — the manual-edit case, which no simulated write can settle:
+              setPowerupProperty on the parent is not the same operation as typing
+              into the visible property row, and it is the typing that has to be
+              caught. Two clicks with a real edit in between. */}
+          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--rn-clr-border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
+              3. Hand-edit test — the case that decides the design
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '6px', lineHeight: 1.5 }}>
+              A user editing the Priority property row calls nothing in this plugin, so no hidden slot
+              is written. If <code>updatedAt</code> does not move for that, a warm start would serve the
+              hand-edited priority stale forever. Snapshot → <strong>close this popup</strong> → edit the
+              Priority row by hand → reopen → Compare. The baseline is kept in session storage, so
+              closing the popup does not lose it.
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button onClick={handleSnapshotForHandEdit} disabled={!remId} style={smallBtnStyle}>
+                Snapshot now
+              </button>
+              {/* Never disabled on the baseline: the handler checks storage and
+                  toasts if it is missing. A button that disables itself exactly
+                  when the popup reopens is indistinguishable from a broken one —
+                  which is how this test failed the first time. */}
+              <button onClick={handleCompareAfterHandEdit} style={smallBtnStyle}>
+                Compare after editing
+              </button>
+              <button onClick={handleClearHandEditBaseline} style={smallBtnStyle}>
+                Clear baseline
+              </button>
+            </div>
+            {handEditBaseline && (
+              <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '4px' }}>
+                baseline: priority <code>{handEditBaseline.priority || '(empty)'}</code>, taken{' '}
+                {dayjs(handEditBaseline.takenAt).format('HH:mm:ss')} on <code>{handEditBaseline.remId}</code>
+                {remId && handEditBaseline.remId !== remId && (
+                  <span style={{ color: '#f59e0b' }}>
+                    {' '}— note this is a DIFFERENT rem from the one this popup is open on; Compare will
+                    re-read the baseline's rem, not this one.
+                  </span>
+                )}
+              </div>
+            )}
+            {handEditResult && (
+              <div style={{ fontSize: '11px', marginTop: '6px', lineHeight: 1.6 }}>
+                <div style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                  priority <code>{handEditResult.before.priority || '(empty)'}</code> → <code>{handEditResult.after.priority || '(empty)'}</code>
+                  {' · '}updatedAt {handEditResult.updatedAtMoved ? 'MOVED' : 'unchanged'}
+                  {' · '}localUpdatedAt {handEditResult.localUpdatedAtMoved ? 'moved' : 'unchanged'}
+                  {' · '}lastUpdated slot {handEditResult.lastUpdatedChanged ? 'changed' : 'unchanged'}
+                </div>
+                <div style={{ marginTop: '4px', fontWeight: 600, color: handEditResult.updatedAtMoved && handEditResult.priorityChanged ? '#22c55e' : '#ef4444' }}>
+                  {handEditResult.verdict}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ── CardPriority repair ──────────────────────────────────────────────
             Ordered dry-run → small live run → full run → staged deletion. The
