@@ -20,6 +20,8 @@ It is also used only where it can be trusted. The plugin rebuilds from scratch w
 
 That seven-day limit exists for one specific gap. Editing a **Priority** property row by hand is noticed and saved while the plugin is running — but doing it on **another device**, or with the plugin disabled, leaves nothing to detect, because that edit changes a hidden child of the rem rather than the rem itself. Rebuilding weekly bounds how long such an edit can stay stale.
 
+The command **Refresh Card Priority Cache** deliberately ignores the saved copy: it re-reads every priority from the database and rebuilds the copy from what it finds. It is what you run when you suspect a priority is wrong, and answering that with a copy derived from the same suspect state would make it useless in the one case anyone runs it.
+
 📖 [Startup: how the priority cache is built](Priorities-for-Flashcards.md#startup-cache)
 
 ### 🎨 Changed: the Priority property row no longer clutters new knowledge bases

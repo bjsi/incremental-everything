@@ -275,7 +275,9 @@ The spot-check reads a couple of hundred priorities at random and compares them 
 The seven-day limit covers the one change that cannot be detected. If you edit a **Priority** property row by hand while the plugin is running, the change is noticed and saved as normal. If you do it **on another device**, or with the plugin disabled, nothing marks the rem as changed, and the saved copy would keep the old value indefinitely. Rebuilding weekly puts a bound on how long such an edit can stay wrong.
 
 !!! tip "Forcing a rebuild"
-    The debug widget's **Warm-Start Store** panel shows the saved copy and clears it, which makes the next start rebuild from scratch. Clearing it is harmless — it is derived data, and the rebuild writes it again.
+    The command **Refresh Card Priority Cache** ignores the saved copy and re-reads every priority from the database, rebuilding both the cache and the saved copy from what it finds. That is the one to run if you suspect a priority is being displayed wrongly — the saved copy is derived from the same state you would be doubting, so a refresh that reused it would tell you nothing.
+
+    The debug widget's **Warm-Start Store** panel also clears the copy, which makes the *next* start rebuild from scratch. Clearing it is harmless — it is derived data, and the rebuild writes it again.
 
 ## See also
 

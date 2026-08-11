@@ -493,8 +493,14 @@ async function tryWarmPhase1(
  *
  * @param plugin Plugin instance
  */
-export async function loadCardPriorityCache(plugin: RNPlugin) {
-  console.log('[Card Priority Cache] Starting cache build with deferred loading...');
+export async function loadCardPriorityCache(
+  plugin: RNPlugin,
+  opts?: { forceCold?: boolean }
+) {
+  console.log(
+    `[Card Priority Cache] Starting cache build with deferred loading...` +
+      (opts?.forceCold ? ' (FORCED COLD — ignoring the saved copy)' : '')
+  );
 
   const startTime = Date.now();
 
@@ -540,7 +546,16 @@ export async function loadCardPriorityCache(plugin: RNPlugin) {
   // that disagrees with the database — and the cold build below runs unchanged.
   // The cold build is not a degraded mode; it is what writes the blob the next
   // warm start depends on.
-  const warmPriorities = await tryWarmPhase1(plugin, taggedForInheritanceRems, cardsByRem);
+  //
+  // forceCold skips it entirely. The 'Refresh Card Priority Cache' command exists
+  // precisely for when the cache is suspected of being wrong, and answering that
+  // by handing back the saved copy — which is derived from the same suspect state
+  // — would make the command useless in the one situation anyone runs it. It
+  // re-reads every slot from the database and rewrites the saved copy from what
+  // it finds, so it also repairs the copy rather than merely bypassing it.
+  const warmPriorities = opts?.forceCold
+    ? null
+    : await tryWarmPhase1(plugin, taggedForInheritanceRems, cardsByRem);
 
   if (warmPriorities) {
     const percentileByRemWarm = calculateCardRemPercentilesFromCards(warmPriorities);
