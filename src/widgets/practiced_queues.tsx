@@ -85,6 +85,23 @@ const NUM_TO_LOAD_IN_BATCH = 20;
 type SpeedUnit = "cpm" | "spc";
 const SPEED_UNIT_KEY = "summarySpeedUnit";
 
+// Red → green gradient over 1.5–4 cards per minute, shared by the Summary
+// table, the History Log and the live session card. Always driven by cpm, so
+// the Summary's s/card reading gets the exact same colour for the same pace
+// (1.5 cpm = 40 s/card = red, 4 cpm = 15 s/card = green).
+const SPEED_HUE_MIN_CPM = 1.5;
+const SPEED_HUE_MAX_CPM = 4;
+
+const speedHue = (cpm: number) => {
+    if (cpm <= SPEED_HUE_MIN_CPM) return 0;
+    if (cpm >= SPEED_HUE_MAX_CPM) return 120;
+    const ratio = (cpm - SPEED_HUE_MIN_CPM) / (SPEED_HUE_MAX_CPM - SPEED_HUE_MIN_CPM);
+    return Math.floor(ratio * 120);
+};
+
+const speedColorStyle = (cpm: number): React.CSSProperties =>
+    cpm > 0 ? { color: `hsl(${speedHue(cpm)}, 90%, 35%)` } : {};
+
 const formatTimeShort = (ms: number) => {
     if (!ms) return "0s";
     const seconds = Math.floor(ms / 1000);
@@ -270,7 +287,7 @@ function SummaryTable({
                                 <td className="p-2 text-right">
                                     {row.cardsCount > 0 ? (
                                         <span>
-                                            <span className="rn-clr-content-primary">
+                                            <span className="font-bold" style={speedColorStyle(row.avgSpeed)}>
                                                 {unit === "cpm"
                                                     ? row.avgSpeed.toFixed(1)
                                                     : row.avgSecondsPerCard.toFixed(1)}
@@ -898,18 +915,7 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
     const rememberedCount = Math.max(0, count - forgotCount);
     const retentionRate = count > 0 ? ((rememberedCount / count) * 100).toFixed(0) : "100";
 
-    let hue = 0;
-    if (count > 0 && seconds > 0) {
-        if (cardsPerMinVal < 1.5) {
-            hue = 0;
-        } else if (cardsPerMinVal >= 4) {
-            hue = 120;
-        } else {
-            const ratio = (cardsPerMinVal - 1.5) / (4 - 1.5);
-            hue = Math.floor(ratio * 120);
-        }
-    }
-    const speedColor = { color: count > 0 ? `hsl(${hue}, 90%, 35%)` : '' };
+    const speedColor = speedColorStyle(count > 0 ? cardsPerMinVal : 0);
 
     const retentionVal = parseInt(retentionRate);
     const retentionColor = retentionVal >= 90 ? "text-green-600" : (retentionVal < 80 ? "text-red-500" : "text-yellow-600");

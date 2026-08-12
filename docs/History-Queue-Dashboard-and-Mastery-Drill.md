@@ -131,13 +131,27 @@ The **Debug: Clear Flashcard History** command clears the list for the knowledge
 |---|---|
 | **Total Time** | Total time spent in the session |
 | **Retention Rate** | Remembered vs. Forgot percentage |
-| **Speed (CPM / s/card)** | Cards per minute and seconds per card, with visual indicator |
+| **Speed (CPM / s/card)** | Cards per minute and seconds per card, [colour-coded](#speed-colour-coding) |
 | **Card Age** | Age of the card currently being reviewed (live view only) |
 | **Cost** | Minutes per year of card age/coverage |
 | **Interval** | Time until next scheduled review (prev/current card) |
 | **Sessions Summary** | Aggregated stats for Today, Yesterday, This Week, Last Week, and more |
 | **Flashcards** | Count and time for regular flashcards |
 | **Incremental Rems** | Count and time for IncRems reviewed during the session — tracked from the queue widget, the Editor Review Timer, and the Editor Review popup |
+
+### Speed Colour Coding
+
+Every speed reading — in the live session card, in the History Log, and in the Sessions Summary table — is tinted on a **red → yellow → green gradient**. The colour is always derived from the cards-per-minute pace, so a given pace looks identical whichever unit it is displayed in:
+
+| Colour | Cards per minute | Seconds per card | Reading |
+|---|---|---|---|
+| 🔴 Red | ≤ 1.5 cpm | ≥ 40 s/card | Slow — long cards, heavy material, or interruptions |
+| 🟡 Yellow | ≈ 2.75 cpm | ≈ 22 s/card | Mid-range |
+| 🟢 Green | ≥ 4 cpm | ≤ 15 s/card | Fast — short cards or well-known material |
+
+Between 1.5 and 4 cpm the hue shifts continuously with the pace; below and above those bounds it stays fully red and fully green. Since seconds per card is the inverse of cards per minute, the s/card scale runs the other way — **lower** s/card is greener.
+
+The gradient is a pace indicator, not a quality score: reading-heavy or cloze-dense material sits naturally at the red end, and speed says nothing on its own without the **Ret.** column beside it.
 
 **Cluster-aware tracking:** Card count, time, and retention are tracked per sibling card in a cluster — not just the cluster anchor. Average speed (s/card) and total card count correctly reflect all siblings rated.
 
@@ -167,6 +181,8 @@ This is intentionally a passive readout — it doesn't gate or sort the queue. I
 The Sessions Summary table's **Speed** column has a small unit button in its header. Click it to switch every row between **cpm** (cards per minute) and **s/card** (seconds per card) — the same two readings the per-session History Log below always shows side by side.
 
 The choice is stored **on your device** (not synced), so the table opens in your preferred unit in every later session, while another device can keep its own.
+
+Values are colour-coded on the same red → green gradient as the live session card and the History Log, and the colour follows the underlying pace rather than the printed number — so switching to s/card recolours nothing. See [Speed Colour Coding](#speed-colour-coding).
 
 ### Refresh Statistics — Authoritative Summary Recompute
 

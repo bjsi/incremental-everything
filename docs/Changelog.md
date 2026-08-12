@@ -10,9 +10,11 @@ The **Speed** column of the Sessions Summary table was fixed to cards per minute
 
 The chosen unit is remembered on your device and survives restarts, so the table always opens the way you last left it. It is not synced: each device keeps its own preference.
 
+The column is now colour-coded on the same red → green gradient the live session card and the History Log already used. The colour follows the underlying pace, not the printed number, so a given pace looks the same in either unit — 1.5 cpm and 40 s/card are both fully red, 4 cpm and 15 s/card both fully green.
+
 The table's large figures also read more easily: card counts, Incremental Rem counts and hour totals now carry thousands separators — `269,461` rather than `269461`, `15,024h 49m` rather than `15024h 49m`.
 
-📖 [Speed units in the Sessions Summary](History-Queue-Dashboard-and-Mastery-Drill.md#speed-units-in-the-sessions-summary)
+📖 [Speed units in the Sessions Summary](History-Queue-Dashboard-and-Mastery-Drill.md#speed-units-in-the-sessions-summary) · [Speed colour coding](History-Queue-Dashboard-and-Mastery-Drill.md#speed-colour-coding)
 
 ## v1.0.39 - August 12th, 2026
 
