@@ -12,7 +12,8 @@
       "Bash(grep -iA4 \"warning\")",
       "Bash(awk '/registerCallback<SpecialPluginCallback.GetNextCard>/,/^  \\\\\\);$/' src/register/callbacks.ts)",
       "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(p.version\\)\")",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit:$?\")"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

@@ -162,6 +162,12 @@ This is intentionally a passive readout — it doesn't gate or sort the queue. I
 
 **Export & Import:** Back up your practice session history across all Knowledge Bases to a local JSON file, and import it back at any time (duplicate sessions are automatically skipped).
 
+### Speed Units in the Sessions Summary
+
+The Sessions Summary table's **Speed** column has a small unit button in its header. Click it to switch every row between **cpm** (cards per minute) and **s/card** (seconds per card) — the same two readings the per-session History Log below always shows side by side.
+
+The choice is stored **on your device** (not synced), so the table opens in your preferred unit in every later session, while another device can keep its own.
+
 ### Refresh Statistics — Authoritative Summary Recompute
 
 Above the Sessions Summary table you'll find a **Refresh Statistics** button alongside an "Updated *N* ago" timestamp. Clicking it walks RemNote's durable state — every card's repetition history, every Incremental Rem's history slot, and the Dismissed powerup's preserved history — and recomputes the per-period totals from ground truth instead of from the live event listeners.

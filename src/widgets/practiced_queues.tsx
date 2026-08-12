@@ -5,6 +5,7 @@ import {
     usePlugin,
     useSyncedStorageState,
     useSessionStorageState,
+    useLocalStorageState,
 } from "@remnote/plugin-sdk";
 import '../style.css';
 import '../App.css';
@@ -74,16 +75,23 @@ interface AggregatedStats {
     incRemsTime: number;
     retentionRate: number;
     avgSpeed: number;
+    avgSecondsPerCard: number;
 }
 
 const NUM_TO_LOAD_IN_BATCH = 20;
+
+// Unit the Summary table's Speed column is rendered in. Device-local (not
+// synced) so each machine keeps its own preference.
+type SpeedUnit = "cpm" | "spc";
+const SPEED_UNIT_KEY = "summarySpeedUnit";
 
 const formatTimeShort = (ms: number) => {
     if (!ms) return "0s";
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    // The "Ever" row reaches five-digit hour counts, so separate thousands.
+    if (hours > 0) return `${hours.toLocaleString()}h ${minutes % 60}m`;
     if (minutes > 0) return `${minutes}m`;
     return `${seconds}s`;
 };
@@ -138,6 +146,7 @@ function buildRow(
     const retentionRate = s.cardsCount > 0 ? (remembered / s.cardsCount) * 100 : 0;
     const cardsTimeMin = s.cardsTime / 1000 / 60;
     const avgSpeed = cardsTimeMin > 0 ? s.cardsCount / cardsTimeMin : 0;
+    const avgSecondsPerCard = s.cardsCount > 0 ? s.cardsTime / 1000 / s.cardsCount : 0;
     return {
         label,
         totalTime: s.totalTime,
@@ -147,6 +156,7 @@ function buildRow(
         incRemsTime: s.incRemsTime,
         retentionRate,
         avgSpeed,
+        avgSecondsPerCard,
     };
 }
 
@@ -161,6 +171,10 @@ function SummaryTable({
     allAggregates: DailyAggregate[];
     lastComputed: number;
 }) {
+    const [speedUnit, setSpeedUnit] = useLocalStorageState<SpeedUnit>(SPEED_UNIT_KEY, "cpm");
+    // Guard against a stale/garbled stored value so the column never renders blank.
+    const unit: SpeedUnit = speedUnit === "spc" ? "spc" : "cpm";
+
     const stats = useMemo(() => {
         const now = new Date();
         const startOfToday = getStartOfDay(now);
@@ -205,7 +219,22 @@ function SummaryTable({
                             <th className="p-2 font-bold rn-clr-content-secondary text-right">Cards</th>
                             <th className="p-2 font-bold rn-clr-content-secondary text-right">Inc. Rems</th>
                             <th className="p-2 font-bold rn-clr-content-secondary text-right">Ret.</th>
-                            <th className="p-2 font-bold rn-clr-content-secondary text-right">Speed</th>
+                            <th className="p-2 font-bold rn-clr-content-secondary text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                    <span>Speed</span>
+                                    <button
+                                        onClick={() => setSpeedUnit(unit === "cpm" ? "spc" : "cpm")}
+                                        className="px-1.5 py-0.5 text-[10px] font-medium rounded border rn-clr-border-opaque rn-clr-content-tertiary hover:rn-clr-background-primary transition-colors"
+                                        title={
+                                            unit === "cpm"
+                                                ? "Showing cards per minute — click to show seconds per card"
+                                                : "Showing seconds per card — click to show cards per minute"
+                                        }
+                                    >
+                                        {unit === "cpm" ? "cpm" : "s/card"}
+                                    </button>
+                                </div>
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y rn-clr-divide-opaque">
@@ -218,7 +247,7 @@ function SummaryTable({
                                 <td className="p-2 text-right">
                                     {row.cardsCount > 0 ? (
                                         <div>
-                                            <span className="font-bold rn-clr-content-primary">{row.cardsCount}</span>
+                                            <span className="font-bold rn-clr-content-primary">{row.cardsCount.toLocaleString()}</span>
                                             <span className="rn-clr-content-tertiary text-[10px] ml-1">({formatTimeShort(row.cardsTime)})</span>
                                         </div>
                                     ) : <span className="rn-clr-content-tertiary">-</span>}
@@ -226,7 +255,7 @@ function SummaryTable({
                                 <td className="p-2 text-right">
                                     {row.incRemsCount > 0 ? (
                                         <div>
-                                            <span className="font-bold rn-clr-content-primary">{row.incRemsCount}</span>
+                                            <span className="font-bold rn-clr-content-primary">{row.incRemsCount.toLocaleString()}</span>
                                             <span className="rn-clr-content-tertiary text-[10px] ml-1">({formatTimeShort(row.incRemsTime)})</span>
                                         </div>
                                     ) : <span className="rn-clr-content-tertiary">-</span>}
@@ -240,7 +269,16 @@ function SummaryTable({
                                 </td>
                                 <td className="p-2 text-right">
                                     {row.cardsCount > 0 ? (
-                                        <span><span className="rn-clr-content-primary">{row.avgSpeed.toFixed(1)}</span> <span className="rn-clr-content-tertiary text-[10px]">cpm</span></span>
+                                        <span>
+                                            <span className="rn-clr-content-primary">
+                                                {unit === "cpm"
+                                                    ? row.avgSpeed.toFixed(1)
+                                                    : row.avgSecondsPerCard.toFixed(1)}
+                                            </span>{" "}
+                                            <span className="rn-clr-content-tertiary text-[10px]">
+                                                {unit === "cpm" ? "cpm" : "s/card"}
+                                            </span>
+                                        </span>
                                     ) : <span className="rn-clr-content-tertiary">-</span>}
                                 </td>
                             </tr>

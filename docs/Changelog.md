@@ -2,6 +2,18 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.40 - August 12th, 2026
+
+### 🎨 Changed: the Sessions Summary Speed column can now be read in seconds per card
+
+The **Speed** column of the Sessions Summary table was fixed to cards per minute, while the History Log below it showed both readings. Its header now carries a small unit button — click it to switch the whole column between **cpm** and **s/card**.
+
+The chosen unit is remembered on your device and survives restarts, so the table always opens the way you last left it. It is not synced: each device keeps its own preference.
+
+The table's large figures also read more easily: card counts, Incremental Rem counts and hour totals now carry thousands separators — `269,461` rather than `269461`, `15,024h 49m` rather than `15024h 49m`.
+
+📖 [Speed units in the Sessions Summary](History-Queue-Dashboard-and-Mastery-Drill.md#speed-units-in-the-sessions-summary)
+
 ## v1.0.39 - August 12th, 2026
 
 ### ⚡ Improved: Incremental Rems no longer go missing from the queue in large knowledge bases
