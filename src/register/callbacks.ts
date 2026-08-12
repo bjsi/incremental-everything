@@ -20,7 +20,6 @@ import {
   incRemDisabledDeviceKey,
   currentIncrementalRemTypeKey,
   incremNotesSidebarRemIdKey,
-  currentIncRemKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import {
@@ -110,13 +109,35 @@ export const resetSessionItemCounter = () => {
 //   1. Wall time per phase, on every return, both paths. Anything at or above
 //      SLOW_CALL_WARN_MS is loud, because that is the regime where the deadline
 //      is plausibly in play.
-//   2. Whether the PREVIOUS decision actually reached the screen. The queue
-//      widget writes `currentIncRemKey` when it mounts, so on the next call we
-//      can compare what we returned against what was really shown. A mismatch is
-//      a dropped injection — the only direct evidence available to us.
+//   2. Whether the PREVIOUS decision actually reached the screen — read off the
+//      `queueInfo` counters RemNote hands us, which is exact and costs nothing.
+//
+// On (2): the first version of this compared our returned remId against
+// `currentIncRemKey`, which the queue widget writes when it mounts. That
+// produced FALSE DROP reports — under bridge congestion the widget can take
+// longer to mount and write that key than RemNote takes to ask for the next
+// item, so a perfectly good injection looks unconfirmed. The counters settle it
+// without ambiguity:
+//
+//   cardsPracticed +1 and numCardsRemaining UNCHANGED  → a non-flashcard was
+//     consumed, i.e. our Plugin item was shown.
+//   cardsPracticed +1 and numCardsRemaining DECREASED  → a flashcard was
+//     consumed instead — our item was dropped.
+//   cardsPracticed UNCHANGED                           → RemNote is asking again
+//     for the same slot: a retry, which is itself evidence of a blown deadline.
+//
+// A card rated AGAIN also leaves numCardsRemaining flat, so the SHOWN verdict is
+// the softer of the two; DROPPED is high-confidence and is the one that matters.
 const SLOW_CALL_WARN_MS = 800;
 
 type PhaseTimings = Record<string, number>;
+
+type QueueInfo = {
+  mode: 'practice-all' | 'in-order' | 'normal';
+  cardsPracticed: number;
+  subQueueId: string | undefined;
+  numCardsRemaining: number;
+};
 
 type Decision = {
   seq: number;
@@ -124,6 +145,8 @@ type Decision = {
   reason: string;
   totalMs: number;
   phases: PhaseTimings;
+  cardsPracticed: number;
+  numCardsRemaining: number;
 };
 
 let callSeq = 0;
@@ -147,26 +170,49 @@ function startTimer() {
 
 /**
  * Confirms (or refutes) that the item returned by the PREVIOUS GetNextCard call
- * was actually displayed. Runs fire-and-forget so it never adds latency to the
- * call it is invoked from — its verdict is a diagnostic, not an input.
+ * was actually displayed, using only the counters RemNote passes in. Purely
+ * synchronous and free — no bridge traffic on the path whose latency is the
+ * whole problem. See the block comment above for the decision table.
  */
-async function verifyPreviousDecision(plugin: ReactRNPlugin) {
+function verifyPreviousDecision(queueInfo: QueueInfo) {
   const prev = lastDecision;
-  if (!prev || prev.remId === null) return; // flashcard turns have nothing to verify
-  try {
-    const shown = await plugin.storage.getSession<string>(currentIncRemKey);
-    if (shown === prev.remId) {
-      console.log(`✅ GetNextCard #${prev.seq}: IncRem ${prev.remId} was shown (${prev.totalMs}ms).`);
-    } else {
-      console.warn(
-        `⛔ GetNextCard #${prev.seq}: DROPPED INJECTION — we returned IncRem ${prev.remId} ` +
-          `after ${prev.totalMs}ms but the queue is showing ${shown ?? '(nothing)'}. ` +
-          `Most likely RemNote's getNextCard deadline expired before we resolved.`,
-        { phases: prev.phases, reason: prev.reason }
-      );
-    }
-  } catch (e) {
-    console.error('[GetNextCard verify] failed:', e);
+  if (!prev) return;
+
+  const practicedDelta = queueInfo.cardsPracticed - prev.cardsPracticed;
+  const remainingDelta = prev.numCardsRemaining - queueInfo.numCardsRemaining;
+  const ctx = {
+    practicedDelta,
+    remainingDelta,
+    tookMs: prev.totalMs,
+    phases: prev.phases,
+    reason: prev.reason,
+  };
+
+  if (practicedDelta === 0) {
+    console.warn(
+      `🔁 GetNextCard #${prev.seq}: RETRY — RemNote is asking again for the same slot ` +
+        `(cardsPracticed still ${queueInfo.cardsPracticed}) after our ${prev.totalMs}ms response. ` +
+        `Strong sign the deadline expired.`,
+      ctx
+    );
+    return;
+  }
+
+  if (prev.remId === null) return; // we yielded a flashcard on purpose; nothing to verify
+
+  if (remainingDelta === 0) {
+    console.log(
+      `✅ GetNextCard #${prev.seq}: IncRem ${prev.remId} WAS SHOWN — flashcard count held at ` +
+        `${queueInfo.numCardsRemaining} while cardsPracticed advanced (${prev.totalMs}ms).`,
+      ctx
+    );
+  } else {
+    console.warn(
+      `⛔ GetNextCard #${prev.seq}: DROPPED INJECTION — we returned IncRem ${prev.remId} after ` +
+        `${prev.totalMs}ms, but RemNote consumed ${remainingDelta} flashcard(s) instead. ` +
+        `The candidate was burned from the session pool for nothing.`,
+      ctx
+    );
   }
 }
 
@@ -209,9 +255,8 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       console.log(`▶️ GetNextCard #${seq}`, queueInfo);
 
       // Did the item we returned LAST time actually make it onto the screen?
-      // Fire-and-forget: this is a diagnostic, and must not cost this call a
-      // round-trip on the very path whose latency we are trying to reduce.
-      void verifyPreviousDecision(plugin);
+      // Answered from `queueInfo` alone, so it costs nothing.
+      verifyPreviousDecision(queueInfo);
 
       /**
        * Single exit point for logging. Every `return` in this callback goes
@@ -227,6 +272,8 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           reason,
           totalMs,
           phases: { ...timer.phases },
+          cardsPracticed: queueInfo.cardsPracticed,
+          numCardsRemaining: queueInfo.numCardsRemaining,
         };
         const label = result ? `IncRem ${result.remId}` : 'flashcard (null)';
         if (totalMs >= SLOW_CALL_WARN_MS) {
