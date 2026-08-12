@@ -2,6 +2,31 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.39 - August 12th, 2026
+
+### ⚡ Improved: Incremental Rems no longer go missing from the queue in large knowledge bases
+
+On large knowledge bases, Incremental Rems sometimes failed to appear at their turn — a flashcard showed up instead, and the item you should have seen was skipped for the rest of the session. The plugin now decides the next item ahead of time, while you read the current one, so it is always ready the instant RemNote asks. Background work is lighter too.
+
+Nothing changes about *which* item you get: the same priority order, the same due filter, the same randomness. Only the timing of the decision changed.
+
+Two smaller fixes ride along:
+
+- An Incremental Rem that was prepared but never actually shown is no longer counted as reviewed — it comes back on the next turn instead of disappearing for the session.
+- [Priority Review Documents](Priority-Review-Document.md) scoped to the whole knowledge base could record a wrong **Shield** history point when the queue was opened during the plugin's startup. Those points are now correct.
+
+#### Technical explanation
+
+RemNote gives a plugin about **one second** to answer its "what is the next item?" request. Past that it stops waiting and loads a flashcard of its own, discarding the plugin's answer with no error and no event — which is why nothing ever reported a problem.
+
+Measurements on a 5,525-Incremental-Rem knowledge base found answers landing at 623ms, 863ms, 969ms and 993ms, with one dropped at 1088ms. The plugin was never slow at *computing* the answer: sorting and filtering all 5,525 items took 0–3ms every time. The entire cost was round-trips to RemNote, and those are unpredictable — two trivial reads of a single stored value measured anywhere from 13ms to 631ms depending only on how busy the connection was at that instant. Small knowledge bases never hit the limit, which is why the problem looked size-dependent.
+
+So the answer is no longer computed on demand. The blocking checks, the interval setting and a small buffer of already-validated candidates are kept in memory and refreshed in the background while you read the current item; the request itself is now answered without a single round-trip, in **0–1ms**. Validation of the next candidate — the most expensive step, at 114–231ms — moved into that same background window.
+
+Marking an item as seen was also moved to *after* it is confirmed on screen. RemNote reports enough in each request to tell exactly what happened to the previous one, so a discarded item is now returned to the front of the buffer and retried rather than burned.
+
+📖 [How the plugin prioritizes due items](Prioritization-&-Sorting.md#prepared-in-advance)
+
 ## v1.0.38 - August 11th, 2026
 
 ### ⚡ Improved: the flashcard priority cache now starts from a saved copy

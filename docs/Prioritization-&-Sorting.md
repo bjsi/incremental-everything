@@ -633,3 +633,18 @@ Here is a complete breakdown of how the plugin decides which incremental item to
 
 
 The system is built to surface your highest-priority due material first, regardless of how long it has been overdue. The **Sorting Randomness** setting is a tool that allows you to introduce variability, preventing the queue from becoming too rigid and ensuring that even lower-priority items get a chance to surface over time.
+
+### Prepared in advance { #prepared-in-advance }
+
+The four steps above do not run at the moment RemNote asks for the next item. They run **while you are reading the current one**, and the result is held ready.
+
+The reason is a hard time limit: RemNote waits about **one second** for a plugin to name the next item, and then gives up and shows a flashcard instead. On a large knowledge base the selection could exceed that — not because choosing is slow, but because every piece of information it needs has to be fetched from RemNote, and those requests queue behind whatever else is happening. The Incremental Rem you should have seen was silently replaced by a flashcard, and (before v1.0.39) counted as already reviewed, so it did not come back later in the session.
+
+With the decision prepared ahead of time, answering takes about a millisecond and the limit is never in play, no matter how large the knowledge base or how busy the moment.
+
+What this means in practice:
+
+* **Your settings still apply immediately.** Priority, due dates, the randomness sliders and the [Flashcard Ratio](#3-flashcard-ratio) are re-read every time the next candidate is prepared — that is, once per item you review. A change you make mid-session takes effect from the following item.
+* **Changing the queue mid-session is handled.** Switching to a different document or study mode rebuilds the selection for the new context; that single turn shows a flashcard while the rebuild happens.
+* **Nothing is lost to a missed turn.** If an item is prepared but does not reach the screen, it returns to the front of the queue and is offered again on the next turn.
+* **At the very start of a session**, the first opportunity may pass as a flashcard while the first selection is being prepared — particularly right after RemNote starts, when the plugin is still building its index.
