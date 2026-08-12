@@ -2,6 +2,8 @@
   <img src="assets/inc-logo.png" width="400" alt="Incremental Everything Logo" />
 </p>
 
+> **Review notes, PDFs, Youtube videos and web articles incrementally alongside your flashcards, and tackle overload by prioritizing your learning.**
+
 Welcome to the official **User's Manual** for the **Incremental Everything plugin** for RemNote!
 
 This Wiki is your comprehensive guide to mastering a powerful learning technique inspired by SuperMemo's Incremental Reading. Whether you want to read books and articles in parallel, watch videos incrementally, or manage your writing projects more effectively, this plugin allows you to seamlessly interleave all of your learning material directly into your daily flashcard queue.
