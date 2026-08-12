@@ -123,6 +123,26 @@ Settings live in **two places**, and the tables below say which.
 
 ---
 
+## Queue Dashboard
+
+*In the IE Settings popup. Which parameters appear depends on the threshold mode.*
+
+These govern the red → green colouring of every speed reading in the [Practiced Queues dashboard](History-Queue-Dashboard-and-Mastery-Drill.md#practiced-queues-history-live-dashboard) — the live session card, the History Log and the Sessions Summary table. 📖 [Speed Colour Coding](History-Queue-Dashboard-and-Mastery-Drill.md#speed-colour-coding).
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| **Speed Colour Thresholds** | Dropdown | `Calibrated from my card history` | *Calibrated* derives the two ends of the gradient from your own average seconds-per-card, so the colours judge a session against your usual pace rather than a universal standard. *Fixed cards-per-minute limits* uses the two absolute limits below instead — the same for everyone, and what the dashboard used before this setting existed. |
+| **Red At or Below** | Number | `1.5` cpm | *Fixed mode.* A pace at or below this is drawn fully red. 1.5 cpm is 40 s/card. Also the fallback used in calibrated mode until the first measurement completes. |
+| **Green At or Above** | Number | `4` cpm | *Fixed mode.* A pace at or above this is drawn fully green. 4 cpm is 15 s/card. Must be higher than the red limit; if it is not, the plugin falls back to the 1.5 / 4 defaults rather than drawing a broken gradient. |
+| **Calibration Period** | Dropdown | `Last 1 year` | *Calibrated mode.* How far back your average is measured: *Ever*, *Last 1 year*, *Last 1 month* or *Last 1 week*. Shorter windows track your current form; longer ones are steadier. |
+| **Margin Around the Average** | Number | `10` s | *Calibrated mode.* Distance from your average, in seconds per card, at which the colour saturates: average **+** this is fully red, average **−** this is fully green, and your average itself sits mid-gradient. A smaller margin reacts more sharply to small changes of pace. |
+
+In calibrated mode the section also shows the measured average itself — in both **cpm** and **s/card**, with the number of repetitions behind it and the resulting green and red points — and a **Recalibrate** button that re-measures on the spot.
+
+![The Queue Dashboard settings section in calibrated mode](assets/settings-queue-dashboard.png){ width="900" }
+
+---
+
 ## Integrations
 
 *In RemNote's settings panel.*

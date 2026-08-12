@@ -64,6 +64,13 @@ import {
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
   disableFinalDrillNotificationId,
+  speedColorModeId,
+  SpeedColorMode,
+  speedColorRedCpmId,
+  speedColorGreenCpmId,
+  speedCalibrationPeriodId,
+  SpeedCalibrationPeriod,
+  speedCalibrationMarginSecondsId,
   ieSettingsValuesKey,
 } from './consts';
 // Type-only: utils.ts imports getIESetting from this module, so a value import
@@ -124,6 +131,13 @@ export interface IESettings {
   [oldItemThresholdId]: number;
   [masteryDrillMinDelayMinutesId]: number;
   [disableFinalDrillNotificationId]: boolean;
+
+  // Queue Dashboard
+  [speedColorModeId]: SpeedColorMode;
+  [speedColorRedCpmId]: number;
+  [speedColorGreenCpmId]: number;
+  [speedCalibrationPeriodId]: SpeedCalibrationPeriod;
+  [speedCalibrationMarginSecondsId]: number;
 }
 
 export type IESettingId = keyof IESettings;
@@ -174,6 +188,16 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [oldItemThresholdId]: 7,
   [masteryDrillMinDelayMinutesId]: 180,
   [disableFinalDrillNotificationId]: false,
+
+  // Calibrated by default: an absolute cards-per-minute standard says little
+  // about a knowledge base whose cards are long extracts or one-word clozes.
+  // The two cpm values below stay at the thresholds the dashboard has always
+  // used, and are what fixed mode — and the calibrated fallback — apply.
+  [speedColorModeId]: 'calibrated',
+  [speedColorRedCpmId]: 1.5,
+  [speedColorGreenCpmId]: 4,
+  [speedCalibrationPeriodId]: 'year',
+  [speedCalibrationMarginSecondsId]: 10,
 };
 
 // ---------------------------------------------------------------------------
@@ -191,6 +215,7 @@ export type SettingGroupId =
   | 'editor'
   | 'fsrs'
   | 'masteryDrill'
+  | 'queueDashboard'
   | 'performance'
   | 'integrations'
   | 'misc';
@@ -237,6 +262,13 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
     label: 'Mastery Drill',
     blurb: 'Deliberate practice of poorly-rated cards.',
     helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#mastery-drill',
+  },
+  queueDashboard: {
+    label: 'Queue Dashboard',
+    blurb:
+      'How the Practiced Queues dashboard reads: the pace at which a speed reading turns red or ' +
+      'green, in the live session card, the History Log and the Sessions Summary.',
+    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#speed-colour-coding',
   },
   integrations: { label: 'Integrations', blurb: 'Features ported from other plugins.' },
   misc: { label: 'Other', blurb: '' },
@@ -616,6 +648,79 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     showWhen: { id: enableMasteryDrillId, equals: true },
     title: 'Disable Mastery Drill Notifications',
     description: 'Stops the Mastery Drill sidebar notification from appearing.',
+  },
+
+  // --- Queue Dashboard ---
+  [speedColorModeId]: {
+    kind: 'dropdown',
+    tier: 'popup',
+    group: 'queueDashboard',
+    title: 'Speed Colour Thresholds',
+    description:
+      'What counts as a "red" (slow) or "green" (fast) pace in the dashboard.\n\n' +
+      '"Fixed" uses the two cards-per-minute limits below, the same for everyone. "Calibrated" ' +
+      'derives them from your own flashcard history instead, so the colours judge you against ' +
+      'your usual pace rather than an absolute standard — useful if your material is much ' +
+      'heavier or much lighter than average.',
+    options: [
+      { value: 'fixed', label: 'Fixed cards-per-minute limits' },
+      { value: 'calibrated', label: 'Calibrated from my card history' },
+    ],
+  },
+  [speedColorRedCpmId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'queueDashboard',
+    showWhen: { id: speedColorModeId, equals: 'fixed' },
+    min: 0.1,
+    unit: 'cpm',
+    title: 'Red At or Below',
+    description:
+      'A pace at or below this is drawn fully red; between here and the green limit the colour ' +
+      'shifts gradually. Default 1.5 cpm (40 s/card).',
+  },
+  [speedColorGreenCpmId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'queueDashboard',
+    showWhen: { id: speedColorModeId, equals: 'fixed' },
+    min: 0.1,
+    unit: 'cpm',
+    title: 'Green At or Above',
+    description:
+      'A pace at or above this is drawn fully green. Must be higher than the red limit. ' +
+      'Default 4 cpm (15 s/card).',
+  },
+  [speedCalibrationPeriodId]: {
+    kind: 'dropdown',
+    tier: 'popup',
+    group: 'queueDashboard',
+    showWhen: { id: speedColorModeId, equals: 'calibrated' },
+    title: 'Calibration Period',
+    description:
+      'How far back your average seconds-per-card is measured. Every real flashcard repetition ' +
+      'in the window counts, capped by the Flashcard Response Time Limit. A shorter window ' +
+      'tracks your current form; a longer one is steadier.',
+    options: [
+      { value: 'ever', label: 'Ever' },
+      { value: 'year', label: 'Last 1 year' },
+      { value: 'month', label: 'Last 1 month' },
+      { value: 'week', label: 'Last 1 week' },
+    ],
+  },
+  [speedCalibrationMarginSecondsId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'queueDashboard',
+    showWhen: { id: speedColorModeId, equals: 'calibrated' },
+    min: 0.5,
+    unit: 'seconds',
+    title: 'Margin Around the Average',
+    description:
+      'Distance from your average, in seconds per card, at which the colour saturates: average ' +
+      'plus this many seconds is fully red, average minus it is fully green, and your average ' +
+      'itself sits mid-gradient. A smaller margin makes the dashboard react more sharply to ' +
+      'small changes of pace.',
   },
 
   // --- Performance (native tier) ---

@@ -4,7 +4,7 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.40 - August 12th, 2026
 
-### 🎨 Changed: the Sessions Summary Speed column can now be read in seconds per card
+### 🎨 Changed - Queue Dashboard: the Sessions Summary Speed column can now be read in seconds per card
 
 The **Speed** column of the Sessions Summary table was fixed to cards per minute, while the History Log below it showed both readings. Its header now carries a small unit button — click it to switch the whole column between **cpm** and **s/card**.
 
@@ -14,7 +14,33 @@ The column is now colour-coded on the same red → green gradient the live sessi
 
 The table's large figures also read more easily: card counts, Incremental Rem counts and hour totals now carry thousands separators — `269,461` rather than `269461`, `15,024h 49m` rather than `15024h 49m`.
 
+![The Sessions Summary table in s/card mode, with the unit button in the Speed header](assets/queue-dashboard-summary.png){ width="800" }
+
 📖 [Speed units in the Sessions Summary](History-Queue-Dashboard-and-Mastery-Drill.md#speed-units-in-the-sessions-summary) · [Speed colour coding](History-Queue-Dashboard-and-Mastery-Drill.md#speed-colour-coding)
+
+### ✨ New - Queue Dashboard: speed colours calibrated from your own history
+
+Until now, "red" meant 1.5 cards per minute and "green" 4, for everyone. Those numbers say little if your cards are long extracts or one-word clozes. A new **Queue Dashboard** section in the IE Settings popup places both ends of the gradient, in either of two ways.
+
+**Calibrated from your card history** is the new default. The plugin measures your average seconds-per-card over a window you choose — *Ever*, *last year*, *last month* or *last week* — and puts the gradient around it: your average sits mid-gradient, a margin of *N* seconds faster is fully green, the same margin slower is fully red. With a 24 s/card average and the default 10 s margin, that is green at 14 s/card and red at 34. The colours then tell you how this session compares with how you normally work, rather than with a universal figure.
+
+**Fixed limits** is the alternative, and keeps the old behaviour with the two cards-per-minute values now editable. Their defaults are exactly what the dashboard used before, so choosing this mode and leaving the numbers alone restores precisely what you had.
+
+While calibrated mode is selected, the settings section itself shows the average it is working from — in both **cpm** and **s/card**, with the number of repetitions behind it and the green and red points your margin produces — and a **Recalibrate** button beside it.
+
+![The new Queue Dashboard settings section, in calibrated mode](assets/settings-queue-dashboard.png){ width="900" }
+
+Only real repetitions count — *Again*, *Hard*, *Good*, *Easy* — each capped by the **Flashcard Response Time Limit**, so a card left on screen while you stepped away cannot skew the average.
+
+In calibrated mode the Sessions Summary gains a caption stating the scale actually in force — the measured average, how many repetitions it came from, and the resulting green and red points — with a **Recalibrate** link for an immediate re-measurement.
+
+#### Technical explanation
+
+Measuring the average means reading the repetition history of every card in the knowledge base — far too heavy to do on each render. The result is cached **on your device** (never synced: it is derived data any device can rebuild, and the window is a personal reading preference) and re-measured only when the cache is missing, came from another knowledge base, was measured for a different period, or is more than **seven days** old. A module-level guard means two dashboards opening at once still walk the cards only once.
+
+Nothing waits on it. The dashboard paints immediately with whatever is available — the fixed limits, or a still-valid cached calibration — and repaints if a background measurement produces something better. A window with no reviews in it says so and stays on the fixed limits, rather than colouring everything from an average of zero. Since the mode is on by default, that amounts to one history walk the first time the dashboard (or the Queue Dashboard settings section) is opened, then none for a week.
+
+📖 [Choosing your own limits](History-Queue-Dashboard-and-Mastery-Drill.md#choosing-your-own-limits) · [Queue Dashboard settings](Plugin-Settings-Reference.md#queue-dashboard)
 
 ## v1.0.39 - August 12th, 2026
 

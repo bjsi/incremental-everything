@@ -34,6 +34,25 @@ import {
     type ProgressUpdate,
 } from "../lib/authoritative_aggregates";
 import { computeMonthlyShieldCatchUp, MonthlyShieldCatchUp } from "../lib/shield_history";
+import {
+    CALIBRATION_PERIOD_LABELS,
+    FIXED_FALLBACK,
+    SpeedThresholds,
+    cpmToSecondsPerCard,
+    ensureSpeedCalibration,
+    resolveSpeedThresholds,
+    speedColorStyle,
+} from "../lib/speed_color";
+import { useIESetting } from "../lib/settings";
+import {
+    SpeedCalibrationPeriod,
+    SpeedColorMode,
+    speedCalibrationMarginSecondsId,
+    speedCalibrationPeriodId,
+    speedColorGreenCpmId,
+    speedColorModeId,
+    speedColorRedCpmId,
+} from "../lib/consts";
 
 export interface PracticedQueueSession {
     id: string;
@@ -85,23 +104,6 @@ const NUM_TO_LOAD_IN_BATCH = 20;
 type SpeedUnit = "cpm" | "spc";
 const SPEED_UNIT_KEY = "summarySpeedUnit";
 
-// Red → green gradient over 1.5–4 cards per minute, shared by the Summary
-// table, the History Log and the live session card. Always driven by cpm, so
-// the Summary's s/card reading gets the exact same colour for the same pace
-// (1.5 cpm = 40 s/card = red, 4 cpm = 15 s/card = green).
-const SPEED_HUE_MIN_CPM = 1.5;
-const SPEED_HUE_MAX_CPM = 4;
-
-const speedHue = (cpm: number) => {
-    if (cpm <= SPEED_HUE_MIN_CPM) return 0;
-    if (cpm >= SPEED_HUE_MAX_CPM) return 120;
-    const ratio = (cpm - SPEED_HUE_MIN_CPM) / (SPEED_HUE_MAX_CPM - SPEED_HUE_MIN_CPM);
-    return Math.floor(ratio * 120);
-};
-
-const speedColorStyle = (cpm: number): React.CSSProperties =>
-    cpm > 0 ? { color: `hsl(${speedHue(cpm)}, 90%, 35%)` } : {};
-
 const formatTimeShort = (ms: number) => {
     if (!ms) return "0s";
     const seconds = Math.floor(ms / 1000);
@@ -112,6 +114,64 @@ const formatTimeShort = (ms: number) => {
     if (minutes > 0) return `${minutes}m`;
     return `${seconds}s`;
 };
+
+interface SpeedColorState {
+    thresholds: SpeedThresholds;
+    /** A history walk is running right now. */
+    calibrating: boolean;
+    mode: SpeedColorMode;
+    period: SpeedCalibrationPeriod;
+    recalibrate: () => Promise<void>;
+}
+
+/**
+ * The colour scale in force, plus a way to re-measure it.
+ *
+ * Calibrated mode needs a walk over every card's repetition history, so the
+ * hook never blocks on it: it paints with whatever is available immediately
+ * (the fixed limits, or a still-valid cached calibration) and only then, if the
+ * cache is missing or stale, measures in the background and repaints.
+ */
+function useSpeedThresholds(): SpeedColorState {
+    const plugin = usePlugin();
+    const mode = useIESetting(speedColorModeId);
+    const period = useIESetting(speedCalibrationPeriodId);
+    const margin = useIESetting(speedCalibrationMarginSecondsId);
+    const redCpm = useIESetting(speedColorRedCpmId);
+    const greenCpm = useIESetting(speedColorGreenCpmId);
+
+    const [thresholds, setThresholds] = useState<SpeedThresholds>(FIXED_FALLBACK);
+    const [calibrating, setCalibrating] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const immediate = await resolveSpeedThresholds(plugin);
+            if (cancelled) return;
+            setThresholds(immediate);
+            // resolveSpeedThresholds only reports 'calibrated' when a usable
+            // cache backed it, so this is exactly the "must measure" case.
+            if (mode !== "calibrated" || immediate.source === "calibrated") return;
+            setCalibrating(true);
+            await ensureSpeedCalibration(plugin, period);
+            if (cancelled) return;
+            setCalibrating(false);
+            setThresholds(await resolveSpeedThresholds(plugin));
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [plugin, mode, period, margin, redCpm, greenCpm]);
+
+    const recalibrate = useCallback(async () => {
+        setCalibrating(true);
+        await ensureSpeedCalibration(plugin, period, true);
+        setCalibrating(false);
+        setThresholds(await resolveSpeedThresholds(plugin));
+    }, [plugin, period]);
+
+    return { thresholds, calibrating, mode, period, recalibrate };
+}
 
 function getStartOfDay(date: Date) {
     const newDate = new Date(date);
@@ -182,12 +242,15 @@ function SummaryTable({
     allSessions,
     allAggregates,
     lastComputed,
+    speed,
 }: {
     authoritative: DailyAggregate[];
     allSessions: PracticedQueueSession[];
     allAggregates: DailyAggregate[];
     lastComputed: number;
+    speed: SpeedColorState;
 }) {
+    const { thresholds } = speed;
     const [speedUnit, setSpeedUnit] = useLocalStorageState<SpeedUnit>(SPEED_UNIT_KEY, "cpm");
     // Guard against a stale/garbled stored value so the column never renders blank.
     const unit: SpeedUnit = speedUnit === "spc" ? "spc" : "cpm";
@@ -287,7 +350,7 @@ function SummaryTable({
                                 <td className="p-2 text-right">
                                     {row.cardsCount > 0 ? (
                                         <span>
-                                            <span className="font-bold" style={speedColorStyle(row.avgSpeed)}>
+                                            <span className="font-bold" style={speedColorStyle(row.avgSpeed, thresholds)}>
                                                 {unit === "cpm"
                                                     ? row.avgSpeed.toFixed(1)
                                                     : row.avgSecondsPerCard.toFixed(1)}
@@ -303,6 +366,51 @@ function SummaryTable({
                     </tbody>
                 </table>
             </div>
+            <SpeedScaleCaption speed={speed} />
+        </div>
+    );
+}
+
+/**
+ * One line under the Summary explaining what "red" and "green" currently mean.
+ * Only shown in calibrated mode: with fixed limits the two numbers are in the
+ * settings the user just typed them into, and a caption would be noise.
+ */
+function SpeedScaleCaption({ speed }: { speed: SpeedColorState }) {
+    const { thresholds, calibrating, mode, period, recalibrate } = speed;
+    if (mode !== "calibrated") return null;
+
+    const windowLabel = CALIBRATION_PERIOD_LABELS[period];
+    return (
+        <div className="mt-1.5 flex items-center gap-2 text-[10px] rn-clr-content-tertiary">
+            {calibrating ? (
+                <span>Measuring your average speed over {windowLabel}…</span>
+            ) : thresholds.source === "calibrated" ? (
+                <>
+                    <span>
+                        Speed colours calibrated on{" "}
+                        <b className="rn-clr-content-secondary">
+                            {thresholds.avgSeconds?.toFixed(1)} s/card
+                        </b>{" "}
+                        average over {windowLabel} ({thresholds.sampleCount?.toLocaleString()}{" "}
+                        reps): green at{" "}
+                        {cpmToSecondsPerCard(thresholds.greenCpm).toFixed(1)} s/card or faster,
+                        red at {cpmToSecondsPerCard(thresholds.redCpm).toFixed(1)} s/card or
+                        slower.
+                    </span>
+                    <button
+                        onClick={recalibrate}
+                        className="underline hover:rn-clr-content-secondary whitespace-nowrap"
+                        title="Re-measure your average from card history now"
+                    >
+                        Recalibrate
+                    </button>
+                </>
+            ) : (
+                <span>
+                    No reviews found in {windowLabel} — using the fixed speed colour limits.
+                </span>
+            )}
         </div>
     );
 }
@@ -332,6 +440,7 @@ function PracticedQueues() {
     );
     const [activeSession] = useSessionStorageState<PracticedQueueSession | null>("activeQueueSession", null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const speed = useSpeedThresholds();
 
     const [recomputeJob, setRecomputeJob] = useState<{
         running: boolean;
@@ -669,6 +778,7 @@ function PracticedQueues() {
                             session={activeSession}
                             isLive={true}
                             onDelete={() => { }}
+                            thresholds={speed.thresholds}
                         />
                         <div className="h-px w-full rn-clr-background-elevation-10 mt-6 md:mt-4"></div>
                     </div>
@@ -722,6 +832,7 @@ function PracticedQueues() {
                     allSessions={filteredData}
                     allAggregates={filteredAggregates}
                     lastComputed={authoritativeLastComputed}
+                    speed={speed}
                 />
 
                 <div className="flex items-center gap-2 mb-4">
@@ -769,6 +880,7 @@ function PracticedQueues() {
                                 key={session.id}
                                 session={session}
                                 onDelete={() => deleteItem(session.id)}
+                                thresholds={speed.thresholds}
                             />
                         ))}
                     </div>
@@ -844,7 +956,7 @@ function MonthlyShieldCatchUpPanel({ refreshKey }: { refreshKey: number }) {
     );
 }
 
-function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQueueSession, onDelete: () => void, isLive?: boolean }) {
+function QueueSessionItem({ session, onDelete, isLive, thresholds }: { session: PracticedQueueSession, onDelete: () => void, isLive?: boolean, thresholds: SpeedThresholds }) {
     const plugin = usePlugin();
 
     const formatTime = (ms: number) => {
@@ -915,7 +1027,7 @@ function QueueSessionItem({ session, onDelete, isLive }: { session: PracticedQue
     const rememberedCount = Math.max(0, count - forgotCount);
     const retentionRate = count > 0 ? ((rememberedCount / count) * 100).toFixed(0) : "100";
 
-    const speedColor = speedColorStyle(count > 0 ? cardsPerMinVal : 0);
+    const speedColor = speedColorStyle(count > 0 ? cardsPerMinVal : 0, thresholds);
 
     const retentionVal = parseInt(retentionRate);
     const retentionColor = retentionVal >= 90 ? "text-green-600" : (retentionVal < 80 ? "text-red-500" : "text-yellow-600");

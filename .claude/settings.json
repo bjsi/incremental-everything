@@ -13,7 +13,8 @@
       "Bash(awk '/registerCallback<SpecialPluginCallback.GetNextCard>/,/^  \\\\\\);$/' src/register/callbacks.ts)",
       "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(p.version\\)\")",
       "Bash(git check-ignore *)",
-      "Bash(echo \"exit:$?\")"
+      "Bash(echo \"exit:$?\")",
+      "Bash(echo \"build-exit:$?\")"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

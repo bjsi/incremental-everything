@@ -1,5 +1,18 @@
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
-import React, { CSSProperties, useMemo, useState } from 'react';
+import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
+import {
+  SpeedCalibrationPeriod,
+  speedCalibrationMarginSecondsId,
+  speedCalibrationPeriodId,
+  speedColorModeId,
+} from '../lib/consts';
+import {
+  CALIBRATION_PERIOD_LABELS,
+  SpeedCalibration,
+  cpmToSecondsPerCard,
+  ensureSpeedCalibration,
+  thresholdsFromCalibration,
+} from '../lib/speed_color';
 import {
   IE_DOCS_BASE_URL,
   IE_SETTINGS_DEFAULTS,
@@ -169,6 +182,9 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
               disabled={readOnly}
               min={spec.min}
               max={spec.max}
+              // Fractional settings (speed thresholds, the interval multiplier)
+              // would otherwise inherit step=1 and read as invalid at 1.5.
+              step={spec.integer ? 1 : 'any'}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={(e) => commitNumber(e.target.value)}
               onKeyDown={(e) => {
@@ -300,6 +316,116 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
           {dep.ids.map((depId) => IE_SETTINGS_SCHEMA[depId].title).join(' and ')}.
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The measured average behind calibrated speed colours, shown under the Queue
+ * Dashboard group — the margin above is expressed in seconds per card, and is
+ * meaningless without knowing what it is a margin *around*.
+ *
+ * Measuring walks every card's repetition history, so this reuses the same
+ * cached result the dashboard does; it only ever recomputes when that cache
+ * cannot answer, or when the user asks for it.
+ */
+function SpeedCalibrationReadout({
+  period,
+  marginSeconds,
+}: {
+  period: SpeedCalibrationPeriod;
+  marginSeconds: number;
+}) {
+  const plugin = usePlugin();
+  const [cal, setCal] = useState<SpeedCalibration | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    ensureSpeedCalibration(plugin, period).then((c) => {
+      if (cancelled) return;
+      setCal(c);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [plugin, period]);
+
+  const recalibrate = async () => {
+    setLoading(true);
+    const c = await ensureSpeedCalibration(plugin, period, true);
+    setCal(c);
+    setLoading(false);
+  };
+
+  const box: CSSProperties = {
+    marginTop: 10,
+    padding: '10px 12px',
+    borderRadius: 8,
+    fontSize: 12,
+    lineHeight: 1.6,
+    border: '1px solid var(--rn-clr-border-primary, #cbd5e1)',
+    backgroundColor: 'var(--rn-clr-background-secondary, #f8fafc)',
+    color: 'var(--rn-clr-content-secondary, #475569)',
+  };
+  const strong: CSSProperties = { fontWeight: 700, color: 'var(--rn-clr-content-primary, #0f172a)' };
+  const windowLabel = CALIBRATION_PERIOD_LABELS[period];
+
+  if (loading) {
+    return <div style={box}>Measuring your average speed over {windowLabel}…</div>;
+  }
+  if (!cal || cal.sampleCount === 0) {
+    return (
+      <div style={box}>
+        No flashcard repetitions found in {windowLabel}, so the fixed limits (1.5 / 4 cpm) are
+        used until there are. Try a longer calibration period.
+      </div>
+    );
+  }
+
+  const avgSeconds = cal.avgSeconds;
+  const avgCpm = avgSeconds > 0 ? 60 / avgSeconds : 0;
+  const t = thresholdsFromCalibration(cal, marginSeconds);
+
+  return (
+    <div style={box}>
+      <div>
+        Your average over {windowLabel}: <span style={strong}>{avgCpm.toFixed(1)} cpm</span> ·{' '}
+        <span style={strong}>{avgSeconds.toFixed(1)} s/card</span>{' '}
+        <span style={{ color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
+          ({cal.sampleCount.toLocaleString()} repetitions, measured{' '}
+          {new Date(cal.computedAt).toLocaleDateString()})
+        </span>
+      </div>
+      <div style={{ marginTop: 4 }}>
+        With a {marginSeconds} s margin: green at{' '}
+        <span style={{ color: 'hsl(120, 90%, 35%)', fontWeight: 700 }}>
+          {t.greenCpm.toFixed(1)} cpm / {cpmToSecondsPerCard(t.greenCpm).toFixed(1)} s/card
+        </span>{' '}
+        or faster, red at{' '}
+        <span style={{ color: 'hsl(0, 90%, 35%)', fontWeight: 700 }}>
+          {t.redCpm.toFixed(1)} cpm / {cpmToSecondsPerCard(t.redCpm).toFixed(1)} s/card
+        </span>{' '}
+        or slower.
+      </div>
+      <button
+        onClick={recalibrate}
+        style={{
+          marginTop: 6,
+          fontSize: 11,
+          padding: '3px 9px',
+          borderRadius: 6,
+          cursor: 'pointer',
+          border: '1px solid var(--rn-clr-border-primary, #cbd5e1)',
+          backgroundColor: 'var(--rn-clr-background-primary, #fff)',
+          color: 'var(--rn-clr-content-secondary, #475569)',
+        }}
+        title="Re-measure now from your card history"
+      >
+        Recalibrate
+      </button>
     </div>
   );
 }
@@ -469,6 +595,12 @@ export function IESettingsWidget() {
                     hiddenDependents={hiddenDependentsOf(id, values)}
                   />
                 ))}
+                {group === 'queueDashboard' && values[speedColorModeId] === 'calibrated' && (
+                  <SpeedCalibrationReadout
+                    period={values[speedCalibrationPeriodId]}
+                    marginSeconds={values[speedCalibrationMarginSecondsId]}
+                  />
+                )}
               </div>
             ))
           )}

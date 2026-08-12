@@ -58,6 +58,22 @@ export const oldItemThresholdId = 'old_item_threshold';
 export const masteryDrillMinDelayMinutesId = 'mastery_drill_min_delay_minutes';
 export const disableFinalDrillNotificationId = 'disable_final_drill_notification';
 
+// --- Queue Dashboard: speed colour coding ---
+/** Fixed cpm thresholds, or thresholds derived from the user's own history. */
+export const speedColorModeId = 'speed_color_mode';
+export type SpeedColorMode = 'fixed' | 'calibrated';
+/** Fixed mode: at or below this pace the speed reading is fully red. */
+export const speedColorRedCpmId = 'speed_color_red_cpm';
+/** Fixed mode: at or above this pace the speed reading is fully green. */
+export const speedColorGreenCpmId = 'speed_color_green_cpm';
+/** Calibrated mode: how far back the average seconds-per-card is measured. */
+export const speedCalibrationPeriodId = 'speed_calibration_period';
+export type SpeedCalibrationPeriod = 'ever' | 'year' | 'month' | 'week';
+/** Calibrated mode: seconds either side of that average for red / green. */
+export const speedCalibrationMarginSecondsId = 'speed_calibration_margin_seconds';
+/** Device-local cache of the last calibration run (see lib/speed_color.ts). */
+export const speedCalibrationCacheKey = 'speed_calibration_cache_v1';
+
 // Opt-in gate for the heavy flashcard-prioritisation machinery (KB-wide
 // pretagging, the inheritance cascade and the card-priority cache). Off by
 // default: most users want extracts and scheduling, and should not pay for
