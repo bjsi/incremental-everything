@@ -4,6 +4,26 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.40 - August 12th, 2026
 
+### 🐛 Fixed - Dismissing a Rem with no flashcards yet threw its priority away
+
+Dismissing an Incremental Rem is supposed to leave its priority behind on the Rem, so that flashcards made from that material later inherit it. It only did so if the Rem — or a descendant within three levels — already owned a flashcard at that moment. Everything else was dismissed silently untagged, and its priority went with the `Incremental` powerup.
+
+That hit precisely the wrong Rems. A PDF section you read, extracted from, and dismissed typically has no cards *of its own* — only extracted Incremental Rem children. Set it to 16, dismiss it, and it kept nothing; the cards you cloze out of those extracts afterwards inherited from whatever distant ancestor happened to carry a priority, often a much lower one.
+
+The flashcard search is gone. Dismiss now always writes the priority onto the Rem's `cardPriority` tag, in Light Mode and Full Mode alike. A priority you set **manually** on that Rem is still never overwritten.
+
+This applies to Dismiss wherever it appears: the queue's answer buttons, the [Editor Review Timer](Reviewing-Items-in-the-Editor.md#the-workflow)'s **✓ Dismiss**, and the *Dismiss Incremental Rem* command.
+
+#### Technical explanation
+
+`handleCardPriorityInheritance` ran a two-tier check in Full Mode: `getCards()` on the Rem, then a batched `getCards()` sweep over `getDescendantsToDepth(rem, 3)`. Light Mode already skipped all of it and tagged directly, so the two modes disagreed about what a dismissal means — and the "thorough" branch was the one losing data. Both tiers are removed; the function is now a `manual`-source guard plus a single `setCardPriority(..., 'incremental')`, which also drops a subtree walk from every Dismiss.
+
+The depth-3 limit made this worse than it looks: cards deeper than great-grandchildren were invisible to the check, so even Rems that *did* have flashcards below them could go untagged.
+
+Nothing changes for the inheritance **cascade** over descendants, which still tags only nodes that actually own flashcards — that restriction exists to prevent [rogue CardPriority tags](Troubleshooting.md#rogue-cardpriority-tags-sanitization) on tag slots and property values, and is unrelated to anchoring the dismissed Rem itself.
+
+📖 [Priority Sources](Priorities-for-Flashcards.md#priority-sources) · [Dismiss is the same in both modes](Full-Mode-x-Light-Mode.md#counter-example-dismiss-is-the-same-in-both-modes)
+
 ### 🎨 Changed - Queue Dashboard: the Sessions Summary Speed column can now be read in seconds per card
 
 The **Speed** column of the Sessions Summary table was fixed to cards per minute, while the History Log below it showed both readings. Its header now carries a small unit button — click it to switch the whole column between **cpm** and **s/card**.

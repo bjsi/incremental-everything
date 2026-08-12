@@ -139,7 +139,7 @@ The plugin auto-detects your platform (if you chose Full Mode):
 | KB Priority Shield (IncRems and Cards) | ✅ | ❌ |
 | Doc Priority Shield (IncRems and Cards) | ✅ | ❌ |
 | [Priority Review Docs](Priority-Review-Document.md) | ✅ | ✅ |
-| Card Priority Tagging | ✅ Deep | ✅ Instant |
+| Card Priority Tagging (on Dismiss) | ✅ Instant | ✅ Instant |
 | Fast Startup | ❌ | ✅ |
 | Mobile Stability | ❌ | ✅ |
 
@@ -305,7 +305,11 @@ SETTINGS (user preferences)
 └─────────────────────────────────────────────────────┘
 ```
 
-## Real-World Example: answer_buttons.tsx
+## Counter-Example: Dismiss is the same in both modes
+
+Not every operation splits by mode. Dismissing an Incremental Rem stamps its
+priority onto the Rem's own `cardPriority` tag, and that write is identical in
+Light Mode and Full Mode:
 
 ```
 User clicks "Dismiss (untag)" button
@@ -314,25 +318,20 @@ User clicks "Dismiss (untag)" button
 ┌──────────────────────────────┐
 │ handleCardPriorityInheritance│
 ├──────────────────────────────┤
-│ Check existing priority      │
-│          │                   │
-│          ▼                   │
-│ const useLightMode =         │
-│   await shouldUseLightMode() │
-│          │                   │
+│ Existing source == manual?   │
 │     ┌────┴────┐              │
-│     │ Light?  │              │
-│     └─┬─────┬─┘              │
-│ YES   │     │  NO            │
-│   ┌───▼─┐   ▼────────┐       │
-│   │Skip │   │ Check  │       │
-│   │card │   │ cards  │       │
-│   │check│   │ in Rem │       │
-│   │     │   │ and    │       │
-│   │Set  │   │ 3 level│       │
-│   │prio │   │ descend│       │
-│   │NOW  │   │        │       │
-│   └─────┘   └────────┘       │
-│   ⚡Fast     🔍 Thorough      │
+│  YES│         │NO            │
+│  ┌──▼──┐   ┌──▼───────────┐  │
+│  │Leave│   │ Set priority │  │
+│  │ it  │   │ source =     │  │
+│  │alone│   │ 'incremental'│  │
+│  └─────┘   └──────────────┘  │
+│            ⚡ Same both modes │
 └──────────────────────────────┘
 ```
+
+Until v1.0.40, Full Mode first searched the Rem and three levels of descendants
+for flashcards and wrote nothing if it found none. That was the wrong trade:
+the search cost a subtree walk on every Dismiss, and the Rems it refused to tag
+— sections whose cards do not exist *yet* — are exactly the ones that need the
+anchor. See [Priority Sources](Priorities-for-Flashcards.md#priority-sources).
