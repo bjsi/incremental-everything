@@ -6,17 +6,26 @@ import {
     renderWidget,
     usePlugin,
     useSyncedStorageState,
+    useTrackerPlugin,
 } from "@remnote/plugin-sdk";
 import '../style.css';
 import '../App.css';
 import { timeSince } from "../lib/utils";
 import { safeRemTextToString } from "../lib/pdfUtils";
 import { remHistoryTextLimit } from "../lib/consts";
+import {
+    remHistorySpec,
+    shardKey,
+    writeHistoryShard,
+    migrateLegacyHistory,
+} from "../lib/history_shards";
 
 const NUM_TO_LOAD_IN_BATCH = 20;
 
 export interface RemHistoryData {
-    key: number;
+    /** @deprecated Was a `Math.random()` row identity. Identity is derived from
+     *  remId + time now; old entries still carry it and it is ignored. */
+    key?: number;
     remId: RemId;
     /** @deprecated Legacy field. Row expansion is component state now — entries
      *  written before that change still carry it, and it is ignored. */
@@ -27,11 +36,32 @@ export interface RemHistoryData {
     _v?: number;
 }
 
+const entryId = remHistorySpec.getId;
+
 function RemHistory() {
     const plugin = usePlugin();
-    const [remDataRaw, setRemData] = useSyncedStorageState<RemHistoryData[]>(
-        "remData",
+    // One shard per knowledge base — this list only ever showed the current KB.
+    const kbId = useTrackerPlugin(
+        async (rp) => (await rp.kb.getCurrentKnowledgeBaseData())?._id,
         []
+    );
+    const [remDataRaw] = useSyncedStorageState<RemHistoryData[]>(
+        kbId ? shardKey(remHistorySpec, kbId) : "",
+        []
+    );
+
+    useEffect(() => {
+        migrateLegacyHistory(plugin, remHistorySpec);
+    }, [plugin]);
+
+    const setRemData = React.useCallback(
+        async (entries: RemHistoryData[]) => {
+            // Never write before the KB resolves, or the entries would land in the
+            // unpartitioned shard and disappear from this list.
+            if (!kbId) return;
+            await writeHistoryShard(plugin, remHistorySpec, kbId, entries);
+        },
+        [plugin, kbId]
     );
 
     const [filteredRemData, setFilteredRemData] = useState<RemHistoryData[]>([]);
@@ -47,17 +77,19 @@ function RemHistory() {
 
             if (needsBackfill.length === 0) return;
 
-            const updates = new Map<number, string>();
+            const updates = new Map<string, string>();
 
             for (const item of needsBackfill) {
                 try {
                     const rem = await plugin.rem.findOne(item.remId);
                     const frontText = await safeRemTextToString(plugin, rem?.text);
                     const backText = await safeRemTextToString(plugin, rem?.backText);
-                    const cleanFront = frontText === 'Untitled' && (!rem?.text || rem.text.length === 0) ? '' : frontText.substring(0, remHistoryTextLimit);
-                    const cleanBack = backText === 'Untitled' && (!rem?.backText || rem.backText.length === 0) ? '' : backText.substring(0, remHistoryTextLimit);
-                    const text = `${cleanFront} ${cleanBack}`.trim();
-                    updates.set(item.key, text);
+                    const cleanFront = frontText === 'Untitled' && (!rem?.text || rem.text.length === 0) ? '' : frontText;
+                    const cleanBack = backText === 'Untitled' && (!rem?.backText || rem.backText.length === 0) ? '' : backText;
+                    // The limit applies to the combined preview; writeHistoryShard
+                    // enforces it again, so the two cannot drift.
+                    const text = `${cleanFront} ${cleanBack}`.trim().substring(0, remHistoryTextLimit);
+                    updates.set(entryId(item), text);
                 } catch (e) {
                     console.error("Error processing rem history backfill", item.remId, e);
                 }
@@ -67,8 +99,9 @@ function RemHistory() {
 
             setRemData(
                 remDataRaw.map(item => {
-                    if (updates.has(item.key)) {
-                        return { ...item, text: updates.get(item.key), _v: 1 };
+                    const id = entryId(item);
+                    if (updates.has(id)) {
+                        return { ...item, text: updates.get(id), _v: 1 };
                     }
                     return item;
                 })
@@ -81,19 +114,11 @@ function RemHistory() {
         }
     }, [remDataRaw, plugin]);
 
-    // Filter by KB and search text
+    // Filter by search text. The KB filter that used to live here is gone: the
+    // shard we read IS the current KB's, so every entry qualifies.
     useEffect(() => {
         async function filterData() {
-            const currentKb = await plugin.kb.getCurrentKnowledgeBaseData();
-            const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-            const currentKbId = currentKb._id;
-
-            let filtered = remDataRaw.filter((item) => {
-                if (!item.kbId) {
-                    return isPrimary;
-                }
-                return item.kbId === currentKbId;
-            });
+            let filtered = remDataRaw;
 
             if (searchText.trim().length > 0) {
                 const lowerSearch = searchText.toLowerCase();
@@ -123,11 +148,10 @@ function RemHistory() {
         filterData();
     }, [remDataRaw, plugin, searchText]);
 
-    const closeIndex = (itemKey: number) => {
-        const originalIndex = remDataRaw.findIndex(x => x.key === itemKey);
-        if (originalIndex !== -1) {
-            remDataRaw.splice(originalIndex, 1);
-            setRemData([...remDataRaw]);
+    const closeIndex = (itemKey: string) => {
+        const remaining = remDataRaw.filter(x => entryId(x) !== itemKey);
+        if (remaining.length !== remDataRaw.length) {
+            setRemData(remaining);
         }
     };
 
@@ -135,8 +159,8 @@ function RemHistory() {
     // It used to live on the stored entry as `open`, so every chevron click
     // rewrote the whole history array to synced storage. Component state costs
     // nothing and removes that write entirely.
-    const [openKeys, setOpenKeys] = useState<Set<number>>(new Set());
-    const toggleOpen = (itemKey: number) => {
+    const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
+    const toggleOpen = (itemKey: string) => {
         setOpenKeys((prev) => {
             const next = new Set(prev);
             if (next.has(itemKey)) next.delete(itemKey);
@@ -175,16 +199,22 @@ function RemHistory() {
                     Navigate to other documents to automatically record history.
                 </div>
             )}
-            {filteredRemData.slice(0, NUM_TO_LOAD_IN_BATCH * numLoaded).map((data) => (
-                <RemHistoryItem
-                    data={data}
-                    remId={data.remId}
-                    key={data.key || Math.random()}
-                    open={openKeys.has(data.key)}
-                    toggleOpen={() => toggleOpen(data.key)}
-                    closeIndex={() => closeIndex(data.key)}
-                />
-            ))}
+            {filteredRemData.slice(0, NUM_TO_LOAD_IN_BATCH * numLoaded).map((data) => {
+                // Derived, stable identity. The old `data.key || Math.random()`
+                // remounted any row missing a key on every single render, which
+                // reset its expansion state.
+                const id = entryId(data);
+                return (
+                    <RemHistoryItem
+                        data={data}
+                        remId={data.remId}
+                        key={id}
+                        open={openKeys.has(id)}
+                        toggleOpen={() => toggleOpen(id)}
+                        closeIndex={() => closeIndex(id)}
+                    />
+                );
+            })}
             {numUnloaded > 0 && (
                 <div
                     onMouseOver={() => setNumLoaded((i) => i + 1)}

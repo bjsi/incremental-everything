@@ -53,6 +53,7 @@ import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
 import { IncrementalRep } from '../lib/incremental_rem/types';
 import { safeRemTextToString, getIncrementalReadingPosition, addPageToHistory, registerRemsAsPdfKnown, getActivePdfForIncRem, getAllPDFsInRem, getDescendantsToDepth, getRemCardContent, resolveSourcePopupTarget } from '../lib/pdfUtils';
 import { getHoveredReference } from './events';
+import { flashcardHistorySpec, clearHistoryShard } from '../lib/history_shards';
 import { transferToDismissed } from '../lib/dismissed';
 import { addToIncrementalHistory, addDismissalToIncrementalHistory } from '../lib/history_utils';
 import { handleCardPriorityInheritance } from '../lib/card_priority/card_priority_inheritance';
@@ -1414,11 +1415,21 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
   // Command to manually refresh the card priority cache ---
+  //
+  // forceCold is not optional in spirit. Startup reads the saved copy and only
+  // re-reads what changed, but this command is what someone runs when they think
+  // the cache is wrong — and the saved copy is derived from the same state they
+  // are doubting. Serving it back would make the command a no-op in exactly the
+  // case it exists for. Cold re-reads every priority slot from the database and
+  // rewrites the saved copy from the result, repairing it in passing.
   plugin.app.registerCommand({
     id: 'refresh-card-priority-cache',
     name: 'Refresh Card Priority Cache',
+    description:
+      'Re-reads every card priority from the database, ignoring the saved copy, and rebuilds both the cache and the saved copy from it.',
     action: async () => {
-      await loadCardPriorityCache(plugin);
+      await plugin.app.toast('Rebuilding card priority cache from the database…');
+      await loadCardPriorityCache(plugin, { forceCold: true });
     },
   });
 
@@ -3292,8 +3303,12 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     id: 'debug_clear_flashcard_history',
     name: 'Debug: Clear Flashcard History (Fix Sync Error)',
     action: async () => {
-      await plugin.storage.setSynced('flashcardHistoryData', []);
-      await plugin.app.toast('Flashcard History cleared!');
+      // Clears this KB's shard and the pre-shard global key, which may still hold
+      // entries this KB could not claim during migration.
+      const kbId = (await plugin.kb.getCurrentKnowledgeBaseData())?._id;
+      await clearHistoryShard(plugin, flashcardHistorySpec, kbId);
+      await plugin.storage.setSynced(flashcardHistorySpec.legacyKey, []);
+      await plugin.app.toast('Flashcard History cleared for this knowledge base!');
     },
   });
 

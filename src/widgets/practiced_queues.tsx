@@ -22,8 +22,9 @@ import {
     totalAggregatedSessionCount,
 } from "../lib/queue_aggregates";
 import {
-    AUTHORITATIVE_AGGREGATES_KEY,
     AUTHORITATIVE_LAST_COMPUTED_KEY,
+    authoritativeShardKey,
+    migrateAuthoritativeAggregatesToShards,
     aggregatePeriodStatsCombined,
     computeAuthoritativeAggregatesForCurrentKb,
     filterAuthoritativeForKb,
@@ -261,10 +262,13 @@ function PracticedQueues() {
         DAILY_AGGREGATES_KEY,
         []
     );
-    // Stored shape varies (legacy array vs the compact kbId→date→row store), so
-    // this stays untyped and filterAuthoritativeForKb does the decoding.
+    const [currentKbId, setCurrentKbId] = useState<string | null>(null);
+
+    // One shard per KB. Stored shape still varies (legacy array vs the compact
+    // kbId→date→row store), so this stays untyped and filterAuthoritativeForKb
+    // does the decoding.
     const [authoritativeRaw] = useSyncedStorageState<unknown>(
-        AUTHORITATIVE_AGGREGATES_KEY,
+        currentKbId ? authoritativeShardKey(currentKbId) : "",
         null
     );
     const [authoritativeLastComputed] = useSyncedStorageState<number>(
@@ -273,8 +277,6 @@ function PracticedQueues() {
     );
     const [activeSession] = useSessionStorageState<PracticedQueueSession | null>("activeQueueSession", null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const [currentKbId, setCurrentKbId] = useState<string | null>(null);
 
     const [recomputeJob, setRecomputeJob] = useState<{
         running: boolean;
@@ -291,6 +293,12 @@ function PracticedQueues() {
         return () => {
             cancelled = true;
         };
+    }, [plugin]);
+
+    // Drain the pre-shard key if activation has not already done it, so a
+    // dashboard opened in a fresh session still finds this KB's buckets.
+    useEffect(() => {
+        migrateAuthoritativeAggregatesToShards(plugin);
     }, [plugin]);
 
     // Handshake with QueueEnter auto-focus loop in queue_session.ts: it polls

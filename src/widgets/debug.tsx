@@ -20,6 +20,40 @@ import { diagnosePowerupReadPath } from '../lib/powerup_read_diagnostic';
 import { dumpRawPowerupSlots } from '../lib/raw_slot_dump';
 import { scanKbForDetachedSlots, SlotScanReport } from '../lib/raw_slot_scan';
 import { repairDetachedCardPriorities, testDeleteOrphanProperties, RepairReport } from '../lib/raw_slot_repair';
+import {
+  probeUpdatedAtSensitivity,
+  probeTaggedRemPayload,
+  snapshotRemTimes,
+  compareRemTimes,
+  saveHandEditBaseline,
+  loadHandEditBaseline,
+  HAND_EDIT_BASELINE_KEY,
+  UpdatedAtProbeReport,
+  TaggedRemPayloadReport,
+  RemTimesComparison,
+} from '../lib/updated_at_probe';
+import {
+  captureCardPrioritySnapshot,
+  verifyCardPrioritySnapshot,
+  restoreCardPrioritySnapshot,
+  loadSnapshot,
+  SnapshotMeta,
+  VerifyReport,
+  RestoreReport,
+} from '../lib/card_priority_snapshot';
+import { probeLocalPerKeyLimit, LocalLimitReport } from '../lib/local_storage_probe';
+import {
+  readCardPriorityStoreMeta,
+  clearPersistedCardPriorities,
+  CARD_PRIORITY_STORE_VERSION,
+  StoreMeta,
+} from '../lib/card_priority/persistence';
+import {
+  readRemChangeTape,
+  clearRemChangeTape,
+  enrichRemChangeTape,
+  EnrichedRemChange,
+} from '../lib/rem_change_tape';
 import { getDismissedHistoryFromRem } from '../lib/dismissed';
 import {
   safeRemTextToString,
@@ -49,12 +83,19 @@ import {
   auditSyncedKeys,
   probeWriteCapacity,
   testNullFreesSlot,
+  calibratePerKeyLimit,
+  analyzeArrayKey,
+  worstCaseBytes,
   SYNCED_KEY_CAP,
   formatBytes,
   AuditResult,
   CapacityReport,
   NullFreesSlotReport,
+  PerKeyLimitReport,
+  ArrayKeyAnatomy,
 } from '../lib/synced_key_audit';
+import { AUTHORITATIVE_AGGREGATES_KEY, authoritativeShardKey } from '../lib/authoritative_aggregates';
+import { flashcardHistorySpec, remHistorySpec, shardKey } from '../lib/history_shards';
 import { CardPriorityInfo } from '../lib/card_priority';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -310,6 +351,18 @@ function Debug() {
   const [isAuditingKeys, setIsAuditingKeys] = useState(false);
   const [capacityReport, setCapacityReport] = useState<CapacityReport | null>(null);
   const [nullTestReport, setNullTestReport] = useState<NullFreesSlotReport | null>(null);
+  const [limitReport, setLimitReport] = useState<PerKeyLimitReport | null>(null);
+  // Per-key anatomy: which key's bytes to break down. Defaults to the largest key
+  // in the KB — the pre-shard `flashcardHistoryData` holds [] since it was drained
+  // into per-KB shards, so naming it would only ever report an empty array.
+  const [anatomyKey, setAnatomyKey] = useState(AUTHORITATIVE_AGGREGATES_KEY);
+  const [anatomy, setAnatomy] = useState<ArrayKeyAnatomy | null>(null);
+  // Shard names embed a 24-character kbId, so offer them as one click rather than
+  // asking for them to be typed.
+  const currentKbId = useTrackerPlugin(
+    async (rp) => (await rp.kb.getCurrentKnowledgeBaseData())?._id,
+    []
+  );
 
   const debugData = useTrackerPlugin(
     async (rp) => {
@@ -400,6 +453,22 @@ function Debug() {
         source: await rem.getPowerupProperty('cardPriority', 'prioritySource'),
         lastUpdated: await rem.getPowerupProperty('cardPriority', 'lastUpdated'),
       };
+
+      // What the session cache believes about this rem, next to what the DB
+      // actually says. Widgets differ in which one they read — priority_editor
+      // resolves the value live via getCardPriority, card_info_bar reads only
+      // the cache — so "the number looked right in the UI" does not establish
+      // that the cache is current. This is the direct observation.
+      const cachedEntry =
+        ((await rp.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [])
+          .find((info) => info.remId === rem._id) ?? null;
+      const cacheDrift = {
+        cached: cachedEntry ? String(cachedEntry.priority) : null,
+        live: cardPrioritySlots.priority ?? null,
+        inCache: Boolean(cachedEntry),
+        cachedSource: cachedEntry?.source ?? null,
+        liveSource: cardPrioritySlots.source ?? null,
+      };
       const dismissed = await getDismissedHistoryFromRem(rp, rem);
       
       const isCardDisabledLocally = await rem.hasPowerup(BuiltInPowerupCodes.DisableCards);
@@ -434,6 +503,7 @@ function Debug() {
         cardPriority,
         hasCardPriorityTag,
         cardPrioritySlots,
+        cacheDrift,
         dismissed,
         isCardDisabledLocally,
         isCardDisabledInAncestors,
@@ -616,6 +686,46 @@ function Debug() {
   const [isRepairingCP, setIsRepairingCP] = useState(false);
   const [repairProgress, setRepairProgress] = useState<string | null>(null);
   const [deletionProbes, setDeletionProbes] = useState<Awaited<ReturnType<typeof testDeleteOrphanProperties>> | null>(null);
+  // Warm-start viability probes (lib/updated_at_probe.ts): can the card-priority
+  // cache be persisted and invalidated by rem.updatedAt instead of rebuilt from
+  // 135k slot reads on every launch?
+  const [isProbingUpdatedAt, setIsProbingUpdatedAt] = useState(false);
+  const [updatedAtProbe, setUpdatedAtProbe] = useState<UpdatedAtProbeReport | null>(null);
+  const [isProbingPayload, setIsProbingPayload] = useState(false);
+  const [payloadProbe, setPayloadProbe] = useState<TaggedRemPayloadReport | null>(null);
+  // NOT useState: taking the baseline, closing the popup to make the hand edit,
+  // and reopening it is the whole point of this test, and the popup's teardown
+  // would discard component state in the middle of it.
+  const handEditBaseline = useTrackerPlugin(
+    async (rp) => {
+      await rp.storage.getSession(HAND_EDIT_BASELINE_KEY); // reactive dependency
+      return await loadHandEditBaseline(rp);
+    },
+    []
+  );
+  const [handEditResult, setHandEditResult] = useState<RemTimesComparison | null>(null);
+  // Card-priority slot visibility experiment (lib/card_priority_slot_migration.ts).
+  const [slotMigBusy, setSlotMigBusy] = useState(false);
+  const [slotMigProgress, setSlotMigProgress] = useState<string | null>(null);
+  const [slotMigNote, setSlotMigNote] = useState<string | null>(null);
+  const [verifyReport, setVerifyReport] = useState<VerifyReport | null>(null);
+  const [restoreReport, setRestoreReport] = useState<RestoreReport | null>(null);
+  const snapshotMeta = useTrackerPlugin(
+    async (rp) => ((await loadSnapshot(rp))?.meta ?? null) as SnapshotMeta | null,
+    [refreshKey]
+  );
+  // Dirty-set probe: raw GlobalRemChanged remIds, enriched on demand.
+  const [tapeRows, setTapeRows] = useState<EnrichedRemChange[] | null>(null);
+  const [tapeBusy, setTapeBusy] = useState(false);
+  // Warm-start store status. Reads only the meta key — pulling the chunks here
+  // would materialise 45k rows just to draw a status line.
+  const warmStore = useTrackerPlugin(
+    async (rp) => (await readCardPriorityStoreMeta(rp)) as StoreMeta | null,
+    [refreshKey]
+  );
+  const [localLimitBusy, setLocalLimitBusy] = useState(false);
+  const [localLimitProgress, setLocalLimitProgress] = useState<string | null>(null);
+  const [localLimit, setLocalLimit] = useState<LocalLimitReport | null>(null);
   // Result of the settings-migration probe (see handleProbeSettingsPersistence).
   const [isProbingSettings, setIsProbingSettings] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -643,7 +753,7 @@ function Debug() {
 
   if (!debugData) return null;
 
-  const { incrementalRem, rawSlotProbe, cardPriority, hasCardPriorityTag, cardPrioritySlots, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
+  const { incrementalRem, rawSlotProbe, cardPriority, hasCardPriorityTag, cardPrioritySlots, cacheDrift, dismissed, isCardDisabledLocally, isCardDisabledInAncestors, hasSpuriousTags, guaranteedRogue, suspicious, historySlotError, historyBackupExists, rem } = debugData;
 
   const handleCardCompare = async () => {
     if (!remId) return;
@@ -1841,6 +1951,53 @@ function Debug() {
     }
   };
 
+  const handleCalibrateLimit = async () => {
+    const confirmed = confirm(
+      'Find the real per-key size ceiling?\n\n' +
+        'This writes a scratch key repeatedly, up to a few MB per attempt, until RemNote refuses it — ' +
+        'roughly 30 large writes and the sync traffic that implies. It leaves one extra key behind ' +
+        '(nulled at the end). Continue?'
+    );
+    if (!confirmed) return;
+    setIsAuditingKeys(true);
+    setLimitReport(null);
+    try {
+      const report = await calibratePerKeyLimit(plugin, setKeyAuditProgress);
+      setLimitReport(report);
+      setKeyAuditProgress('');
+      await plugin.app.toast(
+        report.unit === 'unknown' ? 'Calibration inconclusive — see console.' : report.verdict
+      );
+    } catch (e) {
+      console.error('[KeyAudit] Calibration failed', e);
+      setKeyAuditProgress('');
+      await plugin.app.toast('Calibration failed — check console.');
+    } finally {
+      setIsAuditingKeys(false);
+    }
+  };
+
+  const handleAnalyzeKey = async () => {
+    const key = anatomyKey.trim();
+    if (!key) return;
+    setIsAuditingKeys(true);
+    setAnatomy(null);
+    try {
+      const result = await analyzeArrayKey(plugin, key);
+      setAnatomy(result);
+      await plugin.app.toast(
+        result.exists
+          ? `${key}: ${result.entries} entries, worst case ${formatBytes(result.worst)}.`
+          : `${key} is absent or null.`
+      );
+    } catch (e) {
+      console.error('[KeyAudit] Key anatomy failed', e);
+      await plugin.app.toast('Key anatomy failed — check console.');
+    } finally {
+      setIsAuditingKeys(false);
+    }
+  };
+
   const handleTestNullFreesSlot = async () => {
     const sacrificial = keyAudit?.disposable?.[0];
     if (!sacrificial) return;
@@ -2025,6 +2182,217 @@ function Debug() {
   // priority reverted to 10. The "Priority" row above shows the value AFTER
   // getIncrementalRemFromRem's `let priority = 10` fallback, so it cannot tell a
   // stored 10 from an unreadable slot. This bypasses getPowerupProperty and reads
+  // ── Warm-start viability probes ────────────────────────────────────────────
+  // See lib/updated_at_probe.ts for what these are deciding and why.
+
+  const handleProbeUpdatedAt = async () => {
+    if (!remId) return;
+    setIsProbingUpdatedAt(true);
+    setUpdatedAtProbe(null);
+    try {
+      const report = await probeUpdatedAtSensitivity(plugin, remId);
+      setUpdatedAtProbe(report);
+      console.log('[updatedAt probe]', report);
+      if (report.error) {
+        await plugin.app.toast(`Probe could not run: ${report.error}`);
+      } else if (!report.restored) {
+        // Loud, because the probe writes to a real rem: a silent restore failure
+        // would leave a bogus priority behind on a rem the user cares about.
+        await plugin.app.toast(
+          '⚠️ Probe finished but could NOT restore the original slot values — see the report.'
+        );
+      }
+    } catch (err) {
+      console.error('[updatedAt probe] failed', err);
+      await plugin.app.toast(`Probe failed: ${err}`);
+    } finally {
+      setIsProbingUpdatedAt(false);
+    }
+  };
+
+  const handleProbeTaggedRemPayload = async () => {
+    setIsProbingPayload(true);
+    setPayloadProbe(null);
+    try {
+      const report = await probeTaggedRemPayload(plugin);
+      setPayloadProbe(report);
+      console.log('[taggedRem payload probe]', report);
+    } catch (err) {
+      console.error('[taggedRem payload probe] failed', err);
+      await plugin.app.toast(`Probe failed: ${err}`);
+    } finally {
+      setIsProbingPayload(false);
+    }
+  };
+
+  const handleSnapshotForHandEdit = async () => {
+    if (!remId) return;
+    const snap = await snapshotRemTimes(plugin, remId);
+    await saveHandEditBaseline(plugin, snap);
+    setHandEditResult(null);
+    await plugin.app.toast(
+      snap
+        ? 'Baseline saved. Close this popup, edit the Priority property row by hand, then reopen and click Compare.'
+        : 'Could not read this rem.'
+    );
+  };
+
+  const handleCompareAfterHandEdit = async () => {
+    // Read from storage rather than the tracked value: the tracker may not have
+    // re-run yet on a freshly reopened popup, and a stale null here would look
+    // like the baseline was lost again.
+    const baseline = await loadHandEditBaseline(plugin);
+    if (!baseline) {
+      await plugin.app.toast('No baseline saved — click "Snapshot now" first.');
+      return;
+    }
+    const result = await compareRemTimes(plugin, baseline);
+    setHandEditResult(result);
+    console.log('[hand-edit comparison]', result);
+  };
+
+  // ── Card-priority slot visibility experiment ───────────────────────────────
+
+  const handleCaptureSlotSnapshot = async () => {
+    setSlotMigBusy(true);
+    setSlotMigNote(null);
+    try {
+      const result = await captureCardPrioritySnapshot(plugin, setSlotMigProgress);
+      // Log the whole result, not just meta: storedLocally and any storeError
+      // are the point of the run, and they are not on meta.
+      console.log('[CardPriority snapshot]', {
+        ...result.meta,
+        approxMB: +(result.approxBytes / 1024 / 1024).toFixed(2),
+        storedLocally: result.storedLocally,
+        storeError: result.storeError,
+        perChunkApproxKB: +(result.approxBytes / 1024 / Math.max(1, result.meta.chunkCount)).toFixed(0),
+      });
+
+      // The downloaded file is the copy that matters. Local storage is convenient
+      // for the in-app verify/restore, but it is the same storage layer the
+      // experiment is poking at, and it has limits we have not measured at 45k
+      // rows — so the snapshot is not considered taken until a file exists.
+      let downloaded = false;
+      try {
+        const blob = new Blob([JSON.stringify({ meta: result.meta, rows: result.rows })], {
+          type: 'application/json',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `card-priority-snapshot-${dayjs().format('YYYY-MM-DD-HHmmss')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        downloaded = true;
+      } catch (err) {
+        console.error('[slot migration] download failed', err);
+      }
+
+      setSlotMigNote(
+        `Captured ${result.meta.count} priorities (~${(result.approxBytes / 1024 / 1024).toFixed(1)}MB). ` +
+        `Local storage: ${result.storedLocally ? 'written' : `FAILED — ${result.storeError}`}. ` +
+        `File download: ${downloaded ? 'saved' : 'FAILED — do not flip the slot without it'}.`
+      );
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setSlotMigNote(`Capture failed: ${err}`);
+    } finally {
+      setSlotMigBusy(false);
+      setSlotMigProgress(null);
+    }
+  };
+
+  const handleVerifySlotSnapshot = async () => {
+    setSlotMigBusy(true);
+    setVerifyReport(null);
+    try {
+      const report = await verifyCardPrioritySnapshot(plugin, setSlotMigProgress);
+      if (!report) {
+        setSlotMigNote('No snapshot found for this KB.');
+        return;
+      }
+      setVerifyReport(report);
+      console.log('[slot migration] verify', report);
+    } catch (err) {
+      setSlotMigNote(`Verify failed: ${err}`);
+    } finally {
+      setSlotMigBusy(false);
+      setSlotMigProgress(null);
+    }
+  };
+
+  const handleRestoreSlotSnapshot = async () => {
+    setSlotMigBusy(true);
+    setRestoreReport(null);
+    try {
+      const report = await restoreCardPrioritySnapshot(plugin, setSlotMigProgress);
+      if (!report) {
+        setSlotMigNote('No snapshot found for this KB.');
+        return;
+      }
+      setRestoreReport(report);
+      console.log('[slot migration] restore', report);
+    } catch (err) {
+      setSlotMigNote(`Restore failed: ${err}`);
+    } finally {
+      setSlotMigBusy(false);
+      setSlotMigProgress(null);
+    }
+  };
+
+  const handleReadTape = async () => {
+    setTapeBusy(true);
+    try {
+      const raw = await readRemChangeTape(plugin);
+      const enriched = await enrichRemChangeTape(plugin, raw.slice(-40));
+      setTapeRows(enriched);
+      console.log('[rem change tape]', enriched);
+    } finally {
+      setTapeBusy(false);
+    }
+  };
+
+  const handleProbeLocalLimit = async () => {
+    setLocalLimitBusy(true);
+    setLocalLimit(null);
+    try {
+      const report = await probeLocalPerKeyLimit(
+        plugin,
+        warmStore?.count ?? 45000,
+        setLocalLimitProgress
+      );
+      setLocalLimit(report);
+      console.log('[Local storage limit]', report);
+    } catch (err) {
+      console.error('[Local storage limit] probe failed', err);
+      await plugin.app.toast(`Probe failed: ${err}`);
+    } finally {
+      setLocalLimitBusy(false);
+      setLocalLimitProgress(null);
+    }
+  };
+
+  const handleClearWarmStore = async () => {
+    await clearPersistedCardPriorities(plugin);
+    setRefreshKey((k) => k + 1);
+    await plugin.app.toast(
+      'Warm-start store cleared. The next build will be COLD. For a true cold-start ' +
+      'measurement, fully restart RemNote rather than reloading the plugin.'
+    );
+  };
+
+  const handleClearTape = async () => {
+    await clearRemChangeTape(plugin);
+    setTapeRows(null);
+    await plugin.app.toast('Tape cleared. Now hand-edit a Priority, then Read tape.');
+  };
+
+  const handleClearHandEditBaseline = async () => {
+    await saveHandEditBaseline(plugin, null);
+    setHandEditResult(null);
+    await plugin.app.toast('Baseline cleared.');
+  };
+
   // the property rems directly, for this rem and every descendant. Read-only.
   const handleDumpRawSlots = async () => {
     if (!rem) return;
@@ -3652,6 +4020,27 @@ function Debug() {
                      {JSON.stringify(cardPrioritySlots.source ?? null)} lastUpdated=
                      {JSON.stringify(cardPrioritySlots.lastUpdated ?? null)}
                    </span>
+                   {/* Cache vs DB. Which one a widget shows depends on the widget
+                       — priority_editor reads the value live, card_info_bar reads
+                       only the cache — so a correct-looking number in the UI does
+                       not tell you the cache is current. This line does. */}
+                   <span style={{ fontFamily: 'monospace' }}>
+                     {!cacheDrift.inCache ? (
+                       <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                         cache: no entry for this rem
+                       </span>
+                     ) : cacheDrift.cached === cacheDrift.live ? (
+                       <span style={{ color: '#22c55e' }}>
+                         cache in sync (priority={cacheDrift.cached})
+                       </span>
+                     ) : (
+                       <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                         CACHE STALE — cache says {JSON.stringify(cacheDrift.cached)} /{' '}
+                         {JSON.stringify(cacheDrift.cachedSource)}, DB says{' '}
+                         {JSON.stringify(cacheDrift.live)} / {JSON.stringify(cacheDrift.liveSource)}
+                       </span>
+                     )}
+                   </span>
                  </div>
                );
              })()}
@@ -3984,6 +4373,13 @@ function Debug() {
               Test Capacity
             </button>
             <button
+              onClick={handleCalibrateLimit}
+              disabled={isAuditingKeys}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isAuditingKeys ? 'wait' : 'pointer' }}
+            >
+              Calibrate size ceiling
+            </button>
+            <button
               onClick={handleTestNullFreesSlot}
               disabled={isAuditingKeys || !keyAudit?.disposable?.length}
               style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-warning)', color: 'var(--rn-clr-content-warning)', border: '1px solid var(--rn-clr-border-warning)', borderRadius: '4px', cursor: (isAuditingKeys || !keyAudit?.disposable?.length) ? 'not-allowed' : 'pointer' }}
@@ -3998,8 +4394,8 @@ function Debug() {
           videos, …) and probes each with <code>getSynced</code>. <strong>live</strong> = holds a value,{' '}
           <strong>nulled</strong> = the key exists holding <code>null</code> (our "delete" pattern — still occupying a
           slot). Orphan keys whose rem was deleted can't be named; they show up as <em>unaccounted</em>. Sizes are the
-          UTF-8 length of each value's JSON — a close proxy for what syncs, measured against RemNote's{' '}
-          {formatBytes(900 * 1024)} per-key and {formatBytes(10 * 1024 * 1024)} total ceilings. Every candidate costs
+          UTF-8 length of each value's JSON, measured against the {formatBytes(896 * 1024)} per-key ceiling (UTF-16, so
+          double the UTF-8 figure) and the {formatBytes(10 * 1024 * 1024)} total budget. Every candidate costs
           one IPC read, so a large KB can take a few minutes and will feel sluggish while it runs. Full dump in console.
         </div>
         {keyAuditProgress && (
@@ -4106,15 +4502,32 @@ function Debug() {
                 <summary style={{ fontSize: '11px', cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>
                   Largest keys ({keyAudit.largestKeys.length}) — per-key ceiling {formatBytes(keyAudit.perKeyLimit)}
                 </summary>
+                <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', margin: '4px 0' }}>
+                  UTF-8 / UTF-16 / re-escaped are the same value counted three ways. The ceiling was <em>measured</em> at{' '}
+                  {formatBytes(896 * 1024)} counted in <strong>UTF-16</strong> bytes, so the UTF-8 column is half of what
+                  the limit sees — <strong>% worst</strong> is the figure to act on. Re-run "Calibrate size ceiling" if
+                  RemNote changes its storage layer again.
+                </div>
                 <table style={{ fontSize: '11px', width: '100%', borderCollapse: 'collapse', marginTop: '4px' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>
+                      <th style={{ padding: '3px 4px', textAlign: 'left' }}>Key</th>
+                      <th style={{ padding: '3px 4px' }}>UTF-8</th>
+                      <th style={{ padding: '3px 4px' }}>UTF-16</th>
+                      <th style={{ padding: '3px 4px' }}>Escaped</th>
+                      <th style={{ padding: '3px 4px' }}>% worst</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {keyAudit.largestKeys.map((k) => {
-                      const pct = (k.bytes / keyAudit.perKeyLimit) * 100;
+                      const pct = (worstCaseBytes(k) / keyAudit.perKeyLimit) * 100;
                       return (
                         <tr key={k.key} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
                           <td style={{ padding: '3px 4px', wordBreak: 'break-all' }}><code style={{ fontSize: '10px' }}>{k.key}</code></td>
                           <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{formatBytes(k.bytes)}</td>
-                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: pct >= 50 ? '#ef4444' : 'var(--rn-clr-content-tertiary)' }}>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{k.utf16 != null ? formatBytes(k.utf16) : '—'}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{k.escaped != null ? formatBytes(k.escaped) : '—'}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: pct >= 100 ? '#ef4444' : pct >= 50 ? '#f59e0b' : 'var(--rn-clr-content-tertiary)' }}>
                             {pct.toFixed(1)}%
                           </td>
                         </tr>
@@ -4126,6 +4539,215 @@ function Debug() {
             )}
           </div>
         )}
+        {limitReport && (
+          <div style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px', fontSize: '11px' }}>
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+              Per-key ceiling calibration — documented limit {formatBytes(limitReport.documentedLimit)}
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
+              <thead>
+                <tr style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>
+                  <th style={{ padding: '3px 4px', textAlign: 'left' }}>Alphabet</th>
+                  <th style={{ padding: '3px 4px' }}>Largest accepted</th>
+                  <th style={{ padding: '3px 4px' }}>as UTF-8</th>
+                  <th style={{ padding: '3px 4px' }}>as UTF-16</th>
+                </tr>
+              </thead>
+              <tbody>
+                {limitReport.probes.map((p) => (
+                  <tr key={p.label} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                    <td style={{ padding: '3px 4px' }}>{p.label}</td>
+                    <td style={{ padding: '3px 4px', textAlign: 'right' }}>{p.acceptedChars.toLocaleString()} chars</td>
+                    <td style={{ padding: '3px 4px', textAlign: 'right' }}>{formatBytes(p.acceptedUtf8)}</td>
+                    <td style={{ padding: '3px 4px', textAlign: 'right' }}>{formatBytes(p.acceptedUtf16)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ padding: '6px', borderRadius: '4px', backgroundColor: limitReport.unit === 'unknown' ? 'var(--rn-clr-background-warning)' : 'var(--rn-clr-background-secondary)', color: limitReport.unit === 'unknown' ? 'var(--rn-clr-content-warning)' : 'inherit' }}>
+              {limitReport.verdict}
+            </div>
+          </div>
+        )}
+        <div style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px', fontSize: '11px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <strong>Key anatomy:</strong>
+            <input
+              value={anatomyKey}
+              onChange={(e) => setAnatomyKey(e.target.value)}
+              style={{ fontSize: '11px', padding: '2px 6px', flex: '1 1 220px', minWidth: '160px', backgroundColor: 'var(--rn-clr-background-primary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px' }}
+            />
+            <button
+              onClick={handleAnalyzeKey}
+              disabled={isAuditingKeys}
+              style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: isAuditingKeys ? 'wait' : 'pointer' }}
+            >
+              Break it down
+            </button>
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '4px' }}>
+            Reads one array-valued key and reports where its bytes go — entries, cost per field, fattest entries, and
+            what capping the entry count or the stored text would save.
+          </div>
+          {currentKbId && (
+            <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)' }}>This KB’s shards:</span>
+              {[
+                { label: 'Flashcard history', key: shardKey(flashcardHistorySpec, currentKbId) },
+                { label: 'Visited rems', key: shardKey(remHistorySpec, currentKbId) },
+                { label: 'Study aggregates', key: authoritativeShardKey(currentKbId) },
+              ].map(({ label, key }) => (
+                <button
+                  key={key}
+                  onClick={() => setAnatomyKey(key)}
+                  style={{ fontSize: '10px', padding: '1px 6px', backgroundColor: 'var(--rn-clr-background-secondary)', color: 'var(--rn-clr-content-primary)', border: '1px solid var(--rn-clr-border)', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {anatomy && (
+            <div style={{ marginTop: '8px' }}>
+              {!anatomy.exists ? (
+                <div>Key is absent or null.</div>
+              ) : anatomy.shape === 'object' ? (
+                <>
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>{anatomy.branches.length}</strong> branch(es)
+                    {anatomy.branchRoot && <> under <code style={{ fontSize: '10px' }}>{anatomy.branchRoot}</code></>}{' '}
+                    holding <strong>{anatomy.entries}</strong> rows · {formatBytes(anatomy.size.utf8)} UTF-8 ·{' '}
+                    <span style={{ color: anatomy.worst >= anatomy.perKeyLimit ? '#ef4444' : anatomy.worst >= anatomy.perKeyLimit * 0.5 ? '#f59e0b' : 'inherit', fontWeight: 600 }}>
+                      worst case {formatBytes(anatomy.worst)} ({((anatomy.worst / anatomy.perKeyLimit) * 100).toFixed(0)}% of ceiling)
+                    </span>
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>
+                        <th style={{ padding: '3px 4px', textAlign: 'left' }}>Branch</th>
+                        <th style={{ padding: '3px 4px' }}>Rows</th>
+                        <th style={{ padding: '3px 4px' }}>Size</th>
+                        <th style={{ padding: '3px 4px' }}>Share</th>
+                        <th style={{ padding: '3px 4px' }}>Span</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {anatomy.branches.map((b) => (
+                        <tr key={b.path} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                          <td style={{ padding: '3px 4px', wordBreak: 'break-all' }}><code style={{ fontSize: '10px' }}>{b.path}</code></td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{b.children}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatBytes(b.bytes)}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: b.share >= 0.5 ? 600 : 400 }}>{(b.share * 100).toFixed(1)}%</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--rn-clr-content-tertiary)' }}>
+                            {b.firstChildKey ? `${b.firstChildKey} → ${b.lastChildKey}` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {anatomy.projections.length > 0 && (
+                    <>
+                      <div style={{ fontWeight: 600, marginBottom: '2px' }}>What would shrink it</div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          {anatomy.projections.map((p) => (
+                            <tr key={p.label} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                              <td style={{ padding: '3px 4px' }}>{p.label}</td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatBytes(p.utf8)} UTF-8</td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                worst {formatBytes(p.worst)} ({((p.worst / anatomy.perKeyLimit) * 100).toFixed(0)}%)
+                              </td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: '#10b981' }}>−{(p.savedPct * 100).toFixed(0)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
+                </>
+              ) : !anatomy.isArray ? (
+                <div>
+                  Neither an array nor an object map — {formatBytes(anatomy.size.utf8)} UTF-8 /{' '}
+                  {formatBytes(anatomy.size.utf16)} UTF-16 / {formatBytes(anatomy.size.escaped)} re-escaped.
+                </div>
+              ) : (
+                <>
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>{anatomy.entries}</strong> entries · {formatBytes(anatomy.size.utf8)} UTF-8 ·{' '}
+                    {formatBytes(anatomy.size.utf16)} UTF-16 ·{' '}
+                    <span style={{ color: anatomy.worst >= anatomy.perKeyLimit ? '#ef4444' : anatomy.worst >= anatomy.perKeyLimit * 0.5 ? '#f59e0b' : 'inherit', fontWeight: 600 }}>
+                      worst case {formatBytes(anatomy.worst)} ({((anatomy.worst / anatomy.perKeyLimit) * 100).toFixed(0)}% of ceiling)
+                    </span>
+                    {anatomy.oldest && anatomy.newest && (
+                      <> · spans {Math.round((anatomy.newest - anatomy.oldest) / 86400000)} days</>
+                    )}
+                  </div>
+                  <div style={{ marginBottom: '6px', color: 'var(--rn-clr-content-secondary)' }}>
+                    Per entry — avg {formatBytes(anatomy.entryBytes.avg)}, median {formatBytes(anatomy.entryBytes.median)},
+                    p95 {formatBytes(anatomy.entryBytes.p95)}, max {formatBytes(anatomy.entryBytes.max)}
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>
+                        <th style={{ padding: '3px 4px', textAlign: 'left' }}>Field</th>
+                        <th style={{ padding: '3px 4px' }}>Total</th>
+                        <th style={{ padding: '3px 4px' }}>Share</th>
+                        <th style={{ padding: '3px 4px' }}>Present</th>
+                        <th style={{ padding: '3px 4px' }}>Fattest</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {anatomy.fields.map((f) => (
+                        <tr key={f.field} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                          <td style={{ padding: '3px 4px' }}><code style={{ fontSize: '10px' }}>{f.field}</code></td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right' }}>{formatBytes(f.bytes)}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: f.share >= 0.3 ? 600 : 400 }}>{(f.share * 100).toFixed(1)}%</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{f.present}/{anatomy.entries}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{formatBytes(f.longest)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {anatomy.distributions.map((dist) => (
+                    <details key={dist.field} style={{ marginBottom: '6px' }}>
+                      <summary style={{ cursor: 'pointer', color: 'var(--rn-clr-content-secondary)' }}>
+                        Split by <code style={{ fontSize: '10px' }}>{dist.field}</code> ({dist.values.length} distinct) —
+                        would sharding on it help?
+                      </summary>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '4px' }}>
+                        <tbody>
+                          {dist.values.slice(0, 25).map((v) => (
+                            <tr key={v.value} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                              <td style={{ padding: '3px 4px', wordBreak: 'break-all' }}><code style={{ fontSize: '10px' }}>{v.value}</code></td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--rn-clr-content-tertiary)' }}>{v.count} entries</td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatBytes(v.bytes)}</td>
+                              <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: v.share >= 0.5 ? 600 : 400 }}>{(v.share * 100).toFixed(1)}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </details>
+                  ))}
+                  <div style={{ fontWeight: 600, marginBottom: '2px' }}>If we trimmed it</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {anatomy.projections.map((p) => (
+                        <tr key={p.label} style={{ borderBottom: '1px solid var(--rn-clr-background-tertiary)' }}>
+                          <td style={{ padding: '3px 4px' }}>{p.label}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>{formatBytes(p.utf8)} UTF-8</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            worst {formatBytes(p.worst)} ({((p.worst / anatomy.perKeyLimit) * 100).toFixed(0)}%)
+                          </td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', whiteSpace: 'nowrap', color: '#10b981' }}>−{(p.savedPct * 100).toFixed(0)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         {nullTestReport && (
           <div style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--rn-clr-background-tertiary)', borderRadius: '4px', fontSize: '11px' }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>
@@ -4681,6 +5303,370 @@ function Debug() {
             {scanProgress}
           </div>
         )}
+
+        {/* ── CardPriority snapshot / restore ─────────────────────────────────
+            A way back from any bulk operation that touches priorities. Built for
+            a slot-visibility migration that was abandoned; kept because the
+            capability outlives it. */}
+        <div style={{ marginBottom: '12px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>CardPriority Snapshot / Restore</div>
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '8px', lineHeight: 1.5 }}>
+            Captures every tagged rem's priority, source and lastUpdated to local storage
+            <strong> and a downloaded JSON file</strong> — the file being the copy that survives a
+            storage limit or the very bug you are guarding against. Verify re-reads and classifies
+            what changed; Restore writes the snapshot back. Capture costs about as much as a full
+            cache build. Worth running before any bulk re-prioritisation, repair pass or import.
+          </div>
+
+          <div style={{ fontSize: '11px', marginBottom: '8px' }}>
+            snapshot:{' '}
+            {snapshotMeta ? (
+              <strong style={{ color: '#22c55e' }}>
+                {snapshotMeta.count} rows
+                {/* Guarded: snapshots captured before approxBytes was persisted
+                    have no size to show, and NaN MB reads as a bug. */}
+                {typeof snapshotMeta.approxBytes === 'number'
+                  ? `, ${(snapshotMeta.approxBytes / 1024 / 1024).toFixed(1)}MB`
+                  : ''}
+                {' '}across {snapshotMeta.chunkCount} chunks, {dayjs(snapshotMeta.capturedAt).format('MMM D HH:mm')}
+              </strong>
+            ) : (
+              <strong style={{ color: 'var(--rn-clr-content-tertiary)' }}>none for this KB</strong>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button onClick={handleCaptureSlotSnapshot} disabled={slotMigBusy} style={{ ...smallBtnStyle, cursor: slotMigBusy ? 'wait' : 'pointer', fontWeight: 600 }} title="Read every tagged rem's three CardPriority slots and save them to local storage AND a downloaded JSON file. Same cost as a cache build.">
+              1. Capture full snapshot
+            </button>
+            <button onClick={handleVerifySlotSnapshot} disabled={slotMigBusy} style={{ ...smallBtnStyle, cursor: slotMigBusy ? 'wait' : 'pointer' }}>
+              2. Verify against snapshot
+            </button>
+            <button onClick={handleRestoreSlotSnapshot} disabled={slotMigBusy || !snapshotMeta} style={{ ...smallBtnStyle, cursor: slotMigBusy ? 'wait' : 'pointer', borderColor: '#ef4444', color: '#ef4444' }} title="Write the snapshotted values back onto any rem whose priority no longer matches.">
+              3. Restore from snapshot
+            </button>
+          </div>
+
+          {slotMigProgress && (
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '6px' }}>{slotMigProgress}</div>
+          )}
+          {slotMigNote && (
+            <div style={{ fontSize: '11px', marginTop: '6px', lineHeight: 1.5 }}>{slotMigNote}</div>
+          )}
+
+          {verifyReport && (
+            <div style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.7 }}>
+              <div>snapshot {verifyReport.total} rows</div>
+              <div style={{ paddingLeft: '10px' }}>
+                • unchanged: <strong style={{ color: '#22c55e' }}>{verifyReport.matched}</strong><br />
+                • <strong style={{ color: verifyReport.stranded > 0 ? '#ef4444' : 'inherit' }}>lost (value gone): {verifyReport.stranded}</strong><br />
+                • changed value: <strong style={{ color: verifyReport.changed > 0 ? '#f59e0b' : 'inherit' }}>{verifyReport.changed}</strong><br />
+                • rem no longer exists: {verifyReport.missingRem}
+              </div>
+              {verifyReport.strandedSamples.length > 0 && (
+                <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                  lost samples: {verifyReport.strandedSamples.join(', ')}
+                </div>
+              )}
+              {verifyReport.changedSamples.length > 0 && (
+                <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                  changed samples: {verifyReport.changedSamples.join(' · ')}
+                </div>
+              )}
+              <div style={{ marginTop: '6px', fontWeight: 600, color: verifyReport.stranded > 0 ? '#ef4444' : '#22c55e' }}>{verifyReport.verdict}</div>
+            </div>
+          )}
+
+          {restoreReport && (
+            <div style={{ fontSize: '11px', marginTop: '8px', fontWeight: 600 }}>{restoreReport.verdict}</div>
+          )}
+        </div>
+
+        {/* ── Warm-start store ────────────────────────────────────────────────
+            The persisted mirror the cache starts from. Clearing it is the only
+            way to force a cold build, which is what makes the two comparable. */}
+        <div style={{ marginBottom: '12px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>Warm-Start Store</div>
+          <div style={{ fontSize: '11px', marginBottom: '6px' }}>
+            {warmStore ? (
+              <>
+                <strong style={{ color: warmStore.version === CARD_PRIORITY_STORE_VERSION ? '#22c55e' : '#ef4444' }}>
+                  {warmStore.count} rows
+                </strong>{' '}
+                in one key · synced {dayjs(warmStore.syncedAt).format('MMM D HH:mm:ss')}{' '}
+                ({dayjs(warmStore.syncedAt).fromNow()}) · last full rebuild{' '}
+                {dayjs(warmStore.builtAt).fromNow()} · schema v{warmStore.version}
+                {warmStore.version !== CARD_PRIORITY_STORE_VERSION && (
+                  <span style={{ color: '#ef4444' }}> (expected v{CARD_PRIORITY_STORE_VERSION} — will cold build)</span>
+                )}
+              </>
+            ) : (
+              <span style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                empty — the next build will be cold
+              </span>
+            )}
+          </div>
+          <button
+            onClick={handleClearWarmStore}
+            style={{ ...smallBtnStyle, borderColor: '#f59e0b', color: '#f59e0b' }}
+            title="Deletes the persisted mirror so the next build runs cold. Non-destructive: the cold build rewrites it."
+          >
+            Clear store (force cold build)
+          </button>
+          <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '4px' }}>
+            Non-destructive — this is a derived index, and the cold build rewrites it. It is not the
+            CardPriority Snapshot above, which is your backup of the actual slot values.
+          </div>
+
+          {/* Local per-key ceiling. The 896KB UTF-16 figure this codebase uses was
+              measured against setSynced only; local storage has never been probed,
+              and the mirror was chunked against the synced number for want of a
+              better one. */}
+          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--rn-clr-border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
+              Local storage per-key ceiling
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '6px', lineHeight: 1.5 }}>
+              The known 896KB limit was measured on <code>setSynced</code>. <code>setLocal</code> is a
+              different, unsynced backend and has never been probed — the mirror is chunked against the
+              synced number only because it was the one available. Doubles a scratch key until a write
+              fails <em>or reads back corrupted</em>, then bisects. Writes megabytes; costs no sync traffic.
+            </div>
+            <button
+              onClick={handleProbeLocalLimit}
+              disabled={localLimitBusy}
+              style={{ ...smallBtnStyle, cursor: localLimitBusy ? 'wait' : 'pointer' }}
+            >
+              {localLimitBusy ? 'Probing…' : 'Probe local per-key ceiling'}
+            </button>
+            {localLimitProgress && (
+              <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginTop: '4px' }}>
+                {localLimitProgress}
+              </div>
+            )}
+            {localLimit && (
+              <div style={{ fontSize: '10px', marginTop: '6px', lineHeight: 1.6 }}>
+                {localLimit.steps.map((st, i) => (
+                  <div key={i} style={{ paddingLeft: '8px', color: 'var(--rn-clr-content-tertiary)' }}>
+                    <span style={{ color: st.ok ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                      {st.ok ? 'ok  ' : 'FAIL'}
+                    </span>{' '}
+                    {st.approxMB.toFixed(2)}MB ({st.chars.toLocaleString()} chars) · {st.ms}ms
+                    {st.corruption && <span style={{ color: '#f59e0b' }}> · {st.corruption}</span>}
+                  </div>
+                ))}
+                <div style={{ marginTop: '6px', fontWeight: 600, fontSize: '11px' }}>{localLimit.verdict}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Warm-start viability ────────────────────────────────────────────
+            Decides whether the card-priority cache can be persisted across
+            sessions (storage.setLocal) and invalidated by rem.updatedAt, instead
+            of rebuilt from ~135,000 slot reads on every launch. See
+            lib/updated_at_probe.ts for the full reasoning. */}
+        <div style={{ marginBottom: '12px', padding: '8px', borderRadius: '4px', border: '1px solid var(--rn-clr-border)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>Warm-Start Viability (rem.updatedAt)</div>
+          <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '8px', lineHeight: 1.5 }}>
+            Phase 1 of the cache build costs three slot reads per tagged rem and the IPC bridge is a
+            fixed-rate pipe, so the only real speed-up is not making the calls. <code>RemObject.updatedAt</code>{' '}
+            comes free in the <code>taggedRem()</code> payload — <em>if</em> it actually moves when a
+            priority changes. The <code>priority</code> slot is VISIBLE, so its value lives in a child
+            rem; a hand edit of that property row writes no hidden slot and may leave the parent's{' '}
+            <code>updatedAt</code> untouched. Test 3 is the one that decides it.
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleProbeTaggedRemPayload}
+              disabled={isProbingPayload}
+              style={{ ...smallBtnStyle, cursor: isProbingPayload ? 'wait' : 'pointer' }}
+              title="Read-only, KB-wide. Is updatedAt populated in the bulk taggedRem() payload, and how many rems would a warm start actually have to re-read?"
+            >
+              {isProbingPayload ? 'Scanning…' : '1. Probe taggedRem payload (read-only)'}
+            </button>
+            <button
+              onClick={handleProbeUpdatedAt}
+              disabled={isProbingUpdatedAt || !remId}
+              style={{ ...smallBtnStyle, cursor: isProbingUpdatedAt ? 'wait' : 'pointer', borderColor: '#f59e0b', color: '#f59e0b' }}
+              title="WRITES to this rem: sets each cardPriority slot in isolation and reports whether rem.updatedAt moved. All three slots are restored afterwards and the restore is verified."
+            >
+              {isProbingUpdatedAt ? 'Probing…' : '2. Probe slot sensitivity (WRITES to this rem)'}
+            </button>
+          </div>
+
+          {payloadProbe && (
+            <div style={{ fontSize: '11px', marginTop: '8px', lineHeight: 1.7 }}>
+              <div><code>taggedRem()</code>: <strong>{payloadProbe.taggedCount}</strong> rems in {(payloadProbe.elapsedMs / 1000).toFixed(1)}s</div>
+              <div>
+                carry a usable <code>updatedAt</code>:{' '}
+                <strong style={{ color: payloadProbe.withUpdatedAt === payloadProbe.taggedCount ? '#22c55e' : '#ef4444' }}>
+                  {payloadProbe.withUpdatedAt}
+                </strong>{' '}
+                · <code>localUpdatedAt</code>: <strong>{payloadProbe.withLocalUpdatedAt}</strong>
+              </div>
+              {payloadProbe.oldest !== null && payloadProbe.newest !== null && (
+                <div style={{ color: 'var(--rn-clr-content-secondary)' }}>
+                  range: {dayjs(payloadProbe.oldest).format('YYYY-MM-DD')} → {dayjs(payloadProbe.newest).format('YYYY-MM-DD HH:mm')}
+                </div>
+              )}
+              <div style={{ marginTop: '4px', fontWeight: 600 }}>Rems a warm start would re-read:</div>
+              <div style={{ paddingLeft: '10px' }}>
+                • last hour: <strong>{payloadProbe.changedLastHour}</strong><br />
+                • last 24h: <strong>{payloadProbe.changedLast24h}</strong><br />
+                • last 7d: <strong>{payloadProbe.changedLast7d}</strong><br />
+                • last 30d: <strong>{payloadProbe.changedLast30d}</strong>
+              </div>
+              <div style={{ marginTop: '6px', fontWeight: 600 }}>{payloadProbe.verdict}</div>
+            </div>
+          )}
+
+          {updatedAtProbe && (
+            <div style={{ fontSize: '11px', marginTop: '10px', lineHeight: 1.6 }}>
+              {updatedAtProbe.error && (
+                <div style={{ color: '#ef4444' }}>{updatedAtProbe.error}</div>
+              )}
+              {updatedAtProbe.probes.map((p) => (
+                <div key={p.label} style={{ marginBottom: '4px', paddingLeft: '10px' }}>
+                  <span style={{ color: p.moved ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                    {p.moved ? 'MOVED' : 'no change'}
+                  </span>{' '}
+                  — <code>{p.label}</code>
+                  {p.neededRetry && <span style={{ color: '#f59e0b' }}> (only after a retry)</span>}
+                  <div style={{ paddingLeft: '10px', color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                    updatedAt {p.remUpdatedAtBefore} → {p.remUpdatedAtAfter}
+                    {' · '}localUpdatedAt {p.localMoved ? 'moved' : 'unchanged'}
+                    {p.propertyChildId && (
+                      <> · property child {p.propertyChildMoved ? 'MOVED' : 'unchanged'}</>
+                    )}
+                    {p.error && <span style={{ color: '#ef4444' }}> · {p.error}</span>}
+                  </div>
+                </div>
+              ))}
+              {updatedAtProbe.ok && (
+                <div style={{ marginTop: '4px', color: updatedAtProbe.restored ? 'var(--rn-clr-content-secondary)' : '#ef4444' }}>
+                  {updatedAtProbe.restored
+                    ? 'Original slot values restored and verified.'
+                    : `RESTORE FAILED — this rem may be left with probe values. ${updatedAtProbe.restoreError ?? ''}`}
+                </div>
+              )}
+              <div style={{ marginTop: '6px', fontWeight: 600 }}>{updatedAtProbe.verdict}</div>
+            </div>
+          )}
+
+          {/* Test 4 — the dirty-set probe.
+              updatedAt is out as a sole invalidation key (test 3 proved a hand
+              edit does not move it). The fallback is recording changed remIds
+              from GlobalRemChanged as they happen. That only works if the event
+              names the TAGGED rem — directly, or via a child's free `parent`
+              field. This reads the raw event tape and says which. */}
+          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--rn-clr-border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
+              4. Dirty-set probe — can GlobalRemChanged name the tagged rem?
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '6px', lineHeight: 1.5 }}>
+              Clear the tape → <strong>close this popup</strong> → hand-edit a Priority row → reopen →
+              Read tape. Every event is classified by what a dirty-set could derive from it:{' '}
+              <code>self</code> (the rem is tagged — trivial), <code>parent</code> (it is a property
+              child, and its free <code>parent</code> field reaches the tagged rem — one hop, no extra
+              call), or <code>none</code> (the event cannot name a tagged rem, and this approach fails).
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button onClick={handleClearTape} style={smallBtnStyle}>Clear tape</button>
+              <button onClick={handleReadTape} disabled={tapeBusy} style={{ ...smallBtnStyle, cursor: tapeBusy ? 'wait' : 'pointer' }}>
+                {tapeBusy ? 'Reading…' : 'Read tape'}
+              </button>
+            </div>
+            {tapeRows && (
+              <div style={{ fontSize: '10px', marginTop: '6px', lineHeight: 1.6 }}>
+                {tapeRows.length === 0 && (
+                  <div style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+                    Tape is empty — no GlobalRemChanged events since it was cleared. Note the listener
+                    skips events while <code>plugin_operation_active</code> is set, but the tape is
+                    written before that check, so an empty tape means no events fired at all.
+                  </div>
+                )}
+                {tapeRows.length > 0 && (
+                  <div style={{ marginBottom: '4px', fontWeight: 600, fontSize: '11px' }}>
+                    {tapeRows.length} events ·{' '}
+                    self: {tapeRows.filter((r) => r.via === 'self').length} ·{' '}
+                    parent: {tapeRows.filter((r) => r.via === 'parent').length} ·{' '}
+                    none: {tapeRows.filter((r) => r.via === 'none').length}
+                  </div>
+                )}
+                {tapeRows.map((r, i) => (
+                  <div key={`${r.remId}-${i}`} style={{ paddingLeft: '8px', color: 'var(--rn-clr-content-tertiary)' }}>
+                    <span style={{ color: r.via === 'none' ? '#ef4444' : '#22c55e', fontWeight: 600 }}>{r.via}</span>
+                    {' · '}{dayjs(r.at).format('HH:mm:ss')}
+                    {' · '}<code>{r.remId}</code>
+                    {r.isPowerupProperty && ' · isProperty'}
+                    {r.isTagged && ' · tagged'}
+                    {r.text && ` · "${r.text}"`}
+                    {r.via === 'parent' && <> · → parent <code>{r.wouldMark}</code> "{r.parentText}"</>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Test 3 — the manual-edit case, which no simulated write can settle:
+              setPowerupProperty on the parent is not the same operation as typing
+              into the visible property row, and it is the typing that has to be
+              caught. Two clicks with a real edit in between. */}
+          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--rn-clr-border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>
+              3. Hand-edit test — the case that decides the design
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-secondary)', marginBottom: '6px', lineHeight: 1.5 }}>
+              A user editing the Priority property row calls nothing in this plugin, so no hidden slot
+              is written. If <code>updatedAt</code> does not move for that, a warm start would serve the
+              hand-edited priority stale forever. Snapshot → <strong>close this popup</strong> → edit the
+              Priority row by hand → reopen → Compare. The baseline is kept in session storage, so
+              closing the popup does not lose it.
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button onClick={handleSnapshotForHandEdit} disabled={!remId} style={smallBtnStyle}>
+                Snapshot now
+              </button>
+              {/* Never disabled on the baseline: the handler checks storage and
+                  toasts if it is missing. A button that disables itself exactly
+                  when the popup reopens is indistinguishable from a broken one —
+                  which is how this test failed the first time. */}
+              <button onClick={handleCompareAfterHandEdit} style={smallBtnStyle}>
+                Compare after editing
+              </button>
+              <button onClick={handleClearHandEditBaseline} style={smallBtnStyle}>
+                Clear baseline
+              </button>
+            </div>
+            {handEditBaseline && (
+              <div style={{ fontSize: '10px', color: 'var(--rn-clr-content-tertiary)', marginTop: '4px' }}>
+                baseline: priority <code>{handEditBaseline.priority || '(empty)'}</code>, taken{' '}
+                {dayjs(handEditBaseline.takenAt).format('HH:mm:ss')} on <code>{handEditBaseline.remId}</code>
+                {remId && handEditBaseline.remId !== remId && (
+                  <span style={{ color: '#f59e0b' }}>
+                    {' '}— note this is a DIFFERENT rem from the one this popup is open on; Compare will
+                    re-read the baseline's rem, not this one.
+                  </span>
+                )}
+              </div>
+            )}
+            {handEditResult && (
+              <div style={{ fontSize: '11px', marginTop: '6px', lineHeight: 1.6 }}>
+                <div style={{ color: 'var(--rn-clr-content-tertiary)', fontSize: '10px' }}>
+                  priority <code>{handEditResult.before.priority || '(empty)'}</code> → <code>{handEditResult.after.priority || '(empty)'}</code>
+                  {' · '}updatedAt {handEditResult.updatedAtMoved ? 'MOVED' : 'unchanged'}
+                  {' · '}localUpdatedAt {handEditResult.localUpdatedAtMoved ? 'moved' : 'unchanged'}
+                  {' · '}lastUpdated slot {handEditResult.lastUpdatedChanged ? 'changed' : 'unchanged'}
+                </div>
+                <div style={{ marginTop: '4px', fontWeight: 600, color: handEditResult.updatedAtMoved && handEditResult.priorityChanged ? '#22c55e' : '#ef4444' }}>
+                  {handEditResult.verdict}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ── CardPriority repair ──────────────────────────────────────────────
             Ordered dry-run → small live run → full run → staged deletion. The

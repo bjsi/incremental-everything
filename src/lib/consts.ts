@@ -78,6 +78,41 @@ export const ieSettingsMigrationReportKey = 'ie_settings_migration_report';
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
+/**
+ * Selection-only projection of {@link allIncrementalRemKey}: `remId`,
+ * `nextRepDate` and `priority`, and nothing else.
+ *
+ * The full cache carries every Rem's complete repetition history — measured at
+ * 7.99MB across 5,525 entries, 4,758 of them with history. Queue item selection
+ * needs none of it, but used to pull the whole thing over the plugin bridge on
+ * every single GetNextCard call. This projection is roughly a tenth of the size
+ * and is written by the same writers, in the same places, so the two cannot
+ * drift. Anything needing `history` must still read the full key.
+ */
+export const allIncrementalRemSlimKey = 'all-incremental-rem-slim';
+
+/**
+ * Whether the priority-calculation scope stored in `priorityCalcScopeRemIdsKey`
+ * was derived from COMPLETE caches, per item type: `{ incRem, card }`.
+ *
+ * Why this has to be recorded at build time rather than checked at use time: for
+ * a Priority Review Document scoped to the whole KB, that scope is not walked
+ * from the rem tree — it is *materialised from the two session caches* as
+ * "every card rem plus every incremental rem". If a cache is still loading when
+ * QueueEnter runs (a full IncRem load was measured at 28s on a 5,525-rem KB),
+ * the resulting id list is permanently missing that type, and no later cache
+ * load repairs it.
+ *
+ * QueueExit's `isIncRemCacheLoaded || !skipIncRemHistorySave` guard cannot catch
+ * this: by exit the cache HAS finished loading, so the guard passes and a
+ * document shield gets written against the truncated scope. That is how a
+ * session recorded an IncRem document shield over a universe of 239 instead of
+ * 5,525 — a wrong number, silently, in permanent history.
+ *
+ * Scopes built by `buildComprehensiveScope` walk the rem tree and do not depend
+ * on either cache, so they are always complete.
+ */
+export const priorityCalcScopeCompletenessKey = 'priority-calc-scope-completeness';
 export const currentIncRemKey = 'current-inc-rem';
 export const allCardPriorityInfoKey = 'all-card-priority-info-key';
 export const cardAnalyticsCacheKey = 'card-analytics-cache-key';
@@ -171,14 +206,21 @@ export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shie
 // clears this KB's shield partition, plus an index listing them for restore.
 export const cardShieldCleanupBackupPrefix = 'card-shield-cleanup-backup-';
 export const cardShieldCleanupBackupIndexKey = 'card-shield-cleanup-backup-index';
-// Characters kept per side (front / back) in the history jump-lists. The stored
-// `text` field is "front back", so one entry holds at most 2×limit + 1 chars.
+// Characters kept in the `text` preview of the history jump-lists. The stored
+// field is "front back" and the limit applies to that COMBINED string — it used
+// to be per side, which let a single entry hold 2×limit + 1 characters.
 // These lists are searched by substring and shown as one-line previews — they are
 // caches for navigation, not a copy of the card, and they live in synced storage
-// where a 900KB per-key ceiling applies. Keep the writer and the widget backfill
-// on the same constant so they cannot drift apart.
-export const flashcardHistoryTextLimit = 500;
-export const remHistoryTextLimit = 200;
+// where a 900KB per-key ceiling applies (896KB in practice, counted in UTF-16
+// bytes, i.e. HALF the character count our audit reports as UTF-8). Keep the
+// writer and the widget backfill on the same constant so they cannot drift apart.
+export const flashcardHistoryTextLimit = 400;
+export const remHistoryTextLimit = 400;
+// Entries kept per knowledge base. `text` dominates an entry, so these caps and
+// the limits above are what actually bound the key; see history_shards.ts for
+// the byte budget that backstops both.
+export const flashcardHistoryMaxEntries = 500;
+export const remHistoryMaxEntries = 500;
 
 // Restore point of a rem's Incremental history, captured by the debug tools
 // before a hand-edit. One synced key per backed-up rem — lives here (not in

@@ -100,7 +100,23 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
           code: PRIORITY_SLOT,
           name: 'Priority',
           propertyType: PropertyType.NUMBER,
-          propertyLocation: PropertyLocation.BELOW,
+          // ONLY_DOCUMENT, not BELOW: the priority row rendered under every
+          // tagged rem in the outline is noise, and it is the first thing a new
+          // user sees after tagging anything.
+          //
+          // Registering the slot `hidden` was tried instead and does not work on
+          // an existing knowledge base: RemNote applies slot options when the
+          // slot definition Rem is created and does not mutate an existing one on
+          // re-registration. Confirmed directly — the registration ran with
+          // `hidden: true` (the log fired) while getPowerupSlotByCode continued
+          // to resolve the slot natively, which it only does for visible slots.
+          // Forcing it would mean deleting the slot definition Rem, orphaning
+          // every property child that references it. Not worth it for cosmetics.
+          //
+          // This only governs NEW knowledge bases, for the same reason: existing
+          // ones keep whatever location their slot Rem already has, and the user
+          // changes it in RemNote's own UI.
+          propertyLocation: PropertyLocation.ONLY_DOCUMENT,
         },
         {
           code: SOURCE_SLOT,

@@ -85,16 +85,41 @@ The **PDF Control Panel** (`Command Palette → PDF Control Panel`) is the centr
 The **All Rems Using This PDF** list builds a **containment tree** based on page ranges:
 
 - If a rem's range is **fully contained** within another's (e.g. a sub-section inside a chapter), it appears **indented** below the parent.
+- Each rem is placed under the **tightest** range that contains it, so a sub-sub-section nests under its sub-section rather than jumping straight to the chapter.
 - Depth-based indentation (16 px/level) makes nesting visible at a glance.
 - Rems without an assigned page range float below the tree at depth 0.
 
 This is useful when you split a chapter into sub-sections during incremental reading — you can see the exact hierarchy without any manual tagging.
+
+**Page ranges are the only thing that builds the tree.** Where a rem lives in your knowledge base is never consulted for nesting. If you scatter a book's sections across unrelated parts of your KB, a snippet *4.1 Introduction* with range 30–40 still nests under a *Chapter 4* snippet with range 30–60, because 30–40 sits inside 30–60. The reconstruction is purely geometric, which is what makes it survive any amount of reorganisation.
+
+A chapter and its first sub-section usually **start on the same page** (Chapter 4 opens on p.30, and so does 4.1). Ties on the start page are resolved by putting the **wider** range first, so the chapter is always recognised as the container.
+
+**Reading order:** the list is emitted depth-first — each rem is followed immediately by its own sub-tree, then the next rem at that level. So you read it top to bottom in page order, with every child directly beneath the parent it belongs to.
+
+> [!NOTE]
+> The current rem is marked by its highlighted border and a **Current** chip, and the panel scrolls it into view when it opens. It is *not* pulled to the top of the list — doing so would break the containment ordering above.
 
 **Overlap detection:** If two siblings have genuinely overlapping ranges, an inline **⚠ overlap** badge appears on both. Shared boundary pages (one chapter ends on page 265, the next starts on page 265) are **not** flagged.
 
 **Coverage badge:** Parent rows show an **X/Ypp** badge with a tiny fill bar indicating how many pages are already covered by child rems. Hover to see the percentage (e.g. `"25 of 30 pages covered by sub-rems (83%)"`). This tells you at a glance how much of a chapter still needs to be sub-divided.
 
 ![PDF Control Panel](assets/pdf-control-panel.png){ width="650" }
+
+### Dismissed Chapters in the Panel
+
+Dismissing a chapter stops it being scheduled, but it keeps its page range and reading history (see [v1.0.34](Changelog.md#v1034-august-5th-2026)). Such a chapter still appears in the tree, nested by its range like any other, and carries a **Dismissed** chip so you can tell it apart from a rem that was never Incremental — otherwise the two look identical, since neither shows the ⚡ or a priority badge.
+
+Expanding a dismissed row offers:
+
+| Action | Available | Why |
+|---|---|---|
+| **📄 Range** | ✅ | The range is stored with the chapter and stays editable, so you can keep the book's map accurate without reviving anything. |
+| **📖 History** | ✅ | Same — the reading position and history travel with the rem. |
+| **★ Priority** | ❌ | A priority only means something for a scheduled rem; a dismissed one has none to edit. |
+| **⚡ Restore** | ✅ | Makes it Incremental again, resuming at the page it was left on and merging the history from before it was dismissed. |
+
+A rem that has **neither** been made Incremental nor dismissed — the book's own document rem, say — offers only **Make Incremental**. It has nowhere to keep a page range yet, so there is no range to edit.
 
 ---
 
@@ -105,7 +130,7 @@ When you select text in the PDF Reader and create a highlight, the native RemNot
 | Icon | Tool | Description |
 |------|------|-------------|
 | 🔖 | **Set Bookmark Position** | Manually records your current reading position at this highlight's exact page. *(Note: Using the extraction tools below will also do this automatically).* |
-| ![](https://cdn-icons-png.flaticon.com/512/8365/8365483.png){ width="16" } | **Create Incremental Rem** | Extracts the highlight into a standalone Incremental Rem and lets you choose precisely where it should live in your Knowledge Base hierarchy. See the [Create-Incremental-Rem-from-PDF-Highlights](dedicated-guide-here.md) for full details. |
+| ![](https://cdn-icons-png.flaticon.com/512/8365/8365483.png){ width="16" } | **Create Incremental Rem** | Extracts the highlight into a standalone Incremental Rem and lets you choose precisely where it should live in your Knowledge Base hierarchy. See the [Create-Incremental-Rem-from-PDF-Highlights](Create-Incremental-Rem-from-PDF-Highlights.md) for full details. |
 | ![](https://cdn-icons-png.flaticon.com/512/1504/1504044.png){ width="16" } | **Toggle Incremental Rem** | Quick-tags the highlight itself as an Incremental Rem without moving it. The button background turns blue to indicate the highlight is now actively tracked in your queue. |
 | 👁️ / 🙈 | **Toggle Marker Borders (Peek)** | Shows/hides the extract & incremental **marker borders** (see below) over all PDF highlights, so you can read a busy page cleanly. Turns amber while markers are hidden. Also available as the **Toggle PDF Highlight Marker Borders** command (quick code `tb`), and remembered per device (default: on). |
 
@@ -174,7 +199,7 @@ Toggle behavior simply by adding or removing the `extractviewer` tag:
 | `#extractviewer` tag | ExtractViewer (notes and children) |
 
 > [!TIP]
-> If the chapter has a **[read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems)** set on a descendant, you don't need the tag to peek at the outline: a **📑 View outline / 📄 Read document** toggle appears in the top-right of the queue card, letting you flip between the PDF reader and the outline view **per session** without re-tagging. The `#extractviewer` tag is for making the outline the **permanent default** for that chapter. See [Reviewing-Items-in-the-Queue#the-answer-buttons](Reviewing-in-the-Queue-→-hybrid-toggle.md).
+> If the chapter has a **[read point](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems)** set on a descendant, you don't need the tag to peek at the outline: a **📑 View outline / 📄 Read document** toggle appears in the top-right of the queue card, letting you flip between the PDF reader and the outline view **per session** without re-tagging. The `#extractviewer` tag is for making the outline the **permanent default** for that chapter. See [Reviewing-Items-in-the-Queue#the-answer-buttons](Reviewing-Items-in-the-Queue.md#the-answer-buttons).
 
 ### Multiple PDF Sources — Active PDF, Switcher, and `#preferthispdf`
 

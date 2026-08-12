@@ -37,8 +37,8 @@ The first step is to convert a Rem, PDF, or website into an "Incremental Rem" so
 
 ### Method 2: Keyboard Shortcut
 
-- **[Alt+X](Keyboard-Shortcuts.md#core-commands)** (or **Opt+X** on Mac) — Makes the focused Rem incremental. **If text is selected**, it creates a new **[Reviewing-Items-in-the-Editor#extracting-text](Text-Extract.md)** from that selection.
-- **[Alt+Shift+X](Keyboard-Shortcuts.md#core-commands)** — Makes the Rem incremental AND opens the priority popup. Supports **[Reviewing-Items-in-the-Editor#extracting-text](text-extraction.md)** from selections.
+- **[Alt+X](Keyboard-Shortcuts.md#core-commands)** (or **Opt+X** on Mac) — Makes the focused Rem incremental. **If text is selected**, it creates a new **[Reviewing-Items-in-the-Editor#extracting-text](Reviewing-Items-in-the-Editor.md#extracting-text)** from that selection.
+- **[Alt+Shift+X](Keyboard-Shortcuts.md#core-commands)** — Makes the Rem incremental AND opens the priority popup. Supports **[Reviewing-Items-in-the-Editor#extracting-text](Reviewing-Items-in-the-Editor.md#extracting-text)** from selections.
 
 ![Extract Selection Demo](assets/extract-selected-text.gif)
 
@@ -188,9 +188,9 @@ Priority is crucial for managing information overload. Lower numbers = higher pr
 
 ### Quick Methods
 
-- **[Alt+P](Keyboard-Shortcuts.md#priority-commands)** — [Full priority popup](Prioritization-&-Sorting.md#set-priority-popup) with analytics
+- **[Alt+P](Keyboard-Shortcuts.md#priority-commands)** — [Full priority popup](Prioritization-&-Sorting.md#main-priority-popup) with analytics
 - **[Ctrl+Opt+P](Keyboard-Shortcuts.md#priority-commands)** — [Light priority popup](Prioritization-&-Sorting.md#light-priority-popup) (faster)
-- **[Ctrl+Opt+Up/Down](Keyboard-Shortcuts.md#priority-commands)** — [Quick Priority Change](Prioritization-&-Sorting.md#quick-priority-change): Adjust priority instantly without opening any popup
+- **[Ctrl+Opt+Up/Down](Keyboard-Shortcuts.md#priority-commands)** — [Quick Priority Change](Prioritization-&-Sorting.md#quick-priority-shortcuts): Adjust priority instantly without opening any popup
 
 For comprehensive details, see [Prioritization & Sorting](Prioritization-&-Sorting.md).
 

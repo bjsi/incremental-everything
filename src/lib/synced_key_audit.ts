@@ -29,7 +29,12 @@ import {
 import { getLastDestinationKey } from './hierarchical_parent_selector/types';
 import { snapshotKey } from './listify';
 import { PRACTICED_QUEUES_HISTORY_KEY, DAILY_AGGREGATES_KEY } from './queue_aggregates';
-import { AUTHORITATIVE_AGGREGATES_KEY, AUTHORITATIVE_LAST_COMPUTED_KEY } from './authoritative_aggregates';
+import {
+  AUTHORITATIVE_AGGREGATES_KEY,
+  AUTHORITATIVE_LAST_COMPUTED_KEY,
+  authoritativeShardKey,
+} from './authoritative_aggregates';
+import { flashcardHistorySpec, remHistorySpec, shardKey } from './history_shards';
 
 // ---------------------------------------------------------------------------
 // Synced-storage key audit
@@ -55,11 +60,20 @@ import { AUTHORITATIVE_AGGREGATES_KEY, AUTHORITATIVE_LAST_COMPUTED_KEY } from '.
 
 export const SYNCED_KEY_CAP = 1000;
 
-/** RemNote's documented ceilings: 900KB for a single synced value, 10MB for a
- *  plugin's whole synced footprint. Measured sizes here are the UTF-8 length of
- *  `JSON.stringify(value)` — a close proxy for what gets synced, not the exact
- *  on-disk figure, which we have no way to read. */
-export const PER_KEY_BYTE_LIMIT = 900 * 1024;
+/**
+ * RemNote's ceilings: one synced value is documented at 900KB, and a plugin's
+ * whole synced footprint at 10MB.
+ *
+ * The per-key figure is measured rather than assumed. `calibratePerKeyLimit`
+ * bisected a scratch key to the rejection point on 2026-08-11 and got **458,752
+ * characters accepted, identical for 1-, 2- and 3-byte UTF-8 alphabets** — so the
+ * limit is counted in UTF-16 bytes (`JSON.stringify(v).length * 2`) and lands at
+ * 896KB, not 900KB of UTF-8. Every UTF-8 size in this report is therefore HALF of
+ * what the limit sees, which is why `worstCaseBytes` exists and why the report
+ * compares against that. Re-run the calibration if RemNote changes its storage
+ * layer again; it is the only way to know.
+ */
+export const PER_KEY_BYTE_LIMIT = 896 * 1024;
 export const TOTAL_BYTE_BUDGET = 10 * 1024 * 1024;
 /** Flag a key once it passes half of the per-key ceiling — enough runway to act. */
 const SIZE_WARN_RATIO = 0.5;
@@ -72,9 +86,36 @@ const PROBE_CONCURRENCY = 12;
 
 export type ProbeState = 'live' | 'nulled' | 'absent';
 
+/** The same value measured every way RemNote could plausibly be counting it. The
+ *  units differ by up to 2×, and `calibratePerKeyLimit` showed the live one is
+ *  UTF-16 — a key reading 57% of the limit in UTF-8 was in fact over it. The
+ *  other columns are kept so a future change of unit shows up as a discrepancy
+ *  rather than as a mystery. */
+export interface SizeBreakdown {
+  /** `JSON.stringify(value).length` — UTF-16 code units. */
+  chars: number;
+  /** UTF-8 bytes of the JSON. What every earlier audit reported. */
+  utf8: number;
+  /** UTF-16 bytes (chars × 2): what a host measuring JS string memory sees. */
+  utf16: number;
+  /** UTF-8 bytes of the JSON escaped once more, as when a value is stored as a
+   *  string field inside another JSON document. */
+  escaped: number;
+}
+
 export interface KeySize {
   key: string;
+  /** UTF-8 bytes — kept as the primary figure so totals stay comparable. */
   bytes: number;
+  chars?: number;
+  utf16?: number;
+  escaped?: number;
+}
+
+/** The largest of the measurements we have for a key: the only figure safe to
+ *  compare against the per-key ceiling while the accounting unit is unknown. */
+export function worstCaseBytes(size: KeySize): number {
+  return Math.max(size.bytes, size.utf16 ?? 0, size.escaped ?? 0);
 }
 
 export interface FamilyReport {
@@ -103,6 +144,100 @@ export interface CapacityReport {
   atCap: boolean;
   probeKey: string;
   error?: string;
+}
+
+/** One filler alphabet's answer to "how big a value does RemNote actually take?" */
+export interface LimitProbe {
+  label: string;
+  utf8PerChar: number;
+  /** Largest payload the write accepted, and the smallest one it rejected. */
+  acceptedChars: number;
+  rejectedChars: number | null;
+  /** The accepted payload expressed in each candidate accounting unit. */
+  acceptedUtf8: number;
+  acceptedUtf16: number;
+  writes: number;
+}
+
+export interface PerKeyLimitReport {
+  probes: LimitProbe[];
+  documentedLimit: number;
+  /** Which unit best explains the measured ceilings, and how confident we are. */
+  verdict: string;
+  /** The unit whose measured ceiling is most consistent across alphabets. */
+  unit: 'utf8' | 'utf16' | 'chars' | 'unknown';
+  /** Ceiling in that unit, averaged over the probes. */
+  measuredLimit: number;
+  error?: string;
+}
+
+export interface FieldCost {
+  field: string;
+  /** UTF-8 bytes this field contributes across every entry, key name included. */
+  bytes: number;
+  share: number;
+  present: number;
+  longest: number;
+}
+
+export interface TrimOption {
+  label: string;
+  maxEntries?: number;
+  stringLimit?: number;
+  dropFields?: string[];
+}
+
+export interface Projection {
+  label: string;
+  utf8: number;
+  worst: number;
+  savedPct: number;
+  entries: number;
+}
+
+/** How a low-cardinality field's values split the array — the measurement that
+ *  says whether sharding the key on that field would actually buy anything. */
+export interface ValueDistribution {
+  field: string;
+  values: { value: string; count: number; bytes: number; share: number }[];
+}
+
+/** One top-level branch of an object-shaped key — a kbId in the aggregate and
+ *  shield-history stores. Its size is what sharding on that level would move out
+ *  of the hot key. */
+export interface ObjectBranch {
+  path: string;
+  bytes: number;
+  share: number;
+  /** Depth-2 keys under this branch (dates, in every store we have). */
+  children: number;
+  firstChildKey?: string;
+  lastChildKey?: string;
+}
+
+export interface ArrayKeyAnatomy {
+  key: string;
+  exists: boolean;
+  isArray: boolean;
+  /** How the value is organised. Object maps get `branches` instead of `fields`. */
+  shape: 'array' | 'object' | 'other';
+  /** Where the branches were found, when the analyser descended through a
+   *  wrapper (`{v: 2, kbs: {…}}` reports `kbs`). */
+  branchRoot?: string;
+  branches: ObjectBranch[];
+  entries: number;
+  size: SizeBreakdown;
+  worst: number;
+  perKeyLimit: number;
+  fields: FieldCost[];
+  distributions: ValueDistribution[];
+  entryBytes: { avg: number; median: number; p95: number; max: number };
+  largestEntries: { index: number; bytes: number; preview: string }[];
+  /** Running UTF-8 total over the first N entries — what a retention cap buys. */
+  cumulative: { entries: number; utf8: number }[];
+  oldest?: number;
+  newest?: number;
+  projections: Projection[];
 }
 
 export interface NullFreesSlotReport {
@@ -169,7 +304,28 @@ function measureBytes(value: unknown): number {
   } catch {
     return 0; // circular or otherwise unserializable — should not happen for stored data
   }
+  return utf8Bytes(json);
+}
+
+function utf8Bytes(json: string): number {
   return textEncoder ? textEncoder.encode(json).length : json.length;
+}
+
+/** Escaping a 500 KB string allocates another copy of it; only worth doing for
+ *  values big enough that the distinction can matter. */
+const ESCAPE_MEASURE_THRESHOLD = 16 * 1024;
+
+export function measureSizes(value: unknown): SizeBreakdown {
+  let json: string;
+  try {
+    json = JSON.stringify(value) ?? '';
+  } catch {
+    return { chars: 0, utf8: 0, utf16: 0, escaped: 0 };
+  }
+  const utf8 = utf8Bytes(json);
+  const escaped =
+    utf8 >= ESCAPE_MEASURE_THRESHOLD ? utf8Bytes(JSON.stringify(json)) : utf8 + 2;
+  return { chars: json.length, utf8, utf16: json.length * 2, escaped };
 }
 
 export function formatBytes(bytes: number): string {
@@ -178,18 +334,22 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-async function probeKey(plugin: RNPlugin, key: string): Promise<{ state: ProbeState; bytes: number }> {
+async function probeKey(
+  plugin: RNPlugin,
+  key: string
+): Promise<{ state: ProbeState; size: SizeBreakdown }> {
+  const empty: SizeBreakdown = { chars: 0, utf8: 0, utf16: 0, escaped: 0 };
   try {
     const value = await plugin.storage.getSynced(key);
-    if (value === undefined) return { state: 'absent', bytes: 0 };
-    if (value === null) return { state: 'nulled', bytes: 0 };
+    if (value === undefined) return { state: 'absent', size: empty };
+    if (value === null) return { state: 'nulled', size: empty };
     // Measure and drop the value immediately — holding thousands of them would
     // cost more memory than the storage we're auditing.
-    return { state: 'live', bytes: measureBytes(value) };
+    return { state: 'live', size: measureSizes(value) };
   } catch {
     // A read that throws tells us nothing about existence; treat as absent so we
     // never over-count, and let the unaccounted figure absorb it.
-    return { state: 'absent', bytes: 0 };
+    return { state: 'absent', size: empty };
   }
 }
 
@@ -219,13 +379,21 @@ async function probeFamily(
   for (let i = 0; i < keys.length; i += PROBE_CONCURRENCY) {
     const chunk = keys.slice(i, i + PROBE_CONCURRENCY);
     const results = await Promise.all(chunk.map((k) => probeKey(plugin, k)));
-    results.forEach(({ state, bytes }, j) => {
+    results.forEach(({ state, size }, j) => {
       const key = chunk[j];
+      const bytes = size.utf8;
       if (state === 'live') {
+        const entry: KeySize = {
+          key,
+          bytes,
+          chars: size.chars,
+          utf16: size.utf16,
+          escaped: size.escaped,
+        };
         report.live++;
         report.bytes += bytes;
-        if (!report.largest || bytes > report.largest.bytes) report.largest = { key, bytes };
-        onLiveKey?.({ key, bytes });
+        if (!report.largest || bytes > report.largest.bytes) report.largest = entry;
+        onLiveKey?.(entry);
         if (report.sample.length < 5) report.sample.push(key);
         if (candidates.disposable) report.disposable!.push(key);
       } else if (state === 'nulled') {
@@ -298,8 +466,10 @@ async function buildCandidates(
     coverage: 'full',
     keys: [
       'finalDrillIds',
-      'flashcardHistoryData',
-      'remData',
+      // Pre-shard globals. Drained into per-KB shards on first read; they linger
+      // holding [] (or the entries no session could place yet).
+      flashcardHistorySpec.legacyKey,
+      remHistorySpec.legacyKey,
       'incrementalHistoryData', // HISTORY_KEY in history_utils.ts (not exported)
       PRACTICED_QUEUES_HISTORY_KEY,
       DAILY_AGGREGATES_KEY,
@@ -341,6 +511,28 @@ async function buildCandidates(
       `sortingPresets_${kbId}`,
       `weightSelectionK_${kbId}`,
     ]),
+  });
+
+  // 3b. History shards — one key per KB for each of the two jump-lists.
+  families.push({
+    family: 'History shards (per KB)',
+    pattern: '{flashcardHistoryData|remData}_{kbId}',
+    coverage: 'partial',
+    note: 'Same kbId discovery limits as the sorting settings above.',
+    keys: kbIds.flatMap((kbId) => [
+      shardKey(flashcardHistorySpec, kbId),
+      shardKey(remHistorySpec, kbId),
+    ]),
+  });
+
+  // 3c. Authoritative study aggregates — one key per KB, holding every day that
+  //     KB has ever been studied.
+  families.push({
+    family: 'Authoritative aggregates (per KB)',
+    pattern: `${AUTHORITATIVE_AGGREGATES_KEY}_{kbId}`,
+    coverage: 'partial',
+    note: 'Same kbId discovery limits as the sorting settings above.',
+    keys: kbIds.map((kbId) => authoritativeShardKey(kbId)),
   });
 
   // 4. Rem universes.
@@ -630,7 +822,9 @@ export async function auditSyncedKeys(
     perKeyLimit: PER_KEY_BYTE_LIMIT,
     totalBudget: TOTAL_BYTE_BUDGET,
     largestKeys,
-    sizeWarnings: largestKeys.filter((k) => k.bytes >= PER_KEY_BYTE_LIMIT * SIZE_WARN_RATIO),
+    sizeWarnings: largestKeys.filter(
+      (k) => worstCaseBytes(k) >= PER_KEY_BYTE_LIMIT * SIZE_WARN_RATIO
+    ),
     totals,
     cap: SYNCED_KEY_CAP,
     occupied,
@@ -675,19 +869,27 @@ export function logAuditResult(result: AuditResult): void {
       `(${((result.totalBytes / result.totalBudget) * 100).toFixed(1)}% of the plugin budget)`
   );
   if (result.largestKeys.length > 0) {
-    console.log(`Largest keys (per-key ceiling ${formatBytes(result.perKeyLimit)}):`);
+    console.log(
+      `Largest keys. The ceiling is ${formatBytes(result.perKeyLimit)} counted in UTF-16 bytes ` +
+        '(measured, not assumed — see calibratePerKeyLimit), so the UTF-8 column is half of what ' +
+        'the limit sees. "% worst" is the figure to act on.'
+    );
     console.table(
       result.largestKeys.map((k) => ({
         key: k.key,
-        size: formatBytes(k.bytes),
-        '% of per-key limit': `${((k.bytes / result.perKeyLimit) * 100).toFixed(1)}%`,
+        utf8: formatBytes(k.bytes),
+        utf16: k.utf16 != null ? formatBytes(k.utf16) : '—',
+        escaped: k.escaped != null ? formatBytes(k.escaped) : '—',
+        '% utf8': `${((k.bytes / result.perKeyLimit) * 100).toFixed(1)}%`,
+        '% worst': `${((worstCaseBytes(k) / result.perKeyLimit) * 100).toFixed(1)}%`,
       }))
     );
   }
   for (const warn of result.sizeWarnings) {
+    const worst = worstCaseBytes(warn);
     console.warn(
-      `[KeyAudit] "${warn.key}" is ${formatBytes(warn.bytes)} — ` +
-        `${((warn.bytes / result.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(result.perKeyLimit)} per-key ceiling.`
+      `[KeyAudit] "${warn.key}" is ${formatBytes(warn.bytes)} UTF-8 / ${formatBytes(worst)} worst-case — ` +
+        `${((worst / result.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(result.perKeyLimit)} per-key ceiling.`
     );
   }
   console.log(`Unaccounted (orphans we cannot name): ~${result.unaccounted}`);
@@ -781,4 +983,604 @@ export async function testNullFreesSlot(
   }
 
   return report;
+}
+
+// --- per-key size ceiling: what does RemNote actually count? ----------------
+//
+// The audit can only measure what a value weighs in JS. RemNote rejects writes
+// against a 900 KB "per-item" ceiling without telling us the unit, and the
+// candidate units differ by 2× (a 512 KB UTF-8 value is 1.02 MB in UTF-16).
+// That gap is exactly the band flashcardHistoryData sits in, so guessing is not
+// good enough: this walks a scratch key up to the rejection point with three
+// different alphabets and reads the unit off the results.
+//
+//   • If the ceiling lands at ~900 KB of UTF-8 for all three alphabets, RemNote
+//     counts UTF-8 bytes and our audit figures were already right.
+//   • If it lands at ~460 K characters regardless of alphabet, it counts UTF-16
+//     bytes (string length × 2) and every audit figure must be doubled.
+
+// SCOPE: this calibration measures `setSynced` and nothing else. Local storage
+// is a separate backend and does NOT share this ceiling — it was probed at
+// 128 MB in one key without failing (lib/local_storage_probe.ts). Do not apply
+// the number below to a setLocal key.
+const SIZE_PROBE_KEY = '__ie_size_probe__';
+
+/** Stop bisecting once the bracket is this tight — one more halving costs a
+ *  multi-hundred-KB IPC write and buys nothing we would act on. */
+const LIMIT_PROBE_TOLERANCE_CHARS = 4096;
+/** Never write more than this in one probe, whatever the doubling suggests. */
+const LIMIT_PROBE_MAX_CHARS = 4 * 1024 * 1024;
+
+const LIMIT_PROBE_FILLERS: Array<{ label: string; char: string; utf8PerChar: number }> = [
+  { label: 'ASCII (1 UTF-8 byte/char)', char: 'x', utf8PerChar: 1 },
+  { label: 'Accented Latin (2 UTF-8 bytes/char)', char: 'é', utf8PerChar: 2 },
+  { label: 'CJK (3 UTF-8 bytes/char)', char: '漢', utf8PerChar: 3 },
+];
+
+async function scratchWriteSucceeds(plugin: RNPlugin, payload: string): Promise<boolean> {
+  try {
+    await plugin.storage.setSynced(SIZE_PROBE_KEY, payload);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Find the real per-key ceiling by bisection on a single scratch key.
+ *
+ * Writes several hundred KB repeatedly, so it is deliberately a manual, opt-in
+ * action: it costs sync traffic and it leaves one extra key behind (nulled at
+ * the end — nulling does not free the slot, see testNullFreesSlot).
+ */
+export async function calibratePerKeyLimit(
+  plugin: RNPlugin,
+  onProgress?: (message: string) => void
+): Promise<PerKeyLimitReport> {
+  const probes: LimitProbe[] = [];
+  const report: PerKeyLimitReport = {
+    probes,
+    documentedLimit: PER_KEY_BYTE_LIMIT,
+    verdict: '',
+    unit: 'unknown',
+    measuredLimit: 0,
+  };
+
+  try {
+    for (const filler of LIMIT_PROBE_FILLERS) {
+      let writes = 0;
+      const attempt = async (chars: number) => {
+        writes++;
+        onProgress?.(
+          `${filler.label}: testing ${chars.toLocaleString()} chars ` +
+            `(${formatBytes(chars * filler.utf8PerChar)} UTF-8)…`
+        );
+        return scratchWriteSucceeds(plugin, filler.char.repeat(chars));
+      };
+
+      // Bracket: double from a value we are confident fits until one is refused.
+      let lo = 1024; // known-good floor; if even this fails we report it as such
+      let hi = 0;
+      if (!(await attempt(lo))) {
+        probes.push({
+          label: filler.label,
+          utf8PerChar: filler.utf8PerChar,
+          acceptedChars: 0,
+          rejectedChars: lo,
+          acceptedUtf8: 0,
+          acceptedUtf16: 0,
+          writes,
+        });
+        continue;
+      }
+      let candidate = lo * 2;
+      while (candidate <= LIMIT_PROBE_MAX_CHARS) {
+        if (await attempt(candidate)) {
+          lo = candidate;
+          candidate *= 2;
+        } else {
+          hi = candidate;
+          break;
+        }
+      }
+
+      // Bisect the [accepted, rejected] bracket.
+      if (hi > 0) {
+        while (hi - lo > LIMIT_PROBE_TOLERANCE_CHARS) {
+          const mid = Math.floor((lo + hi) / 2);
+          if (await attempt(mid)) lo = mid;
+          else hi = mid;
+        }
+      }
+
+      probes.push({
+        label: filler.label,
+        utf8PerChar: filler.utf8PerChar,
+        acceptedChars: lo,
+        rejectedChars: hi > 0 ? hi : null,
+        // The stored JSON is the string plus its two quote characters.
+        acceptedUtf8: lo * filler.utf8PerChar + 2,
+        acceptedUtf16: (lo + 2) * 2,
+        writes,
+      });
+    }
+
+    // Hand the bytes back. The slot stays taken either way, but a 1 MB scratch
+    // value left behind would eat 10% of the plugin's whole budget.
+    onProgress?.('Releasing the scratch key…');
+    await plugin.storage.setSynced(SIZE_PROBE_KEY, null);
+
+    const usable = probes.filter((p) => p.acceptedChars > 0 && p.rejectedChars !== null);
+    if (usable.length >= 2) {
+      // Whichever unit gives the most consistent ceiling across alphabets is the
+      // unit RemNote counts in: the other two vary with bytes-per-char.
+      const candidates: Array<{ unit: PerKeyLimitReport['unit']; values: number[] }> = [
+        { unit: 'utf8', values: usable.map((p) => p.acceptedUtf8) },
+        { unit: 'utf16', values: usable.map((p) => p.acceptedUtf16) },
+        { unit: 'chars', values: usable.map((p) => p.acceptedChars) },
+      ];
+      const scored = candidates.map((c) => {
+        const min = Math.min(...c.values);
+        const max = Math.max(...c.values);
+        const mean = c.values.reduce((s, v) => s + v, 0) / c.values.length;
+        return { ...c, spread: max / Math.max(1, min), mean };
+      });
+      scored.sort((a, b) => a.spread - b.spread);
+      const best = scored[0];
+      report.unit = best.spread <= 1.1 ? best.unit : 'unknown';
+      report.measuredLimit = Math.round(best.mean);
+      const pct = ((report.measuredLimit / PER_KEY_BYTE_LIMIT) * 100).toFixed(0);
+      report.verdict =
+        report.unit === 'unknown'
+          ? `No unit explains all three alphabets (best spread ${best.spread.toFixed(2)}×) — the ceiling is not a plain size check. Treat the worst-case column as the budget.`
+          : `RemNote counts ${best.unit === 'chars' ? 'JSON characters' : best.unit === 'utf16' ? 'UTF-16 bytes (string length × 2)' : 'UTF-8 bytes'}: ` +
+            `ceiling measured at ${formatBytes(report.measuredLimit)} (${pct}% of the documented 900 KB), consistent within ${((best.spread - 1) * 100).toFixed(1)}% across alphabets.` +
+            (best.unit === 'utf16'
+              ? ' Every UTF-8 figure in the key audit must be doubled before comparing it to the limit.'
+              : '');
+    } else {
+      report.verdict =
+        'Inconclusive — the probe never found a rejection point (or every write failed). Check the console for the raw results.';
+    }
+  } catch (e) {
+    report.error = String(e);
+    console.error('[KeyAudit] per-key limit calibration failed', e);
+  }
+
+  logPerKeyLimitReport(report);
+  return report;
+}
+
+export function logPerKeyLimitReport(report: PerKeyLimitReport): void {
+  console.log('\n===== PER-KEY SIZE CEILING CALIBRATION =====');
+  console.table(
+    report.probes.map((p) => ({
+      alphabet: p.label,
+      'largest accepted': `${p.acceptedChars.toLocaleString()} chars`,
+      'smallest rejected': p.rejectedChars ? `${p.rejectedChars.toLocaleString()} chars` : '—',
+      'accepted UTF-8': formatBytes(p.acceptedUtf8),
+      'accepted UTF-16': formatBytes(p.acceptedUtf16),
+      writes: p.writes,
+    }))
+  );
+  console.log(`Documented limit: ${formatBytes(report.documentedLimit)}`);
+  console.log(`Verdict: ${report.verdict}`);
+  if (report.error) console.warn(`Error: ${report.error}`);
+  console.log('============================================\n');
+}
+
+// --- anatomy of one oversized key ------------------------------------------
+
+/** Approximate UTF-8 cost of one `"field":value,` pair inside an object. */
+function fieldCostBytes(field: string, value: unknown): number {
+  return measureBytes(field) + 1 + measureBytes(value) + 1;
+}
+
+function truncateStrings<T>(entry: T, limit: number, dropFields: string[]): T {
+  if (!entry || typeof entry !== 'object') return entry;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(entry as Record<string, unknown>)) {
+    if (dropFields.includes(k)) continue;
+    out[k] = typeof v === 'string' && v.length > limit ? v.substring(0, limit) : v;
+  }
+  return out as unknown as T;
+}
+
+const DEFAULT_TRIM_OPTIONS: TrimOption[] = [
+  // The first row is what the history shards actually ship with, so an oversized
+  // key can be compared against the current policy rather than only hypotheticals.
+  { label: 'Shipped history-shard limits: 500 entries, text ≤ 400 chars', maxEntries: 500, stringLimit: 400 },
+  { label: 'Cap at 500 entries, text ≤ 250 chars', maxEntries: 500, stringLimit: 250 },
+  { label: 'Cap at 300 entries, text ≤ 250 chars', maxEntries: 300, stringLimit: 250 },
+  { label: 'Cap at 300 entries, drop stored text entirely', maxEntries: 300, dropFields: ['text'] },
+];
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * Find the level that actually holds the data. `authoritativeDailyAggregates` is
+ * `{v: 2, kbs: {kbId: …}}`, so the interesting branches are one level down; the
+ * shield-history stores are already `{kbId: …}` and need no descent.
+ */
+function findBranchRoot(value: Record<string, unknown>): { root: Record<string, unknown>; path?: string } {
+  let root = value;
+  let path: string | undefined;
+  for (let depth = 0; depth < 3; depth++) {
+    const entries = Object.entries(root);
+    const objectProps = entries.filter(([, v]) => isPlainObject(v));
+    const scalarProps = entries.length - objectProps.length;
+    // A wrapper carries metadata alongside the payload — `{v: 2, kbs: {…}}`. The
+    // presence of a scalar sibling is what identifies it, NOT how many partitions
+    // the payload holds: a single-KB shard has exactly one, and descending on
+    // size alone would then walk straight past the partitions into the dates.
+    if (objectProps.length !== 1 || scalarProps === 0) break;
+    const [name, child] = objectProps[0];
+    root = child as Record<string, unknown>;
+    path = path ? `${path}.${name}` : name;
+  }
+  return { root, path };
+}
+
+/**
+ * Break one object-shaped key into its top-level branches, and project what
+ * sharding or a retention window would do to it.
+ *
+ * The stores that reach this path are all `{partition: {date: row}}`, so the two
+ * levers are the same two every time: split the partitions into separate keys, or
+ * stop keeping every date forever. This measures both instead of guessing.
+ */
+function analyzeObjectShape(
+  anatomy: ArrayKeyAnatomy,
+  value: Record<string, unknown>
+): void {
+  const { root, path } = findBranchRoot(value);
+  anatomy.branchRoot = path;
+
+  const totalBytes = measureBytes(root) || 1;
+  const allChildKeys: string[] = [];
+
+  anatomy.branches = Object.entries(root)
+    .map(([branchKey, branchValue]) => {
+      const childKeys = isPlainObject(branchValue) ? Object.keys(branchValue).sort() : [];
+      allChildKeys.push(...childKeys);
+      return {
+        path: branchKey,
+        bytes: measureBytes(branchValue),
+        share: measureBytes(branchValue) / totalBytes,
+        children: childKeys.length,
+        firstChildKey: childKeys[0],
+        lastChildKey: childKeys[childKeys.length - 1],
+      };
+    })
+    .sort((a, b) => b.bytes - a.bytes);
+
+  anatomy.entries = anatomy.branches.reduce((s, b) => s + b.children, 0);
+
+  // Sharding: the hot key keeps only its own branch, so the largest branch IS the
+  // post-shard size. Worth stating as a projection rather than left to arithmetic.
+  const largest = anatomy.branches[0];
+  if (largest && anatomy.branches.length > 1) {
+    const shardSize = measureSizes(root[largest.path]);
+    anatomy.projections.push({
+      label: `Shard by ${anatomy.branchRoot ? `${anatomy.branchRoot} ` : ''}partition (largest: ${largest.path.substring(0, 12)}…)`,
+      utf8: shardSize.utf8,
+      worst: Math.max(shardSize.utf8, shardSize.utf16, shardSize.escaped),
+      savedPct: 1 - shardSize.utf8 / Math.max(1, anatomy.size.utf8),
+      entries: largest.children,
+    });
+  }
+
+  // Retention: only meaningful when the second level is dated, which is how every
+  // one of these stores is keyed.
+  const dated = allChildKeys.filter((k) => DATE_KEY.test(k));
+  if (dated.length >= allChildKeys.length * 0.8 && dated.length > 0) {
+    const newest = dated.sort()[dated.length - 1];
+    const newestMs = Date.parse(newest);
+    for (const days of [730, 365, 180]) {
+      const cutoff = new Date(newestMs - days * 86400000).toISOString().slice(0, 10);
+      const pruned: Record<string, unknown> = {};
+      let kept = 0;
+      for (const [branchKey, branchValue] of Object.entries(root)) {
+        if (!isPlainObject(branchValue)) {
+          pruned[branchKey] = branchValue;
+          continue;
+        }
+        const keptChildren: Record<string, unknown> = {};
+        for (const [childKey, childValue] of Object.entries(branchValue)) {
+          if (!DATE_KEY.test(childKey) || childKey >= cutoff) {
+            keptChildren[childKey] = childValue;
+            kept++;
+          }
+        }
+        if (Object.keys(keptChildren).length > 0) pruned[branchKey] = keptChildren;
+      }
+      const prunedSize = measureSizes(pruned);
+      // A window wider than the data on file saves nothing; the 1% margin also
+      // absorbs the wrapper (`{v: 2, …}`) that `pruned` does not carry.
+      if (prunedSize.utf8 >= anatomy.size.utf8 * 0.99) continue;
+      anatomy.projections.push({
+        label: `Keep the last ${days} days only (from ${newest})`,
+        utf8: prunedSize.utf8,
+        worst: Math.max(prunedSize.utf8, prunedSize.utf16, prunedSize.escaped),
+        savedPct: 1 - prunedSize.utf8 / Math.max(1, anatomy.size.utf8),
+        entries: kept,
+      });
+    }
+  }
+}
+
+/**
+ * Break one synced key down into where its bytes actually go.
+ *
+ * Handles the two shapes the plugin stores: an array of entries (the history
+ * lists) and a `{partition: {date: row}}` map (the aggregate and shield-history
+ * stores). Answers what the size number alone cannot — how many entries, which
+ * field or partition dominates, and what a cap, a shard or a retention window
+ * would actually save.
+ */
+export async function analyzeArrayKey(
+  plugin: RNPlugin,
+  key: string,
+  trimOptions: TrimOption[] = DEFAULT_TRIM_OPTIONS
+): Promise<ArrayKeyAnatomy> {
+  const value = await plugin.storage.getSynced(key);
+  const size = measureSizes(value);
+  const anatomy: ArrayKeyAnatomy = {
+    key,
+    exists: value !== undefined && value !== null,
+    isArray: Array.isArray(value),
+    shape: Array.isArray(value) ? 'array' : isPlainObject(value) ? 'object' : 'other',
+    branches: [],
+    entries: Array.isArray(value) ? value.length : 0,
+    size,
+    worst: Math.max(size.utf8, size.utf16, size.escaped),
+    perKeyLimit: PER_KEY_BYTE_LIMIT,
+    fields: [],
+    distributions: [],
+    entryBytes: { avg: 0, median: 0, p95: 0, max: 0 },
+    largestEntries: [],
+    cumulative: [],
+    projections: [],
+  };
+
+  if (anatomy.shape === 'object') {
+    analyzeObjectShape(anatomy, value as Record<string, unknown>);
+    logArrayKeyAnatomy(anatomy);
+    return anatomy;
+  }
+
+  if (!Array.isArray(value) || value.length === 0) {
+    logArrayKeyAnatomy(anatomy);
+    return anatomy;
+  }
+
+  const rows = value as Record<string, unknown>[];
+  const fieldTotals = new Map<string, { bytes: number; present: number; longest: number }>();
+  const perEntry: number[] = [];
+  let running = 0;
+  // Candidate shard keys: fields whose values repeat. A field that exceeds this
+  // many distinct values is an id, not a category, and is dropped from the tally.
+  const MAX_DISTINCT = 25;
+  const valueTotals = new Map<string, Map<string, { count: number; bytes: number }> | null>();
+
+  rows.forEach((row, index) => {
+    const bytes = measureBytes(row);
+    perEntry.push(bytes);
+    running += bytes;
+    if (index < 25 || index % 50 === 0 || index === rows.length - 1) {
+      anatomy.cumulative.push({ entries: index + 1, utf8: running });
+    }
+    if (row && typeof row === 'object') {
+      for (const [field, v] of Object.entries(row)) {
+        const cost = fieldCostBytes(field, v);
+        const acc = fieldTotals.get(field) || { bytes: 0, present: 0, longest: 0 };
+        acc.bytes += cost;
+        acc.present++;
+        acc.longest = Math.max(acc.longest, cost);
+        fieldTotals.set(field, acc);
+
+        // Tally the whole entry's weight against this field's value, so the
+        // report reads "sharding on kbId would move N KB out of the hot shard".
+        if (v === null || (typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean')) {
+          continue;
+        }
+        if (!valueTotals.has(field)) valueTotals.set(field, new Map());
+        const buckets = valueTotals.get(field);
+        if (!buckets) continue; // already disqualified as an id-like field
+        const label = String(v);
+        const bucket = buckets.get(label);
+        if (bucket) {
+          bucket.count++;
+          bucket.bytes += bytes;
+        } else if (buckets.size >= MAX_DISTINCT) {
+          valueTotals.set(field, null);
+        } else {
+          buckets.set(label, { count: 1, bytes });
+        }
+      }
+    }
+  });
+
+  anatomy.distributions = Array.from(valueTotals.entries())
+    .filter((entry): entry is [string, Map<string, { count: number; bytes: number }>] =>
+      entry[1] !== null && entry[1].size > 1
+    )
+    .map(([field, buckets]) => ({
+      field,
+      values: Array.from(buckets.entries())
+        .map(([label, b]) => ({
+          value: label,
+          count: b.count,
+          bytes: b.bytes,
+          share: b.bytes / Math.max(1, size.utf8),
+        }))
+        .sort((a, b) => b.bytes - a.bytes),
+    }))
+    .sort((a, b) => a.values.length - b.values.length);
+
+  const totalFieldBytes = Array.from(fieldTotals.values()).reduce((s, f) => s + f.bytes, 0) || 1;
+  anatomy.fields = Array.from(fieldTotals.entries())
+    .map(([field, acc]) => ({
+      field,
+      bytes: acc.bytes,
+      share: acc.bytes / totalFieldBytes,
+      present: acc.present,
+      longest: acc.longest,
+    }))
+    .sort((a, b) => b.bytes - a.bytes);
+
+  const sorted = [...perEntry].sort((a, b) => a - b);
+  anatomy.entryBytes = {
+    avg: Math.round(perEntry.reduce((s, v) => s + v, 0) / perEntry.length),
+    median: sorted[Math.floor(sorted.length / 2)],
+    p95: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))],
+    max: sorted[sorted.length - 1],
+  };
+
+  anatomy.largestEntries = perEntry
+    .map((bytes, index) => ({ bytes, index }))
+    .sort((a, b) => b.bytes - a.bytes)
+    .slice(0, 10)
+    .map(({ bytes, index }) => ({
+      bytes,
+      index,
+      preview: JSON.stringify(rows[index]).substring(0, 160),
+    }));
+
+  const times = rows
+    .map((r) => (typeof r.time === 'number' ? (r.time as number) : undefined))
+    .filter((t): t is number => t !== undefined);
+  if (times.length > 0) {
+    anatomy.oldest = Math.min(...times);
+    anatomy.newest = Math.max(...times);
+  }
+
+  anatomy.projections = trimOptions.map((opt) => {
+    const capped = opt.maxEntries ? rows.slice(0, opt.maxEntries) : rows;
+    const projected =
+      opt.stringLimit !== undefined || opt.dropFields
+        ? capped.map((r) => truncateStrings(r, opt.stringLimit ?? Infinity, opt.dropFields ?? []))
+        : capped;
+    const projSize = measureSizes(projected);
+    return {
+      label: opt.label,
+      utf8: projSize.utf8,
+      worst: Math.max(projSize.utf8, projSize.utf16, projSize.escaped),
+      savedPct: 1 - projSize.utf8 / Math.max(1, size.utf8),
+      entries: projected.length,
+    };
+  });
+
+  logArrayKeyAnatomy(anatomy);
+  return anatomy;
+}
+
+export function logArrayKeyAnatomy(a: ArrayKeyAnatomy): void {
+  console.log(`\n===== KEY ANATOMY: "${a.key}" =====`);
+  if (!a.exists) {
+    console.log('Key is absent or null — nothing to measure.');
+    console.log('===================================\n');
+    return;
+  }
+  const sizeLine =
+    `${formatBytes(a.size.utf8)} UTF-8 · ${formatBytes(a.size.utf16)} UTF-16 · ` +
+    `${formatBytes(a.size.escaped)} re-escaped → worst case ${formatBytes(a.worst)} ` +
+    `(${((a.worst / a.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(a.perKeyLimit)} ceiling)`;
+
+  if (a.shape === 'object') {
+    console.log(
+      `Object map: ${a.branches.length} branch(es)` +
+        (a.branchRoot ? ` under "${a.branchRoot}"` : '') +
+        ` holding ${a.entries} rows · ${sizeLine}`
+    );
+    console.table(
+      a.branches.map((b) => ({
+        branch: b.path,
+        rows: b.children,
+        size: formatBytes(b.bytes),
+        share: `${(b.share * 100).toFixed(1)}%`,
+        span: b.firstChildKey ? `${b.firstChildKey} → ${b.lastChildKey}` : '—',
+      }))
+    );
+    if (a.projections.length > 0) {
+      console.log('What would shrink it:');
+      console.table(
+        a.projections.map((p) => ({
+          option: p.label,
+          rows: p.entries,
+          utf8: formatBytes(p.utf8),
+          'worst case': formatBytes(p.worst),
+          saves: `${(p.savedPct * 100).toFixed(0)}%`,
+          'vs ceiling': `${((p.worst / a.perKeyLimit) * 100).toFixed(0)}%`,
+        }))
+      );
+    }
+    console.log('===================================\n');
+    return;
+  }
+
+  if (!a.isArray) {
+    console.log(
+      `Value is not an array or object map — size only: ${formatBytes(a.size.utf8)} UTF-8 / ` +
+        `${formatBytes(a.size.utf16)} UTF-16 / ${formatBytes(a.size.escaped)} re-escaped.`
+    );
+    console.log('===================================\n');
+    return;
+  }
+  console.log(
+    `${a.entries} entries · ${formatBytes(a.size.utf8)} UTF-8 · ${formatBytes(a.size.utf16)} UTF-16 · ` +
+      `${formatBytes(a.size.escaped)} re-escaped → worst case ${formatBytes(a.worst)} ` +
+      `(${((a.worst / a.perKeyLimit) * 100).toFixed(0)}% of the ${formatBytes(a.perKeyLimit)} ceiling)`
+  );
+  if (a.oldest && a.newest) {
+    console.log(
+      `Spans ${new Date(a.oldest).toISOString().slice(0, 10)} → ${new Date(a.newest).toISOString().slice(0, 10)} ` +
+        `(${Math.round((a.newest - a.oldest) / 86400000)} days)`
+    );
+  }
+  console.log(
+    `Per entry — avg ${formatBytes(a.entryBytes.avg)}, median ${formatBytes(a.entryBytes.median)}, ` +
+      `p95 ${formatBytes(a.entryBytes.p95)}, max ${formatBytes(a.entryBytes.max)}`
+  );
+  console.log('Where the bytes go:');
+  console.table(
+    a.fields.map((f) => ({
+      field: f.field,
+      total: formatBytes(f.bytes),
+      share: `${(f.share * 100).toFixed(1)}%`,
+      'present in': `${f.present}/${a.entries}`,
+      'fattest instance': formatBytes(f.longest),
+    }))
+  );
+  for (const dist of a.distributions) {
+    console.log(`Split by "${dist.field}" (${dist.values.length} distinct) — would sharding on it help?`);
+    console.table(
+      dist.values.slice(0, 25).map((v) => ({
+        value: v.value,
+        entries: v.count,
+        utf8: formatBytes(v.bytes),
+        'share of key': `${(v.share * 100).toFixed(1)}%`,
+      }))
+    );
+  }
+  console.log('If we trimmed it:');
+  console.table(
+    a.projections.map((p) => ({
+      option: p.label,
+      entries: p.entries,
+      utf8: formatBytes(p.utf8),
+      'worst case': formatBytes(p.worst),
+      'saves': `${(p.savedPct * 100).toFixed(0)}%`,
+      'vs ceiling': `${((p.worst / a.perKeyLimit) * 100).toFixed(0)}%`,
+    }))
+  );
+  console.log('Fattest entries:');
+  console.table(
+    a.largestEntries.map((e) => ({ index: e.index, size: formatBytes(e.bytes), preview: e.preview }))
+  );
+  console.log('===================================\n');
 }

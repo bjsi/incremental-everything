@@ -2,6 +2,8 @@
   <img src="assets/inc-logo.png" width="400" alt="Incremental Everything Logo" />
 </p>
 
+> **Review notes, PDFs, Youtube videos and web articles incrementally alongside your flashcards, and tackle overload by prioritizing your learning.**
+
 Welcome to the official **User's Manual** for the **Incremental Everything plugin** for RemNote!
 
 This Wiki is your comprehensive guide to mastering a powerful learning technique inspired by SuperMemo's Incremental Reading. Whether you want to read books and articles in parallel, watch videos incrementally, or manage your writing projects more effectively, this plugin allows you to seamlessly interleave all of your learning material directly into your daily flashcard queue.
@@ -139,7 +141,7 @@ The minimum cost comes from intelligent prioritization—you spend your limited 
 
 1. Install **Incremental Everything (Plus)** from RemNote plugin library
 2. Tag any rem with `#Incremental` (using [Alt+X or Alt+Shift+X](Keyboard-Shortcuts.md#core-commands)) to add it to your reading queue
-3. [Set priorities](Prioritization-&-Sorting.md#set-priority-popup) ([Alt+P](Keyboard-Shortcuts.md#priority-commands)) on important material
+3. [Set priorities](Prioritization-&-Sorting.md#main-priority-popup) ([Alt+P](Keyboard-Shortcuts.md#priority-commands)) on important material
 4. Enter queue and [start reviewing](Reviewing-Items-in-the-Queue.md)
 5. Use [Priority Review Documents](Priority-Review-Document.md) when overwhelmed
 
@@ -174,7 +176,7 @@ Happy learning! 📚✨
         * Making a Rem incremental (slash command, shortcuts, menu).
         * Reviewing Incremental Rems in the queue (answer buttons overview).
         * Dismissing and re-activating Rems (with history preservation).
-        * Using the [Repetition History widget](Getting-Started.md#repetition-history-widget).
+        * Using the [Repetition History widget](Getting-Started.md#repetition-history-statistics).
         * Setting priorities basics.
 
 * **2. The Philosophy: [What is Incrementalism?](What-is-Incrementalism%3F.md)**
@@ -195,7 +197,7 @@ Happy learning! 📚✨
             * **[Dismiss](Reviewing-Items-in-the-Queue.md#dismiss):** How to finish an item and remove it from the queue.
             * **[Change Priority](Reviewing-Items-in-the-Queue.md#change-priority):** Its basic function of opening the priority menu.
             * **[Review & Open](Reviewing-Items-in-the-Queue.md#review-in-editor):** The workflow for moving from the queue to the editor.
-            * **[Scroll to Highlight](Reviewing-Items-in-the-Queue.md#scroll-to-highlight):** Its function for PDF extracts.
+            * **[Scroll to Highlight](Utilities.md#scroll-to-highlight):** Its function for PDF extracts.
             * **[Strategic Guide to the Answer Buttons](Reviewing-Items-in-the-Queue.md#a-strategic-guide-to-the-answer-buttons):** In-depth explanation of when to use each action.
 
     * **3.3 [Reviewing Items in the Editor](Reviewing-Items-in-the-Editor.md)**
@@ -207,14 +209,14 @@ Happy learning! 📚✨
 * **4. Mastering the Queue: [Prioritization-&-Sorting](Prioritization-&-Sorting.md)**
     * **Purpose:** Explain the priority and sorting menus in a comprehensive guide for advanced queue management.
     * **Content:**
-        * **[Prioritization-&-Sorting#the-priority-system-explained](The-Priority-System-Explained.md):** Why priority is important.
-        * **[Prioritization-&-Sorting#priority-inheritance-system](Priority-Inheritance-System.md):** when you create a new incremental rem, it automatically inherits the priority of its closest parent or ancestor that is also an incremental rem.
-        * **The [Prioritization-&-Sorting#set-priority-popup]("Set-Priority"-Popup.md):** A detailed breakdown of the redesigned popup, explaining the absolute vs. relative sliders and the color gradient.
-        * **The [Prioritization-&-Sorting#sorting-criteria](Sorting-Criteria.md) Menu:** An explanation of the Flashcard Ratio and Randomness sliders and how they affect what you see in the queue — including the [Prioritization-&-Sorting#how-randomness-works-the-priority-weighted-lottery](Priority-Weighted-Lottery.md) that makes randomness favor higher-priority items instead of spreading it flat.
-        * **The [Prioritization-&-Sorting#priority-shield](Priority-Shield.md):** diagnostic tool to help you understand and manage your learning process, giving you a clear, numerical value for your "Priority Protection" — your capacity to process high-priority material on any given day and over time.
+        * **[Prioritization-&-Sorting#the-priority-system-explained](Prioritization-&-Sorting.md#the-priority-system-explained):** Why priority is important.
+        * **[Prioritization-&-Sorting#priority-inheritance-system](Prioritization-&-Sorting.md#priority-inheritance-system):** when you create a new incremental rem, it automatically inherits the priority of its closest parent or ancestor that is also an incremental rem.
+        * **The [Prioritization-&-Sorting#set-priority-popup](Prioritization-&-Sorting.md#main-priority-popup):** A detailed breakdown of the redesigned popup, explaining the absolute vs. relative sliders and the color gradient.
+        * **The [Prioritization-&-Sorting#sorting-criteria](Prioritization-&-Sorting.md#sorting-criteria) Menu:** An explanation of the Flashcard Ratio and Randomness sliders and how they affect what you see in the queue — including the [Prioritization-&-Sorting#how-randomness-works-the-priority-weighted-lottery](Prioritization-&-Sorting.md#how-randomness-works-the-priority-weighted-lottery) that makes randomness favor higher-priority items instead of spreading it flat.
+        * **The [Prioritization-&-Sorting#priority-shield](Prioritization-&-Sorting.md#priority-shield):** diagnostic tool to help you understand and manage your learning process, giving you a clear, numerical value for your "Priority Protection" — your capacity to process high-priority material on any given day and over time.
         * **[Priorities for Flashcards](Priorities-for-Flashcards.md):** understand how can you benefit from this plugin to manage overload of due flashcards. It will allow you to intelligently focus on what is most important with only a few manual prioritization inputs, giving you confidence even when your backlog remains large.
         * **The [Priority Review Document](Priority-Review-Document.md):** this is the only reason for having a flashcard priority system. This priority review document is an intermediate step necessary to give you the ability to select flashcards by priority.
-        * [Prioritization-&-Sorting#how-the-plugin-prioritizes-due-items](How-the-Plugin-Prioritizes-Due-Items.md)
+        * [Prioritization-&-Sorting#how-the-plugin-prioritizes-due-items](Prioritization-&-Sorting.md#how-the-plugin-prioritizes-due-items)
 
 * **5. Advanced Workflows & Use Cases**
     * **Purpose:** Practical, step-by-step guides for specific tasks.
@@ -224,10 +226,10 @@ Happy learning! 📚✨
           * [Create Incremental Rem from PDF Highlights](Create-Incremental-Rem-from-PDF-Highlights.md)
         * **Incremental Reading** with web pages.
         * **[Incremental Video](Incremental-Video.md)**: Watch YouTube videos incrementally, create timed extracts, and auto-transcribe segments.
-        * **[IncRem-List-and-Main-View](IncRem-List-&-Main-View.md)**: Browse, filter, and manage your Incremental Rems outside the queue. Includes the Review in Editor flow and the KB Priority Distribution Graph.
+        * **[IncRem-List-and-Main-View](IncRem-List-and-Main-View.md)**: Browse, filter, and manage your Incremental Rems outside the queue. Includes the Review in Editor flow and the KB Priority Distribution Graph.
         * Tips for **Incremental Writing**.
         * How to use document/folder-specific queues for **Subset Review**.
-        * **[History-Queue-Dashboard-and-Mastery-Drill](History,-Queue-Dashboard-&-Mastery-Drill.md)**: Track session history, monitor real-time study metrics, find recently reviewed cards, and deliberately re-practice difficult material with the Mastery Drill.
+        * **[History-Queue-Dashboard-and-Mastery-Drill](History-Queue-Dashboard-and-Mastery-Drill.md)**: Track session history, monitor real-time study metrics, find recently reviewed cards, and deliberately re-practice difficult material with the Mastery Drill.
 
 * **6. Essential References**
     * **Purpose:** A complete index of the plugin's visual and functional capabilities.

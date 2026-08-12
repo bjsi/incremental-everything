@@ -49,7 +49,7 @@ To streamline workflow and make priority management more intuitive, new items au
 
 This system is particularly useful for hierarchically organized notes. For example, if you have an important book summary with a high priority (e.g., 5), any new extracts or notes you create within that summary will automatically inherit the same priority, saving you from setting it manually each time.
 
-The "[Set Priority](#set-priority)" and "Reschedule" popups also display the ancestor's priority, giving you immediate context when you decide to manually override the inherited value.
+The "[Set Priority](#main-priority-popup)" and "Reschedule" popups also display the ancestor's priority, giving you immediate context when you decide to manually override the inherited value.
 
 ### Use Cases
 
@@ -463,7 +463,7 @@ The Shield metric for Incremental Rems is separate of that for Flashcards; each 
 The core purpose of the Priority Shield is to move beyond guessing and provide you with concrete data to build a sustainable and effective study strategy. By knowing the exact priority of the most important Incremental Rem you have yet to review, you can answer critical questions about your learning habits:
 
 -   **Am I creating new material faster than I can review it?** If you consistently see a low Priority Shield value (e.g., your Relative Priority Shield is only protecting 4% of your top priority Incremental Rems), it's a strong indicator that the inflow of new Incremental Rems is too high, and your most important knowledge is at risk of being forgotten.
--   **Is my "[Sorting Criteria](#sorting-criteria)" [Randomness](#randomness) setting right for me?** The Priority Shield gives you direct feedback on your randomness setting. If your shield value is too low, you might want to decrease the randomness to focus more strictly on high-priority items. Conversely, if you feel your reviews are too rigid, you can increase randomness and watch how it affects your shield value over time.
+-   **Is my "[Sorting Criteria](#sorting-criteria)" [Randomness](#1-incremental-rem-randomness) setting right for me?** The Priority Shield gives you direct feedback on your randomness setting. If your shield value is too low, you might want to decrease the randomness to focus more strictly on high-priority items. Conversely, if you feel your reviews are too rigid, you can increase randomness and watch how it affects your shield value over time.
 -   **Am I at risk of burnout?** The history graph allows you to see trends. If you notice your Priority Shield value steadily declining over days or weeks, it may be a sign that your workload is becoming unmanageable, allowing you to adjust your strategy *before* you feel overwhelmed.
 
 ### Weighted Shield
@@ -633,3 +633,18 @@ Here is a complete breakdown of how the plugin decides which incremental item to
 
 
 The system is built to surface your highest-priority due material first, regardless of how long it has been overdue. The **Sorting Randomness** setting is a tool that allows you to introduce variability, preventing the queue from becoming too rigid and ensuring that even lower-priority items get a chance to surface over time.
+
+### Prepared in advance { #prepared-in-advance }
+
+The four steps above do not run at the moment RemNote asks for the next item. They run **while you are reading the current one**, and the result is held ready.
+
+The reason is a hard time limit: RemNote waits about **one second** for a plugin to name the next item, and then gives up and shows a flashcard instead. On a large knowledge base the selection could exceed that — not because choosing is slow, but because every piece of information it needs has to be fetched from RemNote, and those requests queue behind whatever else is happening. The Incremental Rem you should have seen was silently replaced by a flashcard, and (before v1.0.39) counted as already reviewed, so it did not come back later in the session.
+
+With the decision prepared ahead of time, answering takes about a millisecond and the limit is never in play, no matter how large the knowledge base or how busy the moment.
+
+What this means in practice:
+
+* **Your settings still apply immediately.** Priority, due dates, the randomness sliders and the [Flashcard Ratio](#3-flashcard-ratio) are re-read every time the next candidate is prepared — that is, once per item you review. A change you make mid-session takes effect from the following item.
+* **Changing the queue mid-session is handled.** Switching to a different document or study mode rebuilds the selection for the new context; that single turn shows a flashcard while the rebuild happens.
+* **Nothing is lost to a missed turn.** If an item is prepared but does not reach the screen, it returns to the front of the queue and is offered again on the next turn.
+* **At the very start of a session**, the first opportunity may pass as a flashcard while the first selection is being prepared — particularly right after RemNote starts, when the plugin is still building its index.

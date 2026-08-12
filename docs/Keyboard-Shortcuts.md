@@ -11,10 +11,10 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
-| `Alt` + `X` | Make Incremental (Extract) | Tags the currently focused Rem as "Incremental". Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Text-Extract.md)** if text is selected. If triggered in the queue on a flashcard with no text selected, it intelligently converts that specific flashcard to an Incremental Rem natively. | Editor and Queue |
-| `Alt` + `Shift` + `X` | Extract with Priority | Tags as "Incremental" and opens the Priority & Interval popup. Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Text-Extract.md)** if text is selected. If triggered in the queue on a flashcard with no text selected, it smartly converts the flashcard to an Incremental Rem and opens the Priority popup. | Editor and Queue |
-| `Alt` + `Z` | Create Cloze Deletion | Applies **[Reviewing-Items-in-the-Editor#creating-clozes](Cloze-Deletion.md)** formatting to the selected text. | Editor Only |
-| `Alt` + `Shift` + `Z` | Create Cloze Deletion with Priority | Same as above, then opens the **[Prioritization-&-Sorting#set-priority-popup](Light-Priority-popup.md)** to set a Card Priority for the new cloze Rem. | Editor Only |
+| `Alt` + `X` | Make Incremental (Extract) | Tags the currently focused Rem as "Incremental". Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Reviewing-Items-in-the-Editor.md#extracting-text)** if text is selected. If triggered in the queue on a flashcard with no text selected, it intelligently converts that specific flashcard to an Incremental Rem natively. | Editor and Queue |
+| `Alt` + `Shift` + `X` | Extract with Priority | Tags as "Incremental" and opens the Priority & Interval popup. Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Reviewing-Items-in-the-Editor.md#extracting-text)** if text is selected. If triggered in the queue on a flashcard with no text selected, it smartly converts the flashcard to an Incremental Rem and opens the Priority popup. | Editor and Queue |
+| `Alt` + `Z` | Create Cloze Deletion | Applies **[Reviewing-Items-in-the-Editor#creating-clozes](Reviewing-Items-in-the-Editor.md#creating-clozes)** formatting to the selected text. | Editor Only |
+| `Alt` + `Shift` + `Z` | Create Cloze Deletion with Priority | Same as above, then opens the **[Prioritization-&-Sorting#set-priority-popup](Prioritization-&-Sorting.md#light-priority-popup)** to set a Card Priority for the new cloze Rem. | Editor Only |
 | `Ctrl` + `J` | [Reschedule Incremental Rem](Reviewing-Items-in-the-Queue.md#reschedule) | Opens the Reschedule popup to set a custom next review date and priority. *(On macOS: also `Ctrl+J`, not `Cmd+J`)* | Editor and Queue |
 | `Ctrl` + `Shift` + `J` | [Execute Incremental Rem Repetition](Reviewing-Items-in-the-Editor.md#1-execute-repetition-command) | Opens a popup to register a review directly in the Editor (with manual time entry or timer mode). When in the queue, it opens the IncRem in the Editor (greater flexibility and editing power), and starts the Editor Review Timer; when the processing is finished, it open the queue document again, so the user can continue the queue. | Editor and Queue |
 | `Ctrl` + `F7` | [Set Read Point (Bookmark)](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems) | Marks the focused descendant rem as the current **reading position** of a Rem-type Incremental Rem (resolved from the active review session or nearest ancestor IncRem). The rem-type analogue of a PDF/HTML highlight bookmark. | Editor and Queue |
@@ -34,7 +34,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
-| `Alt` + `P` | [Set Priority](Prioritization-&-Sorting.md#set-priority-popup) | Opens the full Priority popup with analytics, inheritance info, and scope navigation. | Editor and Queue |
+| `Alt` + `P` | [Set Priority](Prioritization-&-Sorting.md#main-priority-popup) | Opens the full Priority popup with analytics, inheritance info, and scope navigation. | Editor and Queue |
 | `Ctrl` + `Opt` + `P` | Quick Set Priority | Opens the Light Priority popup for fast priority adjustments without heavy stats. | Editor and Queue |
 | `Ctrl` + `Opt` + `↑` | Quick Increase Priority Number | Increases priority number by step size (default 10), making item **less important**. | Editor and Queue |
 | `Ctrl` + `Opt` + `↓` | Quick Decrease Priority Number | Decreases priority number by step size (default 10), making item **more important**. | Editor and Queue |
@@ -52,7 +52,7 @@ This table lists all the custom keyboard shortcuts that are unique to the Increm
 | Shortcut | Command Name | Function | Context |
 | :--- | :--- | :--- | :--- |
 | `Alt` + `Shift` + `I` | Open Incremental Rems Main View | Opens the main view popup showing all Incremental Rems with filtering and sorting. | Global |
-| `Ctrl` + `Shift` + `H` | [Open IncRem Repetition History](Getting-Started.md#repetition-history-widget) | Opens the **Single History** view for individual items or **Aggregated History** view for folders with incremental descendants. | Editor and Queue |
+| `Ctrl` + `Shift` + `H` | [Open IncRem Repetition History](Getting-Started.md#repetition-history-statistics) | Opens the **Single History** view for individual items or **Aggregated History** view for folders with incremental descendants. | Editor and Queue |
 | `Ctrl` + `Shift` + `I` | [Toggle Ignore Tag](Plugin-Commands-Reference.md#other-utilities) | Adds/removes the `#ignore` tag on the focused Rem **or a multi-rem selection** (run from the Omnibar). Ignored rems are shrunk and dimmed (full opacity on hover/focus) and the tag chip is hidden — used during IR to mark already-read snippets that don't deserve becoming Incremental. | Editor Only |
 
 ### Editing Utilities

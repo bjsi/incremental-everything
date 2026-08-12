@@ -40,6 +40,7 @@ import {
   batchPriorityTargetRemIdsKey
 } from '../lib/consts';
 import { updateCardPriorityCache, flushLightCacheUpdates } from '../lib/card_priority/cache';
+import { writeCardPriorityCache } from '../lib/card_priority/persistence';
 import { findClosestAncestorWithAnyPriority } from '../lib/priority_inheritance';
 import { getRemCardContent, safeRemTextToString } from '../lib/pdfUtils';
 import { resolveRemTextForBreadcrumb } from '../lib/richTextRemRefs';
@@ -748,7 +749,7 @@ function Priority() {
         } else {
           newCache.push(optimisticInfo);
         }
-        await plugin.storage.setSession(allCardPriorityInfoKey, newCache);
+        await writeCardPriorityCache(plugin, newCache);
         console.log(`[Priority] Fast optimistic push cross-iframe succeeded for ${rem._id}`);
       } catch (err) {
         console.error("Fast cache set failed", err);
@@ -972,7 +973,7 @@ function Priority() {
       try {
         const currentCache = await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey) || [];
         const newCache = currentCache.filter(i => i.remId !== rem._id);
-        await plugin.storage.setSession(allCardPriorityInfoKey, newCache);
+        await writeCardPriorityCache(plugin, newCache);
       } catch (err) {
         console.error('[Priority] removeCardPriority optimistic eviction failed:', err);
       }

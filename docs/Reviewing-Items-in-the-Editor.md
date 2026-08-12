@@ -35,7 +35,7 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
 
 - **Counts for interval calculation**: Unlike editor reschedules (`Ctrl+J` in editor), the Execute Repetition command **does count** as a real review because you're confirming that you engaged with the content.
 - **PDF Reading History Sync**: If the Incremental Rem is a PDF or has a PDF source, the modal will automatically render the tracking **PDF Page Controls**. You can manipulate your current reading page directly from the popup and any time tracked by the Timer mode will perfectly log into your PDF Reading Analytics!
-- **Multi-PDF support**: If the Inc Rem has **more than one PDF source**, a PDF dropdown appears just above the Page Controls. Selecting a different PDF pins it as active for this Inc Rem (★ marks the `#preferthispdf` one) — Start Timer will then open and scroll to that PDF, and any subsequent reading-time writes target it. See the [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Workflow-→-Multiple-PDF-Sources.md) section for the resolution chain.
+- **Multi-PDF support**: If the Inc Rem has **more than one PDF source**, a PDF dropdown appears just above the Page Controls. Selecting a different PDF pins it as active for this Inc Rem (★ marks the `#preferthispdf` one) — Start Timer will then open and scroll to that PDF, and any subsequent reading-time writes target it. See the [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) section for the resolution chain.
 - **Records review time**: The time you enter is saved in the repetition history.
 - **Schedules next review**: Uses the same exponential algorithm as the queue's "Next" button.
 - **Indicator in history**: Shows with a ⌨️ indicator in the Repetition History widget.
@@ -76,9 +76,9 @@ Sequential Review solves this by creating a dedicated, queue-like experience tha
 
 ### How to Start a Sequential Review
 
-1. Open the [IncRem-List-and-Main-View](All-Inc-Rems-view.md) (or an IncRem List in a document).
+1. Open the [IncRem-List-and-Main-View](IncRem-List-and-Main-View.md) (or an IncRem List in a document).
 2. Click the `Sort` button and select **Sort for Review (Queue Order)**.
-   * *Note: This locks your filters to "Due" and "Ascending". It authentically recreates the exact sorting mix you would experience in the standard queue: due Incremental Rems will be sorted by priority, incorporating the degree of randomness you have configured in your [Prioritization-&-Sorting#Sorting-Criteria](Sorting-Criteria.md). If you want a completely random order, you can achieve this by setting the Incremental Rem randomness in the Sorting Criteria to 100% (full).*
+   * *Note: This locks your filters to "Due" and "Ascending". It authentically recreates the exact sorting mix you would experience in the standard queue: due Incremental Rems will be sorted by priority, incorporating the degree of randomness you have configured in your [Prioritization-&-Sorting#Sorting-Criteria](Prioritization-&-Sorting.md#sorting-criteria). If you want a completely random order, you can achieve this by setting the Incremental Rem randomness in the Sorting Criteria to 100% (full).*
 3. Click the blue **"Review in Editor"** button at the top of the table.
 
 ### The Workflow
@@ -106,7 +106,7 @@ When the Inc Rem being reviewed has **more than one PDF source**, a small PDF dr
 - **Re-targets the page controls and the 🔖 Scroll button** to the new PDF immediately,
 - **Re-routes reading-time records** (saved when you click Next / End Review / Dismiss) to the new `(IncRem, PDF)` pair.
 
-The switcher is hidden when the Inc Rem has zero or one PDF sources. See [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Workflow-→-Multiple-PDF-Sources.md) for the full resolution chain across surfaces.
+The switcher is hidden when the Inc Rem has zero or one PDF sources. See [PDF-Incremental-Reading-Workflow#multiple-pdf-sources--active-pdf-switcher-and-preferthispdf](PDF-Incremental-Reading-Workflow.md#multiple-pdf-sources-active-pdf-switcher-and-preferthispdf) for the full resolution chain across surfaces.
 
 ### Layout & Responsiveness
 
@@ -134,7 +134,7 @@ When you are reading a PDF in the editor (instead of the queue), your reading po
 
 1. Create a highlight and click the **Bookmark (🔖)** widget in the PDF Highlight Toolbar.
 2. The popup will ask you to select which Incremental Rem you want to save the bookmark to (since a single PDF might be linked to multiple sibling chapters, and the plugin needs to know which one you are currently reviewing).
-3. **Smart Suggestions**: If you previously assigned page ranges to your chapters (via the [PDF-Incremental-Reading-Workflow#3-pdf-control-panel](PDF-Control-Panel.md) or inline widget), the Bookmarks popup will automatically suggest the correct Incremental Rem (marked with a ★) based on the page you are currently on.
+3. **Smart Suggestions**: If you previously assigned page ranges to your chapters (via the [PDF-Incremental-Reading-Workflow#3-pdf-control-panel](PDF-Incremental-Reading-Workflow.md#3-pdf-control-panel) or inline widget), the Bookmarks popup will automatically suggest the correct Incremental Rem (marked with a ★) based on the page you are currently on.
 4. **Timer-aware**: If you are currently using the **Editor Review Timer** (e.g. you clicked "Start Timer" from the Execute Repetition popup), the Bookmark popup will automatically detect the active IncRem — the same fast-path that works in the queue — and show an **"Update Current Editor Review Reading"** button at the top, letting you save the bookmark in one click.
 
 #### Jumping Back to Your Last Bookmark
@@ -217,7 +217,7 @@ To create flashcards during the reading process:
 2.  Press **`Alt+Z`**.
 3.  **What happens**: A **standalone child Rem** is created containing the parent's full text, with the selected word marked as a cloze deletion. The parent is tagged with `#remove-from-queue` and the selected text is highlighted in yellow/red to signal it has been extracted. A violet **↑** badge appears on the card in the queue.
 
-For a full explanation of what this command does, how it differs from native RemNote clozes, and when to use each approach, see **[IR-Flow--Reading-Extracting-and-Clozing#create-cloze-altz](IR-Flow:-Reading,-Extracting-&-Clozing.md)**.
+For a full explanation of what this command does, how it differs from native RemNote clozes, and when to use each approach, see **[IR-Flow--Reading-Extracting-and-Clozing#create-cloze-altz](IR-Flow--Reading-Extracting-and-Clozing.md#create-cloze-altz-altshiftz)**.
 
 ### Built-in Remove From Queue Support
 

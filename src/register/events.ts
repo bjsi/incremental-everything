@@ -1,8 +1,9 @@
-import { AppEvents, ReactRNPlugin, RemId, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
+import { AppEvents, ReactRNPlugin, RemId, PluginRem, BuiltInPowerupCodes, RichTextElementRemInterface, QueueInteractionScore } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
   priorityCalcScopeRemIdsKey,
+  priorityCalcScopeCompletenessKey,
   currentSubQueueIdKey,
   priorityShieldHistoryKey,
   cardPriorityShieldHistoryKey,
@@ -36,7 +37,7 @@ import {
   setCardPriority,
   PrioritySource,
 } from '../lib/card_priority';
-import { IncrementalRem, getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { IncrementalRem, getIncrementalRemFromRem, isKnownIncRemId } from '../lib/incremental_rem';
 import { flushCacheUpdatesNow, updateCardPriorityCache } from '../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { transferToDismissed } from '../lib/dismissed';
@@ -59,12 +60,19 @@ import { resetQueueSession, clearSeenItems, calculateDueIncRemCount } from '../l
 import { registerQueueCounter, clearQueueUI } from '../lib/ui_helpers';
 import { buildComprehensiveScope } from '../lib/scope_helpers';
 import { safeRemTextToString } from '../lib/pdfUtils';
-import type { RemHistoryData } from '../widgets/rem_history';
-import type { FlashcardHistoryData } from '../widgets/flashcard_history';
+import {
+  flashcardHistorySpec,
+  remHistorySpec,
+  prependHistoryEntry,
+  readHistoryShard,
+  writeHistoryShard,
+} from '../lib/history_shards';
 import { registerQueueSessionTracking, saveCurrentSession, hasActiveSession } from '../lib/queue_session';
 import { shouldUseLightMode } from '../lib/mobileUtils';
+import { primeQueuePrefetch, flushPendingServed } from '../lib/queue_prefetch';
 import dayjs from 'dayjs';
 import { getIESetting } from '../lib/settings';
+import { recordRemChangeEvent } from '../lib/rem_change_tape';
 
 // Debounce/timeout constants
 const CARD_PROCESSING_DEBOUNCE_MS = 2000;
@@ -159,6 +167,11 @@ export function registerQueueExitListener(
     await plugin.storage.setSession(incrementalQueueActiveKey, false);
     await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
 
+    // Commit the last served IncRem before anything reads the seen list below:
+    // its normal confirmation would have arrived on the next GetNextCard call,
+    // which never happens for the final item of a session.
+    await flushPendingServed(plugin);
+
     await flushCacheUpdatesNow(plugin);
     console.log('QueueExit triggered, subQueueId:', subQueueId);
 
@@ -212,12 +225,51 @@ export function registerQueueExitListener(
       // Save document-level shields if scope exists
       const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
 
-      if (historyKey && priorityCalcScopeRemIds && priorityCalcScopeRemIds.length > 0) {
-        if (shouldSaveIncRem) {
+      // Document shields are computed by intersecting the (now complete) caches
+      // with the scope FROZEN AT QUEUE ENTER. So they need a guard the KB shields
+      // above do not: `shouldSaveIncRem` asks "is the cache loaded now", which by
+      // exit is true even when the scope was materialised from an empty cache
+      // half an hour earlier. Intersecting a full cache with a truncated scope
+      // produces a plausible-looking, wrong universe — 239 IncRems instead of
+      // 5,525 in the session that surfaced this. Skipping the entry is the
+      // correct outcome; a wrong entry is permanent and indistinguishable from a
+      // real drop in the user's shield history.
+      const scopeCompleteness =
+        (await plugin.storage.getSession<{ incRem: boolean; card: boolean; fullKb: boolean }>(
+          priorityCalcScopeCompletenessKey
+          // absent = session predating this key; assume complete and behave as before
+        )) ?? { incRem: true, card: true, fullKb: false };
+
+      // Recovery: a full-KB scope is just "every card rem plus every incremental
+      // rem", and by now both caches HAVE finished loading. So when it was built
+      // truncated we can reconstruct it exactly rather than throw the session's
+      // shield history away. Only valid for the full-KB branch — a tree-walked
+      // scope is not derivable from the caches and must not be faked.
+      let docScopeRemIds = priorityCalcScopeRemIds;
+      let scopeUsable = { incRem: scopeCompleteness.incRem, card: scopeCompleteness.card };
+      if (scopeCompleteness.fullKb && (!scopeCompleteness.incRem || !scopeCompleteness.card)) {
+        if (isIncRemCacheLoaded && isCardCacheLoaded) {
+          docScopeRemIds = Array.from(
+            new Set<RemId>([
+              ...allCardInfos.map((info) => info.remId).filter((id): id is RemId => !!id),
+              ...allIncRems.map((rem) => rem.remId),
+            ])
+          );
+          scopeUsable = { incRem: true, card: true };
+          console.log(
+            `[QueueExit] Rebuilt the full-KB priority scope from the finished caches: ` +
+              `${priorityCalcScopeRemIds?.length ?? 0} → ${docScopeRemIds.length} rems. ` +
+              `It was materialised at queue enter while a cache was still loading.`
+          );
+        }
+      }
+
+      if (historyKey && docScopeRemIds && docScopeRemIds.length > 0) {
+        if (shouldSaveIncRem && scopeUsable.incRem) {
           await saveDocumentShield(
             plugin,
             allIncRems as any,
-            priorityCalcScopeRemIds,
+            docScopeRemIds,
             isIncRemDue,
             seenRemIds,
             documentPriorityShieldHistoryKey,
@@ -225,13 +277,18 @@ export function registerQueueExitListener(
             'IncRem',
             displayWeighted
           );
+        } else if (shouldSaveIncRem) {
+          console.warn(
+            '[QueueExit] Skipping IncRem document shield: the priority scope was built ' +
+              'before the IncRem cache finished loading, so its universe would be wrong.'
+          );
         }
 
-        if (shouldSaveCard) {
+        if (shouldSaveCard && scopeUsable.card) {
           await saveDocumentShield(
             plugin,
             allCardInfos,
-            priorityCalcScopeRemIds,
+            docScopeRemIds,
             isCardDueOverdue,
             seenCardIds,
             documentCardPriorityShieldHistoryKey,
@@ -239,6 +296,11 @@ export function registerQueueExitListener(
             'Card',
             displayWeighted,
             cardVerifyOptions
+          );
+        } else if (shouldSaveCard) {
+          console.warn(
+            '[QueueExit] Skipping Card document shield: the priority scope was built ' +
+              'before the card priority cache finished loading, so its universe would be wrong.'
           );
         }
       } else {
@@ -356,15 +418,38 @@ export function registerQueueEnterListener(
       await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
 
       let priorityCalcScope: Set<RemId> = new Set<RemId>();
+      // Tree-walked scopes don't consult the caches, so they start out complete;
+      // only the materialised full-KB branch below can be born truncated.
+      let scopeCompleteness = { incRem: true, card: true, fullKb: false };
 
       if (isPriorityReviewDoc && scopeForPriorityCalc !== undefined) {
         if (scopeForPriorityCalc === null) {
+          // This scope IS the caches — see priorityCalcScopeCompletenessKey. If
+          // either is still loading, the id list it produces is permanently
+          // missing that item type and a later load cannot repair it, so record
+          // which halves are trustworthy alongside the scope itself.
+          const [incRemCacheLoaded, cardCacheLoaded] = await Promise.all([
+            plugin.storage.getSession<boolean>('inc_rem_cache_fully_loaded'),
+            plugin.storage.getSession<boolean>('card_priority_cache_fully_loaded'),
+          ]);
+          // fullKb records that this scope is a pure function of the two caches,
+          // which is what lets QueueExit rebuild it correctly if it was born
+          // truncated. Tree-walked scopes cannot be reconstructed that way.
+          scopeCompleteness = { incRem: !!incRemCacheLoaded, card: !!cardCacheLoaded, fullKb: true };
+
           const fullKbIds = [
             ...allCardInfos.map(info => info.remId).filter((id): id is RemId => !!id),
             ...allIncRems.map(rem => rem.remId),
           ];
           priorityCalcScope = new Set<RemId>(fullKbIds);
           console.log(`QUEUE ENTER: Priority Review Doc using FULL KB for priority calculations (${priorityCalcScope.size} rems).`);
+          if (!scopeCompleteness.incRem || !scopeCompleteness.card) {
+            console.warn(
+              '[QueueEnter] FULL KB priority scope built from an INCOMPLETE cache ' +
+                `(incRem loaded: ${scopeCompleteness.incRem}, card loaded: ${scopeCompleteness.card}). ` +
+                'QueueExit will rebuild it from the finished caches before saving shield history.'
+            );
+          }
         } else {
           priorityCalcScope = await buildComprehensiveScope(plugin, scopeForPriorityCalc);
         }
@@ -375,6 +460,7 @@ export function registerQueueEnterListener(
       if (priorityCalcScope.size > 0) {
 
         await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
+        await plugin.storage.setSession(priorityCalcScopeCompletenessKey, scopeCompleteness);
 
         if (!(await shouldUseLightMode(plugin))) {
           console.log('QUEUE ENTER: Full mode. Calculating session cache...');
@@ -492,12 +578,79 @@ export function registerQueueEnterListener(
     );
 
     registerQueueCounter(plugin, dueIncRemCount);
+
+    // Prime the IncRem prefetch buffer LAST, once the document scope and the
+    // session caches it depends on are all resolved. From here the GetNextCard
+    // callback answers from module state without a single await, which is what
+    // keeps it clear of RemNote's ~1s deadline in large KBs. Fire-and-forget:
+    // nothing in this handler depends on it, and the callback degrades to a
+    // flashcard turn if it is asked before the first build lands.
+    void primeQueuePrefetch(plugin, subQueueId);
   });
 }
 
 // Shared Set for coordinating between QueueCompleteCard and GlobalRemChanged listeners
 // to avoid duplicate processing
 const recentlyProcessedCards = new Set<string>();
+
+/**
+ * Record one rated card in the Flashcard History sidebar's list for the current KB.
+ *
+ * Three events feed that list — normal completion, cluster cards and drill cards,
+ * the latter two because QueueCompleteCard does not fire for them — and they used
+ * to carry three copies of this logic. They now differ only in what they can hand
+ * over. Writes go through the shard helpers, which cap the entry count, truncate
+ * the preview text and enforce a byte budget, so a write can no longer be rejected
+ * for exceeding RemNote's per-item ceiling.
+ */
+async function recordFlashcardHistory(
+  plugin: ReactRNPlugin,
+  args: {
+    remId?: RemId;
+    cardId: string;
+    /** Already-loaded rem, when the caller has one; otherwise it is looked up,
+     *  but only if the entry actually needs writing. */
+    rem?: PluginRem | null;
+    kbId?: string;
+    score?: QueueInteractionScore;
+    /** Names the caller in the error log. */
+    context: string;
+  }
+): Promise<void> {
+  try {
+    const kbId = args.kbId ?? (await plugin.kb.getCurrentKnowledgeBaseData())?._id;
+
+    await prependHistoryEntry(plugin, flashcardHistorySpec, kbId, args.cardId, async () => {
+      const rem = args.rem ?? (args.remId ? await plugin.rem.findOne(args.remId) : undefined);
+
+      let text = '';
+      try {
+        const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
+        const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+        const front = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw : '';
+        const back = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw : '';
+        // The limit is on the combined preview. writeHistoryShard applies it again,
+        // so this is belt and braces rather than the only guard.
+        text = `${front} ${back}`.trim().substring(0, flashcardHistoryTextLimit);
+      } catch (error) {
+        console.warn('Error parsing Rem text for flashcard history:', error);
+        text = '[Complex Media Rem]';
+      }
+
+      return {
+        remId: args.remId as RemId,
+        cardId: args.cardId,
+        time: Date.now(),
+        kbId,
+        text,
+        _v: 1,
+        score: args.score,
+      };
+    });
+  } catch (error) {
+    console.error(`Failed to record flashcard history for ${args.context}:`, error);
+  }
+}
 
 /**
  * Hooks into card completion events to keep the card priority cache fresh in full-performance mode.
@@ -551,48 +704,13 @@ export function registerQueueCompleteCardListener(plugin: ReactRNPlugin) {
       // Flashcard History: record the completed card for the sidebar widget.
       // This block runs unconditionally (regardless of Light Mode) so the history
       // sidebar always receives entries with a score badge.
-      try {
-        const historyData =
-          ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-
-        if (historyData[0]?.cardId !== effectiveCardId) {
-          const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-          const currentKbId = kbData._id;
-
-          let frontText = '';
-          let backText = '';
-          try {
-            const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
-            const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
-            frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
-            backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
-          } catch (error) {
-            console.warn('Error parsing Rem text for flashcard history:', error);
-            frontText = '[Complex Media Rem]';
-          }
-
-          const text = `${frontText} ${backText}`.trim();
-
-          // Actively remove any existing entries with the same cardId before prepending.
-          const deduped = historyData.filter((entry) => entry.cardId !== effectiveCardId);
-
-          await plugin.storage.setSynced('flashcardHistoryData', [
-            {
-              key: Math.random(),
-              remId,
-              cardId: effectiveCardId,
-              time: new Date().getTime(),
-              kbId: currentKbId,
-              text,
-              _v: 1,
-              score,
-            },
-            ...deduped.slice(0, 999),
-          ]);
-        }
-      } catch (error) {
-        console.error('Failed to record flashcard history entry:', error);
-      }
+      await recordFlashcardHistory(plugin, {
+        remId,
+        cardId: effectiveCardId,
+        rem,
+        score,
+        context: 'entry',
+      });
 
       // --- Light Mode gate: priority cache and shield updates only ---
       if (!(await shouldUseLightMode(plugin))) {
@@ -685,6 +803,17 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
     AppEvents.GlobalRemChanged,
     undefined,
     async (data) => {
+      // Raw event tape for the debug widget's dirty-set probe. Recorded here, at
+      // the very top, BEFORE the plugin_operation_active early return and before
+      // the debounce below — the probe's question is which remIds this event
+      // actually reports for a hand edit (the tagged rem, its property child, or
+      // both), and anything filtered downstream would answer a different one.
+      //
+      // Costs no IPC per event: recordRemChangeEvent pushes to a module-level
+      // ring buffer and flushes to session storage on a time throttle, so this
+      // hot path (which is known to fire in the thousands) pays an array push.
+      recordRemChangeEvent(plugin, data.remId);
+
       const isBatchActive = await plugin.storage.getSession<boolean>('plugin_operation_active');
       if (isBatchActive) {
         return;
@@ -758,40 +887,13 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
               }
 
               // Flashcard History: record cluster card rating (QueueCompleteCard doesn't fire for clusters)
-              try {
-                const historyData =
-                  ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-                if (historyData[0]?.cardId !== clusterCardId) {
-                  const clusterRem = card?.remId ? await plugin.rem.findOne(card.remId) : undefined;
-                  let frontText = '';
-                  let backText = '';
-                  try {
-                    const frontRaw = clusterRem?.text ? await safeRemTextToString(plugin, clusterRem.text) : '';
-                    const backRaw = clusterRem?.backText ? await safeRemTextToString(plugin, clusterRem.backText) : '';
-                    frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
-                    backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
-                  } catch (_e) {
-                    frontText = '[Complex Media Rem]';
-                  }
-                  const text = `${frontText} ${backText}`.trim();
-                  const deduped = historyData.filter((entry) => entry.cardId !== clusterCardId);
-                  await plugin.storage.setSynced('flashcardHistoryData', [
-                    {
-                      key: Math.random(),
-                      remId: card?.remId,
-                      cardId: clusterCardId,
-                      time: new Date().getTime(),
-                      kbId: currentKbId,
-                      text,
-                      _v: 1,
-                      score,
-                    },
-                    ...deduped.slice(0, 999),
-                  ]);
-                }
-              } catch (error) {
-                console.error('Failed to record flashcard history for cluster card:', error);
-              }
+              await recordFlashcardHistory(plugin, {
+                remId: card?.remId,
+                cardId: clusterCardId,
+                kbId: currentKbId,
+                score,
+                context: 'cluster card',
+              });
             }
           } catch (error) {
             console.error('Failed to update Mastery Drill for cluster card:', error);
@@ -813,8 +915,27 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       // populated yet (e.g., Light Mode or before first queue entry).
       let capturedHistory: IncrementalRep[] | null = null;
 
-      // Primary: read from session cache (immune to powerup removal timing)
-      const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+      // Primary: read from session cache (immune to powerup removal timing).
+      //
+      // Gated on the known-IncRem index, because this listener fires for EVERY
+      // rem edit in the knowledge base — thousands of times a session — and this
+      // read pulls the entire cache (7.99MB measured) across the bridge just to
+      // pluck one entry out of it. It sits above the debounce and above the
+      // recentlyProcessedCards guard further down, so nothing else was sparing
+      // it. On a KB where a small fraction of rems are incremental, skipping it
+      // for the rest removes almost all of that traffic.
+      //
+      // `isKnownIncRemId` returns undefined in realms that never ran a full
+      // cache load, in which case we read as before. A `false` means the rem was
+      // not incremental as of the last load: the lookup below would have missed
+      // anyway, so skipping is behaviour-preserving — and the direct-rem
+      // fallback immediately after still covers a rem that became incremental
+      // since (which, being new, has no history in the cache to recover either).
+      const knownIncremental = isKnownIncRemId(data.remId);
+      const allIncRems =
+        knownIncremental === false
+          ? []
+          : (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
       const cachedIncRem = allIncRems.find(r => r.remId === data.remId);
 
       if (cachedIncRem && cachedIncRem.history && cachedIncRem.history.length > 0) {
@@ -1064,47 +1185,38 @@ export function registerGlobalOpenRemListener(plugin: ReactRNPlugin) {
       await saveCurrentSession(plugin, 'GlobalOpenRem Navigation');
     }
 
-    const currentRemData =
-      ((await plugin.storage.getSynced('remData')) as RemHistoryData[]) || [];
-
-    if (currentRemData[0]?.remId === currentRemId) return;
-
     const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
     const currentKbId = kbData._id;
 
+    const currentRemData = await readHistoryShard(plugin, remHistorySpec, currentKbId);
+    if (currentRemData[0]?.remId === currentRemId) return;
+
     const rem = await plugin.rem.findOne(currentRemId);
 
-    let frontText = '';
-    let backText = '';
+    let text = '';
     try {
       const frontRaw = rem?.text ? await safeRemTextToString(plugin, rem.text) : '';
       const backRaw = rem?.backText ? await safeRemTextToString(plugin, rem.backText) : '';
+      const front = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw : '';
+      const back = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw : '';
       // Capped to match the widget's own backfill: this writer had no limit at
       // all, so visiting a Rem with a long body stored the whole thing.
-      frontText =
-        typeof frontRaw === 'string' && frontRaw !== 'Untitled'
-          ? frontRaw.substring(0, remHistoryTextLimit)
-          : '';
-      backText =
-        typeof backRaw === 'string' && backRaw !== 'Untitled'
-          ? backRaw.substring(0, remHistoryTextLimit)
-          : '';
+      text = `${front} ${back}`.trim().substring(0, remHistoryTextLimit);
     } catch (error) {
       console.warn('Error parsing Rem text for visited history:', error);
     }
 
-    const text = `${frontText} ${backText}`.trim();
-
-    await plugin.storage.setSynced('remData', [
+    // The same rem can be revisited, so this list does not dedupe by remId the way
+    // the flashcard list dedupes by cardId — each visit is its own entry.
+    await writeHistoryShard(plugin, remHistorySpec, currentKbId, [
       {
-        key: Math.random(),
         remId: currentRemId,
-        time: new Date().getTime(),
+        time: Date.now(),
         kbId: currentKbId,
         text,
         _v: 1,
       },
-      ...currentRemData.slice(0, 500),
+      ...currentRemData,
     ]);
   });
 }
@@ -1166,40 +1278,13 @@ function registerDrillCardRatingListener(plugin: ReactRNPlugin) {
     }
 
     // Flashcard History: record drill card rating (QueueCompleteCard doesn't fire in the drill popup)
-    try {
-      const historyData =
-        ((await plugin.storage.getSynced('flashcardHistoryData')) as FlashcardHistoryData[]) || [];
-      if (historyData[0]?.cardId !== cardId) {
-        const drillRem = card?.remId ? await plugin.rem.findOne(card.remId) : undefined;
-        let frontText = '';
-        let backText = '';
-        try {
-          const frontRaw = drillRem?.text ? await safeRemTextToString(plugin, drillRem.text) : '';
-          const backRaw = drillRem?.backText ? await safeRemTextToString(plugin, drillRem.backText) : '';
-          frontText = typeof frontRaw === 'string' && frontRaw !== 'Untitled' ? frontRaw.substring(0, flashcardHistoryTextLimit) : '';
-          backText = typeof backRaw === 'string' && backRaw !== 'Untitled' ? backRaw.substring(0, flashcardHistoryTextLimit) : '';
-        } catch (_e) {
-          frontText = '[Complex Media Rem]';
-        }
-        const text = `${frontText} ${backText}`.trim();
-        const deduped = historyData.filter((entry) => entry.cardId !== cardId);
-        await plugin.storage.setSynced('flashcardHistoryData', [
-          {
-            key: Math.random(),
-            remId: card?.remId,
-            cardId,
-            time: new Date().getTime(),
-            kbId: currentKbId,
-            text,
-            _v: 1,
-            score,
-          },
-          ...deduped.slice(0, 999),
-        ]);
-      }
-    } catch (error) {
-      console.error('Failed to record flashcard history for drill card:', error);
-    }
+    await recordFlashcardHistory(plugin, {
+      remId: card?.remId,
+      cardId,
+      kbId: currentKbId,
+      score,
+      context: 'drill card',
+    });
   };
 
   plugin.event.addListener(AppEvents.QueueLoadCard, undefined, async (data: any) => {

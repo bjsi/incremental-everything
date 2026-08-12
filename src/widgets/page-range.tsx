@@ -37,6 +37,13 @@ function PageRangeWidget() {
   const plugin = usePlugin();
   const pageRangeInputRefs = React.useRef<Record<string, { start: HTMLInputElement | null, end: HTMLInputElement | null }>>({});
   const inputStartRef = React.useRef<HTMLInputElement>(null);
+  // Scroll plumbing for centering the current rem in the tree. The tree is now
+  // emitted in DFS order, so the current rem can land anywhere in a long list.
+  const scrollAreaRef = React.useRef<HTMLDivElement>(null);
+  const currentRowRef = React.useRef<HTMLDivElement | null>(null);
+  // Which rem we've already centred on — keeps background phases from yanking
+  // the view away while the user reads.
+  const centredForRemId = React.useRef<string | null>(null);
 
   const contextData = useTrackerPlugin(
     async (rp) => rp.storage.getSession('pageRangeContext'),
@@ -599,21 +606,32 @@ function PageRangeWidget() {
 
   // ─── Build containment tree ──────────────────────────────────────────────
   // Algorithm:
-  //  1. Sort with current rem first, then by start page (no-range items last).
+  //  1. Sort by page geometry alone — start page ascending, then widest first
+  //     (no-range items last). Incremental status must NOT influence this sort:
+  //     a dismissed rem still owns a real page range (it lives in the Dismissed
+  //     powerup's slots), so sorting those to the bottom would both misplace
+  //     them in the output and hide them from the parent search below.
   //  2. Walk the sorted list assigning each item the tightest parent whose
-  //     range fully contains this item's range.
+  //     range fully contains this item's range. Geometric sort guarantees any
+  //     container appears before what it contains, so scanning j < i is safe.
   //  3. Assign depth = parent.depth + 1, or 0 for root items.
-  //  4. Mark the last child of each parent for the "└─" corner elbow.
-  //  5. Flag sibling items (same parent, same depth) whose ranges overlap
+  //  4. Flag sibling items (same parent, same depth) whose ranges overlap
   //     (not containment — that's the child case).
+  //  5. Emit in DFS order so every child renders directly beneath its parent.
+  //     The flat list is indented purely by `depth`, so emission order *is* the
+  //     visible hierarchy — a child far from its parent reads as nested under
+  //     whatever item happens to precede it.
 
   const buildRangeTree = () => {
-    // Step 1: base sort
+    // Step 1: geometric sort — start ascending, widest first, ranges before
+    // range-less items. Ties broken by name for stable output.
     const sorted = [...relatedRems].sort((a, b) => {
-      if (a.remId === contextData?.incrementalRemId) return -1;
-      if (b.remId === contextData?.incrementalRemId) return 1;
-      if (a.isIncremental !== b.isIncremental) return a.isIncremental ? -1 : 1;
-      if (a.range && b.range) return a.range.start - b.range.start;
+      if (a.range && b.range) {
+        if (a.range.start !== b.range.start) return a.range.start - b.range.start;
+        const aEnd = a.range.end ?? Infinity;
+        const bEnd = b.range.end ?? Infinity;
+        if (aEnd !== bEnd) return bEnd - aEnd; // widest first → containers lead
+      }
       if (a.range && !b.range) return -1;
       if (!a.range && b.range) return 1;
       return a.name.localeCompare(b.name);
@@ -737,11 +755,53 @@ function PageRangeWidget() {
       }
     }
 
-    return items;
+    // Step 5: flatten depth-first so each child immediately follows its parent.
+    // Within a parent, children keep the geometric order from `sorted`.
+    const ordered: TreeItem[] = [];
+    const emit = (parentId: string | null) => {
+      for (const child of childrenOf.get(parentId) ?? []) {
+        ordered.push(child);
+        emit(child.remId);
+      }
+    };
+    emit(null);
+
+    // Safety net: if a cycle or orphaned parentId ever dropped an item, append
+    // it rather than silently losing it from the panel.
+    if (ordered.length !== items.length) {
+      const emitted = new Set(ordered.map(i => i.remId));
+      for (const item of items) {
+        if (!emitted.has(item.remId)) ordered.push(item);
+      }
+    }
+
+    return ordered;
   };
 
   const treeItems = buildRangeTree();
   const INDENT_PX = 16;
+
+  // Ref callback for the current rem's row. Centres it in the scroll area on
+  // first mount so it stays findable in long trees now that DFS order puts it
+  // wherever its page range belongs. Scrolls the panel's own container rather
+  // than calling scrollIntoView, which would also scroll the host iframe.
+  const attachCurrentRow = (el: HTMLDivElement | null) => {
+    currentRowRef.current = el;
+    const remId = contextData?.incrementalRemId;
+    if (!el || !remId || centredForRemId.current === remId) return;
+    centredForRemId.current = remId;
+    requestAnimationFrame(() => {
+      const container = scrollAreaRef.current;
+      if (!container || !currentRowRef.current) return;
+      const row = currentRowRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      // Already fully visible — leave the scroll position alone.
+      if (rowRect.top >= containerRect.top && rowRect.bottom <= containerRect.bottom) return;
+      const delta = rowRect.top - containerRect.top;
+      container.scrollTop += delta - (container.clientHeight - row.offsetHeight) / 2;
+    });
+  };
 
   return (
     <div
@@ -852,7 +912,7 @@ function PageRangeWidget() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
 
         {/* Current Rem - Quick Edit */}
         <div className="mb-3 p-3 rounded" style={{
@@ -959,7 +1019,12 @@ function PageRangeWidget() {
           </div>
           <div className="flex flex-col gap-1">
             {treeItems.map((item) => (
-              <div key={item.remId} className="relative" style={{ marginLeft: item.depth * INDENT_PX }}>
+              <div
+                key={item.remId}
+                ref={item.remId === contextData?.incrementalRemId ? attachCurrentRow : undefined}
+                className="relative"
+                style={{ marginLeft: item.depth * INDENT_PX }}
+              >
                 {/* Overlap warning inline via hasOverlap prop */}
                 <PdfRemItem
                   item={item}

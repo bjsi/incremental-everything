@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
+import { writeCardPriorityCache } from '../lib/card_priority/persistence';
 import { registerEventListeners } from '../register/events';
 import { registerPluginPowerups } from '../register/powerups';
 import { registerPluginSettings } from '../register/settings';
@@ -13,6 +14,7 @@ import { registerWidgets } from '../register/widgets';
 import { registerMenus } from '../register/menus';
 import { registerCommands } from '../register/commands';
 import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
+import { registerPrefetchTrackers } from '../lib/queue_prefetch';
 import {
   registerCoreQueueDisplayPowerups,
   registerHideInQueueLegacyPowerups,
@@ -24,7 +26,7 @@ import {
 import { enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
-import { compactAuthoritativeAggregatesIfNeeded } from '../lib/authoritative_aggregates';
+import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS } from '../lib/ui_helpers';
 import { getIESetting } from '../lib/settings';
@@ -81,13 +83,17 @@ async function onActivate(plugin: ReactRNPlugin) {
   // must not block activation.
   void cleanupOrphanedReviewGraphs(plugin);
 
-  // Fire-and-forget: shrink the authoritative-aggregates key into its compact
-  // form if it is still the legacy array. Needs no card/rem enumeration, so it
-  // works while those APIs are unavailable — and until it runs, that key sits
-  // over RemNote's 900KB per-key ceiling and every write to it is rejected.
-  void compactAuthoritativeAggregatesIfNeeded(plugin);
+  // Fire-and-forget: split the authoritative-aggregates key into one shard per
+  // knowledge base, compacting the legacy array shape on the way through. Needs
+  // no card/rem enumeration, so it works while those APIs are unavailable. Costs
+  // one read per session once the legacy key is drained.
+  void migrateAuthoritativeAggregatesToShards(plugin);
 
   registerCallbacks(plugin);
+  // Keeps the GetNextCard prefetch's no-IncRem-timer gate live. Must run in the
+  // index widget: plugin.track subscriptions belong to the realm that owns the
+  // callback, and this is the same realm registerCallbacks runs in.
+  registerPrefetchTrackers(plugin);
   await registerWidgets(plugin);
 
   // Register CSS rules
@@ -162,7 +168,11 @@ async function onActivate(plugin: ReactRNPlugin) {
     console.log(
       `CACHE: Skipping card priority cache build (${useLightMode ? 'light mode' : 'flashcard prioritisation off'}).`
     );
-    await plugin.storage.setSession(allCardPriorityInfoKey, []);
+    // Session only, deliberately. An empty cache here means "not built in this
+    // context" (light mode, or the opt-in off), not "there are no priorities" —
+    // persisting it would wipe a good copy on every mobile session and make the
+    // next full-mode launch pay a cold build for it.
+    await writeCardPriorityCache(plugin, []);
   }
 }
 

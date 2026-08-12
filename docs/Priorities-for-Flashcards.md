@@ -83,7 +83,7 @@ If you previously used tags like `#HighPriority` or `#P1` to organise your cards
 
 ### 3. Unified Batch Priority Change
 
-While the tool above is specialized for migrations, the **[Prioritization-&-Sorting#batch-priority-change-increms--flashcards](Batch-Priority-Change.md)** widget provides a unified interface for managing existing priorities across an entire document tree.
+While the tool above is specialized for migrations, the **[Prioritization-&-Sorting#batch-priority-change-increms--flashcards](Prioritization-&-Sorting.md#batch-priority-change-increms-flashcards)** widget provides a unified interface for managing existing priorities across an entire document tree.
 
 - **Unified Interface:** Shows both Incremental Rems and Flashcard priorities in a single table.
 - **Bulk Adjustment:** Increase or decrease all selected card priorities by a specific amount or percentage.
@@ -181,7 +181,7 @@ This means cards that became due *during* the current session — for example, a
 
 When the session ends, before writing the shield value to the history graph, the plugin performs a **live `rem.getCards()` check** on the highest-priority candidate from the cache. If the cache entry turns out to be stale (e.g., the card was reviewed or rescheduled since the cache was last built), the plugin escalates to the next priority tier and retries — up to **20 API calls total**, grouped by priority level. This prevents phantom low-shield readings in the history caused by stale cache data.
 
-You can view the history of your Card Shield in the "[Prioritization-&-Sorting#priority-shield-history](Priority-Shield-History.md)" graph to track your retention discipline over time.
+You can view the history of your Card Shield in the "[Prioritization-&-Sorting#priority-shield-history](Prioritization-&-Sorting.md#priority-shield-history)" graph to track your retention discipline over time.
 
 ![Card Priority Shield history](assets/uploaded/d082cc01-a089-41c0-a6c0-24ece4662400.png){ width="800" }
 
@@ -243,6 +243,41 @@ For large-scale reorganizations or after running bulk operations (Batch Priority
 
 
 ![CleanShot 2026-01-03 at 16 06 53@2x](assets/uploaded/c04bec93-9af1-4de3-946c-959601f97d34.png){ width="700" }
+
+
+## Startup: how the priority cache is built { #startup-cache }
+
+Everything on this page — the Card Shield, relative percentiles, [Priority Review Documents](Priority-Review-Document.md), the priority badges — reads from one in-memory index of every prioritised flashcard, built when the plugin starts.
+
+On a large knowledge base that index is expensive. Building it from scratch means reading three stored values for every tagged rem: on a 45,000-rem library that is roughly **135,000 separate reads, and about 100 seconds**. It runs in the background and nothing blocks on it, but until it finishes the shield and the percentile colours have nothing to work from.
+
+### The saved copy
+
+The plugin keeps a copy of the index on your device and starts from it, re-reading only what has actually changed since the copy was saved.
+
+The copy is written once, straight after the index is built. While you work, the plugin notes only the *identifiers* of flashcards whose priority changed — a few bytes each — and the next start re-reads just those before saving the copy again. There is no reason to keep the copy itself current during a session, since nothing reads it until the next start.
+
+**Measured on a 45,085-rem knowledge base: 108 seconds to build from scratch, 14 seconds starting from the saved copy.** Most of what remains is loading the flashcards themselves, which has to happen every time — whether a card is due changes with the clock, so those counts are always recomputed.
+
+The copy lives only on the device that wrote it. It is never synced, because it is derived data that each device can rebuild for itself, and syncing several megabytes of it would be wasteful.
+
+### When it rebuilds from scratch anyway
+
+The saved copy is used only when it can be trusted. The plugin falls back to a full rebuild when:
+
+* there is no saved copy yet — the first start after installing or updating;
+* it belongs to a different knowledge base, or was written by an older version of the plugin;
+* **it is more than seven days since the last full rebuild** — starting quickly from the copy does not reset that clock, or the rebuild would be postponed forever;
+* a spot-check disagrees with what is actually stored.
+
+The spot-check reads a couple of hundred priorities at random and compares them against the saved copy before trusting the rest. It costs a fraction of a second and catches the copy being wrong in bulk — after restoring a backup, or an import that rewrote priorities.
+
+The seven-day limit covers the one change that cannot be detected. If you edit a **Priority** property row by hand while the plugin is running, the change is noticed and saved as normal. If you do it **on another device**, or with the plugin disabled, nothing marks the rem as changed, and the saved copy would keep the old value indefinitely. Rebuilding weekly puts a bound on how long such an edit can stay wrong.
+
+!!! tip "Forcing a rebuild"
+    The command **Refresh Card Priority Cache** ignores the saved copy and re-reads every priority from the database, rebuilding both the cache and the saved copy from what it finds. That is the one to run if you suspect a priority is being displayed wrongly — the saved copy is derived from the same state you would be doubting, so a refresh that reused it would tell you nothing.
+
+    The debug widget's **Warm-Start Store** panel also clears the copy, which makes the *next* start rebuild from scratch. Clearing it is harmless — it is derived data, and the rebuild writes it again.
 
 ## See also
 

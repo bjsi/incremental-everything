@@ -11,11 +11,11 @@ See the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page for default bindings.
 
 - **[Make Incremental (Extract)](Getting-Started.md#making-a-rem-incremental)** (`Opt+X` / `Alt+X`) — `quick: ext`
   Tags the focused Rem with the `#Incremental` powerup.
-  **Text Selection:** If text is selected in the editor, it performs a **[Reviewing-Items-in-the-Editor#extracting-text](Text-Extract.md)** (see below). If no text is selected, it initializes the current Rem with inherited or default priority.
+  **Text Selection:** If text is selected in the editor, it performs a **[Reviewing-Items-in-the-Editor#extracting-text](Reviewing-Items-in-the-Editor.md#extracting-text)** (see below). If no text is selected, it initializes the current Rem with inherited or default priority.
 
 - **[Extract with Priority](Getting-Started.md#making-a-rem-incremental)** (`Opt+Shift+X` / `Alt+Shift+X`) — `quick: ep`
   Tags the target with the `#Incremental` powerup and immediately opens the **Priority & Interval Popup**.
-  **Text Selection:** Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Text-Extract.md)**, creating a new child Rem from the selected text. The source text is highlighted in **blue**, and a **reference pin** to the new extract is inserted immediately after. The new extract includes a back-reference to the parent. The source Rem is also hidden from queue display so its slot doesn't show redundantly during review of the extract — the mechanism depends on what's installed: **Remove from Queue** powerup on the parent (preferred, survives extract relocation) when the [Hide-in-Queue integration](Utilities.md#queue-display-utilities) is enabled or the standalone Hide in Queue plugin is installed; otherwise **Remove Parent** powerup on the extract itself (fallback — see [Create Extract behavior](Utilities.md#create-extract-source-rem-hiding-behavior)). If you extract from a PDF highlight, the new sub-extract will also automatically inherit a reference pin bridging directly back to the original PDF source!
+  **Text Selection:** Performs a **[Reviewing-Items-in-the-Editor#extracting-text](Reviewing-Items-in-the-Editor.md#extracting-text)**, creating a new child Rem from the selected text. The source text is highlighted in **blue**, and a **reference pin** to the new extract is inserted immediately after. The new extract includes a back-reference to the parent. The source Rem is also hidden from queue display so its slot doesn't show redundantly during review of the extract — the mechanism depends on what's installed: **Remove from Queue** powerup on the parent (preferred, survives extract relocation) when the [Hide-in-Queue integration](Utilities.md#queue-display-utilities) is enabled or the standalone Hide in Queue plugin is installed; otherwise **Remove Parent** powerup on the extract itself (fallback — see [Create Extract behavior](Utilities.md#create-extract-source-rem-hiding-behavior)). If you extract from a PDF highlight, the new sub-extract will also automatically inherit a reference pin bridging directly back to the original PDF source!
   **Multi-rem selection:** When multiple Rems are selected, all are initialized as Incremental and the popup opens in **batch mode**.
 
 ![Extract Selection Demo](assets/extract-selected-text.gif)
@@ -34,11 +34,11 @@ See the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page for default bindings.
   Applies the native RemNote **Cloze Deletion** formatting to the selected text. Mimics the SuperMemo workflow for rapid creation of flashcards during incremental reading. Requires a selection — which can be plain text, a **Rem reference** (`[...](....md)`), or a mix of both; references anywhere in the selection (including on the front or back of a two-sided card) are clozed too, and the selected span is highlighted on the source Rem. The new cloze child is automatically tagged with the **Remove Parent** powerup, so the source Rem is hidden from queue display *only* while reviewing this specific cloze — sibling and descendant flashcards are unaffected. See [Remove Parent](Utilities.md#remove-parent-rp-new) in Queue Display Utilities.
 
 - **Create Cloze Deletion with Priority** (`Opt+Shift+Z` / `Alt+Shift+Z`)
-  Identical to **Create Cloze Deletion**, but immediately opens the **[Prioritization-&-Sorting#set-priority-popup](Light-Priority-popup.md)** after creating the cloze child Rem. The popup is pre-filled with the auto-computed priority (see below) and shows a **parent extract context panel** — including the parent's text, its resolved priority with source label, the number of existing cloze children, and the suggested priority with its formula (e.g. `30 + 2×10`). Use this when you want to review and optionally override the computed value.
+  Identical to **Create Cloze Deletion**, but immediately opens the **[Prioritization-&-Sorting#set-priority-popup](Prioritization-&-Sorting.md#light-priority-popup)** after creating the cloze child Rem. The popup is pre-filled with the auto-computed priority (see below) and shows a **parent extract context panel** — including the parent's text, its resolved priority with source label, the number of existing cloze children, and the suggested priority with its formula (e.g. `30 + 2×10`). Use this when you want to review and optionally override the computed value.
 
 Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: each new cloze created from a parent extract inherits a priority derived from the parent's priority plus a per-cloze step increment, so that the most important fact (first cloze) gets the lowest priority number and subsequent, less critical clozes get progressively higher numbers. The formula is `clamp(parentPriority + min(existingCount, 10) × stepSize, 0, 100)`, where `existingCount` is the sum of (a) the parent's `#cloze-extract`-tagged children and (b) the cards the parent rem already owns itself (native clozes plus front/back-direction cards if it is a flashcard). The decrement is capped at 10 steps regardless of how many prior cards/clozes exist. `Alt+Z` applies this silently; `Alt+Shift+Z` shows it in the popup so you can adjust.
 
-- **[Dismiss Incremental Rem](Getting-Started.md#dismissing-and-re-activating-rems)** (`Ctrl+D`) — `quick: dis`
+- **[Dismiss Incremental Rem](Getting-Started.md#dismissing-an-incremental-rem-dismiss-button)** (`Ctrl+D`) — `quick: dis`
   Equivalent to clicking the "[Dismiss](Reviewing-Items-in-the-Queue.md#dismiss)" button. Removes the Incremental and transfers its history to the Dismissed powerup.
 
 - **[Open Repetition History](Getting-Started.md#repetition-history-statistics)** (`Ctrl+Shift+H`) — `quick: his`
@@ -56,10 +56,10 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 
 ## Prioritization Commands
 
-- **[Set Priority](Prioritization-&-Sorting.md#set-priority-popup)** (`Opt+P` / `Alt+P`) — `quick: pri`
+- **[Set Priority](Prioritization-&-Sorting.md#main-priority-popup)** (`Opt+P` / `Alt+P`) — `quick: pri`
   Opens the Full Priority widget to deeply adjust absolute and relative rankings of the Rem.
 
-- **[Quick Set Priority](Prioritization-&-Sorting.md#set-priority-popup)** (Light Widget) (`Ctrl+Opt+P` / `Ctrl+Alt+P`) — `quick: qpri`
+- **[Quick Set Priority](Prioritization-&-Sorting.md#main-priority-popup)** (Light Widget) (`Ctrl+Opt+P` / `Ctrl+Alt+P`) — `quick: qpri`
   Opens the zero-lag Light Priority widget for immediate integer adjustments.
 
 - **Quick Increase Priority Number (Less Important)** (`Ctrl+Opt+Up` / `Ctrl+Alt+Up`)
@@ -68,7 +68,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 - **Quick Decrease Priority Number (More Important)** (`Ctrl+Opt+Down` / `Ctrl+Alt+Down`)
   Instantly decreases the priority number (making the item *more* important) by the configured [Priority Step Size](Plugin-Settings-Reference.md#priority) (default: `5`). No popup is shown.
 
-- **[Batch Priority Change](Prioritization-&-Sorting.md#batch-priority-change-incremental-rems)**
+- **[Batch Priority Change](Prioritization-&-Sorting.md#batch-priority-change-increms-flashcards)**
   A powerful widget for managing the priorities of multiple Incremental Rems at once, designed for large documents with many nested items. (No quick code)
 
 
@@ -130,7 +130,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
   Copies all sources from the **focused Rem** into a session clipboard. Use this to capture the PDF source rem from a template chapter before pasting it onto other chapters/sections.
 
 - **[Paste Rem Sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources)** (`Opt+Shift+V` / `Alt+Shift+V`) — `quick: paste`
-  Adds the previously copied sources to **all selected Rems** (multi-select supported), or to the focused Rem if nothing is selected. Sources already present are silently skipped (idempotent). Together with **Copy Rem Sources**, this automates the [PDF-Incremental-Reading-Workflow#2-copying-and-pasting-sources](PDF-split-workflow.md).
+  Adds the previously copied sources to **all selected Rems** (multi-select supported), or to the focused Rem if nothing is selected. Sources already present are silently skipped (idempotent). Together with **Copy Rem Sources**, this automates the [PDF-Incremental-Reading-Workflow#2-copying-and-pasting-sources](PDF-Incremental-Reading-Workflow.md#2-copying-and-pasting-sources).
 
 - **No Inc Rem for 15 min** (Queue Menu)
   Temporarily disables the injection of Incremental Rems into your queue for 15 minutes, allowing you to focus purely on flashcards. A timer countdown widget appears in the queue to show the remaining time.
@@ -153,7 +153,7 @@ Both `Alt+Z` and `Alt+Shift+Z` apply **automatic Card Priority graduation**: eac
 
 ### Queue Display Commands
 
-These commands tag a Rem with one of the [Utilities#queue-display-utilities](Queue-Display-Utilities.md) powerups. The tagged Rem then renders differently (or is removed entirely) during queue review. All commands work both from the editor and directly inside the Queue. See the [Utilities](Utilities.md#queue-display-utilities) page for visual examples and full behavior of each powerup.
+These commands tag a Rem with one of the [Utilities#queue-display-utilities](Utilities.md#queue-display-utilities) powerups. The tagged Rem then renders differently (or is removed entirely) during queue review. All commands work both from the editor and directly inside the Queue. See the [Utilities](Utilities.md#queue-display-utilities) page for visual examples and full behavior of each powerup.
 
 **Always available:**
 
@@ -189,7 +189,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   - **Selection modes:** a multi-line text selection acts on every line it touches (partial selections expand back to each line's start); a collapsed cursor bulletizes the rem's entire front text.
   - **Formatting-safe:** preserves highlights, colors, references and other inline nodes; empty lines are skipped; the bullet is inserted as a plain node.
 
-  📖 See [Utilities → Bulletize Inline Selected Text](Utilities#bulletize-inline-selected-text.md) for full behavior and examples.
+  📖 See [Utilities → Bulletize Inline Selected Text](Utilities.md#bulletize-inline-selected-text) for full behavior and examples.
 
 - **Inlinize Detected List** — `quick: inl`
   Detects a list flattened onto one line by a PDF highlight (`… evitá-las: 1 Aumentar… 2 Deixar… 3 O Oficial…`, or bullets run together like `… reconhecidas: • alvos…; • ocorrem…`) and inserts a line break + `• ` before each item, turning it into soft-wrapped bulleted lines **in the same rem**. Enumerated items keep their number; existing `•`/`-`/`*` markers are normalized to `• `. Acts on the **focused rem** (no selection needed) and is `Ctrl+Z`-able — the review checkpoint before breaking to children.
@@ -205,7 +205,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
 - **Restore List Rem** — `quick: rlr`
   Reverses the most recent **Break Inline List Into Children** on the focused rem: deletes exactly the children it created (skipping any you re-parented), rewrites the original front text from the snapshot, and clears the snapshot.
 
-  📖 See [Utilities → Inlinize & Break Lists](Utilities#inlinize--break-lists-from-pdf-highlights.md) for the detection algorithm, the full workflow, and limitations.
+  📖 See [Utilities → Inlinize & Break Lists](Utilities.md#inlinize-break-lists-from-pdf-highlights) for the detection algorithm, the full workflow, and limitations.
 
 - **Text Case Converter** (`Shift+F3`) — `quick: case`
   Cycles through **Title Case** → **UPPERCASE** → **lowercase**.
@@ -224,7 +224,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   - **Headings:** supports **H1 through H6**. Heading-level skips (e.g. `H1 → H3` with no `H2` between) are handled — the `H3` nests directly under the `H1`.
   - **Undo:** after applying, an **Outline Restructured** banner appears in the sidebar with an **Undo Restructure** button; also available as the `Revert Last Outline Restructure` command (below). Single-slot, session-scoped.
 
-  📖 See [Utilities → Restructure Outline by Headings](Utilities#restructure-outline-by-headings.md) for the full algorithm and preview UI details.
+  📖 See [Utilities → Restructure Outline by Headings](Utilities.md#restructure-outline-by-headings) for the full algorithm and preview UI details.
 
 - **Revert Last Outline Restructure** — `quick: rolr`
   Reverts the most recent Restructure Outline by Headings operation in this session. Same effect as the **Undo Restructure** button on the sidebar banner. Restores every moved rem to its exact prior parent and position.
@@ -235,7 +235,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   - **Grandparent fallback:** parent isn't a heading but the grandparent is `Hn` → a confirmation dialog offers to set the **parent** to `H(n+1)` and the **rem** to `H(n+2)` (e.g. grandparent `H2` → parent `H3`, rem `H4`); Cancel leaves both unchanged.
   - **Multi-rem:** select several rems → each is styled relative to its own parent; all grandparent-fallback cases are covered by a **single** confirmation, and a shared parent is promoted only once. Rems with no ancestor heading are skipped (reported in a summary toast).
 
-  📖 See [Utilities → Set Next Heading Level](Utilities#set-next-heading-level.md).
+  📖 See [Utilities → Set Next Heading Level](Utilities.md#set-next-heading-level).
 
 - **Apply Heading Levels by Hierarchy (Table of Contents)** — `quick: htoc`
   Assigns heading levels (H1–H6) to the selected outline **by each rem's depth in the hierarchy**, to a level range you choose — a one-shot "table of contents". Never moves rems; only changes their level. Reuses the same H1–H6 detection/application as Restructure Outline by Headings.
@@ -244,7 +244,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   - **Preview & undo:** opens a Before | After popup with live Top/Deepest dropdowns and `old → new` badges; after Apply a sidebar **Heading Levels Applied** banner offers undo (own snapshot slot, separate from the restructure banner).
   - Quick code is `htoc`, not `toc` (RemNote's built-in Table-of-Contents reference owns `toc`).
 
-  📖 See [Utilities → Apply Heading Levels by Hierarchy](Utilities#apply-heading-levels-by-hierarchy-table-of-contents.md).
+  📖 See [Utilities → Apply Heading Levels by Hierarchy](Utilities.md#apply-heading-levels-by-hierarchy-table-of-contents).
 
 - **Demote Heading Level (one level deeper)** — `quick: hdmt`
   Shifts the **selected subtree's** existing headings one level deeper (`H2 → H3`). RemNote's outline selection reports only the top-level rems, so this walks the whole selected subtree (like the ToC command) and shifts every heading within it; non-heading rems are left untouched. Clamped at `H6`. Opens the same Before | After preview as the ToC command and is undoable via the same banner.
@@ -256,13 +256,13 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   Reverts the most recent heading-level change (ToC or promote/demote) in this session, restoring each rem's prior level (including back to a plain paragraph). Same effect as the **Undo Heading Changes** button on the sidebar banner. Single-slot, session-scoped.
 
 - **Find Rem (insert reference / open in pane)** (`Opt+Shift+F` / `Alt+Shift+F`) — `quick: fir`
-  Opens a floating picker that finds Rems **RemNote's `[Utilities → Find Rem — Reference or Open](`-reference-search-can't-surface**-—-Rems-whose-name-is-made-entirely-of-high-frequency-words-(e.g.-`Navegação-Interior`.md)-get-out-ranked-off-RemNote's-per-token-candidate-list,-so-typing-the-name-never-returns-them.-The-picker-searches-each-word-separately,-unions-the-results,-keeps-Rems-containing-all-words,-and-floats-exact-name-matches-to-the-top.
-----**Enter-/-click**-inserts-a-reference-at-the-cursor;-**Ctrl/Cmd+Enter**-(or-Ctrl/Cmd+click)-inserts-it-as-a-**pin**-(link-chip-without-text-—-one-keystroke-vs.-RemNote's-right-click-→-Edit-Alias-→-clear-text-trick);-**Opt/Alt+Enter**-(or-Opt/Alt+click)-inserts-the-Rem's-**text-then-a-pin**-("Text-with-Pin"-—-preserves-formatting/images,-brings-a-card's-back-text-after-a-practice-direction-arrow,-and-marks-the-source's-clozes-rather-than-re-clozing-them);-**Shift+Enter-/-Shift+click**-opens-the-Rem-in-a-new-pane-(to-reach-"invisible"-Rems).
-----**Alias-aware:**-also-matches-a-Rem-by-its-**aliases**-(`ALIAS`-badge);-picking-one-inserts-a-reference-to-the-owning-Rem-that-renders-the-alias-text.
-----**Cloze-aware:**-inserting-inside-a-cloze-keeps-the-reference-inside-it-instead-of-breaking-it.
-----**Accent-insensitive**-(`navegacao-interior`-→-`Navegação-Interior`);-**selection-aware**-(selected-text-seeds-the-search-and-is-replaced-by-the-reference-on-insert).
+  Opens a floating picker that finds Rems **RemNote's `[[` reference search can't surface** — Rems whose name is made entirely of high-frequency words (e.g. `Navegação Interior`) get out-ranked off RemNote's per-token candidate list, so typing the name never returns them. The picker searches each word separately, unions the results, keeps Rems containing all words, and floats exact-name matches to the top.
+  - **Enter / click** inserts a reference at the cursor; **Ctrl/Cmd+Enter** (or Ctrl/Cmd+click) inserts it as a **pin** (link chip without text — one keystroke vs. RemNote's right-click → Edit Alias → clear-text trick); **Opt/Alt+Enter** (or Opt/Alt+click) inserts the Rem's **text then a pin** ("Text with Pin" — preserves formatting/images, brings a card's back text after a practice-direction arrow, and marks the source's clozes rather than re-clozing them); **Shift+Enter / Shift+click** opens the Rem in a new pane (to reach "invisible" Rems).
+  - **Alias-aware:** also matches a Rem by its **aliases** (`ALIAS` badge); picking one inserts a reference to the owning Rem that renders the alias text.
+  - **Cloze-aware:** inserting inside a cloze keeps the reference inside it instead of breaking it.
+  - **Accent-insensitive** (`navegacao interior` → `Navegação Interior`); **selection-aware** (selected text seeds the search and is replaced by the reference on insert).
 
---📖-See-[[Utilities#find-rem--reference-or-open.md).
+  📖 See [Utilities → Find Rem — Reference or Open](Utilities.md#find-rem-reference-or-open).
 
 - **Open Hovered Source in Popup** (`Opt+O` / `Alt+O`)
   Opens the **PDF or web article behind a hovered reference pin in a centered modal popup — without leaving the queue.** Clicking a pin directly navigates away and tears down the queue (losing your position and rating ability); this command shows the source on top of the queue instead. **Hover** the pin, then press the shortcut.
@@ -270,7 +270,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   - **Why hover, not right-click:** RemNote exposes a *hover* event for references but **no right-click event**, and the navigating left-click can't be intercepted — so the queue-safe path is hover-to-identify + a shortcut you own.
   - **Scroll to Highlight:** the header has a **🔖 Scroll to Highlight** button to re-center on the highlight after scrolling around.
 
-  📖 See [Utilities → Open Source in Popup](Utilities#open-source-in-popup.md).
+  📖 See [Utilities → Open Source in Popup](Utilities.md#open-source-in-popup).
 
 - **Open Hovered Source in Floating Window** (`Opt+Shift+O` / `Alt+Shift+O`)
   Same source viewer as above, but opened as a **non-blocking floating window on the right (~48% width)** instead of a centered modal — so the **card/editor stays visible beside it** for peeking back and forth without close/reopen. **Hover** the pin, then press the shortcut.
@@ -279,7 +279,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   - **Esc closes it without closing the queue:** the float "steals" the Esc key while open. (Inside the PDF iframe, use `✕`.)
   - Same source-detection and 🔖 Scroll to Highlight behavior as the modal variant.
 
-  📖 See [Utilities → Open Source in Popup](Utilities#open-source-in-popup.md).
+  📖 See [Utilities → Open Source in Popup](Utilities.md#open-source-in-popup).
 
 - **Jump to Rem by ID**
   Utility to navigate quickly based on raw IDs.
@@ -296,6 +296,8 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   - **History entries** carry date, review time (`reviewTimeSeconds`, feeding the total-time-spent stats), interval, and free-form notes — displayed in the Repetition History popup like natively-recorded reps. A `madeIncremental` marker is appended **after** the imported reps, so the scheduler restarts interval counting at the import (counting hundreds of historical reps would explode the classic exponential scheduler's next interval).
   - **Preview before import:** the popup validates the payload and shows books/rems/entries counts plus a warning list of histories **over 50 KB** (worth verifying for sync after import).
   - **Resume-safe:** rems already created (matched by text under the same parent) that already carry the Incremental powerup are skipped, so an interrupted import can simply be re-run with the same file. Large imports can take a few minutes; keep the popup open.
+
+  <a id="import-json-format-version-1"></a>
 
   #### Import JSON format (version 1)
 
@@ -352,7 +354,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
 
   Orphan cards are also flagged at **startup**: when the Card Priority cache finishes its background pass, any Rem whose cards exist but whose Rem cannot be found is counted and surfaced via a toast suggesting you run this command — **nothing is deleted automatically at startup**, since a Rem can transiently appear missing before sync finishes hydrating.
 
-  📖 See [Troubleshooting](Troubleshooting#rem-not-found-errors.md) for more details.
+  📖 See [Troubleshooting](Troubleshooting.md) for more details.
 
 - **Refresh Card Priority Cache**
   Forces a manual recalculation of the queue caching system.
@@ -375,7 +377,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   Bulk maintenance to wipe priorities across a scope. Use with caution.
 
 - **Refresh Priority Badges (Tables and PDF Highlights)**
-  Recomputes the band tags behind both the [table-cell badges](Prioritization-&-Sorting#priorities-in-tables.md) and the [PDF highlight badges](Prioritization-&-Sorting#priorities-on-pdf-highlights.md). Bands are kept current by every priority write, so this is for the **first run after enabling the feature** and for repairing drift.
+  Recomputes the band tags behind both the [table-cell badges](Prioritization-&-Sorting.md#priorities-in-tables) and the [PDF highlight badges](Prioritization-&-Sorting.md#priorities-on-pdf-highlights). Bands are kept current by every priority write, so this is for the **first run after enabling the feature** and for repairing drift.
 
   Runs in two phases, reported separately in the developer console:
   1. **Table badges** — walks every IncRem and every Rem with a card priority. Only Rems that can appear as a table row (tagged with a non-powerup tag that defines slots) are banded. Links are harvested along the way for phase 2.
@@ -387,7 +389,7 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   Strips every `PriorityBand0-9` tag. **Destroys no data** — unlike *Remove All CardPriority Tags*, bands are a derived mirror of priorities that still live in the Incremental and CardPriority slots, so *Refresh Priority Badges (Tables)* rebuilds them exactly. Useful for shedding bands applied before the eligibility filter existed, or to fully disable the feature's footprint.
 
 - **Sanitize Rogue CardPriority Tags**
-  Scans the whole knowledge base and removes "rogue" `cardPriority` tags — the powerup sitting on rems that own **no flashcards** with an `inherited`/`default` source (cascade artifacts on tag slots, property values, list items, etc.). Legitimate inheritance anchors (`manual`/`incremental` source, no cards) are preserved and never offered for deletion. Removals are confirmed in batches. 📖 See [Troubleshooting](Troubleshooting#-rogue-cardpriority-tags-sanitization.md).
+  Scans the whole knowledge base and removes "rogue" `cardPriority` tags — the powerup sitting on rems that own **no flashcards** with an `inherited`/`default` source (cascade artifacts on tag slots, property values, list items, etc.). Legitimate inheritance anchors (`manual`/`incremental` source, no cards) are preserved and never offered for deletion. Removals are confirmed in batches. 📖 See [Troubleshooting](Troubleshooting.md).
 
 - **Cancel No Inc Rem Timer**
   Stops system checks when queues are temporarily empty.
@@ -396,4 +398,4 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Que
   Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
 
 - **Debug: Clear Flashcard History**
-  Clears all entries from the Flashcard History sidebar widget. Use this if you encounter sync errors with the flashcard history data (e.g., after a corrupted sync). A confirmation toast is shown on completion.
+  Clears the Flashcard History sidebar's entries **for the knowledge base you are currently in** — since v1.0.37 each KB keeps its own list. Use this if you encounter sync errors with the flashcard history data (e.g., after a corrupted sync). A confirmation toast is shown on completion. See [How the history lists are stored](History-Queue-Dashboard-and-Mastery-Drill.md#how-the-history-lists-are-stored).

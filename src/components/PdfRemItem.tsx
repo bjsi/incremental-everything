@@ -13,6 +13,8 @@ interface PdfRemItemData {
   remId: string;
   name: string;
   isIncremental: boolean;
+  /** Carries the Dismissed powerup. See the three-state action gate below. */
+  isDismissed?: boolean;
   range?: { start: number; end: number | null };
   currentPage?: number | null;
 }
@@ -98,6 +100,18 @@ export function PdfRemItem({
         {isCurrentRem && (
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: '#d1fae5', color: '#065f46' }}>Current</span>
         )}
+        {/* Without this, a dismissed Rem is indistinguishable from one that was
+            never incremental — both simply lack the ⚡ and the priority badge —
+            yet only the dismissed one keeps an editable range and history. */}
+        {item.isDismissed && (
+          <span
+            className="text-xs px-1.5 py-0.5 rounded"
+            style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: 'var(--rn-clr-content-tertiary)', whiteSpace: 'nowrap', flexShrink: 0 }}
+            title="Dismissed — no longer scheduled, but its page range and reading history are kept and remain editable"
+          >
+            Dismissed
+          </span>
+        )}
         {item.isIncremental && priorityInfo && (
           <PriorityBadge
             priority={priorityInfo.absolute}
@@ -176,9 +190,15 @@ export function PdfRemItem({
       {/* Expanded Content */}
       {isExpanded && (
         <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--rn-clr-border-primary)' }} onClick={(e) => e.stopPropagation()}>
-          {/* Action Buttons */}
+          {/* Action Buttons — three-state gate, not a plain incremental/not split.
+              A dismissed Rem still hosts the pdfState slot on the Dismissed
+              powerup, so its range and history stay writable; a Rem with neither
+              powerup cannot hold that state (savePdfState bails without a host),
+              so offering it an editor would silently discard the edit.
+              Priority is Incremental-only either way: the slot lives on the
+              Incremental powerup, so writing it to a dismissed Rem is a no-op. */}
           <div className="flex gap-1 mb-2 flex-wrap">
-            {!item.isIncremental ? (
+            {!item.isIncremental && !item.isDismissed ? (
               <button
                 onClick={() => onInitIncremental(item.remId)}
                 className="px-2 py-1 text-xs rounded transition-colors"
@@ -210,15 +230,17 @@ export function PdfRemItem({
                     >
                       📄 Range
                     </button>
-                    <button
-                      onClick={() => onStartEditingPriority(item.remId)}
-                      className="px-2 py-1 text-xs rounded transition-colors"
-                      style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#8b5cf6' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#8b5cf6'; e.currentTarget.style.color = 'white'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#8b5cf6'; }}
-                    >
-                      ★ Priority
-                    </button>
+                    {item.isIncremental && (
+                      <button
+                        onClick={() => onStartEditingPriority(item.remId)}
+                        className="px-2 py-1 text-xs rounded transition-colors"
+                        style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#8b5cf6' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#8b5cf6'; e.currentTarget.style.color = 'white'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#8b5cf6'; }}
+                      >
+                        ★ Priority
+                      </button>
+                    )}
                     <button
                       onClick={() => onStartEditingHistory(item.remId, item.currentPage || null)}
                       className="px-2 py-1 text-xs rounded transition-colors"
@@ -228,6 +250,18 @@ export function PdfRemItem({
                     >
                       📖 History
                     </button>
+                    {item.isDismissed && (
+                      <button
+                        onClick={() => onInitIncremental(item.remId)}
+                        title="Make incremental again — resumes at the page it was left on and merges the history from before it was dismissed"
+                        className="px-2 py-1 text-xs rounded transition-colors"
+                        style={{ backgroundColor: 'var(--rn-clr-background-tertiary)', color: '#10b981' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#10b981'; e.currentTarget.style.color = 'white'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--rn-clr-background-tertiary)'; e.currentTarget.style.color = '#10b981'; }}
+                      >
+                        ⚡ Restore
+                      </button>
+                    )}
                   </>
                 )}
               </>

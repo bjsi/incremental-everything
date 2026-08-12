@@ -46,7 +46,7 @@ A popup will appear allowing you to tailor the session:
 * **(2) Number of Items:** Set a hard limit (e.g., 50, 100, or 200). This helps prevent burnout by giving you a finish line.
   * Note: Due to RemNote queue [gathering rules](https://help.remnote.com/en/articles/8892109-how-does-remnote-decide-what-flashcards-are-part-of-a-document) and its _recursive_ nature, the size of the queue when you click "Practice" and enter the queue will probably be larger, as RemNote will gather e.g. rems that are referenced within the selected items.
 * **(3) Content Mix:** Displays the current ratio of Flashcards to Incremental Rems (e.g., "6 flashcards for every incremental rem"). 
-  * Note: This ratio is pulled from your "[Prioritization-&-Sorting#sorting-criteria](Sorting-Criteria.md)" settings. _If the ratio is not the desired or if you can check the randomness, press the button (4) **Change Sorting Criteria Settings**_.
+  * Note: This ratio is pulled from your "[Prioritization-&-Sorting#sorting-criteria](Prioritization-&-Sorting.md#sorting-criteria)" settings. _If the ratio is not the desired or if you can check the randomness, press the button (4) **Change Sorting Criteria Settings**_.
 * **(4) Skip paused documents** *(default: on)*: When enabled, flashcard rems that live inside a document whose **Deck Status** is **"Paused"** are excluded from the review session. This prevents a paused deck from silently filling slots that should go to your active, high-priority material.
   * **Priority override threshold:** A number input (default **20**) lets you keep items with a priority of that value or less — even if they sit inside a paused document. This ensures genuinely critical items are never silently dropped.
   * If any items are skipped, a **warning panel** appears after creation listing each skipped rem (name and absolute priority), sorted from highest to lowest priority. Items with priority < 20 are highlighted in red as potential high-priority oversights. The same list is printed to the browser console with rem IDs for easy lookup.
@@ -81,7 +81,7 @@ The plugin uses a sophisticated selection process to ensure you see the right ma
 1.  **Filtering:** It gathers all items (Flashcards and Incremental Rems) that are **Due** (scheduled for today or in the past).
 2.  **Scoping:** It filters these items based on your selected scope (Specific Document or Full KB).
 3.  **Sorting:** It ranks them by **Priority** (0 is highest, 100 is lowest).
-4.  **Randomness:** It applies your **[Prioritization-&-Sorting#sorting-criteria](Sorting-Criteria.md)** randomness settings.
+4.  **Randomness:** It applies your **[Prioritization-&-Sorting#sorting-criteria](Prioritization-&-Sorting.md#sorting-criteria)** randomness settings.
     * *Low randomness* = Strict adherence to priority (0, 1, 2...).
     * *High randomness* = Introduces serendipity, allowing lower priority items to surface occasionally.
 5.  **Mixing:** It interleaves the lists based on your **Flashcard Ratio**.
@@ -175,7 +175,7 @@ Even though you are reviewing a generated list, the plugin is smart enough to kn
 
 * **The "Overwhelmed" Workflow:** If you wake up to 1000+ due cards, don't panic. Create a Priority Review Document for 100 items (Full KB). Review them. If you have energy left, create another. If not, you can stop knowing you tackled the most important 100 items.
 * **The "Deep Dive" Workflow:** If you want to focus specifically on one project, navigate to that folder, create a Priority Review Document (Current Document scope), and finish that queue completely before moving on.
-* **Maintain Priority Hygiene:** To ensure your Priority Review Documents accurately catch your most critical content, regularly set priorities on your key documents and flashcards. Crucially, run the "**[Priorities-for-Flashcards#maintenance-the-update-all-inherited-card-priorities-command](Update-all-inherited-Card-Priorities.md)**" command periodically (e.g., weekly). This updates the priority inheritance across your entire knowledge base, ensuring that every single flashcard — even those you haven't manually touched — inherits the correct priority from its parent document.
+* **Maintain Priority Hygiene:** To ensure your Priority Review Documents accurately catch your most critical content, regularly set priorities on your key documents and flashcards. Crucially, run the "**[Priorities-for-Flashcards#maintenance-the-update-all-inherited-card-priorities-command](Priorities-for-Flashcards.md#manual-full-kb-sweep-update-all-inherited-card-priorities)**" command periodically (e.g., weekly). This updates the priority inheritance across your entire knowledge base, ensuring that every single flashcard — even those you haven't manually touched — inherits the correct priority from its parent document.
 * **Cleanup:** Get in the habit of deleting these documents after you finish the queue. They are meant to be temporary snapshots of your priorities at that specific moment. Leaving them in your collection will create unnecessary rem references to your items, cluttering the UI and making your KB heavier and slower.
 
 ---

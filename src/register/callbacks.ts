@@ -2,33 +2,31 @@ import {
   AppEvents,
   QueueItemType,
   ReactRNPlugin,
-  RemId,
   SpecialPluginCallback,
 } from '@remnote/plugin-sdk';
-import dayjs from 'dayjs';
-import * as _ from 'remeda';
 import {
-  allIncrementalRemKey,
-  currentScopeRemIdsKey,
   queueCounterId,
   queueLayoutFixId,
   queueHideElementsId,
-  seenRemInSessionKey,
-  noIncRemTimerKey,
   incremReviewStartTimeKey,
   incrementalQueueActiveKey,
-  incRemDisabledDeviceKey,
   currentIncrementalRemTypeKey,
   incremNotesSidebarRemIdKey,
 } from '../lib/consts';
-import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
-import {
-  getCardsPerRem,
-  getSortingRandomness,
-  getWeightSelectionK,
-  applyPriorityWeightedLottery,
-} from '../lib/sorting';
 import { consumePendingScrollRequest } from '../lib/remHelpers';
+import {
+  PrefetchQueueInfo,
+  buildQueuePrefetch,
+  confirmServed,
+  isPrefetchReadyFor,
+  readCardsPerRem,
+  readDueCount,
+  readGates,
+  resetQueuePrefetch,
+  rollbackServed,
+  scheduleQueuePrefetchRefill,
+  takePrefetchedCandidate,
+} from '../lib/queue_prefetch';
 
 
 // Registered once globally — safe because all selectors are highly specific to the
@@ -87,7 +85,169 @@ let sessionItemCounter = 0;
 
 export const resetSessionItemCounter = () => {
   sessionItemCounter = 0;
+  lastDecision = null;
+  // The prefetch buffer, its seen set and its scope are all per-session. This
+  // runs on both queue enter and queue exit, so nothing from a finished session
+  // can leak into the next one.
+  resetQueuePrefetch();
 };
+
+/**
+ * Rewinds the interval counter after a dropped injection.
+ *
+ * The counter exists only to space IncRems among flashcards. When RemNote drops
+ * our item it shows a flashcard in its place, so the spacing is already
+ * satisfied — rewinding makes the very next call an injection turn again
+ * instead of waiting out another full interval. Without this, a single drop cost
+ * the user `cardsPerRem + 1` more items before the next attempt.
+ */
+const rewindSessionItemCounter = () => {
+  if (sessionItemCounter > 0) sessionItemCounter--;
+};
+
+// ---------------------------------------------------------------------------
+// GetNextCard instrumentation
+// ---------------------------------------------------------------------------
+// RemNote awaits this callback with an internal deadline of about one second
+// (measured: 993ms landed, 1088ms was dropped). Past it, RemNote stops waiting
+// and loads a flashcard of its own; whatever we return afterwards is discarded
+// with no error and no event.
+//
+// The callback now answers entirely from module state (see lib/queue_prefetch),
+// so totalMs should read ~0–1ms. The instrumentation stays because it is what
+// proves that, and because it is the only way a future regression that puts an
+// await back on this path would ever be noticed.
+//
+// Two things are measured:
+//   1. Wall time per phase on every return, both paths.
+//   2. Whether the PREVIOUS decision actually reached the screen — read off the
+//      `queueInfo` counters RemNote hands us, which is exact and costs nothing.
+//
+// On (2): the first version compared our returned remId against
+// `currentIncRemKey`, which the queue widget writes when it mounts. That
+// produced FALSE DROP reports — under bridge congestion the widget can take
+// longer to mount and write that key than RemNote takes to ask for the next
+// item, so a perfectly good injection looked unconfirmed. The counters settle it
+// without ambiguity:
+//
+//   cardsPracticed +1 and numCardsRemaining UNCHANGED  → a non-flashcard was
+//     consumed, i.e. our Plugin item was shown.
+//   cardsPracticed +1 and numCardsRemaining DECREASED  → a flashcard was
+//     consumed instead — our item was dropped.
+//   cardsPracticed UNCHANGED                           → same slot asked twice.
+//
+// A card rated AGAIN also leaves numCardsRemaining flat, so the SHOWN verdict is
+// the softer of the two; DROPPED is high-confidence, and it is the one wired to
+// a real consequence (rolling the candidate back onto the buffer).
+const SLOW_CALL_WARN_MS = 800;
+
+type PhaseTimings = Record<string, number>;
+
+type QueueInfo = {
+  mode: 'practice-all' | 'in-order' | 'normal';
+  cardsPracticed: number;
+  subQueueId: string | undefined;
+  numCardsRemaining: number;
+};
+
+type Decision = {
+  seq: number;
+  remId: string | null; // null = we deliberately yielded a flashcard turn
+  reason: string;
+  totalMs: number;
+  phases: PhaseTimings;
+  cardsPracticed: number;
+  numCardsRemaining: number;
+};
+
+let callSeq = 0;
+let lastDecision: Decision | null = null;
+let cachePayloadProbed = false;
+
+function startTimer() {
+  const t0 = Date.now();
+  let last = t0;
+  const phases: PhaseTimings = {};
+  return {
+    phases,
+    mark(label: string) {
+      const now = Date.now();
+      phases[label] = now - last;
+      last = now;
+    },
+    total: () => Date.now() - t0,
+  };
+}
+
+/**
+ * Confirms (or refutes) that the item returned by the PREVIOUS GetNextCard call
+ * was actually displayed, using only the counters RemNote passes in. Purely
+ * synchronous and free — no bridge traffic on the path whose latency is the
+ * whole problem. See the block comment above for the decision table.
+ *
+ * This is not merely a log: it is the commit point for the confirm-then-burn
+ * rule. A candidate is only written into the session's seen list once it is
+ * known to have been displayed, and is otherwise returned to the buffer.
+ */
+function verifyPreviousDecision(plugin: ReactRNPlugin, queueInfo: QueueInfo) {
+  const prev = lastDecision;
+  if (!prev) return;
+
+  const practicedDelta = queueInfo.cardsPracticed - prev.cardsPracticed;
+  const remainingDelta = prev.numCardsRemaining - queueInfo.numCardsRemaining;
+  const ctx = {
+    practicedDelta,
+    remainingDelta,
+    tookMs: prev.totalMs,
+    phases: prev.phases,
+    reason: prev.reason,
+  };
+
+  if (practicedDelta === 0) {
+    // Observed so far ONLY as call #1→#2 at queue open, with the IncRem cache
+    // still cold — including on calls well under the deadline, while genuinely
+    // slower calls mid-session were never re-asked. So this reads as a
+    // queue-entry artifact rather than a timeout retry. Logged, not accused.
+    //
+    // Either way, RemNote asking again for the same slot means our previous
+    // answer did not stick. If that answer was an IncRem it must go back on the
+    // buffer — leaving it pending would let the next serve overwrite it, losing
+    // the candidate without ever marking it seen or showing it.
+    if (prev.remId !== null) {
+      rollbackServed();
+      rewindSessionItemCounter();
+    }
+    console.log(
+      `🔁 GetNextCard #${prev.seq}: same slot asked again ` +
+        `(cardsPracticed still ${queueInfo.cardsPracticed}) after our ${prev.totalMs}ms response.` +
+        (prev.remId !== null ? ` Candidate ${prev.remId} returned to the buffer.` : ''),
+      ctx
+    );
+    return;
+  }
+
+  if (prev.remId === null) return; // we yielded a flashcard on purpose; nothing to verify
+
+  if (remainingDelta === 0) {
+    confirmServed(plugin);
+    console.log(
+      `✅ GetNextCard #${prev.seq}: IncRem ${prev.remId} WAS SHOWN — flashcard count held at ` +
+        `${queueInfo.numCardsRemaining} while cardsPracticed advanced (${prev.totalMs}ms).`,
+      ctx
+    );
+  } else {
+    const recovered = rollbackServed();
+    rewindSessionItemCounter();
+    console.warn(
+      `⛔ GetNextCard #${prev.seq}: DROPPED INJECTION — we returned IncRem ${prev.remId} after ` +
+        `${prev.totalMs}ms, but RemNote consumed ${remainingDelta} flashcard(s) instead. ` +
+        (recovered
+          ? `Candidate returned to the buffer and the interval counter rewound; it will be retried next turn.`
+          : `Nothing pending to recover.`),
+      ctx
+    );
+  }
+}
 
 export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
@@ -96,7 +256,47 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
     async (queueInfo) => {
-      console.log('queueInfo', queueInfo);
+      const timer = startTimer();
+      const seq = ++callSeq;
+
+      // Did the item we returned LAST time actually make it onto the screen?
+      // Answered from `queueInfo` alone, so it costs nothing — and it is what
+      // commits the previous candidate to the seen list or rolls it back.
+      verifyPreviousDecision(plugin, queueInfo);
+
+      const prefetchInfo: PrefetchQueueInfo = {
+        mode: queueInfo.mode,
+        subQueueId: queueInfo.subQueueId,
+      };
+
+      /**
+       * Single exit point. Records the decision for the next call's verification
+       * and logs the phase breakdown.
+       */
+      const finish = <T extends { remId: string } | null>(result: T, reason: string): T => {
+        const totalMs = timer.total();
+        lastDecision = {
+          seq,
+          remId: result?.remId ?? null,
+          reason,
+          totalMs,
+          phases: { ...timer.phases },
+          cardsPracticed: queueInfo.cardsPracticed,
+          numCardsRemaining: queueInfo.numCardsRemaining,
+        };
+        const label = result ? `IncRem ${result.remId}` : 'flashcard (null)';
+        if (totalMs >= SLOW_CALL_WARN_MS) {
+          console.warn(
+            `🐢 GetNextCard #${seq} → ${label} [${reason}] took ${totalMs}ms — ` +
+              `slow enough that RemNote may have stopped waiting. An await has ` +
+              `crept back onto this path; it is supposed to be synchronous.`,
+            timer.phases
+          );
+        } else {
+          console.log(`⏱️ GetNextCard #${seq} → ${label} [${reason}] in ${totalMs}ms`);
+        }
+        return result;
+      };
 
       // Helper: clear stale sidebar signals when returning null (flashcard turn).
       // The QueueComponent's useEffect cleanup is unreliable — RemNote can
@@ -114,93 +314,35 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         plugin.storage.setSession(incremNotesSidebarRemIdKey, undefined);
       };
 
-      const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
-      const isDeviceDisabled = await plugin.storage.getLocal<boolean>(incRemDisabledDeviceKey);
-      const now = Date.now();
+      // ---------------------------------------------------------------------
+      // Everything from here to the return is synchronous by design.
+      //
+      // No `await`. Not for storage, not for settings, not for rem lookups. The
+      // decision is read out of module state that lib/queue_prefetch keeps warm
+      // in the background, so this callback cannot be pushed past RemNote's
+      // ~1s deadline by bridge congestion no matter how busy the plugin is.
+      //
+      // Side effects (counter CSS, review timestamp, sidebar signal clearing,
+      // buffer rebuild) are all fired WITHOUT await. Putting an `await` back in
+      // front of any return below is exactly what caused injections to be
+      // silently dropped in large KBs.
+      // ---------------------------------------------------------------------
 
-      const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > now;
-
-      if (isTimerActive || isDeviceDisabled) {
-        if (isTimerActive) {
-          const remainingSeconds = Math.ceil((noIncRemTimerEnd - now) / 1000);
-          // console.log('⚠️ TIMER IS ACTIVE - BLOCKING INCREM! Time remaining:', remainingSeconds, 'seconds');
-        } else {
-          // console.log('⚠️ DEVICE IS DISABLED - BLOCKING INCREM!');
-        }
-
-        // Timer or Device is blocking IncRem — this turn will be a flashcard.
+      const gates = readGates();
+      if (gates.blocked) {
+        // A No-IncRem timer is running, or IncRems are disabled on this device.
         plugin.app.registerCSS(queueCounterId, '');
         clearStaleIncRemSignals();
-        return null;
-      } else if (noIncRemTimerEnd && noIncRemTimerEnd <= now) {
-        // console.log('🧹 Timer expired, cleaning up...');
-        await plugin.storage.setSynced(noIncRemTimerKey, null);
-        // console.log('No Inc Rem timer expired and cleared');
-      } else {
-        // console.log('✅ No timer active and device enabled - IncRem allowed');
+        scheduleQueuePrefetchRefill(plugin, prefetchInfo);
+        return finish(null, gates.reason ?? 'blocked');
       }
 
-      const allIncrementalRem: IncrementalRem[] =
-        (await plugin.storage.getSession(allIncrementalRemKey)) || [];
-
-      let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
-
-      if (queueInfo.subQueueId && docScopeRemIds === null) {
-        // QueueEnter is still computing the scope in the background.
-        // Do NOT call buildDocumentScope here — it hangs and causes RemNote's
-        // getNextCard timeout to expire, blocking all IncRem injection.
-        // Instead, temporarily skip scope filtering and inject from the full KB.
-        // The QueueEnter handler will set the proper scope for future calls.
-        console.log('⚠️ GetNextCard: Scope not ready yet. Using full KB for IncRem injection.');
-        docScopeRemIds = null; // explicit: no scope filtering
-      }
-
-      const cardsPerRem = await getCardsPerRem(plugin);
+      const cardsPerRem = readCardsPerRem();
       const intervalBetweenIncRem =
         typeof cardsPerRem === 'number' ? cardsPerRem + 1 : cardsPerRem;
+      const dueCount = readDueCount();
 
-      const sorted = _.sortBy(allIncrementalRem, (incRem) => {
-        if (queueInfo.mode === 'in-order' && docScopeRemIds) {
-          return docScopeRemIds.indexOf(incRem.remId);
-        } else {
-          return incRem.priority;
-        }
-      });
-
-      const seenRemIds = (await plugin.storage.getSession<RemId[]>(seenRemInSessionKey)) || [];
-      const filtered = sorted.filter((x) => {
-        const isDue = Date.now() >= x.nextRepDate;
-        const hasBeenSeen = seenRemIds.includes(x.remId);
-        const isInScope = !queueInfo.subQueueId || !docScopeRemIds || docScopeRemIds.includes(x.remId);
-
-        if (!isInScope) {
-          return false;
-        }
-
-        switch (queueInfo.mode) {
-          case 'practice-all':
-          case 'in-order':
-            return !hasBeenSeen;
-          default:
-            return isDue && !hasBeenSeen;
-        }
-      });
-
-      console.log('📊 GetNextCard Summary:', {
-        allIncrementalRem: allIncrementalRem.length,
-        sorted: sorted.length,
-        filtered: filtered.length,
-        seenRemIds: seenRemIds.length,
-        queueMode: queueInfo.mode,
-        subQueueId: queueInfo.subQueueId,
-        sessionItemCounter,
-        intervalBetweenIncRem,
-        scopeSource: docScopeRemIds ? (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null ? 'cached' : 'on-the-fly' : 'none',
-      });
-
-      // Always register the queue counter — don't gate it behind scope being cached.
-      // During the race window (QueueEnter still running), the counter would never appear
-      // because currentScopeRemIdsKey is null.
+      // Queue counter suffix (" + N" due IncRems). Never awaited, as before.
       plugin.app.registerCSS(
         queueCounterId,
         `
@@ -209,11 +351,11 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         }
 
         .light .rn-queue__card-counter:after {
-          content: ' + ${filtered.length}';
+          content: ' + ${dueCount}';
         }
 
         .dark .rn-queue__card-counter:after {
-          content: ' + ${filtered.length}';
+          content: ' + ${dueCount}';
         }`.trim()
       );
 
@@ -226,91 +368,66 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       console.log('🎯 GetNextCard → deciding NEXT item:', {
         willShowIncRem: shouldShowIncRem,
         sessionItemCounter,
-        counterCheck: typeof intervalBetweenIncRem === 'number' ? `(${sessionItemCounter}+1) % ${intervalBetweenIncRem} = ${(sessionItemCounter + 1) % intervalBetweenIncRem}` : intervalBetweenIncRem,
+        counterCheck:
+          typeof intervalBetweenIncRem === 'number'
+            ? `(${sessionItemCounter}+1) % ${intervalBetweenIncRem} = ${
+                (sessionItemCounter + 1) % intervalBetweenIncRem
+              }`
+            : intervalBetweenIncRem,
         numCardsRemaining: queueInfo.numCardsRemaining,
-        filteredIncRems: filtered.length,
+        dueIncRems: dueCount,
+        prefetchReady: isPrefetchReadyFor(prefetchInfo),
       });
 
-      if (shouldShowIncRem) {
-        // console.log('🎯 INCREM CONDITION TRUE:', {
-        //   sessionItemCounter,
-        //   intervalBetweenIncRem,
-        //   calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${
-        //     (sessionItemCounter + 1) % intervalBetweenIncRem
-        //   }`,
-        //   numCardsRemaining: queueInfo.numCardsRemaining,
-        //   filteredLength: filtered.length,
-        //   allIncrementalRemLength: allIncrementalRem.length,
-        // });
-
-        if (filtered.length === 0) {
-          // console.log('⚠️ FILTERED LENGTH IS 0 - Returning null, will show a flashcard.');
-          plugin.app.registerCSS(queueCounterId, '');
-          sessionItemCounter++;
-          clearStaleIncRemSignals();
-          return null;
-        }
-
-        // Inject randomness via the priority-weighted lottery — the SAME weighting
-        // used by the Priority Review Document — so raising the IncRem randomness
-        // slider pulls higher-priority due IncRems toward the front far more often
-        // than low-priority ones (instead of the old flat uniform swap).
-        // Only applies when `filtered` is in priority order: in 'in-order' mode it is
-        // sorted by document position, so we leave it untouched (no randomisation).
-        if (queueInfo.mode !== 'in-order') {
-          const sortingRandomness = await getSortingRandomness(plugin);
-          const weightK = await getWeightSelectionK(plugin);
-          applyPriorityWeightedLottery(filtered, sortingRandomness, weightK);
-        }
-
-        // console.log('✅ Filtered has items, selecting first IncRem');
-        let first = filtered[0];
-
-        while (!(await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(first.remId)))) {
-          filtered.shift();
-          if (filtered.length === 0) {
-            console.log('❌ All filtered items were invalid after verification - Returning null');
-            plugin.app.registerCSS(queueCounterId, '');
-            clearStaleIncRemSignals();
-            return null;
-          }
-          first = filtered[0];
-        }
-        await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
-        await plugin.storage.setSession(incremReviewStartTimeKey, Date.now());
-
-        // Activate hide CSS now that we know we're genuinely showing a Plugin (IncRem) item.
-        // (No-op: the CSS is now registered globally and self-gates via :has().)
-
-        // console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
+      if (!shouldShowIncRem) {
         sessionItemCounter++;
-        return {
-          type: QueueItemType.Plugin,
-          remId: first.remId,
-          pluginId: 'incremental-everything',
-        };
-      } else {
-        const moduloDenominator: number =
-          typeof intervalBetweenIncRem === 'number'
-            ? intervalBetweenIncRem
-            : Number(intervalBetweenIncRem);
-        // console.log('🎴 FLASHCARD TURN:', {
-        //   sessionItemCounter,
-        //   intervalBetweenIncRem,
-        //   calculation: `(${sessionItemCounter} + 1) % ${intervalBetweenIncRem} = ${
-        //     (sessionItemCounter + 1) % moduloDenominator
-        //   }`,
-        //   nextIncRemAt:
-        //     typeof intervalBetweenIncRem === 'number'
-        //       ? intervalBetweenIncRem - ((sessionItemCounter + 1) % intervalBetweenIncRem)
-        //       : 'N/A',
-        // });
-        sessionItemCounter++;
-        // Flashcard turn — the hide CSS is globally registered and self-deactivates via :has()
-        // when the Plugin iframe is absent; no manual clearing needed.
+        // Flashcard turn — the hide CSS is globally registered and self-deactivates
+        // via :has() when the Plugin iframe is absent; no manual clearing needed.
         clearStaleIncRemSignals();
-        return null;
+        scheduleQueuePrefetchRefill(plugin, prefetchInfo);
+        return finish(null, 'interval-not-reached');
       }
+
+      if (!isPrefetchReadyFor(prefetchInfo)) {
+        // The buffer was built for a different queue (the mode or sub-queue
+        // changed), or the plugin activated mid-session and has never built one.
+        // Rebuild for the real parameters immediately — this turn yields a
+        // flashcard rather than blocking on it.
+        plugin.app.registerCSS(queueCounterId, '');
+        sessionItemCounter++;
+        clearStaleIncRemSignals();
+        void buildQueuePrefetch(plugin, prefetchInfo);
+        return finish(null, 'prefetch-not-ready');
+      }
+
+      const candidate = takePrefetchedCandidate(prefetchInfo);
+      if (!candidate) {
+        // Nothing due and in scope, or every candidate failed verification.
+        plugin.app.registerCSS(queueCounterId, '');
+        sessionItemCounter++;
+        clearStaleIncRemSignals();
+        scheduleQueuePrefetchRefill(plugin, prefetchInfo);
+        return finish(null, 'no-due-increms');
+      }
+
+      // Baseline for the review-duration measurement. Fire-and-forget: nothing
+      // reads it until the user finishes the item, many seconds from now.
+      void plugin.storage.setSession(incremReviewStartTimeKey, Date.now());
+
+      // Refill in the background while the user reads this item. The candidate
+      // is NOT written to the seen list here — see confirm-then-burn in
+      // verifyPreviousDecision.
+      scheduleQueuePrefetchRefill(plugin, prefetchInfo);
+
+      sessionItemCounter++;
+      return finish(
+        {
+          type: QueueItemType.Plugin,
+          remId: candidate.remId,
+          pluginId: 'incremental-everything',
+        },
+        'inject'
+      );
     }
   );
 

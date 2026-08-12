@@ -196,6 +196,11 @@ export async function appendNoteToLastHistoryEntry(
 
   // Keep the session IncRem cache consistent (same pattern as updateIncrementalRemCache,
   // inlined here to avoid an import cycle with incremental_rem/index).
+  //
+  // Safe to bypass writeIncRemCaches — the documented exception. This patches
+  // ONLY `history`, on an entry already present, so none of the three fields the
+  // slim selection projection mirrors (remId, nextRepDate, priority) can change.
+  // If this ever starts touching those, it must route through writeIncRemCaches.
   try {
     const allRems: IncrementalRem[] = (await plugin.storage.getSession(allIncrementalRemKey)) || [];
     const cached = allRems.find((r) => r.remId === remId);
