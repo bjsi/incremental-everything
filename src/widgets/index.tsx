@@ -14,6 +14,7 @@ import { registerWidgets } from '../register/widgets';
 import { registerMenus } from '../register/menus';
 import { registerCommands } from '../register/commands';
 import { registerCallbacks, resetSessionItemCounter } from '../register/callbacks';
+import { registerPrefetchTrackers } from '../lib/queue_prefetch';
 import {
   registerCoreQueueDisplayPowerups,
   registerHideInQueueLegacyPowerups,
@@ -89,6 +90,10 @@ async function onActivate(plugin: ReactRNPlugin) {
   void migrateAuthoritativeAggregatesToShards(plugin);
 
   registerCallbacks(plugin);
+  // Keeps the GetNextCard prefetch's no-IncRem-timer gate live. Must run in the
+  // index widget: plugin.track subscriptions belong to the realm that owns the
+  // callback, and this is the same realm registerCallbacks runs in.
+  registerPrefetchTrackers(plugin);
   await registerWidgets(plugin);
 
   // Register CSS rules

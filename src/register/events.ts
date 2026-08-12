@@ -68,6 +68,7 @@ import {
 } from '../lib/history_shards';
 import { registerQueueSessionTracking, saveCurrentSession, hasActiveSession } from '../lib/queue_session';
 import { shouldUseLightMode } from '../lib/mobileUtils';
+import { primeQueuePrefetch, flushPendingServed } from '../lib/queue_prefetch';
 import dayjs from 'dayjs';
 import { getIESetting } from '../lib/settings';
 import { recordRemChangeEvent } from '../lib/rem_change_tape';
@@ -164,6 +165,11 @@ export function registerQueueExitListener(
     // The QueueComponent's useEffect cleanup may not fire if its iframe is destroyed abruptly.
     await plugin.storage.setSession(incrementalQueueActiveKey, false);
     await plugin.storage.setSession(currentIncrementalRemTypeKey, undefined);
+
+    // Commit the last served IncRem before anything reads the seen list below:
+    // its normal confirmation would have arrived on the next GetNextCard call,
+    // which never happens for the final item of a session.
+    await flushPendingServed(plugin);
 
     await flushCacheUpdatesNow(plugin);
     console.log('QueueExit triggered, subQueueId:', subQueueId);
@@ -498,6 +504,14 @@ export function registerQueueEnterListener(
     );
 
     registerQueueCounter(plugin, dueIncRemCount);
+
+    // Prime the IncRem prefetch buffer LAST, once the document scope and the
+    // session caches it depends on are all resolved. From here the GetNextCard
+    // callback answers from module state without a single await, which is what
+    // keeps it clear of RemNote's ~1s deadline in large KBs. Fire-and-forget:
+    // nothing in this handler depends on it, and the callback degrades to a
+    // flashcard turn if it is asked before the first build lands.
+    void primeQueuePrefetch(plugin, subQueueId);
   });
 }
 

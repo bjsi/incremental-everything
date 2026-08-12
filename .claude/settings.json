@@ -7,7 +7,10 @@
       "Bash(awk 'NR==1404,NR==1500' /Users/hugomarins/incremental-everything/src/register/commands.ts)",
       "Bash(awk 'NR==1820,NR==1900' /Users/hugomarins/incremental-everything/src/register/commands.ts)",
       "Bash(awk -F: '{print $1, $2}')",
-      "Bash(awk '$1 > 1700 && $1 < 1820')"
+      "Bash(awk '$1 > 1700 && $1 < 1820')",
+      "Bash(npx cross-env *)",
+      "Bash(grep -iA4 \"warning\")",
+      "Bash(awk '/registerCallback<SpecialPluginCallback.GetNextCard>/,/^  \\\\\\);$/' src/register/callbacks.ts)"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"
