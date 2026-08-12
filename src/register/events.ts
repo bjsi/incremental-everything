@@ -36,7 +36,7 @@ import {
   setCardPriority,
   PrioritySource,
 } from '../lib/card_priority';
-import { IncrementalRem, getIncrementalRemFromRem } from '../lib/incremental_rem';
+import { IncrementalRem, getIncrementalRemFromRem, isKnownIncRemId } from '../lib/incremental_rem';
 import { flushCacheUpdatesNow, updateCardPriorityCache } from '../lib/card_priority/cache';
 import { setCurrentIncrementalRem } from '../lib/incremental_rem';
 import { transferToDismissed } from '../lib/dismissed';
@@ -841,8 +841,27 @@ export function registerGlobalRemChangedListener(plugin: ReactRNPlugin) {
       // populated yet (e.g., Light Mode or before first queue entry).
       let capturedHistory: IncrementalRep[] | null = null;
 
-      // Primary: read from session cache (immune to powerup removal timing)
-      const allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+      // Primary: read from session cache (immune to powerup removal timing).
+      //
+      // Gated on the known-IncRem index, because this listener fires for EVERY
+      // rem edit in the knowledge base — thousands of times a session — and this
+      // read pulls the entire cache (7.99MB measured) across the bridge just to
+      // pluck one entry out of it. It sits above the debounce and above the
+      // recentlyProcessedCards guard further down, so nothing else was sparing
+      // it. On a KB where a small fraction of rems are incremental, skipping it
+      // for the rest removes almost all of that traffic.
+      //
+      // `isKnownIncRemId` returns undefined in realms that never ran a full
+      // cache load, in which case we read as before. A `false` means the rem was
+      // not incremental as of the last load: the lookup below would have missed
+      // anyway, so skipping is behaviour-preserving — and the direct-rem
+      // fallback immediately after still covers a rem that became incremental
+      // since (which, being new, has no history in the cache to recover either).
+      const knownIncremental = isKnownIncRemId(data.remId);
+      const allIncRems =
+        knownIncremental === false
+          ? []
+          : (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
       const cachedIncRem = allIncRems.find(r => r.remId === data.remId);
 
       if (cachedIncRem && cachedIncRem.history && cachedIncRem.history.length > 0) {

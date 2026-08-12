@@ -2,12 +2,13 @@ import { ReactRNPlugin, RemId } from '@remnote/plugin-sdk';
 import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
+  allIncrementalRemSlimKey,
   currentScopeRemIdsKey,
   seenRemInSessionKey,
   noIncRemTimerKey,
   incRemDisabledDeviceKey,
 } from './consts';
-import { getIncrementalRemFromRem, IncrementalRem } from './incremental_rem';
+import { getIncrementalRemFromRem, IncrementalRem, SlimIncRem } from './incremental_rem';
 import {
   CardsPerRem,
   DEFAULT_CARDS_PER_REM,
@@ -75,13 +76,14 @@ const MAX_VERIFY_ROUNDS = 4;
 /**
  * Delay before the background rebuild starts after a GetNextCard call.
  *
- * The rebuild reads the full IncRem session cache — 7.99MB on the KB this was
- * measured against. That read used to happen *inside* GetNextCard, i.e. before
- * the queue widget mounted. Firing it immediately after the return would instead
- * put it in direct contention with that mount, which is already slow enough to
- * be visible (it was slow enough to make an earlier mount-based drop detector
- * report false positives). Waiting about a second hands the bridge to the widget
- * first and still finishes long before the user rates the item.
+ * The rebuild reads the slim IncRem cache and verifies a few candidates, so it
+ * is far from free even after that projection landed. It used to happen *inside*
+ * GetNextCard, i.e. before the queue widget mounted. Firing it immediately after
+ * the return would instead put it in direct contention with that mount, which is
+ * already slow enough to be visible (slow enough, in fact, to make an earlier
+ * mount-based drop detector report false positives). Waiting about a second
+ * hands the bridge to the widget first and still finishes long before the user
+ * rates the item.
  */
 const REFILL_DELAY_MS = 1200;
 
@@ -89,7 +91,7 @@ type PrefetchState = {
   /** `${mode}|${subQueueId}` the buffer was built for; null when never built. */
   buildKey: string | null;
   /** Verified candidates, best-first. */
-  buffer: IncrementalRem[];
+  buffer: SlimIncRem[];
   /** Due-and-in-scope count, for the queue counter CSS. */
   dueCount: number;
   cardsPerRem: CardsPerRem;
@@ -108,17 +110,31 @@ type PrefetchState = {
    * be served twice, but not yet burned into `seen` — if RemNote dropped it, it
    * goes back on the buffer intact.
    */
-  pending: IncrementalRem | null;
+  pending: SlimIncRem | null;
   ready: boolean;
 };
 
-const emptyState = (): PrefetchState => ({
+/**
+ * Clears the SESSION-scoped fields, carrying the rest forward.
+ *
+ * `cardsPerRem` and the two gate mirrors describe the KB and the device, not the
+ * queue session, so resetting them to defaults on every queue enter/exit was
+ * wrong: until the first background build completed, `readCardsPerRem` handed
+ * out DEFAULT_CARDS_PER_REM instead of the user's setting, and the first calls
+ * of a session computed their injection interval from it. A session with
+ * cardsPerRem 2 opened with `(0+1) % 7` instead of `(0+1) % 3`.
+ *
+ * These three are seeded at activation (see registerPrefetchTrackers) and
+ * refreshed on every build, so carrying them across a reset is strictly more
+ * accurate than re-defaulting.
+ */
+const emptyState = (previous?: PrefetchState): PrefetchState => ({
   buildKey: null,
   buffer: [],
   dueCount: 0,
-  cardsPerRem: DEFAULT_CARDS_PER_REM,
-  timerEndsAt: null,
-  deviceDisabled: false,
+  cardsPerRem: previous?.cardsPerRem ?? DEFAULT_CARDS_PER_REM,
+  timerEndsAt: previous?.timerEndsAt ?? null,
+  deviceDisabled: previous?.deviceDisabled ?? false,
   seen: new Set<RemId>(),
   pending: null,
   ready: false,
@@ -150,7 +166,7 @@ export function resetQueuePrefetch() {
   }
   rebuildRequested = null;
   generation++;
-  state = emptyState();
+  state = emptyState(state);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +201,7 @@ export function isPrefetchReadyFor(info: PrefetchQueueInfo): boolean {
  * The candidate becomes `pending` rather than `seen`: see confirmServed /
  * rollbackServed. Purely synchronous — no awaits anywhere on this path.
  */
-export function takePrefetchedCandidate(info: PrefetchQueueInfo): IncrementalRem | null {
+export function takePrefetchedCandidate(info: PrefetchQueueInfo): SlimIncRem | null {
   if (!isPrefetchReadyFor(info)) return null;
   const next = state.buffer.shift();
   if (!next) return null;
@@ -248,7 +264,7 @@ export async function flushPendingServed(plugin: ReactRNPlugin): Promise<void> {
  * 6 while `seenRemIds` climbed, and it is what turned an occasional timeout into
  * "incremental rems have stopped appearing".
  */
-export function rollbackServed(): IncrementalRem | null {
+export function rollbackServed(): SlimIncRem | null {
   const served = state.pending;
   if (!served) return null;
   state.pending = null;
@@ -302,7 +318,7 @@ async function refreshGates(plugin: ReactRNPlugin) {
  * at 114–231ms. It used to run inside GetNextCard, between the decision and the
  * return. Here it runs while the user is reading.
  */
-async function verifyCandidate(plugin: ReactRNPlugin, candidate: IncrementalRem): Promise<boolean> {
+async function verifyCandidate(plugin: ReactRNPlugin, candidate: SlimIncRem): Promise<boolean> {
   try {
     const rem = await plugin.rem.findOne(candidate.remId);
     return !!(await getIncrementalRemFromRem(plugin, rem));
@@ -338,8 +354,8 @@ export async function buildQueuePrefetch(
   try {
     await refreshGates(plugin);
 
-    const [allIncRemsRaw, scopeRaw, cardsPerRem, sortingRandomness, weightK] = await Promise.all([
-      plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+    const [slimRaw, scopeRaw, cardsPerRem, sortingRandomness, weightK] = await Promise.all([
+      plugin.storage.getSession<SlimIncRem[]>(allIncrementalRemSlimKey),
       plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey),
       getCardsPerRem(plugin),
       getSortingRandomness(plugin),
@@ -348,7 +364,17 @@ export async function buildQueuePrefetch(
 
     state.cardsPerRem = cardsPerRem;
 
-    const allIncRems = allIncRemsRaw || [];
+    // Selection reads the slim projection — remId/nextRepDate/priority only —
+    // which is roughly a tenth of the full cache's 7.99MB. The full key is the
+    // fallback for the window before the first cache load under this version has
+    // written the slim one; `IncrementalRem` is structurally a `SlimIncRem`, so
+    // no mapping is needed.
+    let allIncRems: SlimIncRem[];
+    if (slimRaw) {
+      allIncRems = slimRaw;
+    } else {
+      allIncRems = (await plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey)) || [];
+    }
     // Same fallback the inline version used: while QueueEnter is still resolving
     // a document scope, select from the full KB rather than blocking. The scope
     // lands within a few seconds and later rebuilds pick it up.
@@ -385,7 +411,7 @@ export async function buildQueuePrefetch(
     // Verify from the front in windows, keeping order, until the buffer is full
     // or we run out of candidates. Parallel within a window because these are
     // independent reads and this is off the critical path anyway.
-    const verified: IncrementalRem[] = [];
+    const verified: SlimIncRem[] = [];
     let cursor = 0;
     for (let round = 0; round < MAX_VERIFY_ROUNDS && verified.length < BUFFER_TARGET; round++) {
       const window = filtered.slice(cursor, cursor + (BUFFER_TARGET - verified.length));
@@ -459,4 +485,25 @@ export function registerPrefetchTrackers(plugin: ReactRNPlugin) {
     const timerEnd = await rp.storage.getSynced<number>(noIncRemTimerKey);
     state.timerEndsAt = timerEnd && timerEnd > Date.now() ? timerEnd : null;
   });
+
+  // Seed the non-session mirrors at activation so the very first GetNextCard of
+  // the very first queue already reads real values rather than defaults.
+  //
+  // Deliberately NOT inside a plugin.track: getCardsPerRem calls
+  // kb.getCurrentKnowledgeBaseData(), and subscribing the tracker to that would
+  // re-run this on unrelated KB churn. A one-shot read at activation plus the
+  // refresh inside every build keeps it current — the setting only changes by
+  // deliberate user action, and a change mid-queue lands on the next rebuild.
+  void (async () => {
+    try {
+      const [cardsPerRem, deviceDisabled] = await Promise.all([
+        getCardsPerRem(plugin),
+        plugin.storage.getLocal<boolean>(incRemDisabledDeviceKey),
+      ]);
+      state.cardsPerRem = cardsPerRem;
+      state.deviceDisabled = !!deviceDisabled;
+    } catch (e) {
+      console.error('[prefetch] activation seed failed:', e);
+    }
+  })();
 }

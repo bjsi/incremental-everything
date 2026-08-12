@@ -1,5 +1,5 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
-import { loadIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { loadIncrementalRemCache, writeIncRemCaches } from '../lib/incremental_rem/cache';
 import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, enableFlashcardPrioritisationId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
@@ -474,7 +474,12 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
         for (const p of patchedIncRems) {
           if (!merged.find(r => r.remId === p.remId)) merged.push(p);
         }
-        await plugin.storage.setSession(allIncrementalRemKey, merged);
+        // Must go through writeIncRemCaches, not a bare setSession: this patches
+        // `priority` and `nextRepDate` and can add rems, all of which the slim
+        // selection projection mirrors. A direct write here would leave queue
+        // selection ordering by stale priorities and blind to rems created by
+        // the batch-save path until the next full cache load.
+        await writeIncRemCaches(plugin, merged);
       }
 
       // 4. Trigger inheritance cascade for ALL saved rems (each cascade walks its

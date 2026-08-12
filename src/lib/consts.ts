@@ -78,6 +78,18 @@ export const ieSettingsMigrationReportKey = 'ie_settings_migration_report';
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
+/**
+ * Selection-only projection of {@link allIncrementalRemKey}: `remId`,
+ * `nextRepDate` and `priority`, and nothing else.
+ *
+ * The full cache carries every Rem's complete repetition history — measured at
+ * 7.99MB across 5,525 entries, 4,758 of them with history. Queue item selection
+ * needs none of it, but used to pull the whole thing over the plugin bridge on
+ * every single GetNextCard call. This projection is roughly a tenth of the size
+ * and is written by the same writers, in the same places, so the two cannot
+ * drift. Anything needing `history` must still read the full key.
+ */
+export const allIncrementalRemSlimKey = 'all-incremental-rem-slim';
 export const currentIncRemKey = 'current-inc-rem';
 export const allCardPriorityInfoKey = 'all-card-priority-info-key';
 export const cardAnalyticsCacheKey = 'card-analytics-cache-key';

@@ -17,7 +17,7 @@ import { updateCardPriorityCache } from '../lib/card_priority/cache';
 import { setCardPriority } from '../lib/card_priority';
 import { IncrementalRem, ActionItemType } from '../lib/incremental_rem';
 import { getIncrementalRemFromRem, setIncRemPriority } from '../lib/incremental_rem';
-import { updateIncrementalRemCache } from '../lib/incremental_rem/cache';
+import { updateIncrementalRemCache, writeIncRemCaches } from '../lib/incremental_rem/cache';
 import { percentileToHslColor, calculateRelativePercentile } from '../lib/utils';
 import { remToActionItemType } from '../lib/incremental_rem';
 import { safeRemTextToString } from '../lib/pdfUtils';
@@ -599,7 +599,10 @@ function BatchPriority() {
             currentIncCache[index] = { ...currentIncCache[index], priority: remData.newIncPriority! };
           }
         }
-        await plugin.storage.setSession(allIncrementalRemKey, currentIncCache);
+        // Routed through writeIncRemCaches because this changes `priority`,
+        // which the slim selection projection mirrors. A bare setSession here
+        // would leave the queue ordering IncRems by their pre-batch priorities.
+        await writeIncRemCaches(plugin, currentIncCache);
       }
       console.log(`⏱️ Phase 2 (IncRem cache sync): ${Math.round(performance.now() - t2)}ms`);
 
