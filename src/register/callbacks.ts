@@ -20,6 +20,7 @@ import {
   incRemDisabledDeviceKey,
   currentIncrementalRemTypeKey,
   incremNotesSidebarRemIdKey,
+  currentIncRemKey,
 } from '../lib/consts';
 import { getIncrementalRemFromRem, IncrementalRem } from '../lib/incremental_rem';
 import {
@@ -87,7 +88,114 @@ let sessionItemCounter = 0;
 
 export const resetSessionItemCounter = () => {
   sessionItemCounter = 0;
+  lastDecision = null;
 };
+
+// ---------------------------------------------------------------------------
+// GetNextCard latency instrumentation
+// ---------------------------------------------------------------------------
+// Why this exists: RemNote awaits this callback with an internal deadline. If we
+// resolve after it expires, RemNote stops waiting and loads a card of its own
+// choosing — our returned Plugin item is discarded with no error, no event, and
+// nothing in the log to distinguish it from "we decided not to inject".
+//
+// That distinction mattered: the old logging stopped at the DECISION line, which
+// is ~20 serial SDK round-trips before the actual return. A log reading
+// `willShowIncRem: true` therefore proved only that we INTENDED to inject, never
+// that RemNote accepted it. In a large KB (5.5k IncRems, each carrying its full
+// repetition history through the session-storage bridge) that gap is exactly
+// where the injection was being lost.
+//
+// So we measure two things:
+//   1. Wall time per phase, on every return, both paths. Anything at or above
+//      SLOW_CALL_WARN_MS is loud, because that is the regime where the deadline
+//      is plausibly in play.
+//   2. Whether the PREVIOUS decision actually reached the screen. The queue
+//      widget writes `currentIncRemKey` when it mounts, so on the next call we
+//      can compare what we returned against what was really shown. A mismatch is
+//      a dropped injection — the only direct evidence available to us.
+const SLOW_CALL_WARN_MS = 800;
+
+type PhaseTimings = Record<string, number>;
+
+type Decision = {
+  seq: number;
+  remId: string | null; // null = we deliberately yielded a flashcard turn
+  reason: string;
+  totalMs: number;
+  phases: PhaseTimings;
+};
+
+let callSeq = 0;
+let lastDecision: Decision | null = null;
+let cachePayloadProbed = false;
+
+function startTimer() {
+  const t0 = Date.now();
+  let last = t0;
+  const phases: PhaseTimings = {};
+  return {
+    phases,
+    mark(label: string) {
+      const now = Date.now();
+      phases[label] = now - last;
+      last = now;
+    },
+    total: () => Date.now() - t0,
+  };
+}
+
+/**
+ * Confirms (or refutes) that the item returned by the PREVIOUS GetNextCard call
+ * was actually displayed. Runs fire-and-forget so it never adds latency to the
+ * call it is invoked from — its verdict is a diagnostic, not an input.
+ */
+async function verifyPreviousDecision(plugin: ReactRNPlugin) {
+  const prev = lastDecision;
+  if (!prev || prev.remId === null) return; // flashcard turns have nothing to verify
+  try {
+    const shown = await plugin.storage.getSession<string>(currentIncRemKey);
+    if (shown === prev.remId) {
+      console.log(`✅ GetNextCard #${prev.seq}: IncRem ${prev.remId} was shown (${prev.totalMs}ms).`);
+    } else {
+      console.warn(
+        `⛔ GetNextCard #${prev.seq}: DROPPED INJECTION — we returned IncRem ${prev.remId} ` +
+          `after ${prev.totalMs}ms but the queue is showing ${shown ?? '(nothing)'}. ` +
+          `Most likely RemNote's getNextCard deadline expired before we resolved.`,
+        { phases: prev.phases, reason: prev.reason }
+      );
+    }
+  } catch (e) {
+    console.error('[GetNextCard verify] failed:', e);
+  }
+}
+
+/**
+ * One-off measurement of what the IncRem session cache actually costs to move
+ * across the plugin bridge. Deliberately off the critical path (the stringify
+ * alone is expensive on a 5k-entry cache with full histories) and run at most
+ * once per plugin session.
+ */
+function probeCachePayloadOnce(allIncrementalRem: IncrementalRem[]) {
+  if (cachePayloadProbed) return;
+  cachePayloadProbed = true;
+  setTimeout(() => {
+    try {
+      const t0 = Date.now();
+      const json = JSON.stringify(allIncrementalRem);
+      const withHistory = allIncrementalRem.filter((r) => r.history?.length).length;
+      console.log('📦 IncRem session-cache payload (transferred on EVERY GetNextCard call):', {
+        entries: allIncrementalRem.length,
+        entriesWithHistory: withHistory,
+        bytesUtf16: json.length * 2,
+        megabytesUtf16: +((json.length * 2) / 1024 / 1024).toFixed(2),
+        stringifyMs: Date.now() - t0,
+      });
+    } catch (e) {
+      console.error('[GetNextCard probe] failed:', e);
+    }
+  }, 0);
+}
 
 export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCSS(queueLayoutFixId, QUEUE_LAYOUT_FIX_CSS);
@@ -96,7 +204,42 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
     async (queueInfo) => {
-      console.log('queueInfo', queueInfo);
+      const timer = startTimer();
+      const seq = ++callSeq;
+      console.log(`▶️ GetNextCard #${seq}`, queueInfo);
+
+      // Did the item we returned LAST time actually make it onto the screen?
+      // Fire-and-forget: this is a diagnostic, and must not cost this call a
+      // round-trip on the very path whose latency we are trying to reduce.
+      void verifyPreviousDecision(plugin);
+
+      /**
+       * Single exit point for logging. Every `return` in this callback goes
+       * through here so the phase breakdown is emitted on all paths — including
+       * the ones that yield a flashcard, which are just as interesting when the
+       * question is "why did no IncRem appear".
+       */
+      const finish = <T extends { remId: string } | null>(result: T, reason: string): T => {
+        const totalMs = timer.total();
+        lastDecision = {
+          seq,
+          remId: result?.remId ?? null,
+          reason,
+          totalMs,
+          phases: { ...timer.phases },
+        };
+        const label = result ? `IncRem ${result.remId}` : 'flashcard (null)';
+        if (totalMs >= SLOW_CALL_WARN_MS) {
+          console.warn(
+            `🐢 GetNextCard #${seq} → ${label} [${reason}] took ${totalMs}ms — ` +
+              `slow enough that RemNote may have stopped waiting.`,
+            timer.phases
+          );
+        } else {
+          console.log(`⏱️ GetNextCard #${seq} → ${label} [${reason}] in ${totalMs}ms`, timer.phases);
+        }
+        return result;
+      };
 
       // Helper: clear stale sidebar signals when returning null (flashcard turn).
       // The QueueComponent's useEffect cleanup is unreliable — RemNote can
@@ -114,8 +257,11 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         plugin.storage.setSession(incremNotesSidebarRemIdKey, undefined);
       };
 
-      const noIncRemTimerEnd = await plugin.storage.getSynced<number>(noIncRemTimerKey);
-      const isDeviceDisabled = await plugin.storage.getLocal<boolean>(incRemDisabledDeviceKey);
+      const [noIncRemTimerEnd, isDeviceDisabled] = await Promise.all([
+        plugin.storage.getSynced<number>(noIncRemTimerKey),
+        plugin.storage.getLocal<boolean>(incRemDisabledDeviceKey),
+      ]);
+      timer.mark('gates');
       const now = Date.now();
 
       const isTimerActive = noIncRemTimerEnd && noIncRemTimerEnd > now;
@@ -131,7 +277,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         // Timer or Device is blocking IncRem — this turn will be a flashcard.
         plugin.app.registerCSS(queueCounterId, '');
         clearStaleIncRemSignals();
-        return null;
+        return finish(null, isTimerActive ? 'timer-active' : 'device-disabled');
       } else if (noIncRemTimerEnd && noIncRemTimerEnd <= now) {
         // console.log('🧹 Timer expired, cleaning up...');
         await plugin.storage.setSynced(noIncRemTimerKey, null);
@@ -140,10 +286,29 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         // console.log('✅ No timer active and device enabled - IncRem allowed');
       }
 
-      const allIncrementalRem: IncrementalRem[] =
-        (await plugin.storage.getSession(allIncrementalRemKey)) || [];
+      // One parallel wave instead of a serial chain. Every read below is
+      // independent of the others, but they used to be awaited one at a time and
+      // interleaved with the sorting/filtering logic — nine-plus sequential
+      // round-trips (three of them full `getCurrentKnowledgeBaseData` fetches,
+      // via the settings getters) stacked end to end on the critical path.
+      // Firing them together collapses that to roughly the cost of the slowest
+      // one, which is the IncRem cache read.
+      const [allIncrementalRemRaw, docScopeRemIdsRaw, cardsPerRem, seenRemIdsRaw, sortingRandomness, weightK] =
+        await Promise.all([
+          plugin.storage.getSession<IncrementalRem[]>(allIncrementalRemKey),
+          plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey),
+          getCardsPerRem(plugin),
+          plugin.storage.getSession<RemId[]>(seenRemInSessionKey),
+          getSortingRandomness(plugin),
+          getWeightSelectionK(plugin),
+        ]);
+      timer.mark('load');
 
-      let docScopeRemIds = await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey);
+      const allIncrementalRem: IncrementalRem[] = allIncrementalRemRaw || [];
+      const seenRemIds = seenRemIdsRaw || [];
+      probeCachePayloadOnce(allIncrementalRem);
+
+      let docScopeRemIds = docScopeRemIdsRaw;
 
       if (queueInfo.subQueueId && docScopeRemIds === null) {
         // QueueEnter is still computing the scope in the background.
@@ -155,7 +320,6 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         docScopeRemIds = null; // explicit: no scope filtering
       }
 
-      const cardsPerRem = await getCardsPerRem(plugin);
       const intervalBetweenIncRem =
         typeof cardsPerRem === 'number' ? cardsPerRem + 1 : cardsPerRem;
 
@@ -167,7 +331,6 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         }
       });
 
-      const seenRemIds = (await plugin.storage.getSession<RemId[]>(seenRemInSessionKey)) || [];
       const filtered = sorted.filter((x) => {
         const isDue = Date.now() >= x.nextRepDate;
         const hasBeenSeen = seenRemIds.includes(x.remId);
@@ -195,8 +358,13 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         subQueueId: queueInfo.subQueueId,
         sessionItemCounter,
         intervalBetweenIncRem,
-        scopeSource: docScopeRemIds ? (await plugin.storage.getSession<RemId[] | null>(currentScopeRemIdsKey)) !== null ? 'cached' : 'on-the-fly' : 'none',
+        // This used to re-read currentScopeRemIdsKey to label the source, which
+        // cost a second full transfer of the scope array purely for a log string
+        // — and could only ever print 'cached', since docScopeRemIds is itself
+        // that same read. Same information, no round-trip.
+        scopeSource: docScopeRemIds ? 'cached' : 'none',
       });
+      timer.mark('sortFilter');
 
       // Always register the queue counter — don't gate it behind scope being cached.
       // During the race window (QueueEnter still running), the counter would never appear
@@ -248,7 +416,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
           plugin.app.registerCSS(queueCounterId, '');
           sessionItemCounter++;
           clearStaleIncRemSignals();
-          return null;
+          return finish(null, 'no-due-increms');
         }
 
         // Inject randomness via the priority-weighted lottery — the SAME weighting
@@ -257,38 +425,56 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         // than low-priority ones (instead of the old flat uniform swap).
         // Only applies when `filtered` is in priority order: in 'in-order' mode it is
         // sorted by document position, so we leave it untouched (no randomisation).
+        // Settings for the lottery are now read in the parallel wave above rather
+        // than here, where they added two serial settings round-trips (each of
+        // which fetches the whole KB data object) between the decision and the
+        // return.
         if (queueInfo.mode !== 'in-order') {
-          const sortingRandomness = await getSortingRandomness(plugin);
-          const weightK = await getWeightSelectionK(plugin);
           applyPriorityWeightedLottery(filtered, sortingRandomness, weightK);
         }
 
         // console.log('✅ Filtered has items, selecting first IncRem');
         let first = filtered[0];
 
+        let verifyRounds = 0;
         while (!(await getIncrementalRemFromRem(plugin, await plugin.rem.findOne(first.remId)))) {
+          verifyRounds++;
           filtered.shift();
           if (filtered.length === 0) {
             console.log('❌ All filtered items were invalid after verification - Returning null');
             plugin.app.registerCSS(queueCounterId, '');
             clearStaleIncRemSignals();
-            return null;
+            timer.mark('verifyCandidate');
+            return finish(null, `all-candidates-invalid(${verifyRounds})`);
           }
           first = filtered[0];
         }
-        await plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]);
-        await plugin.storage.setSession(incremReviewStartTimeKey, Date.now());
+        // Each round of the loop above is ~11 serial SDK round-trips
+        // (hasPowerup, two Daily-Doc resolutions of 3 calls each, the history
+        // slot, and the priority slot + richText conversion). Recorded
+        // separately because it is the single most expensive phase whenever the
+        // first candidate does not verify.
+        timer.mark('verifyCandidate');
+
+        await Promise.all([
+          plugin.storage.setSession(seenRemInSessionKey, [...seenRemIds, first.remId]),
+          plugin.storage.setSession(incremReviewStartTimeKey, Date.now()),
+        ]);
+        timer.mark('markSeen');
 
         // Activate hide CSS now that we know we're genuinely showing a Plugin (IncRem) item.
         // (No-op: the CSS is now registered globally and self-gates via :has().)
 
         // console.log('✅ SHOWING INCREM:', first, 'due', dayjs(first.nextRepDate).fromNow());
         sessionItemCounter++;
-        return {
-          type: QueueItemType.Plugin,
-          remId: first.remId,
-          pluginId: 'incremental-everything',
-        };
+        return finish(
+          {
+            type: QueueItemType.Plugin,
+            remId: first.remId,
+            pluginId: 'incremental-everything',
+          },
+          verifyRounds > 0 ? `inject(after ${verifyRounds} invalid)` : 'inject'
+        );
       } else {
         const moduloDenominator: number =
           typeof intervalBetweenIncRem === 'number'
@@ -309,7 +495,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         // Flashcard turn — the hide CSS is globally registered and self-deactivates via :has()
         // when the Plugin iframe is absent; no manual clearing needed.
         clearStaleIncRemSignals();
-        return null;
+        return finish(null, 'interval-not-reached');
       }
     }
   );
