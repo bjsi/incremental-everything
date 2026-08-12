@@ -3,6 +3,7 @@ import * as _ from 'remeda';
 import {
   allIncrementalRemKey,
   priorityCalcScopeRemIdsKey,
+  priorityCalcScopeCompletenessKey,
   currentSubQueueIdKey,
   priorityShieldHistoryKey,
   cardPriorityShieldHistoryKey,
@@ -224,12 +225,51 @@ export function registerQueueExitListener(
       // Save document-level shields if scope exists
       const historyKey = originalScopeId || subQueueId || await plugin.storage.getSession<string>(currentSubQueueIdKey);
 
-      if (historyKey && priorityCalcScopeRemIds && priorityCalcScopeRemIds.length > 0) {
-        if (shouldSaveIncRem) {
+      // Document shields are computed by intersecting the (now complete) caches
+      // with the scope FROZEN AT QUEUE ENTER. So they need a guard the KB shields
+      // above do not: `shouldSaveIncRem` asks "is the cache loaded now", which by
+      // exit is true even when the scope was materialised from an empty cache
+      // half an hour earlier. Intersecting a full cache with a truncated scope
+      // produces a plausible-looking, wrong universe — 239 IncRems instead of
+      // 5,525 in the session that surfaced this. Skipping the entry is the
+      // correct outcome; a wrong entry is permanent and indistinguishable from a
+      // real drop in the user's shield history.
+      const scopeCompleteness =
+        (await plugin.storage.getSession<{ incRem: boolean; card: boolean; fullKb: boolean }>(
+          priorityCalcScopeCompletenessKey
+          // absent = session predating this key; assume complete and behave as before
+        )) ?? { incRem: true, card: true, fullKb: false };
+
+      // Recovery: a full-KB scope is just "every card rem plus every incremental
+      // rem", and by now both caches HAVE finished loading. So when it was built
+      // truncated we can reconstruct it exactly rather than throw the session's
+      // shield history away. Only valid for the full-KB branch — a tree-walked
+      // scope is not derivable from the caches and must not be faked.
+      let docScopeRemIds = priorityCalcScopeRemIds;
+      let scopeUsable = { incRem: scopeCompleteness.incRem, card: scopeCompleteness.card };
+      if (scopeCompleteness.fullKb && (!scopeCompleteness.incRem || !scopeCompleteness.card)) {
+        if (isIncRemCacheLoaded && isCardCacheLoaded) {
+          docScopeRemIds = Array.from(
+            new Set<RemId>([
+              ...allCardInfos.map((info) => info.remId).filter((id): id is RemId => !!id),
+              ...allIncRems.map((rem) => rem.remId),
+            ])
+          );
+          scopeUsable = { incRem: true, card: true };
+          console.log(
+            `[QueueExit] Rebuilt the full-KB priority scope from the finished caches: ` +
+              `${priorityCalcScopeRemIds?.length ?? 0} → ${docScopeRemIds.length} rems. ` +
+              `It was materialised at queue enter while a cache was still loading.`
+          );
+        }
+      }
+
+      if (historyKey && docScopeRemIds && docScopeRemIds.length > 0) {
+        if (shouldSaveIncRem && scopeUsable.incRem) {
           await saveDocumentShield(
             plugin,
             allIncRems as any,
-            priorityCalcScopeRemIds,
+            docScopeRemIds,
             isIncRemDue,
             seenRemIds,
             documentPriorityShieldHistoryKey,
@@ -237,13 +277,18 @@ export function registerQueueExitListener(
             'IncRem',
             displayWeighted
           );
+        } else if (shouldSaveIncRem) {
+          console.warn(
+            '[QueueExit] Skipping IncRem document shield: the priority scope was built ' +
+              'before the IncRem cache finished loading, so its universe would be wrong.'
+          );
         }
 
-        if (shouldSaveCard) {
+        if (shouldSaveCard && scopeUsable.card) {
           await saveDocumentShield(
             plugin,
             allCardInfos,
-            priorityCalcScopeRemIds,
+            docScopeRemIds,
             isCardDueOverdue,
             seenCardIds,
             documentCardPriorityShieldHistoryKey,
@@ -251,6 +296,11 @@ export function registerQueueExitListener(
             'Card',
             displayWeighted,
             cardVerifyOptions
+          );
+        } else if (shouldSaveCard) {
+          console.warn(
+            '[QueueExit] Skipping Card document shield: the priority scope was built ' +
+              'before the card priority cache finished loading, so its universe would be wrong.'
           );
         }
       } else {
@@ -368,15 +418,38 @@ export function registerQueueEnterListener(
       await plugin.storage.setSession(currentScopeRemIdsKey, Array.from(itemSelectionScope));
 
       let priorityCalcScope: Set<RemId> = new Set<RemId>();
+      // Tree-walked scopes don't consult the caches, so they start out complete;
+      // only the materialised full-KB branch below can be born truncated.
+      let scopeCompleteness = { incRem: true, card: true, fullKb: false };
 
       if (isPriorityReviewDoc && scopeForPriorityCalc !== undefined) {
         if (scopeForPriorityCalc === null) {
+          // This scope IS the caches — see priorityCalcScopeCompletenessKey. If
+          // either is still loading, the id list it produces is permanently
+          // missing that item type and a later load cannot repair it, so record
+          // which halves are trustworthy alongside the scope itself.
+          const [incRemCacheLoaded, cardCacheLoaded] = await Promise.all([
+            plugin.storage.getSession<boolean>('inc_rem_cache_fully_loaded'),
+            plugin.storage.getSession<boolean>('card_priority_cache_fully_loaded'),
+          ]);
+          // fullKb records that this scope is a pure function of the two caches,
+          // which is what lets QueueExit rebuild it correctly if it was born
+          // truncated. Tree-walked scopes cannot be reconstructed that way.
+          scopeCompleteness = { incRem: !!incRemCacheLoaded, card: !!cardCacheLoaded, fullKb: true };
+
           const fullKbIds = [
             ...allCardInfos.map(info => info.remId).filter((id): id is RemId => !!id),
             ...allIncRems.map(rem => rem.remId),
           ];
           priorityCalcScope = new Set<RemId>(fullKbIds);
           console.log(`QUEUE ENTER: Priority Review Doc using FULL KB for priority calculations (${priorityCalcScope.size} rems).`);
+          if (!scopeCompleteness.incRem || !scopeCompleteness.card) {
+            console.warn(
+              '[QueueEnter] FULL KB priority scope built from an INCOMPLETE cache ' +
+                `(incRem loaded: ${scopeCompleteness.incRem}, card loaded: ${scopeCompleteness.card}). ` +
+                'QueueExit will rebuild it from the finished caches before saving shield history.'
+            );
+          }
         } else {
           priorityCalcScope = await buildComprehensiveScope(plugin, scopeForPriorityCalc);
         }
@@ -387,6 +460,7 @@ export function registerQueueEnterListener(
       if (priorityCalcScope.size > 0) {
 
         await plugin.storage.setSession(priorityCalcScopeRemIdsKey, Array.from(priorityCalcScope));
+        await plugin.storage.setSession(priorityCalcScopeCompletenessKey, scopeCompleteness);
 
         if (!(await shouldUseLightMode(plugin))) {
           console.log('QUEUE ENTER: Full mode. Calculating session cache...');

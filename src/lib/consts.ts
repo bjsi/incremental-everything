@@ -90,6 +90,29 @@ export const allIncrementalRemKey = 'all-incremental-rem';
  * drift. Anything needing `history` must still read the full key.
  */
 export const allIncrementalRemSlimKey = 'all-incremental-rem-slim';
+
+/**
+ * Whether the priority-calculation scope stored in `priorityCalcScopeRemIdsKey`
+ * was derived from COMPLETE caches, per item type: `{ incRem, card }`.
+ *
+ * Why this has to be recorded at build time rather than checked at use time: for
+ * a Priority Review Document scoped to the whole KB, that scope is not walked
+ * from the rem tree — it is *materialised from the two session caches* as
+ * "every card rem plus every incremental rem". If a cache is still loading when
+ * QueueEnter runs (a full IncRem load was measured at 28s on a 5,525-rem KB),
+ * the resulting id list is permanently missing that type, and no later cache
+ * load repairs it.
+ *
+ * QueueExit's `isIncRemCacheLoaded || !skipIncRemHistorySave` guard cannot catch
+ * this: by exit the cache HAS finished loading, so the guard passes and a
+ * document shield gets written against the truncated scope. That is how a
+ * session recorded an IncRem document shield over a universe of 239 instead of
+ * 5,525 — a wrong number, silently, in permanent history.
+ *
+ * Scopes built by `buildComprehensiveScope` walk the rem tree and do not depend
+ * on either cache, so they are always complete.
+ */
+export const priorityCalcScopeCompletenessKey = 'priority-calc-scope-completeness';
 export const currentIncRemKey = 'current-inc-rem';
 export const allCardPriorityInfoKey = 'all-card-priority-info-key';
 export const cardAnalyticsCacheKey = 'card-analytics-cache-key';
