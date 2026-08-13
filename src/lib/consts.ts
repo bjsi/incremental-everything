@@ -83,6 +83,7 @@ export const enableFlashcardPrioritisationId = 'enable-flashcard-prioritisation'
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';
 export const fsrsWeightsId = 'fsrs-weights';
+export const fsrsRequestedRetentionId = 'fsrs-requested-retention';
 
 // --- Plugin-owned settings store (see lib/settings_migration.ts) ---
 /** Synced blob holding the values of every popup-tier setting. */

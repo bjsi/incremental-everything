@@ -45,6 +45,13 @@ export const FSRS_DEFAULT_WEIGHTS: number[] = [
 // ---------------------------------------------------------------------------
 const RATINGS = { again: 1, hard: 2, good: 3, easy: 4 } as const;
 
+/**
+ * The retention FSRS's stability is *defined* against: at 90%, the scheduled
+ * interval equals the stability in days. Any other requested retention scales
+ * the interval away from the stability — see `intervalFactorForRetention`.
+ */
+export const DEFAULT_REQUESTED_RETENTION = 0.9;
+
 // ---------------------------------------------------------------------------
 // Card state machine
 // ---------------------------------------------------------------------------
@@ -62,14 +69,31 @@ export interface FSRSState {
     nextD: { again: number; hard: number; good: number; easy: number };
     /** Stability Increase ratio (nextS / currentS) for each recall grade */
     sInc: { hard: number; good: number; easy: number };
+    /** Stability in days after grading with each recall grade */
+    nextS: { hard: number; good: number; easy: number };
+    /**
+     * Interval in days each recall grade would schedule, at `requestedRetention`.
+     * Equals `nextS` only when the requested retention is the 90% FSRS default.
+     */
+    nextInterval: { hard: number; good: number; easy: number };
     /**
      * U-Factor (Used-Interval Increase) ratio for each recall grade:
      * nextInterval / usedInterval, where usedInterval is the actual elapsed
      * time since the last review and nextInterval is the interval that grade
-     * would schedule (= new stability in days, since interval@90% ≡ stability).
+     * would schedule at `requestedRetention`.
      * 0 when there is no usable elapsed interval (e.g. reviewed just now).
      */
     uFactor: { hard: number; good: number; easy: number };
+    /**
+     * U-Factor the card would get at the 90% default retention (nextS /
+     * usedInterval) — the textbook figure, kept so the UI can show both when
+     * the user schedules at a different retention. Identical to `uFactor` at 90%.
+     */
+    uFactorAtDefaultRetention: { hard: number; good: number; easy: number };
+    /** Requested retention these intervals were derived with (0–1). */
+    requestedRetention: number;
+    /** intervalDays / stabilityDays for `requestedRetention`; 1 at the 90% default. */
+    intervalFactor: number;
     daysSinceLastReview: number;
 }
 
@@ -126,6 +150,29 @@ function nextDifficulty(w: number[], d: number, rating: number): number {
 
 export function forgettingCurve(elapsedDays: number, stability: number, decay: number, factor: number): number {
     return Math.pow(1 + factor * elapsedDays / stability, decay);
+}
+
+/**
+ * Ratio between the interval a scheduler actually gives and the stability it
+ * derives it from, for a given requested retention.
+ *
+ * Inverting the forgetting curve for the elapsed time at which R equals the
+ * requested retention gives `t = S / FACTOR * (R^(1/DECAY) - 1)`, so the ratio
+ * `t / S` depends only on the retention. It is exactly 1 at 90% (that is what
+ * makes "interval ≡ stability" true), below 1 for a stricter retention, and
+ * above 1 for a looser one.
+ *
+ * @param requestedRetention Target recall probability at review time, 0–1.
+ * @param decay FSRS DECAY (negative, = -w20).
+ * @param factor FSRS FACTOR (= 0.9^(1/DECAY) - 1).
+ */
+export function intervalFactorForRetention(requestedRetention: number, decay: number, factor: number): number {
+    if (!Number.isFinite(requestedRetention)) return 1;
+    // Outside this band the curve inversion stops being meaningful (and blows up
+    // as R → 1), so clamp rather than return an interval of 0 or infinity.
+    const r = Math.min(Math.max(requestedRetention, 0.5), 0.995);
+    const result = (Math.pow(r, 1 / decay) - 1) / factor;
+    return Number.isFinite(result) && result > 0 ? result : 1;
 }
 
 function nextRecallStability(w: number[], d: number, s: number, r: number, rating: number): number {
@@ -194,9 +241,15 @@ export function resolveWeights(weights?: number[] | null): { w: number[]; is21w:
 // ---------------------------------------------------------------------------
 // Main entry: replay history → current D, S, R
 // ---------------------------------------------------------------------------
+/**
+ * @param requestedRetention Target recall probability the scheduler aims for,
+ *   0–1. Only affects the interval-derived figures (`nextInterval`, `uFactor`);
+ *   D, S and R are properties of the memory, not of the scheduling target.
+ */
 export function computeFSRSState(
     history: RepetitionStatusInterface[],
     weights?: number[] | null,
+    requestedRetention: number = DEFAULT_REQUESTED_RETENTION,
 ): FSRSState | null {
     const { w, is21w } = resolveWeights(weights);
     const DECAY = -w[20];
@@ -287,16 +340,37 @@ export function computeFSRSState(
         easy: computeSInc(RATINGS.easy),
     };
 
+    const nextS = {
+        hard: finalS * sInc.hard,
+        good: finalS * sInc.good,
+        easy: finalS * sInc.easy,
+    };
+
+    // Stability is an interval only at 90% retention; at any other requested
+    // retention the scheduler shortens (or lengthens) it by this factor.
+    const intervalFactor = intervalFactorForRetention(requestedRetention, DECAY_VAL, FACTOR_VAL);
+    const nextInterval = {
+        hard: nextS.hard * intervalFactor,
+        good: nextS.good * intervalFactor,
+        easy: nextS.easy * intervalFactor,
+    };
+
     // U-Factor (Used-Interval Increase): how much the interval that grade would
-    // schedule (= new stability in days, since interval@90% ≡ stability) grows
-    // relative to the interval actually used since the last review.
+    // schedule grows relative to the interval actually used since the last
+    // review. `uFactor` uses the interval the user will really get;
+    // `uFactorAtDefaultRetention` is the same figure at the 90% default, where
+    // interval ≡ stability.
     const usedInterval = daysSinceLastReview;
-    const computeUFactor = (sIncValue: number): number =>
-        usedInterval > 0 ? (finalS * sIncValue) / usedInterval : 0;
+    const ratioToUsed = (days: number): number => (usedInterval > 0 ? days / usedInterval : 0);
     const uFactor = {
-        hard: computeUFactor(sInc.hard),
-        good: computeUFactor(sInc.good),
-        easy: computeUFactor(sInc.easy),
+        hard: ratioToUsed(nextInterval.hard),
+        good: ratioToUsed(nextInterval.good),
+        easy: ratioToUsed(nextInterval.easy),
+    };
+    const uFactorAtDefaultRetention = {
+        hard: ratioToUsed(nextS.hard),
+        good: ratioToUsed(nextS.good),
+        easy: ratioToUsed(nextS.easy),
     };
 
     const nextD = {
@@ -306,7 +380,21 @@ export function computeFSRSState(
         easy: nextDifficulty(w, finalD, RATINGS.easy),
     };
 
-    return { d: finalD, s: finalS, r, reviewCount, sInc, uFactor, daysSinceLastReview, nextD };
+    return {
+        d: finalD,
+        s: finalS,
+        r,
+        reviewCount,
+        sInc,
+        nextS,
+        nextInterval,
+        uFactor,
+        uFactorAtDefaultRetention,
+        requestedRetention,
+        intervalFactor,
+        daysSinceLastReview,
+        nextD,
+    };
 }
 
 // ---------------------------------------------------------------------------

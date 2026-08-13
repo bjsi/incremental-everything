@@ -4,6 +4,25 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.41 - August 13th, 2026
 
+### ✨ New - the card info bar now shows the next stability, and tells the truth about intervals if you don't review at 90% retention
+
+The FSRS strip under each flashcard reads `D: 4.04 · S: 2.5y (1.3y passed) → 4.2y · R: 93.7%`: the arrow is the **stability a Good rating would leave the card with**, previously buried in the SInc tooltip. You can now see where the card is heading without hovering anything.
+
+The second half matters if you have moved your scheduler off the FSRS default. Stability *is* the interval only at **90% requested retention**; at 95% RemNote schedules a card at roughly 0.40× its stability, at 85% roughly 1.91×. The plugin had no way of knowing, so its U-Factor — the ratio of your next interval to the interval you just cleared — was quietly reporting the 90% figure to everyone.
+
+A new **Requested Retention** setting (**IE Settings → FSRS**, default `90`%) fixes that. Set it to whatever RemNote uses and:
+
+- The interval that next stability really converts to is printed next to it: `S: 2.5y (1.3y passed) → 4.2y (int. 1.7y)`.
+- The **U-Factor** divides by that real interval. Off the default it prints both: `U-Factor: 3.11× (3.30×)` — yours first, the 90% textbook figure in parentheses.
+- Hovering **D · S · R** spells out the conversion for the current card, and the U-Factor tooltip carries both figures for Hard / Good / Easy.
+- **D, S and R are untouched.** They describe your memory, not your scheduling target.
+
+#### Technical explanation
+
+Inverting the forgetting curve for the time at which R equals the requested retention gives `t = S / FACTOR × (R^(1/DECAY) − 1)`, so the interval-to-stability ratio depends only on the retention — `intervalFactorForRetention` in `lib/fsrs.ts` returns it, and is exactly `1` at 0.9 by construction (that identity is what "interval ≡ stability" means). `computeFSRSState` takes the retention as a third, defaulted argument and now returns `nextS`, `nextInterval`, `intervalFactor` and both U-Factors, so callers that do not care about scheduling (the queue-session recorder, the repetition history popup) keep the old behaviour untouched. The retention is stored as a percentage because that is how the setting reads, and divided down at the single point of use.
+
+📖 [Requested Retention](Reviewing-Items-in-the-Queue.md#requested-retention)
+
 ### ✨ New - Weighted Shield popup: how much more likely is one priority to be drawn than another?
 
 The **Weighted Shield Breakdown** tab ends with a new **🎲 Queue Selection Odds** panel. Set two items — say one at the 15th percentile and one at the 35th — and it tells you, in one number, how much more often the queue draws the first: `1.58× · Item A is more likely to be drawn`, plus the head-to-head split (`61.2% / 38.8%`) if only those two competed for a slot.

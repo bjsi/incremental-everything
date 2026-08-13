@@ -317,7 +317,7 @@ The info bar includes (from left to right):
 |(2) **Card Shield** | Shield status (if enabled) |
 |(3) **Weighted Shield** | Exponential priority-weighted workload percentage (if enabled) |
 |(4) **Reps & Time** | Total number of reviews (with **lapses** in red parentheses), cumulative review time, **card age**, and **cost** (per year of age/coverage) for this card. Hover over it for an explanatory tooltip. |
-|(5)(6) **D · S · R · SInc** | FSRS Difficulty, Stability (and time passed since last review), Retrievability, and Stability Increase (if enabled) |
+|(5)(6) **D · S · R · SInc · U-Factor** | FSRS Difficulty, Stability (time passed since last review, and the stability a Good rating would leave), Retrievability, Stability Increase and Used-Interval Increase (if enabled) |
 |(7) **🔬** | Opens the Flashcard Repetition History popup |
 |(8) **Incremental Rem Status Indicator** | An icon displayed on the right border whenever the current card is also an Incremental Rem |
 
@@ -328,7 +328,7 @@ The info bar includes (from left to right):
 **Understanding D, S, and R:**
 
 *   **Difficulty (D):** How hard it is to maintain a memory of something. The higher the difficulty, the harder it is to increase its Stability and maintain it in the long term. The larger the number, the greater the difficulty. Its value ranges from 1 (easiest) to 10 (hardest). Difficulty increases when you forget (rate "Again") and decreases when you recall easily. Hover over the DSR stats to see the projected **Next Difficulty** for each of the four grading options (Again, Hard, Good, Easy).
-*   **Stability (S):** The expected interval (in days) at which your recall probability equals 90%. It is the **storage strength** of memory. A stability of 30d means you'd need to review the card in approximately 30 days to have a 90% chance of recalling it. The exact time passed since your last review of this card is shown in parentheses next to it (e.g., `(6.2 m passed)`).
+*   **Stability (S):** The expected interval (in days) at which your recall probability equals 90%. It is the **storage strength** of memory. A stability of 30d means you'd need to review the card in approximately 30 days to have a 90% chance of recalling it. The exact time passed since your last review of this card is shown in parentheses next to it (e.g., `(6.2 m passed)`), followed by an arrow pointing to the **stability a Good rating would leave the card with** — `S: 2.5y (1.3y passed) → 4.2y`. If your [Requested Retention](#requested-retention) is not the 90% default, the interval that stability actually converts to follows it: `→ 4.2y (int. 1.7y)`.
 *   **Retrievability (R):** Your estimated probability of recalling this card *right now* (memory's **retrieval strength**).The lower it is, the higher the probability that the memory will be forgotten. Shown as a percentage with color coding: 🟢 green (≥90%), 🟡 yellow (≥70%), 🔴 red (<70%).
 *   **Stability Increase (SInc):** How much your memory stability will grow after answering. Shown as a multiplier (e.g., `1.42×`) for the **Good** grade. Hover over it to see the SInc for all three recall grades (Hard / Good / Easy) along with the projected new stability after each. A value of `1.0×` means no growth; higher values mean faster learning. SInc is influenced by the card's current Difficulty, Stability, and Retrievability — reviewing at lower retrievability (closer to forgetting) produces a larger stability increase, reflecting the [desirable difficulty](https://en.wikipedia.org/wiki/Desirable_difficulty) principle.
 
@@ -376,6 +376,19 @@ If left empty, the official FSRS v6.1.1 default weights are used, which will pro
 
 ![DSR Settings](assets/DSR-settings.png){ width="800" }
 
+#### Requested Retention
+
+FSRS defines stability as *the interval at which recall probability is 90%*. That is why "S: 4.2y" and "your next review is in 4.2 years" are usually the same sentence — but only if your scheduler is aiming at 90%.
+
+If you set a different **requested retention** in RemNote, the interval you get is no longer the stability. Tell the plugin which value you use in **Plugin Settings → Incremental Everything → Requested Retention** (default `90%`), and the card info bar reports the scheduling you will really see:
+
+*   **The interval behind the next stability.** The `→ 4.2y` after Stability is still the *stability* a Good rating produces; the interval it converts to is printed right after it — `→ 4.2y (int. 1.7y)` at 95%.
+*   **The U-Factor.** It divides by the interval you will actually get, so it stops overstating how far your reviews are being pushed out. Off the 90% default a second value appears in parentheses — `U-Factor: 3.11× (3.30×)` — the first the real one, the second the textbook figure at 90% retention.
+
+The conversion follows straight from inverting the forgetting curve: the interval is `stability × (R^(1/DECAY) − 1) / FACTOR`, which is exactly `1×` at 90%, shorter for a stricter retention (≈`0.40×` at 95%) and longer for a looser one (≈`1.91×` at 85%).
+
+> **Note:** D, S and R themselves are properties of your memory and do **not** depend on this setting — only the interval-derived figures do.
+
 #### Limitation: Global Weights Only
 
 > ⚠️ **Important:** RemNote allows assigning different custom schedulers (with different FSRS weights) to different documents or folders. However, the plugin SDK does not expose which scheduler is assigned to a specific card. As a result, the plugin can only use a single set of **global weights** for all cards.
@@ -390,6 +403,7 @@ For most users who use a single global scheduler, this is not an issue — just 
 |---------|------|-------------|
 | **Display FSRS DSR Stats** | Boolean | Toggle D/S/R display on or off (default: on) |
 | **FSRS Global Weights** | String | Your FSRS weights, comma-separated (accepts 19 or 21 values, with or without brackets) |
+| **Requested Retention** | Number | The recall probability your scheduler aims for, as a percentage (default: `90`). See [Requested Retention](#requested-retention) |
 
 
 ---

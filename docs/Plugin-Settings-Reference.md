@@ -107,6 +107,7 @@ Settings live in **two places**, and the tables below say which.
 |---------|------|---------|-------------|
 | **Display FSRS DSR Stats (Flashcards)** | Boolean | `true` | Shows calculated FSRS Difficulty (D), Stability (S), and Retrievability (R) for flashcards in the [Card Info Bar](Plugin-Widgets-Reference.md#11-card-info-bar) widget. Requires FSRS v6 scheduler. 📖 [Card Stats & FSRS Integration](Reviewing-Items-in-the-Queue.md#card-stats-fsrs-integration). |
 | **FSRS Global Weights** | String | *(empty)* | Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste from your RemNote scheduler settings. If left blank, the official FSRS v6.1.1 defaults are used. See [FSRS Configuration](Reviewing-Items-in-the-Queue.md#fsrs-configuration) for details. |
+| **Requested Retention** | Number | `90` % | The recall probability your RemNote scheduler aims for at review time — set it to the same value you use there. Stability equals the scheduled interval only at the 90% default; off it, the plugin converts stability to the interval you will actually get and computes the **U-Factor** from that, showing the 90% figure alongside in parentheses. D, S and R are unaffected. 📖 [Requested Retention](Reviewing-Items-in-the-Queue.md#requested-retention). |
 
 ---
 

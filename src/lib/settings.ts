@@ -58,6 +58,7 @@ import {
   alwaysUseLightModeOnWebId,
   displayFsrsDsrId,
   fsrsWeightsId,
+  fsrsRequestedRetentionId,
   remnoteEnvironmentId,
   flashcardResponseTimeLimitId,
   enableMasteryDrillId,
@@ -121,6 +122,7 @@ export interface IESettings {
   // FSRS
   [displayFsrsDsrId]: boolean;
   [fsrsWeightsId]: string;
+  [fsrsRequestedRetentionId]: number;
 
   // Misc
   [remnoteEnvironmentId]: 'beta' | 'www';
@@ -180,6 +182,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
 
   [displayFsrsDsrId]: true,
   [fsrsWeightsId]: '',
+  [fsrsRequestedRetentionId]: 90,
 
   [remnoteEnvironmentId]: 'www',
   [flashcardResponseTimeLimitId]: 180,
@@ -601,6 +604,22 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     description:
       'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler ' +
       'settings. Leave blank to use the official defaults.',
+  },
+  [fsrsRequestedRetentionId]: {
+    kind: 'number',
+    tier: 'popup',
+    group: 'fsrs',
+    min: 70,
+    max: 99,
+    unit: '%',
+    helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
+    title: 'Requested Retention',
+    description:
+      'The recall probability your RemNote scheduler aims for at review time. Set it to the same ' +
+      'value you use there.\n\n' +
+      'Stability is an interval only at the 90% default: a stricter retention schedules a card ' +
+      'sooner than its stability, a looser one later. The card info bar uses this to show the ' +
+      'interval you will actually get, and to compute the U-Factor from it.',
   },
 
   // --- Mastery Drill ---
