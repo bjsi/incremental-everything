@@ -14,7 +14,11 @@
       "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(p.version\\)\")",
       "Bash(git check-ignore *)",
       "Bash(echo \"exit:$?\")",
-      "Bash(echo \"build-exit:$?\")"
+      "Bash(echo \"build-exit:$?\")",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./package.json'\\).scripts,null,1\\)\\)\")",
+      "Bash(grep -n \"^#\\\\{2,4\\\\} \" \"docs/Prioritization-&-Sorting.md\")",
+      "Bash(grep -n \"arithmatex\\\\|mathjax\\\\|katex\" mkdocs.yml docs/../mkdocs.yml 2>/dev/null | head; grep -rn '^\\\\$\\\\$' docs/*.md | head -5)",
+      "Read(//Users/hugomarins/incremental-everything/**)"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

@@ -5,6 +5,7 @@ import { currentSubQueueIdKey } from '../lib/consts';
 import { getMonthlyBestAbsolutePriorityShield } from '../lib/shield_history';
 import { CardMemoryAnalyticsView } from './CardMemoryAnalyticsView';
 import { FSRSCalibrationView } from './FSRSCalibrationView';
+import { OddsUniverse, SelectionOddsPanel } from './SelectionOddsPanel';
 
 interface MonthlyBests {
   kbIncRem: number | null;
@@ -466,6 +467,40 @@ export function WeightedShieldPopup() {
   // narrow popup is shown when only one group exists — no tabs there.
   const showTabs = hasGroups && ctx.groups!.length >= 2;
 
+  // Universes offered to the Queue Selection Odds panel: every (item type ×
+  // scope) pair that actually has a breakdown, in the order they're displayed.
+  const oddsUniverses: OddsUniverse[] = [];
+  const pushUniverse = (
+    breakdown: WeightedShieldBreakdown | null | undefined,
+    label: string,
+    kind: 'incRem' | 'card',
+    scope: 'kb' | 'doc'
+  ) => {
+    if (!breakdown?.sortedItems || breakdown.sortedItems.length === 0) return;
+    oddsUniverses.push({
+      key: `${kind}-${scope}`,
+      label,
+      kind,
+      scope,
+      sortedItems: breakdown.sortedItems,
+    });
+  };
+  const kindOf = (label: string): 'incRem' | 'card' =>
+    label.toLowerCase() === 'cards' ? 'card' : 'incRem';
+  const iconOf = (kind: 'incRem' | 'card') => (kind === 'card' ? '🃏' : '📘');
+  if (hasGroups) {
+    for (const group of ctx.groups!) {
+      const kind = kindOf(group.itemLabel);
+      pushUniverse(group.kb, `${iconOf(kind)} ${group.title} · 🌐 Knowledge Base`, kind, 'kb');
+      pushUniverse(group.doc, `${iconOf(kind)} ${group.title} · 📄 Document Scope`, kind, 'doc');
+    }
+  } else if (ctx.kbBreakdown) {
+    const kind = kindOf(itemLabel);
+    const title = kind === 'card' ? 'Cards' : 'Incremental Rems';
+    pushUniverse(ctx.kbBreakdown, `${iconOf(kind)} ${title} · 🌐 Knowledge Base`, kind, 'kb');
+    pushUniverse(ctx.docBreakdown, `${iconOf(kind)} ${title} · 📄 Document Scope`, kind, 'doc');
+  }
+
   const tabBtnStyle = (active: boolean): React.CSSProperties => ({
     padding: '8px 14px',
     fontSize: '12px',
@@ -655,6 +690,10 @@ export function WeightedShieldPopup() {
             <div style={{ padding: '12px', color: 'var(--rn-clr-content-tertiary)', textAlign: 'center' }}>
               No prioritized items found.
             </div>
+          )}
+
+          {oddsUniverses.length > 0 && (
+            <SelectionOddsPanel universes={oddsUniverses} compact={!showTabs} />
           )}
         </>
       )}

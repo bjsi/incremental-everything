@@ -566,6 +566,40 @@ Results are session-cached so reopening the popup in the same session is instant
 > [!NOTE]
 > Both **Shields** can be toggled on and off the queue toolbar in the plugins [Settings](Plugin-Settings-Reference.md#queue).
 
+#### Queue Selection Odds
+
+At the bottom of the **Weighted Shield Breakdown** tab there is a **🎲 Queue Selection Odds** panel that answers a question the tables above only imply: *how much more often does the queue actually pick an item at this priority than an item at that one?*
+
+Pick a universe from the dropdown — **Incremental Rems** or **Cards**, each in **🌐 Knowledge Base** or **📄 Document Scope** — and set two items, **A** and **B**. Each side accepts either a **relative percentile** or an **absolute priority**; whichever you type, the panel shows both, because it converts through the same sorted universe the bucket tables are built from:
+
+*   Type a **relative percentile** → it shows the **absolute priority** of the item sitting at that rank.
+*   Type an **absolute priority** → it shows the **relative percentile** that priority reaches, defined exactly as the threshold slider's *Rel %ile*: the share of the universe at or above it (`items with priority ≤ P / total × 100`).
+
+The middle column reports the verdict:
+
+*   **The ratio** — e.g. `1.58× · Item A is more likely to be drawn`.
+*   **Head-to-head** — the same thing as a split, e.g. `61.2% / 38.8%`: if only these two items competed for one slot, that's how often each would win it.
+*   **Δp** — the percentile gap driving it.
+
+**Where the number comes from.** It is the same curve as the rest of the popup, read as *lottery tickets*. An item holds
+
+```
+W = e^(−k × p/100)
+```
+
+…tickets, where `p` is its relative percentile and `k` is the decay constant of the [priority-weighted lottery](#how-randomness-works-the-priority-weighted-lottery) (your synced `weightSelectionK`, default `2.3026`). The odds ratio is therefore
+
+```
+W_A / W_B = e^(k × (p_B − p_A)/100)
+```
+
+…it depends **only on the gap** between the two percentiles, not on where they sit. With the default `k`, every 10 percentile points is a factor of ~1.26, and the extremes (0% vs 100%) come out at the familiar ~10×. The panel header shows the `k` and the randomness percentage actually in force for the selected item type, so the numbers reflect *your* configuration rather than the defaults.
+
+**Sample items.** Under each side the panel pulls a **real item at that priority** out of the current universe — the capped text of an actual Incremental Rem or card-bearing Rem — so the comparison has a face instead of two bare numbers. Click it to open that Rem; press **🎲** to draw another one at the same priority. When no item sits at exactly that absolute priority the nearest available one is used and prefixed with `≈`.
+
+> [!NOTE]
+> **How literally to read the ratio.** The lottery only fills the *randomized* share of the queue (your [Incremental Rem Randomness](#1-incremental-rem-randomness) / [Flashcard Randomness](#2-flashcard-randomness) setting); the remaining slots stay in strict priority order, where the more important item wins every time. Inside a session the lottery also ranks within the **due** population rather than the whole universe, so absolute percentiles shift — but the ratio survives, as long as the *gap* between the two items does. Read it as the relative pull of one priority over another, which is exactly the question the setting is meant to answer.
+
 ###  Priority Shield History
 
 You can track your performance over time by accessing the **"Priority Shield History"** graph from the queue menu (the three-dot icon). This graph plots your daily shield values, helping you identify trends and adjust your workload or priorities accordingly.
