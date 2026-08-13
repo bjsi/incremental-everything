@@ -171,7 +171,7 @@ The history includes special event markers:
 | ▶ **Made Incremental** | When the Rem was first made (or re-made) incremental |
 | ⏸ **Dismissed** | When the Rem was dismissed via the Dismiss button |
 
-These markers help you understand your learning timeline and distinguish between different review sessions. Each banner shows the **date and the time of day** (`Aug 13, 2026 09:44`) it was recorded — the same wall-clock detail the repetition rows carry — so a day holding several lifecycle events (made incremental → dismissed → made incremental again) still reads in order.
+These markers help you understand your learning timeline and distinguish between different review sessions. Each banner shows the **date and the time of day** (`Aug 13, 2026 · 09:44`) it was recorded — the same wall-clock detail the repetition rows carry — so a day holding several lifecycle events (made incremental → dismissed → made incremental again) still reads in order.
 
 ---
 

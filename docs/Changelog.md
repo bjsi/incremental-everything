@@ -26,7 +26,7 @@ The percentile ⇄ absolute-priority conversion reuses `breakdown.sortedItems` �
 
 The history rows for repetitions have always shown the wall-clock time under the date. The **event banners** — ▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset — showed only the date, even though the exact timestamp was already stored.
 
-That made a day with several lifecycle events unreadable: made incremental → dismissed → made incremental again → dismissed, all stacked as "Aug 13, 2026" with no way to tell the order apart from their position. Each banner now carries its `HH:mm` next to the date.
+That made a day with several lifecycle events unreadable: made incremental → dismissed → made incremental again → dismissed, all stacked as "Aug 13, 2026" with no way to tell the order apart from their position. Each banner now carries its time next to the date, after a separator dot: `⏸ Dismissed — Aug 13, 2026 · 09:44`.
 
 📖 [Event Markers](Getting-Started.md#event-markers)
 

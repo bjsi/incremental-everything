@@ -1115,11 +1115,25 @@ function RepetitionHistoryPopup() {
                         // event was recorded. Same information the rep rows show —
                         // it disambiguates several lifecycle events on one day
                         // (make incremental → dismiss → make incremental again).
+                        //
+                        // Spacing comes from the span's own margins, never from plain
+                        // spaces around it: the banner is a flex container, so this
+                        // span is a flex item and the layout trims the whitespace at
+                        // its edges — that is what glued "2026" to "09:44", and what
+                        // ate the space before a trailing " — Pri: 26" once the span
+                        // split that text off into its own item.
                         const bannerWhen = (
                             <>
                                 {dayjs(rep.date).format('MMM D, YYYY')}
-                                <span style={{ opacity: 0.75, fontWeight: 400 }}>
-                                    {' '}{dayjs(rep.date).format('HH:mm')}
+                                <span
+                                    style={{
+                                        opacity: 0.75,
+                                        fontWeight: 400,
+                                        margin: '0 5px',
+                                        letterSpacing: '0.2px',
+                                    }}
+                                >
+                                    · {dayjs(rep.date).format('HH:mm')}
                                 </span>
                             </>
                         );

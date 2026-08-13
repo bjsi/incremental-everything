@@ -28,7 +28,8 @@
       "Bash(rg -n \"eventType: 'dismissed'|eventType: \\\\\"dismissed\\\\\"\" -r '' src/ -l)",
       "Bash(rg -n \"Dismiss Incremental Rem\" docs/*.md)",
       "Bash(rg -ln \"Repetition History\" docs/*.md)",
-      "Bash(rg -n \"Recording and correcting records\" docs/*.md)"
+      "Bash(rg -n \"Recording and correcting records\" docs/*.md)",
+      "Bash(rg -n \"getNextSpacingDateForRem\" src/lib/*.ts src/lib/*/*.ts)"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"
