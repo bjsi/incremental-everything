@@ -234,6 +234,8 @@ It performs a powerful sequence of actions:
 3. It **automatically starts the Editor Review Timer** for that session.
   * *Note for PDF Notes*: If the item is a `pdf-note`, this button carefully opens the Rem as a full page in the editor rather than triggering the PDF viewer, maintaining your note-taking context.
 
+**With a Rem selected, `Ctrl+Shift+J` targets that Rem instead.** Open something in the previewer (`P`), select it, and the shortcut opens the [Execute Repetition popup](Reviewing-Items-in-the-Editor.md#opened-from-the-queue-previewer) for it — the editor flow, where you set the review time and interval yourself and nothing is written until you confirm. Recording a review there **deducts** those minutes from the item the queue is showing, since that is where they were spent; starting the timer instead asks what to do with the turn you are leaving. The button above, and the shortcut with nothing selected, still act on the queue item itself.
+
 #### The Workflow Loop
 Once you are in the editor with the timer running, you can perform heavy editing, restructuring, or use AI tools. 
 When you are completely finished processing the item:

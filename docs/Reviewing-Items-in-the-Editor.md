@@ -53,6 +53,21 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
   - **Custom Interval** (`3`): Reveals an inline input to set a custom review interval in days.
   - **Go Back** (`←` or `Esc`): Return to the main popup.
 
+### Opened from the queue previewer
+
+`Ctrl+Shift+J` in the queue acts on the Rem you have **selected** — typically one opened in the previewer (`P`) — rather than on the item being reviewed. The previewer is an editor surface, so it gets this same popup, and nothing is written until you confirm.
+
+When a queue **Incremental Rem turn is running behind it**, the popup accounts for the time in that turn:
+
+- **Confirm Review** — the minutes you record here are **deducted** from the running turn's clock, since you spent them on this Rem, not on the item the queue is showing. You stay in the queue; whatever ends that turn later (Next, Dismiss, Reschedule) records the remainder. The toast reports the deduction.
+- **⏱️ Start Timer** — this navigates away, abandoning the turn. A confirmation appears first, naming the item you are leaving and how long it has been on screen:
+
+    - **Leave it due today** (`Enter`) — records the repetition with that time and keeps the item due today, exactly like dragging the **Next** button down ("Repeat today"). It comes back in the queue.
+    - **Reschedule** — records the repetition and applies the normal computed interval, like the **Next** button.
+    - **Carry to this Rem** (minutes) — time you actually spent reading the previewed Rem before pressing the shortcut. It is taken off the abandoned item's recorded duration and **back-dates the timer** that starts next, so those minutes land on the Rem they belong to.
+
+    The repetition is recorded either way — the reading you did is real; the only choice is what happens to the schedule.
+
 ### Execute Repetition vs. Reschedule in Editor
 
 | Action | Shortcut | Counts for Interval? | Purpose |

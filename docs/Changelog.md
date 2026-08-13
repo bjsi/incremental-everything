@@ -22,6 +22,25 @@ The percentile ⇄ absolute-priority conversion reuses `breakdown.sortedItems` �
 
 📖 [Queue Selection Odds](Prioritization-&-Sorting.md#queue-selection-odds)
 
+### ✨ New - `Ctrl+Shift+J` in the queue now works on the Rem you have open in the previewer
+
+Reading an item in the queue and spotting another Incremental Rem you want to work on — in the previewer (`P`), in the sidebar, anywhere — used to be awkward: `Ctrl+Shift+J` ignored what you had selected and acted on the queue item instead, silently. It now targets your **selection**, the same way `Ctrl+D` already did, and opens the [Execute Repetition popup](Reviewing-Items-in-the-Editor.md#opened-from-the-queue-previewer) for it. The previewer *is* an editor surface, so it gets the editor flow: you set the review time and interval, and nothing is written until you confirm.
+
+The interesting part is the clock. While an Incremental Rem turn is running in the queue, the plugin is timing it — so minutes you spend on a Rem in the previewer were, until now, silently credited to the item on screen:
+
+- **Confirm Review** records the review on the previewed Rem and **deducts those minutes** from the running turn. You stay in the queue, and whatever ends that turn later (Next, Dismiss, Reschedule) records only the remainder. Do it for three Rems in a row and all three deductions apply.
+- **⏱️ Start Timer** navigates away, abandoning the turn — so it now asks first, naming the item you are leaving and how long it has been on screen. The repetition is recorded either way (that reading was real); you choose whether the item is **rescheduled** or **left due today**, the latter being the default and behaving exactly like dragging **Next** down. A **Carry to this Rem** field moves any minutes you actually spent in the previewer out of that recording and **back-dates the new timer** by the same amount, so they land on the Rem they belong to.
+
+With nothing selected — and for the **Review in Editor** button — the command still acts on the queue item exactly as before.
+
+#### Technical explanation
+
+Both queue commands now resolve their target through one helper (`lib/queue_target.ts`), so selection-wins-over-queue-item is decided in a single place rather than twice with different rules. It also reports whether the queue is genuinely on the target's Incremental turn: no card from the SDK (Plugin queue items have none) **and** `currentIncRemKey` pointing at that rem.
+
+Time accounting rides on the existing `incremReviewStartTimeKey` baseline instead of a parallel timer: a deduction moves the baseline **forward** by the recorded span (clamped to what has actually elapsed), so every consumer of the turn's duration sees the corrected figure without knowing about any of this. Leaving the turn goes through `finishQueueIncRemTurn`, which records the repetition — via the normal scheduler for *Reschedule*, or with a today timestamp for *Leave it due* — and then clears the baseline, so the rem you jump to can never inherit it. The confirmation renders as an overlay inside the Execute Repetition popup, like the Scheduling Conflict dialog: a nested popup would close its parent.
+
+📖 [Opened from the queue previewer](Reviewing-Items-in-the-Editor.md#opened-from-the-queue-previewer) · [Review in Editor](Reviewing-Items-in-the-Queue.md#review-in-editor)
+
 ### ✨ Improved - lifecycle markers in the Repetition History now show the time of day
 
 The history rows for repetitions have always shown the wall-clock time under the date. The **event banners** — ▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset — showed only the date, even though the exact timestamp was already stored.
@@ -53,6 +72,8 @@ Those minutes then counted as real everywhere history is read — total time on 
 `Ctrl+D` now records a repetition **only when the queue was actually on that Rem's Incremental turn** — exactly the case the **Dismiss** button covers. Used on any other Rem it is a pure lifecycle change: history is transferred to the Dismissed state and the power-up removed, like `Ctrl+D` in the editor. Since nothing on screen moves in that case, a toast now names the Rem that was dismissed.
 
 For the same reason, `Ctrl+D` no longer removes the **current card** from the queue when that card is a flashcard: the card was still due and being reviewed, and dropping it silently ate a scheduled repetition.
+
+`Ctrl+Shift+J` could borrow the same clock, and worse: pressed during a flashcard turn whose Rem happened to be incremental, it executed a repetition on that Rem with the stale duration *and* advanced its interval, leaving a corrupted chain in an item that stays in rotation. That path is gone — see the previewer targeting above; when no Incremental review is in progress, the reading clock is cleared before anything is recorded.
 
 Phantom entries already written can be removed with the 🗑 button on the row — see [Recording and correcting records](Plugin-Widgets-Reference.md#recording-and-correcting-records).
 

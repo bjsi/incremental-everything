@@ -84,6 +84,7 @@ import {
 } from './queue_display_powerups';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
+import { resolveQueueCommandTarget } from '../lib/queue_target';
 import {
   setRemReadPoint,
   isDescendantOf,
@@ -1579,15 +1580,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const isQueue = url && url.includes('/flashcards');
 
       if (isQueue) {
-        // Queue context behavior
-        const currentQueueItem = await plugin.queue.getCurrentCard();
-        let remId = currentQueueItem?.remId;
-
-        if (!remId) {
-          // If the SDK doesn't report an active card (because it's an IncRem or document), fall back to session storage
-          remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
-          console.log('review-increm-in-editor: remId from session storage (currentIncRemKey):', remId);
-        }
+        // Queue context: an explicit selection (previewer, sidebar, …) wins over
+        // the queue item, exactly like Ctrl+D — see lib/queue_target.
+        const target = await resolveQueueCommandTarget(plugin);
+        const { remId, incRemTurnRemId } = target;
 
         if (!remId) {
           await plugin.app.toast('No card or Incremental Rem currently active in the queue.');
@@ -1599,12 +1595,38 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
         const hasIncPowerup = await rem.hasPowerup(powerupCode);
         if (!hasIncPowerup) {
-          await plugin.app.toast('Current card is not an Incremental Rem.');
+          await plugin.app.toast(
+            target.isTargetingQueueContext
+              ? 'Current card is not an Incremental Rem.'
+              : 'The selected Rem is not an Incremental Rem.'
+          );
           return;
         }
 
-        // Delegate to exact function used by "Review in Editor"
-        await handleReviewInEditorRem(plugin, rem, null);
+        if (target.isActiveIncRemTurn) {
+          // The queue is reviewing this very Rem: the elapsed reading time
+          // belongs to it, and the timer continues the same engagement.
+          await handleReviewInEditorRem(plugin, rem, null);
+          return;
+        }
+
+        // A Rem picked out of the previewer (or any other selection) is an
+        // EDITOR target, and the previewer is an editor surface — so it gets
+        // the editor flow: the Execute Repetition popup, where the review time
+        // and interval are the user's to set, and nothing is written until they
+        // confirm. `queueIncRemId` tells that popup a queue turn is live, so it
+        // can deduct the recorded time from it (Confirm Review) or close it out
+        // properly (Start Timer, which navigates away from the queue).
+        if (!incRemTurnRemId) {
+          // Flashcard turn: no Incremental review is in progress, so nothing may
+          // inherit the stale clock of an IncRem injected earlier in the session.
+          await plugin.storage.setSession(incremReviewStartTimeKey, null);
+        }
+
+        await plugin.widget.openPopup('editor_review', {
+          remId: rem._id,
+          queueIncRemId: incRemTurnRemId,
+        });
       } else {
         // Editor context behavior
         // Get focused Rem
@@ -2321,53 +2343,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       let incRemInfo;
 
       if (isQueue) {
-        // Queue context: check for explicit selection first
-        const card = await plugin.queue.getCurrentCard();
-        const sel = await plugin.editor.getSelection();
-        const selType = sel?.type;
-
-        // The queue is on an IncRem turn only when the SDK reports no flashcard
-        // (Plugin queue items have no card) AND the session points at an
-        // injected IncRem. On a flashcard turn `currentIncRemKey` still holds
-        // the PREVIOUS IncRem, so it must never be trusted on its own.
-        const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-        const incRemTurnRemId = !card ? currentIncRemId || undefined : undefined;
-
-        let isTargetingQueueContext = false;
-
-        if (!selType) {
-          isTargetingQueueContext = true;
-        } else if (card) {
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(card.remId)) {
-            isTargetingQueueContext = true;
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === card.remId) {
-            isTargetingQueueContext = true;
-          }
-        } else {
-          if (incRemTurnRemId) {
-            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(incRemTurnRemId)) {
-              isTargetingQueueContext = true;
-            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === incRemTurnRemId) {
-              isTargetingQueueContext = true;
-            }
-          }
-        }
-
-        let remId: string | undefined;
-
-        if (isTargetingQueueContext) {
-          if (card) {
-            remId = card.remId;
-          } else {
-            remId = incRemTurnRemId;
-          }
-        } else {
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
-            remId = (sel as any).remIds[0];
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
-            remId = (sel as any).remId;
-          }
-        }
+        // Queue context: an explicit selection (previewer, sidebar, …) wins over
+        // the queue item — see lib/queue_target.
+        const target = await resolveQueueCommandTarget(plugin);
+        const { remId } = target;
 
         if (!remId) {
           await plugin.app.toast('No Incremental Rem currently active in the queue or selected.');
@@ -2397,7 +2376,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // Dismissing a rem opened in the previewer (or selected anywhere else)
         // during a flashcard turn is a pure lifecycle change, exactly like the
         // editor branch below.
-        const isActiveIncRemTurn = !!incRemTurnRemId && incRemTurnRemId === rem._id;
+        const isActiveIncRemTurn = target.isActiveIncRemTurn;
 
         // Replicate the Dismiss button logic from answer_buttons.tsx
         // 1. Handle card priority inheritance
