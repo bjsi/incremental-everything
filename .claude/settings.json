@@ -23,7 +23,12 @@
       "Bash(grep -n \"^#\\\\{2,3\\\\} \" docs/Utilities.md)",
       "Bash(grep -n \"^#\\\\{1,3\\\\} \" docs/Plugin-Commands-Reference.md)",
       "Bash(grep -rn \"Reviewing-Items-in-the-Queue.md#review-in-editor\\\\|^#\\\\{1,3\\\\} \" docs/Reviewing-Items-in-the-Queue.md)",
-      "Bash(grep -n \"^#\\\\{2,3\\\\} \" docs/Keyboard-Shortcuts.md)"
+      "Bash(grep -n \"^#\\\\{2,3\\\\} \" docs/Keyboard-Shortcuts.md)",
+      "Bash(rg -rn \"dismissed\" --include=\"*.ts\" --include=\"*.tsx\" -l src/)",
+      "Bash(rg -n \"eventType: 'dismissed'|eventType: \\\\\"dismissed\\\\\"\" -r '' src/ -l)",
+      "Bash(rg -n \"Dismiss Incremental Rem\" docs/*.md)",
+      "Bash(rg -ln \"Repetition History\" docs/*.md)",
+      "Bash(rg -n \"Recording and correcting records\" docs/*.md)"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

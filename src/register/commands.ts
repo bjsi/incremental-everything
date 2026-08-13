@@ -2326,6 +2326,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         const sel = await plugin.editor.getSelection();
         const selType = sel?.type;
 
+        // The queue is on an IncRem turn only when the SDK reports no flashcard
+        // (Plugin queue items have no card) AND the session points at an
+        // injected IncRem. On a flashcard turn `currentIncRemKey` still holds
+        // the PREVIOUS IncRem, so it must never be trusted on its own.
+        const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
+        const incRemTurnRemId = !card ? currentIncRemId || undefined : undefined;
+
         let isTargetingQueueContext = false;
 
         if (!selType) {
@@ -2337,11 +2344,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
             isTargetingQueueContext = true;
           }
         } else {
-          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-          if (currentIncRemId) {
-            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
+          if (incRemTurnRemId) {
+            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(incRemTurnRemId)) {
               isTargetingQueueContext = true;
-            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
+            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === incRemTurnRemId) {
               isTargetingQueueContext = true;
             }
           }
@@ -2353,7 +2359,7 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           if (card) {
             remId = card.remId;
           } else {
-            remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
+            remId = incRemTurnRemId;
           }
         } else {
           if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
@@ -2386,24 +2392,38 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
+        // Was the queue actually reviewing THIS rem as an IncRem when Ctrl+D was
+        // pressed? Only then did a review happen that deserves a 'rep' entry.
+        // Dismissing a rem opened in the previewer (or selected anywhere else)
+        // during a flashcard turn is a pure lifecycle change, exactly like the
+        // editor branch below.
+        const isActiveIncRemTurn = !!incRemTurnRemId && incRemTurnRemId === rem._id;
+
         // Replicate the Dismiss button logic from answer_buttons.tsx
         // 1. Handle card priority inheritance
         await handleCardPriorityInheritance(plugin, rem, incRemInfo);
 
-        // 2. Calculate review time
-        const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-        const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
+        // 2/3. Record the review that is ending — ONLY on a real IncRem turn.
+        // `incremReviewStartTimeKey` is stamped when the queue injects an IncRem
+        // and is never cleared afterwards, so on any other turn it still points
+        // at an earlier item; using it here fabricated a rep whose duration was
+        // the time since some unrelated IncRem was shown.
+        const updatedHistory = [...(incRemInfo.history || [])];
 
-        // 3. Build the current rep history entry
-        const currentRep: IncrementalRep = {
-          date: Date.now(),
-          scheduled: incRemInfo.nextRepDate,
-          reviewTimeSeconds: reviewTimeSeconds,
-          eventType: 'rep',
-          priority: incRemInfo.priority,
-        };
+        if (isActiveIncRemTurn) {
+          const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+          const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
 
-        const updatedHistory = [...(incRemInfo.history || []), currentRep];
+          const currentRep: IncrementalRep = {
+            date: Date.now(),
+            scheduled: incRemInfo.nextRepDate,
+            reviewTimeSeconds: reviewTimeSeconds,
+            eventType: 'rep',
+            priority: incRemInfo.priority,
+          };
+
+          updatedHistory.push(currentRep);
+        }
 
         // 4. Transfer history to dismissed powerup
         await transferToDismissed(plugin, rem, updatedHistory);
@@ -2417,7 +2437,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // 6. Remove incremental powerup AND conditionally advance queue simultaneously.
         // removePowerup destroys the widget sandbox on the next microtask,
         // so both IPC messages must be sent in the same tick if targeting queue.
-        if (isTargetingQueueContext) {
+        // Only a real IncRem turn is advanced: on a flashcard turn the card on
+        // screen is a different item that is still due, so dropping it would
+        // silently eat a scheduled review.
+        if (isActiveIncRemTurn) {
           // Like "Next", dismissing the queue card means we've left the rem —
           // restore the dashboard. Flag BEFORE the destructive call (consumed by
           // the persistent QueueLoadCard listener once the next card loads).
@@ -2428,6 +2451,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           ]);
         } else {
           await rem.removePowerup(powerupCode);
+          // No queue advance here, so nothing on screen changes — confirm which
+          // rem was actually dismissed.
+          const name = await safeRemTextToString(plugin, rem.text);
+          const short = name.length > 40 ? name.slice(0, 40) + '…' : name;
+          await plugin.app.toast(
+            short ? `Incremental Rem dismissed: "${short}"` : 'Incremental Rem dismissed.'
+          );
         }
 
       } else {

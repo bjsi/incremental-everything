@@ -211,6 +211,8 @@ The primary goal of incremental reading is to process source materials (like art
 
 Once you have reviewed the entire source and are confident you've extracted all the key knowledge into flashcards, the original passive material has served its purpose. Click "Dismiss" to remove the source text from your queue, leaving only the efficient, active-recall cards you created from it.
 
+**What gets recorded:** a repetition is written into the item's history — with the time you spent on it — **only when the queue was actually on that item's Incremental turn**, which is always the case for the **Dismiss** button. `Ctrl+D` reaches further: it also dismisses a Rem you have merely *selected* or opened in the previewer (`P`) while the queue is showing a flashcard or a different item. In that case nothing was being reviewed, so no repetition is recorded and no queue item is skipped — the history is transferred to the Dismissed state and the power-up removed, exactly like `Ctrl+D` in the editor. A toast names the Rem that was dismissed, since the queue itself does not move.
+
 ### Change Priority
 
 Prioritization is essential for managing a large volume of learning material.

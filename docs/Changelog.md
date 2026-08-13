@@ -22,6 +22,14 @@ The percentile ⇄ absolute-priority conversion reuses `breakdown.sortedItems` �
 
 📖 [Queue Selection Odds](Prioritization-&-Sorting.md#queue-selection-odds)
 
+### ✨ Improved - lifecycle markers in the Repetition History now show the time of day
+
+The history rows for repetitions have always shown the wall-clock time under the date. The **event banners** — ▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset — showed only the date, even though the exact timestamp was already stored.
+
+That made a day with several lifecycle events unreadable: made incremental → dismissed → made incremental again → dismissed, all stacked as "Aug 13, 2026" with no way to tell the order apart from their position. Each banner now carries its `HH:mm` next to the date.
+
+📖 [Event Markers](Getting-Started.md#event-markers)
+
 ### 📚 Docs - the Keyboard Shortcuts page now also lists every binding by key
 
 The [Keyboard Shortcuts](Keyboard-Shortcuts.md) page listed shortcuts only **by function** — fine when you know the task you want, useless when you half-remember a key or want to know which combinations are still free before assigning your own. It now carries a second index, **[Shortcuts by Key](Keyboard-Shortcuts.md#shortcuts-by-key)**, grouped the way a keyboard map is: single keys, function keys, `Shift+`, `Ctrl+`, `Opt+`, `Ctrl+Shift+`, `Opt+Shift+`, `Ctrl+Opt+`, `Cmd/Ctrl+`. A closing table lists the commands that ship deliberately **unbound**, with their quick codes.
@@ -35,6 +43,26 @@ A new **Keys Inside Plugin Popups** section covers the keys that only exist whil
 Three bindings were documented wrongly elsewhere and have been fixed: Change Priority is **`Opt+P`**, not `Ctrl+P` ([Reviewing Items in the Queue](Reviewing-Items-in-the-Queue.md#change-priority)); the Quick Priority shortcuts are **`Ctrl+Opt+↑/↓`**, not `Ctrl+Shift+↑/↓` ([Prioritization & Sorting](Prioritization-&-Sorting.md#quick-priority-shortcuts)); and the [Priority Step Size](Plugin-Settings-Reference.md#priority) they move by defaults to **5**, not 10.
 
 📖 [Keyboard Shortcuts → Shortcuts by Key](Keyboard-Shortcuts.md#shortcuts-by-key)
+
+### 🐛 Fixed - `Ctrl+D` on a Rem you were not reviewing recorded a repetition that never happened
+
+Dismissing an Incremental Rem with `Ctrl+D` **while the queue was showing something else** — a Rem opened in the previewer (`P`) during a flashcard turn, or any Rem you had selected — wrote a **`rep` entry** into its history before dismissing it, complete with a review duration. Nothing had been reviewed. Worse, the duration was borrowed: it was the time elapsed since the *last Incremental Rem the queue had injected*, so a Rem you made incremental and dismissed within a minute could be credited with half an hour of reading.
+
+Those minutes then counted as real everywhere history is read — total time on the item, the [Aggregated History](Plugin-Widgets-Reference.md#212-increm-repetition-history--aggregated-view) totals of every ancestor, and the [Study Dashboard](Study-Dashboard.md).
+
+`Ctrl+D` now records a repetition **only when the queue was actually on that Rem's Incremental turn** — exactly the case the **Dismiss** button covers. Used on any other Rem it is a pure lifecycle change: history is transferred to the Dismissed state and the power-up removed, like `Ctrl+D` in the editor. Since nothing on screen moves in that case, a toast now names the Rem that was dismissed.
+
+For the same reason, `Ctrl+D` no longer removes the **current card** from the queue when that card is a flashcard: the card was still due and being reviewed, and dropping it silently ate a scheduled repetition.
+
+Phantom entries already written can be removed with the 🗑 button on the row — see [Recording and correcting records](Plugin-Widgets-Reference.md#recording-and-correcting-records).
+
+#### Technical explanation
+
+The queue branch of the command built its `rep` entry unconditionally, reading `incremReviewStartTimeKey` for the duration. That session key is stamped when `GetNextCard` injects an Incremental Rem and is **never cleared afterwards**, so on a flashcard turn it still holds the previous IncRem's start time. The command's existing `isTargetingQueueContext` flag was not a guard against this — it is only true when the target *is* the current queue item, and it is also true when the current item is a flashcard whose Rem happens to be incremental, or when there is no selection at all.
+
+The command now derives an explicit `isActiveIncRemTurn`: the SDK reports no current card (Plugin queue items have none) **and** `currentIncRemKey` equals the Rem being dismissed. Both halves are required — on a flashcard turn `currentIncRemKey` still points at the previously injected IncRem, so it can never be trusted on its own. That flag gates both the `rep` entry and the `removeCurrentCardFromQueue` advance.
+
+📖 [Dismiss](Reviewing-Items-in-the-Queue.md#dismiss)
 
 ## v1.0.40 - August 12th, 2026
 
