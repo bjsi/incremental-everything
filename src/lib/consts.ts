@@ -137,6 +137,12 @@ export const cardAnalyticsCacheKey = 'card-analytics-cache-key';
 export const cardAnalyticsLastPeriodKey = 'card-analytics-last-period';
 export const fsrsCalibrationLastPeriodKey = 'fsrs-calibration-last-period';
 export const studyDashboardLastPeriodKey = 'study-dashboard-last-period';
+/**
+ * Queue Selection Odds panel: last selected universe, as its `kind-scope` key
+ * (e.g. `card-kb`). Device-local, like the period keys above — which universe
+ * you compare in is a reading preference, not shared knowledge-base state.
+ */
+export const selectionOddsLastUniverseKey = 'selection-odds-last-universe';
 // Priority Shield Graph: persists the "Show Weighted Shield" checkbox and the
 // 1M/3M/6M/1Y/All period filter across sessions. Device-specific.
 // Stored shape: { showWeightedShield: boolean, timePeriod: 'month'|'3m'|'6m'|'year'|'all' }.

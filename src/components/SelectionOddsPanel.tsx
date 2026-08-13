@@ -26,6 +26,7 @@ import {
   allIncrementalRemKey,
   allIncrementalRemSlimKey,
   priorityCalcScopeRemIdsKey,
+  selectionOddsLastUniverseKey,
 } from '../lib/consts';
 import { CardPriorityInfo } from '../lib/card_priority/types';
 import { DEFAULT_WEIGHT_K, getCardRandomness, getSortingRandomness, getWeightSelectionK } from '../lib/sorting';
@@ -247,6 +248,31 @@ export function SelectionOddsPanel({
 
   const [universeKey, setUniverseKey] = React.useState<string>(universes[0]?.key ?? '');
   const universe = universes.find((u) => u.key === universeKey) ?? universes[0];
+
+  // Restore the last universe (device-local, so it survives a full restart).
+  // A selection made before the read resolves wins — hence the ref guard. A
+  // saved universe the current popup doesn't offer (e.g. a Document scope that
+  // isn't in play) is ignored, leaving the default.
+  const userPickedRef = React.useRef(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    plugin.storage
+      .getLocal<string | null>(selectionOddsLastUniverseKey)
+      .then((saved) => {
+        if (cancelled || userPickedRef.current || !saved) return;
+        if (universes.some((u) => u.key === saved)) setUniverseKey(saved);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectUniverse = (key: string) => {
+    userPickedRef.current = true;
+    setUniverseKey(key);
+    plugin.storage.setLocal(selectionOddsLastUniverseKey, key).catch(() => {});
+  };
 
   const [sideA, setSideA] = React.useState<SideInput>({ mode: 'percentile', value: 15 });
   const [sideB, setSideB] = React.useState<SideInput>({ mode: 'percentile', value: 35 });
@@ -515,7 +541,7 @@ export function SelectionOddsPanel({
         <span style={{ fontSize: '15px', fontWeight: 700 }}>🎲 Queue Selection Odds</span>
         <select
           value={universe.key}
-          onChange={(e) => setUniverseKey(e.target.value)}
+          onChange={(e) => selectUniverse(e.target.value)}
           style={{
             fontSize: '12px',
             padding: '3px 6px',
