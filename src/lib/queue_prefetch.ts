@@ -52,6 +52,23 @@ import {
  * very cost we are removing.)
  */
 
+/**
+ * Per-turn tracing for queue injection: the selection decision, the outcome of
+ * each call, and every buffer rebuild. Roughly five console lines per queue
+ * item, which drowns out everything else during a study session, so it ships
+ * off.
+ *
+ * Flip to `true` to get a full session trace back — the diagnostic that found
+ * the dropped-injection bug in the first place. Deliberately a flag rather than
+ * deleted code: this subsystem has a failure mode (RemNote silently discarding
+ * a late answer) that produces no symptom whatsoever, so the next investigation
+ * should not have to start by rebuilding the instrumentation.
+ *
+ * Genuine problems are NOT gated on this. The dropped-injection warning and the
+ * slow-call warning always print, and every console.error stays unconditional.
+ */
+export const VERBOSE_QUEUE_INJECTION = false;
+
 export type QueueMode = 'practice-all' | 'in-order' | 'normal';
 
 export type PrefetchQueueInfo = {
@@ -424,7 +441,9 @@ export async function buildQueuePrefetch(
     }
 
     if (builtForGeneration !== generation) {
-      console.log('🧰 Prefetch build discarded — the queue session changed while it ran.');
+      if (VERBOSE_QUEUE_INJECTION) {
+        console.log('🧰 Prefetch build discarded — the queue session changed while it ran.');
+      }
       return;
     }
 
@@ -433,10 +452,12 @@ export async function buildQueuePrefetch(
     state.buildKey = makeBuildKey(info);
     state.ready = true;
 
-    console.log(
-      `🧰 Prefetch built for [${state.buildKey}] in ${Date.now() - startedAt}ms: ` +
-        `${verified.length} verified of ${filtered.length} eligible (${allIncRems.length} cached).`
-    );
+    if (VERBOSE_QUEUE_INJECTION) {
+      console.log(
+        `🧰 Prefetch built for [${state.buildKey}] in ${Date.now() - startedAt}ms: ` +
+          `${verified.length} verified of ${filtered.length} eligible (${allIncRems.length} cached).`
+      );
+    }
   } catch (e) {
     console.error('[prefetch] build failed:', e);
   } finally {
