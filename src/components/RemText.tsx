@@ -6,15 +6,23 @@ import { resolveRemTextSegments, RemTextSegment } from '../lib/richTextRemRefs';
  * Renders pre-resolved rem-text segments as plain spans:
  *  - text segments      → plain text (references already wrapped in `[ ]`)
  *  - pin segments       → a 📌 icon whose hover tooltip is the referenced text
+ *  - clozed text        → wrapped in `{{ }}` when `markClozes` is set
  *
  * Synchronous and embed-free, so it is cheap even in long lists.
  */
 export function RemTextSegments({
   segments,
   className,
+  markClozes,
 }: {
   segments: RemTextSegment[];
   className?: string;
+  /**
+   * Wrap clozed spans in `{{ }}` — the same convention the preserve-history
+   * card names use. Off by default: most lists show a rem, not a card, and the
+   * braces would be noise there.
+   */
+  markClozes?: boolean;
 }) {
   return (
     <span className={className}>
@@ -22,6 +30,12 @@ export function RemTextSegments({
         seg.kind === 'pin' ? (
           <span key={i} title={seg.text} style={{ cursor: 'help', opacity: 0.7 }}>
             📌
+          </span>
+        ) : markClozes && seg.cId ? (
+          <span key={i} title="Cloze">
+            <span style={{ opacity: 0.5 }}>{'{{'}</span>
+            {seg.text}
+            <span style={{ opacity: 0.5 }}>{'}}'}</span>
           </span>
         ) : (
           <React.Fragment key={i}>{seg.text}</React.Fragment>
@@ -37,6 +51,8 @@ interface RemTextProps {
   /** Raw rich text, when already loaded — avoids an extra rem lookup. */
   text?: unknown;
   className?: string;
+  /** Wrap clozed spans in `{{ }}`. See {@link RemTextSegments}. */
+  markClozes?: boolean;
 }
 
 /**
@@ -45,7 +61,7 @@ interface RemTextProps {
  * plain spans. Use {@link RemTextSegments} directly when segments are already
  * resolved upstream.
  */
-export function RemText({ remId, text, className }: RemTextProps) {
+export function RemText({ remId, text, className, markClozes }: RemTextProps) {
   const plugin = usePlugin();
 
   const segments = useRunAsync(async () => {
@@ -65,5 +81,5 @@ export function RemText({ remId, text, className }: RemTextProps) {
     return <span className={className}>[Empty rem]</span>;
   }
 
-  return <RemTextSegments segments={segments} className={className} />;
+  return <RemTextSegments segments={segments} className={className} markClozes={markClozes} />;
 }

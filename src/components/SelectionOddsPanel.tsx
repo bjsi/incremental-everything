@@ -19,7 +19,7 @@
  * priority out of the session caches so the numbers have a face.
  */
 
-import { RNPlugin, usePlugin } from '@remnote/plugin-sdk';
+import { RNPlugin, usePlugin, useRunAsync } from '@remnote/plugin-sdk';
 import React from 'react';
 import {
   allCardPriorityInfoKey,
@@ -189,6 +189,51 @@ const labelStyle: React.CSSProperties = {
   letterSpacing: '0.04em',
   fontWeight: 600,
 };
+
+/**
+ * A sample item's text. A front/back Rem (Concept · Descriptor, Question ·
+ * Answer, …) shows both sides joined by the same `front → back` arrow the
+ * priority popups use — the arrow reads in the direction the card is asked.
+ * Rems with no back side render unchanged.
+ *
+ * Not gated on the selected universe: a Rem can be an Incremental Rem *and* a
+ * flashcard at once, so an IncRem sample with a back side is a real card whose
+ * back is worth showing.
+ *
+ * Clozed spans are marked `{{…}}` on either side (the convention the
+ * preserve-history card names already use), so a cloze rem reads as a card
+ * rather than as an unexplained sentence.
+ */
+function SampleRemContent({ remId }: { remId: string }) {
+  const plugin = usePlugin();
+
+  // One lookup for both sides; RemText then renders the already-loaded rich
+  // text, so rem references and 📌 pins resolve exactly as they do elsewhere.
+  const content = useRunAsync(async () => {
+    const rem = await plugin.rem.findOne(remId);
+    if (!rem) return null;
+    return { text: rem.text, backText: rem.backText };
+  }, [remId]);
+
+  if (content === undefined) return <span>Loading…</span>;
+  if (!content) return <span>[Empty rem]</span>;
+
+  const back = content.backText && content.backText.length > 0 ? content.backText : null;
+
+  return (
+    <>
+      <RemText text={content.text} markClozes />
+      {back && (
+        <>
+          <span style={{ opacity: 0.5, margin: '0 4px' }}>→</span>
+          <span style={{ opacity: 0.8 }}>
+            <RemText text={back} markClozes />
+          </span>
+        </>
+      )}
+    </>
+  );
+}
 
 export function SelectionOddsPanel({
   universes,
@@ -432,13 +477,14 @@ export function SelectionOddsPanel({
               color: 'var(--rn-clr-content-secondary)',
               cursor: 'pointer',
               display: '-webkit-box',
-              WebkitLineClamp: 2,
+              // 3 lines rather than 2: a card sample carries both sides.
+              WebkitLineClamp: 3,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             }}
           >
             {sample.exact ? '' : '≈ '}
-            <RemText remId={sample.remId} />
+            <SampleRemContent remId={sample.remId} />
           </div>
         ) : (
           <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>

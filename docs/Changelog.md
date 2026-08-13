@@ -10,7 +10,7 @@ The **Weighted Shield Breakdown** tab ends with a new **🎲 Queue Selection Odd
 
 Either side can be entered as a **relative percentile** or as an **absolute priority**, and the panel always shows both — type `35` as an absolute priority and it reports the percentile that priority actually reaches in the chosen universe, converted through the very same sorted population the bucket tables above are built from. The universe dropdown covers every combination the popup has data for: Incremental Rems or Cards, Knowledge Base or Document Scope.
 
-Under each side sits a **real sample item** at that priority — the capped text of an actual Rem — so the comparison isn't two abstract numbers. Click it to open the Rem, or press 🎲 to draw another one at the same priority.
+Under each side sits a **real sample item** at that priority — the capped text of an actual Rem — so the comparison isn't two abstract numbers. A front/back Rem shows both sides as `front → back`, the same arrow format the priority popups use, and clozed spans are marked `{{ }}` — in either universe, since a Rem can be an Incremental Rem and a flashcard at the same time. Click a sample to open the Rem, or press 🎲 to draw another one at the same priority.
 
 The odds are not a new metric: an item's lottery tickets are the Weighted-Shield weight `W = e^(−k × p/100)`, so the ratio is `e^(k × Δp/100)` and depends only on the *gap* between the two percentiles. The panel reads your synced `weightSelectionK` and your randomness setting for the selected item type and prints both in the header, so the figures reflect your configuration rather than the defaults.
 

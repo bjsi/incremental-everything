@@ -1,7 +1,8 @@
 import { RNPlugin, RichTextElementRemInterface } from '@remnote/plugin-sdk';
 
 export type RemTextSegment =
-  | { kind: 'text'; text: string }
+  /** `cId` is the cloze id of the element this text came from, when it was clozed. */
+  | { kind: 'text'; text: string; cId?: string }
   | { kind: 'pin'; text: string };
 
 const isRemRef = (el: unknown): el is RichTextElementRemInterface =>
@@ -85,11 +86,13 @@ export async function resolveRemTextSegments(
   if (!Array.isArray(richText)) return [];
 
   const segments: RemTextSegment[] = [];
-  const pushText = (t: string) => {
+  // Adjacent text merges only within the same cloze (or outside every cloze), so
+  // a clozed span stays its own segment and a renderer can mark it.
+  const pushText = (t: string, cId?: string) => {
     if (!t) return;
     const last = segments[segments.length - 1];
-    if (last?.kind === 'text') last.text += t;
-    else segments.push({ kind: 'text', text: t });
+    if (last?.kind === 'text' && last.cId === cId) last.text += t;
+    else segments.push({ kind: 'text', text: t, cId });
   };
 
   for (const el of richText) {
@@ -104,7 +107,8 @@ export async function resolveRemTextSegments(
       continue;
     }
     const anyEl = el as any;
-    if (anyEl?.text) pushText(anyEl.text);
+    const cId = typeof anyEl?.cId === 'string' ? (anyEl.cId as string) : undefined;
+    if (anyEl?.text) pushText(anyEl.text, cId);
     else if (anyEl?.i === 'i') pushText('🖼️');
     else if (anyEl?.url) pushText('🔗');
   }
