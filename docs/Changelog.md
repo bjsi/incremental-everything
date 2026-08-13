@@ -2,7 +2,7 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
-## v1.0.41 - August 13th, 2026
+## v1.0.42 - August 13th, 2026
 
 ### ✨ New - the card info bar now shows the next stability, and tells the truth about intervals if you don't review at 90% retention
 
@@ -22,6 +22,8 @@ A new **Requested Retention** setting (**IE Settings → FSRS**, default `90`%) 
 Inverting the forgetting curve for the time at which R equals the requested retention gives `t = S / FACTOR × (R^(1/DECAY) − 1)`, so the interval-to-stability ratio depends only on the retention — `intervalFactorForRetention` in `lib/fsrs.ts` returns it, and is exactly `1` at 0.9 by construction (that identity is what "interval ≡ stability" means). `computeFSRSState` takes the retention as a third, defaulted argument and now returns `nextS`, `nextInterval`, `intervalFactor` and both U-Factors, so callers that do not care about scheduling (the queue-session recorder, the repetition history popup) keep the old behaviour untouched. The retention is stored as a percentage because that is how the setting reads, and divided down at the single point of use.
 
 📖 [Requested Retention](Reviewing-Items-in-the-Queue.md#requested-retention)
+
+## v1.0.41 - August 13th, 2026
 
 ### ✨ New - Weighted Shield popup: how much more likely is one priority to be drawn than another?
 
