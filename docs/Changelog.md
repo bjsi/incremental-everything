@@ -14,6 +14,8 @@ Under each side sits a **real sample item** at that priority — the capped text
 
 The odds are not a new metric: an item's lottery tickets are the Weighted-Shield weight `W = e^(−k × p/100)`, so the ratio is `e^(k × Δp/100)` and depends only on the *gap* between the two percentiles. The panel reads your synced `weightSelectionK` and your randomness setting for the selected item type and prints both in the header, so the figures reflect your configuration rather than the defaults.
 
+![The Queue Selection Odds panel comparing a card at absolute priority 15 (16.9th percentile) with one at 35 (47.9th): 2.04×, head-to-head 67.1% / 32.9%, with a real sample item under each side](assets/queue-selection-odds.png){ width="900" }
+
 #### Technical explanation
 
 The percentile ⇄ absolute-priority conversion reuses `breakdown.sortedItems` — the priority-ascending snapshot already shipped to the popup for the threshold slider — so no extra data crosses the plugin bridge and the two panels can never disagree about a percentile. Sample items are the only thing that needs Rem ids: those are read lazily from the session caches (`all-incremental-rem-slim`, `all-card-priority-info-key`) the first time a universe is selected, indexed by priority once, and re-sampled locally on every 🎲. Document-scoped pools intersect with the queue's cached scope ids; when the popup was opened from the editor and no cached scope exists, sampling falls back to the KB pool and the sample carries a hover caveat saying so.

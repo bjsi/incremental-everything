@@ -570,6 +570,8 @@ Results are session-cached so reopening the popup in the same session is instant
 
 At the bottom of the **Weighted Shield Breakdown** tab there is a **🎲 Queue Selection Odds** panel that answers a question the tables above only imply: *how much more often does the queue actually pick an item at this priority than an item at that one?*
 
+![The Queue Selection Odds panel comparing a card at absolute priority 15 (16.9th percentile) with one at 35 (47.9th): 2.04×, head-to-head 67.1% / 32.9%, with a real sample item under each side](assets/queue-selection-odds.png){ width="900" }
+
 Pick a universe from the dropdown — **Incremental Rems** or **Cards**, each in **🌐 Knowledge Base** or **📄 Document Scope** — and set two items, **A** and **B**. Your choice is remembered on your device and restored the next time the popup opens, surviving a full RemNote restart; it is not synced, so each device keeps its own. If the saved universe isn't on offer this time (a Document scope that isn't in play, say), the panel simply opens on the first one available. Each side accepts either a **relative percentile** or an **absolute priority**; whichever you type, the panel shows both, because it converts through the same sorted universe the bucket tables are built from:
 
 *   Type a **relative percentile** → it shows the **absolute priority** of the item sitting at that rank.
