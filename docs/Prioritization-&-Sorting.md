@@ -68,7 +68,7 @@ There are several ways to set priorities in Incremental Everything, each designe
 
 *   **Main Priority Popup (`Opt+P`):** The comprehensive tool. Best for deep analysis, seeing relative priorities, ancestors, and using the "Shield" logic.
 *   **Light Priority Popup (`Ctrl+Opt+P`):** A streamlined, instant-opening version. Best for quick, friction-free adjustments during study sessions.
-*   **Quick Priority Shortcuts (`Ctrl+Shift+↑/↓`):** The fastest method. Adjusts absolute priority instantly without any UI popping up.
+*   **Quick Priority Shortcuts (`Ctrl+Opt+↑/↓`):** The fastest method. Adjusts absolute priority instantly without any UI popping up.
 *   **Priority Editor Widget:** An always-on visual control in the editor or queue.
 *   **Batch Tools:** Advanced tables for managing priorities en masse for documents or tags.
 
@@ -120,8 +120,8 @@ It works exactly like the main popup but skips the heavy calculations (like chec
 
 ### Quick Priority Shortcuts
 **Shortcuts:** 
-*   `Ctrl+Opt+Up Arrow`: **Increase** priority number (make **less** important). E.g., 10 → 20.
-*   `Ctrl+Opt+Down Arrow`: **Decrease** priority number (make **more** important). E.g., 20 → 10.
+*   `Ctrl+Opt+Up Arrow`: **Increase** priority number (make **less** important). E.g., 10 → 15 with the default step of 5.
+*   `Ctrl+Opt+Down Arrow`: **Decrease** priority number (make **more** important). E.g., 20 → 15 with the default step of 5.
 
 *Note: In this system, lower numbers mean higher importance (1 is top priority, 100 is low).*
 

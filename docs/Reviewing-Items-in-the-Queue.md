@@ -37,7 +37,7 @@ This button opens a popup that gives you manual control over the item's schedule
 * **[Dismiss](#dismiss):** (Shortcut: `Ctrl+D`)
 When you have finished processing an item and no longer wish to see it in your queue, click "Dismiss" (or press `Ctrl+D`). This permanently finishes the item by removing its `Incremental` power-up. This shortcut also works in the Editor to dismiss the focused Incremental Rem.
 
-* **[Change Priority](#change-priority):** (Shortcut: `Ctrl+P` for full widget and `Ctrl+Alt+P` for light widget)
+* **[Change Priority](#change-priority):** (Shortcut: `Opt+P` / `Alt+P` for full widget and `Ctrl+Opt+P` / `Ctrl+Alt+P` for light widget)
 This opens the advanced priority popup. The label on the button itself provides rich, at-a-glance information:
   * **The Number:** The Rem's absolute priority value (0-100, lower is more important).
   * **The Percentiles:** The Rem's rank within your entire Knowledge Base (`% of KB`) and within the current document (`% of Doc`).

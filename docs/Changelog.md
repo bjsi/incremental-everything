@@ -20,6 +20,20 @@ The percentile ⇄ absolute-priority conversion reuses `breakdown.sortedItems` �
 
 📖 [Queue Selection Odds](Prioritization-&-Sorting.md#queue-selection-odds)
 
+### 📚 Docs - the Keyboard Shortcuts page now also lists every binding by key
+
+The [Keyboard Shortcuts](Keyboard-Shortcuts.md) page listed shortcuts only **by function** — fine when you know the task you want, useless when you half-remember a key or want to know which combinations are still free before assigning your own. It now carries a second index, **[Shortcuts by Key](Keyboard-Shortcuts.md#shortcuts-by-key)**, grouped the way a keyboard map is: single keys, function keys, `Shift+`, `Ctrl+`, `Opt+`, `Ctrl+Shift+`, `Opt+Shift+`, `Ctrl+Opt+`, `Cmd/Ctrl+`. A closing table lists the commands that ship deliberately **unbound**, with their quick codes.
+
+Four shortcuts were missing from the page altogether and are now documented under a new **Sources & Reading** group: **`Opt+O`** (Open Hovered Source in Popup), **`Opt+Shift+O`** (Open Hovered Source in Floating Window), **`Ctrl+Shift+F1`** (Copy Rem Sources) and **`Opt+Shift+V`** (Paste Rem Sources).
+
+A new **Keys Inside Plugin Popups** section covers the keys that only exist while a widget is open, and had never been written down in one place: `Enter` / `Esc` / `Tab` in the priority and reschedule popups, the four `Enter` variants of the Find Rem picker (reference, pin, text + pin, open in pane), and `Esc` to close the floating source window without closing the queue.
+
+#### Corrections
+
+Three bindings were documented wrongly elsewhere and have been fixed: Change Priority is **`Opt+P`**, not `Ctrl+P` ([Reviewing Items in the Queue](Reviewing-Items-in-the-Queue.md#change-priority)); the Quick Priority shortcuts are **`Ctrl+Opt+↑/↓`**, not `Ctrl+Shift+↑/↓` ([Prioritization & Sorting](Prioritization-&-Sorting.md#quick-priority-shortcuts)); and the [Priority Step Size](Plugin-Settings-Reference.md#priority) they move by defaults to **5**, not 10.
+
+📖 [Keyboard Shortcuts → Shortcuts by Key](Keyboard-Shortcuts.md#shortcuts-by-key)
+
 ## v1.0.40 - August 12th, 2026
 
 ### 🐛 Fixed - Dismissing a Rem with no flashcards yet threw its priority away
