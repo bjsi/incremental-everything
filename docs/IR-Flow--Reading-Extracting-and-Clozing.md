@@ -188,11 +188,12 @@ RemNote has its own built-in cloze system — marking text with `{curly braces}`
 |---|---|---|
 | Spoiler protection (bury) | Yes | No (each card is independent) |
 | Standalone Rem | No | Yes |
-| Individually schedulable | No | Yes |
+| Incrementally introduced to the Queue | No | Yes |
+| Per-card prioritization | No | Yes |
 | Can be simplified over time | No | Yes |
-| Atomic card design | Encouraged by discipline | Structurally enforced |
+| Atomic card design | Difficult, as the context for the other cards in the same rem need to be preserved | Easy to do, structurally enforced |
 | Number of Rems created | 0 (inline) | 1 per cloze |
-| Back-reference to source | No | Yes (pin appended) |
+| Back-reference to source rem | -- | Yes (pin appended) |
 | Visual queue badge | No | Yes (violet ↑ badge) |
 
 The two approaches are **complementary**. Use native clozes for quick, spoiler-safe multi-cloze sentences. Use `Alt+Z` when you are reading incrementally and want each fact to stand on its own: ranked in the order you found it, arriving in the queue according to their priority rather than alongside its siblings, and free to be simplified over time — because the parent still holds the full context, nothing is lost when you cut the card down to its essentials.
