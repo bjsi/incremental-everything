@@ -20,6 +20,8 @@ import {
   videoExtractUrlSlotCode,
   videoExtractStartSlotCode,
   videoExtractEndSlotCode,
+  hasImagePowerupCode,
+  hasImagePowerupName,
 } from '../lib/consts';
 import { initIncrementalRem } from '../lib/incremental_rem';
 import { BAND_COUNT, bandPowerupCode, bandPowerupName } from '../lib/priority_bands';
@@ -226,6 +228,17 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
         },
       ],
     },
+  });
+
+  // HasImage Powerup - marks a rem holding at least one image, so RemNote's own
+  // document Filter can isolate them. No slots: the tag itself is the whole
+  // payload, and the CSS hook is its data-rem-tags slug (`hasimage`).
+  await plugin.app.registerPowerup({
+    name: hasImagePowerupName,
+    code: hasImagePowerupCode,
+    description:
+      'Marks a Rem that contains an image. Applied and removed by the "Tag Rems With Images" command; filter a document by this tag to see only its images.',
+    options: { slots: [] },
   });
 
   // Priority band powerups — one per band of ten. These exist purely as CSS

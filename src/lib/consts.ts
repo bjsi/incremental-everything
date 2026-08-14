@@ -23,6 +23,21 @@ export const dismissedDateSlotCode = 'dismissedDate';
 // to hide the tombstone in the editor and queue.
 export const preservedHistoryPowerupCode = 'preservedHistory';
 
+// Marks a rem that carries at least one image in its text or back text. Applied
+// and removed by the 'Tag Rems With Images' command, which exists because
+// RemNote's own search indexes text only: an image contributes no searchable
+// token, so there is no native way to isolate the images in a document. The tag
+// gives RemNote's document Filter something to match on.
+//
+// A powerup rather than a plain tag rem for two reasons: RemNote's Filter lists
+// powerups alongside ordinary tags, and an applied powerup pill carries a stable
+// `data-test` attribute, so the chip can be hidden without hiding the user's own
+// tags on the same rem (see registerHasImageCSS).
+export const hasImagePowerupCode = 'hasImage';
+// RemNote derives the data-rem-tags slug from the NAME, lowercased with spaces
+// stripped — so this name and the `hasimage` slug in the CSS must stay in step.
+export const hasImagePowerupName = 'HasImage';
+
 // settings
 export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';

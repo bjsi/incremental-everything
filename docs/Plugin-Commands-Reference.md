@@ -183,6 +183,16 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
   **Use Case:** During [Incremental Reading](IR-Flow--Reading-Extracting-and-Clozing.md), use this to signal that a snippet has already been read but wasn't important enough to make Incremental — it stays in place for archive or future consultation, and the de-emphasized styling tells you not to re-process it next time you're exposed to it.
 
+- **Tag Rems With Images** — `quick: twi`
+  Scans the **focused Rem** (or the **open document**, when nothing is focused) and every descendant for images, tagging each Rem that holds one with **`HasImage`** — so RemNote's native document filter can isolate them. Checks **front text and back text**, so an image on the back of a flashcard counts.
+  - **Confirmation first:** a dialog names the exact scope it is about to scan, and tells you to filter by `HasImage` (`Cmd/Ctrl+Shift+F`) afterwards.
+  - **Self-correcting:** Rems inside the scope that carry the tag but no longer hold an image lose it, so a re-run never leaves stale marks. Nothing outside the scope is touched.
+  - **Invisible tag:** the `HasImage` chip is hidden from the editor tag bar (your own tags on the same Rem stay visible).
+
+  **Use Case:** reviewing all the figures of a chapter, or finding the images you have not yet turned into occlusion cards — neither of which RemNote's search can do, because an image carries no indexed text.
+
+  📖 See [Utilities → Filter a Document by Images](Utilities.md#filter-a-document-by-images) for the full workflow.
+
 - **Bulletize Inline Selected Text** (`Shift+F8`) — `quick: bul`
   Toggles a `• ` prefix at the start of each line **within a single rem**, across a multi-line selection. Built for restoring bullets that a **PDF highlight flattened** into soft-wrapped text (lines joined by `Shift+Enter`) before turning the highlight into an IncRem.
   - **Toggle:** if every non-empty selected line already starts with `• `, all are stripped; otherwise the prefix is added only to the lines that lack it (no double bullets).

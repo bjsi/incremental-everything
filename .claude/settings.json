@@ -29,7 +29,11 @@
       "Bash(rg -n \"Dismiss Incremental Rem\" docs/*.md)",
       "Bash(rg -ln \"Repetition History\" docs/*.md)",
       "Bash(rg -n \"Recording and correcting records\" docs/*.md)",
-      "Bash(rg -n \"getNextSpacingDateForRem\" src/lib/*.ts src/lib/*/*.ts)"
+      "Bash(rg -n \"getNextSpacingDateForRem\" src/lib/*.ts src/lib/*/*.ts)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:plugins.remnote.com)",
+      "Bash(npx remnote-plugin *)"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

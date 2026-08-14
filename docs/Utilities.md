@@ -657,6 +657,43 @@ The floating variant is designed so the source sits **beside** your card while y
 
 ---
 
+# Filter a Document by Images
+
+RemNote's search indexes **text**. An image carries no searchable token, so neither `Ctrl+F`, nor the query language, nor a Search Portal can answer *"show me the figures in this chapter"* — the **Filters** section of RemNote's document search only lists **tags**, and an image is not one.
+
+**Tag Rems With Images** (`quick: twi`) closes that gap. It scans a scope for images and marks every Rem holding one with the **`HasImage`** tag — which the native document filter *can* isolate.
+
+## How to use it
+
+1. Put your cursor in the Rem you want to scan — or simply open the document — and run **Tag Rems With Images** from the Omnibar (`Cmd+/`).
+2. A confirmation appears **naming the exact scope** it is about to scan, so you can be sure of the target before anything is written. The scope is the **focused Rem** when your cursor is in one, and the **open document** otherwise.
+3. Confirm. A toast reports how many Rems were scanned, how many hold images, and how many tags were added or cleared.
+4. Press **`Cmd/Ctrl+Shift+F`** in the document (or `Cmd/Ctrl+F` and switch the search mode to **Filter**), then pick **HasImage**. The document collapses to just the Rems that carry an image.
+
+## What counts as an image
+
+Any image element in a Rem's **front text or back text** — pasted, dragged, added with `/image`, or extracted from a PDF. Image-occlusion Rems count too, since the occlusion is drawn on an ordinary image element. An image sitting only on the **back of a flashcard** is found, which a purely visual scan of the outline would miss.
+
+## Re-running it
+
+The command is **idempotent and self-correcting**. On every run it also *removes* the tag from Rems inside the scope that carry it but no longer hold an image — so deleting a figure and re-running leaves no stale mark behind. Rems **outside** the scanned scope are never touched, so tags applied in other documents survive.
+
+Only Rems whose state actually changes are written to, which is what makes a re-scan of a large document cheap.
+
+## The tag is invisible in the outline
+
+`HasImage` is bookkeeping for the filter, not something to read. Its chip is hidden from the editor tag bar — precisely, by targeting that pill alone, so **your own tags on the same Rem stay visible**. You will still see `HasImage` where it matters: in the document's Filter list.
+
+---
+
+# Reference pins are ringed
+
+Reference **pins** — the small link chips this plugin drops next to an extract to bridge it back to its PDF highlight or source Rem — are drawn with a **hairline ring** and at reduced opacity, going to full strength when you hover them or edit the Rem. It makes a pin readable as a distinct object rather than a stray glyph in the middle of a sentence.
+
+The treatment is deliberately **colourless**. Hue is already a language in this plugin: the [priority bands](Prioritization-&-Sorting.md) own the full red→green ramp, `#pdfextract` highlights are blue and still-`incremental` ones green. A coloured pin would either collide with a band or read as a fourth category in the same code, so pins are distinguished on the channels nothing else uses — a border, a corner radius and opacity. There is no background fill either, so a pin sitting inside a highlighted extract never paints over the highlight's own colour. The ring is drawn from RemNote's own border token, so it follows light and dark mode.
+
+---
+
 # Omnibar Selection Recovery
 
 Internally, the plugin runs a small editor-selection cache so that commands invoked via the `Cmd+/` Omnibar can still access the multi-rem selection you had before opening the palette. (Without this, RemNote blurs the editor when the Omnibar opens, and a plugin command's `getSelection()` call comes back empty — `Add Tag`-style internal commands sidestep this by capturing the selection synchronously when the palette opens, but plugins have no equivalent hook.)

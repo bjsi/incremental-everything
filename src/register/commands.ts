@@ -47,6 +47,7 @@ import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
+import { scanAndTagImages } from '../lib/image_scan';
 import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -1718,6 +1719,67 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         return;
       }
       await plugin.widget.openPopup('pdf_bookmark_popup', { mode: 'rem', incRemId });
+    },
+  });
+
+  // Tag every rem holding an image inside the focused rem / open document, so
+  // RemNote's document Filter can isolate them — search alone cannot, because an
+  // image carries no indexed text.
+  plugin.app.registerCommand({
+    id: 'tag-rems-with-images',
+    name: 'Tag Rems With Images',
+    description:
+      'Marks every Rem containing an image inside the focused Rem (or the open document) with the HasImage tag, and clears the tag from Rems that no longer hold one.',
+    quickCode: 'twi',
+    action: async () => {
+      // Scope: the focused rem when the cursor is in one, otherwise whatever
+      // document the focused pane has open — so the command works from the
+      // document title, where there is no focused rem.
+      let scope = await plugin.focus.getFocusedRem();
+      if (!scope) {
+        const paneId = await plugin.window.getFocusedPaneId();
+        const openRemId = await plugin.window.getOpenPaneRemId(paneId);
+        scope = openRemId ? (await plugin.rem.findOne(openRemId)) || undefined : undefined;
+      }
+      if (!scope) {
+        await plugin.app.toast('No focused Rem or open document to scan.');
+        return;
+      }
+
+      // Name the exact target in the confirmation: the focused-rem fallback means
+      // the scope is not always the document the user has in mind.
+      const rawName = await safeRemTextToString(plugin, scope.text);
+      const scopeName = rawName.length > 80 ? rawName.slice(0, 80) + '…' : rawName || 'Untitled';
+
+      const ok = confirm(
+        `🖼️ Tag Rems With Images\n\n` +
+          `Scope: "${scopeName}"\n\n` +
+          `This Rem and all of its descendants will be scanned for images ` +
+          `(front and back text).\n\n` +
+          `• Every Rem holding an image gets the #HasImage tag\n` +
+          `• Rems inside this scope that carry the tag but no longer hold an ` +
+          `image lose it\n` +
+          `• Nothing outside this scope is touched\n\n` +
+          `Afterwards, press Cmd/Ctrl+Shift+F in the document (or Cmd/Ctrl+F and ` +
+          `switch the search mode to "Filter"), then pick HasImage — the document ` +
+          `collapses to just the Rems with images.\n\n` +
+          `Proceed?`
+      );
+      if (!ok) return;
+
+      await plugin.app.toast('🔍 Scanning for images…');
+      try {
+        const result = await scanAndTagImages(plugin, scope);
+        const failedNote = result.failed > 0 ? `, ${result.failed} failed` : '';
+        await plugin.app.toast(
+          `🖼️ ${result.withImages} Rem(s) with images in ${result.scanned} scanned ` +
+            `— +${result.tagged} tagged, −${result.untagged} cleared${failedNote}. ` +
+            `Filter the document by HasImage to see them.`
+        );
+      } catch (e) {
+        console.error('[ImageScan] scan failed:', e);
+        await plugin.app.toast(`Image scan failed: ${(e as any)?.message ?? e}`);
+      }
     },
   });
 

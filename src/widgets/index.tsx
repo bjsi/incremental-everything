@@ -28,7 +28,7 @@ import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
-import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS } from '../lib/ui_helpers';
+import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS, registerHasImageCSS, registerPinReferenceCSS } from '../lib/ui_helpers';
 import { getIESetting } from '../lib/settings';
 import { migrateIESettingsIfNeeded, isIESettingsSeedNeeded } from '../lib/settings_migration';
 
@@ -125,6 +125,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerClozeExtractCSS(plugin);
   await registerTagBadgeCSS(plugin);
   await registerIgnoreTagCSS(plugin);
+  await registerHasImageCSS(plugin);
+  await registerPinReferenceCSS(plugin);
 
   await registerCommands(plugin);
 

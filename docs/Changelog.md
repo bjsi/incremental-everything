@@ -2,6 +2,37 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.43 - August 14th, 2026
+
+### ✨ New - filter a document down to just the Rems that hold an image
+
+RemNote's search indexes text, so an image is invisible to it: there is no way to ask a document *"show me the figures in this chapter"*. The new **Tag Rems With Images** command (`quick: twi`) makes the question answerable by turning it into one the native filter can already handle — it scans a scope for images and tags each Rem holding one with **`HasImage`**. Press `Cmd/Ctrl+Shift+F` afterwards, pick `HasImage`, and the document collapses to its figures.
+
+- **You are told what will be scanned.** The confirmation names the exact scope Rem — the **focused Rem**, or the **open document** when nothing is focused — and reminds you of the filter shortcut to use afterwards.
+- **Front *and* back text.** An image sitting only on the back of a flashcard is found, which scrolling the outline would miss. Image-occlusion Rems count too.
+- **Self-correcting.** Every run also *clears* the tag from Rems in the scope that carry it but no longer hold an image, so deleting a figure and re-running leaves nothing stale. Rems outside the scope are never touched.
+- **The tag stays out of your way.** Its chip is hidden from the editor tag bar — targeted at that pill alone, so your own tags on the same Rem remain visible.
+
+#### Technical explanation
+
+An image is a rich-text element with `i: 'i'`, so detection is a scan of `text` and `backText` in `lib/image_scan.ts` — no bridge call per Rem. Membership of the tag is read **once**, via the powerup's `taggedRem()`, and turned into a set: the obvious alternative, `hasPowerup` per Rem, is a round trip for every Rem in the document and is exactly the pattern that saturates the plugin bridge on large subtrees. Only Rems whose state actually changes are written to, which is what makes a re-scan cheap.
+
+`HasImage` is a slotless powerup rather than a plain tag Rem for two reasons: RemNote's Filter lists powerups alongside ordinary tags, and an applied-powerup pill carries a stable `data-test` attribute — which is what lets the chip be hidden without the broad `[data-rem-tags~="…"] .hierarchy-editor__tag-bar__tag` rule that would have wiped the user's real tags off every Rem holding an image.
+
+📖 [Filter a Document by Images](Utilities.md#filter-a-document-by-images)
+
+### ✨ Improved - reference pins now read as objects, not stray glyphs
+
+Reference **pins** — the link chips that bridge an extract back to its PDF highlight or source Rem — are drawn with a **hairline ring** at reduced opacity, resolving to full strength when you hover one or edit the Rem.
+
+The treatment is **colourless on purpose**. Hue is already a language here: the priority bands own the full red→green ramp, `#pdfextract` highlights are blue and still-`incremental` ones green. A coloured pin would either collide with a band or read as a fourth category in the same code, so pins are distinguished on the channels nothing else uses — border, radius and opacity. There is no background fill either, so a pin sitting inside a highlighted extract never paints over the highlight's own colour.
+
+#### Technical explanation
+
+RemNote renders a pinned reference as a container carrying `data-rem-reference-pin="true"` (set from the rich-text element's `pin` flag), which is the only thing separating a pin from an ordinary reference in CSS — an ordinary reference container is otherwise identical. The border uses RemNote's `--rn-clr-border-opaque` token, so it follows light and dark mode without a `.dark` branch, with an `rgba` fallback in case the token is renamed.
+
+📖 [Reference pins are ringed](Utilities.md#reference-pins-are-ringed)
+
 ## v1.0.42 - August 13th, 2026
 
 ### ✨ New - the card info bar now shows the next stability, and tells the truth about intervals if you don't review at 90% retention

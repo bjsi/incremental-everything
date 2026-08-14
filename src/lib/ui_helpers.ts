@@ -14,6 +14,7 @@ import {
   pdfHighlightBordersEnabledKey,
   pdfHighlightBordersReloadKey,
   showPriorityBandsInTablesId,
+  hasImagePowerupName,
 } from './consts';
 import { getIESetting } from './settings';
 
@@ -296,6 +297,79 @@ export async function registerIgnoreTagCSS(plugin: ReactRNPlugin) {
     }
   `;
   await plugin.app.registerCSS('ignore-tag-styling', css);
+}
+
+/**
+ * Hides the HasImage tag chip.
+ *
+ * The tag exists so RemNote's document Filter has something to match on; seeing
+ * it in the outline is pure noise, and it would appear on a great many rems.
+ *
+ * Matched by the pill's own `data-test` (RemNote stamps every applied-powerup
+ * pill with `Applied Powerup Pill <Name>`), not by "any chip on a hasimage rem".
+ * The broad form — the shape HIDE_DISMISSED_TAG_CSS uses — would also wipe the
+ * user's real tags off every rem holding an image.
+ */
+export async function registerHasImageCSS(plugin: ReactRNPlugin) {
+  const slug = hasImagePowerupName.toLowerCase();
+  const css = `
+    [data-test="Applied Powerup Pill ${hasImagePowerupName}"].hierarchy-editor__tag-bar__tag {
+      display: none;
+    }
+
+    /* RemNote renders a second, duplicate pill inside the Tag Bar when a rem has
+       a single tag, and that one carries no attribute naming its powerup. Match
+       it via the rem's own slug plus .rem-powerup-icon (the ⚡, present on powerup
+       pills and never on a plain user tag) — same approach as registerTagBadgeCSS. */
+    [data-rem-tags~="${slug}" i] [data-test="Tag Bar"] .hierarchy-editor__tag-bar__tag:has(.rem-powerup-icon) {
+      display: none;
+    }
+  `;
+  await plugin.app.registerCSS('has-image-tag-hide', css);
+}
+
+/**
+ * Marks reference pins in the editor with a hairline ring.
+ *
+ * RemNote renders a pinned rem reference as an icon-only container carrying
+ * `data-rem-reference-pin="true"` (set from the rich-text element's `pin` flag),
+ * which is what makes a pin separable from an ordinary reference in CSS.
+ *
+ * **Achromatic on purpose.** Every other marker this plugin draws speaks through
+ * hue: the priority bands own the full red→green ramp, `#pdfextract` is blue and
+ * `#incremental` is green. Giving pins any colour would either collide with a
+ * band or read as a fourth category in the same code. So they are distinguished
+ * on the channels nothing else uses — a hairline border, small radius, and
+ * reduced opacity that resolves on hover.
+ *
+ * No background fill: a pin can sit inside a highlighted extract, and a fill
+ * would paint over the highlight's own colour. The border is drawn from
+ * RemNote's `--rn-clr-border-*` tokens, so it follows light and dark mode
+ * without a `.dark` branch.
+ */
+export async function registerPinReferenceCSS(plugin: ReactRNPlugin) {
+  const css = `
+    [data-rem-reference-pin="true"] {
+      /* border-opaque is RemNote's own hairline token — the one its dividers and
+         input outlines use — so the ring matches the surrounding chrome in both
+         themes. The rgba fallback covers a token rename. */
+      border: 1px solid var(--rn-clr-border-opaque, rgba(128, 128, 128, 0.3));
+      border-radius: 4px;
+      padding: 0 1px;
+      margin: 0 1px;
+      opacity: 0.6;
+      transition: opacity 120ms ease;
+    }
+
+    /* Full strength on hover, and while the rem is being edited — the pin is a
+       navigation target there, not decoration. Strengthening opacity rather than
+       swapping the border colour keeps the rule on one token. */
+    [data-rem-reference-pin="true"]:hover,
+    .rem-text:focus-within [data-rem-reference-pin="true"] {
+      opacity: 1;
+    }
+  `;
+  await plugin.app.registerCSS('pin-reference-styling', css);
 }
 
 export async function registerTagBadgeCSS(plugin: ReactRNPlugin) {
