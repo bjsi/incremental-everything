@@ -6,38 +6,38 @@ This page documents the major changes and improvements for each version of the I
 
 ### ✨ New - filter a document down to just the Rems that hold an image
 
-RemNote's search indexes text, so an image is invisible to it: there is no way to ask a document *"show me the figures in this chapter"*. The new **Tag Rems With Images** command (`quick: img`) makes the question answerable by turning it into one the native filter can already handle — it scans for images and tags each Rem holding one with **`HasImage`**. Press `Cmd/Ctrl+Shift+F` afterwards, pick `HasImage`, and the document collapses to its figures. A **Search Portal** on the same tag collects them across documents.
+RemNote's search indexes text, so images are invisible to it. The new **Tag Rems With Images** command (`quick: img`) tags every Rem holding an image with **`HasImage`** — then `Cmd/Ctrl+Shift+F` → `HasImage` collapses the document to its figures, and a **Search Portal** on the same tag collects them across documents.
 
-- **You choose the scope, and you can see it.** The popup's first button *names the Rem it would scan* — the **focused Rem**, or the **open document** when nothing is focused — so you can verify the target before anything is written. The second scans the **whole knowledge base**, which is what makes a knowledge-base-wide figure portal possible.
-- **The result stays on screen.** Live progress while it runs, then a report — scanned, holding images, newly tagged, cleared — with both ways to use the tag spelled out underneath, and a **?** to the documentation. **Scan again** returns to the scope choice.
-- **Keyboard-driven.** `↑`/`↓` move between the two scopes, `Enter` runs the selected one (and closes the popup from the report), `Esc` cancels — ignored while a scan is running, so a reflex press can't abort a run that may be minutes in.
-- **Front *and* back text.** An image sitting only on the back of a flashcard is found, which scrolling the outline would miss. Image-occlusion Rems count too.
-- **Self-correcting.** Every run also *clears* the tag from Rems in the scope that carry it but no longer hold an image, so deleting a figure and re-running leaves nothing stale. A scoped run never touches Rems outside its subtree.
-- **The tag stays out of your way.** Its chip is hidden from the editor tag bar — targeted at that pill alone, so your own tags on the same Rem remain visible.
+![The Tag Rems With Images popup: the first button names the Rem it would scan, the second offers the whole knowledge base](assets/tag-rems-with-images-popup.png){ width="700" }
+
+- **Two scopes:** the focused Rem (or open document), named on the button, or the whole knowledge base.
+- **Front *and* back text**, so an image on the back of a flashcard counts.
+- **Self-correcting:** a re-run clears the tag from Rems whose image is gone.
+- **Keyboard-driven:** `↑`/`↓` choose, `Enter` runs, `Esc` cancels. The `HasImage` chip is hidden from the editor tag bar.
+
+![Filtering a document by the HasImage tag from Ctrl+F](assets/filtering-doc-hasimage-tag.png){ width="700" }
 
 #### Technical explanation
 
-An image is a rich-text element with `i: 'i'`, so detection is a scan of `text` and `backText` in `lib/image_scan.ts` — no bridge call per Rem. Membership of the tag is read **once**, via the powerup's `taggedRem()`, and turned into a set: the obvious alternative, `hasPowerup` per Rem, is a round trip for every Rem in the document and is exactly the pattern that saturates the plugin bridge on large subtrees. Only Rems whose state actually changes are written to, which is what makes a re-scan cheap. The walk yields to the event loop every 200 Rems, or the popup's progress line would never repaint and a whole-KB run would look like a hang.
+An image is a rich-text element with `i: 'i'`, so detection is a plain scan of `text` and `backText`. Tag membership is read **once** via the powerup's `taggedRem()` rather than a `hasPowerup` per Rem — that shape is a bridge round trip for every Rem in the document — and only Rems whose state changes are written to. The walk yields every 200 Rems so the progress line repaints.
 
-Keys are read on the popup's container rather than on the buttons: with focus on a button, `Enter` would fire the browser's native activation *and* bubble to the handler, running the scan twice. Focus is returned to the container on every phase change, and the **?** button refuses focus outright for the same reason. The cost is drawing the selection ring by hand.
-
-The dialog is a widget rather than a native `confirm()` because `confirm()` can express only two outcomes and this one has three, and because the first draft's toast pair raced — the result toast was replaced by "scanning…" before it could be read. The scope is resolved in the *command*, not the widget: by the time the popup mounts the editor has lost focus, so `getFocusedRem()` there comes back empty. The whole-KB branch calls `plugin.rem.getAll()`, which RemNote has removed from the plugin API before, so its failure is translated into a sentence the popup can show rather than surfacing as an opaque bridge error.
-
-`HasImage` is a slotless powerup rather than a plain tag Rem for two reasons: RemNote's Filter lists powerups alongside ordinary tags, and an applied-powerup pill carries a stable `data-test` attribute — which is what lets the chip be hidden without the broad `[data-rem-tags~="…"] .hierarchy-editor__tag-bar__tag` rule that would have wiped the user's real tags off every Rem holding an image.
+`HasImage` is a slotless powerup, not a plain tag Rem: RemNote's Filter lists powerups alongside tags, and an applied-powerup pill carries a stable `data-test`, which is what lets its chip be hidden without also hiding the user's own tags on the same Rem.
 
 📖 [Filter a Document by Images](Utilities.md#filter-a-document-by-images)
 
-### ✨ Improved - reference pins now read as objects, not stray glyphs
+### ✨ New - a pin that leads to an image is ringed
 
-Reference **pins** — the link chips that bridge an extract back to its PDF highlight or source Rem — are drawn with a **hairline ring** at reduced opacity, resolving to full strength when you hover one or edit the Rem.
+A **pin whose target holds an image** gets a blue ring after the scan mentioned above, so you can tell which links lead to a figure without following them. It follows the tag, so it needs the scan to have run — and clears itself when a re-scan finds the image gone.
 
-The treatment is **colourless on purpose**. Hue is already a language here: the priority bands own the full red→green ramp, `#pdfextract` highlights are blue and still-`incremental` ones green. A coloured pin would either collide with a band or read as a fourth category in the same code, so pins are distinguished on the channels nothing else uses — border, radius and opacity. There is no background fill either, so a pin sitting inside a highlighted extract never paints over the highlight's own colour.
+![A pin to a Rem holding an image, ringed in blue, next to a pin carrying the orange priority-band marker](assets/pin-with-image-ringed.png){ width="800" }
 
 #### Technical explanation
 
-RemNote renders a pinned reference as a container carrying `data-rem-reference-pin="true"` (set from the rich-text element's `pin` flag), which is the only thing separating a pin from an ordinary reference in CSS — an ordinary reference container is otherwise identical. The border uses RemNote's `--rn-clr-border-opaque` token, so it follows light and dark mode without a `.dark` branch, with an `rgba` fallback in case the token is renamed.
+`data-rem-tags` on a reference container describes the **referenced** Rem, not the host — so `[data-rem-reference-pin="true"][data-rem-tags~="hasimage"]` reads as "this pin points at a Rem holding an image". The pin attribute alone would ring every pin in the knowledge base and therefore say nothing.
 
-📖 [Reference pins are ringed](Utilities.md#reference-pins-are-ringed)
+Colours come from RemNote's `--rn-clr-border-accent` / `--rn-clr-border-selected` tokens, so the ring follows light and dark mode without a `.dark` branch.
+
+📖 [Pins that lead to an image are ringed](Utilities.md#pins-that-lead-to-an-image-are-ringed)
 
 ## v1.0.42 - August 13th, 2026
 

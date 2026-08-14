@@ -671,12 +671,16 @@ RemNote's search indexes **text**. An image carries no searchable token, so neit
     - **Scan the whole knowledge base** — every Rem, every document. Slow on a large knowledge base, so reach for it when you want the tag applied everywhere once, and use the scoped run for day-to-day work.
 
     The popup is **fully keyboard-driven**: `↑`/`↓` move between the two scopes, `Enter` runs the selected one, `Esc` cancels. (`Esc` is ignored *while a scan is running*, so a reflex press can't abort a long run.)
+
+    ![The Image Scan popup: the first button names the Rem it would scan, the second offers the whole knowledge base, and the footer lists the keys](assets/tag-rems-with-images-popup.png){ width="700" }
 3. Progress is reported live while it runs. **Keep the popup open until it finishes** — the scan runs inside it, so closing it stops the walk. Nothing is corrupted if you do: whatever was already tagged stays correct, and running the command again picks the work up.
 4. When it finishes, the **same popup reports the work done** — Rems scanned, how many hold an image, how many were newly tagged, how many had the tag cleared — and repeats the two ways to use it. **Scan again** goes back to the scope choice; **?** in the header opens this page.
 
 ## Seeing the result
 
-**Filter one document.** Open it, press **`Cmd/Ctrl+Shift+F`** (or `Cmd/Ctrl+F` and switch the search mode to **Filter**), then pick **HasImage**. The document collapses to just the Rems that carry an image.
+**Filter one document.** Open it, press **`Cmd/Ctrl+Shift+F`** (or `Cmd/Ctrl+F` and switch the search mode to **Filter**), then pick **HasImage**. The document collapses to just the Rems that carry an image. The count next to each filter tells you how many Rems it would leave — `3 · ⚡ HasImage` below.
+
+![The Ctrl+F Filter list showing HasImage alongside the plugin's other powerup tags](assets/filtering-doc-hasimage-tag.png){ width="700" }
 
 **Collect them anywhere.** A **Search Portal** on the `HasImage` tag gathers every tagged Rem into one place — useful for building a figure index across documents, and combinable with another tag or a document in the query to narrow it down. This is the whole-KB scan's payoff: with the tag applied everywhere, one portal is a live index of every image in the knowledge base.
 
@@ -696,11 +700,19 @@ Only Rems whose state actually changes are written to, which is what makes a re-
 
 ---
 
-# Reference pins are ringed
+# Pins that lead to an image are ringed
 
-Reference **pins** — the small link chips this plugin drops next to an extract to bridge it back to its PDF highlight or source Rem — are drawn with a **hairline ring** and at reduced opacity, going to full strength when you hover them or edit the Rem. It makes a pin readable as a distinct object rather than a stray glyph in the middle of a sentence.
+A **pin** whose target Rem carries the `HasImage` tag is drawn with a **hairline ring**, firming up when you hover it or edit the Rem. Everywhere a pin appears — inside an extract, in a flashcard, in a soft-wrapped list — you can tell at a glance which link leads to a **figure** and which leads to plain text, without following either.
 
-The treatment is deliberately **colourless**. Hue is already a language in this plugin: the [priority bands](Prioritization-&-Sorting.md) own the full red→green ramp, `#pdfextract` highlights are blue and still-`incremental` ones green. A coloured pin would either collide with a band or read as a fourth category in the same code, so pins are distinguished on the channels nothing else uses — a border, a corner radius and opacity. There is no background fill either, so a pin sitting inside a highlighted extract never paints over the highlight's own colour. The ring is drawn from RemNote's own border token, so it follows light and dark mode.
+This is the second thing the [image scan](#filter-a-document-by-images) buys you, and it needs the scan to have run: the ring keys on the tag, so it appears on a pin only once its target has been tagged, and disappears when a re-scan clears the tag from a Rem whose image is gone.
+
+![Two pins side by side: the left carries the orange priority-band highlight marker, the right is ringed in blue because its target holds a figure](assets/pin-with-image-ringed.png){ width="800" }
+
+The pin next to it in that screenshot shows the two markers are independent: the **orange dotted box** is the [priority band](Prioritization-&-Sorting.md) of the linked highlight, the **blue ring** is "leads to an image". A pin can carry both.
+
+The ring is drawn in RemNote's **accent** colour — the same one the app uses for links and selection, which reads correctly on something that *is* a navigation target. It was neutral grey at first, on the theory that hue is already spoken for in this plugin ([priority bands](Prioritization-&-Sorting.md) own the red→green ramp, `#pdfextract` is blue, `#incremental` green); in practice a grey hairline around an 18px icon in running text was invisible until hovered, which is no marker at all. The accent can't be confused with any of those, because this ring is an **outline on an icon** — never a background fill, never a left border — and it appears on nothing but pins. There is no fill either, so a pin sitting inside a highlighted extract never paints over the highlight's own colour, and both colours come from RemNote's own border tokens, so the ring follows light and dark mode.
+
+> **Only image pins.** Pins to ordinary Rems are left alone. Ringing *every* pin was tried and says nothing — a marker that appears on all of them carries no information.
 
 ---
 

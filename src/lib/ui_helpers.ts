@@ -329,44 +329,57 @@ export async function registerHasImageCSS(plugin: ReactRNPlugin) {
 }
 
 /**
- * Marks reference pins in the editor with a hairline ring.
+ * Rings the reference pins that lead to a Rem holding an image.
  *
- * RemNote renders a pinned rem reference as an icon-only container carrying
- * `data-rem-reference-pin="true"` (set from the rich-text element's `pin` flag),
- * which is what makes a pin separable from an ordinary reference in CSS.
+ * Two attributes on RemNote's reference container make this possible, and both
+ * are needed:
+ *   - `data-rem-reference-pin="true"` — set from the rich-text element's `pin`
+ *     flag, and the only thing separating a pin from an ordinary reference.
+ *   - `data-rem-tags` — which on a reference container describes the **referenced**
+ *     Rem, not the host. So `~="hasimage"` reads as *"this pin points at a Rem
+ *     that holds an image"*.
  *
- * **Achromatic on purpose.** Every other marker this plugin draws speaks through
- * hue: the priority bands own the full red→green ramp, `#pdfextract` is blue and
- * `#incremental` is green. Giving pins any colour would either collide with a
- * band or read as a fourth category in the same code. So they are distinguished
- * on the channels nothing else uses — a hairline border, small radius, and
- * reduced opacity that resolves on hover.
+ * Scoping matters here: keying on the pin attribute alone rings every pin in the
+ * knowledge base, which says nothing. Paired with the tag it becomes a real
+ * signal while reading — this link leads to a figure — and it appears only after
+ * the Tag Rems With Images command has run (see registerHasImageCSS).
+ *
+ * **Accent-coloured, not achromatic.** The first draft used the neutral hairline
+ * token on the theory that hue is spoken for — bands own the red→green ramp,
+ * `#pdfextract` is blue, `#incremental` is green. In practice a grey 1px outline
+ * around an 18px icon in running text was invisible until hovered, which is no
+ * marker at all. The accent is safe here because this ring cannot be confused
+ * with any of those: it is an outline on an icon, never a background fill or a
+ * left border, and it appears on nothing but pins. Borrowing RemNote's own
+ * interactive accent also reads correctly — the same colour the app uses for
+ * links and selection, on something that *is* a navigation target.
+ *
+ * Opacity is deliberately NOT reduced. The ring marks a pin as more interesting
+ * than its neighbours; dimming it below the un-ringed pins around it would say
+ * the opposite.
  *
  * No background fill: a pin can sit inside a highlighted extract, and a fill
- * would paint over the highlight's own colour. The border is drawn from
- * RemNote's `--rn-clr-border-*` tokens, so it follows light and dark mode
- * without a `.dark` branch.
+ * would paint over the highlight's own colour. Both colours come from RemNote's
+ * `--rn-clr-border-*` tokens, so the ring follows light and dark mode without a
+ * `.dark` branch.
  */
 export async function registerPinReferenceCSS(plugin: ReactRNPlugin) {
+  const slug = hasImagePowerupName.toLowerCase();
   const css = `
-    [data-rem-reference-pin="true"] {
-      /* border-opaque is RemNote's own hairline token — the one its dividers and
-         input outlines use — so the ring matches the surrounding chrome in both
-         themes. The rgba fallback covers a token rename. */
-      border: 1px solid var(--rn-clr-border-opaque, rgba(128, 128, 128, 0.3));
+    [data-rem-reference-pin="true"][data-rem-tags~="${slug}" i] {
+      border: 1px solid var(--rn-clr-border-accent, #3B82F6);
       border-radius: 4px;
       padding: 0 1px;
       margin: 0 1px;
-      opacity: 0.6;
-      transition: opacity 120ms ease;
+      transition: border-color 120ms ease;
     }
 
-    /* Full strength on hover, and while the rem is being edited — the pin is a
-       navigation target there, not decoration. Strengthening opacity rather than
-       swapping the border colour keeps the rule on one token. */
-    [data-rem-reference-pin="true"]:hover,
-    .rem-text:focus-within [data-rem-reference-pin="true"] {
-      opacity: 1;
+    /* Hover and edit-mode: step up to the selected-border token. RemNote already
+       paints its own light-accent background on a hovered reference, so the ring
+       only has to stay legible on top of it rather than supply the whole cue. */
+    [data-rem-reference-pin="true"][data-rem-tags~="${slug}" i]:hover,
+    .rem-text:focus-within [data-rem-reference-pin="true"][data-rem-tags~="${slug}" i] {
+      border-color: var(--rn-clr-border-selected, #1d4ed8);
     }
   `;
   await plugin.app.registerCSS('pin-reference-styling', css);
