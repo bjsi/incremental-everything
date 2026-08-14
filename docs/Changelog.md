@@ -4,6 +4,18 @@ This page documents the major changes and improvements for each version of the I
 
 ## v1.0.45 - August 14th, 2026
 
+### ✨ New - an Incremental Plugin panel in the sidebar
+
+The plugin now has one fixed place to reach it from: an **Incremental Plugin** 🌐 panel at the bottom of the left sidebar. **⚙️** opens the settings, **?** opens the documentation, and two buttons open **Sorting Criteria** and the **Priority Review Document** creator — the latter already scoped to the document you have open, with that scope named under the button.
+
+Under the shortcuts it shows one tip at a time. **I Got It** retires a tip for good, **✕** puts it back in the pile for later, and **Learn More** opens the page that explains the feature. When every tip has been answered the tip area goes away and the shortcuts stay.
+
+#### Technical explanation
+
+`widgets/plugin_hub.tsx` in `SidebarEnd`, ungated — it is the entry point, so it cannot be behind a setting the user has not found yet. The tip pile lives in `lib/onboarding_tips.ts`: acknowledgements are stored KB-partitioned in synced storage (a tip retired in one knowledge base is not pre-retired in the next), while the ✕ snooze is *local*, since "not right now" is about the session in front of you rather than a device you have not opened. The tip is drawn once per mount rather than on a tracker, so a synced-storage change cannot reshuffle it under the cursor. The Priority Review button resolves scope exactly as the document-menu item does — focused Rem, then the focused pane's open document, then the first open pane — and a missing scope is not an error, since the creator still offers the whole knowledge base.
+
+📖 [The Incremental Plugin Panel](Getting-Started.md#the-incremental-plugin-panel)
+
 ### ✨ New - all the settings are in one window now
 
 The last five settings that stayed in RemNote's own plugin panel — **Enable Flashcard Prioritisation**, **Performance Mode**, the two **Always Use Light Mode** switches and **Enable Hide-in-Queue Powerups and Commands** — have moved into the plugin's settings popup with everything else, and are editable there. The plugin's section of **Settings → Plugins → Incremental Everything** is now empty.

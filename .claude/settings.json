@@ -37,7 +37,8 @@
       "Bash(python3 -c \"import material,os;print\\(os.path.dirname\\(material.__file__\\)\\)\")",
       "Bash(pip3 show *)",
       "Bash(cat \"/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/material/templates/partials/toc.html\")",
-      "Read(//Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/material/templates/partials/**)"
+      "Read(//Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/material/templates/partials/**)",
+      "Bash(grep -n \"^#\\\\{1,3\\\\} \" docs/Plugin-Widgets-Reference.md)"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

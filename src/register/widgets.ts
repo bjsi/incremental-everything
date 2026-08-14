@@ -1,9 +1,20 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+
+  // The "Incremental Plugin" hub: shortcuts to settings, docs, sorting criteria
+  // and the Priority Review Document creator, plus one onboarding tip at a time.
+  // Ungated on purpose — it is the entry point to everything else, so it has to
+  // be visible before the user knows there is a settings popup to find.
+  plugin.app.registerWidget(pluginHubWidgetId, WidgetLocation.SidebarEnd, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
 
   // IE Settings popup — the plugin's own settings UI (grouped and layered,
   // unlike RemNote's flat plugin-settings list).

@@ -505,6 +505,17 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 
 📖 **Full documentation:** [Filter a Document by Images](Utilities.md#filter-a-document-by-images)
 
+### 6.10. Incremental Plugin Panel
+*(Left Sidebar)*
+
+The plugin's hub, always present at the bottom of the left sidebar. Header controls: **⚙️** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation. Two shortcut buttons: **Sorting Criteria**, and **Priority Review** — which creates a [Priority Review Document](Priority-Review-Document.md) scoped to the document you currently have open, naming that scope under the button.
+
+Below the shortcuts it shows one onboarding tip at a time, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile; the panel goes quiet for two hours) and **Learn More** (opens the tip's documentation section).
+
+📖 **Full documentation:** [The Incremental Plugin Panel](Getting-Started.md#the-incremental-plugin-panel)
+
+---
+
 ## 7. Mastery Drill
 
 ### 7.1. Mastery Drill Popup

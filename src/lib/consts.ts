@@ -118,6 +118,17 @@ export const ieSettingsMigratedKey = 'ie_settings_migrated';
 /** Durable per-setting record of the last migration run. */
 export const ieSettingsMigrationReportKey = 'ie_settings_migration_report';
 
+// --- Onboarding hub (see lib/onboarding_tips.ts, widgets/plugin_hub.tsx) ---
+/** Sidebar widget id for the "Incremental Plugin" hub panel. */
+export const pluginHubWidgetId = 'plugin_hub';
+/**
+ * Synced, KB-partitioned record of the tips the user has answered "I Got It"
+ * to: `{ [kbId]: { acknowledged: string[] } }`.
+ */
+export const onboardingTipsStateKey = 'onboarding-tips-state';
+/** Local timestamp until which the tip panel stays quiet after a ✕ dismissal. */
+export const onboardingTipsSnoozeKey = 'onboarding-tips-snooze-until';
+
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
 /**
