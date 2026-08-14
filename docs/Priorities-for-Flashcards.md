@@ -8,7 +8,7 @@ This page explains how the plugin allows you to layer a priority system on top o
 
 ## Switching it on { #the-opt-in }
 
-Flashcard prioritisation is **off by default**. Turn it on at **Settings → Plugins → Incremental Everything → Enable Flashcard Prioritisation**, then reload RemNote.
+Flashcard prioritisation is **off by default**. Turn it on in the plugin's settings popup — run **`Incremental Everything: Settings`** (quick code `ies`) → **Flashcard Prioritisation** → *Enable Flashcard Prioritisation* — then reload RemNote. (Before v1.0.45 this switch lived in RemNote's own plugin settings panel.)
 
 It is opt-in because it is the one part of the plugin that works across your **entire** knowledge base rather than on the Rems you are handling. While it is on, the plugin tags flashcard-bearing Rems with the `cardPriority` powerup and keeps those tags in step as you edit — on a large library that means a long initial pass and continuous background work, and RemNote can feel slow until it settles.
 

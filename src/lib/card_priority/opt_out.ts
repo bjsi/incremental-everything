@@ -4,12 +4,13 @@
 // not undo what the machinery already wrote: every rem it tagged keeps its
 // CardPriority powerup and its three slots, visible in the editor, forever.
 //
-// Nothing in the SDK reports a setting change, and the gate is a native-tier
-// setting (RemNote's own panel), so there is no onChange to subscribe to. What
-// there is, is a value we can compare against the last one we saw. This module
-// records that value per knowledge base and, the first time it comes back as
-// `false` after having been `true`, offers to run the reversible cleanup —
-// inherited/default tags only, so nothing the user chose is lost.
+// Nothing in the SDK reports a setting change, and the gate itself is only ever
+// read, never subscribed to. What there is, is a value we can compare against
+// the last one we saw. This module records that value per knowledge base and,
+// the first time it comes back as `false` after having been `true`, offers to
+// run the reversible cleanup — inherited/default tags only, so nothing the user
+// chose is lost. The comparison happens on activation, which is also when the
+// setting's own "takes effect after reloading RemNote" note lands.
 //
 // Design constraints:
 //  - Offered at most ONCE per switch-off. The last-seen value is written before

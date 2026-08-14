@@ -13,6 +13,7 @@ import {
   IE_SETTINGS_SCHEMA,
   IE_DOCS_BASE_URL,
   IESettingId,
+  MORE_SETTINGS_POINTER,
   SettingSpec,
   getIESetting,
 } from '../lib/settings';
@@ -89,23 +90,25 @@ const COLLAPSE_TOP_BAR_CSS = `
  * Renders a schema entry's prose for RemNote's settings panel, which takes a
  * single plain-text string: warning first, then the description, then the docs
  * link and the reload note.
+ *
+ * @param isLast Append MORE_SETTINGS_POINTER. Passed for whichever setting is
+ *   registered last, so the pointer reads as the closing line of the plugin's
+ *   section — RemNote gives us no heading or footer of our own.
  */
-function panelDescription(spec: SettingSpec): string {
+function panelDescription(spec: SettingSpec, isLast: boolean): string {
   const parts: string[] = [];
   if (spec.warning) parts.push(`⚠️ ${spec.warning}`);
   parts.push(spec.description);
   if (spec.helpPath) parts.push(`Documentation: ${IE_DOCS_BASE_URL}${spec.helpPath}`);
   if (spec.reloadRequired) parts.push('Takes effect after reloading RemNote.');
-  // Last, deliberately: on the final setting of the panel this is the pointer to
-  // the settings popup, and it should read as the closing line of the section.
-  if (spec.panelFooter) parts.push(spec.panelFooter);
+  if (isLast) parts.push(MORE_SETTINGS_POINTER);
   return parts.join('\n\n');
 }
 
 /** Registers one schema entry with RemNote, picking the register* call by kind. */
-async function registerFromSchema(plugin: ReactRNPlugin, id: IESettingId) {
+async function registerFromSchema(plugin: ReactRNPlugin, id: IESettingId, isLast: boolean) {
   const spec = IE_SETTINGS_SCHEMA[id];
-  const common = { id, title: spec.title, description: panelDescription(spec) };
+  const common = { id, title: spec.title, description: panelDescription(spec, isLast) };
 
   switch (spec.kind) {
     case 'boolean':
@@ -152,27 +155,25 @@ async function registerFromSchema(plugin: ReactRNPlugin, id: IESettingId) {
  * the IE Settings popup can never describe the same setting differently.
  *
  * @param plugin RemNote plugin entry point.
- * @param opts.includePopupTier Also register the settings that have moved into
- *   the IE Settings popup. True only while this knowledge base still needs
- *   seeding: `getSetting` throws for an unregistered id, so the migration can
- *   only read a value while its registration is live. Once seeded, these
- *   disappear from RemNote's panel and the popup owns them.
+ * @param opts.ids The settings to put into RemNote's own panel — only those the
+ *   migration still has to read across (`settingIdsNeedingRegistration`), which
+ *   is EMPTY for an up-to-date knowledge base. `getSetting` throws for an
+ *   unregistered id, so a value can only be read while its registration is live;
+ *   once read, the IE Settings popup owns it and the panel entry would only
+ *   confuse. The CSS below is registered regardless.
  */
 export async function registerPluginSettings(
   plugin: ReactRNPlugin,
-  opts: { includePopupTier: boolean }
+  opts: { ids: IESettingId[] }
 ) {
-  const ids = (Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[]).filter(
-    (id) => IE_SETTINGS_SCHEMA[id].tier === 'native' || opts.includePopupTier
-  );
-  for (const id of ids) {
-    await registerFromSchema(plugin, id);
+  for (let i = 0; i < opts.ids.length; i++) {
+    await registerFromSchema(plugin, opts.ids[i], i === opts.ids.length - 1);
   }
 
   // --- Startup CSS driven by the toggles above ---
-  // registerCSS is index-only (it silently no-ops from other iframes), and these
-  // read their setting through getIESetting, so they work whether the value
-  // comes from RemNote's panel or the plugin's own store.
+  // registerCSS is index-only (it silently no-ops from other iframes). These
+  // read their setting through getIESetting, i.e. from the plugin's own store,
+  // so they are unaffected by whether anything was registered above.
 
   if (await getIESetting(plugin, collapseQueueTopBar)) {
     await plugin.app.registerCSS(collapseTopBarCssId, COLLAPSE_TOP_BAR_CSS);

@@ -31,7 +31,7 @@ import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_agg
 import { registerJumpToRemHelper } from '../register/window';
 import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS, registerHasImageCSS, registerPinReferenceCSS } from '../lib/ui_helpers';
 import { getIESetting } from '../lib/settings';
-import { migrateIESettingsIfNeeded, isIESettingsSeedNeeded } from '../lib/settings_migration';
+import { migrateIESettingsIfNeeded, settingIdsNeedingRegistration } from '../lib/settings_migration';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -51,12 +51,14 @@ async function onActivate(plugin: ReactRNPlugin) {
   // newly-created rems. These powerup codes don't exist in the standalone
   // Hide in Queue plugin, so they cannot collide with it.
   await registerCoreQueueDisplayPowerups(plugin);
-  // Popup-tier settings are registered with RemNote only while this KB still
-  // needs seeding — the migration reads them through getSetting, which throws
-  // for an unregistered id. Once seeded they vanish from RemNote's panel and
-  // the IE Settings popup owns them.
-  const seedNeeded = await isIESettingsSeedNeeded(plugin);
-  await registerPluginSettings(plugin, { includePopupTier: seedNeeded });
+  // Settings appear in RemNote's own panel only while this KB still has to read
+  // them across — the migration reads through getSetting, which throws for an
+  // unregistered id. For an up-to-date KB this list is empty, so the plugin's
+  // section of that panel is empty too and the IE Settings popup owns every
+  // setting.
+  await registerPluginSettings(plugin, {
+    ids: await settingIdsNeedingRegistration(plugin),
+  });
 
   // Seed the plugin-owned settings store from the registrations that were just
   // installed. Must run after registerPluginSettings and before any widget can

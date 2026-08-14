@@ -22,7 +22,7 @@ The cleanest migration path is to disable IE's Mastery Drill while you finish an
 
 **Step 1 — Disable IE's Mastery Drill temporarily**
 
-In RemNote Settings → Plugins → Incremental Everything, enable the **Skip Mastery Drill** toggle. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
+In the plugin's settings popup (**`Incremental Everything: Settings`**, quick code `ies`) → **Mastery Drill**, turn **Enable Mastery Drill** off. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
 
 **Step 2 — Complete your old Mastery Drill queue *(optional)*
 
@@ -40,7 +40,7 @@ Go to **RemNote Settings → Plugins**, find *History, Queue Dashboard and Maste
 
 **Step 5 — Re-enable IE's Mastery Drill**
 
-In RemNote Settings → Plugins → Incremental Everything, disable the **Skip Mastery Drill** toggle. Then **reload RemNote**. IE's drill popup, notification widget, and command are now active again, and AGAIN/HARD tracking resumes.
+In the same place, turn **Enable Mastery Drill** back on. Then **reload RemNote**. IE's drill popup, notification widget, and command are now active again, and AGAIN/HARD tracking resumes.
 
 **Step 6 — Import your Practiced Queues history**
 

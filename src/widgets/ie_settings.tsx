@@ -33,10 +33,9 @@ import {
  * The IE Settings popup: every setting the plugin owns, grouped and layered,
  * because RemNote's own panel renders three dozen entries as one flat list.
  *
- * Native-tier settings (see lib/settings.ts) are shown read-only with a pointer
- * to RemNote's panel: the SDK has no setter for a registered setting, and those
- * particular ones are deliberately kept where someone chasing a performance
- * problem would look for them.
+ * Since v1.0.45 this is the ONLY place any of them can be edited — the five
+ * performance/integration switches that used to stay behind in RemNote's panel
+ * moved into the same store as the rest, so nothing here is read-only any more.
  */
 
 const openDocs = (path: string) => {
@@ -62,17 +61,14 @@ const isDefault = (id: IESettingId, value: unknown) =>
  * hides the Multiplier when on — so the phrase follows the required value.
  */
 function requirementPhrase(spec: SettingSpec, requires: unknown): string {
-  // A native-tier switch cannot be flipped here, so say where it lives rather
-  // than pointing at a control the popup renders disabled.
-  const where = spec.tier === 'native' ? " in RemNote's settings" : '';
   if (spec.kind === 'boolean') {
-    return `Turn this ${requires ? 'on' : 'off'}${where} to configure`;
+    return `Turn this ${requires ? 'on' : 'off'} to configure`;
   }
   if (spec.kind === 'dropdown') {
     const label = spec.options.find((o) => o.value === requires)?.label ?? String(requires);
-    return `Set this to “${label}”${where} to configure`;
+    return `Set this to “${label}” to configure`;
   }
-  return `Set this to ${JSON.stringify(requires)}${where} to configure`;
+  return `Set this to ${JSON.stringify(requires)} to configure`;
 }
 
 function HelpLink({ path, label }: { path: string; label: string }) {
@@ -130,7 +126,6 @@ interface RowProps {
 }
 
 function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
-  const readOnly = spec.tier === 'native';
   // Text and number inputs keep a local draft so that typing is not fought by
   // the reactive value coming back from storage; committed on blur / Enter.
   const [draft, setDraft] = useState<string | null>(null);
@@ -142,7 +137,6 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
     borderRadius: 6,
     backgroundColor: 'var(--rn-clr-background-primary, #fff)',
     color: 'var(--rn-clr-content-primary, #0f172a)',
-    opacity: readOnly ? 0.6 : 1,
   };
 
   const commitNumber = (raw: string) => {
@@ -160,13 +154,12 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
     switch (spec.kind) {
       case 'boolean':
         return (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: readOnly ? 'default' : 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={!!value}
-              disabled={readOnly}
               onChange={(e) => onChange(e.target.checked)}
-              style={{ width: 15, height: 15, cursor: readOnly ? 'default' : 'pointer' }}
+              style={{ width: 15, height: 15, cursor: 'pointer' }}
             />
             <span style={{ fontSize: 12, color: 'var(--rn-clr-content-secondary, #475569)' }}>
               {value ? 'On' : 'Off'}
@@ -179,7 +172,6 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
             <input
               type="number"
               value={draft ?? String(value ?? '')}
-              disabled={readOnly}
               min={spec.min}
               max={spec.max}
               // Fractional settings (speed thresholds, the interval multiplier)
@@ -202,7 +194,6 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
           <input
             type="text"
             value={draft ?? String(value ?? '')}
-            disabled={readOnly}
             placeholder={spec.placeholder}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={(e) => {
@@ -219,9 +210,8 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
         return (
           <select
             value={String(value ?? '')}
-            disabled={readOnly}
             onChange={(e) => onChange(e.target.value)}
-            style={{ ...inputStyle, minWidth: 220, cursor: readOnly ? 'default' : 'pointer' }}
+            style={{ ...inputStyle, minWidth: 220, cursor: 'pointer' }}
           >
             {spec.options.map((o) => (
               <option key={o.value} value={o.value}>
@@ -233,7 +223,7 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
     }
   };
 
-  const modified = !readOnly && !isDefault(id, value);
+  const modified = !isDefault(id, value);
 
   return (
     <div
@@ -249,7 +239,6 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
         <span style={{ fontSize: 13, fontWeight: 600 }}>{spec.title}</span>
         {spec.helpPath && <HelpLink path={spec.helpPath} label={spec.title} />}
         {spec.reloadRequired && <Badge tone="neutral">needs reload</Badge>}
-        {readOnly && <Badge tone="neutral">RemNote settings</Badge>}
         {modified && <Badge tone="neutral">modified</Badge>}
       </div>
 
@@ -281,29 +270,22 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {control()}
-        {readOnly ? (
-          <span style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
-            Change this in Settings → Plugins → Incremental Everything. It is kept there on purpose: that panel
-            is where you would look first if the plugin felt heavy.
-          </span>
-        ) : (
-          modified && (
-            <button
-              onClick={() => onChange(IE_SETTINGS_DEFAULTS[id])}
-              style={{
-                fontSize: 11,
-                padding: '2px 8px',
-                borderRadius: 5,
-                border: '1px solid var(--rn-clr-border-primary, #cbd5e1)',
-                backgroundColor: 'transparent',
-                color: 'var(--rn-clr-content-secondary, #475569)',
-                cursor: 'pointer',
-              }}
-              title={`Reset to ${JSON.stringify(IE_SETTINGS_DEFAULTS[id])}`}
-            >
-              Reset
-            </button>
-          )
+        {modified && (
+          <button
+            onClick={() => onChange(IE_SETTINGS_DEFAULTS[id])}
+            style={{
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 5,
+              border: '1px solid var(--rn-clr-border-primary, #cbd5e1)',
+              backgroundColor: 'transparent',
+              color: 'var(--rn-clr-content-secondary, #475569)',
+              cursor: 'pointer',
+            }}
+            title={`Reset to ${JSON.stringify(IE_SETTINGS_DEFAULTS[id])}`}
+          >
+            Reset
+          </button>
         )}
       </div>
 
@@ -437,8 +419,8 @@ export function IESettingsWidget() {
 
   const allIds = useMemo(() => Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[], []);
 
-  // One tracker for the whole set: re-runs when the synced blob or any native
-  // setting changes, so the popup reflects edits made anywhere.
+  // One tracker for the whole set: re-runs when the synced blob changes, so the
+  // popup reflects an edit made from anywhere (another pane, another device).
   const values = useTrackerPlugin(async (rp) => {
     const entries = await Promise.all(allIds.map(async (id) => [id, await getIESetting(rp, id)] as const));
     return Object.fromEntries(entries) as unknown as IESettings;
@@ -461,7 +443,7 @@ export function IESettingsWidget() {
   };
 
   const modifiedCount = values
-    ? (allIds.filter((id) => IE_SETTINGS_SCHEMA[id].tier === 'popup' && !isDefault(id, values[id])).length)
+    ? allIds.filter((id) => !isDefault(id, values[id])).length
     : 0;
 
   const onChange = async (id: IESettingId, value: unknown) => {

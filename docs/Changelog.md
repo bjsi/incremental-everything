@@ -2,6 +2,28 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.45 - August 14th, 2026
+
+### ✨ New - all the settings are in one window now
+
+The last five settings that stayed in RemNote's own plugin panel — **Enable Flashcard Prioritisation**, **Performance Mode**, the two **Always Use Light Mode** switches and **Enable Hide-in-Queue Powerups and Commands** — have moved into the plugin's settings popup with everything else, and are editable there. The plugin's section of **Settings → Plugins → Incremental Everything** is now empty.
+
+They were kept back on the theory that RemNote's own panel is where you would look first if the plugin ever felt heavy. There was no heaviness to chase, so the split bought nothing and cost a second place to look.
+
+Your values carry over on the first load, and anything you had already changed in the popup is left alone. The five settings appear in RemNote's panel for that one session, with a note saying so, and are gone after the next reload.
+
+#### Technical explanation
+
+`SEED_VERSION` goes to 6 and the `native` tier is deleted outright — one `SettingTier`-shaped branch each in `readRawSetting`, `setIESetting`, the registration filter and four places in the popup. The bump no longer re-reads everything: up to v5 a version bump forced a full re-read from RemNote's panel, which was safe only while the panel was younger than the blob. Now that the popup is where people edit, and a value equal to its default is stored as an *absent* key, a blanket re-read would resurrect pre-migration panel values and silently undo later edits. `ADOPTED_AT_VERSION` names the ids each version takes over, and only those are read across. Registration follows the same list, so a knowledge base moving from v5 to v6 sees five entries in RemNote's panel for one session rather than all thirty-four a second time.
+
+📖 [Where the settings are](Plugin-Settings-Reference.md#where-the-settings-are)
+
+### 🐛 Fixed - a renamed setting could lose its value during the migration
+
+The migration drops blob keys that are no longer settings, and it did that *before* running the renames — so a setting whose id had changed had its old key deleted a step before the rename needed to read it, and the value fell back to the default. Only *Skip Mastery Drill* → *Enable Mastery Drill* was ever affected. The renames now run first.
+
+📖 [Where the settings are](Plugin-Settings-Reference.md#where-the-settings-are)
+
 ## v1.0.44 - August 14th, 2026
 
 ### ✨ New - the CardPriority cleanup no longer has to be all-or-nothing

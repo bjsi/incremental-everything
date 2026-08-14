@@ -95,7 +95,7 @@ The plugin auto-detects your platform (if you chose Full Mode):
 ```
 
 ### Manual Override
-**Settings → Performance Mode**
+**`Incremental Everything: Settings` (quick code `ies`) → Performance → Performance Mode**
 - Choose "Light Mode" or "Full Mode"
 
 **Platform-Specific Settings:**
