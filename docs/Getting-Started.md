@@ -31,15 +31,17 @@ Once installed, the plugin adds a small **Incremental Plugin** 🌐 panel at the
 
 **In the header:**
 
-| Control | What it opens |
-|---------|---------------|
-| ⚙️ | The plugin's [settings popup](Plugin-Settings-Reference.md) — every setting the plugin owns, grouped |
-| ? | This documentation, at the home page |
+| Control | What it does |
+|---------|--------------|
+| ⚙ | Opens the plugin's [settings popup](Plugin-Settings-Reference.md) — every setting the plugin owns, grouped |
+| ? | Opens this documentation, at the home page |
+| ✕ | Hides the panel **for this session** — it is back next time you open RemNote. To bring it back sooner, run the **Show Incremental Plugin Panel** command |
 
 **Shortcut buttons:**
 
-- **Sorting Criteria** — the [flashcard/incremental mix and randomness](Prioritization-&-Sorting.md#sorting-criteria) for your queue.
-- **Priority Review** — creates a [Priority Review Document](Priority-Review-Document.md), scoped to the document you currently have open. This is the same as using **Create Priority Review Document** in the document menu, without having to open the menu; the scope it will use is spelled out under the button. With no document open, it falls back to the whole knowledge base.
+- **⌨** — the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page.
+- **Sorting** — the [flashcard/incremental mix and randomness](Prioritization-&-Sorting.md#sorting-criteria) for your queue.
+- **Priority Review** — creates a [Priority Review Document](Priority-Review-Document.md), scoped to the document you currently have open. This is the same as using **Create Priority Review Document** in the document menu, without having to open the menu; the scope it will use is named under the button. With no document open, it falls back to the whole knowledge base.
 
 ### Tips { #tips }
 

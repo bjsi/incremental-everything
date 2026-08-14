@@ -128,6 +128,15 @@ export const pluginHubWidgetId = 'plugin_hub';
 export const onboardingTipsStateKey = 'onboarding-tips-state';
 /** Local timestamp until which the tip panel stays quiet after a ✕ dismissal. */
 export const onboardingTipsSnoozeKey = 'onboarding-tips-snooze-until';
+/**
+ * The user closed the hub panel. **Session** storage on purpose: closing it is
+ * "not now, I need the room", not a preference — it comes back on the next
+ * start, the same way the Mastery Drill notification does. Cleared early by
+ * {@link showPluginHubCommandId}.
+ */
+export const pluginHubHiddenKey = 'plugin-hub-hidden';
+/** Command that brings the hub back within the same session. */
+export const showPluginHubCommandId = 'ie_show_plugin_hub';
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';

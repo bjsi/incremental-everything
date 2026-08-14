@@ -24,9 +24,14 @@ export interface OnboardingTip {
    * existing user. Retiring a tip means deleting the entry and burying the id.
    */
   id: string;
-  /** One short line, sentence case, no trailing period. */
+  /** Three or four words. The sidebar column is ~130px at its narrowest. */
   title: string;
-  /** Two sentences at most — this renders in a sidebar column. */
+  /**
+   * ONE line of prose — roughly 90 characters, hard ceiling 110. This renders in
+   * a sidebar the user can drag down to about 130px wide, where 90 characters
+   * already wrap to four lines. A tip is a hook, not an explanation: the
+   * explanation is what `docsPath` is for.
+   */
   body: string;
   /**
    * Docs target for "Learn More", relative to `IE_DOCS_BASE_URL` (e.g.
@@ -48,92 +53,92 @@ export const TIP_SNOOZE_MS = 2 * 60 * 60 * 1000;
 export const ONBOARDING_TIPS: OnboardingTip[] = [
   {
     id: 'create-first-incremental-rem',
-    title: 'Make your first Incremental Rem',
-    body: 'Put the cursor on any Rem — with nothing selected — and press Alt+X (Opt+X on Mac). It joins your queue and comes back on a schedule you control, no flashcard needed.',
+    title: 'Your first Incremental Rem',
+    body: 'Alt+X on any Rem, nothing selected, and it joins your queue. No flashcard needed.',
     docsPath: 'Getting-Started/#method-2-keyboard-shortcut',
   },
   {
     id: 'extract-while-reading',
-    title: 'Extract instead of re-reading',
-    body: 'The same Alt+X, with text selected, pulls that passage out as its own Incremental Rem. The long source shrinks a little on every pass.',
+    title: 'Extract, don’t re-read',
+    body: 'Alt+X with text selected pulls that passage out on its own. The source shrinks each pass.',
     docsPath: 'IR-Flow--Reading-Extracting-and-Clozing/#create-extract-altx--altshiftx',
   },
   {
     id: 'cloze-an-extract',
-    title: 'Turn an extract into a flashcard',
-    body: 'Once an extract is short and clear, select the key words and press Alt+Z to cloze it. Reading turns into remembering without leaving the Rem.',
+    title: 'Extract → flashcard',
+    body: 'Alt+Z clozes the words that matter. Reading becomes remembering, in place.',
     docsPath: 'IR-Flow--Reading-Extracting-and-Clozing/#create-cloze-altz--altshiftz',
   },
   {
     id: 'set-a-priority',
-    title: 'Priority decides what you actually see',
-    body: 'Press Alt+P on any Incremental Rem to set its priority. The queue draws by priority, so this is the one knob that changes what your day looks like.',
+    title: 'Priority runs the queue',
+    body: 'Alt+P sets it. It is the one knob that changes what your day looks like.',
     docsPath: 'Prioritization-&-Sorting/#setting-priorities',
   },
   {
     id: 'priority-inheritance',
-    title: 'Set priority once, for a whole document',
-    body: 'Priority is inherited: give a document a priority and everything inside it starts there. You only override the exceptions.',
+    title: 'Set priority once',
+    body: 'Priority is inherited — prioritise a document, override only the exceptions.',
     docsPath: 'Prioritization-&-Sorting/#priority-inheritance-system',
   },
   {
     id: 'sorting-criteria',
-    title: 'Tune the mix of cards and reading',
-    body: 'Sorting Criteria sets how much of your queue is flashcards, how much is incremental reading, and how much randomness sits on top. Presets save the mixes you like.',
+    title: 'Tune your queue mix',
+    body: 'Cards vs. reading vs. randomness, saved as presets. Click Sorting above.',
     docsPath: 'Prioritization-&-Sorting/#sorting-criteria',
   },
   {
     id: 'answer-buttons',
-    title: 'The queue buttons do more than "next"',
-    body: 'From an Incremental Rem you can reschedule, dismiss, change priority, or open it in the editor — without breaking your review session.',
+    title: 'More than “next”',
+    body: 'Reschedule, dismiss, reprioritise or open in the editor — without leaving the queue.',
     docsPath: 'Reviewing-Items-in-the-Queue/#the-answer-buttons',
   },
   {
     id: 'review-in-editor',
     title: 'Review outside the queue',
-    body: 'Long reading is painful in a flashcard slot. Open the item in the editor, work at your own pace, and record the repetition when you are done.',
+    body: 'Long reading needs room. Ctrl+Shift+J opens the item in the editor and times it.',
     docsPath: 'Reviewing-Items-in-the-Editor/',
   },
   {
     id: 'priority-review-document',
-    title: 'Beat the "too many cards" queue',
-    body: 'A Priority Review Document collects the highest-priority items in a scope into one document you can work through deliberately, instead of hoping the queue serves them.',
+    title: 'Too many cards due?',
+    body: 'A Priority Review Document collects the top items into one doc you can actually finish.',
     docsPath: 'Priority-Review-Document/',
   },
   {
     id: 'pdf-workflow',
     title: 'Read PDFs incrementally',
-    body: 'A PDF can be an Incremental Rem: the plugin remembers your page, and highlights become extracts you can prioritise like anything else.',
+    body: 'The plugin keeps your page, and turns highlights into prioritised extracts.',
     docsPath: 'PDF-Incremental-Reading-Workflow/',
   },
   {
     id: 'incremental-adoption',
-    title: 'Add one tool at a time',
-    body: 'You do not have to adopt the whole plugin at once. Start with Incremental Rems and priority; bring in extracts, PDFs and dashboards when the current habit is boring.',
+    title: 'Adopt it incrementally',
+    body: 'Start with Incremental Rems and priority. Add the rest when the habit gets boring.',
     docsPath: 'What-is-Incrementalism%3F/',
   },
   {
     id: 'increm-list',
-    title: 'See every Incremental Rem at once',
-    body: 'The IncRem List shows what is queued in a document — priorities, due dates, history — and lets you edit priorities inline instead of one Rem at a time.',
+    title: 'See the whole queue',
+    body: 'The IncRem List shows priorities, due dates and history — and edits them inline.',
     docsPath: 'IncRem-List-and-Main-View/',
   },
   {
     id: 'keyboard-shortcuts',
-    title: 'Most of this is one keystroke away',
-    body: 'Alt+X, Alt+Z, Alt+P and Ctrl+J cover the daily loop. The shortcuts page lists the rest, including the ones not bound by default.',
+    title: 'One keystroke away',
+    body: 'Alt+X, Alt+Shift+X and Alt+P cover the daily loop. Click to see the rest.',
     docsPath: 'Keyboard-Shortcuts/',
   },
   {
     id: 'study-dashboard',
-    title: 'Check what you actually studied',
-    body: 'The Study Dashboard breaks your reviews down by document and period, so you can see where the time went rather than guess.',
+    title: 'Where did the time go?',
+    body: 'The Study Dashboard breaks your reviews down by document and period.',
     docsPath: 'Study-Dashboard/',
   },
   {
     id: 'settings-live-here',
-    title: 'Every setting is in one window',
-    body: 'The gear at the top of this panel opens the plugin’s own settings — grouped, searchable, and each one linked to the page that explains it.',
+    title: 'Settings, all in one place',
+    body: 'The ⚙ above opens them: grouped, and each one linked to the page explaining it.',
     docsPath: 'Plugin-Settings-Reference/',
   },
 ];

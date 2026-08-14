@@ -20,6 +20,8 @@ import {
   dismissedPowerupCode,
   currentSubQueueIdKey,
   dismissIncRemCommandId,
+  pluginHubHiddenKey,
+  showPluginHubCommandId,
   nextInQueueCommandId,
   togglePdfHighlightBordersCommandId,
   currentIncrementalRemTypeKey,
@@ -3400,6 +3402,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'ies',
     action: async () => {
       await plugin.widget.openPopup('ie_settings');
+    },
+  });
+
+  // The hub's ✕ only lasts the session, so this is for getting it back sooner
+  // than the next start.
+  plugin.app.registerCommand({
+    id: showPluginHubCommandId,
+    name: 'Show Incremental Plugin Panel',
+    description: 'Bring back the Incremental Plugin panel in the sidebar after closing it',
+    action: async () => {
+      await plugin.storage.setSession(pluginHubHiddenKey, false);
+      await plugin.app.toast('Plugin panel restored.');
     },
   });
 

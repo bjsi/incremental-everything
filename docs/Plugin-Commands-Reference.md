@@ -297,6 +297,9 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
 ## System & Maintenance Commands
 
+- **Show Incremental Plugin Panel**
+  Brings back the [Incremental Plugin panel](Getting-Started.md#the-incremental-plugin-panel) in the sidebar after you have closed it with its **✕**. The **✕** only lasts the session — the panel returns on its own next time you open RemNote — so this is for getting it back sooner.
+
 - **Incremental Everything: Settings** (`ies`)
   Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
 
