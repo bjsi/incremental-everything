@@ -94,6 +94,16 @@ export const speedCalibrationCacheKey = 'speed_calibration_cache_v1';
 // default: most users want extracts and scheduling, and should not pay for
 // per-flashcard priorities they never asked for.
 export const enableFlashcardPrioritisationId = 'enable-flashcard-prioritisation';
+/**
+ * Per-KB record of the last seen value of the gate above, so that turning it OFF
+ * can offer the (reversible) inherited/default cleanup exactly once — see
+ * lib/card_priority/opt_out.ts.
+ *
+ * Synced storage is shared across ALL of the user's knowledge bases, and the tags
+ * this drives are per-KB, so the value is stored KB-partitioned as
+ * `{ [kbId]: record }` — the same shape as the shield history.
+ */
+export const flashcardPrioritisationOptOutStateKey = 'flashcard-prioritisation-opt-out-state';
 
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';
@@ -240,7 +250,7 @@ export const documentPriorityShieldHistoryKey = 'document-priority-shield-histor
 export const currentSubQueueIdKey = 'current-sub-queue-id-key';
 export const cardPriorityShieldHistoryKey = 'card-priority-shield-history-key';
 export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shield-history-key';
-// Dated backups written by the "Remove All CardPriority Tags" cleanup before it
+// Dated backups written by the "Remove CardPriority Tags…" cleanup (full scope) before it
 // clears this KB's shield partition, plus an index listing them for restore.
 export const cardShieldCleanupBackupPrefix = 'card-shield-cleanup-backup-';
 export const cardShieldCleanupBackupIndexKey = 'card-shield-cleanup-backup-index';

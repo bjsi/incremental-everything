@@ -358,7 +358,12 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'initial pass and continuous background work, and RemNote can feel slow until it settles.\n\n' +
       'Everything else — extracts, incremental reading, PDF and video, scheduling, the queue, the ' +
       'Mastery Drill, and priorities on Incremental Rems themselves — works exactly the same with ' +
-      'this off.',
+      'this off.\n\n' +
+      'Turning it back off stops all of that work, but the tags already written stay on your rems. ' +
+      'The plugin offers to remove them on the next reload; you can also run "Remove CardPriority ' +
+      'Tags…" and choose "inherited & default only" at any time. That cleanup is reversible — ' +
+      'manual priorities are kept, and the automatic ones are rebuilt by "Update all inherited ' +
+      'Card Priorities" if you switch this on again.',
   },
 
   // --- Scheduling ---

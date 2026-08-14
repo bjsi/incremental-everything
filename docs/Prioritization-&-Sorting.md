@@ -256,7 +256,7 @@ One badge appears per **row**, not per cell: the row's priority belongs to the R
 The band follows your priorities automatically — every priority write updates it, including inherited priorities flowing down a cascade, priorities set in bulk, and priorities changed from the IncRem List, Main View, Page Range, reschedule and editor-review widgets. Two commands exist for the rest:
 
 - **Refresh Priority Badges (Tables)** — recomputes bands for every IncRem and every Rem with a card priority. Run it **once after enabling the feature** to fill in Rems whose priority was set before it existed, or any time you suspect drift. Progress and a completion summary are reported as toasts and in the developer console.
-- **Remove All Priority Band Tags** — strips every band tag. Unlike *Remove All CardPriority Tags*, **this destroys nothing**: bands are a derived mirror of priorities that still live in the Incremental and CardPriority slots, so *Refresh* rebuilds them exactly.
+- **Remove All Priority Band Tags** — strips every band tag. Unlike the full scope of *[Remove CardPriority Tags…](Plugin-Commands-Reference.md#remove-cardpriority-tags)*, **this destroys nothing**: bands are a derived mirror of priorities that still live in the Incremental and CardPriority slots, so *Refresh* rebuilds them exactly.
 
 > [!TIP]
 > If you ran the plugin before the eligibility filter existed, run **Remove All Priority Band Tags** once and then **Refresh Priority Badges (Tables)** to shed the bands that were applied to Rems outside any table.
@@ -264,7 +264,7 @@ The band follows your priorities automatically — every priority write updates 
 > [!NOTE]
 > **Before v1.0.27**, only some priority writes updated the band: batch changes, the Priority & Interval batch save, reschedules, editor reviews and the list-view widgets all left the badge showing the previous value until the next *Refresh*. If you have been using tables since before that release, one run of **Refresh Priority Badges (Tables)** clears any badges left stale by it.
 >
-> One category is still not covered automatically: **removing** a card priority outright, via *Remove All CardPriority Tags* or the single-Rem cleanup. A Rem that is also an Incremental Rem keeps the correct badge (it falls back to the incremental priority), but a plain flashcard Rem holds its old badge until a *Refresh*.
+> One category is still not covered automatically: **removing** a card priority outright, via *[Remove CardPriority Tags…](Plugin-Commands-Reference.md#remove-cardpriority-tags)* or the single-Rem cleanup. A Rem that is also an Incremental Rem keeps the correct badge (it falls back to the incremental priority), but a plain flashcard Rem holds its old badge until a *Refresh*.
 
 ---
 

@@ -2659,7 +2659,7 @@ function Debug() {
   };
 
   // KB-wide audit that answers: does `getPowerupByCode('cardPriority').taggedRem()`
-  // match reality? "Remove All CardPriority Tags" and the cache both enumerate via
+  // match reality? "Remove CardPriority Tags…" and the cache both enumerate via
   // taggedRem(), yet it can return far fewer rems than are actually tagged. This
   // cross-checks taggedRem() against a DIRECT hasPowerup('cardPriority') probe over
   // every card-bearing rem, and also flags rems that carry a priority slot value
@@ -4003,7 +4003,7 @@ function Debug() {
                          in its priority slot — so the numbers below are resolved on read from the
                          nearest ancestor, exactly as they would be for an untagged rem.{' '}
                          {cardPriority.cardCount > 0
-                           ? '"Sanitize Rogue Tags" will NOT touch this: it only strips tags from rems that own no cards, and this one does. setCardPriority always writes priority, source and lastUpdated together, so a surviving source/lastUpdated with no priority means the value was lost after it was written, not that the write was partial. To drop tags wholesale while flashcard prioritisation is off, use the "Remove All CardPriority Tags" command.'
+                           ? '"Sanitize Rogue Tags" will NOT touch this: it only strips tags from rems that own no cards, and this one does. setCardPriority always writes priority, source and lastUpdated together, so a surviving source/lastUpdated with no priority means the value was lost after it was written, not that the write was partial. To drop tags wholesale while flashcard prioritisation is off, use the "Remove CardPriority Tags…" command.'
                            : 'This rem owns no cards, so "Sanitize Rogue Tags" is the tool that removes it.'}
                        </>
                      ) : (

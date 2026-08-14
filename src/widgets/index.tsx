@@ -7,6 +7,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { writeCardPriorityCache } from '../lib/card_priority/persistence';
+import { checkFlashcardPrioritisationOptOut } from '../lib/card_priority/opt_out';
 import { registerEventListeners } from '../register/events';
 import { registerPluginPowerups } from '../register/powerups';
 import { registerPluginSettings } from '../register/settings';
@@ -176,6 +177,16 @@ async function onActivate(plugin: ReactRNPlugin) {
     // next full-mode launch pay a cold build for it.
     await writeCardPriorityCache(plugin, []);
   }
+
+  // Turning the flashcard-prioritisation opt-in OFF leaves every tag it wrote in
+  // place. Deferred and deliberately not awaited: it ends in a modal and a KB-wide
+  // scan, neither of which belongs on the activation path. It is a no-op unless
+  // the setting actually changed since the last launch of this KB.
+  setTimeout(() => {
+    checkFlashcardPrioritisationOptOut(plugin).catch((err) =>
+      console.warn('Flashcard prioritisation opt-out check failed', err)
+    );
+  }, 8000);
 }
 
 async function onDeactivate(_: ReactRNPlugin) { }

@@ -384,8 +384,13 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
   > [!NOTE]
   > Preserved flashcard reviews (`importedRep`) **count toward the Study Dashboard's time and rep totals** but are **ignored by the scheduler** — they never influence the rem's next-interval calculations, even if it's later re-incrementalized. In the repetition-history views they show a 🃏 marker with the source card's name and grade. For **cloze** cards, the preserved name wraps the clozed span in `{{…}}` (e.g. `flashcard {{inside}} that rem`) so multiple clozes from the same rem stay distinguishable.
 
-- **Remove All CardPriority Tags**
-  Bulk maintenance to wipe priorities across a scope. Use with caution.
+- **Remove CardPriority Tags…** { #remove-cardpriority-tags }
+  Strips the `cardPriority` powerup and its slots from **the knowledge base you currently have open** — named in every dialog, and the only one touched. It asks which tags to remove first:
+
+  - **OK — inherited & default only (recommended).** Removes just the tags the plugin wrote by itself. `manual` priorities, the `incremental` anchors left by dismissed Incremental Rems, tags whose source is unreadable, and your shield history are all kept. **Reversible:** those priorities are computed from your document tree, so *Update all inherited Card Priorities* rebuilds them exactly. This is the option to use after turning [Enable Flashcard Prioritisation](Priorities-for-Flashcards.md#switching-it-off) off.
+  - **Cancel — remove everything.** Wipes every `cardPriority` tag, **including the priorities you set by hand**, and clears this KB's [Priority Shield](Prioritization-&-Sorting.md#priority-shield) history (a dated backup of the history is saved first; the tags are not backed up). It cannot be undone, so it takes a second confirmation — and if manual priorities are at stake, you must type `REMOVE ALL` to proceed.
+
+  Both scopes report what they found before touching anything: how many tags are inherited/default, how many are manual/incremental, and how many carry no recognisable source.
 
 - **Refresh Priority Badges (Tables and PDF Highlights)**
   Recomputes the band tags behind both the [table-cell badges](Prioritization-&-Sorting.md#priorities-in-tables) and the [PDF highlight badges](Prioritization-&-Sorting.md#priorities-on-pdf-highlights). Bands are kept current by every priority write, so this is for the **first run after enabling the feature** and for repairing drift.

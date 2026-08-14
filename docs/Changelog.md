@@ -2,6 +2,33 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.44 - August 14th, 2026
+
+### ✨ New - the CardPriority cleanup no longer has to be all-or-nothing
+
+**Remove All CardPriority Tags** is now **Remove CardPriority Tags…** and asks which tags to remove:
+
+- **Inherited & default only (recommended)** — the tags the plugin wrote by itself. Manual priorities, the `incremental` anchors left by dismissed Incremental Rems, tags with an unreadable source, and your shield history are all kept. **Reversible:** *Update all inherited Card Priorities* rebuilds them exactly.
+- **Everything** — the old behaviour, now behind two warnings and, when manual priorities are at stake, a typed `REMOVE ALL`.
+
+Both scopes count what they found before touching anything, and name the knowledge base they are about to modify.
+
+#### Technical explanation
+
+One scan classifies every tag by its `prioritySource` into derived (`inherited`/`default`), intentional (`manual`/`incremental`) and unknown. The derived scope removes only the first bucket — an unrecognised source could be a manual priority whose source slot was lost, so a non-destructive pass will not gamble on it. KB scoping is explicit in two layers: the powerup comes from `getPowerupByCode`, so foreign CardPriority powerups left by cross-KB imports are never enumerated, and every tagged id is re-resolved through `rem.findOne` before it is written to. The partial scope also prunes only the removed rows from the session cache and the persisted copy, instead of emptying both — an empty cache would read as "this KB has no priorities" and hide the manual ones it just preserved.
+
+📖 [Remove CardPriority Tags…](Plugin-Commands-Reference.md#remove-cardpriority-tags)
+
+### ✨ New - turning flashcard prioritisation off now offers to clean up after itself
+
+Switching **Enable Flashcard Prioritisation** off stops the machinery, but the tags it already wrote stayed on your Rems with no hint of how to get rid of them. On the next reload the plugin now counts them and offers the reversible cleanup, in one dialog; declining explains how to run it later. Offered **once per switch-off**, and never on Light Mode devices — the cleanup is a KB-wide write, so it waits for a Full Mode session.
+
+#### Technical explanation
+
+Native-tier settings have no change event, so the gate's value is recorded per knowledge base in synced storage and compared on activation. The new value is written *before* the dialog opens, so declining or crashing cannot turn the offer into a nag, and a first sighting only establishes the baseline (an opt-out is indistinguishable from a fresh install otherwise). The check is fired from `onActivate` without being awaited.
+
+📖 [Switching it back off](Priorities-for-Flashcards.md#switching-it-off)
+
 ## v1.0.43 - August 14th, 2026
 
 ### ✨ New - filter a document down to just the Rems that hold an image

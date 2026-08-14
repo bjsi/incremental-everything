@@ -22,6 +22,21 @@ It is opt-in because it is the one part of the plugin that works across your **e
 
 What is skipped is the **bulk index**: the KB-wide tagging pass, the inheritance cascade over descendants, the priority cache, and everything built on it — the [Priority Shield](Prioritization-&-Sorting.md#priority-shield), relative percentiles, and flashcards in Priority Review Documents.
 
+### Switching it back off { #switching-it-off }
+
+Turning the setting off stops all of that work immediately, but it does **not** undo it: every `cardPriority` tag already written stays on your Rems, with its `Priority`, `Priority Source` and `Last Updated` slots.
+
+So, on the next reload after you switch it off, the plugin offers to clear them for you:
+
+> The plugin has stopped writing card priorities, but *N* tag(s) it created automatically (source: inherited or default) are still on your Rems. Would you like to remove them now?
+
+- **OK** removes them.
+- **Cancel** leaves everything as it is and tells you how to do it later. The offer is made **once per switch-off**, never repeatedly, and never on [Light Mode](Full-Mode-x-Light-Mode.md) devices — the cleanup is a knowledge-base-wide write, which is what Light Mode exists to avoid, so it waits for a Full Mode session.
+
+You can run the same cleanup at any time with **[Remove CardPriority Tags…](Plugin-Commands-Reference.md#remove-cardpriority-tags)** → *inherited & default only*.
+
+**Nothing is lost either way.** Inherited and default priorities are *computed* from your document tree, so they are rebuilt exactly by switching the setting back on and running *Update all inherited Card Priorities*. Your `manual` priorities, the `incremental` anchors left by dismissed Incremental Rems, and your shield history are never touched by this cleanup.
+
 ---
 
 ## How It Works

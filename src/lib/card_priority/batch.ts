@@ -12,66 +12,312 @@ import {
 } from '../consts';
 import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
 import { isPowerupPropertySafe } from '../powerupSlotFilter';
-import { CardPriorityInfo } from './types';
+import { CardPriorityInfo, PrioritySource } from './types';
 import { calculateNewPriority, setCardPriority } from './index';
+import { loadPersistedCardPriorities } from './persistence';
 import * as _ from 'remeda';
 import { safeRemTextToString } from '../pdfUtils';
 import { formatDuration } from '../utils';
 import { getIESetting } from '../settings';
 
-export async function removeAllCardPriorityTags(plugin: RNPlugin) {
-  const confirmed = confirm(
-    '⚠️ Remove All CardPriority Data\n\n' +
-    'This will permanently remove ALL cardPriority tags and their priority data from THIS knowledge base.\n\n' +
-    'It will also clear THIS knowledge base\'s Card Priority Shield history (both KB-level and ' +
-    'document-level). Other knowledge bases are not affected. A dated backup of this KB\'s shield ' +
-    'history is saved first (restorable from the debug tools), but the tags/priorities cannot be undone.\n\n' +
-    'Are you sure you want to proceed?'
-  );
+/**
+ * What a cleanup run is allowed to touch.
+ *
+ * - `derived` — ONLY tags the plugin created by itself: the `inherited` and
+ *   `default` sources produced by the inheritance cascade and the KB-wide
+ *   pretagging pass. Nothing the user decided is lost, so the state is fully
+ *   recomposable by re-enabling Flashcard Prioritisation and running
+ *   "Update all inherited Card Priorities".
+ * - `all` — every cardPriority tag, including `manual` (set by hand) and
+ *   `incremental` (mirrored from an IncRem, and left behind on dismissal so
+ *   descendants keep inheriting). IRREVERSIBLE.
+ */
+export type CardPriorityCleanupScope = 'derived' | 'all';
 
-  if (!confirmed) {
-    console.log('CardPriority cleanup cancelled by user');
-    await plugin.app.toast('CardPriority cleanup cancelled');
-    return;
+/** Sources written by the plugin's own machinery — recomputable at any time. */
+const DERIVED_PRIORITY_SOURCES = new Set(['inherited', 'default']);
+
+export interface CardPriorityCleanupOptions {
+  /** Defaults to 'all' — the historical behaviour of this function. */
+  scope?: CardPriorityCleanupScope;
+  /** The caller already confirmed with the user; skip the built-in dialogs. */
+  skipConfirm?: boolean;
+  /** Extra line shown at the top of the dialogs (e.g. why the flow was offered). */
+  context?: string;
+  /** Suppress the "refresh the page?" prompt at the end. */
+  skipReloadPrompt?: boolean;
+}
+
+export interface CardPriorityCleanupResult {
+  cancelled: boolean;
+  /** Tagged rems found in this KB. */
+  scanned: number;
+  /** inherited / default — the recomputable ones. */
+  derived: number;
+  /** manual / incremental — deliberate user input. */
+  intentional: number;
+  /** Empty or unrecognised source. Never removed by the `derived` scope. */
+  unknown: number;
+  /** Tagged ids that did not resolve in this KB and were therefore skipped. */
+  foreign: number;
+  /** Tags actually stripped. */
+  removed: number;
+}
+
+/** Sorts the current KB's tagged rems into the three source buckets. */
+interface ScannedTag {
+  rem: PluginRem;
+  source: string;
+  bucket: 'derived' | 'intentional' | 'unknown';
+}
+
+/**
+ * Reads every cardPriority tag in the CURRENT knowledge base and classifies it.
+ *
+ * KB scoping, in two layers:
+ *  1. `getPowerupByCode('cardPriority')` resolves the powerup THIS knowledge base
+ *     registered, so imported/foreign CardPriority powerups (see
+ *     findOrphanedImportedCardPriorities) are not enumerated at all.
+ *  2. Every tagged id is re-resolved through `plugin.rem.findOne`, and anything
+ *     that does not resolve here is counted as `foreign` and left alone rather
+ *     than written to. Cheap insurance: the removal path only ever touches rems
+ *     this KB can hand back.
+ */
+async function scanCardPriorityTags(
+  plugin: RNPlugin
+): Promise<{ tags: ScannedTag[]; foreign: number }> {
+  const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
+  const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
+
+  const tags: ScannedTag[] = [];
+  let foreign = 0;
+  const batchSize = 50;
+
+  for (let i = 0; i < taggedRems.length; i += batchSize) {
+    const batch = taggedRems.slice(i, i + batchSize);
+    const scanned = await Promise.all(
+      batch.map(async (tagged): Promise<ScannedTag | null> => {
+        const rem = await plugin.rem.findOne(tagged._id);
+        if (!rem) return null; // not in this KB — never written to
+        let source = '';
+        try {
+          source = ((await rem.getPowerupProperty('cardPriority', 'prioritySource')) || '')
+            .trim()
+            .toLowerCase();
+        } catch {
+          source = '';
+        }
+        const bucket: ScannedTag['bucket'] = DERIVED_PRIORITY_SOURCES.has(source)
+          ? 'derived'
+          : INTENTIONAL_PRIORITY_SOURCES.has(source)
+            ? 'intentional'
+            : 'unknown';
+        return { rem: rem as PluginRem, source, bucket };
+      })
+    );
+    for (const entry of scanned) {
+      if (entry) tags.push(entry);
+      else foreign++;
+    }
   }
 
-  console.log('Starting CardPriority cleanup...');
-  await plugin.app.toast('Starting CardPriority cleanup...');
+  return { tags, foreign };
+}
+
+/**
+ * Read-only tally of this KB's cardPriority tags by source bucket. Used by the
+ * opt-out flow to decide whether there is anything worth offering to clean, and
+ * to put real numbers in the dialog.
+ */
+export async function summarizeCardPriorityTags(plugin: RNPlugin): Promise<{
+  scanned: number;
+  derived: number;
+  intentional: number;
+  unknown: number;
+  foreign: number;
+}> {
+  const { tags, foreign } = await scanCardPriorityTags(plugin);
+  return {
+    scanned: tags.length,
+    derived: tags.filter((t) => t.bucket === 'derived').length,
+    intentional: tags.filter((t) => t.bucket === 'intentional').length,
+    unknown: tags.filter((t) => t.bucket === 'unknown').length,
+    foreign,
+  };
+}
+
+/** Strips the three slots and the tag itself from one rem. */
+async function stripCardPriorityTag(rem: PluginRem): Promise<void> {
+  try {
+    await rem.setPowerupProperty('cardPriority', 'priority', []);
+    await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
+    await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
+  } catch (e) {
+    console.log(`Warning: Could not clear slots for rem ${rem._id}:`, e);
+  }
+  await rem.removePowerup('cardPriority');
+}
+
+/**
+ * Removes cardPriority tags from the current knowledge base.
+ *
+ * Two scopes — see `CardPriorityCleanupScope`. The `derived` scope is the one to
+ * reach for after turning Flashcard Prioritisation off: it clears the machinery's
+ * own footprint and keeps every priority the user actually chose.
+ */
+export async function removeAllCardPriorityTags(
+  plugin: RNPlugin,
+  options: CardPriorityCleanupOptions = {}
+): Promise<CardPriorityCleanupResult> {
+  const { scope = 'all', skipConfirm = false, context, skipReloadPrompt = false } = options;
+  const empty: CardPriorityCleanupResult = {
+    cancelled: true,
+    scanned: 0,
+    derived: 0,
+    intentional: 0,
+    unknown: 0,
+    foreign: 0,
+    removed: 0,
+  };
+
+  // Name the KB in every dialog: this command only ever touches the open one,
+  // and saying which removes the "did I just wipe the wrong library?" doubt.
+  const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
+  const currentKbId = kbData?._id || 'global';
+  const kbName = kbData?.name || 'this knowledge base';
+  const prefix = context ? `${context}\n\n` : '';
+
+  await plugin.app.toast(`Scanning "${kbName}" for CardPriority tags...`);
+  const { tags, foreign } = await scanCardPriorityTags(plugin);
+
+  const derivedTags = tags.filter((t) => t.bucket === 'derived');
+  const intentionalTags = tags.filter((t) => t.bucket === 'intentional');
+  const unknownTags = tags.filter((t) => t.bucket === 'unknown');
+  const counts = {
+    scanned: tags.length,
+    derived: derivedTags.length,
+    intentional: intentionalTags.length,
+    unknown: unknownTags.length,
+    foreign,
+  };
+
+  console.log(
+    `[CardPriority cleanup] KB "${kbName}" (${currentKbId}) — scope=${scope}: ` +
+      `${counts.scanned} tag(s) — ${counts.derived} inherited/default, ` +
+      `${counts.intentional} manual/incremental, ${counts.unknown} unknown source` +
+      (foreign > 0 ? `; ${foreign} tagged id(s) skipped (not resolvable in this KB)` : '')
+  );
+
+  // Only the derived scope leaves anything behind, so it alone reports "unknown"
+  // separately; an unrecognised source could be a manual priority whose source
+  // slot was lost, and a non-destructive pass must not gamble on that.
+  const targets = scope === 'derived' ? derivedTags : tags;
+
+  if (targets.length === 0) {
+    const message =
+      scope === 'derived'
+        ? counts.scanned === 0
+          ? `No CardPriority tags found in "${kbName}".`
+          : `No inherited/default CardPriority tags in "${kbName}" — the ${counts.scanned} ` +
+            `tag(s) present are manual/incremental or of unknown source, and were left alone.`
+        : `No CardPriority tags found in "${kbName}".`;
+    console.log(`[CardPriority cleanup] ${message}`);
+    await plugin.app.toast(message);
+    return { ...empty, ...counts, cancelled: false };
+  }
+
+  if (!skipConfirm) {
+    if (scope === 'derived') {
+      const confirmed = confirm(
+        `${prefix}🧹 Remove Inherited & Default CardPriority Tags — "${kbName}"\n\n` +
+          `This removes ${derivedTags.length} tag(s) the plugin created on its own ` +
+          `(source: inherited or default) and their priority slots.\n\n` +
+          `KEPT:\n` +
+          `  • ${intentionalTags.length} manual/incremental tag(s) — priorities you set, and ` +
+          `anchors left by Incremental Rems\n` +
+          `  • ${unknownTags.length} tag(s) with no recognisable source\n` +
+          `  • Your Card Priority Shield history (untouched)\n\n` +
+          `NON-DESTRUCTIVE: inherited and default priorities are computed from your ` +
+          `document tree, so they can be rebuilt at any time — enable Flashcard ` +
+          `Prioritisation and run "Update all inherited Card Priorities".\n\n` +
+          `Proceed?`
+      );
+      if (!confirmed) {
+        console.log('[CardPriority cleanup] derived cleanup cancelled by user');
+        await plugin.app.toast('CardPriority cleanup cancelled');
+        return { ...empty, ...counts };
+      }
+    } else {
+      const firstWarning = confirm(
+        `${prefix}⚠️ Remove ALL CardPriority Data — "${kbName}"\n\n` +
+          `This permanently removes ALL ${tags.length} cardPriority tag(s) and their priority ` +
+          `data from this knowledge base, including:\n` +
+          `  • ${intentionalTags.length} MANUAL / INCREMENTAL priorit(ies) — set by you, or ` +
+          `anchoring inheritance for descendants of an Incremental Rem\n` +
+          `  • ${counts.derived} inherited/default tag(s)\n` +
+          `  • ${counts.unknown} tag(s) of unknown source\n\n` +
+          `It also clears this knowledge base's Card Priority Shield history (KB-level and ` +
+          `document-level). Other knowledge bases are not affected. A dated backup of the ` +
+          `shield history is saved first (restorable from the debug tools).\n\n` +
+          `⛔ THE TAGS AND PRIORITIES CANNOT BE RECOVERED. There is no backup and no undo.\n\n` +
+          `Continue to the final confirmation?`
+      );
+      if (!firstWarning) {
+        console.log('[CardPriority cleanup] cancelled by user (first warning)');
+        await plugin.app.toast('CardPriority cleanup cancelled');
+        return { ...empty, ...counts };
+      }
+
+      if (intentionalTags.length > 0) {
+        // Manual work is about to be destroyed — a click is too cheap for that,
+        // so require the phrase to be typed out.
+        const typed = prompt(
+          `⛔ FINAL CONFIRMATION — "${kbName}"\n\n` +
+            `${intentionalTags.length} priorit(ies) you set by hand (or that anchor inheritance ` +
+            `from an Incremental Rem) will be destroyed and cannot be restored.\n\n` +
+            `If you only want to undo the plugin's automatic tagging, cancel here and choose ` +
+            `"inherited & default only" instead — that keeps these ${intentionalTags.length}.\n\n` +
+            `Type  REMOVE ALL  to proceed:`
+        );
+        if ((typed || '').trim().toUpperCase() !== 'REMOVE ALL') {
+          console.log('[CardPriority cleanup] cancelled at typed confirmation');
+          await plugin.app.toast('CardPriority cleanup cancelled — nothing was removed');
+          return { ...empty, ...counts };
+        }
+      } else {
+        const finalOk = confirm(
+          `⛔ FINAL CONFIRMATION — "${kbName}"\n\n` +
+            `Remove all ${tags.length} cardPriority tag(s) and clear this KB's shield history?\n\n` +
+            `This cannot be undone.`
+        );
+        if (!finalOk) {
+          console.log('[CardPriority cleanup] cancelled at final confirmation');
+          await plugin.app.toast('CardPriority cleanup cancelled');
+          return { ...empty, ...counts };
+        }
+      }
+    }
+  }
+
+  console.log(`Starting CardPriority cleanup (scope=${scope})...`);
+  await plugin.app.toast(`Removing ${targets.length} CardPriority tag(s)...`);
 
   // Suppress GlobalRemChanged listener during bulk writes
   await plugin.storage.setSession('plugin_operation_active', true);
 
   try {
-    const cardPriorityPowerup = await plugin.powerup.getPowerupByCode('cardPriority');
-    const taggedRems = (await cardPriorityPowerup?.taggedRem()) || [];
-
-    if (taggedRems.length === 0) {
-      await plugin.app.toast('No CardPriority tags found to remove');
-      console.log('No CardPriority tags found');
-      return;
-    }
-
     let removed = 0;
-    const total = taggedRems.length;
+    const total = targets.length;
     const batchSize = 50;
+    const removedIds = new Set<string>();
 
-    console.log(`Found ${total} rems with CardPriority tags. Starting removal...`);
-    await plugin.app.toast(`Found ${total} CardPriority tags to remove...`);
-
-    for (let i = 0; i < taggedRems.length; i += batchSize) {
-      const batch = taggedRems.slice(i, i + batchSize);
+    for (let i = 0; i < targets.length; i += batchSize) {
+      const batch = targets.slice(i, i + batchSize);
 
       await Promise.all(
-        batch.map(async (rem) => {
-          try {
-            await rem.setPowerupProperty('cardPriority', 'priority', []);
-            await rem.setPowerupProperty('cardPriority', 'prioritySource', []);
-            await rem.setPowerupProperty('cardPriority', 'lastUpdated', []);
-          } catch (e) {
-            console.log(`Warning: Could not clear slots for rem ${rem._id}:`, e);
-          }
-
-          await rem.removePowerup('cardPriority');
+        batch.map(async ({ rem }) => {
+          await stripCardPriorityTag(rem);
+          removedIds.add(rem._id);
         })
       );
 
@@ -84,85 +330,60 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
       }
     }
 
-    console.log('Clearing session storage...');
-    // Real removal: this cleanup strips CardPriority from every rem, so an empty
-    // mirror is the truth. Immediate, so a launch right after cannot come back
-    // warm with priorities that no longer exist.
-    await writeCardPriorityCache(plugin, []);
-    // Real removal: CardPriority is stripped from every rem, so an empty copy is
-    // the truth and this counts as a full read of the (now empty) database.
-    await persistCardPriorityStore(plugin, [], Date.now(), Date.now());
-    await plugin.storage.setSession(seenCardInSessionKey, []);
+    if (scope === 'all') {
+      console.log('Clearing session storage...');
+      // Real removal: this cleanup strips CardPriority from every rem, so an empty
+      // mirror is the truth. Immediate, so a launch right after cannot come back
+      // warm with priorities that no longer exist.
+      await writeCardPriorityCache(plugin, []);
+      // Real removal: CardPriority is stripped from every rem, so an empty copy is
+      // the truth and this counts as a full read of the (now empty) database.
+      await persistCardPriorityStore(plugin, [], Date.now(), Date.now());
+      await plugin.storage.setSession(seenCardInSessionKey, []);
 
-    // Clear ONLY the current KB's shield-history partition. These synced keys are
-    // shared across all of the user's KBs and stored KB-partitioned as
-    // `{ [kbId]: {...} }`; a blanket `setSynced(key, {})` (the previous behaviour)
-    // wiped EVERY KB's card shield history, not just this one — silently destroying
-    // history for unrelated knowledge bases. Read-modify-write the current KB out
-    // instead, mirroring the per-KB save path in shield_history.ts.
-    console.log('Clearing this KB\'s card shield-history partition...');
-    const kbData = await plugin.kb.getCurrentKnowledgeBaseData();
-    const currentKbId = kbData?._id || 'global';
-    const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
-
-    // Remove ONLY the current KB's slice (partition + any legacy root date-keys that
-    // belong to the Primary KB), returning what was removed so it can be backed up.
-    const removedByKey: Record<string, any> = {};
-    const clearCurrentKbPartition = async (storageKey: string) => {
-      const raw = (await plugin.storage.getSynced<Record<string, any>>(storageKey)) || {};
-      const removed: Record<string, any> = {};
-      if (currentKbId in raw) {
-        removed[currentKbId] = raw[currentKbId];
-        delete raw[currentKbId];
-      }
-      // Legacy flat layout (date keys at the root) belongs to the Primary KB.
-      if (isPrimary) {
-        for (const key of Object.keys(raw)) {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
-            removed[key] = raw[key];
-            delete raw[key];
-          }
-        }
-      }
-      removedByKey[storageKey] = removed;
-      await plugin.storage.setSynced(storageKey, raw);
-    };
-    await clearCurrentKbPartition(cardPriorityShieldHistoryKey);
-    await clearCurrentKbPartition(documentCardPriorityShieldHistoryKey);
-
-    // Save a dated backup of exactly what was removed so the cleared history can be
-    // restored later (e.g. from the debug tools) if the cleanup was a mistake.
-    try {
-      const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const backupKey = `${cardShieldCleanupBackupPrefix}${currentKbId}-${ts}`;
-      await plugin.storage.setSynced(backupKey, {
-        backedUpAt: Date.now(),
-        kbId: currentKbId,
-        isPrimary,
-        removed: removedByKey,
-      });
-      // Maintain a discoverable index so the debug "Restore" tool can list backups
-      // (plugin synced storage has no key-enumeration API).
-      const index = (await plugin.storage.getSynced<string[]>(cardShieldCleanupBackupIndexKey)) || [];
-      if (!index.includes(backupKey)) {
-        index.push(backupKey);
-        await plugin.storage.setSynced(cardShieldCleanupBackupIndexKey, index);
-      }
-      console.log(`[Cleanup] Backed up cleared card shield history to "${backupKey}".`);
-    } catch (e) {
-      console.warn('[Cleanup] Could not save shield-history backup:', e);
+      await clearCurrentKbShieldHistory(plugin, currentKbId);
+    } else {
+      // Partial removal: drop exactly the removed rems from both copies and leave
+      // the rest — an empty cache here would read as "no priorities in this KB"
+      // and hide the manual ones that were deliberately preserved. The shield
+      // history is not touched at all: it is a record of past days, not state
+      // derived from the tags.
+      await pruneCardPriorityCopies(plugin, removedIds);
     }
 
-    await plugin.app.toast(`✅ Cleanup complete! Removed ${removed} CardPriority tags.`);
-    console.log(`CardPriority cleanup finished. Successfully removed ${removed} tags from knowledge base.`);
-
-    const shouldRefresh = confirm(
-      'Cleanup successful!\n\n' + 'Would you like to refresh the page to ensure a clean state?'
+    const kept = counts.scanned - removed;
+    await plugin.app.toast(
+      `✅ Cleanup complete! Removed ${removed} CardPriority tag(s)` +
+        (kept > 0 ? `, kept ${kept}.` : '.')
+    );
+    console.log(
+      `CardPriority cleanup finished (scope=${scope}). Removed ${removed} tag(s) from "${kbName}"` +
+        (kept > 0 ? `, kept ${kept}.` : '.')
     );
 
-    if (shouldRefresh) {
-      window.location.reload();
+    if (scope === 'derived') {
+      alert(
+        `✅ Removed ${removed} inherited/default CardPriority tag(s) from "${kbName}".\n\n` +
+          `Kept: ${intentionalTags.length} manual/incremental priorit(ies)` +
+          (unknownTags.length > 0 ? ` and ${unknownTags.length} of unknown source` : '') +
+          `.\n\nNothing is lost: re-enable "Enable Flashcard Prioritisation" and run ` +
+          `"Update all inherited Card Priorities" to rebuild them.\n\n` +
+          `If priority badges still show in tables, run "Remove All Priority Band Tags" ` +
+          `(also reversible).`
+      );
     }
+
+    if (!skipReloadPrompt) {
+      const shouldRefresh = confirm(
+        'Cleanup successful!\n\n' + 'Would you like to refresh the page to ensure a clean state?'
+      );
+
+      if (shouldRefresh) {
+        window.location.reload();
+      }
+    }
+
+    return { ...counts, removed, cancelled: false };
   } catch (error) {
     console.error('Error during CardPriority cleanup:', error);
     await plugin.app.toast('❌ Error during cleanup. Check console for details.');
@@ -171,9 +392,109 @@ export async function removeAllCardPriorityTags(plugin: RNPlugin) {
       'Some tags may not have been removed.\n' +
       'Please check the console for details.'
     );
+    return { ...counts, removed: 0, cancelled: false };
   } finally {
     await plugin.storage.setSession('plugin_operation_active', false);
   }
+}
+
+/**
+ * Clears ONLY the current KB's shield-history partition, backing up what it
+ * removed first.
+ *
+ * These synced keys are shared across all of the user's KBs and stored
+ * KB-partitioned as `{ [kbId]: {...} }`; a blanket `setSynced(key, {})` (an
+ * earlier behaviour) wiped EVERY KB's card shield history, not just this one —
+ * silently destroying history for unrelated knowledge bases. Read-modify-write
+ * the current KB out instead, mirroring the per-KB save path in shield_history.ts.
+ */
+async function clearCurrentKbShieldHistory(plugin: RNPlugin, currentKbId: string): Promise<void> {
+  console.log("Clearing this KB's card shield-history partition...");
+  const isPrimary = await plugin.kb.isPrimaryKnowledgeBase();
+
+  // Remove ONLY the current KB's slice (partition + any legacy root date-keys that
+  // belong to the Primary KB), returning what was removed so it can be backed up.
+  const removedByKey: Record<string, any> = {};
+  const clearCurrentKbPartition = async (storageKey: string) => {
+    const raw = (await plugin.storage.getSynced<Record<string, any>>(storageKey)) || {};
+    const removed: Record<string, any> = {};
+    if (currentKbId in raw) {
+      removed[currentKbId] = raw[currentKbId];
+      delete raw[currentKbId];
+    }
+    // Legacy flat layout (date keys at the root) belongs to the Primary KB.
+    if (isPrimary) {
+      for (const key of Object.keys(raw)) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+          removed[key] = raw[key];
+          delete raw[key];
+        }
+      }
+    }
+    removedByKey[storageKey] = removed;
+    await plugin.storage.setSynced(storageKey, raw);
+  };
+  await clearCurrentKbPartition(cardPriorityShieldHistoryKey);
+  await clearCurrentKbPartition(documentCardPriorityShieldHistoryKey);
+
+  // Save a dated backup of exactly what was removed so the cleared history can be
+  // restored later (e.g. from the debug tools) if the cleanup was a mistake.
+  try {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupKey = `${cardShieldCleanupBackupPrefix}${currentKbId}-${ts}`;
+    await plugin.storage.setSynced(backupKey, {
+      backedUpAt: Date.now(),
+      kbId: currentKbId,
+      isPrimary,
+      removed: removedByKey,
+    });
+    // Maintain a discoverable index so the debug "Restore" tool can list backups
+    // (plugin synced storage has no key-enumeration API).
+    const index = (await plugin.storage.getSynced<string[]>(cardShieldCleanupBackupIndexKey)) || [];
+    if (!index.includes(backupKey)) {
+      index.push(backupKey);
+      await plugin.storage.setSynced(cardShieldCleanupBackupIndexKey, index);
+    }
+    console.log(`[Cleanup] Backed up cleared card shield history to "${backupKey}".`);
+  } catch (e) {
+    console.warn('[Cleanup] Could not save shield-history backup:', e);
+  }
+}
+
+/**
+ * Drops `removedIds` from the session cache and the persisted copy, leaving every
+ * other row intact. `builtAt` is carried over unchanged: pruning is not a fresh
+ * read of the database, and advancing it would postpone the staleness rebuild
+ * (see the header note in persistence.ts).
+ */
+async function pruneCardPriorityCopies(plugin: RNPlugin, removedIds: Set<string>): Promise<void> {
+  if (removedIds.size === 0) return;
+
+  const cache = (await plugin.storage.getSession<CardPriorityInfo[]>(allCardPriorityInfoKey)) || [];
+  const remainingCache = cache.filter((info) => !removedIds.has(info.remId));
+  await writeCardPriorityCache(plugin, remainingCache);
+
+  const stored = await loadPersistedCardPriorities(plugin);
+  if (!stored) return;
+
+  const remainingRows: CardPriorityInfo[] = [];
+  for (const [remId, row] of stored.byRem) {
+    if (removedIds.has(remId)) continue;
+    remainingRows.push({
+      remId,
+      priority: row.priority,
+      source: row.source as PrioritySource,
+      // Only remId/priority/source are persisted; the rest are recomputed on load.
+      lastUpdated: 0,
+      cardCount: 0,
+      dueCards: 0,
+    });
+  }
+  await persistCardPriorityStore(plugin, remainingRows, stored.meta.builtAt, stored.meta.syncedAt);
+  console.log(
+    `[CardPriority cleanup] pruned ${removedIds.size} rem(s) from the cache and persisted copy ` +
+      `(${remainingRows.length} row(s) remain).`
+  );
 }
 
 export async function updateAllCardPriorities(plugin: RNPlugin) {

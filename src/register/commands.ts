@@ -1790,14 +1790,52 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  // Cleanup command
+  // Cleanup command. Two scopes, because the two intentions behind "remove the
+  // CardPriority tags" are very different: undoing the plugin's own automatic
+  // tagging (reversible, what someone who just turned the opt-in off wants) and
+  // wiping every priority including the ones set by hand (irreversible).
   await plugin.app.registerCommand({
     id: 'cleanup-card-priority',
-    name: 'Remove All CardPriority Tags',
+    name: 'Remove CardPriority Tags…',
     description:
-      'Completely remove all CardPriority powerup tags and data from your knowledge base',
+      'Remove CardPriority powerup tags from this knowledge base — either only the ' +
+      'inherited/default ones the plugin created (reversible), or all of them including ' +
+      'manual priorities (irreversible).',
     action: async () => {
-      await removeAllCardPriorityTags(plugin);
+      const kbName = (await plugin.kb.getCurrentKnowledgeBaseData())?.name || 'this knowledge base';
+
+      // OK / Cancel as a two-way chooser, the same pattern the orphan-card flow
+      // uses. The safe option is on OK so a reflexive Enter cannot start the
+      // destructive one — Cancel only leads to further warnings.
+      const derivedOnly = confirm(
+        `🧹 Remove CardPriority Tags — "${kbName}"\n\n` +
+          `Which tags should be removed?\n\n` +
+          `➡️ OK = INHERITED & DEFAULT only (recommended)\n` +
+          `      The tags the plugin created by itself. Manual priorities, Incremental Rem ` +
+          `anchors and your shield history are kept. Fully reversible — rebuild them with ` +
+          `"Update all inherited Card Priorities".\n\n` +
+          `➡️ Cancel = go to the option to remove EVERYTHING\n` +
+          `      Including priorities you set by hand. Cannot be undone. You will be warned again.`
+      );
+
+      if (derivedOnly) {
+        await removeAllCardPriorityTags(plugin, { scope: 'derived' });
+        return;
+      }
+
+      const goDestructive = confirm(
+        `⚠️ Remove EVERYTHING? — "${kbName}"\n\n` +
+          `You chose not to limit the cleanup to inherited/default tags.\n\n` +
+          `OK = continue to the full removal (manual priorities included, irreversible)\n` +
+          `Cancel = abort, nothing is removed`
+      );
+
+      if (!goDestructive) {
+        await plugin.app.toast('CardPriority cleanup cancelled');
+        return;
+      }
+
+      await removeAllCardPriorityTags(plugin, { scope: 'all' });
     },
   });
 
