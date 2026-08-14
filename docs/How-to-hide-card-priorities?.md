@@ -20,7 +20,7 @@ If you want to remove these tags (cardPriority) and slots altogether of all your
 
 - AFTER changing that setting, use the Omnibar to run the command **"Remove CardPriority Tags…"**. It asks which tags to remove:
     - **OK — inherited & default only:** removes the tags the plugin created by itself and keeps the priorities you set by hand. **Reversible.** This is what the plugin also offers to do for you on the first reload after you turn Flashcard Prioritisation off — see [Switching it back off](Priorities-for-Flashcards.md#switching-it-off).
-    - **Cancel — remove everything:** wipes every cardPriority tag, manual priorities included, and clears this knowledge base's shield history. **This cannot be undone**, so it asks again and makes you type `REMOVE ALL` when manual priorities are at stake.
+    - **Cancel — remove everything:** wipes every cardPriority tag, manual priorities included, and clears this knowledge base's shield history. **This cannot be undone**, so it asks again — and when manual priorities are at stake it offers, one dialog before the last, to switch to the reversible scope instead.
 
 ![image](assets/uploaded/803588e9-6a74-4732-aee4-bb33cee5159a.png){ width="700" }
 

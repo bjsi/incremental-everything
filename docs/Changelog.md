@@ -9,7 +9,7 @@ This page documents the major changes and improvements for each version of the I
 **Remove All CardPriority Tags** is now **Remove CardPriority Tags…** and asks which tags to remove:
 
 - **Inherited & default only (recommended)** — the tags the plugin wrote by itself. Manual priorities, the `incremental` anchors left by dismissed Incremental Rems, tags with an unreadable source, and your shield history are all kept. **Reversible:** *Update all inherited Card Priorities* rebuilds them exactly.
-- **Everything** — the old behaviour, now behind two warnings and, when manual priorities are at stake, a typed `REMOVE ALL`.
+- **Everything** — the old behaviour, now behind a chain of warnings that state how many manual priorities are about to be destroyed, and offer the reversible scope one dialog before the last.
 
 Both scopes count what they found before touching anything, and name the knowledge base they are about to modify.
 

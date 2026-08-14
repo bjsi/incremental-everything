@@ -268,33 +268,44 @@ export async function removeAllCardPriorityTags(
         return { ...empty, ...counts };
       }
 
-      if (intentionalTags.length > 0) {
-        // Manual work is about to be destroyed — a click is too cheap for that,
-        // so require the phrase to be typed out.
-        const typed = prompt(
-          `⛔ FINAL CONFIRMATION — "${kbName}"\n\n` +
-            `${intentionalTags.length} priorit(ies) you set by hand (or that anchor inheritance ` +
-            `from an Incremental Rem) will be destroyed and cannot be restored.\n\n` +
-            `If you only want to undo the plugin's automatic tagging, cancel here and choose ` +
-            `"inherited & default only" instead — that keeps these ${intentionalTags.length}.\n\n` +
-            `Type  REMOVE ALL  to proceed:`
+      // NOTE: no typed "REMOVE ALL" gate here. RemNote runs in Electron, where
+      // window.prompt() is not implemented — it returns null without ever showing
+      // a dialog, so a typed confirmation silently reads as a cancellation. The
+      // friction is provided by an extra confirm instead.
+      // Only worth offering when the safe scope would actually do something —
+      // with no inherited/default tags present it would remove nothing, and
+      // "keep them: remove 0 tags instead" reads as a broken dialog.
+      if (intentionalTags.length > 0 && counts.derived > 0) {
+        // Manual work is about to be destroyed. Spell out the alternative that
+        // keeps it, so the last click is made against a real choice rather than
+        // against a wall of warnings.
+        const keepManual = confirm(
+          `⛔ ${intentionalTags.length} MANUAL priorit(ies) will be destroyed — "${kbName}"\n\n` +
+            `These are priorities you set by hand, or that anchor inheritance for the ` +
+            `descendants of an Incremental Rem. They cannot be recomputed and cannot be restored.\n\n` +
+            `➡️ OK = keep them: remove only the ${counts.derived} inherited/default tag(s) instead ` +
+            `(reversible)\n` +
+            `➡️ Cancel = continue to destroy all ${tags.length} tag(s), manual ones included`
         );
-        if ((typed || '').trim().toUpperCase() !== 'REMOVE ALL') {
-          console.log('[CardPriority cleanup] cancelled at typed confirmation');
-          await plugin.app.toast('CardPriority cleanup cancelled — nothing was removed');
-          return { ...empty, ...counts };
+        if (keepManual) {
+          console.log('[CardPriority cleanup] switched to the derived scope at the last warning');
+          return await removeAllCardPriorityTags(plugin, { ...options, scope: 'derived' });
         }
-      } else {
-        const finalOk = confirm(
-          `⛔ FINAL CONFIRMATION — "${kbName}"\n\n` +
-            `Remove all ${tags.length} cardPriority tag(s) and clear this KB's shield history?\n\n` +
-            `This cannot be undone.`
-        );
-        if (!finalOk) {
-          console.log('[CardPriority cleanup] cancelled at final confirmation');
-          await plugin.app.toast('CardPriority cleanup cancelled');
-          return { ...empty, ...counts };
-        }
+      }
+
+      const finalOk = confirm(
+        `⛔ FINAL CONFIRMATION — "${kbName}"\n\n` +
+          `Remove all ${tags.length} cardPriority tag(s)` +
+          (intentionalTags.length > 0
+            ? ` — including ${intentionalTags.length} manual/incremental priorit(ies) —`
+            : '') +
+          ` and clear this knowledge base's shield history?\n\n` +
+          `This is the last confirmation. It cannot be undone.`
+      );
+      if (!finalOk) {
+        console.log('[CardPriority cleanup] cancelled at final confirmation');
+        await plugin.app.toast('CardPriority cleanup cancelled — nothing was removed');
+        return { ...empty, ...counts };
       }
     }
   }
