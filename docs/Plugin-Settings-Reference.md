@@ -63,7 +63,7 @@ Open the popup with the command **`Incremental Everything: Settings`** (quick co
 |---------|------|---------|-------|-------------|
 | **Default IncRem Priority** | Number | `50` | 0–100 | Priority assigned to new Incremental Rems. Lower = more important. |
 | **Default Card Priority** | Number | `50` | 0–100 | Priority assigned to flashcards without inherited priority. Lower = more important. |
-| **Priority Step Size** | Number | `5` | 1–50 | Amount the priority number changes when using the [Quick Increase/Decrease Priority](Plugin-Commands-Reference.md#prioritization-commands) shortcuts (`Ctrl+Opt+Up/Down`). |
+| **Priority Step Size** | Number | `5` | 1–50 | What "one step" of priority means throughout the plugin. It is the amount the priority number changes with the [Quick Increase/Decrease Priority](Plugin-Commands-Reference.md#prioritization-commands) shortcuts (`Ctrl+Opt+Up/Down`), **and** the amount each new cloze's number is raised above the previous one by [Auto-Priority Graduation](IR-Flow--Reading-Extracting-and-Clozing.md#auto-priority-graduation). |
 | **Priority Widget in Editor** | Dropdown | `Show for IncRem and Cards` | — | Controls when the priority widget appears in the right-hand margin of the editor. Options: *Show for IncRem and Cards*, *Show only for IncRem*, or *Disable*. |
 
 ---
