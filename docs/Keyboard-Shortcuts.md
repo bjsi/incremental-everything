@@ -203,6 +203,9 @@ These keys are active **while a plugin popup or floating window is open** — th
 | | `Alt` + `Enter` | Insert the Rem's **text, then a pin** |
 | | `Shift` + `Enter` | Open the Rem in a new pane |
 | | `Esc` | Close the picker |
+| [Image Scan popup](Utilities.md#filter-a-document-by-images) | `↑` / `↓` | Move between the two scopes (this Rem / whole knowledge base) |
+| | `Enter` | Run the selected scope — or, on the report, close the popup |
+| | `Esc` | Cancel and close (ignored **while a scan is running**, so a reflex Esc can't abort it) |
 | [Floating source window](Utilities.md#floating-window-interaction-closing) | `Esc` | Close the window **without** closing the queue |
 
 ---

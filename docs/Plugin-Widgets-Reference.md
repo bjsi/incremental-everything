@@ -499,6 +499,7 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 - **Live progress** while it runs (`Scanning 1,400 / 5,200 Rems…`), because a whole-KB scan is not instant.
 - **The report stays on screen**: Rems scanned, how many hold an image, how many were newly tagged, and how many had the tag cleared. Under it sit the two ways to use the tag — the document **Filter** and a **Search Portal** — so you don't have to remember the shortcut.
 - **Scan again** returns to the scope choice without reopening the command; **?** in the header opens this feature's documentation.
+- **Keyboard-driven:** `↑`/`↓` move between the scopes, `Enter` runs the selected one (and closes the popup from the report), `Esc` cancels — ignored while a scan is running so a reflex press can't abort it.
 
 📖 **Full documentation:** [Filter a Document by Images](Utilities.md#filter-a-document-by-images)
 

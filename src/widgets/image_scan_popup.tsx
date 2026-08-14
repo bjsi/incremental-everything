@@ -1,5 +1,5 @@
 import { renderWidget, usePlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import '../style.css';
 import '../App.css';
 import {
@@ -53,14 +53,30 @@ export function ImageScanPopup() {
   const [ranOnKb, setRanOnKb] = useState(false);
   const [error, setError] = useState('');
 
+  /** Which scope button the keyboard is on: 0 = this Rem, 1 = whole KB. */
+  const [selected, setSelected] = useState<0 | 1>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const init = async () => {
       const ctx = await plugin.widget.getWidgetContext<WidgetLocation.Popup>();
-      setScopeRemId((ctx?.contextData?.scopeRemId as string) ?? null);
+      const remId = (ctx?.contextData?.scopeRemId as string) ?? null;
+      setScopeRemId(remId);
       setScopeName((ctx?.contextData?.scopeName as string) ?? '');
+      // With no scope Rem the first option is disabled, so the keyboard starts
+      // on the only one that can actually run.
+      if (!remId) setSelected(1);
     };
     init();
   }, []);
+
+  // Keys are read on the container, not on the buttons: with focus on a button,
+  // Enter would fire the browser's native activation AND bubble up here, running
+  // the scan twice. Holding focus on the container keeps a single code path, at
+  // the cost of drawing the selection ring ourselves.
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, [phase]);
 
   const run = async (scope: ImageScanScope) => {
     setRanOnKb(scope.kind === 'kb');
@@ -79,6 +95,51 @@ export function ImageScanPopup() {
 
   const close = () => plugin.widget.closePopup();
 
+  /** Runs whichever scope option the keyboard is currently on. */
+  const runSelected = () => {
+    if (selected === 0 && scopeRemId) run({ kind: 'rem', remId: scopeRemId });
+    else run({ kind: 'kb' });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      // Not while scanning: Esc is a reflex, and here it would abort a run that
+      // may be minutes in. Closing the popup is still available with the mouse,
+      // and the warning under the progress line says what that costs.
+      if (phase === 'running') return;
+      e.preventDefault();
+      close();
+      return;
+    }
+
+    if (phase === 'confirm') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        // Two options, so either arrow toggles — except that the scope option is
+        // disabled without a scope Rem, and must not be landed on.
+        setSelected((prev) => (prev === 1 && scopeRemId ? 0 : 1));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        runSelected();
+      }
+      return;
+    }
+
+    if ((phase === 'done' || phase === 'error') && e.key === 'Enter') {
+      e.preventDefault();
+      close();
+    }
+  };
+
+  /** The keyboard selection ring. Drawn outside the button so it reads on both
+   *  the filled primary and the outlined secondary. */
+  const selectionRing = (isSelected: boolean): React.CSSProperties =>
+    isSelected
+      ? { outline: '2px solid var(--rn-clr-border-accent, #3B82F6)', outlineOffset: '2px' }
+      : {};
+
   const header = (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
@@ -87,6 +148,9 @@ export function ImageScanPopup() {
       </div>
       <button
         onClick={openDocs}
+        // Never take focus: the container owns the keys, and a focused ? button
+        // would make Enter both reopen the docs and fall through to the scan.
+        onMouseDown={(e) => e.preventDefault()}
         title="Open the documentation for this command"
         className="rounded-full w-6 h-6 flex items-center justify-center hover:opacity-75"
         style={{
@@ -142,7 +206,13 @@ export function ImageScanPopup() {
   );
 
   return (
-    <div className="flex flex-col gap-3 p-4">
+    <div
+      ref={containerRef}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      className="flex flex-col gap-3 p-4"
+      style={{ outline: 'none' }}
+    >
       {header}
 
       {phase === 'confirm' && (
@@ -157,9 +227,15 @@ export function ImageScanPopup() {
           <div className="flex flex-col gap-2">
             <button
               onClick={() => scopeRemId && run({ kind: 'rem', remId: scopeRemId })}
+              onMouseEnter={() => scopeRemId && setSelected(0)}
               disabled={!scopeRemId}
               className="w-full py-2 px-3 text-sm font-medium rounded text-left"
-              style={scopeRemId ? primaryButton : { ...secondaryButton, opacity: 0.5, cursor: 'not-allowed' }}
+              style={{
+                ...(scopeRemId
+                  ? primaryButton
+                  : { ...secondaryButton, opacity: 0.5, cursor: 'not-allowed' }),
+                ...selectionRing(selected === 0 && !!scopeRemId),
+              }}
             >
               <div>Scan this Rem and its descendants</div>
               <div className="text-xs font-normal opacity-90 mt-0.5" style={{ fontStyle: 'italic' }}>
@@ -169,8 +245,9 @@ export function ImageScanPopup() {
 
             <button
               onClick={() => run({ kind: 'kb' })}
+              onMouseEnter={() => setSelected(1)}
               className="w-full py-2 px-3 text-sm font-medium rounded text-left"
-              style={secondaryButton}
+              style={{ ...secondaryButton, ...selectionRing(selected === 1) }}
             >
               <div>Scan the whole knowledge base</div>
               <div
@@ -182,7 +259,12 @@ export function ImageScanPopup() {
             </button>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between">
+            <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+              <span className="font-mono">↑↓</span> choose ·{' '}
+              <span className="font-mono">Enter</span> run ·{' '}
+              <span className="font-mono">Esc</span> cancel
+            </div>
             <button onClick={close} className="px-3 py-1.5 text-sm rounded" style={secondaryButton}>
               Cancel
             </button>

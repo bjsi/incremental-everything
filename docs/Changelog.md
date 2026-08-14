@@ -10,6 +10,7 @@ RemNote's search indexes text, so an image is invisible to it: there is no way t
 
 - **You choose the scope, and you can see it.** The popup's first button *names the Rem it would scan* — the **focused Rem**, or the **open document** when nothing is focused — so you can verify the target before anything is written. The second scans the **whole knowledge base**, which is what makes a knowledge-base-wide figure portal possible.
 - **The result stays on screen.** Live progress while it runs, then a report — scanned, holding images, newly tagged, cleared — with both ways to use the tag spelled out underneath, and a **?** to the documentation. **Scan again** returns to the scope choice.
+- **Keyboard-driven.** `↑`/`↓` move between the two scopes, `Enter` runs the selected one (and closes the popup from the report), `Esc` cancels — ignored while a scan is running, so a reflex press can't abort a run that may be minutes in.
 - **Front *and* back text.** An image sitting only on the back of a flashcard is found, which scrolling the outline would miss. Image-occlusion Rems count too.
 - **Self-correcting.** Every run also *clears* the tag from Rems in the scope that carry it but no longer hold an image, so deleting a figure and re-running leaves nothing stale. A scoped run never touches Rems outside its subtree.
 - **The tag stays out of your way.** Its chip is hidden from the editor tag bar — targeted at that pill alone, so your own tags on the same Rem remain visible.
@@ -17,6 +18,8 @@ RemNote's search indexes text, so an image is invisible to it: there is no way t
 #### Technical explanation
 
 An image is a rich-text element with `i: 'i'`, so detection is a scan of `text` and `backText` in `lib/image_scan.ts` — no bridge call per Rem. Membership of the tag is read **once**, via the powerup's `taggedRem()`, and turned into a set: the obvious alternative, `hasPowerup` per Rem, is a round trip for every Rem in the document and is exactly the pattern that saturates the plugin bridge on large subtrees. Only Rems whose state actually changes are written to, which is what makes a re-scan cheap. The walk yields to the event loop every 200 Rems, or the popup's progress line would never repaint and a whole-KB run would look like a hang.
+
+Keys are read on the popup's container rather than on the buttons: with focus on a button, `Enter` would fire the browser's native activation *and* bubble to the handler, running the scan twice. Focus is returned to the container on every phase change, and the **?** button refuses focus outright for the same reason. The cost is drawing the selection ring by hand.
 
 The dialog is a widget rather than a native `confirm()` because `confirm()` can express only two outcomes and this one has three, and because the first draft's toast pair raced — the result toast was replaced by "scanning…" before it could be read. The scope is resolved in the *command*, not the widget: by the time the popup mounts the editor has lost focus, so `getFocusedRem()` there comes back empty. The whole-KB branch calls `plugin.rem.getAll()`, which RemNote has removed from the plugin API before, so its failure is translated into a sentence the popup can show rather than surfacing as an opaque bridge error.
 
