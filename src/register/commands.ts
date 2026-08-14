@@ -47,7 +47,6 @@ import { togglePdfHighlightBorders } from '../lib/ui_helpers';
 import { CardPriorityInfo, expandCardInfosToCards } from '../lib/card_priority/types';
 import { IncrementalRem as IncrementalRemType } from '../lib/incremental_rem/types';
 import { buildDocumentScope } from '../lib/scope_helpers';
-import { scanAndTagImages } from '../lib/image_scan';
 import { initIncrementalRem } from './powerups';
 import { getIncrementalRemFromRem, handleNextRepetitionClick, getCurrentIncrementalRem, requestQueueDashboardRefocus } from '../lib/incremental_rem';
 import { removeIncrementalRemCache } from '../lib/incremental_rem/cache';
@@ -1730,56 +1729,29 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     name: 'Tag Rems With Images',
     description:
       'Marks every Rem containing an image inside the focused Rem (or the open document) with the HasImage tag, and clears the tag from Rems that no longer hold one.',
-    quickCode: 'twi',
+    quickCode: 'img',
     action: async () => {
       // Scope: the focused rem when the cursor is in one, otherwise whatever
       // document the focused pane has open — so the command works from the
-      // document title, where there is no focused rem.
+      // document title, where there is no focused rem. Resolved here rather than
+      // in the popup: by the time the widget mounts the editor has lost focus,
+      // so getFocusedRem() would come back empty.
       let scope = await plugin.focus.getFocusedRem();
       if (!scope) {
         const paneId = await plugin.window.getFocusedPaneId();
         const openRemId = await plugin.window.getOpenPaneRemId(paneId);
         scope = openRemId ? (await plugin.rem.findOne(openRemId)) || undefined : undefined;
       }
-      if (!scope) {
-        await plugin.app.toast('No focused Rem or open document to scan.');
-        return;
-      }
 
-      // Name the exact target in the confirmation: the focused-rem fallback means
-      // the scope is not always the document the user has in mind.
-      const rawName = await safeRemTextToString(plugin, scope.text);
-      const scopeName = rawName.length > 80 ? rawName.slice(0, 80) + '…' : rawName || 'Untitled';
+      // A missing scope is not an error: the popup still offers the whole-KB
+      // scan, and simply disables the scope button.
+      const rawName = scope ? await safeRemTextToString(plugin, scope.text) : '';
+      const scopeName = rawName.length > 80 ? rawName.slice(0, 80) + '…' : rawName;
 
-      const ok = confirm(
-        `🖼️ Tag Rems With Images\n\n` +
-          `Scope: "${scopeName}"\n\n` +
-          `This Rem and all of its descendants will be scanned for images ` +
-          `(front and back text).\n\n` +
-          `• Every Rem holding an image gets the #HasImage tag\n` +
-          `• Rems inside this scope that carry the tag but no longer hold an ` +
-          `image lose it\n` +
-          `• Nothing outside this scope is touched\n\n` +
-          `Afterwards, press Cmd/Ctrl+Shift+F in the document (or Cmd/Ctrl+F and ` +
-          `switch the search mode to "Filter"), then pick HasImage — the document ` +
-          `collapses to just the Rems with images.\n\n` +
-          `Proceed?`
-      );
-      if (!ok) return;
-
-      await plugin.app.toast('🔍 Scanning for images…');
-      try {
-        const result = await scanAndTagImages(plugin, scope);
-        const failedNote = result.failed > 0 ? `, ${result.failed} failed` : '';
-        await plugin.app.toast(
-          `🖼️ ${result.withImages} Rem(s) with images in ${result.scanned} scanned ` +
-            `— +${result.tagged} tagged, −${result.untagged} cleared${failedNote}. ` +
-            `Filter the document by HasImage to see them.`
-        );
-      } catch (e) {
-        console.error('[ImageScan] scan failed:', e);
-        await plugin.app.toast(`Image scan failed: ${(e as any)?.message ?? e}`);
-      }
+      await plugin.widget.openPopup('image_scan_popup', {
+        scopeRemId: scope?._id ?? null,
+        scopeName,
+      });
     },
   });
 

@@ -148,6 +148,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
     },
   });
 
+  // Confirmation + report for "Tag Rems With Images". A popup rather than a
+  // native confirm(): the dialog offers a third choice (this scope / whole KB),
+  // and the report has to stay on screen — a toast pair raced and the result
+  // was replaced by the "scanning…" toast before it could be read.
+  plugin.app.registerWidget('image_scan_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 480,
+      height: 'auto',
+    },
+  });
+
   plugin.app.registerWidget('card_info_bar', WidgetLocation.FlashcardUnder, {
     powerupFilter: 'cardPriority',
     dimensions: {

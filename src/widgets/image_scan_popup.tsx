@@ -198,6 +198,13 @@ export function ImageScanPopup() {
           <div className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
             {progress}
           </div>
+          {/* The scan runs inside this popup, so closing it stops the walk. The
+              work already written stays valid — the command is idempotent — but
+              the run would be incomplete, which matters most on a KB scan. */}
+          <div className="text-xs" style={{ color: 'var(--rn-clr-content-tertiary)' }}>
+            Keep this popup open until it finishes — closing it stops the scan
+            (anything already tagged stays, and re-running resumes the work).
+          </div>
         </div>
       )}
 
