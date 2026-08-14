@@ -567,6 +567,25 @@ export function IESettingsWidget() {
                     {IE_SETTING_GROUPS[group].blurb}
                   </div>
                 )}
+                {/* Applies to every setting in the group, so it sits above them
+                    all rather than being repeated on each row. */}
+                {IE_SETTING_GROUPS[group].warning && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      borderRadius: 6,
+                      border: '1px solid rgba(245, 158, 11, 0.45)',
+                      backgroundColor: 'rgba(245, 158, 11, 0.10)',
+                      color: 'var(--rn-clr-content-primary, #0f172a)',
+                    }}
+                  >
+                    <strong>⚠️ </strong>
+                    {IE_SETTING_GROUPS[group].warning}
+                  </div>
+                )}
                 {ids.filter(matches).map((id) => (
                   <SettingRow
                     key={id}

@@ -18,6 +18,12 @@ Your values carry over on the first load, and anything you had already changed i
 
 📖 [Where the settings are](Plugin-Settings-Reference.md#where-the-settings-are)
 
+### 📝 Changed - the FSRS settings say plainly that they schedule nothing
+
+The FSRS group in the settings popup now carries a warning above its three settings: they are **display and statistics only**. Nothing there can move a due date — scheduling is RemNote's, at **Settings → Schedulers** — and the values exist so the plugin's readouts describe your real scheduler. Set them to *match* what you use there; changing them here alone only makes the figures wrong. *FSRS Global Weights* and *Requested Retention* say the same in their own descriptions, being the two most easily mistaken for scheduler knobs.
+
+📖 [FSRS settings](Plugin-Settings-Reference.md#fsrs)
+
 ### 🐛 Fixed - a renamed setting could lose its value during the migration
 
 The migration drops blob keys that are no longer settings, and it did that *before* running the renames — so a setting whose id had changed had its old key deleted a step before the rename needed to read it, and the value fell back to the default. Only *Skip Mastery Drill* → *Enable Mastery Drill* was ever affected. The renames now run first.

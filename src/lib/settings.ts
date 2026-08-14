@@ -225,6 +225,12 @@ export interface SettingGroupSpec {
   /** Shown under the group heading in the popup. */
   blurb?: string;
   /**
+   * Rendered as a prominent warning box under the group heading, above its
+   * settings — for a caveat that applies to every setting in the group and would
+   * otherwise have to be repeated on each of them.
+   */
+  warning?: string;
+  /**
    * Page on the docs site, relative to IE_DOCS_BASE_URL, for the feature the
    * whole group configures. Renders a "?" beside the group heading — better
    * than repeating the same link on each of its settings.
@@ -255,7 +261,17 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
   },
   queue: { label: 'Queue', blurb: 'What the queue shows during review.' },
   editor: { label: 'Editor Indicators', blurb: 'Visual markers on rems in the editor.' },
-  fsrs: { label: 'FSRS', blurb: 'Difficulty / Stability / Retrievability display.' },
+  fsrs: {
+    label: 'FSRS',
+    blurb: 'Difficulty / Stability / Retrievability display.',
+    helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
+    warning:
+      'These settings are for DISPLAY AND STATISTICS ONLY. They change what the plugin shows you ' +
+      'about a card — they do not schedule anything, and nothing here can move a due date. Your ' +
+      'actual scheduling is RemNote\'s, and is configured in RemNote Settings → Schedulers. Set ' +
+      'the values below to MATCH what you use there, so the plugin\'s figures describe your real ' +
+      'scheduler; changing them here alone only makes the readouts wrong.',
+  },
   masteryDrill: {
     label: 'Mastery Drill',
     blurb: 'Deliberate practice of poorly-rated cards.',
@@ -575,8 +591,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     placeholder: 'w0, w1, … w20 — leave blank for FSRS v6.1.1 defaults',
     title: 'FSRS Global Weights',
     description:
-      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler ' +
-      'settings. Leave blank to use the official defaults.',
+      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from RemNote Settings → ' +
+      'Schedulers so the plugin computes the same D/S/R your scheduler does. Leave blank to use ' +
+      'the official defaults. Editing them here does not change your scheduler.',
   },
   [fsrsRequestedRetentionId]: {
     kind: 'number',
@@ -587,8 +604,9 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
     helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
     title: 'Requested Retention',
     description:
-      'The recall probability your RemNote scheduler aims for at review time. Set it to the same ' +
-      'value you use there.\n\n' +
+      'The recall probability your RemNote scheduler aims for at review time. Copy the value from ' +
+      'RemNote Settings → Schedulers; setting it here does not change what your scheduler asks ' +
+      'for.\n\n' +
       'Stability is an interval only at the 90% default: a stricter retention schedules a card ' +
       'sooner than its stability, a looser one later. The card info bar uses this to show the ' +
       'interval you will actually get, and to compute the U-Factor from it.',
