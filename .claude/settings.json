@@ -33,7 +33,11 @@
       "WebSearch",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:plugins.remnote.com)",
-      "Bash(npx remnote-plugin *)"
+      "Bash(npx remnote-plugin *)",
+      "Bash(python3 -c \"import material,os;print\\(os.path.dirname\\(material.__file__\\)\\)\")",
+      "Bash(pip3 show *)",
+      "Bash(cat \"/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/material/templates/partials/toc.html\")",
+      "Read(//Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/material/templates/partials/**)"
     ],
     "additionalDirectories": [
       "/Users/hugomarins/incremental-everything.wiki"

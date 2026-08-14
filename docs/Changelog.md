@@ -39,6 +39,12 @@ Colours come from RemNote's `--rn-clr-border-accent` / `--rn-clr-border-selected
 
 📖 [Pins that lead to an image are ringed](Utilities.md#pins-that-lead-to-an-image-are-ringed)
 
+### 📚 Docs - the Utilities page is grouped, and its table of contents is complete again
+
+[Utilities](Utilities.md) now sorts its commands into five groups — **Text & Lists**, **Outline & Headings**, **Finding & Navigating**, **Queue Display Utilities** and **Under the Hood** — and the sidebar lists all of them. It had been showing only the first section's subsections, hiding two thirds of the page. Two stale changelog links were repaired in the same pass.
+
+📖 [Utilities](Utilities.md)
+
 ## v1.0.42 - August 13th, 2026
 
 ### ✨ New - the card info bar now shows the next stability, and tells the truth about intervals if you don't review at 90% retention
@@ -125,7 +131,7 @@ Three bindings were documented wrongly elsewhere and have been fixed: Change Pri
 
 Dismissing an Incremental Rem with `Ctrl+D` **while the queue was showing something else** — a Rem opened in the previewer (`P`) during a flashcard turn, or any Rem you had selected — wrote a **`rep` entry** into its history before dismissing it, complete with a review duration. Nothing had been reviewed. Worse, the duration was borrowed: it was the time elapsed since the *last Incremental Rem the queue had injected*, so a Rem you made incremental and dismissed within a minute could be credited with half an hour of reading.
 
-Those minutes then counted as real everywhere history is read — total time on the item, the [Aggregated History](Plugin-Widgets-Reference.md#212-increm-repetition-history--aggregated-view) totals of every ancestor, and the [Study Dashboard](Study-Dashboard.md).
+Those minutes then counted as real everywhere history is read — total time on the item, the [Aggregated History](Plugin-Widgets-Reference.md#212-increm-repetition-history-aggregated-view) totals of every ancestor, and the [Study Dashboard](Study-Dashboard.md).
 
 `Ctrl+D` now records a repetition **only when the queue was actually on that Rem's Incremental turn** — exactly the case the **Dismiss** button covers. Used on any other Rem it is a pure lifecycle change: history is transferred to the Dismissed state and the power-up removed, like `Ctrl+D` in the editor. Since nothing on screen moves in that case, a toast now names the Rem that was dismissed.
 

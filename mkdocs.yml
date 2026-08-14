@@ -58,6 +58,10 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - toc:
       permalink: true
+      # Stop the sidebar at the utility level. Utilities.md nests four deep
+      # (page title → group → utility → detail); without this its 59 detail
+      # headings all land in the ToC. No other page goes deeper than H3.
+      toc_depth: 3
 
 nav:
   - Home: index.md
