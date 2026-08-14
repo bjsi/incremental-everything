@@ -537,6 +537,8 @@ RemNote's search indexes **text**. An image carries no searchable token, so neit
 
 **Tag Rems With Images** (`quick: img`) closes that gap. It scans a scope for images and marks every Rem holding one with the **`HasImage`** tag — which the native document filter *can* isolate.
 
+![Running Tag Rems With Images on a chapter, then filtering the document by HasImage so it collapses to only the Rems holding a figure](assets/filtering-rems-with-images.gif)
+
 #### How to use it
 
 1. Put your cursor in the Rem you want to scan — or simply open the document — and run **Tag Rems With Images** from the Omnibar (`Cmd+/`).

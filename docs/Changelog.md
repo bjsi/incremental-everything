@@ -15,7 +15,7 @@ RemNote's search indexes text, so images are invisible to it. The new **Tag Rems
 - **Self-correcting:** a re-run clears the tag from Rems whose image is gone.
 - **Keyboard-driven:** `↑`/`↓` choose, `Enter` runs, `Esc` cancels. The `HasImage` chip is hidden from the editor tag bar.
 
-![Filtering a document by the HasImage tag from Ctrl+F](assets/filtering-doc-hasimage-tag.png){ width="700" }
+![Running the command on a chapter, then filtering by HasImage so the document collapses to only the Rems holding a figure](assets/filtering-rems-with-images.gif)
 
 #### Technical explanation
 
