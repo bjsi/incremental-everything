@@ -20,7 +20,7 @@ import {
  * The plugin's surface is spread across a slash-command list, a settings popup,
  * two document menus and a dozen shortcuts, none of which announce themselves.
  * This panel is the one fixed place that does: five things a new user needs
- * within reach, and one tip at a time from the onboarding pile.
+ * within reach, and one tip per session from the onboarding pile.
  *
  * It sits in `SidebarEnd` next to the Mastery Drill notification, and is not
  * gated behind a setting — it is the entry point, so it has to be there before
@@ -110,9 +110,9 @@ function IconButton(props: {
 }
 
 /**
- * One tip, with its three answers. `onGotIt` retires it permanently, `onClose`
- * returns it to the pile, `Learn More` is only rendered when the tip names a
- * docs section.
+ * One tip, with its three answers. `onGotIt` retires it permanently and
+ * `onClose` returns it to the pile; either way the tip area is done for this
+ * session. `Learn More` is only rendered when the tip names a docs section.
  */
 function TipCard(props: { tip: OnboardingTip; onGotIt: () => void; onClose: () => void }) {
   const { tip } = props;
@@ -212,12 +212,14 @@ export function PluginHub() {
     []
   );
 
+  // Retire the tip and stop there — one tip per session. Handing back the next
+  // one on acknowledgement turns the panel into a quiz the user did not ask for,
+  // and the pile is meant to be drained over weeks, not in one sitting.
   const handleGotIt = useCallback(async () => {
     const current = tip;
     if (!current) return;
     await acknowledgeTip(plugin, current.id);
-    const acknowledged = await getAcknowledgedTipIds(plugin);
-    setTip(pickTip(acknowledged, current.id));
+    setTip(null);
   }, [plugin, tip]);
 
   const handleCloseTip = useCallback(async () => {

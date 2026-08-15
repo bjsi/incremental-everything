@@ -45,13 +45,13 @@ Once installed, the plugin adds a small **Incremental Plugin** 🌐 panel at the
 
 ### Tips { #tips }
 
-The panel shows one tip at a time, drawn at random from the tips you have not retired yet. Each has three answers:
+The panel shows **one tip per session**, drawn at random from the tips you have not retired yet. Answer it and the tip area is done until the next time you open RemNote — it will not hand you another one. Each tip has three answers:
 
-- **I Got It** — you know this one. It is never shown again, and the next tip appears straight away. This is remembered per knowledge base and syncs across your devices.
-- **✕** — not now. The tip stays in the pile and can resurface later; the panel goes quiet for two hours first.
+- **I Got It** — you know this one. It is never shown again. This is remembered per knowledge base and syncs across your devices.
+- **✕** — not now. The tip stays in the pile and can resurface later; the panel also goes quiet for two hours, so a reload does not immediately produce another one.
 - **Learn More** — opens the documentation section for the feature the tip is about. Tips that are habits rather than features have no such button.
 
-When you have answered **I Got It** to every tip, the tip area disappears and the panel keeps only its shortcuts.
+When you have answered **I Got It** to every tip, the tip area disappears for good and the panel keeps only its shortcuts.
 
 ---
 

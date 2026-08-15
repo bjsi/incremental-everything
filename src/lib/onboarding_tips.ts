@@ -5,14 +5,16 @@ import { onboardingTipsStateKey, onboardingTipsSnoozeKey } from './consts';
  * The tip pile behind the Incremental Plugin sidebar hub.
  *
  * A tip is one small thing the plugin can do, phrased so it can be acted on
- * immediately. The user has three answers to each:
+ * immediately. **One tip per session**: the panel draws a tip when it mounts,
+ * and once it is answered the tip area is done until the next start. The user
+ * has three answers to each:
  *
  *  - **I Got It** — acknowledged, and never shown again. Persisted per knowledge
  *    base in synced storage, so it survives reloads and follows the user across
  *    devices.
  *  - **✕** — not now. The tip stays in the pile and can resurface later; the
- *    panel goes quiet for {@link TIP_SNOOZE_MS} first so dismissing it does not
- *    hand back another tip on the same breath.
+ *    panel also goes quiet for {@link TIP_SNOOZE_MS}, so a reload inside that
+ *    window does not immediately produce another tip.
  *  - **Learn More** — opens the docs section for the feature, when the tip names
  *    one. Not every tip has a page (some are habits, not features), hence the
  *    optional `docsPath`.
@@ -200,15 +202,11 @@ export async function tipsAreSnoozed(plugin: RNPlugin): Promise<boolean> {
 }
 
 /**
- * Draw one tip at random from what is left, optionally avoiding the one just
- * answered so "I Got It" cannot hand back the same card twice in a row.
+ * Draw one tip at random from what is left. Called once per panel mount — a
+ * session shows one tip and no more, whichever way the user answers it.
  */
-export function pickTip(acknowledged: string[], excludeId?: string): OnboardingTip | null {
-  const pool = ONBOARDING_TIPS.filter((t) => !acknowledged.includes(t.id) && t.id !== excludeId);
-  // Only the exclusion emptied it — better to repeat the last tip than to show
-  // nothing while tips remain.
-  const fallback = ONBOARDING_TIPS.filter((t) => !acknowledged.includes(t.id));
-  const source = pool.length > 0 ? pool : fallback;
-  if (source.length === 0) return null;
-  return source[Math.floor(Math.random() * source.length)];
+export function pickTip(acknowledged: string[]): OnboardingTip | null {
+  const pool = ONBOARDING_TIPS.filter((t) => !acknowledged.includes(t.id));
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
 }

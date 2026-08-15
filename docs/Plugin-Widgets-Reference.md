@@ -510,7 +510,7 @@ The confirmation *and* the report for the image scan, in one popup that stays op
 
 The plugin's hub, at the bottom of the left sidebar. Header controls: **⚙** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation, **✕** hides the panel for the session — it returns on the next start, and the **Show Incremental Plugin Panel** command brings it back sooner. Three shortcut buttons: **⌨** ([Keyboard Shortcuts](Keyboard-Shortcuts.md)), **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and **Priority Review** — which creates a [Priority Review Document](Priority-Review-Document.md) scoped to the document you currently have open, naming that scope under the button.
 
-Below the shortcuts it shows one onboarding tip at a time, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile; the panel goes quiet for two hours) and **Learn More** (opens the tip's documentation section).
+Below the shortcuts it shows **one onboarding tip per session**, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile; the panel also goes quiet for two hours) and **Learn More** (opens the tip's documentation section). Either answer closes the tip area until the next start — it never chains into a second tip.
 
 📖 **Full documentation:** [The Incremental Plugin Panel](Getting-Started.md#the-incremental-plugin-panel)
 
