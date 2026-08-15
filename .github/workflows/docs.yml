@@ -6,7 +6,9 @@ on:
       - main
     paths:
       - 'docs/**'
+      - 'overrides/**'
       - 'mkdocs.yml'
+      - 'docs-requirements.txt'
   workflow_dispatch:
 
 permissions:
@@ -30,11 +32,15 @@ jobs:
       - name: Cache MkDocs dependencies
         uses: actions/cache@v4
         with:
-          key: mkdocs-material-${{ hashFiles('mkdocs.yml') }}
+          # Keyed on the pin file, so bumping the version fetches the new wheel
+          # instead of serving the old one from cache.
+          key: mkdocs-material-${{ hashFiles('docs-requirements.txt') }}
           path: ~/.cache/pip
 
       - name: Install MkDocs Material
-        run: pip install mkdocs-material
+        # Pinned — see docs-requirements.txt for why the theme version and
+        # overrides/partials/header.html have to move together.
+        run: pip install -r docs-requirements.txt
 
       - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy --force

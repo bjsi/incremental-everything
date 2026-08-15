@@ -159,6 +159,11 @@ This represents months of iteration to build a complete learning system. I'd lov
 
 The goal is to make RemNote the ultimate tool for serious, long-term learners. Let me know what you think!
 
+**Where to reach us:**
+
+- **[GitHub Issues](https://github.com/bjsi/incremental-everything/issues)** — bug reports and feature requests. Best for anything that needs tracking down, since an issue keeps its history.
+- **[The plugin's thread on RemNote's Discord](https://discord.com/channels/689979930804617224/1201559830431809566)** — questions, workflows and general discussion with other users.
+
 
 Happy learning! 📚✨
 

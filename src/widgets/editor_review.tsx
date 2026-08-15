@@ -24,10 +24,17 @@ import { setPendingReviewNote, stampNoteAndContext, MAX_NOTE_LENGTH } from '../l
 import { PrioritySlider, PriorityBadge } from '../components';
 import {
   deductFromQueueIncRemClock,
+  deductFromEditorTimerClock,
   finishQueueIncRemTurn,
+  finishEditorReviewTurn,
+  readEditorTimerState,
   LeaveTurnMode,
 } from '../lib/review_actions';
-import { incremReviewStartTimeKey } from '../lib/consts';
+import {
+  incremReviewStartTimeKey,
+  editorReviewTimerAccumulatedMsKey,
+  editorReviewTimerPausedAtKey,
+} from '../lib/consts';
 
 // ─── Core Review Handler ────────────────────────────────────────────────────
 
@@ -121,11 +128,15 @@ interface RegressionInfo {
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 /**
- * Details of the IncRem turn running in the queue behind this popup, shown by
- * the "leaving the queue" overlay. Only ever set when the popup was opened from
- * the queue on a DIFFERENT rem (previewer selection).
+ * A review of a DIFFERENT rem that is already running behind this popup, and
+ * whose clock is therefore still counting while the user records time here.
+ *
+ * Two sources, one behaviour: an Incremental turn in the queue, or the Editor
+ * Review Timer. They keep their elapsed time in different session keys, so the
+ * `kind` decides which clock to deduct from and which recorder closes it out.
  */
-interface QueueTurnInfo {
+interface ActiveReviewInfo {
+  kind: 'queue' | 'editor';
   remId: string;
   name: string;
   elapsedSeconds: number;
@@ -156,7 +167,21 @@ const EditorReviewInput: React.FC<{
    * close its turn out first.
    */
   queueIncRemId?: string;
-}> = ({ plugin, remId, queueIncRemId }) => {
+  /**
+   * Same situation, one surface over: the Editor Review Timer is running for a
+   * different rem. Mutually exclusive with `queueIncRemId` in practice — the
+   * queue handoff sets both, and the queue turn is the one that owns the clock.
+   */
+  editorTimerRemId?: string;
+}> = ({ plugin, remId, queueIncRemId, editorTimerRemId }) => {
+  // One concept, whichever surface it came from. The queue wins if both are
+  // set: a handoff timer is the same review continued, not a second one.
+  const activeReviewKind: ActiveReviewInfo['kind'] | null = queueIncRemId
+    ? 'queue'
+    : editorTimerRemId
+    ? 'editor'
+    : null;
+  const activeReviewRemId = queueIncRemId ?? editorTimerRemId;
   const [days, setDays] = useState<string>('1');
   const [priority, setPriority] = useState<number>(10);
   const [note, setNote] = useState<string>('');
@@ -177,8 +202,8 @@ const EditorReviewInput: React.FC<{
   // Regression warning state
   const [regressionInfo, setRegressionInfo] = useState<RegressionInfo | null>(null);
 
-  // "You are leaving an IncRem turn" overlay state (queue previewer only).
-  const [queueTurn, setQueueTurn] = useState<QueueTurnInfo | null>(null);
+  // "You are leaving a review in progress" overlay state.
+  const [activeReview, setActiveReview] = useState<ActiveReviewInfo | null>(null);
   const [leavePrompt, setLeavePrompt] = useState<PendingTimerStart | null>(null);
   const [carryMinutes, setCarryMinutes] = useState<string>('0');
   const leaveResolvedRef = useRef(false);
@@ -262,31 +287,55 @@ const EditorReviewInput: React.FC<{
     }, 0);
   }, []);
 
-  // Snapshot of the queue turn still running behind this popup. Read-only —
+  // Snapshot of the review still running behind this popup. Read-only —
   // getNextSpacingDateForRem only projects what a repetition WOULD schedule.
-  const readQueueTurn = useCallback(async (): Promise<QueueTurnInfo | null> => {
-    if (!queueIncRemId) return null;
+  const readActiveReview = useCallback(async (): Promise<ActiveReviewInfo | null> => {
+    if (!activeReviewKind || !activeReviewRemId) return null;
 
-    const turnRem = await plugin.rem.findOne(queueIncRemId);
-    if (!turnRem) return null;
+    const otherRem = await plugin.rem.findOne(activeReviewRemId);
+    if (!otherRem) return null;
 
-    const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-    const inLookbackMode = !!(await plugin.queue.inLookbackMode());
-    const spacing = await getNextSpacingDateForRem(plugin, queueIncRemId, inLookbackMode);
+    let elapsedSeconds = 0;
+    let interval: number | undefined;
+    let nextRepDate: number | undefined;
+
+    if (activeReviewKind === 'queue') {
+      const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+      elapsedSeconds = startTime ? Math.max(0, Math.round((Date.now() - startTime) / 1000)) : 0;
+      const inLookbackMode = !!(await plugin.queue.inLookbackMode());
+      const spacing = await getNextSpacingDateForRem(plugin, activeReviewRemId, inLookbackMode);
+      interval = spacing?.newInterval;
+      nextRepDate = spacing?.newNextRepDate;
+    } else {
+      const timer = await readEditorTimerState(plugin);
+      if (!timer) return null;
+      elapsedSeconds = timer.elapsedSeconds;
+      // The timer already fixed its own interval when it started; that is what
+      // End Review would schedule, so it is what "Reschedule" here means. A
+      // queue-handoff timer carries none — its repetition is already dated.
+      interval = timer.interval ?? undefined;
+      if (typeof timer.interval === 'number') {
+        nextRepDate = Date.now() + timer.interval * 24 * 60 * 60 * 1000;
+      } else {
+        const info = await getIncrementalRemFromRem(plugin, otherRem);
+        nextRepDate = info?.nextRepDate;
+      }
+    }
 
     return {
-      remId: queueIncRemId,
-      name: (await safeRemTextToString(plugin, turnRem.text)) || 'Unnamed Rem',
-      elapsedSeconds: startTime ? Math.max(0, Math.round((Date.now() - startTime) / 1000)) : 0,
-      interval: spacing?.newInterval,
-      nextRepDate: spacing?.newNextRepDate,
+      kind: activeReviewKind,
+      remId: activeReviewRemId,
+      name: (await safeRemTextToString(plugin, otherRem.text)) || 'Unnamed Rem',
+      elapsedSeconds,
+      interval,
+      nextRepDate,
     };
-  }, [plugin, queueIncRemId]);
+  }, [plugin, activeReviewKind, activeReviewRemId]);
 
   useEffect(() => {
-    if (!queueIncRemId) return;
-    readQueueTurn().then((info) => info && setQueueTurn(info));
-  }, [queueIncRemId, readQueueTurn]);
+    if (!activeReviewKind) return;
+    readActiveReview().then((info) => info && setActiveReview(info));
+  }, [activeReviewKind, readActiveReview]);
 
   useEffect(() => {
     const numDays = parseInt(days);
@@ -352,34 +401,38 @@ const EditorReviewInput: React.FC<{
         if (result) {
           await recordIncRemRep(plugin, remId, Math.round(numMinutes * 60 * 1000));
 
-          // Opened from the queue on a different rem: these minutes were spent
-          // here, inside the other item's turn, so they must come off its clock
-          // instead of being counted twice. The queue turn itself continues.
+          // Another review is running on a different rem: these minutes were
+          // spent HERE, inside its clock, so they must come off that clock
+          // instead of being counted twice. That review itself continues.
           let deducted = 0;
-          if (queueIncRemId && numMinutes > 0) {
-            deducted = await deductFromQueueIncRemClock(plugin, numMinutes * 60);
+          if (activeReviewKind && numMinutes > 0) {
+            deducted =
+              activeReviewKind === 'queue'
+                ? await deductFromQueueIncRemClock(plugin, numMinutes * 60)
+                : await deductFromEditorTimerClock(plugin, numMinutes * 60);
           }
 
           const dateStr = dayjs(result.newNextRepDate).format('MMMM D, YYYY');
           await plugin.app.toast(
             `✓ ${remName}: Repetition stored, next review: ${dateStr}` +
-            (deducted > 0 ? ` · ${formatSpan(deducted)} deducted from ${queueTurn?.name ?? 'the queue item'}` : '')
+            (deducted > 0 ? ` · ${formatSpan(deducted)} deducted from ${activeReview?.name ?? 'the running review'}` : '')
           );
           await plugin.widget.closePopup();
         }
       }
     },
-    [days, reviewTimeMinutes, plugin, remId, priority, remName, note, queueIncRemId, queueTurn]
+    [days, reviewTimeMinutes, plugin, remId, priority, remName, note, activeReviewKind, activeReview]
   );
 
   const executeStartTimer = useCallback(
     async (intervalOverride?: number, dateOverride?: number) => {
-      // Starting the timer navigates away from the queue, abandoning the turn
-      // in progress. Ask what happens to it first — and park the arguments, so
-      // the answer resumes exactly this call.
-      if (queueIncRemId && !leaveResolvedRef.current) {
-        const fresh = await readQueueTurn();
-        if (fresh) setQueueTurn(fresh);
+      // Starting the timer abandons the review in progress — by navigating away
+      // from the queue, or by taking the timer over from the rem that had it.
+      // Ask what happens to it first, parking the arguments so the answer
+      // resumes exactly this call.
+      if (activeReviewKind && !leaveResolvedRef.current) {
+        const fresh = await readActiveReview();
+        if (fresh) setActiveReview(fresh);
         setCarryMinutes('0');
         setLeavePrompt({ intervalOverride, dateOverride });
         return;
@@ -441,6 +494,11 @@ const EditorReviewInput: React.FC<{
       // previewer, so the timer picks up where that reading stopped.
       await plugin.storage.setSession('editor-review-timer-rem-id', remId);
       await plugin.storage.setSession('editor-review-timer-start', Date.now() - carryToTargetMsRef.current);
+      // Start this rem's clock from zero (plus any carry-over back-dated
+      // above). Without this, a timer taken over from another rem hands its
+      // accumulated segment — and any pause — to the new review.
+      await plugin.storage.setSession(editorReviewTimerAccumulatedMsKey, undefined);
+      await plugin.storage.setSession(editorReviewTimerPausedAtKey, undefined);
       await plugin.storage.setSession('editor-review-timer-interval', resolvedInterval);
       await plugin.storage.setSession('editor-review-timer-priority', priority);
       await plugin.storage.setSession('editor-review-timer-rem-name', remName);
@@ -476,7 +534,7 @@ const EditorReviewInput: React.FC<{
 
       await plugin.widget.closePopup();
     },
-    [days, plugin, remId, priority, remName, note, queueIncRemId, readQueueTurn]
+    [days, plugin, remId, priority, remName, note, activeReviewKind, readActiveReview]
   );
 
   // ─── Leaving the Queue Turn ─────────────────────────────────────────────
@@ -489,20 +547,23 @@ const EditorReviewInput: React.FC<{
    */
   const resolveLeave = useCallback(
     async (mode: LeaveTurnMode) => {
-      if (!queueIncRemId) return;
+      if (!activeReviewKind) return;
 
       const carry = Math.max(0, parseFloat(carryMinutes) || 0);
       const carrySeconds = Math.round(carry * 60);
       carryToTargetMsRef.current = carrySeconds * 1000;
 
-      const result = await finishQueueIncRemTurn(plugin, queueIncRemId, mode, carrySeconds);
+      const result =
+        activeReviewKind === 'queue'
+          ? await finishQueueIncRemTurn(plugin, activeReviewRemId!, mode, carrySeconds)
+          : await finishEditorReviewTurn(plugin, mode, carrySeconds);
       if (result) {
         const where =
           mode === 'due'
             ? 'stays due today'
             : `next on ${dayjs(result.nextRepDate).format('MMM D, YYYY')}`;
         await plugin.app.toast(
-          `↩ ${queueTurn?.name ?? 'Queue item'}: ${formatSpan(result.recordedSeconds)} recorded, ${where}`
+          `↩ ${activeReview?.name ?? 'Previous item'}: ${formatSpan(result.recordedSeconds)} recorded, ${where}`
         );
       }
 
@@ -512,7 +573,7 @@ const EditorReviewInput: React.FC<{
       setLeavePrompt(null);
       await executeStartTimer(pending?.intervalOverride, pending?.dateOverride);
     },
-    [plugin, queueIncRemId, queueTurn, carryMinutes, leavePrompt, executeStartTimer]
+    [plugin, activeReviewKind, activeReviewRemId, activeReview, carryMinutes, leavePrompt, executeStartTimer]
   );
 
   // ─── User-facing Handlers (with regression gate) ────────────────────────
@@ -686,9 +747,10 @@ const EditorReviewInput: React.FC<{
 
             <div className="text-xs flex flex-col gap-1.5" style={{ color: 'var(--rn-clr-content-secondary)' }}>
               <p>
-                The queue is reviewing{' '}
-                <strong title={queueTurn?.name}>{queueTurn?.name ?? '…'}</strong> — on screen for{' '}
-                <strong>{formatSpan(queueTurn?.elapsedSeconds ?? 0)}</strong>.
+                {activeReview?.kind === 'editor' ? 'The timer is running for' : 'The queue is reviewing'}{' '}
+                <strong title={activeReview?.name}>{activeReview?.name ?? '…'}</strong> —{' '}
+                {activeReview?.kind === 'editor' ? 'counting' : 'on screen for'}{' '}
+                <strong>{formatSpan(activeReview?.elapsedSeconds ?? 0)}</strong>.
               </p>
               <p>
                 That time is recorded as a repetition either way. Choose what happens to its
@@ -737,9 +799,9 @@ const EditorReviewInput: React.FC<{
                 title="Records the repetition and applies the normal computed interval, like the Next button"
               >
                 Reschedule
-                {queueTurn?.interval !== undefined && ` → ${queueTurn.interval}d`}
-                {queueTurn?.nextRepDate !== undefined &&
-                  ` (${dayjs(queueTurn.nextRepDate).format('MMM D')})`}
+                {activeReview?.interval !== undefined && ` → ${activeReview.interval}d`}
+                {activeReview?.nextRepDate !== undefined &&
+                  ` (${dayjs(activeReview.nextRepDate).format('MMM D')})`}
               </button>
             </div>
 
@@ -915,10 +977,10 @@ const EditorReviewInput: React.FC<{
       <div className="px-4 py-3">
         <form onSubmit={handleConfirm} className="flex flex-col gap-3">
 
-          {/* ─── Queue Turn Banner ─── */}
-          {/* Opened from the previewer while the queue times another item: say so
-              up front, so the deduction on Confirm Review is never a surprise. */}
-          {queueIncRemId && (
+          {/* ─── Running Review Banner ─── */}
+          {/* Another rem's review is being timed right now: say so up front, so
+              the deduction on Confirm Review is never a surprise. */}
+          {activeReviewKind && (
             <div
               className="p-2.5 rounded-lg flex items-start gap-2"
               style={{
@@ -928,10 +990,10 @@ const EditorReviewInput: React.FC<{
             >
               <span className="text-sm shrink-0 mt-0.5">⏱️</span>
               <div className="text-xs" style={{ color: 'var(--rn-clr-content-secondary)' }}>
-                The queue is reviewing{' '}
-                <strong title={queueTurn?.name}>{queueTurn?.name ?? 'another item'}</strong>. Time
+                {activeReviewKind === 'editor' ? 'The Editor Review Timer is running for' : 'The queue is reviewing'}{' '}
+                <strong title={activeReview?.name}>{activeReview?.name ?? 'another item'}</strong>. Time
                 recorded here is <strong>deducted</strong> from it — Start Timer will ask what to do
-                with that turn before leaving.
+                with that review before taking over.
               </div>
             </div>
           )}
@@ -1240,6 +1302,9 @@ export function EditorReview() {
   // Set only when opened from the queue on a rem other than the one being
   // reviewed there (previewer selection) — see the Ctrl+Shift+J command.
   const queueIncRemId = ctx?.contextData?.queueIncRemId as string | undefined;
+  // Set by the editor branch of Ctrl+Shift+J when the Editor Review Timer is
+  // already running for a different rem.
+  const editorTimerRemId = ctx?.contextData?.editorTimerRemId as string | undefined;
 
   if (!remId) {
     return null;
@@ -1247,7 +1312,12 @@ export function EditorReview() {
 
   return (
     <div style={{ backgroundColor: 'var(--rn-clr-background-primary)' }}>
-      <EditorReviewInput plugin={plugin} remId={remId} queueIncRemId={queueIncRemId} />
+      <EditorReviewInput
+        plugin={plugin}
+        remId={remId}
+        queueIncRemId={queueIncRemId}
+        editorTimerRemId={editorTimerRemId}
+      />
     </div>
   );
 }

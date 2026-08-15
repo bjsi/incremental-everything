@@ -1669,9 +1669,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
+        // Is the Editor Review Timer already running for a DIFFERENT rem? Then
+        // its clock is counting the time the user is about to record here, and
+        // Start Timer would take the timer away from it — the editor twin of
+        // the queue case above.
+        const runningTimerRemId = await plugin.storage.getSession<string>(editorReviewTimerRemIdKey);
+        const otherReviewRunning =
+          !!runningTimerRemId && runningTimerRemId !== focusedRem._id ? runningTimerRemId : undefined;
+
         // Open the editor review popup
         await plugin.widget.openPopup('editor_review', {
           remId: focusedRem._id,
+          editorTimerRemId: otherReviewRunning,
         });
       }
     },

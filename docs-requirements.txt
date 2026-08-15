@@ -1,0 +1,10 @@
+# Pinned so the published manual is built with the same theme version the
+# templates in overrides/ were copied from. overrides/partials/header.html is a
+# copy of the theme's own header, and an unpinned upgrade could change the
+# header upstream while our copy silently keeps rendering the old one.
+#
+# To upgrade: bump the version here, re-copy
+# `material/templates/partials/header.html` over overrides/partials/header.html,
+# re-add the `partials/contact.html` include, and update the "Last synced" note
+# in that file.
+mkdocs-material==9.7.7
