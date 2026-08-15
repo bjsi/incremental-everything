@@ -8,6 +8,10 @@ edit_uri: ""
 
 theme:
   name: material
+  # Holds partials/header.html (a copy of the theme's, plus the contact menu)
+  # and partials/contact.html. Kept OUTSIDE docs/ so the templates are not
+  # published as pages of the manual.
+  custom_dir: overrides
   logo: assets/logo.png
   favicon: assets/logo.png
   palette:
@@ -41,6 +45,14 @@ theme:
 plugins:
   - search:
       lang: en
+
+# Entries of the header's contact menu (overrides/partials/contact.html).
+extra:
+  contact:
+    - name: Report an issue on GitHub
+      link: https://github.com/bjsi/incremental-everything/issues
+    - name: Ask on RemNote's Discord
+      link: https://discord.com/channels/689979930804617224/1201559830431809566
 
 markdown_extensions:
   - attr_list

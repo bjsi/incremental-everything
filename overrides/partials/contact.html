@@ -1,0 +1,42 @@
+{#-
+  Contact menu for the header.
+
+  Reuses the theme's own `md-select` component — the one the language switcher
+  (partials/alternate.html) is built from — so the dropdown inherits the theme's
+  open/close behaviour, palette and dark-mode handling and needs no CSS of its
+  own. The entries come from `extra.contact` in mkdocs.yml, so adding a channel
+  is a config change rather than a template change.
+
+  Links open in a new tab: both destinations are off-site, and losing the manual
+  mid-read to a Discord tab is not what "contact" should cost.
+-#}
+{% if config.extra.contact %}
+  <div class="md-header__option">
+    <div class="md-select">
+      <button
+        class="md-header__button md-icon"
+        title="Contact & feedback"
+        aria-label="Contact & feedback"
+      >
+        {% set icon = config.theme.icon.contact or "material/message-question-outline" %}
+        {% include ".icons/" ~ icon ~ ".svg" %}
+      </button>
+      <div class="md-select__inner">
+        <ul class="md-select__list">
+          {% for item in config.extra.contact %}
+            <li class="md-select__item">
+              <a
+                href="{{ item.link }}"
+                class="md-select__link"
+                target="_blank"
+                rel="noopener"
+              >
+                {{ item.name }}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+{% endif %}
