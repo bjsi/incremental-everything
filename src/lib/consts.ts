@@ -378,6 +378,13 @@ export const editorReviewTimerStartKey = 'editor-review-timer-start';
 export const editorReviewTimerIntervalKey = 'editor-review-timer-interval';
 export const editorReviewTimerPriorityKey = 'editor-review-timer-priority';
 export const editorReviewTimerRemNameKey = 'editor-review-timer-rem-name';
+// The timer's clock is a PAIR: elapsed = accumulated + (now − start), with
+// `paused-at` freezing the running segment. Anything adjusting the elapsed time
+// must write both, or the widget and the recorder disagree.
+export const editorReviewTimerAccumulatedMsKey = 'editor-review-timer-accumulated-ms';
+export const editorReviewTimerPausedAtKey = 'editor-review-timer-paused-at';
+export const editorReviewTimerOriginKey = 'editor-review-timer-origin';
+export const editorReviewTimerDateOverrideKey = 'editor-review-timer-date-override';
 
 export const pdfHighlightColorId = 'pdf-highlight-color'; // Incremental PDF highlight color
 

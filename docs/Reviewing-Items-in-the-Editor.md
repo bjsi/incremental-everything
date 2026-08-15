@@ -68,6 +68,15 @@ When a queue **Incremental Rem turn is running behind it**, the popup accounts f
 
     The repetition is recorded either way — the reading you did is real; the only choice is what happens to the schedule.
 
+### While the Editor Review Timer is running
+
+The same applies one surface over. If the **Editor Review Timer** is counting for one Rem and you press `Ctrl+Shift+J` on **another** Rem, that timer is still running while you record time here — so the popup treats it exactly like a live queue turn:
+
+- **Confirm Review** deducts the minutes you record from the **running timer**, which keeps counting for its own Rem. You stay where you are. A paused timer stays paused, just with less on the clock.
+- **⏱️ Start Timer** takes the timer away from that Rem, so the same confirmation appears first: **Leave it due today** (`Enter`) or **Reschedule**, plus the **Carry to this Rem** field. The abandoned review is recorded the way **End Review** would have recorded it — including the case where it came from the queue's *Review in Editor* handoff, whose repetition already exists and only needs its duration filled in.
+
+Starting a timer this way now also **resets the clock** for the Rem taking it over. Previously the new Rem inherited whatever the abandoned review had accumulated. This does not affect the queue's *Review in Editor* handoff, which carries your queue reading time forward by back-dating the timer's start — that carry is untouched.
+
 ### Execute Repetition vs. Reschedule in Editor
 
 | Action | Shortcut | Counts for Interval? | Purpose |
