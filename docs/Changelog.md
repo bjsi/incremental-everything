@@ -2,6 +2,22 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.46 - August 15th, 2026
+
+### 🐛 Fixed - Incremental Rem badges in tables and highlights were coloured on the wrong scale
+
+Priority band badges are meant to be coloured by where a priority *ranks*, like every other badge in the plugin. For Incremental Rems they were not: the colour came from the absolute number instead, so a `50s` badge on an Incremental Rem read green while the Priority Editor drew the same Rem's `P54` in cyan. Table badges, the Highlights side-panel pills and the PDF marker tint were all affected. Flashcard badges were always correct.
+
+The bands themselves were right throughout — only the colour was — so nothing needs rebuilding: the fix applies on the next start.
+
+#### Technical explanation
+
+The band colours are baked into a stylesheet at registration time, and `registerCSS` is index-only, so the mapping is a snapshot taken when the stylesheets are registered during activation. The IncRem cache takes ~29s to load on a 5.6k-Rem knowledge base and nothing re-registered afterwards, so the percentile pool was empty every time and `bandColorPercentile` fell back to the band midpoint. Only the card scale looked right, because the card-priority cache build already bumped `priorityBandColorsReloadKey`. `loadIncrementalRemCache` now bumps it too, once per session on the cold→warm transition. Percentile sampling also reads the slim IncRem projection rather than dragging the multi-megabyte full cache across the bridge.
+
+A degraded scale is invisible in the UI — a fallback colour looks exactly like a ranked one — so this now warns in the console when a pool is too small to rank, and the new **Toggle Priority Band Colour Logging** command dumps the full band → percentile → colour table.
+
+📖 [Priorities in Tables](Prioritization-&-Sorting.md#priorities-in-tables)
+
 ## v1.0.45 - August 14th, 2026
 
 ### ✨ New - an Incremental Plugin panel in the sidebar

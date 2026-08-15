@@ -19,9 +19,11 @@ import { BuiltInPowerupCodes, PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import {
   allCardPriorityInfoKey,
   allIncrementalRemKey,
+  allIncrementalRemSlimKey,
   dismissedHistorySlotCode,
   dismissedPowerupCode,
   powerupCode,
+  priorityBandVerboseLogsKey,
   prioritySlotCode,
 } from './consts';
 // Import from card_priority/types, a leaf module of plain constants, NOT from
@@ -780,11 +782,20 @@ function percentilesFor(values: number[]): number[] | null {
 export async function computeBandPercentiles(plugin: RNPlugin): Promise<BandPercentiles> {
   const incPriorities: number[] = [];
   const cardPriorities: number[] = [];
+  const t0 = Date.now();
   try {
-    const [incRems, cardInfos] = await Promise.all([
-      plugin.storage.getSession<Array<{ priority?: number }>>(allIncrementalRemKey),
+    // The SLIM projection, not the full cache: only `priority` is read here, and
+    // the full cache is multi-megabyte to drag across the bridge. Both are
+    // written together by writeIncRemCaches, so the slim key is never the staler
+    // of the two; the fallback covers a realm holding only the full key.
+    const [incSlim, cardInfos] = await Promise.all([
+      plugin.storage.getSession<Array<{ priority?: number }>>(allIncrementalRemSlimKey),
       plugin.storage.getSession<Array<{ priority?: number }>>(allCardPriorityInfoKey),
     ]);
+    const incRems =
+      incSlim?.length
+        ? incSlim
+        : await plugin.storage.getSession<Array<{ priority?: number }>>(allIncrementalRemKey);
     for (const item of incRems || []) {
       if (typeof item?.priority === 'number' && !isNaN(item.priority)) {
         incPriorities.push(item.priority);
@@ -800,7 +811,69 @@ export async function computeBandPercentiles(plugin: RNPlugin): Promise<BandPerc
     return { inc: null, card: null };
   }
 
-  return { inc: percentilesFor(incPriorities), card: percentilesFor(cardPriorities) };
+  const result = { inc: percentilesFor(incPriorities), card: percentilesFor(cardPriorities) };
+  const describe = (p: number[] | null, n: number) =>
+    `${p ? 'RELATIVE' : 'ABSOLUTE FALLBACK'} (${n} samples)`;
+
+  if (await bandVerboseLogsEnabled(plugin)) {
+    console.log(
+      `[PriorityBands] computeBandPercentiles: inc pool=${describe(result.inc, incPriorities.length)}, ` +
+        `card pool=${describe(result.card, cardPriorities.length)}, ` +
+        `min sample=${MIN_PERCENTILE_SAMPLE}, sampled in ${Date.now() - t0}ms`
+    );
+  } else if (!result.inc || !result.card) {
+    // Not gated: a pool too small to rank means the badges built from it fall
+    // back to the absolute midpoint scale and quietly disagree with the Priority
+    // Editor — the exact failure this instrumentation was added for, and one
+    // nothing in the UI reveals. One line, and only when actually degraded.
+    // Expected while a cache is still loading, or with its feature switched off.
+    console.warn(
+      `[PriorityBands] band colours degraded to the absolute scale — ` +
+        `inc pool ${describe(result.inc, incPriorities.length)}, ` +
+        `card pool ${describe(result.card, cardPriorities.length)}`
+    );
+  }
+  return result;
+}
+
+/**
+ * Whether the verbose band-colour instrumentation is switched on for this
+ * device. See {@link priorityBandVerboseLogsKey}.
+ */
+export async function bandVerboseLogsEnabled(plugin: RNPlugin): Promise<boolean> {
+  return (await plugin.storage.getLocal<boolean>(priorityBandVerboseLogsKey)) === true;
+}
+
+/**
+ * Dumps the band → percentile → colour mapping a stylesheet is about to bake in.
+ *
+ * Instrumentation only, and off unless priorityBandVerboseLogsKey is set. The
+ * badge colour is resolved once, at registerCSS time, from a snapshot of the
+ * priority distribution — so when a badge disagrees with the Priority Editor the
+ * question is always "which snapshot was this sheet built from, and when", and
+ * that is exactly what this prints.
+ */
+export async function logBandColorMapping(
+  plugin: RNPlugin,
+  label: string,
+  percentiles: number[] | null,
+  colorForBand: (band: number) => string
+): Promise<void> {
+  if (!(await bandVerboseLogsEnabled(plugin))) return;
+  const source = percentiles
+    ? 'RELATIVE (percentiles of the live distribution)'
+    : 'ABSOLUTE FALLBACK (band midpoint — pool empty or too small)';
+  console.log(`[PriorityBands] ${label} colour scale: ${source}`);
+  const rows = Array.from({ length: BAND_COUNT }, (_, band) => ({
+    band: bandLabel(band),
+    absoluteMidpoint: band * 10 + 5,
+    percentileUsed: bandColorPercentile(percentiles, band),
+    color: colorForBand(band),
+  }));
+  // console.table renders this readably in devtools; the plain log keeps the
+  // data recoverable from a copy-pasted console dump.
+  console.table?.(rows);
+  console.log(`[PriorityBands] ${label} mapping`, JSON.stringify(rows));
 }
 
 /**

@@ -325,6 +325,14 @@ export const showPriorityBandsInTablesId = 'showPriorityBandsInTables';
 // pattern as pdfHighlightBordersReloadKey: registerCSS is index-only, so a
 // plugin.track in index.tsx watches this key and re-registers there.
 export const priorityBandColorsReloadKey = 'priority-band-colors-reload';
+// Per-device opt-in for the band-colour instrumentation: the full band →
+// percentile → colour table each stylesheet is built from. Off by default — the
+// dump is four tables per re-registration and would swamp the console — but the
+// mapping is otherwise invisible, since a badge coloured from the ABSOLUTE
+// fallback scale looks exactly like a correctly ranked one. Local, not session,
+// so it survives a reload once switched on. Toggled by the
+// `toggle-priority-band-logging` command.
+export const priorityBandVerboseLogsKey = 'priority-band-verbose-logs';
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
 // Rem ids a priority popup should apply to when opened in batch mode (Opt+P /
 // Ctrl+Opt+P over a multi-rem selection, e.g. several table rows). Written by the

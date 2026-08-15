@@ -25,6 +25,7 @@ import {
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
 import { enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
+import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
@@ -119,7 +120,18 @@ async function onActivate(plugin: ReactRNPlugin) {
   // after activation. This re-registers both badge stylesheets whenever that
   // mapping should be recomputed (cache load below, or a badge refresh).
   plugin.track(async (rp) => {
-    await rp.storage.getSession(priorityBandColorsReloadKey); // reactive trigger
+    const reloadStamp = await rp.storage.getSession(priorityBandColorsReloadKey); // reactive trigger
+    // Instrumentation (verbose-gated): `undefined` here means this is the
+    // ACTIVATION-time run, i.e. the colours are being baked before either
+    // priority cache is warm. Any later run carries the stamp of whatever
+    // bumped the key.
+    if (await bandVerboseLogsEnabled(plugin)) {
+      console.log(
+        `[PriorityBands] re-registering band stylesheets — trigger=${
+          reloadStamp === undefined ? 'ACTIVATION (caches likely cold)' : `reload key ${reloadStamp}`
+        }`
+      );
+    }
     await registerTableBandBadgeCSS(plugin);
     await registerHighlightBandBadgeCSS(plugin);
   });

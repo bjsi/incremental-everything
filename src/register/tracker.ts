@@ -1,6 +1,6 @@
 import { ReactRNPlugin } from '@remnote/plugin-sdk';
 import { loadIncrementalRemCache, writeIncRemCaches } from '../lib/incremental_rem/cache';
-import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, enableFlashcardPrioritisationId } from '../lib/consts';
+import { incrementalQueueActiveKey, currentIncRemKey, powerupCode, pendingPrioritySaveKey, pendingCardPriorityRemovalKey, pendingPriorityDeltaQueueKey, incRemCacheReloadKey, pendingIntervalBatchSaveKey, pendingIncRemCreateTailKey, enableFlashcardPrioritisationId, priorityBandColorsReloadKey } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 import { withQueueMutex } from '../lib/mutex';
 // Static import (NOT dynamic): a dynamic import() of highlightActions emits a separate
@@ -22,6 +22,11 @@ import { shouldUseLightMode } from '../lib/mobileUtils';
 // GlobalRemChanged suppression (cross-iframe communication).
 let incRemBatchActive = false;
 
+// Whether the band-colour stylesheets have already been re-registered against a
+// warm IncRem cache in this session. Module-level (not session storage) for the
+// same reason as incRemBatchActive: it must not be a reactive dependency.
+let bandColorsBumpedForWarmIncCache = false;
+
 export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
   plugin.track(async (rp) => {
     // Use module-level variable (non-reactive) — does NOT create a reactive dependency.
@@ -42,8 +47,29 @@ export function registerIncrementalRemTracker(plugin: ReactRNPlugin) {
     // Using `rp` here caused every rem open/search to re-trigger a full
     // 2s cache reload because `taggedRem()` subscribed the tracker to
     // the entire powerup membership list.
-    await loadIncrementalRemCache(plugin);
+    const loaded = await loadIncrementalRemCache(plugin);
     console.log('[Tracker] IncRem cache load completed.');
+
+    // The band badge colours rank each band against the live IncRem priority
+    // distribution, and that distribution comes from the cache this load just
+    // wrote. The stylesheets are registered during activation — a full load was
+    // measured at 29s on this KB — so without this bump every IncRem badge and
+    // PDF marker spends the session on the ABSOLUTE fallback scale (band
+    // midpoint), silently disagreeing with the Priority Editor's relative colour
+    // for the same rem.
+    //
+    // Once per session, on the cold→warm transition only. The colour mapping is
+    // a snapshot by design (see computeBandPercentiles), later reloads move a
+    // 5k-item distribution too little to be worth re-registering four
+    // stylesheets for, and the "Refresh priority badges" command already bumps
+    // this key for the case where priorities really did move in bulk.
+    if (!bandColorsBumpedForWarmIncCache && loaded.length > 0) {
+      bandColorsBumpedForWarmIncCache = true;
+      await plugin.storage.setSession(priorityBandColorsReloadKey, Date.now());
+      console.log(
+        `[PriorityBands] IncRem cache warm (${loaded.length} IncRems) — re-registering band stylesheets on the relative scale`
+      );
+    }
   });
 
   // Track queue state and current rem to detect when powerup is removed

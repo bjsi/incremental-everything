@@ -35,6 +35,7 @@ import {
   sourceFloatingActiveIdKey,
   preservedHistoryPowerupCode,
   priorityBandColorsReloadKey,
+  priorityBandVerboseLogsKey,
   enableMasteryDrillId,
   enableFlashcardPrioritisationId,
 } from '../lib/consts';
@@ -1273,6 +1274,29 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+
+  // The band badge colours are baked into a stylesheet at registration time from
+  // a snapshot of the priority distribution, so a badge coloured from the
+  // absolute fallback scale is indistinguishable from a correctly ranked one.
+  // This turns on the full band → percentile → colour dump for that diagnosis.
+  // Per device, and it survives a reload, so the mapping can be inspected on the
+  // next activation — which is when the interesting (cold-cache) run happens.
+  plugin.app.registerCommand({
+    id: 'toggle-priority-band-logging',
+    name: 'Toggle Priority Band Colour Logging',
+    description:
+      'Verbose console logging of the band → percentile → colour mapping used by the priority badges.',
+    action: async () => {
+      const next = !(await plugin.storage.getLocal<boolean>(priorityBandVerboseLogsKey));
+      await plugin.storage.setLocal(priorityBandVerboseLogsKey, next);
+      // Re-register immediately so switching it on prints the current mapping
+      // rather than making the user wait for the next reload.
+      if (next) await plugin.storage.setSession(priorityBandColorsReloadKey, Date.now());
+      await plugin.app.toast(
+        `Priority band colour logging ${next ? 'ON — see the console' : 'OFF'}.`
+      );
+    },
+  });
 
   plugin.app.registerCommand({
     id: 'debug-incremental-everything',

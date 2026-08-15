@@ -416,5 +416,8 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 - **Debug Incremental Everything** / **Debug Video Detection**
   Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
 
+- **Toggle Priority Band Colour Logging**
+  Prints the band → percentile → colour mapping each priority badge stylesheet is built from, to your developer console. Off by default; the setting is per device and survives a reload, so the mapping can be inspected on the next start. Use it if a badge's colour looks out of step with the **[Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget)** for the same Rem.
+
 - **Debug: Clear Flashcard History**
   Clears the Flashcard History sidebar's entries **for the knowledge base you are currently in** — since v1.0.37 each KB keeps its own list. Use this if you encounter sync errors with the flashcard history data (e.g., after a corrupted sync). A confirmation toast is shown on completion. See [How the history lists are stored](History-Queue-Dashboard-and-Mastery-Drill.md#how-the-history-lists-are-stored).

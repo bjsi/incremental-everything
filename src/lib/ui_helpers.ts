@@ -4,6 +4,7 @@ import {
   buildHighlightBandCSS,
   buildPriorityBandCSS,
   computeBandPercentiles,
+  logBandColorMapping,
 } from './priority_bands';
 import { percentileToHslColor } from './utils';
 import {
@@ -130,9 +131,10 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
   // Same scale as the side-panel badges above: a PDF marker's colour comes from
   // the IncRem extracted from that highlight.
   const { inc: incPercentiles } = await computeBandPercentiles(plugin);
-  const highlightBandCSS = buildHighlightBandCSS((band) =>
-    percentileToHslColor(bandColorPercentile(incPercentiles, band))
-  );
+  const incColorForBand = (band: number) =>
+    percentileToHslColor(bandColorPercentile(incPercentiles, band));
+  await logBandColorMapping(plugin, 'pdf marker tint (inc scale)', incPercentiles, incColorForBand);
+  const highlightBandCSS = buildHighlightBandCSS(incColorForBand);
   const css = `
     /* PDF viewer: keep the highlight's ORIGINAL background and distinguish the tag
        with (a) a dashed underline and (b) a thin left bar. The underline gets
@@ -251,9 +253,9 @@ export async function registerHighlightBandBadgeCSS(plugin: ReactRNPlugin) {
   // Highlights are badged with the priority of the IncRem extracted from them,
   // so they rank on the IncRem scale.
   const { inc } = await computeBandPercentiles(plugin);
-  const { badges } = buildHighlightBandCSS((band) =>
-    percentileToHslColor(bandColorPercentile(inc, band))
-  );
+  const colorForBand = (band: number) => percentileToHslColor(bandColorPercentile(inc, band));
+  await logBandColorMapping(plugin, 'highlight side-panel badges (inc scale)', inc, colorForBand);
+  const { badges } = buildHighlightBandCSS(colorForBand);
   await plugin.app.registerCSS('highlight-priority-band-badges', badges);
 }
 
@@ -270,14 +272,16 @@ export async function registerTableBandBadgeCSS(plugin: ReactRNPlugin) {
   const percentiles = enabled
     ? await computeBandPercentiles(plugin)
     : { inc: null, card: null };
+  const incColor = (band: number) => percentileToHslColor(bandColorPercentile(percentiles.inc, band));
+  const cardColor = (band: number) =>
+    percentileToHslColor(bandColorPercentile(percentiles.card, band));
+  if (enabled) {
+    await logBandColorMapping(plugin, 'table badges (inc scale)', percentiles.inc, incColor);
+    await logBandColorMapping(plugin, 'table badges (card scale)', percentiles.card, cardColor);
+  }
   await plugin.app.registerCSS(
     showPriorityBandsInTablesId,
-    enabled
-      ? buildPriorityBandCSS({
-          inc: (band) => percentileToHslColor(bandColorPercentile(percentiles.inc, band)),
-          card: (band) => percentileToHslColor(bandColorPercentile(percentiles.card, band)),
-        })
-      : ''
+    enabled ? buildPriorityBandCSS({ inc: incColor, card: cardColor }) : ''
   );
 }
 
