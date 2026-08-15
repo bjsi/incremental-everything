@@ -25,6 +25,36 @@ For a deeper understanding, see [What is Incrementalism?](What-is-Incrementalism
 
 ---
 
+## The Incremental Plugin Panel
+
+Once installed, the plugin adds a small **Incremental Plugin** 🌐 panel at the bottom of the left sidebar. It is the one fixed place to reach the plugin from, and where the onboarding tips live.
+
+**In the header:**
+
+| Control | What it does |
+|---------|--------------|
+| ⚙ | Opens the plugin's [settings popup](Plugin-Settings-Reference.md) — every setting the plugin owns, grouped |
+| ? | Opens this documentation, at the home page |
+| ✕ | Hides the panel **for this session** — it is back next time you open RemNote. To bring it back sooner, run the **Show Incremental Plugin Panel** command |
+
+**Shortcut buttons:**
+
+- **⌨** — the [Keyboard Shortcuts](Keyboard-Shortcuts.md) page.
+- **Sorting** — the [flashcard/incremental mix and randomness](Prioritization-&-Sorting.md#sorting-criteria) for your queue.
+- **Priority Review** — creates a [Priority Review Document](Priority-Review-Document.md), scoped to the document you currently have open. This is the same as using **Create Priority Review Document** in the document menu, without having to open the menu; the scope it will use is named under the button. With no document open, it falls back to the whole knowledge base.
+
+### Tips { #tips }
+
+The panel shows **one tip per session**, drawn at random from the tips you have not retired yet. Answer it and the tip area is done until the next time you open RemNote — it will not hand you another one. Each tip has three answers:
+
+- **I Got It** — you know this one. It is never shown again. This is remembered per knowledge base and syncs across your devices.
+- **✕** — not now. The tip stays in the pile and can resurface later; the panel also goes quiet for two hours, so a reload does not immediately produce another one.
+- **Learn More** — opens the documentation section for the feature the tip is about. Tips that are habits rather than features have no such button.
+
+When you have answered **I Got It** to every tip, the tip area disappears for good and the panel keeps only its shortcuts.
+
+---
+
 ## Making a Rem Incremental
 
 The first step is to convert a Rem, PDF, or website into an "Incremental Rem" so it will appear in your queue.
@@ -171,7 +201,7 @@ The history includes special event markers:
 | ▶ **Made Incremental** | When the Rem was first made (or re-made) incremental |
 | ⏸ **Dismissed** | When the Rem was dismissed via the Dismiss button |
 
-These markers help you understand your learning timeline and distinguish between different review sessions.
+These markers help you understand your learning timeline and distinguish between different review sessions. Each banner shows the **date and the time of day** (`Aug 13, 2026 · 09:44`) it was recorded — the same wall-clock detail the repetition rows carry — so a day holding several lifecycle events (made incremental → dismissed → made incremental again) still reads in order.
 
 ---
 

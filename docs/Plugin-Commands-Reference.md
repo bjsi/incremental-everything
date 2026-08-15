@@ -183,6 +183,17 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
   **Use Case:** During [Incremental Reading](IR-Flow--Reading-Extracting-and-Clozing.md), use this to signal that a snippet has already been read but wasn't important enough to make Incremental — it stays in place for archive or future consultation, and the de-emphasized styling tells you not to re-process it next time you're exposed to it.
 
+- **Tag Rems With Images** — `quick: img`
+  Scans for images and tags each Rem that holds one with **`HasImage`** — so RemNote's native document filter can isolate them. Checks **front text and back text**, so an image on the back of a flashcard counts.
+  - **Popup first:** the [Image Scan popup](Plugin-Widgets-Reference.md#69-image-scan-popup) offers two scopes — the **focused Rem** (or the **open document**), named on the button so you can verify the target, or the **whole knowledge base**.
+  - **Reports in place:** the same popup shows live progress and then the result — scanned, holding images, tagged, cleared — alongside how to filter a document and how to build a Search Portal on the tag. It stays open until you close it.
+  - **Self-correcting:** Rems inside the scanned scope that carry the tag but no longer hold an image lose it, so a re-run never leaves stale marks. Nothing outside the scope is touched.
+  - **Invisible tag:** the `HasImage` chip is hidden from the editor tag bar (your own tags on the same Rem stay visible).
+
+  **Use Case:** reviewing all the figures of a chapter, or finding the images you have not yet turned into occlusion cards — neither of which RemNote's search can do, because an image carries no indexed text.
+
+  📖 See [Utilities → Filter a Document by Images](Utilities.md#filter-a-document-by-images) for the full workflow.
+
 - **Bulletize Inline Selected Text** (`Shift+F8`) — `quick: bul`
   Toggles a `• ` prefix at the start of each line **within a single rem**, across a multi-line selection. Built for restoring bullets that a **PDF highlight flattened** into soft-wrapped text (lines joined by `Shift+Enter`) before turning the highlight into an IncRem.
   - **Toggle:** if every non-empty selected line already starts with `• `, all are stripped; otherwise the prefix is added only to the lines that lack it (no double bullets).
@@ -286,6 +297,9 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
 ## System & Maintenance Commands
 
+- **Show Incremental Plugin Panel**
+  Brings back the [Incremental Plugin panel](Getting-Started.md#the-incremental-plugin-panel) in the sidebar after you have closed it with its **✕**. The **✕** only lasts the session — the panel returns on its own next time you open RemNote — so this is for getting it back sooner.
+
 - **Incremental Everything: Settings** (`ies`)
   Opens the plugin's own settings popup — every setting the plugin owns, grouped by area, with the ones that do not currently apply hidden and a **?** beside each entry linking to the section of this manual that explains it. See [Plugin Settings Reference](Plugin-Settings-Reference.md#where-the-settings-are) for what lives here and what stays in RemNote's own panel.
 
@@ -373,8 +387,13 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
   > [!NOTE]
   > Preserved flashcard reviews (`importedRep`) **count toward the Study Dashboard's time and rep totals** but are **ignored by the scheduler** — they never influence the rem's next-interval calculations, even if it's later re-incrementalized. In the repetition-history views they show a 🃏 marker with the source card's name and grade. For **cloze** cards, the preserved name wraps the clozed span in `{{…}}` (e.g. `flashcard {{inside}} that rem`) so multiple clozes from the same rem stay distinguishable.
 
-- **Remove All CardPriority Tags**
-  Bulk maintenance to wipe priorities across a scope. Use with caution.
+- **Remove CardPriority Tags…** { #remove-cardpriority-tags }
+  Strips the `cardPriority` powerup and its slots from **the knowledge base you currently have open** — named in every dialog, and the only one touched. It asks which tags to remove first:
+
+  - **OK — inherited & default only (recommended).** Removes just the tags the plugin wrote by itself. `manual` priorities, the `incremental` anchors left by dismissed Incremental Rems, tags whose source is unreadable, and your shield history are all kept. **Reversible:** those priorities are computed from your document tree, so *Update all inherited Card Priorities* rebuilds them exactly. This is the option to use after turning [Enable Flashcard Prioritisation](Priorities-for-Flashcards.md#switching-it-off) off.
+  - **Cancel — remove everything.** Wipes every `cardPriority` tag, **including the priorities you set by hand**, and clears this KB's [Priority Shield](Prioritization-&-Sorting.md#priority-shield) history (a dated backup of the history is saved first; the tags are not backed up). It cannot be undone, so it takes you through three further confirmations — and when manual priorities are at stake, the last-but-one offers to switch to the reversible scope instead.
+
+  Both scopes report what they found before touching anything: how many tags are inherited/default, how many are manual/incremental, and how many carry no recognisable source.
 
 - **Refresh Priority Badges (Tables and PDF Highlights)**
   Recomputes the band tags behind both the [table-cell badges](Prioritization-&-Sorting.md#priorities-in-tables) and the [PDF highlight badges](Prioritization-&-Sorting.md#priorities-on-pdf-highlights). Bands are kept current by every priority write, so this is for the **first run after enabling the feature** and for repairing drift.
@@ -396,6 +415,9 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
 
 - **Debug Incremental Everything** / **Debug Video Detection**
   Opens the Debug Widget popup for the focused Rem (now on **any** Rem, not just IncRem/CardPriority/Dismissed ones) and outputs specialized state logs to your developer console to diagnose edge cases. The Debug Widget includes the **[Search / Linkage Diagnostics](Troubleshooting.md#search-linkage-diagnostics-debug-widget)** section for investigating why a Rem is invisible in reference search.
+
+- **Toggle Priority Band Colour Logging**
+  Prints the band → percentile → colour mapping each priority badge stylesheet is built from, to your developer console. Off by default; the setting is per device and survives a reload, so the mapping can be inspected on the next start. Use it if a badge's colour looks out of step with the **[Priority Editor](Prioritization-&-Sorting.md#priority-editor-widget)** for the same Rem.
 
 - **Debug: Clear Flashcard History**
   Clears the Flashcard History sidebar's entries **for the knowledge base you are currently in** — since v1.0.37 each KB keeps its own list. Use this if you encounter sync errors with the flashcard history data (e.g., after a corrupted sync). A confirmation toast is shown on completion. See [How the history lists are stored](History-Queue-Dashboard-and-Mastery-Drill.md#how-the-history-lists-are-stored).

@@ -19,9 +19,9 @@ Displayed immediately below flashcards in the queue, this widget shows the card'
 - **(2) Card Priority Shield**: A real-time counter showing how many of your highest-priority cards are still due. See [Priority Shield](Prioritization-&-Sorting.md#priority-shield) for details.
 - **(3) Weighted Shield**: An exponential priority-weighted metric (if enabled in settings) showing the fraction of your total learning workload that has been processed. Clicking it opens a detailed percentile bucket breakdown. See [Weighted Shield](Prioritization-&-Sorting.md#weighted-shield) for details.
 - **(4) Reps & Time**: Total number of reviews (with **lapses** in red parentheses), cumulative time spent on this card, the **card age** (time since first review), and the **cost** (time spent per year of age or coverage). Hover over it for an explanatory tooltip.
-- **(5) FSRS DSR Analytics**: Difficulty (D), Stability (S), and Retrievability (R) computed by the plugin's embedded FSRS v6 engine. The exact time passed since the last review is shown next to Stability. Hovering over this section reveals the projected **Next Difficulty** for all four grading options (Again, Hard, Good, Easy).
+- **(5) FSRS DSR Analytics**: Difficulty (D), Stability (S), and Retrievability (R) computed by the plugin's embedded FSRS v6 engine. The exact time passed since the last review is shown next to Stability, and an arrow points to the **stability a Good rating would leave the card with** (`S: 2.5y (1.3y passed) → 4.2y`) — followed by the interval that stability really converts to (`(int. 1.7y)`) whenever your [Requested Retention](Reviewing-Items-in-the-Queue.md#requested-retention) is not the 90% default. Hovering over this section reveals the projected **Next Difficulty** for all four grading options (Again, Hard, Good, Easy).
 - **(6) SInc (Stability Increase)**: The multiplier showing how much stability will grow after a successful review. Hover to see projections for Hard / Good / Easy.
-- **(7) U-Factor (Used-Interval Increase)**: The multiplier showing how much bigger your **next** interval would be than the interval you *actually just used* — the real time elapsed since your last review — if you press **Good**. Where **SInc** compares the new stability to the *current* stability (`S_new / S_old`), the **U-Factor** compares the newly-scheduled interval to the gap you just cleared (`new interval / used interval`), answering the more grounded question *"how much longer can I wait now than I waited this time?"* This mirrors the **U-Factor** metric from the companion [Flashcard Repetition History](https://github.com/hugomarins/flashcard-repetition-history) plugin. A **high U-Factor** (e.g. 3×+) means recall went well and the algorithm is comfortable pushing the next review much further out; a **low U-Factor** (e.g. 1.2×) means the interval is barely growing. Hover to see the U-Factor for Hard / Good / Easy alongside the interval each would schedule. Hidden when there's no usable elapsed interval (e.g. a card reviewed moments ago). *(Because FSRS defines stability as the interval at 90% retention, the resulting interval shown in this tooltip matches the SInc tooltip — only the baseline of the ratio differs.)*
+- **(7) U-Factor (Used-Interval Increase)**: The multiplier showing how much bigger your **next** interval would be than the interval you *actually just used* — the real time elapsed since your last review — if you press **Good**. Where **SInc** compares the new stability to the *current* stability (`S_new / S_old`), the **U-Factor** compares the newly-scheduled interval to the gap you just cleared (`new interval / used interval`), answering the more grounded question *"how much longer can I wait now than I waited this time?"* This mirrors the **U-Factor** metric from the companion [Flashcard Repetition History](https://github.com/hugomarins/flashcard-repetition-history) plugin. A **high U-Factor** (e.g. 3×+) means recall went well and the algorithm is comfortable pushing the next review much further out; a **low U-Factor** (e.g. 1.2×) means the interval is barely growing. Hover to see the U-Factor for Hard / Good / Easy alongside the interval each would schedule. Hidden when there's no usable elapsed interval (e.g. a card reviewed moments ago). The interval it divides by is the one you will **really** get, which depends on your [Requested Retention](Reviewing-Items-in-the-Queue.md#requested-retention): at anything other than the 90% default a second value appears in parentheses — `U-Factor: 3.11× (3.30×)` — the first being what your scheduler gives you, the second what it would be at 90%, where the interval equals the stability.
 - **(8) 🔬**: Opens the Flashcard Repetition History popup
 - **(9) Incremental Rem Status Indicator**: An icon displayed on the right border whenever the current card is also an Incremental Rem, providing instant visual feedback of its dual-status.
 
@@ -99,7 +99,7 @@ A detailed popup for regular flashcards, enriched with FSRS analytics. Open it v
 
 Two interconnected popups for Incremental Rems, both accessed via `Ctrl+Shift+H`:
 
-- **Single History** — triggered on an individual IncRem (in the queue via the 📊 button, or in the editor via `Ctrl+Shift+H`). Shows the Rem's full repetition log: date, time spent, scheduled interval, priority at the time of review, and event type markers (📅 reschedule, ⌨️ editor review, etc.).
+- **Single History** — triggered on an individual IncRem (in the queue via the 📊 button, or in the editor via `Ctrl+Shift+H`). Shows the Rem's full repetition log: date, time spent, scheduled interval, priority at the time of review, and event type markers (📅 reschedule, ⌨️ editor review, etc.). Repetition rows carry the wall-clock time under the date, and the event banners (▶ Made Incremental, ⏸ Dismissed, 📅 Rescheduled in Editor, ✏️ Manual Date Reset) show theirs next to it — several lifecycle events on one day stay distinguishable.
   - **📝 Notes & context sub-lines** — entries carrying a [review note](Reviewing-Items-in-the-Queue.md#the-answer-buttons) show it under the row (📝, full text); entries with an automatic **reading-context snapshot** show a compact line like `p.57 of 40–80 · Book.pdf · 🔖 "bookmark…"` — the page you were on **at that rep**, so your reading trajectory across sessions is visible. Event banners (Dismissed, Rescheduled in Editor, …) show their note the same way — a dismissal reason lives right on the dismissal marker.
   - **PDF reading-progress footer** — when the Rem (active *or* dismissed) reads from a PDF with a **page range** set, a footer shows the PDF name, the page range, your current page, the **degree of processing** (`% read`, with a progress bar), and an **estimated remaining time** (extrapolated from the total time spent and the degree of processing reached). The percentage and estimate are omitted for open-ended ranges (`start–∞`), where there's no finite end to measure against.
   - **➕ Session — recording study done outside RemNote** — see [Recording and correcting records](#recording-and-correcting-records) below.
@@ -489,6 +489,32 @@ The Rem-type analogue of the PDF/HTML Bookmark popup. It lists the **read-point 
 > The same underlying popup, opened on a PDF/HTML highlight, is the **Bookmark popup**; it now also shows the owning Incremental Rem's name under its title.
 
 📖 **Full documentation:** [Read Points for Rem-type Incremental Rems](Reviewing-Items-in-the-Editor.md#read-points-for-rem-type-incremental-rems)
+
+### 6.9. Image Scan Popup
+**Trigger:** `Tag Rems With Images` command (quick code `img`)
+
+The confirmation *and* the report for the image scan, in one popup that stays open until you close it.
+
+![The Image Scan popup showing both scope options and the keyboard hints](assets/tag-rems-with-images-popup.png){ width="600" }
+
+- **Two scopes.** The first button names the Rem it would scan — the **focused Rem**, or the **open document** when nothing is focused — so you can see the target before committing. The second scans the **whole knowledge base** (slow on a large one). If there was no focused Rem or open document, the first button is disabled and the whole-KB option still works.
+- **Live progress** while it runs (`Scanning 1,400 / 5,200 Rems…`), because a whole-KB scan is not instant.
+- **The report stays on screen**: Rems scanned, how many hold an image, how many were newly tagged, and how many had the tag cleared. Under it sit the two ways to use the tag — the document **Filter** and a **Search Portal** — so you don't have to remember the shortcut.
+- **Scan again** returns to the scope choice without reopening the command; **?** in the header opens this feature's documentation.
+- **Keyboard-driven:** `↑`/`↓` move between the scopes, `Enter` runs the selected one (and closes the popup from the report), `Esc` cancels — ignored while a scan is running so a reflex press can't abort it.
+
+📖 **Full documentation:** [Filter a Document by Images](Utilities.md#filter-a-document-by-images)
+
+### 6.10. Incremental Plugin Panel
+*(Left Sidebar)*
+
+The plugin's hub, at the bottom of the left sidebar. Header controls: **⚙** opens the [IE Settings](Plugin-Settings-Reference.md) popup, **?** opens this documentation, **✕** hides the panel for the session — it returns on the next start, and the **Show Incremental Plugin Panel** command brings it back sooner. Three shortcut buttons: **⌨** ([Keyboard Shortcuts](Keyboard-Shortcuts.md)), **Sorting** ([Sorting Criteria](Prioritization-&-Sorting.md#sorting-criteria)), and **Priority Review** — which creates a [Priority Review Document](Priority-Review-Document.md) scoped to the document you currently have open, naming that scope under the button.
+
+Below the shortcuts it shows **one onboarding tip per session**, with **I Got It** (retires the tip permanently, per knowledge base), **✕** (returns it to the pile; the panel also goes quiet for two hours) and **Learn More** (opens the tip's documentation section). Either answer closes the tip area until the next start — it never chains into a second tip.
+
+📖 **Full documentation:** [The Incremental Plugin Panel](Getting-Started.md#the-incremental-plugin-panel)
+
+---
 
 ## 7. Mastery Drill
 

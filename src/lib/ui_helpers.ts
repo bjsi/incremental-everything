@@ -4,6 +4,7 @@ import {
   buildHighlightBandCSS,
   buildPriorityBandCSS,
   computeBandPercentiles,
+  logBandColorMapping,
 } from './priority_bands';
 import { percentileToHslColor } from './utils';
 import {
@@ -14,6 +15,7 @@ import {
   pdfHighlightBordersEnabledKey,
   pdfHighlightBordersReloadKey,
   showPriorityBandsInTablesId,
+  hasImagePowerupName,
 } from './consts';
 import { getIESetting } from './settings';
 
@@ -129,9 +131,10 @@ export async function registerPdfHighlightCSS(plugin: ReactRNPlugin) {
   // Same scale as the side-panel badges above: a PDF marker's colour comes from
   // the IncRem extracted from that highlight.
   const { inc: incPercentiles } = await computeBandPercentiles(plugin);
-  const highlightBandCSS = buildHighlightBandCSS((band) =>
-    percentileToHslColor(bandColorPercentile(incPercentiles, band))
-  );
+  const incColorForBand = (band: number) =>
+    percentileToHslColor(bandColorPercentile(incPercentiles, band));
+  await logBandColorMapping(plugin, 'pdf marker tint (inc scale)', incPercentiles, incColorForBand);
+  const highlightBandCSS = buildHighlightBandCSS(incColorForBand);
   const css = `
     /* PDF viewer: keep the highlight's ORIGINAL background and distinguish the tag
        with (a) a dashed underline and (b) a thin left bar. The underline gets
@@ -250,9 +253,9 @@ export async function registerHighlightBandBadgeCSS(plugin: ReactRNPlugin) {
   // Highlights are badged with the priority of the IncRem extracted from them,
   // so they rank on the IncRem scale.
   const { inc } = await computeBandPercentiles(plugin);
-  const { badges } = buildHighlightBandCSS((band) =>
-    percentileToHslColor(bandColorPercentile(inc, band))
-  );
+  const colorForBand = (band: number) => percentileToHslColor(bandColorPercentile(inc, band));
+  await logBandColorMapping(plugin, 'highlight side-panel badges (inc scale)', inc, colorForBand);
+  const { badges } = buildHighlightBandCSS(colorForBand);
   await plugin.app.registerCSS('highlight-priority-band-badges', badges);
 }
 
@@ -269,14 +272,16 @@ export async function registerTableBandBadgeCSS(plugin: ReactRNPlugin) {
   const percentiles = enabled
     ? await computeBandPercentiles(plugin)
     : { inc: null, card: null };
+  const incColor = (band: number) => percentileToHslColor(bandColorPercentile(percentiles.inc, band));
+  const cardColor = (band: number) =>
+    percentileToHslColor(bandColorPercentile(percentiles.card, band));
+  if (enabled) {
+    await logBandColorMapping(plugin, 'table badges (inc scale)', percentiles.inc, incColor);
+    await logBandColorMapping(plugin, 'table badges (card scale)', percentiles.card, cardColor);
+  }
   await plugin.app.registerCSS(
     showPriorityBandsInTablesId,
-    enabled
-      ? buildPriorityBandCSS({
-          inc: (band) => percentileToHslColor(bandColorPercentile(percentiles.inc, band)),
-          card: (band) => percentileToHslColor(bandColorPercentile(percentiles.card, band)),
-        })
-      : ''
+    enabled ? buildPriorityBandCSS({ inc: incColor, card: cardColor }) : ''
   );
 }
 
@@ -296,6 +301,92 @@ export async function registerIgnoreTagCSS(plugin: ReactRNPlugin) {
     }
   `;
   await plugin.app.registerCSS('ignore-tag-styling', css);
+}
+
+/**
+ * Hides the HasImage tag chip.
+ *
+ * The tag exists so RemNote's document Filter has something to match on; seeing
+ * it in the outline is pure noise, and it would appear on a great many rems.
+ *
+ * Matched by the pill's own `data-test` (RemNote stamps every applied-powerup
+ * pill with `Applied Powerup Pill <Name>`), not by "any chip on a hasimage rem".
+ * The broad form — the shape HIDE_DISMISSED_TAG_CSS uses — would also wipe the
+ * user's real tags off every rem holding an image.
+ */
+export async function registerHasImageCSS(plugin: ReactRNPlugin) {
+  const slug = hasImagePowerupName.toLowerCase();
+  const css = `
+    [data-test="Applied Powerup Pill ${hasImagePowerupName}"].hierarchy-editor__tag-bar__tag {
+      display: none;
+    }
+
+    /* RemNote renders a second, duplicate pill inside the Tag Bar when a rem has
+       a single tag, and that one carries no attribute naming its powerup. Match
+       it via the rem's own slug plus .rem-powerup-icon (the ⚡, present on powerup
+       pills and never on a plain user tag) — same approach as registerTagBadgeCSS. */
+    [data-rem-tags~="${slug}" i] [data-test="Tag Bar"] .hierarchy-editor__tag-bar__tag:has(.rem-powerup-icon) {
+      display: none;
+    }
+  `;
+  await plugin.app.registerCSS('has-image-tag-hide', css);
+}
+
+/**
+ * Rings the reference pins that lead to a Rem holding an image.
+ *
+ * Two attributes on RemNote's reference container make this possible, and both
+ * are needed:
+ *   - `data-rem-reference-pin="true"` — set from the rich-text element's `pin`
+ *     flag, and the only thing separating a pin from an ordinary reference.
+ *   - `data-rem-tags` — which on a reference container describes the **referenced**
+ *     Rem, not the host. So `~="hasimage"` reads as *"this pin points at a Rem
+ *     that holds an image"*.
+ *
+ * Scoping matters here: keying on the pin attribute alone rings every pin in the
+ * knowledge base, which says nothing. Paired with the tag it becomes a real
+ * signal while reading — this link leads to a figure — and it appears only after
+ * the Tag Rems With Images command has run (see registerHasImageCSS).
+ *
+ * **Accent-coloured, not achromatic.** The first draft used the neutral hairline
+ * token on the theory that hue is spoken for — bands own the red→green ramp,
+ * `#pdfextract` is blue, `#incremental` is green. In practice a grey 1px outline
+ * around an 18px icon in running text was invisible until hovered, which is no
+ * marker at all. The accent is safe here because this ring cannot be confused
+ * with any of those: it is an outline on an icon, never a background fill or a
+ * left border, and it appears on nothing but pins. Borrowing RemNote's own
+ * interactive accent also reads correctly — the same colour the app uses for
+ * links and selection, on something that *is* a navigation target.
+ *
+ * Opacity is deliberately NOT reduced. The ring marks a pin as more interesting
+ * than its neighbours; dimming it below the un-ringed pins around it would say
+ * the opposite.
+ *
+ * No background fill: a pin can sit inside a highlighted extract, and a fill
+ * would paint over the highlight's own colour. Both colours come from RemNote's
+ * `--rn-clr-border-*` tokens, so the ring follows light and dark mode without a
+ * `.dark` branch.
+ */
+export async function registerPinReferenceCSS(plugin: ReactRNPlugin) {
+  const slug = hasImagePowerupName.toLowerCase();
+  const css = `
+    [data-rem-reference-pin="true"][data-rem-tags~="${slug}" i] {
+      border: 1px solid var(--rn-clr-border-accent, #3B82F6);
+      border-radius: 4px;
+      padding: 0 1px;
+      margin: 0 1px;
+      transition: border-color 120ms ease;
+    }
+
+    /* Hover and edit-mode: step up to the selected-border token. RemNote already
+       paints its own light-accent background on a hovered reference, so the ring
+       only has to stay legible on top of it rather than supply the whole cue. */
+    [data-rem-reference-pin="true"][data-rem-tags~="${slug}" i]:hover,
+    .rem-text:focus-within [data-rem-reference-pin="true"][data-rem-tags~="${slug}" i] {
+      border-color: var(--rn-clr-border-selected, #1d4ed8);
+    }
+  `;
+  await plugin.app.registerCSS('pin-reference-styling', css);
 }
 
 export async function registerTagBadgeCSS(plugin: ReactRNPlugin) {

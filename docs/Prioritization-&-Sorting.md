@@ -68,7 +68,7 @@ There are several ways to set priorities in Incremental Everything, each designe
 
 *   **Main Priority Popup (`Opt+P`):** The comprehensive tool. Best for deep analysis, seeing relative priorities, ancestors, and using the "Shield" logic.
 *   **Light Priority Popup (`Ctrl+Opt+P`):** A streamlined, instant-opening version. Best for quick, friction-free adjustments during study sessions.
-*   **Quick Priority Shortcuts (`Ctrl+Shift+↑/↓`):** The fastest method. Adjusts absolute priority instantly without any UI popping up.
+*   **Quick Priority Shortcuts (`Ctrl+Opt+↑/↓`):** The fastest method. Adjusts absolute priority instantly without any UI popping up.
 *   **Priority Editor Widget:** An always-on visual control in the editor or queue.
 *   **Batch Tools:** Advanced tables for managing priorities en masse for documents or tags.
 
@@ -120,8 +120,8 @@ It works exactly like the main popup but skips the heavy calculations (like chec
 
 ### Quick Priority Shortcuts
 **Shortcuts:** 
-*   `Ctrl+Opt+Up Arrow`: **Increase** priority number (make **less** important). E.g., 10 → 20.
-*   `Ctrl+Opt+Down Arrow`: **Decrease** priority number (make **more** important). E.g., 20 → 10.
+*   `Ctrl+Opt+Up Arrow`: **Increase** priority number (make **less** important). E.g., 10 → 15 with the default step of 5.
+*   `Ctrl+Opt+Down Arrow`: **Decrease** priority number (make **more** important). E.g., 20 → 15 with the default step of 5.
 
 *Note: In this system, lower numbers mean higher importance (1 is top priority, 100 is low).*
 
@@ -240,7 +240,7 @@ Instead, the plugin writes each Rem's priority band into a hidden tag and draws 
 
 One badge appears per **row**, not per cell: the row's priority belongs to the Rem in the primary column, while the other columns display that Rem's slot values, which have no priority of their own. Scanning that column tells you the shape of a whole table at a glance.
 
-**Colour follows relative priority, per population.** Like the Priority Editor, a badge is coloured by where its priority *ranks*, not by its absolute number — in a knowledge base whose priorities cluster low, `P20` can be the 9th percentile and is drawn accordingly. Incremental Rems are ranked against Incremental Rems and flashcards against flashcards, exactly as the popup does it, so a table mixing both colours each row on its own scale. The mapping is recalculated at startup and after a *Refresh*, so it is a recent snapshot rather than a live figure.
+**Colour follows relative priority, per population.** Like the Priority Editor, a badge is coloured by where its priority *ranks*, not by its absolute number — in a knowledge base whose priorities cluster low, `P20` can be the 9th percentile and is drawn accordingly. Incremental Rems are ranked against Incremental Rems and flashcards against flashcards, exactly as the popup does it, so a table mixing both colours each row on its own scale. The mapping is recalculated at startup — once the priority caches have finished loading, which on a large knowledge base is some seconds into the session — and after a *Refresh*, so it is a recent snapshot rather than a live figure.
 
 **Why bands and not the exact number.** The only channel that reaches inside a table cell is a tag, and a tag is a yes/no — it cannot carry a value. Ten band tags give you ten steps; showing `74` exactly would need a tag per possible priority.
 
@@ -256,7 +256,7 @@ One badge appears per **row**, not per cell: the row's priority belongs to the R
 The band follows your priorities automatically — every priority write updates it, including inherited priorities flowing down a cascade, priorities set in bulk, and priorities changed from the IncRem List, Main View, Page Range, reschedule and editor-review widgets. Two commands exist for the rest:
 
 - **Refresh Priority Badges (Tables)** — recomputes bands for every IncRem and every Rem with a card priority. Run it **once after enabling the feature** to fill in Rems whose priority was set before it existed, or any time you suspect drift. Progress and a completion summary are reported as toasts and in the developer console.
-- **Remove All Priority Band Tags** — strips every band tag. Unlike *Remove All CardPriority Tags*, **this destroys nothing**: bands are a derived mirror of priorities that still live in the Incremental and CardPriority slots, so *Refresh* rebuilds them exactly.
+- **Remove All Priority Band Tags** — strips every band tag. Unlike the full scope of *[Remove CardPriority Tags…](Plugin-Commands-Reference.md#remove-cardpriority-tags)*, **this destroys nothing**: bands are a derived mirror of priorities that still live in the Incremental and CardPriority slots, so *Refresh* rebuilds them exactly.
 
 > [!TIP]
 > If you ran the plugin before the eligibility filter existed, run **Remove All Priority Band Tags** once and then **Refresh Priority Badges (Tables)** to shed the bands that were applied to Rems outside any table.
@@ -264,7 +264,7 @@ The band follows your priorities automatically — every priority write updates 
 > [!NOTE]
 > **Before v1.0.27**, only some priority writes updated the band: batch changes, the Priority & Interval batch save, reschedules, editor reviews and the list-view widgets all left the badge showing the previous value until the next *Refresh*. If you have been using tables since before that release, one run of **Refresh Priority Badges (Tables)** clears any badges left stale by it.
 >
-> One category is still not covered automatically: **removing** a card priority outright, via *Remove All CardPriority Tags* or the single-Rem cleanup. A Rem that is also an Incremental Rem keeps the correct badge (it falls back to the incremental priority), but a plain flashcard Rem holds its old badge until a *Refresh*.
+> One category is still not covered automatically: **removing** a card priority outright, via *[Remove CardPriority Tags…](Plugin-Commands-Reference.md#remove-cardpriority-tags)* or the single-Rem cleanup. A Rem that is also an Incremental Rem keeps the correct badge (it falls back to the incremental priority), but a plain flashcard Rem holds its old badge until a *Refresh*.
 
 ---
 
@@ -565,6 +565,42 @@ Results are session-cached so reopening the popup in the same session is instant
 
 > [!NOTE]
 > Both **Shields** can be toggled on and off the queue toolbar in the plugins [Settings](Plugin-Settings-Reference.md#queue).
+
+#### Queue Selection Odds
+
+At the bottom of the **Weighted Shield Breakdown** tab there is a **🎲 Queue Selection Odds** panel that answers a question the tables above only imply: *how much more often does the queue actually pick an item at this priority than an item at that one?*
+
+![The Queue Selection Odds panel comparing a card at absolute priority 15 (16.9th percentile) with one at 35 (47.9th): 2.04×, head-to-head 67.1% / 32.9%, with a real sample item under each side](assets/queue-selection-odds.png){ width="900" }
+
+Pick a universe from the dropdown — **Incremental Rems** or **Cards**, each in **🌐 Knowledge Base** or **📄 Document Scope** — and set two items, **A** and **B**. Your choice is remembered on your device and restored the next time the popup opens, surviving a full RemNote restart; it is not synced, so each device keeps its own. If the saved universe isn't on offer this time (a Document scope that isn't in play, say), the panel simply opens on the first one available. Each side accepts either a **relative percentile** or an **absolute priority**; whichever you type, the panel shows both, because it converts through the same sorted universe the bucket tables are built from:
+
+*   Type a **relative percentile** → it shows the **absolute priority** of the item sitting at that rank.
+*   Type an **absolute priority** → it shows the **relative percentile** that priority reaches, defined exactly as the threshold slider's *Rel %ile*: the share of the universe at or above it (`items with priority ≤ P / total × 100`).
+
+The middle column reports the verdict:
+
+*   **The ratio** — e.g. `1.58× · Item A is more likely to be drawn`.
+*   **Head-to-head** — the same thing as a split, e.g. `61.2% / 38.8%`: if only these two items competed for one slot, that's how often each would win it.
+*   **Δp** — the percentile gap driving it.
+
+**Where the number comes from.** It is the same curve as the rest of the popup, read as *lottery tickets*. An item holds
+
+```
+W = e^(−k × p/100)
+```
+
+…tickets, where `p` is its relative percentile and `k` is the decay constant of the [priority-weighted lottery](#how-randomness-works-the-priority-weighted-lottery) (your synced `weightSelectionK`, default `2.3026`). The odds ratio is therefore
+
+```
+W_A / W_B = e^(k × (p_B − p_A)/100)
+```
+
+…it depends **only on the gap** between the two percentiles, not on where they sit. With the default `k`, every 10 percentile points is a factor of ~1.26, and the extremes (0% vs 100%) come out at the familiar ~10×. The panel header shows the `k` and the randomness percentage actually in force for the selected item type, so the numbers reflect *your* configuration rather than the defaults.
+
+**Sample items.** Under each side the panel pulls a **real item at that priority** out of the current universe — the capped text of an actual Incremental Rem or card-bearing Rem — so the comparison has a face instead of two bare numbers. A front/back Rem (Concept · Descriptor, Question · Answer, …) shows both sides joined by an arrow, `front → back`, reading in the direction the card is asked — the same format the [priority popups](#main-priority-popup) use. Clozed spans are marked with `{{ }}` on either side of the arrow, so a cloze Rem reads as the card it is — `the capital of France is {{Paris}}` rather than a bare sentence. Both apply in **either** universe, not just Cards: a Rem can be an Incremental Rem *and* a flashcard at the same time, so an Incremental Rem sample that has a back side or a cloze is shown as the card it also is. Click a sample to open that Rem; press **🎲** to draw another one at the same priority (each side re-draws independently, and never lands on the item it is already showing). When no item sits at exactly that absolute priority the nearest available one is used and prefixed with `≈`.
+
+> [!NOTE]
+> **How literally to read the ratio.** The lottery only fills the *randomized* share of the queue (your [Incremental Rem Randomness](#1-incremental-rem-randomness) / [Flashcard Randomness](#2-flashcard-randomness) setting); the remaining slots stay in strict priority order, where the more important item wins every time. Inside a session the lottery also ranks within the **due** population rather than the whole universe, so absolute percentiles shift — but the ratio survives, as long as the *gap* between the two items does. Read it as the relative pull of one priority over another, which is exactly the question the setting is meant to answer.
 
 ###  Priority Shield History
 

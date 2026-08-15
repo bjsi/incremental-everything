@@ -1,9 +1,20 @@
 import { QueueItemType, ReactRNPlugin, WidgetLocation } from '@remnote/plugin-sdk';
-import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId } from '../lib/consts';
+import { pageRangeWidgetId, parentSelectorWidgetId, powerupCode, priorityGraphPowerupCode, incremNotesSidebarWidgetId, enableMasteryDrillId, pluginHubWidgetId } from '../lib/consts';
 import { getIESetting } from '../lib/settings';
 
 export async function registerWidgets(plugin: ReactRNPlugin) {
   const masteryDrillEnabled = await getIESetting(plugin, enableMasteryDrillId);
+
+  // The "Incremental Plugin" hub: shortcuts to settings, docs, sorting criteria
+  // and the Priority Review Document creator, plus one onboarding tip at a time.
+  // Ungated on purpose — it is the entry point to everything else, so it has to
+  // be visible before the user knows there is a settings popup to find.
+  plugin.app.registerWidget(pluginHubWidgetId, WidgetLocation.SidebarEnd, {
+    dimensions: {
+      width: '100%',
+      height: 'auto',
+    },
+  });
 
   // IE Settings popup — the plugin's own settings UI (grouped and layered,
   // unlike RemNote's flat plugin-settings list).
@@ -144,6 +155,17 @@ export async function registerWidgets(plugin: ReactRNPlugin) {
   plugin.app.registerWidget('jump_to_rem_input', WidgetLocation.Popup, {
     dimensions: {
       width: 400,
+      height: 'auto',
+    },
+  });
+
+  // Confirmation + report for "Tag Rems With Images". A popup rather than a
+  // native confirm(): the dialog offers a third choice (this scope / whole KB),
+  // and the report has to stay on screen — a toast pair raced and the result
+  // was replaced by the "scanning…" toast before it could be read.
+  plugin.app.registerWidget('image_scan_popup', WidgetLocation.Popup, {
+    dimensions: {
+      width: 480,
       height: 'auto',
     },
   });

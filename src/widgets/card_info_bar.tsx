@@ -18,6 +18,7 @@ import {
   incrementalQueueActiveKey,
   displayFsrsDsrId,
   fsrsWeightsId,
+  fsrsRequestedRetentionId,
 } from '../lib/consts';
 import {
   CardPriorityInfo,
@@ -29,7 +30,12 @@ import { getPendingCacheUpdate } from '../lib/card_priority/cache';
 import { PERFORMANCE_MODE_LIGHT, calculateVolumeBasedPercentile, calculateWeightedShield, formatStabilityDays, getRetrievabilityColor, percentileToHslColor } from '../lib/utils';
 import { getEffectivePerformanceMode } from '../lib/mobileUtils';
 import { PriorityBadge, WeightedShieldTooltip } from '../components';
-import { computeFSRSState, parseWeightsString, FSRSState } from '../lib/fsrs';
+import {
+  computeFSRSState,
+  parseWeightsString,
+  FSRSState,
+  DEFAULT_REQUESTED_RETENTION,
+} from '../lib/fsrs';
 import * as _ from 'remeda';
 import { useIESetting } from '../lib/settings';
 
@@ -252,6 +258,9 @@ export function CardInfoBar() {
 
   const fsrsWeightsRaw = useIESetting(fsrsWeightsId);
 
+  // Stored as a percentage for the settings UI; FSRS wants a 0–1 probability.
+  const requestedRetentionPct = useIESetting(fsrsRequestedRetentionId);
+
   // --- Fetch card repetition history ---
   const cardRepData = useTrackerPlugin(async (rp) => {
     const cardId = currentIds.cardId;
@@ -338,8 +347,73 @@ export function CardInfoBar() {
   const fsrsState: FSRSState | null = useMemo(() => {
     if (!showFsrsDsr || !cardRepData?.history || cardRepData.history.length === 0) return null;
     const weights = parseWeightsString(fsrsWeightsRaw);
-    return computeFSRSState(cardRepData.history, weights);
-  }, [showFsrsDsr, cardRepData?.history, fsrsWeightsRaw]);
+    const retention = Number.isFinite(requestedRetentionPct)
+      ? requestedRetentionPct / 100
+      : DEFAULT_REQUESTED_RETENTION;
+    return computeFSRSState(cardRepData.history, weights, retention);
+  }, [showFsrsDsr, cardRepData?.history, fsrsWeightsRaw, requestedRetentionPct]);
+
+  /**
+   * At the 90% default the interval equals the stability, so the U-Factor has a
+   * single value and the extra parenthesised figure would be noise. Off the
+   * default the two diverge and both are worth showing.
+   */
+  const usesCustomRetention =
+    !!fsrsState && Math.abs(fsrsState.requestedRetention - DEFAULT_REQUESTED_RETENTION) > 1e-6;
+
+  // Built here rather than inline in the JSX: three multi-line tooltips that all
+  // restate the same stability/interval relationship.
+  const fsrsTooltips = useMemo(() => {
+    if (!fsrsState) return null;
+    const fmt = formatStabilityDays;
+    const retentionPct = (fsrsState.requestedRetention * 100).toFixed(1).replace(/\.0$/, '');
+    const intervalNote = usesCustomRetention
+      ? `You review at ${retentionPct}% requested retention, so the interval you actually get is ` +
+        `${fsrsState.intervalFactor.toFixed(2)}× the stability — a Good rating schedules ` +
+        `${fmt(fsrsState.nextInterval.good)}, not ${fmt(fsrsState.nextS.good)}. That is the ` +
+        `"int." figure shown after the arrow.`
+      : `At the default 90% requested retention the interval equals the stability, so a Good ` +
+        `rating schedules ${fmt(fsrsState.nextInterval.good)}.`;
+
+    const dsr =
+      `FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\n` +
+      `Stability: expected interval in days at 90% retention.\n` +
+      `Retrievability: probability of recall right now.\n\n` +
+      `The number inside the parenthesis after Stability tells you how much time has passed ` +
+      `since your last review of this card. The arrow points to the stability a Good rating ` +
+      `would leave it with.\n\n` +
+      `${intervalNote}\n\n` +
+      `Based on ${fsrsState.reviewCount} reviews.\n\n` +
+      `Next Difficulty:\nAgain: ${fsrsState.nextD.again.toFixed(2)}\nHard: ${fsrsState.nextD.hard.toFixed(2)}\n` +
+      `Good: ${fsrsState.nextD.good.toFixed(2)}\nEasy: ${fsrsState.nextD.easy.toFixed(2)}`;
+
+    const sInc =
+      `SInc (Stability Increase) — how much your memory stability grows after answering.\n\n` +
+      `Hard: ×${fsrsState.sInc.hard.toFixed(2)} → ${fmt(fsrsState.nextS.hard)}\n` +
+      `Good: ×${fsrsState.sInc.good.toFixed(2)} → ${fmt(fsrsState.nextS.good)}\n` +
+      `Easy: ×${fsrsState.sInc.easy.toFixed(2)} → ${fmt(fsrsState.nextS.easy)}\n\n` +
+      `Higher = faster learning. A value of 1.0 means no growth.`;
+
+    const uFactorRow = (grade: 'hard' | 'good' | 'easy', label: string) =>
+      `${label}: ×${fsrsState.uFactor[grade].toFixed(2)} → ${fmt(fsrsState.nextInterval[grade])}` +
+      (usesCustomRetention
+        ? ` (×${fsrsState.uFactorAtDefaultRetention[grade].toFixed(2)} → ${fmt(fsrsState.nextS[grade])} at 90%)`
+        : '');
+
+    const uFactor =
+      `U-Factor (Used-Interval Increase) — how much the new interval grows compared to the ` +
+      `interval you actually used (time since last review: ${fmt(fsrsState.daysSinceLastReview)}).\n\n` +
+      `${uFactorRow('hard', 'Hard')}\n${uFactorRow('good', 'Good')}\n${uFactorRow('easy', 'Easy')}\n\n` +
+      (usesCustomRetention
+        ? `The first value is what you will really get at ${retentionPct}% retention; the value in ` +
+          `parentheses is what it would be at the 90% default, where the interval equals the ` +
+          `stability.\n\n`
+        : '') +
+      `Higher = a bigger jump in scheduling. A value of 1.0 means the new interval equals the ` +
+      `interval you just used.`;
+
+    return { dsr, sInc, uFactor };
+  }, [fsrsState, usesCustomRetention]);
 
 
   // --- 🔌 CACHE-BASED PATH (Full Mode) ---
@@ -644,31 +718,39 @@ export function CardInfoBar() {
                 <strong>{historyStats.reps}</strong> Reps <span style={{ color: '#ef4444' }}>({historyStats.lapses})</span>, ⏳ <strong>{historyStats.totalMinutes}</strong> min, <strong>{historyStats.cardAgeText}</strong> age{historyStats.costText && <>, 💰 <strong>{historyStats.costText}</strong></>}
               </span>
 
-              {showFsrsDsr && fsrsState && (
+              {showFsrsDsr && fsrsState && fsrsTooltips && (
                 <>
                   <span style={{ opacity: 0.4 }}>|</span>
-                  <span title={`FSRS v6 — Difficulty: how hard this card is to remember (1=easy, 10=hard).\nStability: expected interval in days at target retention.\nRetrievability: probability of recall right now.\n\nThe number inside the parenthesis after Stability tells you how much time has passed since your last review of this card.\n\nBased on ${fsrsState.reviewCount} reviews.\n\nNext Difficulty:\nAgain: ${fsrsState.nextD.again.toFixed(2)}\nHard: ${fsrsState.nextD.hard.toFixed(2)}\nGood: ${fsrsState.nextD.good.toFixed(2)}\nEasy: ${fsrsState.nextD.easy.toFixed(2)}`}>
+                  <span title={fsrsTooltips.dsr} style={{ cursor: 'help' }}>
                     D: <strong>{fsrsState.d.toFixed(2)}</strong>
                     {' · '}
                     S: <strong>{formatStabilityDays(fsrsState.s)}</strong> ({formatStabilityDays(fsrsState.daysSinceLastReview)} passed)
+                    {' → '}
+                    <strong>{formatStabilityDays(fsrsState.nextS.good)}</strong>
+                    {/* Off the 90% default the stability is no longer the interval
+                        that gets scheduled, so the real one is spelled out. */}
+                    {usesCustomRetention && (
+                      <> (int. <strong>{formatStabilityDays(fsrsState.nextInterval.good)}</strong>)</>
+                    )}
                     {' · '}
                     R: <strong style={{ color: getRetrievabilityColor(fsrsState.r) }}>
                       {(fsrsState.r * 100).toFixed(1)}%
                     </strong>
                   </span>
                   {' · '}
-                  <span title={`SInc (Stability Increase) — how much your memory stability grows after answering.\n\nHard: ×${fsrsState.sInc.hard.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.hard)}\nGood: ×${fsrsState.sInc.good.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.good)}\nEasy: ×${fsrsState.sInc.easy.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.easy)}\n\nHigher = faster learning. A value of 1.0 means no growth.`}
-                    style={{ cursor: 'help' }}
-                  >
+                  <span title={fsrsTooltips.sInc} style={{ cursor: 'help' }}>
                     SInc: <strong>{fsrsState.sInc.good.toFixed(2)}×</strong>
                   </span>
                   {fsrsState.uFactor.good > 0 && (
                     <>
                       {' · '}
-                      <span title={`U-Factor (Used-Interval Increase) — how much the new interval grows compared to the interval you actually used (time since last review: ${formatStabilityDays(fsrsState.daysSinceLastReview)}).\n\nHard: ×${fsrsState.uFactor.hard.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.hard)}\nGood: ×${fsrsState.uFactor.good.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.good)}\nEasy: ×${fsrsState.uFactor.easy.toFixed(2)} → ${formatStabilityDays(fsrsState.s * fsrsState.sInc.easy)}\n\nHigher = a bigger jump in scheduling. A value of 1.0 means the new interval equals the interval you just used.`}
-                        style={{ cursor: 'help' }}
-                      >
+                      <span title={fsrsTooltips.uFactor} style={{ cursor: 'help' }}>
                         U-Factor: <strong>{fsrsState.uFactor.good.toFixed(2)}×</strong>
+                        {/* Off the 90% default the interval no longer equals the
+                            stability, so the textbook figure is shown alongside. */}
+                        {usesCustomRetention && (
+                          <> ({fsrsState.uFactorAtDefaultRetention.good.toFixed(2)}×)</>
+                        )}
                       </span>
                     </>
                   )}

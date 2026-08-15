@@ -56,7 +56,7 @@ export const OutlineRestructureUndo = () => {
 
   const containerStyle: React.CSSProperties = {
     backgroundColor: 'var(--rn-clr-background-elevation-10)',
-    border: '1px solid var(--rn-clr-border-subtle)',
+    border: '1px solid var(--rn-clr-border-opaque)',
     color: 'var(--rn-clr-content-primary)',
     boxShadow: 'var(--rn-box-shadow-1)',
   };

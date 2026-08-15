@@ -936,7 +936,9 @@ function Debug() {
 
       const cases: Array<{ group: Row['group']; id: string; note: string }> = [
         // Notes read the live default out of the table — a hardcoded literal here
-        // goes stale the moment a default is edited.
+        // goes stale the moment a default is edited. The "control" ids are only
+        // registered while a knowledge base is migrating; once it has, they throw
+        // like any other unregistered id, and that is the expected result.
         { group: 'control', id: defaultPriorityId, note: `registered number, default ${JSON.stringify(IE_SETTINGS_DEFAULTS[defaultPriorityId])}` },
         { group: 'control', id: displayPriorityShieldId, note: `registered boolean, default ${JSON.stringify(IE_SETTINGS_DEFAULTS[displayPriorityShieldId])}` },
         { group: 'control', id: remnoteEnvironmentId, note: `registered dropdown, default ${JSON.stringify(IE_SETTINGS_DEFAULTS[remnoteEnvironmentId])}` },
@@ -1017,9 +1019,13 @@ function Debug() {
     }
   };
 
-  // Re-reads every setting and overwrites the stored blob. For recovering a
-  // migration that ran while some settings were unreadable — not part of the
-  // normal path, which is merge-only.
+  // Re-reads every setting from RemNote's panel and overwrites the stored blob.
+  // For recovering a migration that ran while some settings were unreadable —
+  // not part of the normal path, which is merge-only and re-reads only the ids
+  // adopted since this KB's last completed seed. Note it can only do anything
+  // while the registrations still exist, i.e. during the single session in which
+  // a knowledge base migrates; afterwards every read throws, every setting is
+  // recorded as 'failed', and the stored values are left untouched.
   const handleForceRemigrate = async () => {
     setIsMigrating(true);
     try {
@@ -2659,7 +2665,7 @@ function Debug() {
   };
 
   // KB-wide audit that answers: does `getPowerupByCode('cardPriority').taggedRem()`
-  // match reality? "Remove All CardPriority Tags" and the cache both enumerate via
+  // match reality? "Remove CardPriority Tags…" and the cache both enumerate via
   // taggedRem(), yet it can return far fewer rems than are actually tagged. This
   // cross-checks taggedRem() against a DIRECT hasPowerup('cardPriority') probe over
   // every card-bearing rem, and also flags rems that carry a priority slot value
@@ -4003,7 +4009,7 @@ function Debug() {
                          in its priority slot — so the numbers below are resolved on read from the
                          nearest ancestor, exactly as they would be for an untagged rem.{' '}
                          {cardPriority.cardCount > 0
-                           ? '"Sanitize Rogue Tags" will NOT touch this: it only strips tags from rems that own no cards, and this one does. setCardPriority always writes priority, source and lastUpdated together, so a surviving source/lastUpdated with no priority means the value was lost after it was written, not that the write was partial. To drop tags wholesale while flashcard prioritisation is off, use the "Remove All CardPriority Tags" command.'
+                           ? '"Sanitize Rogue Tags" will NOT touch this: it only strips tags from rems that own no cards, and this one does. setCardPriority always writes priority, source and lastUpdated together, so a surviving source/lastUpdated with no priority means the value was lost after it was written, not that the write was partial. To drop tags wholesale while flashcard prioritisation is off, use the "Remove CardPriority Tags…" command.'
                            : 'This rem owns no cards, so "Sanitize Rogue Tags" is the tool that removes it.'}
                        </>
                      ) : (
@@ -4906,15 +4912,16 @@ function Debug() {
               {isMigrating ? 'Working…' : 'Load status'}
             </button>
             <button onClick={handleCopyMigrationReport} style={{ ...smallBtnStyle, whiteSpace: 'nowrap' }}>Copy</button>
-            <button onClick={handleForceRemigrate} disabled={isMigrating} style={{ ...smallBtnStyle, cursor: isMigrating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }} title="Re-read every setting and overwrite the stored values. Use only to recover a migration that ran while settings were unreadable.">
+            <button onClick={handleForceRemigrate} disabled={isMigrating} style={{ ...smallBtnStyle, cursor: isMigrating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }} title="Re-read every setting from RemNote's panel and overwrite the stored values. Only does anything while those registrations still exist — i.e. during the one session in which this knowledge base migrates. Use only to recover a migration that ran while settings were unreadable.">
               Force re-run
             </button>
           </span>
         </h2>
         <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)', marginBottom: '6px' }}>
-          The migration copies each setting out of RemNote's settings panel into the plugin's own synced storage. It
-          runs once on load and records the outcome per setting, so this stays readable afterwards. Full detail also
-          goes to the DevTools console.
+          The migration copies each setting out of RemNote's settings panel into the plugin's own synced storage,
+          which is where every setting now lives. It runs on load until it completes, reads only the settings adopted
+          since this knowledge base's last completed seed, and records the outcome per setting so this stays readable
+          afterwards. Full detail also goes to the DevTools console.
         </div>
         {migrationReport === null ? (
           <div style={{ fontSize: '11px', color: 'var(--rn-clr-content-tertiary)' }}>

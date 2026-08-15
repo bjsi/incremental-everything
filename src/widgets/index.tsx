@@ -7,6 +7,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobileUtils';
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { writeCardPriorityCache } from '../lib/card_priority/persistence';
+import { checkFlashcardPrioritisationOptOut } from '../lib/card_priority/opt_out';
 import { registerEventListeners } from '../register/events';
 import { registerPluginPowerups } from '../register/powerups';
 import { registerPluginSettings } from '../register/settings';
@@ -24,13 +25,14 @@ import {
   registerHideInQueueLegacyCommands,
 } from '../register/queue_display_commands';
 import { enableHideInQueueIntegrationId, enableFlashcardPrioritisationId, pdfHighlightBordersReloadKey, priorityBandColorsReloadKey } from '../lib/consts';
+import { bandVerboseLogsEnabled } from '../lib/priority_bands';
 import { registerIncrementalRemTracker } from '../register/tracker';
 import { cleanupOrphanedReviewGraphs } from '../lib/priority_review_document/cleanup';
 import { migrateAuthoritativeAggregatesToShards } from '../lib/authoritative_aggregates';
 import { registerJumpToRemHelper } from '../register/window';
-import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS } from '../lib/ui_helpers';
+import { registerPluginHidingCSS, registerPdfHighlightCSS, registerClozeExtractCSS, registerTagBadgeCSS, registerIgnoreTagCSS, registerHighlightBandBadgeCSS, registerTableBandBadgeCSS, registerHasImageCSS, registerPinReferenceCSS } from '../lib/ui_helpers';
 import { getIESetting } from '../lib/settings';
-import { migrateIESettingsIfNeeded, isIESettingsSeedNeeded } from '../lib/settings_migration';
+import { migrateIESettingsIfNeeded, settingIdsNeedingRegistration } from '../lib/settings_migration';
 
 async function onActivate(plugin: ReactRNPlugin) {
   //Debug
@@ -50,12 +52,14 @@ async function onActivate(plugin: ReactRNPlugin) {
   // newly-created rems. These powerup codes don't exist in the standalone
   // Hide in Queue plugin, so they cannot collide with it.
   await registerCoreQueueDisplayPowerups(plugin);
-  // Popup-tier settings are registered with RemNote only while this KB still
-  // needs seeding — the migration reads them through getSetting, which throws
-  // for an unregistered id. Once seeded they vanish from RemNote's panel and
-  // the IE Settings popup owns them.
-  const seedNeeded = await isIESettingsSeedNeeded(plugin);
-  await registerPluginSettings(plugin, { includePopupTier: seedNeeded });
+  // Settings appear in RemNote's own panel only while this KB still has to read
+  // them across — the migration reads through getSetting, which throws for an
+  // unregistered id. For an up-to-date KB this list is empty, so the plugin's
+  // section of that panel is empty too and the IE Settings popup owns every
+  // setting.
+  await registerPluginSettings(plugin, {
+    ids: await settingIdsNeedingRegistration(plugin),
+  });
 
   // Seed the plugin-owned settings store from the registrations that were just
   // installed. Must run after registerPluginSettings and before any widget can
@@ -116,7 +120,18 @@ async function onActivate(plugin: ReactRNPlugin) {
   // after activation. This re-registers both badge stylesheets whenever that
   // mapping should be recomputed (cache load below, or a badge refresh).
   plugin.track(async (rp) => {
-    await rp.storage.getSession(priorityBandColorsReloadKey); // reactive trigger
+    const reloadStamp = await rp.storage.getSession(priorityBandColorsReloadKey); // reactive trigger
+    // Instrumentation (verbose-gated): `undefined` here means this is the
+    // ACTIVATION-time run, i.e. the colours are being baked before either
+    // priority cache is warm. Any later run carries the stamp of whatever
+    // bumped the key.
+    if (await bandVerboseLogsEnabled(plugin)) {
+      console.log(
+        `[PriorityBands] re-registering band stylesheets — trigger=${
+          reloadStamp === undefined ? 'ACTIVATION (caches likely cold)' : `reload key ${reloadStamp}`
+        }`
+      );
+    }
     await registerTableBandBadgeCSS(plugin);
     await registerHighlightBandBadgeCSS(plugin);
   });
@@ -125,6 +140,8 @@ async function onActivate(plugin: ReactRNPlugin) {
   await registerClozeExtractCSS(plugin);
   await registerTagBadgeCSS(plugin);
   await registerIgnoreTagCSS(plugin);
+  await registerHasImageCSS(plugin);
+  await registerPinReferenceCSS(plugin);
 
   await registerCommands(plugin);
 
@@ -174,6 +191,16 @@ async function onActivate(plugin: ReactRNPlugin) {
     // next full-mode launch pay a cold build for it.
     await writeCardPriorityCache(plugin, []);
   }
+
+  // Turning the flashcard-prioritisation opt-in OFF leaves every tag it wrote in
+  // place. Deferred and deliberately not awaited: it ends in a modal and a KB-wide
+  // scan, neither of which belongs on the activation path. It is a no-op unless
+  // the setting actually changed since the last launch of this KB.
+  setTimeout(() => {
+    checkFlashcardPrioritisationOptOut(plugin).catch((err) =>
+      console.warn('Flashcard prioritisation opt-out check failed', err)
+    );
+  }, 8000);
 }
 
 async function onDeactivate(_: ReactRNPlugin) { }

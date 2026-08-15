@@ -16,6 +16,7 @@ import {
 import { consumePendingScrollRequest } from '../lib/remHelpers';
 import {
   PrefetchQueueInfo,
+  VERBOSE_QUEUE_INJECTION,
   buildQueuePrefetch,
   confirmServed,
   isPrefetchReadyFor,
@@ -118,10 +119,16 @@ const rewindSessionItemCounter = () => {
 // proves that, and because it is the only way a future regression that puts an
 // await back on this path would ever be noticed.
 //
-// Two things are measured:
-//   1. Wall time per phase on every return, both paths.
+// Two things are tracked:
+//   1. Wall time of the call. Only ever PRINTED when it crosses
+//      SLOW_CALL_WARN_MS, because at that point an `await` has crept back onto
+//      a path that is supposed to be synchronous — the exact regression that
+//      would resurrect the dropped-injection bug, and one that reports no
+//      symptom of its own.
 //   2. Whether the PREVIOUS decision actually reached the screen — read off the
 //      `queueInfo` counters RemNote hands us, which is exact and costs nothing.
+//      This is NOT diagnostics: it drives confirm-then-burn (see
+//      verifyPreviousDecision). Its logging is separable; its logic is not.
 //
 // On (2): the first version compared our returned remId against
 // `currentIncRemKey`, which the queue widget writes when it mounts. That
@@ -141,8 +148,6 @@ const rewindSessionItemCounter = () => {
 // a real consequence (rolling the candidate back onto the buffer).
 const SLOW_CALL_WARN_MS = 800;
 
-type PhaseTimings = Record<string, number>;
-
 type QueueInfo = {
   mode: 'practice-all' | 'in-order' | 'normal';
   cardsPracticed: number;
@@ -155,29 +160,12 @@ type Decision = {
   remId: string | null; // null = we deliberately yielded a flashcard turn
   reason: string;
   totalMs: number;
-  phases: PhaseTimings;
   cardsPracticed: number;
   numCardsRemaining: number;
 };
 
 let callSeq = 0;
 let lastDecision: Decision | null = null;
-let cachePayloadProbed = false;
-
-function startTimer() {
-  const t0 = Date.now();
-  let last = t0;
-  const phases: PhaseTimings = {};
-  return {
-    phases,
-    mark(label: string) {
-      const now = Date.now();
-      phases[label] = now - last;
-      last = now;
-    },
-    total: () => Date.now() - t0,
-  };
-}
 
 /**
  * Confirms (or refutes) that the item returned by the PREVIOUS GetNextCard call
@@ -199,7 +187,6 @@ function verifyPreviousDecision(plugin: ReactRNPlugin, queueInfo: QueueInfo) {
     practicedDelta,
     remainingDelta,
     tookMs: prev.totalMs,
-    phases: prev.phases,
     reason: prev.reason,
   };
 
@@ -217,12 +204,14 @@ function verifyPreviousDecision(plugin: ReactRNPlugin, queueInfo: QueueInfo) {
       rollbackServed();
       rewindSessionItemCounter();
     }
-    console.log(
-      `🔁 GetNextCard #${prev.seq}: same slot asked again ` +
-        `(cardsPracticed still ${queueInfo.cardsPracticed}) after our ${prev.totalMs}ms response.` +
-        (prev.remId !== null ? ` Candidate ${prev.remId} returned to the buffer.` : ''),
-      ctx
-    );
+    if (VERBOSE_QUEUE_INJECTION) {
+      console.log(
+        `🔁 GetNextCard #${prev.seq}: same slot asked again ` +
+          `(cardsPracticed still ${queueInfo.cardsPracticed}) after our ${prev.totalMs}ms response.` +
+          (prev.remId !== null ? ` Candidate ${prev.remId} returned to the buffer.` : ''),
+        ctx
+      );
+    }
     return;
   }
 
@@ -230,14 +219,19 @@ function verifyPreviousDecision(plugin: ReactRNPlugin, queueInfo: QueueInfo) {
 
   if (remainingDelta === 0) {
     confirmServed(plugin);
-    console.log(
-      `✅ GetNextCard #${prev.seq}: IncRem ${prev.remId} WAS SHOWN — flashcard count held at ` +
-        `${queueInfo.numCardsRemaining} while cardsPracticed advanced (${prev.totalMs}ms).`,
-      ctx
-    );
+    if (VERBOSE_QUEUE_INJECTION) {
+      console.log(
+        `✅ GetNextCard #${prev.seq}: IncRem ${prev.remId} WAS SHOWN — flashcard count held at ` +
+          `${queueInfo.numCardsRemaining} while cardsPracticed advanced (${prev.totalMs}ms).`,
+        ctx
+      );
+    }
   } else {
     const recovered = rollbackServed();
     rewindSessionItemCounter();
+    // Unconditional: a dropped injection is the failure this whole subsystem
+    // exists to prevent. If it starts happening again, it must be visible
+    // without anyone having to switch logging on first.
     console.warn(
       `⛔ GetNextCard #${prev.seq}: DROPPED INJECTION — we returned IncRem ${prev.remId} after ` +
         `${prev.totalMs}ms, but RemNote consumed ${remainingDelta} flashcard(s) instead. ` +
@@ -256,7 +250,7 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
   plugin.app.registerCallback<SpecialPluginCallback.GetNextCard>(
     SpecialPluginCallback.GetNextCard,
     async (queueInfo) => {
-      const timer = startTimer();
+      const startedAt = Date.now();
       const seq = ++callSeq;
 
       // Did the item we returned LAST time actually make it onto the screen?
@@ -270,29 +264,30 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
       };
 
       /**
-       * Single exit point. Records the decision for the next call's verification
-       * and logs the phase breakdown.
+       * Single exit point. Records the decision so the NEXT call can verify it —
+       * that part is load-bearing and runs regardless of logging.
        */
       const finish = <T extends { remId: string } | null>(result: T, reason: string): T => {
-        const totalMs = timer.total();
+        const totalMs = Date.now() - startedAt;
         lastDecision = {
           seq,
           remId: result?.remId ?? null,
           reason,
           totalMs,
-          phases: { ...timer.phases },
           cardsPracticed: queueInfo.cardsPracticed,
           numCardsRemaining: queueInfo.numCardsRemaining,
         };
         const label = result ? `IncRem ${result.remId}` : 'flashcard (null)';
         if (totalMs >= SLOW_CALL_WARN_MS) {
+          // Unconditional. This path is synchronous by construction, so it can
+          // only take this long if someone has put an `await` back in front of a
+          // return — which silently reintroduces dropped injections in large KBs.
           console.warn(
             `🐢 GetNextCard #${seq} → ${label} [${reason}] took ${totalMs}ms — ` +
               `slow enough that RemNote may have stopped waiting. An await has ` +
-              `crept back onto this path; it is supposed to be synchronous.`,
-            timer.phases
+              `crept back onto this path; it is supposed to be synchronous.`
           );
-        } else {
+        } else if (VERBOSE_QUEUE_INJECTION) {
           console.log(`⏱️ GetNextCard #${seq} → ${label} [${reason}] in ${totalMs}ms`);
         }
         return result;
@@ -365,19 +360,21 @@ export function registerCallbacks(plugin: ReactRNPlugin) {
         queueInfo.numCardsRemaining === 0 ||
         intervalBetweenIncRem === 'no-cards';
 
-      console.log('🎯 GetNextCard → deciding NEXT item:', {
-        willShowIncRem: shouldShowIncRem,
-        sessionItemCounter,
-        counterCheck:
-          typeof intervalBetweenIncRem === 'number'
-            ? `(${sessionItemCounter}+1) % ${intervalBetweenIncRem} = ${
-                (sessionItemCounter + 1) % intervalBetweenIncRem
-              }`
-            : intervalBetweenIncRem,
-        numCardsRemaining: queueInfo.numCardsRemaining,
-        dueIncRems: dueCount,
-        prefetchReady: isPrefetchReadyFor(prefetchInfo),
-      });
+      if (VERBOSE_QUEUE_INJECTION) {
+        console.log('🎯 GetNextCard → deciding NEXT item:', {
+          willShowIncRem: shouldShowIncRem,
+          sessionItemCounter,
+          counterCheck:
+            typeof intervalBetweenIncRem === 'number'
+              ? `(${sessionItemCounter}+1) % ${intervalBetweenIncRem} = ${
+                  (sessionItemCounter + 1) % intervalBetweenIncRem
+                }`
+              : intervalBetweenIncRem,
+          numCardsRemaining: queueInfo.numCardsRemaining,
+          dueIncRems: dueCount,
+          prefetchReady: isPrefetchReadyFor(prefetchInfo),
+        });
+      }
 
       if (!shouldShowIncRem) {
         sessionItemCounter++;

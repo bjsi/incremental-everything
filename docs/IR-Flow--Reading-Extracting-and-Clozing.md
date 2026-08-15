@@ -106,7 +106,7 @@ While reading, you often encounter a key term, definition, or fact that you want
 
 ### Auto-Priority Graduation
 
-Both commands automatically assign a **Card Priority** to every new cloze, implementing the standard incremental reading workflow: the first fact you extract from a passage is the most important, so it should get the highest scheduling priority (lowest priority number). Each successive cloze from the same extract is inherently less critical, so it gets a slightly lower scheduling priority.
+Both commands automatically assign a **Card Priority** to every new cloze, implementing the standard incremental reading workflow: the first fact you extract from a passage is the most important, so it should get the highest scheduling priority — which, since [lower numbers mean higher priority](Prioritization-&-Sorting.md#priority-value-absolute-priority), means the **lowest number**. Each successive cloze from the same extract is inherently less critical, so its number goes **up by one step**, ranking it below the ones before it.
 
 **Formula:**
 
@@ -117,8 +117,8 @@ Both commands automatically assign a **Card Priority** to every new cloze, imple
   - the parent's `#cloze-extract` children (clozes previously extracted from it as siblings of the new one), plus
   - the cards the parent rem owns itself — native cloze markers inside its text and front/back-direction cards if it is a flashcard.
   A first cloze from a plain text extract sees `existingCount = 0` and inherits the parent's priority exactly. A first cloze from a Concept/Descriptor extract (which already has 2 own cards) or from a rem that already contains native clozes starts with a non-zero count, reflecting that the material is already partially cardified.
-- **`stepSize`** — configured in Plugin Settings → Priority Step Size (default: 10).
-- Decrements are **capped at 10**, so even the 15th cloze from the same extract receives at most 10 extra steps.
+- **`stepSize`** — how much the number moves per cloze, set by **[Priority Step Size](Plugin-Settings-Reference.md#priority)** (default: `5`). The same setting drives the [Quick Priority shortcuts](Prioritization-&-Sorting.md#quick-priority-shortcuts), so one value defines "one step" everywhere in the plugin.
+- The count is **capped at 10 steps**, so even the 15th cloze from the same extract is only 10 steps below the parent — a long cloze session cannot push a card all the way to priority 100.
 
 **Example** — parent extract at priority 30, step size 5:
 
@@ -169,7 +169,7 @@ RemNote has its own built-in cloze system — marking text with `{curly braces}`
 
 ### Native RemNote Clozes
 
-- **Spoiler protection**: RemNote's scheduler automatically **buries** (hides for ~1 hour) other cloze cards from the same Rem after one is reviewed. This prevents you from accidentally getting spoiled on a related answer you haven't been tested on yet.
+- **Spoiler protection**: RemNote's scheduler automatically **buries** (hides for ~1 hour) other cards (clozes or front/back) from the same Rem after one is reviewed. This prevents you from accidentally getting spoiled on a related answer you haven't been tested on yet.
 - **Compact**: Multiple clozes live inside a single Rem. No extra Rems are created.
 - **Simpler workflow**: Just highlight and mark — no child Rem is generated.
 - **Best for**: Dense material where multiple facts in a single sentence all need to be tested, and you trust RemNote's bury logic to prevent spoilers.
@@ -177,10 +177,10 @@ RemNote has its own built-in cloze system — marking text with `{curly braces}`
 ### `Alt+Z` SuperMemo-style Clozes
 
 - **Standalone Rem**: Each cloze becomes its **own independent Rem** in the knowledge base. This means it has its own scheduling history, its own priority, and can be edited, simplified, or reorganized entirely independently of the parent.
-- **Atomic by design**: Because the child is a separate Rem, you are naturally encouraged to make each card as atomic as possible. Over time, you can simplify the child's wording — removing irrelevant context — making it faster to review and easier to memorize.
-- **Incrementally refineable**: The child can itself be extracted further or restructured. Native clozes inside a parent Rem cannot be individually promoted or separated.
-- **Full context preserved**: The child always carries the full front-and-back of the parent, so you never lose the context in which you learned the fact.
-- **Best for**: Key terms, definitions, and facts you want to make truly independent, atomic, and long-term durable — especially during the first read of a new document.
+- **Prioritized approach**: Each cloze carries its own [Card Priority](Priorities-for-Flashcards.md), and the plugin assigns it for you. Every new cloze taken from the same rem gets a priority **number one step higher** than the one before it — and since [lower numbers mean higher priority](Prioritization-&-Sorting.md#priority-value-absolute-priority), each successive cloze is scheduled as slightly *less* important than its predecessor. That matches how you actually read: the fact you cloze first is the one you judged most worth keeping. One step is the **[Priority Step Size](Plugin-Settings-Reference.md#priority)** setting (default `5`), the same step the [Quick Priority shortcuts](Prioritization-&-Sorting.md#quick-priority-shortcuts) use. The full rule — where the parent's priority comes from, what already counts as an existing cloze, and the 10-step ceiling — is in [Auto-Priority Graduation](#auto-priority-graduation) above.
+- **Atomic by design**: Because the child is a separate Rem, and rewording it won't make you lose content (it already lives in the parent), you are naturally encouraged to make each card as atomic as possible. Over time, you can simplify the child's wording — removing irrelevant context — making it faster to review and easier to memorize.
+- **Full context preserved**: The parent rem will continue to carry the whole content, so you are free to edit the child cloze fearlessly.
+- **Best for**: The incremental approach, where you return to the same passage over several rounds and go one level deeper each time — the most important fact first, the finer detail later. Creating several clozes in one sitting does **not** put them on equal footing: with a parent at priority 30 and a step of 5, they come out at 30, 35, 40, … so the queue reaches them in the order you judged them, spread across sessions rather than bunched into one.
 
 ### Summary
 
@@ -188,11 +188,12 @@ RemNote has its own built-in cloze system — marking text with `{curly braces}`
 |---|---|---|
 | Spoiler protection (bury) | Yes | No (each card is independent) |
 | Standalone Rem | No | Yes |
-| Individually schedulable | No | Yes |
+| Incrementally introduced to the Queue | No | Yes |
+| Per-card prioritization | No | Yes |
 | Can be simplified over time | No | Yes |
-| Atomic card design | Encouraged by discipline | Structurally enforced |
+| Atomic card design | Difficult, as the context for the other cards in the same rem need to be preserved | Easy to do, structurally enforced |
 | Number of Rems created | 0 (inline) | 1 per cloze |
-| Back-reference to source | No | Yes (pin appended) |
+| Back-reference to source rem | -- | Yes (pin appended) |
 | Visual queue badge | No | Yes (violet ↑ badge) |
 
-The two approaches are **complementary**. Use native clozes for quick, spoiler-safe multi-cloze sentences. Use `Alt+Z` when a concept is important enough to deserve its own card and its own long-term refinement path.
+The two approaches are **complementary**. Use native clozes for quick, spoiler-safe multi-cloze sentences. Use `Alt+Z` when you are reading incrementally and want each fact to stand on its own: ranked in the order you found it, arriving in the queue according to their priority rather than alongside its siblings, and free to be simplified over time — because the parent still holds the full context, nothing is lost when you cut the card down to its essentials.

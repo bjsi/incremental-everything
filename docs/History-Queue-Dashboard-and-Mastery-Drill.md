@@ -22,7 +22,7 @@ The cleanest migration path is to disable IE's Mastery Drill while you finish an
 
 **Step 1 — Disable IE's Mastery Drill temporarily**
 
-In RemNote Settings → Plugins → Incremental Everything, enable the **Skip Mastery Drill** toggle. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
+In the plugin's settings popup (**`Incremental Everything: Settings`**, quick code `ies`) → **Mastery Drill**, turn **Enable Mastery Drill** off. Then **reload RemNote**. This hides IE's drill popup, notification widget, and command, and stops IE from tracking AGAIN/HARD cards — leaving only the old plugin's drill active and unambiguous.
 
 **Step 2 — Complete your old Mastery Drill queue *(optional)*
 
@@ -40,7 +40,7 @@ Go to **RemNote Settings → Plugins**, find *History, Queue Dashboard and Maste
 
 **Step 5 — Re-enable IE's Mastery Drill**
 
-In RemNote Settings → Plugins → Incremental Everything, disable the **Skip Mastery Drill** toggle. Then **reload RemNote**. IE's drill popup, notification widget, and command are now active again, and AGAIN/HARD tracking resumes.
+In the same place, turn **Enable Mastery Drill** back on. Then **reload RemNote**. IE's drill popup, notification widget, and command are now active again, and AGAIN/HARD tracking resumes.
 
 **Step 6 — Import your Practiced Queues history**
 
@@ -131,13 +131,62 @@ The **Debug: Clear Flashcard History** command clears the list for the knowledge
 |---|---|
 | **Total Time** | Total time spent in the session |
 | **Retention Rate** | Remembered vs. Forgot percentage |
-| **Speed (CPM / s/card)** | Cards per minute and seconds per card, with visual indicator |
+| **Speed (CPM / s/card)** | Cards per minute and seconds per card, [colour-coded](#speed-colour-coding) |
 | **Card Age** | Age of the card currently being reviewed (live view only) |
 | **Cost** | Minutes per year of card age/coverage |
 | **Interval** | Time until next scheduled review (prev/current card) |
 | **Sessions Summary** | Aggregated stats for Today, Yesterday, This Week, Last Week, and more |
 | **Flashcards** | Count and time for regular flashcards |
 | **Incremental Rems** | Count and time for IncRems reviewed during the session — tracked from the queue widget, the Editor Review Timer, and the Editor Review popup |
+
+### Speed Colour Coding
+
+Every speed reading — in the live session card, in the History Log, and in the Sessions Summary table — is tinted on a **red → yellow → green gradient**. The colour is always derived from the cards-per-minute pace, so a given pace looks identical whichever unit it is displayed in.
+
+**Out of the box the two ends of that gradient are measured from your own card history**, so "slow" and "fast" mean slow and fast *for you* — see [Choosing your own limits](#choosing-your-own-limits) below. Until the first measurement completes, and whenever you switch to fixed limits, the gradient falls back to two absolute values:
+
+| Colour | Cards per minute | Seconds per card | Reading |
+|---|---|---|---|
+| 🔴 Red | ≤ 1.5 cpm | ≥ 40 s/card | Slow — long cards, heavy material, or interruptions |
+| 🟡 Yellow | ≈ 2.75 cpm | ≈ 22 s/card | Mid-range |
+| 🟢 Green | ≥ 4 cpm | ≤ 15 s/card | Fast — short cards or well-known material |
+
+Between the two limits the hue shifts continuously with the pace; below and above them it stays fully red and fully green. Since seconds per card is the inverse of cards per minute, the s/card scale runs the other way — **lower** s/card is greener.
+
+The gradient is a pace indicator, not a quality score: reading-heavy or cloze-dense material sits naturally at the red end, and speed says nothing on its own without the **Ret.** column beside it.
+
+#### Choosing your own limits
+
+The two ends of the gradient are configurable under **Queue Dashboard** in the [IE Settings popup](Plugin-Settings-Reference.md#queue-dashboard), in either of two modes.
+
+**Calibrated from your card history** — the default. An absolute cards-per-minute standard says little about a collection of long extracts, or one of one-word clozes, so instead of two fixed numbers the plugin measures the **average seconds per card** across your real flashcard repetitions and places the gradient around it:
+
+| | Seconds per card |
+|---|---|
+| 🟢 Fully green | your average **−** the margin |
+| 🟡 Mid-gradient | your average |
+| 🔴 Fully red | your average **+** the margin |
+
+Two settings shape the measurement:
+
+- **Calibration Period** — how far back it looks: *Ever*, *Last 1 year*, *Last 1 month*, or *Last 1 week*. A short window tracks your current form and moves with it; a long one is steadier and harder to shift.
+- **Margin Around the Average** — how many seconds either side of your average the colour saturates, 10 s by default. With a 24 s/card average and a 10 s margin, 14 s/card and faster is fully green, 34 s/card and slower fully red. A smaller margin makes the dashboard react sharply to small changes of pace; a larger one only flags real outliers.
+
+While calibrated mode is selected, the **Queue Dashboard** settings section shows the average it is working from — in both cpm and s/card, with the number of repetitions behind it and the green and red points your current margin produces — plus a **Recalibrate** button:
+
+![The Queue Dashboard section of the IE Settings popup, in calibrated mode, showing the measured average and the resulting green and red points](assets/settings-queue-dashboard.png){ width="900" }
+
+Every real repetition in the window counts — *Again*, *Hard*, *Good* and *Easy* — with each response time capped by the **Flashcard Response Time Limit**, so a card left on screen while you made coffee cannot drag your average up by minutes. Ratings that are not real reviews (*Too Early*, leech views, resets, manual date or ease changes) are excluded.
+
+In calibrated mode the Sessions Summary carries a caption spelling out the scale actually in force — your measured average, how many repetitions it came from, and the resulting green and red points — with a **Recalibrate** link beside it:
+
+> Speed colours calibrated on **38.0 s/card** average over the last year (23,290 reps): green at 28.0 s/card or faster, red at 48.0 s/card or slower. *Recalibrate*
+
+**How often it measures.** Reading every card's repetition history is far too heavy to repeat on each render, so the result is cached **on your device** and re-measured only when it is missing, when it came from another knowledge base, when you change the Calibration Period, or when it is more than **seven days** old. Use **Recalibrate** to force a fresh measurement at any time — after a long study run, say. While the first measurement is in flight the dashboard keeps colouring with the fixed limits, and if the window contains no reviews at all it says so and stays on them. In practice this means one history walk the first time you open the dashboard, then nothing for a week.
+
+**Fixed limits** — the alternative, for when you would rather judge against an absolute standard than a moving one. Set **Red At or Below** and **Green At or Above** in cards per minute to whatever suits your material; they apply exactly as typed, the same on every device and in every knowledge base, and nothing is ever measured. The 1.5 / 4 cpm defaults are what the dashboard used before either mode existed.
+
+Both modes affect only the Practiced Queues dashboard. The [Study Dashboard](Study-Dashboard.md) has its own speed columns and still uses the fixed 1.5 / 4 cpm gradient.
 
 **Cluster-aware tracking:** Card count, time, and retention are tracked per sibling card in a cluster — not just the cluster anchor. Average speed (s/card) and total card count correctly reflect all siblings rated.
 
@@ -161,6 +210,16 @@ This is intentionally a passive readout — it doesn't gate or sort the queue. I
 **Interaction:** Clicking on a session opens the document in the Editor, so you can review the material again.
 
 **Export & Import:** Back up your practice session history across all Knowledge Bases to a local JSON file, and import it back at any time (duplicate sessions are automatically skipped).
+
+### Speed Units in the Sessions Summary
+
+The Sessions Summary table's **Speed** column has a small unit button in its header. Click it to switch every row between **cpm** (cards per minute) and **s/card** (seconds per card) — the same two readings the per-session History Log below always shows side by side.
+
+![The Sessions Summary table in s/card mode, with the unit button in the Speed header and the calibration caption below the table](assets/queue-dashboard-summary.png){ width="800" }
+
+The choice is stored **on your device** (not synced), so the table opens in your preferred unit in every later session, while another device can keep its own.
+
+Values are colour-coded on the same red → green gradient as the live session card and the History Log, and the colour follows the underlying pace rather than the printed number — so switching to s/card recolours nothing. See [Speed Colour Coding](#speed-colour-coding).
 
 ### Refresh Statistics — Authoritative Summary Recompute
 

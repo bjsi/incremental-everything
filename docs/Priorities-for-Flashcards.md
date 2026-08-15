@@ -8,7 +8,7 @@ This page explains how the plugin allows you to layer a priority system on top o
 
 ## Switching it on { #the-opt-in }
 
-Flashcard prioritisation is **off by default**. Turn it on at **Settings → Plugins → Incremental Everything → Enable Flashcard Prioritisation**, then reload RemNote.
+Flashcard prioritisation is **off by default**. Turn it on in the plugin's settings popup — run **`Incremental Everything: Settings`** (quick code `ies`) → **Flashcard Prioritisation** → *Enable Flashcard Prioritisation* — then reload RemNote. (Before v1.0.45 this switch lived in RemNote's own plugin settings panel.)
 
 It is opt-in because it is the one part of the plugin that works across your **entire** knowledge base rather than on the Rems you are handling. While it is on, the plugin tags flashcard-bearing Rems with the `cardPriority` powerup and keeps those tags in step as you edit — on a large library that means a long initial pass and continuous background work, and RemNote can feel slow until it settles.
 
@@ -21,6 +21,21 @@ It is opt-in because it is the one part of the plugin that works across your **e
 - **Priorities you set yourself are still saved.** Setting a priority on a flashcard (`Alt+P`, the batch tools) records it with source `manual`, and dismissing an Incremental Rem still stamps `incremental` on the flashcards beneath it. Those two are deliberate acts on identified Rems, so the switch does not block them.
 
 What is skipped is the **bulk index**: the KB-wide tagging pass, the inheritance cascade over descendants, the priority cache, and everything built on it — the [Priority Shield](Prioritization-&-Sorting.md#priority-shield), relative percentiles, and flashcards in Priority Review Documents.
+
+### Switching it back off { #switching-it-off }
+
+Turning the setting off stops all of that work immediately, but it does **not** undo it: every `cardPriority` tag already written stays on your Rems, with its `Priority`, `Priority Source` and `Last Updated` slots.
+
+So, on the next reload after you switch it off, the plugin offers to clear them for you:
+
+> The plugin has stopped writing card priorities, but *N* tag(s) it created automatically (source: inherited or default) are still on your Rems. Would you like to remove them now?
+
+- **OK** removes them.
+- **Cancel** leaves everything as it is and tells you how to do it later. The offer is made **once per switch-off**, never repeatedly, and never on [Light Mode](Full-Mode-x-Light-Mode.md) devices — the cleanup is a knowledge-base-wide write, which is what Light Mode exists to avoid, so it waits for a Full Mode session.
+
+You can run the same cleanup at any time with **[Remove CardPriority Tags…](Plugin-Commands-Reference.md#remove-cardpriority-tags)** → *inherited & default only*.
+
+**Nothing is lost either way.** Inherited and default priorities are *computed* from your document tree, so they are rebuilt exactly by switching the setting back on and running *Update all inherited Card Priorities*. Your `manual` priorities, the `incremental` anchors left by dismissed Incremental Rems, and your shield history are never touched by this cleanup.
 
 ---
 
@@ -36,6 +51,7 @@ Every flashcard in your knowledge base is assigned a priority from **0-100** (Lo
 1.  **Manual (Highest Strength):** You explicitly set a priority for this specific Rem. This overrides everything else.
 2.  **Incremental (Highest Strength):** When you finish reviewing an Incremental Rem (e.g. by clicking "Dismiss"), its priority is automatically synced to its flashcards with this source type. Like a "manual" priority, it is "sticky" and won't be overwritten by inherited or default values, ensuring your specific prioritization from your reading workflow is preserved.
     * *Visual Cue:* In the Priority widgets, both `manual` and `incremental` priorities appear in **bold** (e.g., **P10**), making it clear they are explicitly assigned values. Inherited and default priorities appear in normal weight.
+    * *The Rem itself is always stamped,* whether or not it currently owns any flashcards, and in Light Mode as well as Full Mode. Dismissing removes the `Incremental` powerup, and with it the only record of that reading priority; the `cardPriority` tag left behind is what keeps the value, and what every card created under that Rem later inherits from. A Rem whose priority you set to 16 and then dismissed keeps 16 for its subtree, instead of falling back to whatever a distant ancestor happens to carry. Only a `manual` priority already on the Rem is left untouched.
 3.  **Inherited (Medium Strength):** If a Rem has no manual or incremental priority, it looks up its ancestry tree. It inherits the priority of the nearest ancestor that has:
     * A Manual or Incremental Flashcard Priority set.
     * **OR** An Incremental Rem Priority set (this creates a seamless bridge between your reading list and your flashcards).

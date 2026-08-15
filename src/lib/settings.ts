@@ -8,23 +8,23 @@
  * 1. Defaults live in exactly one place (`IE_SETTINGS_DEFAULTS`) instead of
  *    being restated — and sometimes contradicted — at each call site.
  * 2. There is one seam (`readRawSetting`) behind which the storage backend can
- *    differ per setting, invisible to the ~70 call sites.
+ *    change, invisible to the ~70 call sites.
  *
- * Two tiers, see `SettingTier`:
+ * ONE STORE. Every setting lives in the plugin's own synced blob and is edited
+ * in the IE Settings popup, which can group and layer them properly.
  *
- * - `popup`  — stored in the plugin's own synced blob and edited in the IE
- *   Settings popup, which can group and layer them properly.
- * - `native` — left in RemNote's plugin settings panel. These govern how much
- *   work the plugin is allowed to do, and RemNote's own panel is where someone
- *   chasing a performance problem looks first — long before they discover that
- *   this plugin has a settings window of its own. The SDK has no setter for a
- *   registered setting, so the popup shows them read-only.
+ * Five of them — the performance switches and the Hide-in-Queue integration —
+ * used to be left behind in RemNote's plugin settings panel, on the theory that
+ * someone chasing a slow plugin would look there first. In practice that split
+ * bought nothing (there was no performance problem to chase) and cost the user a
+ * second place to look, so v1.0.45 moved them across with the rest. See
+ * `SEED_VERSION` v6 in lib/settings_migration.ts.
  *
  * Why the defaults table is load-bearing: `plugin.settings.getSetting` resolves
  * a setting through its *registration record* and reads `defaultValue` off it.
  * For an id that is not currently registered it does not return `undefined` —
  * it throws `TypeError: Cannot read properties of undefined (reading
- * 'defaultValue')`. Popup-tier settings stop being registered once a knowledge
+ * 'defaultValue')`. Settings stop being registered with RemNote once a knowledge
  * base has migrated, so this module is what keeps them readable.
  */
 import { RNPlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
@@ -58,12 +58,20 @@ import {
   alwaysUseLightModeOnWebId,
   displayFsrsDsrId,
   fsrsWeightsId,
+  fsrsRequestedRetentionId,
   remnoteEnvironmentId,
   flashcardResponseTimeLimitId,
   enableMasteryDrillId,
   oldItemThresholdId,
   masteryDrillMinDelayMinutesId,
   disableFinalDrillNotificationId,
+  speedColorModeId,
+  SpeedColorMode,
+  speedColorRedCpmId,
+  speedColorGreenCpmId,
+  speedCalibrationPeriodId,
+  SpeedCalibrationPeriod,
+  speedCalibrationMarginSecondsId,
   ieSettingsValuesKey,
 } from './consts';
 // Type-only: utils.ts imports getIESetting from this module, so a value import
@@ -114,6 +122,7 @@ export interface IESettings {
   // FSRS
   [displayFsrsDsrId]: boolean;
   [fsrsWeightsId]: string;
+  [fsrsRequestedRetentionId]: number;
 
   // Misc
   [remnoteEnvironmentId]: 'beta' | 'www';
@@ -124,6 +133,13 @@ export interface IESettings {
   [oldItemThresholdId]: number;
   [masteryDrillMinDelayMinutesId]: number;
   [disableFinalDrillNotificationId]: boolean;
+
+  // Queue Dashboard
+  [speedColorModeId]: SpeedColorMode;
+  [speedColorRedCpmId]: number;
+  [speedColorGreenCpmId]: number;
+  [speedCalibrationPeriodId]: SpeedCalibrationPeriod;
+  [speedCalibrationMarginSecondsId]: number;
 }
 
 export type IESettingId = keyof IESettings;
@@ -166,6 +182,7 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
 
   [displayFsrsDsrId]: true,
   [fsrsWeightsId]: '',
+  [fsrsRequestedRetentionId]: 90,
 
   [remnoteEnvironmentId]: 'www',
   [flashcardResponseTimeLimitId]: 180,
@@ -174,14 +191,21 @@ export const IE_SETTINGS_DEFAULTS: IESettings = {
   [oldItemThresholdId]: 7,
   [masteryDrillMinDelayMinutesId]: 180,
   [disableFinalDrillNotificationId]: false,
+
+  // Calibrated by default: an absolute cards-per-minute standard says little
+  // about a knowledge base whose cards are long extracts or one-word clozes.
+  // The two cpm values below stay at the thresholds the dashboard has always
+  // used, and are what fixed mode — and the calibrated fallback — apply.
+  [speedColorModeId]: 'calibrated',
+  [speedColorRedCpmId]: 1.5,
+  [speedColorGreenCpmId]: 4,
+  [speedCalibrationPeriodId]: 'year',
+  [speedCalibrationMarginSecondsId]: 10,
 };
 
 // ---------------------------------------------------------------------------
 // Presentation schema
 // ---------------------------------------------------------------------------
-
-/** Where a setting is stored and edited. See the module comment. */
-export type SettingTier = 'popup' | 'native';
 
 export type SettingGroupId =
   | 'flashcardPriority'
@@ -191,6 +215,7 @@ export type SettingGroupId =
   | 'editor'
   | 'fsrs'
   | 'masteryDrill'
+  | 'queueDashboard'
   | 'performance'
   | 'integrations'
   | 'misc';
@@ -199,6 +224,12 @@ export interface SettingGroupSpec {
   label: string;
   /** Shown under the group heading in the popup. */
   blurb?: string;
+  /**
+   * Rendered as a prominent warning box under the group heading, above its
+   * settings — for a caveat that applies to every setting in the group and would
+   * otherwise have to be repeated on each of them.
+   */
+  warning?: string;
   /**
    * Page on the docs site, relative to IE_DOCS_BASE_URL, for the feature the
    * whole group configures. Renders a "?" beside the group heading — better
@@ -217,9 +248,7 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
   },
   performance: {
     label: 'Performance',
-    blurb:
-      'How much work the plugin is allowed to do, and where. Kept in RemNote\'s own settings ' +
-      'panel, because that is where you would look first if the plugin felt heavy.',
+    blurb: 'How much work the plugin is allowed to do, and where.',
     helpPath: 'Full-Mode-x-Light-Mode/',
   },
   scheduling: {
@@ -232,11 +261,28 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
   },
   queue: { label: 'Queue', blurb: 'What the queue shows during review.' },
   editor: { label: 'Editor Indicators', blurb: 'Visual markers on rems in the editor.' },
-  fsrs: { label: 'FSRS', blurb: 'Difficulty / Stability / Retrievability display.' },
+  fsrs: {
+    label: 'FSRS',
+    blurb: 'Difficulty / Stability / Retrievability display.',
+    helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
+    warning:
+      'These settings are for DISPLAY AND STATISTICS ONLY. They change what the plugin shows you ' +
+      'about a card — they do not schedule anything, and nothing here can move a due date. Your ' +
+      'actual scheduling is RemNote\'s, and is configured in RemNote Settings → Schedulers. Set ' +
+      'the values below to MATCH what you use there, so the plugin\'s figures describe your real ' +
+      'scheduler; changing them here alone only makes the readouts wrong.',
+  },
   masteryDrill: {
     label: 'Mastery Drill',
     blurb: 'Deliberate practice of poorly-rated cards.',
     helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#mastery-drill',
+  },
+  queueDashboard: {
+    label: 'Queue Dashboard',
+    blurb:
+      'How the Practiced Queues dashboard reads: the pace at which a speed reading turns red or ' +
+      'green, in the live session card, the History Log and the Sessions Summary.',
+    helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#speed-colour-coding',
   },
   integrations: { label: 'Integrations', blurb: 'Features ported from other plugins.' },
   misc: { label: 'Other', blurb: '' },
@@ -246,36 +292,32 @@ export const IE_SETTING_GROUPS: Record<SettingGroupId, SettingGroupSpec> = {
 export const IE_DOCS_BASE_URL = 'https://hugomarins.github.io/incremental-everything/';
 
 /**
- * Appended to the description of the LAST native-tier setting, which is where it
- * lands at the bottom of the plugin's section in RemNote's settings panel.
+ * Appended by register/settings.ts to the description of whichever setting it
+ * registers LAST, so it lands at the bottom of the plugin's section in RemNote's
+ * settings panel.
  *
- * RemNote renders only a title and a description per setting — there is no room
- * for a heading, a footer or a link of our own — so the tail of the last
- * description is the single spot available to tell someone reading that panel
- * that the other twenty-eight settings are elsewhere.
+ * That panel is now only ever populated for the ONE session in which a knowledge
+ * base migrates: the registrations exist so the seed can read the values across,
+ * and are gone after the next reload. RemNote renders only a title and a
+ * description per setting — no heading, no footer, no link of our own — so the
+ * tail of the last description is the single spot available to say so.
  */
 export const MORE_SETTINGS_POINTER =
-  'MORE SETTINGS: these are only the performance switches. Every other Incremental Everything ' +
-  'setting lives in the plugin\'s own settings window — run the "Incremental Everything: ' +
-  'Settings" command from the omnibar (quick code: ies).';
+  'MOVED: every Incremental Everything setting now lives in the plugin\'s own settings window — ' +
+  'run the "Incremental Everything: Settings" command from the omnibar (quick code: ies). The ' +
+  'copies in this panel are the migration reading your existing values across; they disappear ' +
+  'after you reload RemNote, and editing them here in the meantime has no effect.';
 
 interface SettingSpecBase {
   title: string;
   description: string;
   group: SettingGroupId;
-  tier: SettingTier;
   /** Takes effect only after RemNote is reloaded. Surfaced as a badge. */
   reloadRequired?: boolean;
   /** Page on the docs site, relative to IE_DOCS_BASE_URL. Renders a "?" link. */
   helpPath?: string;
   /** Rendered as a prominent warning box above the control in the popup. */
   warning?: string;
-  /**
-   * Appended as the very last line of this setting's description in RemNote's
-   * settings panel — after the docs link and the reload note. Panel-only: the
-   * popup does not render it. See MORE_SETTINGS_POINTER.
-   */
-  panelFooter?: string;
   /**
    * Hide this setting in the popup unless another setting holds a given value —
    * for parameters that only mean something once the feature they configure is
@@ -306,7 +348,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   // --- Flashcard prioritisation (the opt-in gate) ---
   [enableFlashcardPrioritisationId]: {
     kind: 'boolean',
-    tier: 'native',
     group: 'flashcardPriority',
     reloadRequired: true,
     helpPath: 'Priorities-for-Flashcards/',
@@ -323,13 +364,17 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'initial pass and continuous background work, and RemNote can feel slow until it settles.\n\n' +
       'Everything else — extracts, incremental reading, PDF and video, scheduling, the queue, the ' +
       'Mastery Drill, and priorities on Incremental Rems themselves — works exactly the same with ' +
-      'this off.',
+      'this off.\n\n' +
+      'Turning it back off stops all of that work, but the tags already written stay on your rems. ' +
+      'The plugin offers to remove them on the next reload; you can also run "Remove CardPriority ' +
+      'Tags…" and choose "inherited & default only" at any time. That cleanup is reversible — ' +
+      'manual priorities are kept, and the automatic ones are rebuilt by "Update all inherited ' +
+      'Card Priorities" if you switch this on again.',
   },
 
   // --- Scheduling ---
   [initialIntervalId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'scheduling',
     min: 0,
     integer: true,
@@ -339,7 +384,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [multiplierId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'scheduling',
     showWhen: { id: betaSchedulerEnabledId, equals: false },
     min: 1,
@@ -350,7 +394,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [betaSchedulerEnabledId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'scheduling',
     helpPath: 'IncRem-Scheduler/#beta-scheduler',
     title: 'Use Beta Scheduler (Saturating Curve)',
@@ -360,7 +403,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [betaFirstReviewIntervalId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'scheduling',
     showWhen: { id: betaSchedulerEnabledId, equals: true },
     min: 1,
@@ -374,7 +416,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [betaMaxIntervalId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'scheduling',
     showWhen: { id: betaSchedulerEnabledId, equals: true },
     min: 1,
@@ -389,7 +430,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   // --- Priority ---
   [defaultPriorityId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'priority',
     min: 0,
     max: 100,
@@ -399,7 +439,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [defaultCardPriorityId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'priority',
     min: 0,
     max: 100,
@@ -410,7 +449,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [priorityStepSizeId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'priority',
     min: 1,
     max: 50,
@@ -421,7 +459,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [priorityEditorDisplayModeId]: {
     kind: 'dropdown',
-    tier: 'popup',
     group: 'priority',
     title: 'Priority Widget in Editor',
     description:
@@ -436,7 +473,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   // --- Queue ---
   [collapseQueueTopBar]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'queue',
     title: 'Collapse Queue Top Bar (IncRem only)',
     description:
@@ -445,7 +481,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [displayPriorityShieldId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'queue',
     helpPath: 'Prioritization-%26-Sorting/#priority-shield',
     title: 'Display Priority Shield in Queue',
@@ -455,7 +490,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [displayWeightedShieldId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'queue',
     helpPath: 'Prioritization-%26-Sorting/#weighted-shield',
     title: 'Display Weighted Priority Shield in Queue',
@@ -466,7 +500,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [displayQueueToolbarPriorityId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'queue',
     title: 'Display Priority in Queue Toolbar',
     description:
@@ -474,7 +507,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [isolatedQueueModeId]: {
     kind: 'dropdown',
-    tier: 'popup',
     group: 'queue',
     title: 'Use Isolated Card View in Queue for',
     description:
@@ -490,7 +522,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [autoFocusQueueDashboardId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'queue',
     helpPath: 'History-Queue-Dashboard-and-Mastery-Drill/#practiced-queues-history-live-dashboard',
     title: 'Auto-focus Queue Dashboard',
@@ -503,7 +534,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   // --- Editor indicators ---
   [showLeftBorderForIncRemsSettingId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'editor',
     reloadRequired: true,
     title: 'Green Left Border for IncRems',
@@ -511,7 +541,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [showDismissedIndicatorSettingId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'editor',
     reloadRequired: true,
     title: 'Yellow Left Border for Dismissed Rems',
@@ -520,7 +549,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [hideCardPriorityTagSettingId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'editor',
     reloadRequired: true,
     title: 'Hide CardPriority Tag in Editor',
@@ -529,7 +557,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [hideDismissedTagSettingId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'editor',
     reloadRequired: true,
     title: 'Hide Dismissed Tag in Editor',
@@ -537,7 +564,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [showPriorityBandsInTablesId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'editor',
     reloadRequired: true,
     helpPath: 'Prioritization-%26-Sorting/#priorities-in-tables',
@@ -551,7 +577,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   // --- FSRS ---
   [displayFsrsDsrId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'fsrs',
     helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
     title: 'Display FSRS DSR Stats (Flashcards)',
@@ -561,20 +586,35 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [fsrsWeightsId]: {
     kind: 'string',
-    tier: 'popup',
     group: 'fsrs',
     wide: true,
     placeholder: 'w0, w1, … w20 — leave blank for FSRS v6.1.1 defaults',
     title: 'FSRS Global Weights',
     description:
-      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from your RemNote scheduler ' +
-      'settings. Leave blank to use the official defaults.',
+      'Comma-separated list of 21 FSRS v6 weights (w0–w20). Paste them from RemNote Settings → ' +
+      'Schedulers so the plugin computes the same D/S/R your scheduler does. Leave blank to use ' +
+      'the official defaults. Editing them here does not change your scheduler.',
+  },
+  [fsrsRequestedRetentionId]: {
+    kind: 'number',
+    group: 'fsrs',
+    min: 70,
+    max: 99,
+    unit: '%',
+    helpPath: 'Reviewing-Items-in-the-Queue/#card-stats-fsrs-integration',
+    title: 'Requested Retention',
+    description:
+      'The recall probability your RemNote scheduler aims for at review time. Copy the value from ' +
+      'RemNote Settings → Schedulers; setting it here does not change what your scheduler asks ' +
+      'for.\n\n' +
+      'Stability is an interval only at the 90% default: a stricter retention schedules a card ' +
+      'sooner than its stability, a looser one later. The card info bar uses this to show the ' +
+      'interval you will actually get, and to compute the U-Factor from it.',
   },
 
   // --- Mastery Drill ---
   [enableMasteryDrillId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'masteryDrill',
     reloadRequired: true,
     title: 'Enable Mastery Drill',
@@ -587,7 +627,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [oldItemThresholdId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'masteryDrill',
     showWhen: { id: enableMasteryDrillId, equals: true },
     min: 1,
@@ -598,7 +637,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [masteryDrillMinDelayMinutesId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'masteryDrill',
     showWhen: { id: enableMasteryDrillId, equals: true },
     min: 0,
@@ -611,17 +649,83 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [disableFinalDrillNotificationId]: {
     kind: 'boolean',
-    tier: 'popup',
     group: 'masteryDrill',
     showWhen: { id: enableMasteryDrillId, equals: true },
     title: 'Disable Mastery Drill Notifications',
     description: 'Stops the Mastery Drill sidebar notification from appearing.',
   },
 
-  // --- Performance (native tier) ---
+  // --- Queue Dashboard ---
+  [speedColorModeId]: {
+    kind: 'dropdown',
+    group: 'queueDashboard',
+    title: 'Speed Colour Thresholds',
+    description:
+      'What counts as a "red" (slow) or "green" (fast) pace in the dashboard.\n\n' +
+      '"Fixed" uses the two cards-per-minute limits below, the same for everyone. "Calibrated" ' +
+      'derives them from your own flashcard history instead, so the colours judge you against ' +
+      'your usual pace rather than an absolute standard — useful if your material is much ' +
+      'heavier or much lighter than average.',
+    options: [
+      { value: 'fixed', label: 'Fixed cards-per-minute limits' },
+      { value: 'calibrated', label: 'Calibrated from my card history' },
+    ],
+  },
+  [speedColorRedCpmId]: {
+    kind: 'number',
+    group: 'queueDashboard',
+    showWhen: { id: speedColorModeId, equals: 'fixed' },
+    min: 0.1,
+    unit: 'cpm',
+    title: 'Red At or Below',
+    description:
+      'A pace at or below this is drawn fully red; between here and the green limit the colour ' +
+      'shifts gradually. Default 1.5 cpm (40 s/card).',
+  },
+  [speedColorGreenCpmId]: {
+    kind: 'number',
+    group: 'queueDashboard',
+    showWhen: { id: speedColorModeId, equals: 'fixed' },
+    min: 0.1,
+    unit: 'cpm',
+    title: 'Green At or Above',
+    description:
+      'A pace at or above this is drawn fully green. Must be higher than the red limit. ' +
+      'Default 4 cpm (15 s/card).',
+  },
+  [speedCalibrationPeriodId]: {
+    kind: 'dropdown',
+    group: 'queueDashboard',
+    showWhen: { id: speedColorModeId, equals: 'calibrated' },
+    title: 'Calibration Period',
+    description:
+      'How far back your average seconds-per-card is measured. Every real flashcard repetition ' +
+      'in the window counts, capped by the Flashcard Response Time Limit. A shorter window ' +
+      'tracks your current form; a longer one is steadier.',
+    options: [
+      { value: 'ever', label: 'Ever' },
+      { value: 'year', label: 'Last 1 year' },
+      { value: 'month', label: 'Last 1 month' },
+      { value: 'week', label: 'Last 1 week' },
+    ],
+  },
+  [speedCalibrationMarginSecondsId]: {
+    kind: 'number',
+    group: 'queueDashboard',
+    showWhen: { id: speedColorModeId, equals: 'calibrated' },
+    min: 0.5,
+    unit: 'seconds',
+    title: 'Margin Around the Average',
+    description:
+      'Distance from your average, in seconds per card, at which the colour saturates: average ' +
+      'plus this many seconds is fully red, average minus it is fully green, and your average ' +
+      'itself sits mid-gradient. A smaller margin makes the dashboard react more sharply to ' +
+      'small changes of pace.',
+  },
+
+  // --- Performance ---
   [performanceModeId]: {
     kind: 'dropdown',
-    tier: 'native',
     group: 'performance',
     helpPath: 'Full-Mode-x-Light-Mode/',
     title: 'Performance Mode',
@@ -635,7 +739,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [alwaysUseLightModeOnMobileId]: {
     kind: 'boolean',
-    tier: 'native',
     group: 'performance',
     title: 'Always Use Light Mode on Mobile',
     description:
@@ -644,7 +747,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [alwaysUseLightModeOnWebId]: {
     kind: 'boolean',
-    tier: 'native',
     group: 'performance',
     title: 'Always Use Light Mode on Web Browser',
     description:
@@ -654,7 +756,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   // --- Integrations ---
   [enableHideInQueueIntegrationId]: {
     kind: 'boolean',
-    tier: 'native',
     group: 'integrations',
     reloadRequired: true,
     helpPath: 'Utilities/#hide-in-queue',
@@ -667,15 +768,11 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
       'Uninstall the standalone plugin first, then reload RemNote.\n\n' +
       '"Remove Parent" and "Remove Grandparent" are always registered, since the Cloze and Extract ' +
       'creators depend on them.',
-    // Last native-tier setting in registration order, so this lands at the very
-    // bottom of the plugin's section in RemNote's panel.
-    panelFooter: MORE_SETTINGS_POINTER,
   },
 
   // --- Misc ---
   [remnoteEnvironmentId]: {
     kind: 'dropdown',
-    tier: 'popup',
     group: 'misc',
     title: 'RemNote Environment',
     description: 'Which RemNote environment links should open documents in.',
@@ -686,7 +783,6 @@ export const IE_SETTINGS_SCHEMA: Record<IESettingId, SettingSpec> = {
   },
   [flashcardResponseTimeLimitId]: {
     kind: 'number',
-    tier: 'popup',
     group: 'misc',
     min: 1,
     integer: true,
@@ -707,10 +803,14 @@ export const IE_SETTING_IDS_BY_GROUP: Array<{ group: SettingGroupId; ids: IESett
     ),
   }));
 
-/** Every setting stored in the plugin's own blob rather than RemNote's panel. */
-export const IE_POPUP_TIER_IDS: IESettingId[] = (
-  Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[]
-).filter((id) => IE_SETTINGS_SCHEMA[id].tier === 'popup');
+/**
+ * Every setting the plugin owns — i.e. every one stored in the synced blob,
+ * which since v1.0.45 is all of them. Kept as a named list because the migration
+ * uses it both to decide what to seed and to prune keys that are no longer
+ * settings at all.
+ */
+export const IE_MANAGED_SETTING_IDS: IESettingId[] =
+  Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[];
 
 // ---------------------------------------------------------------------------
 // Reading and writing
@@ -742,28 +842,20 @@ function coerce<K extends IESettingId>(id: K, raw: unknown): IESettings[K] {
 }
 
 /**
- * The one place that talks to a settings backend, dispatching on tier.
+ * The one place that talks to a settings backend.
  *
- * Popup-tier reads hit the synced blob; a missing key means "no opinion" and
- * resolves to the default, which is what lets a changed default still reach
- * users who never customised that setting.
+ * Reads hit the synced blob only. A missing key means "no opinion" and resolves
+ * to the default, which is what lets a changed default still reach users who
+ * never customised that setting.
  *
- * Native-tier throws are swallowed on purpose: `getSetting` raises a TypeError
- * for any id that is not currently registered, which is the state a popup-tier
- * id is in after migration and a native id would be in only if registration
- * failed. Either way the default is the right answer.
+ * RemNote's own registrations are deliberately NOT consulted, even during the
+ * one session in which they still exist: the blob is authoritative from the
+ * moment the seed writes it, and a fallback read would let a stale panel value
+ * override an edit made in the popup.
  */
 async function readRawSetting(plugin: RNPlugin, id: IESettingId): Promise<unknown> {
-  if (IE_SETTINGS_SCHEMA[id].tier === 'popup') {
-    const values = await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey);
-    return values ? values[id] : undefined;
-  }
-  try {
-    return await plugin.settings.getSetting<unknown>(id);
-  } catch (e) {
-    console.warn(`[IESettings] read failed for "${id}", using default:`, e);
-    return undefined;
-  }
+  const values = await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey);
+  return values ? values[id] : undefined;
 }
 
 /**
@@ -797,24 +889,17 @@ export async function getIESettings<K extends IESettingId>(
 }
 
 /**
- * Writes a popup-tier setting.
+ * Writes a setting.
  *
  * A value equal to the default is *removed* rather than stored, so that editing
  * a default later still reaches everyone who has not deliberately diverged from
- * it. Native-tier settings have no SDK setter and can only be changed in
- * RemNote's own panel — calling this for one is a no-op with a warning.
+ * it.
  */
 export async function setIESetting<K extends IESettingId>(
   plugin: RNPlugin,
   id: K,
   value: IESettings[K]
 ): Promise<void> {
-  if (IE_SETTINGS_SCHEMA[id].tier !== 'popup') {
-    console.warn(
-      `[IESettings] "${id}" lives in RemNote's settings panel and cannot be written by the plugin.`
-    );
-    return;
-  }
   const values = {
     ...((await plugin.storage.getSynced<Partial<IESettings>>(ieSettingsValuesKey)) || {}),
   };
@@ -826,7 +911,7 @@ export async function setIESetting<K extends IESettingId>(
   await plugin.storage.setSynced(ieSettingsValuesKey, values);
 }
 
-/** Restores a popup-tier setting to its default by removing it from the blob. */
+/** Restores a setting to its default by removing it from the blob. */
 export async function resetIESetting(plugin: RNPlugin, id: IESettingId): Promise<void> {
   await setIESetting(plugin, id, IE_SETTINGS_DEFAULTS[id]);
 }

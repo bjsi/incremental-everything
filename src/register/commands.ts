@@ -20,6 +20,8 @@ import {
   dismissedPowerupCode,
   currentSubQueueIdKey,
   dismissIncRemCommandId,
+  pluginHubHiddenKey,
+  showPluginHubCommandId,
   nextInQueueCommandId,
   togglePdfHighlightBordersCommandId,
   currentIncrementalRemTypeKey,
@@ -33,6 +35,7 @@ import {
   sourceFloatingActiveIdKey,
   preservedHistoryPowerupCode,
   priorityBandColorsReloadKey,
+  priorityBandVerboseLogsKey,
   enableMasteryDrillId,
   enableFlashcardPrioritisationId,
 } from '../lib/consts';
@@ -84,6 +87,7 @@ import {
 } from './queue_display_powerups';
 import { getPerformanceMode } from '../lib/utils';
 import { handleReviewInEditorRem } from '../lib/review_actions';
+import { resolveQueueCommandTarget } from '../lib/queue_target';
 import {
   setRemReadPoint,
   isDescendantOf,
@@ -1271,6 +1275,29 @@ export async function registerCommands(plugin: ReactRNPlugin) {
   });
 
 
+  // The band badge colours are baked into a stylesheet at registration time from
+  // a snapshot of the priority distribution, so a badge coloured from the
+  // absolute fallback scale is indistinguishable from a correctly ranked one.
+  // This turns on the full band → percentile → colour dump for that diagnosis.
+  // Per device, and it survives a reload, so the mapping can be inspected on the
+  // next activation — which is when the interesting (cold-cache) run happens.
+  plugin.app.registerCommand({
+    id: 'toggle-priority-band-logging',
+    name: 'Toggle Priority Band Colour Logging',
+    description:
+      'Verbose console logging of the band → percentile → colour mapping used by the priority badges.',
+    action: async () => {
+      const next = !(await plugin.storage.getLocal<boolean>(priorityBandVerboseLogsKey));
+      await plugin.storage.setLocal(priorityBandVerboseLogsKey, next);
+      // Re-register immediately so switching it on prints the current mapping
+      // rather than making the user wait for the next reload.
+      if (next) await plugin.storage.setSession(priorityBandColorsReloadKey, Date.now());
+      await plugin.app.toast(
+        `Priority band colour logging ${next ? 'ON — see the console' : 'OFF'}.`
+      );
+    },
+  });
+
   plugin.app.registerCommand({
     id: 'debug-incremental-everything',
     name: 'Debug Incremental Everything',
@@ -1579,15 +1606,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       const isQueue = url && url.includes('/flashcards');
 
       if (isQueue) {
-        // Queue context behavior
-        const currentQueueItem = await plugin.queue.getCurrentCard();
-        let remId = currentQueueItem?.remId;
-
-        if (!remId) {
-          // If the SDK doesn't report an active card (because it's an IncRem or document), fall back to session storage
-          remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
-          console.log('review-increm-in-editor: remId from session storage (currentIncRemKey):', remId);
-        }
+        // Queue context: an explicit selection (previewer, sidebar, …) wins over
+        // the queue item, exactly like Ctrl+D — see lib/queue_target.
+        const target = await resolveQueueCommandTarget(plugin);
+        const { remId, incRemTurnRemId } = target;
 
         if (!remId) {
           await plugin.app.toast('No card or Incremental Rem currently active in the queue.');
@@ -1599,12 +1621,38 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
         const hasIncPowerup = await rem.hasPowerup(powerupCode);
         if (!hasIncPowerup) {
-          await plugin.app.toast('Current card is not an Incremental Rem.');
+          await plugin.app.toast(
+            target.isTargetingQueueContext
+              ? 'Current card is not an Incremental Rem.'
+              : 'The selected Rem is not an Incremental Rem.'
+          );
           return;
         }
 
-        // Delegate to exact function used by "Review in Editor"
-        await handleReviewInEditorRem(plugin, rem, null);
+        if (target.isActiveIncRemTurn) {
+          // The queue is reviewing this very Rem: the elapsed reading time
+          // belongs to it, and the timer continues the same engagement.
+          await handleReviewInEditorRem(plugin, rem, null);
+          return;
+        }
+
+        // A Rem picked out of the previewer (or any other selection) is an
+        // EDITOR target, and the previewer is an editor surface — so it gets
+        // the editor flow: the Execute Repetition popup, where the review time
+        // and interval are the user's to set, and nothing is written until they
+        // confirm. `queueIncRemId` tells that popup a queue turn is live, so it
+        // can deduct the recorded time from it (Confirm Review) or close it out
+        // properly (Start Timer, which navigates away from the queue).
+        if (!incRemTurnRemId) {
+          // Flashcard turn: no Incremental review is in progress, so nothing may
+          // inherit the stale clock of an IncRem injected earlier in the session.
+          await plugin.storage.setSession(incremReviewStartTimeKey, null);
+        }
+
+        await plugin.widget.openPopup('editor_review', {
+          remId: rem._id,
+          queueIncRemId: incRemTurnRemId,
+        });
       } else {
         // Editor context behavior
         // Get focused Rem
@@ -1699,6 +1747,40 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
+  // Tag every rem holding an image inside the focused rem / open document, so
+  // RemNote's document Filter can isolate them — search alone cannot, because an
+  // image carries no indexed text.
+  plugin.app.registerCommand({
+    id: 'tag-rems-with-images',
+    name: 'Tag Rems With Images',
+    description:
+      'Marks every Rem containing an image inside the focused Rem (or the open document) with the HasImage tag, and clears the tag from Rems that no longer hold one.',
+    quickCode: 'img',
+    action: async () => {
+      // Scope: the focused rem when the cursor is in one, otherwise whatever
+      // document the focused pane has open — so the command works from the
+      // document title, where there is no focused rem. Resolved here rather than
+      // in the popup: by the time the widget mounts the editor has lost focus,
+      // so getFocusedRem() would come back empty.
+      let scope = await plugin.focus.getFocusedRem();
+      if (!scope) {
+        const paneId = await plugin.window.getFocusedPaneId();
+        const openRemId = await plugin.window.getOpenPaneRemId(paneId);
+        scope = openRemId ? (await plugin.rem.findOne(openRemId)) || undefined : undefined;
+      }
+
+      // A missing scope is not an error: the popup still offers the whole-KB
+      // scan, and simply disables the scope button.
+      const rawName = scope ? await safeRemTextToString(plugin, scope.text) : '';
+      const scopeName = rawName.length > 80 ? rawName.slice(0, 80) + '…' : rawName;
+
+      await plugin.widget.openPopup('image_scan_popup', {
+        scopeRemId: scope?._id ?? null,
+        scopeName,
+      });
+    },
+  });
+
   plugin.app.registerCommand({
     id: 'debug-video',
     name: 'Debug Video Detection',
@@ -1734,14 +1816,52 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     },
   });
 
-  // Cleanup command
+  // Cleanup command. Two scopes, because the two intentions behind "remove the
+  // CardPriority tags" are very different: undoing the plugin's own automatic
+  // tagging (reversible, what someone who just turned the opt-in off wants) and
+  // wiping every priority including the ones set by hand (irreversible).
   await plugin.app.registerCommand({
     id: 'cleanup-card-priority',
-    name: 'Remove All CardPriority Tags',
+    name: 'Remove CardPriority Tags…',
     description:
-      'Completely remove all CardPriority powerup tags and data from your knowledge base',
+      'Remove CardPriority powerup tags from this knowledge base — either only the ' +
+      'inherited/default ones the plugin created (reversible), or all of them including ' +
+      'manual priorities (irreversible).',
     action: async () => {
-      await removeAllCardPriorityTags(plugin);
+      const kbName = (await plugin.kb.getCurrentKnowledgeBaseData())?.name || 'this knowledge base';
+
+      // OK / Cancel as a two-way chooser, the same pattern the orphan-card flow
+      // uses. The safe option is on OK so a reflexive Enter cannot start the
+      // destructive one — Cancel only leads to further warnings.
+      const derivedOnly = confirm(
+        `🧹 Remove CardPriority Tags — "${kbName}"\n\n` +
+          `Which tags should be removed?\n\n` +
+          `➡️ OK = INHERITED & DEFAULT only (recommended)\n` +
+          `      The tags the plugin created by itself. Manual priorities, Incremental Rem ` +
+          `anchors and your shield history are kept. Fully reversible — rebuild them with ` +
+          `"Update all inherited Card Priorities".\n\n` +
+          `➡️ Cancel = go to the option to remove EVERYTHING\n` +
+          `      Including priorities you set by hand. Cannot be undone. You will be warned again.`
+      );
+
+      if (derivedOnly) {
+        await removeAllCardPriorityTags(plugin, { scope: 'derived' });
+        return;
+      }
+
+      const goDestructive = confirm(
+        `⚠️ Remove EVERYTHING? — "${kbName}"\n\n` +
+          `You chose not to limit the cleanup to inherited/default tags.\n\n` +
+          `OK = continue to the full removal (manual priorities included, irreversible)\n` +
+          `Cancel = abort, nothing is removed`
+      );
+
+      if (!goDestructive) {
+        await plugin.app.toast('CardPriority cleanup cancelled');
+        return;
+      }
+
+      await removeAllCardPriorityTags(plugin, { scope: 'all' });
     },
   });
 
@@ -2321,47 +2441,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       let incRemInfo;
 
       if (isQueue) {
-        // Queue context: check for explicit selection first
-        const card = await plugin.queue.getCurrentCard();
-        const sel = await plugin.editor.getSelection();
-        const selType = sel?.type;
-
-        let isTargetingQueueContext = false;
-
-        if (!selType) {
-          isTargetingQueueContext = true;
-        } else if (card) {
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(card.remId)) {
-            isTargetingQueueContext = true;
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === card.remId) {
-            isTargetingQueueContext = true;
-          }
-        } else {
-          const currentIncRemId = await plugin.storage.getSession<string>(currentIncRemKey);
-          if (currentIncRemId) {
-            if (selType === SelectionType.Rem && sel && 'remIds' in sel && sel.remIds.includes(currentIncRemId)) {
-              isTargetingQueueContext = true;
-            } else if (selType === SelectionType.Text && sel && 'remId' in sel && sel.remId === currentIncRemId) {
-              isTargetingQueueContext = true;
-            }
-          }
-        }
-
-        let remId: string | undefined;
-
-        if (isTargetingQueueContext) {
-          if (card) {
-            remId = card.remId;
-          } else {
-            remId = (await plugin.storage.getSession<string>(currentIncRemKey)) || undefined;
-          }
-        } else {
-          if (selType === SelectionType.Rem && sel && 'remIds' in sel) {
-            remId = (sel as any).remIds[0];
-          } else if (selType === SelectionType.Text && sel && 'remId' in sel) {
-            remId = (sel as any).remId;
-          }
-        }
+        // Queue context: an explicit selection (previewer, sidebar, …) wins over
+        // the queue item — see lib/queue_target.
+        const target = await resolveQueueCommandTarget(plugin);
+        const { remId } = target;
 
         if (!remId) {
           await plugin.app.toast('No Incremental Rem currently active in the queue or selected.');
@@ -2386,24 +2469,38 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           return;
         }
 
+        // Was the queue actually reviewing THIS rem as an IncRem when Ctrl+D was
+        // pressed? Only then did a review happen that deserves a 'rep' entry.
+        // Dismissing a rem opened in the previewer (or selected anywhere else)
+        // during a flashcard turn is a pure lifecycle change, exactly like the
+        // editor branch below.
+        const isActiveIncRemTurn = target.isActiveIncRemTurn;
+
         // Replicate the Dismiss button logic from answer_buttons.tsx
         // 1. Handle card priority inheritance
         await handleCardPriorityInheritance(plugin, rem, incRemInfo);
 
-        // 2. Calculate review time
-        const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
-        const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
+        // 2/3. Record the review that is ending — ONLY on a real IncRem turn.
+        // `incremReviewStartTimeKey` is stamped when the queue injects an IncRem
+        // and is never cleared afterwards, so on any other turn it still points
+        // at an earlier item; using it here fabricated a rep whose duration was
+        // the time since some unrelated IncRem was shown.
+        const updatedHistory = [...(incRemInfo.history || [])];
 
-        // 3. Build the current rep history entry
-        const currentRep: IncrementalRep = {
-          date: Date.now(),
-          scheduled: incRemInfo.nextRepDate,
-          reviewTimeSeconds: reviewTimeSeconds,
-          eventType: 'rep',
-          priority: incRemInfo.priority,
-        };
+        if (isActiveIncRemTurn) {
+          const startTime = await plugin.storage.getSession<number>(incremReviewStartTimeKey);
+          const reviewTimeSeconds = startTime ? dayjs().diff(dayjs(startTime), 'second') : 0;
 
-        const updatedHistory = [...(incRemInfo.history || []), currentRep];
+          const currentRep: IncrementalRep = {
+            date: Date.now(),
+            scheduled: incRemInfo.nextRepDate,
+            reviewTimeSeconds: reviewTimeSeconds,
+            eventType: 'rep',
+            priority: incRemInfo.priority,
+          };
+
+          updatedHistory.push(currentRep);
+        }
 
         // 4. Transfer history to dismissed powerup
         await transferToDismissed(plugin, rem, updatedHistory);
@@ -2417,7 +2514,10 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         // 6. Remove incremental powerup AND conditionally advance queue simultaneously.
         // removePowerup destroys the widget sandbox on the next microtask,
         // so both IPC messages must be sent in the same tick if targeting queue.
-        if (isTargetingQueueContext) {
+        // Only a real IncRem turn is advanced: on a flashcard turn the card on
+        // screen is a different item that is still due, so dropping it would
+        // silently eat a scheduled review.
+        if (isActiveIncRemTurn) {
           // Like "Next", dismissing the queue card means we've left the rem —
           // restore the dashboard. Flag BEFORE the destructive call (consumed by
           // the persistent QueueLoadCard listener once the next card loads).
@@ -2428,6 +2528,13 @@ export async function registerCommands(plugin: ReactRNPlugin) {
           ]);
         } else {
           await rem.removePowerup(powerupCode);
+          // No queue advance here, so nothing on screen changes — confirm which
+          // rem was actually dismissed.
+          const name = await safeRemTextToString(plugin, rem.text);
+          const short = name.length > 40 ? name.slice(0, 40) + '…' : name;
+          await plugin.app.toast(
+            short ? `Incremental Rem dismissed: "${short}"` : 'Incremental Rem dismissed.'
+          );
         }
 
       } else {
@@ -3319,6 +3426,18 @@ export async function registerCommands(plugin: ReactRNPlugin) {
     quickCode: 'ies',
     action: async () => {
       await plugin.widget.openPopup('ie_settings');
+    },
+  });
+
+  // The hub's ✕ only lasts the session, so this is for getting it back sooner
+  // than the next start.
+  plugin.app.registerCommand({
+    id: showPluginHubCommandId,
+    name: 'Show Incremental Plugin Panel',
+    description: 'Bring back the Incremental Plugin panel in the sidebar after closing it',
+    action: async () => {
+      await plugin.storage.setSession(pluginHubHiddenKey, false);
+      await plugin.app.toast('Plugin panel restored.');
     },
   });
 

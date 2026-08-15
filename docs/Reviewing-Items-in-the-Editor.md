@@ -53,6 +53,21 @@ The **Execute Repetition** command (`Ctrl+Shift+J`) lets you register a review o
   - **Custom Interval** (`3`): Reveals an inline input to set a custom review interval in days.
   - **Go Back** (`←` or `Esc`): Return to the main popup.
 
+### Opened from the queue previewer
+
+`Ctrl+Shift+J` in the queue acts on the Rem you have **selected** — typically one opened in the previewer (`P`) — rather than on the item being reviewed. The previewer is an editor surface, so it gets this same popup, and nothing is written until you confirm.
+
+When a queue **Incremental Rem turn is running behind it**, the popup accounts for the time in that turn:
+
+- **Confirm Review** — the minutes you record here are **deducted** from the running turn's clock, since you spent them on this Rem, not on the item the queue is showing. You stay in the queue; whatever ends that turn later (Next, Dismiss, Reschedule) records the remainder. The toast reports the deduction.
+- **⏱️ Start Timer** — this navigates away, abandoning the turn. A confirmation appears first, naming the item you are leaving and how long it has been on screen:
+
+    - **Leave it due today** (`Enter`) — records the repetition with that time and keeps the item due today, exactly like dragging the **Next** button down ("Repeat today"). It comes back in the queue.
+    - **Reschedule** — records the repetition and applies the normal computed interval, like the **Next** button.
+    - **Carry to this Rem** (minutes) — time you actually spent reading the previewed Rem before pressing the shortcut. It is taken off the abandoned item's recorded duration and **back-dates the timer** that starts next, so those minutes land on the Rem they belong to.
+
+    The repetition is recorded either way — the reading you did is real; the only choice is what happens to the schedule.
+
 ### Execute Repetition vs. Reschedule in Editor
 
 | Action | Shortcut | Counts for Interval? | Purpose |
@@ -91,7 +106,7 @@ The timer provides a range of powerful controls to manage your session without t
 2.  **Pause if needed**: If you need to step away mid-review, click the **⏸ Pause** button to freeze the timer. Click **▶ Resume** to continue. Only active (non-paused) time is recorded when the repetition is saved.
     * **📝 Review note**: the button next to Pause toggles an inline note field — an observation saved onto this repetition's history entry when you hit **Next / End Review / Dismiss** (on Dismiss it becomes the *dismissal reason*). It prefills with any note typed earlier for this rem (in the queue's 📝 field or the `Ctrl+Shift+J` popup), so you can extend rather than retype.
 3.  **✓ Dismiss Button**: If you've completely finished with an item (e.g. you've finished reading the full chapter and extracted all your flashcards), click the **✓ Dismiss** button (red, placed just before the cancel ✕). It is available in **every** flow that starts the timer — Sequential Review *and* `Ctrl+Shift+J` (Review in Editor) + **Start Timer**.
-    * *What happens under the hood*: Just like the "Dismiss" button in the queue, this records your final review time, transfers your history to the **Dismissed** powerup, and **removes the Incremental status** from the Rem, effectively clearing it from your active learning universe. The dismissal also appears in the [Incremental Rem History](Plugin-Widgets-Reference.md#221-incremental-rem-history) sidebar with a 🔴 **Dismissed** badge.
+    * *What happens under the hood*: Just like the "Dismiss" button in the queue, this records your final review time, transfers your history to the **Dismissed** powerup, and **removes the Incremental status** from the Rem, effectively clearing it from your active learning universe. It also stamps the Rem's priority onto its `cardPriority` tag, so the value outlives the Incremental powerup and anchors every flashcard created under that Rem afterwards — see [Priority Sources](Priorities-for-Flashcards.md#priority-sources). The dismissal also appears in the [Incremental Rem History](Plugin-Widgets-Reference.md#221-incremental-rem-history) sidebar with a 🔴 **Dismissed** badge.
     * *When there are no further items queued* (e.g. single-item flows via `Ctrl+Shift+J`), Dismiss finalizes the item and ends the timer in place. When a queueList is present (Sequential Review), it dismisses the current item and advances to the next one.
 4.  **Move to the next item**: When you are finished with the current review but want the item to remain incremental for future sessions, click the **Next (N) →** button on the timer widget.
     * *What happens under the hood*: The plugin instantly records your repetition (logging the time spent and pushing the Next Rep Date forward), saves this reading history to the Incremental Tracker, and instantly teleports you to the editor of the *next* item in your sorted list.

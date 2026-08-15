@@ -23,6 +23,21 @@ export const dismissedDateSlotCode = 'dismissedDate';
 // to hide the tombstone in the editor and queue.
 export const preservedHistoryPowerupCode = 'preservedHistory';
 
+// Marks a rem that carries at least one image in its text or back text. Applied
+// and removed by the 'Tag Rems With Images' command, which exists because
+// RemNote's own search indexes text only: an image contributes no searchable
+// token, so there is no native way to isolate the images in a document. The tag
+// gives RemNote's document Filter something to match on.
+//
+// A powerup rather than a plain tag rem for two reasons: RemNote's Filter lists
+// powerups alongside ordinary tags, and an applied powerup pill carries a stable
+// `data-test` attribute, so the chip can be hidden without hiding the user's own
+// tags on the same rem (see registerHasImageCSS).
+export const hasImagePowerupCode = 'hasImage';
+// RemNote derives the data-rem-tags slug from the NAME, lowercased with spaces
+// stripped — so this name and the `hasimage` slug in the CSS must stay in step.
+export const hasImagePowerupName = 'HasImage';
+
 // settings
 export const initialIntervalId = 'initial-interval';
 export const multiplierId = 'multiplier';
@@ -58,15 +73,42 @@ export const oldItemThresholdId = 'old_item_threshold';
 export const masteryDrillMinDelayMinutesId = 'mastery_drill_min_delay_minutes';
 export const disableFinalDrillNotificationId = 'disable_final_drill_notification';
 
+// --- Queue Dashboard: speed colour coding ---
+/** Fixed cpm thresholds, or thresholds derived from the user's own history. */
+export const speedColorModeId = 'speed_color_mode';
+export type SpeedColorMode = 'fixed' | 'calibrated';
+/** Fixed mode: at or below this pace the speed reading is fully red. */
+export const speedColorRedCpmId = 'speed_color_red_cpm';
+/** Fixed mode: at or above this pace the speed reading is fully green. */
+export const speedColorGreenCpmId = 'speed_color_green_cpm';
+/** Calibrated mode: how far back the average seconds-per-card is measured. */
+export const speedCalibrationPeriodId = 'speed_calibration_period';
+export type SpeedCalibrationPeriod = 'ever' | 'year' | 'month' | 'week';
+/** Calibrated mode: seconds either side of that average for red / green. */
+export const speedCalibrationMarginSecondsId = 'speed_calibration_margin_seconds';
+/** Device-local cache of the last calibration run (see lib/speed_color.ts). */
+export const speedCalibrationCacheKey = 'speed_calibration_cache_v1';
+
 // Opt-in gate for the heavy flashcard-prioritisation machinery (KB-wide
 // pretagging, the inheritance cascade and the card-priority cache). Off by
 // default: most users want extracts and scheduling, and should not pay for
 // per-flashcard priorities they never asked for.
 export const enableFlashcardPrioritisationId = 'enable-flashcard-prioritisation';
+/**
+ * Per-KB record of the last seen value of the gate above, so that turning it OFF
+ * can offer the (reversible) inherited/default cleanup exactly once — see
+ * lib/card_priority/opt_out.ts.
+ *
+ * Synced storage is shared across ALL of the user's knowledge bases, and the tags
+ * this drives are per-KB, so the value is stored KB-partitioned as
+ * `{ [kbId]: record }` — the same shape as the shield history.
+ */
+export const flashcardPrioritisationOptOutStateKey = 'flashcard-prioritisation-opt-out-state';
 
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';
 export const fsrsWeightsId = 'fsrs-weights';
+export const fsrsRequestedRetentionId = 'fsrs-requested-retention';
 
 // --- Plugin-owned settings store (see lib/settings_migration.ts) ---
 /** Synced blob holding the values of every popup-tier setting. */
@@ -75,6 +117,26 @@ export const ieSettingsValuesKey = 'ie_settings_v1';
 export const ieSettingsMigratedKey = 'ie_settings_migrated';
 /** Durable per-setting record of the last migration run. */
 export const ieSettingsMigrationReportKey = 'ie_settings_migration_report';
+
+// --- Onboarding hub (see lib/onboarding_tips.ts, widgets/plugin_hub.tsx) ---
+/** Sidebar widget id for the "Incremental Plugin" hub panel. */
+export const pluginHubWidgetId = 'plugin_hub';
+/**
+ * Synced, KB-partitioned record of the tips the user has answered "I Got It"
+ * to: `{ [kbId]: { acknowledged: string[] } }`.
+ */
+export const onboardingTipsStateKey = 'onboarding-tips-state';
+/** Local timestamp until which the tip panel stays quiet after a ✕ dismissal. */
+export const onboardingTipsSnoozeKey = 'onboarding-tips-snooze-until';
+/**
+ * The user closed the hub panel. **Session** storage on purpose: closing it is
+ * "not now, I need the room", not a preference — it comes back on the next
+ * start, the same way the Mastery Drill notification does. Cleared early by
+ * {@link showPluginHubCommandId}.
+ */
+export const pluginHubHiddenKey = 'plugin-hub-hidden';
+/** Command that brings the hub back within the same session. */
+export const showPluginHubCommandId = 'ie_show_plugin_hub';
 
 // storage keys
 export const allIncrementalRemKey = 'all-incremental-rem';
@@ -121,6 +183,12 @@ export const cardAnalyticsCacheKey = 'card-analytics-cache-key';
 export const cardAnalyticsLastPeriodKey = 'card-analytics-last-period';
 export const fsrsCalibrationLastPeriodKey = 'fsrs-calibration-last-period';
 export const studyDashboardLastPeriodKey = 'study-dashboard-last-period';
+/**
+ * Queue Selection Odds panel: last selected universe, as its `kind-scope` key
+ * (e.g. `card-kb`). Device-local, like the period keys above — which universe
+ * you compare in is a reading preference, not shared knowledge-base state.
+ */
+export const selectionOddsLastUniverseKey = 'selection-odds-last-universe';
 // Priority Shield Graph: persists the "Show Weighted Shield" checkbox and the
 // 1M/3M/6M/1Y/All period filter across sessions. Device-specific.
 // Stored shape: { showWeightedShield: boolean, timePeriod: 'month'|'3m'|'6m'|'year'|'all' }.
@@ -202,7 +270,7 @@ export const documentPriorityShieldHistoryKey = 'document-priority-shield-histor
 export const currentSubQueueIdKey = 'current-sub-queue-id-key';
 export const cardPriorityShieldHistoryKey = 'card-priority-shield-history-key';
 export const documentCardPriorityShieldHistoryKey = 'document-card-priority-shield-history-key';
-// Dated backups written by the "Remove All CardPriority Tags" cleanup before it
+// Dated backups written by the "Remove CardPriority Tags…" cleanup (full scope) before it
 // clears this KB's shield partition, plus an index listing them for restore.
 export const cardShieldCleanupBackupPrefix = 'card-shield-cleanup-backup-';
 export const cardShieldCleanupBackupIndexKey = 'card-shield-cleanup-backup-index';
@@ -257,6 +325,14 @@ export const showPriorityBandsInTablesId = 'showPriorityBandsInTables';
 // pattern as pdfHighlightBordersReloadKey: registerCSS is index-only, so a
 // plugin.track in index.tsx watches this key and re-registers there.
 export const priorityBandColorsReloadKey = 'priority-band-colors-reload';
+// Per-device opt-in for the band-colour instrumentation: the full band →
+// percentile → colour table each stylesheet is built from. Off by default — the
+// dump is four tables per re-registration and would swamp the console — but the
+// mapping is otherwise invisible, since a badge coloured from the ABSOLUTE
+// fallback scale looks exactly like a correctly ranked one. Local, not session,
+// so it survives a reload once switched on. Toggled by the
+// `toggle-priority-band-logging` command.
+export const priorityBandVerboseLogsKey = 'priority-band-verbose-logs';
 export const pendingPrioritySaveKey = 'pendingPrioritySave';
 // Rem ids a priority popup should apply to when opened in batch mode (Opt+P /
 // Ctrl+Opt+P over a multi-rem selection, e.g. several table rows). Written by the

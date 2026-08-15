@@ -1,5 +1,18 @@
 import { renderWidget, usePlugin, useTrackerPlugin } from '@remnote/plugin-sdk';
-import React, { CSSProperties, useMemo, useState } from 'react';
+import React, { CSSProperties, useEffect, useMemo, useState } from 'react';
+import {
+  SpeedCalibrationPeriod,
+  speedCalibrationMarginSecondsId,
+  speedCalibrationPeriodId,
+  speedColorModeId,
+} from '../lib/consts';
+import {
+  CALIBRATION_PERIOD_LABELS,
+  SpeedCalibration,
+  cpmToSecondsPerCard,
+  ensureSpeedCalibration,
+  thresholdsFromCalibration,
+} from '../lib/speed_color';
 import {
   IE_DOCS_BASE_URL,
   IE_SETTINGS_DEFAULTS,
@@ -20,10 +33,9 @@ import {
  * The IE Settings popup: every setting the plugin owns, grouped and layered,
  * because RemNote's own panel renders three dozen entries as one flat list.
  *
- * Native-tier settings (see lib/settings.ts) are shown read-only with a pointer
- * to RemNote's panel: the SDK has no setter for a registered setting, and those
- * particular ones are deliberately kept where someone chasing a performance
- * problem would look for them.
+ * Since v1.0.45 this is the ONLY place any of them can be edited — the five
+ * performance/integration switches that used to stay behind in RemNote's panel
+ * moved into the same store as the rest, so nothing here is read-only any more.
  */
 
 const openDocs = (path: string) => {
@@ -49,17 +61,14 @@ const isDefault = (id: IESettingId, value: unknown) =>
  * hides the Multiplier when on — so the phrase follows the required value.
  */
 function requirementPhrase(spec: SettingSpec, requires: unknown): string {
-  // A native-tier switch cannot be flipped here, so say where it lives rather
-  // than pointing at a control the popup renders disabled.
-  const where = spec.tier === 'native' ? " in RemNote's settings" : '';
   if (spec.kind === 'boolean') {
-    return `Turn this ${requires ? 'on' : 'off'}${where} to configure`;
+    return `Turn this ${requires ? 'on' : 'off'} to configure`;
   }
   if (spec.kind === 'dropdown') {
     const label = spec.options.find((o) => o.value === requires)?.label ?? String(requires);
-    return `Set this to “${label}”${where} to configure`;
+    return `Set this to “${label}” to configure`;
   }
-  return `Set this to ${JSON.stringify(requires)}${where} to configure`;
+  return `Set this to ${JSON.stringify(requires)} to configure`;
 }
 
 function HelpLink({ path, label }: { path: string; label: string }) {
@@ -117,7 +126,6 @@ interface RowProps {
 }
 
 function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
-  const readOnly = spec.tier === 'native';
   // Text and number inputs keep a local draft so that typing is not fought by
   // the reactive value coming back from storage; committed on blur / Enter.
   const [draft, setDraft] = useState<string | null>(null);
@@ -129,7 +137,6 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
     borderRadius: 6,
     backgroundColor: 'var(--rn-clr-background-primary, #fff)',
     color: 'var(--rn-clr-content-primary, #0f172a)',
-    opacity: readOnly ? 0.6 : 1,
   };
 
   const commitNumber = (raw: string) => {
@@ -147,13 +154,12 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
     switch (spec.kind) {
       case 'boolean':
         return (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: readOnly ? 'default' : 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input
               type="checkbox"
               checked={!!value}
-              disabled={readOnly}
               onChange={(e) => onChange(e.target.checked)}
-              style={{ width: 15, height: 15, cursor: readOnly ? 'default' : 'pointer' }}
+              style={{ width: 15, height: 15, cursor: 'pointer' }}
             />
             <span style={{ fontSize: 12, color: 'var(--rn-clr-content-secondary, #475569)' }}>
               {value ? 'On' : 'Off'}
@@ -166,9 +172,11 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
             <input
               type="number"
               value={draft ?? String(value ?? '')}
-              disabled={readOnly}
               min={spec.min}
               max={spec.max}
+              // Fractional settings (speed thresholds, the interval multiplier)
+              // would otherwise inherit step=1 and read as invalid at 1.5.
+              step={spec.integer ? 1 : 'any'}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={(e) => commitNumber(e.target.value)}
               onKeyDown={(e) => {
@@ -186,7 +194,6 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
           <input
             type="text"
             value={draft ?? String(value ?? '')}
-            disabled={readOnly}
             placeholder={spec.placeholder}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={(e) => {
@@ -203,9 +210,8 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
         return (
           <select
             value={String(value ?? '')}
-            disabled={readOnly}
             onChange={(e) => onChange(e.target.value)}
-            style={{ ...inputStyle, minWidth: 220, cursor: readOnly ? 'default' : 'pointer' }}
+            style={{ ...inputStyle, minWidth: 220, cursor: 'pointer' }}
           >
             {spec.options.map((o) => (
               <option key={o.value} value={o.value}>
@@ -217,7 +223,7 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
     }
   };
 
-  const modified = !readOnly && !isDefault(id, value);
+  const modified = !isDefault(id, value);
 
   return (
     <div
@@ -233,7 +239,6 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
         <span style={{ fontSize: 13, fontWeight: 600 }}>{spec.title}</span>
         {spec.helpPath && <HelpLink path={spec.helpPath} label={spec.title} />}
         {spec.reloadRequired && <Badge tone="neutral">needs reload</Badge>}
-        {readOnly && <Badge tone="neutral">RemNote settings</Badge>}
         {modified && <Badge tone="neutral">modified</Badge>}
       </div>
 
@@ -265,29 +270,22 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {control()}
-        {readOnly ? (
-          <span style={{ fontSize: 11, color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
-            Change this in Settings → Plugins → Incremental Everything. It is kept there on purpose: that panel
-            is where you would look first if the plugin felt heavy.
-          </span>
-        ) : (
-          modified && (
-            <button
-              onClick={() => onChange(IE_SETTINGS_DEFAULTS[id])}
-              style={{
-                fontSize: 11,
-                padding: '2px 8px',
-                borderRadius: 5,
-                border: '1px solid var(--rn-clr-border-primary, #cbd5e1)',
-                backgroundColor: 'transparent',
-                color: 'var(--rn-clr-content-secondary, #475569)',
-                cursor: 'pointer',
-              }}
-              title={`Reset to ${JSON.stringify(IE_SETTINGS_DEFAULTS[id])}`}
-            >
-              Reset
-            </button>
-          )
+        {modified && (
+          <button
+            onClick={() => onChange(IE_SETTINGS_DEFAULTS[id])}
+            style={{
+              fontSize: 11,
+              padding: '2px 8px',
+              borderRadius: 5,
+              border: '1px solid var(--rn-clr-border-primary, #cbd5e1)',
+              backgroundColor: 'transparent',
+              color: 'var(--rn-clr-content-secondary, #475569)',
+              cursor: 'pointer',
+            }}
+            title={`Reset to ${JSON.stringify(IE_SETTINGS_DEFAULTS[id])}`}
+          >
+            Reset
+          </button>
         )}
       </div>
 
@@ -304,6 +302,116 @@ function SettingRow({ id, spec, value, onChange, hiddenDependents }: RowProps) {
   );
 }
 
+/**
+ * The measured average behind calibrated speed colours, shown under the Queue
+ * Dashboard group — the margin above is expressed in seconds per card, and is
+ * meaningless without knowing what it is a margin *around*.
+ *
+ * Measuring walks every card's repetition history, so this reuses the same
+ * cached result the dashboard does; it only ever recomputes when that cache
+ * cannot answer, or when the user asks for it.
+ */
+function SpeedCalibrationReadout({
+  period,
+  marginSeconds,
+}: {
+  period: SpeedCalibrationPeriod;
+  marginSeconds: number;
+}) {
+  const plugin = usePlugin();
+  const [cal, setCal] = useState<SpeedCalibration | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    ensureSpeedCalibration(plugin, period).then((c) => {
+      if (cancelled) return;
+      setCal(c);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [plugin, period]);
+
+  const recalibrate = async () => {
+    setLoading(true);
+    const c = await ensureSpeedCalibration(plugin, period, true);
+    setCal(c);
+    setLoading(false);
+  };
+
+  const box: CSSProperties = {
+    marginTop: 10,
+    padding: '10px 12px',
+    borderRadius: 8,
+    fontSize: 12,
+    lineHeight: 1.6,
+    border: '1px solid var(--rn-clr-border-primary, #cbd5e1)',
+    backgroundColor: 'var(--rn-clr-background-secondary, #f8fafc)',
+    color: 'var(--rn-clr-content-secondary, #475569)',
+  };
+  const strong: CSSProperties = { fontWeight: 700, color: 'var(--rn-clr-content-primary, #0f172a)' };
+  const windowLabel = CALIBRATION_PERIOD_LABELS[period];
+
+  if (loading) {
+    return <div style={box}>Measuring your average speed over {windowLabel}…</div>;
+  }
+  if (!cal || cal.sampleCount === 0) {
+    return (
+      <div style={box}>
+        No flashcard repetitions found in {windowLabel}, so the fixed limits (1.5 / 4 cpm) are
+        used until there are. Try a longer calibration period.
+      </div>
+    );
+  }
+
+  const avgSeconds = cal.avgSeconds;
+  const avgCpm = avgSeconds > 0 ? 60 / avgSeconds : 0;
+  const t = thresholdsFromCalibration(cal, marginSeconds);
+
+  return (
+    <div style={box}>
+      <div>
+        Your average over {windowLabel}: <span style={strong}>{avgCpm.toFixed(1)} cpm</span> ·{' '}
+        <span style={strong}>{avgSeconds.toFixed(1)} s/card</span>{' '}
+        <span style={{ color: 'var(--rn-clr-content-tertiary, #94a3b8)' }}>
+          ({cal.sampleCount.toLocaleString()} repetitions, measured{' '}
+          {new Date(cal.computedAt).toLocaleDateString()})
+        </span>
+      </div>
+      <div style={{ marginTop: 4 }}>
+        With a {marginSeconds} s margin: green at{' '}
+        <span style={{ color: 'hsl(120, 90%, 35%)', fontWeight: 700 }}>
+          {t.greenCpm.toFixed(1)} cpm / {cpmToSecondsPerCard(t.greenCpm).toFixed(1)} s/card
+        </span>{' '}
+        or faster, red at{' '}
+        <span style={{ color: 'hsl(0, 90%, 35%)', fontWeight: 700 }}>
+          {t.redCpm.toFixed(1)} cpm / {cpmToSecondsPerCard(t.redCpm).toFixed(1)} s/card
+        </span>{' '}
+        or slower.
+      </div>
+      <button
+        onClick={recalibrate}
+        style={{
+          marginTop: 6,
+          fontSize: 11,
+          padding: '3px 9px',
+          borderRadius: 6,
+          cursor: 'pointer',
+          border: '1px solid var(--rn-clr-border-primary, #cbd5e1)',
+          backgroundColor: 'var(--rn-clr-background-primary, #fff)',
+          color: 'var(--rn-clr-content-secondary, #475569)',
+        }}
+        title="Re-measure now from your card history"
+      >
+        Recalibrate
+      </button>
+    </div>
+  );
+}
+
 export function IESettingsWidget() {
   const plugin = usePlugin();
   const [activeGroup, setActiveGroup] = useState<SettingGroupId>('flashcardPriority');
@@ -311,8 +419,8 @@ export function IESettingsWidget() {
 
   const allIds = useMemo(() => Object.keys(IE_SETTINGS_SCHEMA) as IESettingId[], []);
 
-  // One tracker for the whole set: re-runs when the synced blob or any native
-  // setting changes, so the popup reflects edits made anywhere.
+  // One tracker for the whole set: re-runs when the synced blob changes, so the
+  // popup reflects an edit made from anywhere (another pane, another device).
   const values = useTrackerPlugin(async (rp) => {
     const entries = await Promise.all(allIds.map(async (id) => [id, await getIESetting(rp, id)] as const));
     return Object.fromEntries(entries) as unknown as IESettings;
@@ -335,7 +443,7 @@ export function IESettingsWidget() {
   };
 
   const modifiedCount = values
-    ? (allIds.filter((id) => IE_SETTINGS_SCHEMA[id].tier === 'popup' && !isDefault(id, values[id])).length)
+    ? allIds.filter((id) => !isDefault(id, values[id])).length
     : 0;
 
   const onChange = async (id: IESettingId, value: unknown) => {
@@ -459,6 +567,25 @@ export function IESettingsWidget() {
                     {IE_SETTING_GROUPS[group].blurb}
                   </div>
                 )}
+                {/* Applies to every setting in the group, so it sits above them
+                    all rather than being repeated on each row. */}
+                {IE_SETTING_GROUPS[group].warning && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      borderRadius: 6,
+                      border: '1px solid rgba(245, 158, 11, 0.45)',
+                      backgroundColor: 'rgba(245, 158, 11, 0.10)',
+                      color: 'var(--rn-clr-content-primary, #0f172a)',
+                    }}
+                  >
+                    <strong>⚠️ </strong>
+                    {IE_SETTING_GROUPS[group].warning}
+                  </div>
+                )}
                 {ids.filter(matches).map((id) => (
                   <SettingRow
                     key={id}
@@ -469,6 +596,12 @@ export function IESettingsWidget() {
                     hiddenDependents={hiddenDependentsOf(id, values)}
                   />
                 ))}
+                {group === 'queueDashboard' && values[speedColorModeId] === 'calibrated' && (
+                  <SpeedCalibrationReadout
+                    period={values[speedCalibrationPeriodId]}
+                    marginSeconds={values[speedCalibrationMarginSecondsId]}
+                  />
+                )}
               </div>
             ))
           )}

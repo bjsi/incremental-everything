@@ -58,6 +58,14 @@ export interface PowerupScanResult {
   detached: number;
   /** No priority property found at all — nothing was ever written, or it is gone. */
   missing: number;
+  /**
+   * Rems carrying MORE THAN ONE property Rem for the registered priority slot.
+   * These read as healthy — the plugin resolves one of them and gets a correct
+   * value — but the user sees several "Priority" rows under the Rem, and only
+   * one of them tracks what the plugin writes. Distinct from `detached`, where
+   * the link is wrong, and from `leftoverSlots`, where the slot Rem is foreign.
+   */
+  duplicated: number;
   /** detached / total, as a percentage. */
   detachedPct: number;
   /** Which orphan slot Rems the detached properties point at, and how often. */
@@ -74,6 +82,8 @@ export interface DateScanResult {
   dangling: number;
   /** Property present but holding no reference at all. */
   empty: number;
+  /** Incremental Rems carrying more than one Next Rep Date property Rem. */
+  duplicated: number;
   danglingPct: number;
   /**
    * Of the dangling ones, how many still carry a `nextRepMs` stamp in their own
@@ -305,13 +315,13 @@ export async function scanKbForDetachedSlots(
 
   const mkResult = (label: string, code: string, registeredSlotId: string | null): PowerupScanResult => ({
     label, code, registeredSlotId,
-    total: 0, ok: 0, detached: 0, missing: 0, detachedPct: 0,
+    total: 0, ok: 0, detached: 0, missing: 0, duplicated: 0, detachedPct: 0,
     orphanTargets: [], samples: [],
   });
   const incremental = mkResult('Incremental', powerupCode, incPriorityId);
   const cardPriority = mkResult('CardPriority', CARD_PRIORITY_CODE, cardPriorityId);
   const nextRepDate: DateScanResult = {
-    totalWithProperty: 0, ok: 0, dangling: 0, empty: 0, danglingPct: 0,
+    totalWithProperty: 0, ok: 0, dangling: 0, empty: 0, duplicated: 0, danglingPct: 0,
     danglingRecoverable: 0, danglingUnrecoverable: 0, recoverablePct: 0,
     byInterval: [], samples: [], unrecoverableSamples: [],
   };
@@ -379,6 +389,8 @@ export async function scanKbForDetachedSlots(
     let linked: PluginRem | null = null;
     let detachedChild: PluginRem | null = null;
     let detachedTarget: string | null = null;
+    /** How many property Rems on this Rem carry the registered slot (1 = healthy). */
+    let linkedCount = 0;
     // Leftovers found on THIS Rem in this pass, so the owner's readability can be
     // stamped onto them once it is known. That flag is what separates litter that
     // is safe to delete from a value that is the only remaining copy.
@@ -393,6 +405,11 @@ export async function scanKbForDetachedSlots(
         // as a stray "Unnamed — N" row. Breaking on the healthy one made those
         // invisible to this scan, which measured readability and silently
         // reported litter as clean.
+        //
+        // Nor is a second match here an error: several property Rems can carry
+        // the SAME registered slot, which reads as healthy while showing the
+        // user repeated rows. Count them so that fault is measurable.
+        linkedCount++;
         linked = child;
         continue;
       }
@@ -442,6 +459,19 @@ export async function scanKbForDetachedSlots(
           });
           if (category !== 'foreign') leftoversHere.push(child._id);
         }
+      }
+    }
+
+    if (linkedCount > 1) {
+      result.duplicated++;
+      if (result.samples.length < SAMPLE_CAP) {
+        result.samples.push({
+          remId: rem._id,
+          text: (await safeRemTextToString(plugin, rem.text)).slice(0, 120),
+          storedValue: `${linkedCount} property Rems on the same slot`,
+          pointsAt: registeredId,
+          pointsAtName: '(duplicated — plugin reads one of them)',
+        });
       }
     }
 
@@ -501,9 +531,15 @@ export async function scanKbForDetachedSlots(
         }
 
         // Next Rep Date — Incremental only.
-        const dateChild = children.find((c) => nextRepId && refIdsIn(c.text).includes(nextRepId));
+        const dateChildren = nextRepId
+          ? children.filter((c) => refIdsIn(c.text).includes(nextRepId))
+          : [];
+        const dateChild = dateChildren[0];
         if (!dateChild) return;
         nextRepDate.totalWithProperty++;
+        // Same duplicate fault as priority: the date reads fine while the Rem
+        // shows repeated "Next Rep Date" rows, one of them stale.
+        if (dateChildren.length > 1) nextRepDate.duplicated++;
 
         const targets = refIdsIn((dateChild as any).backText);
         if (targets.length === 0) {
@@ -751,6 +787,7 @@ export function logSlotScan(report: SlotScanReport): void {
       OK: r.ok,
       DETACHED: r.detached,
       'no value': r.missing,
+      DUPLICATED: r.duplicated,
       'detached %': `${r.detachedPct}%`,
       registeredSlot: r.registeredSlotId ?? '(unresolved)',
     }))
@@ -769,6 +806,7 @@ export function logSlotScan(report: SlotScanReport): void {
     OK: report.nextRepDate.ok,
     DANGLING: report.nextRepDate.dangling,
     'no reference': report.nextRepDate.empty,
+    DUPLICATED: report.nextRepDate.duplicated,
     'dangling %': `${report.nextRepDate.danglingPct}%`,
     'recoverable from history': report.nextRepDate.danglingRecoverable,
     'UNRECOVERABLE': report.nextRepDate.danglingUnrecoverable,

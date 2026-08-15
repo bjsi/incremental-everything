@@ -1111,6 +1111,33 @@ function RepetitionHistoryPopup() {
                             </div>
                         );
 
+                        // Banner timestamp: date plus the local wall-clock time the
+                        // event was recorded. Same information the rep rows show —
+                        // it disambiguates several lifecycle events on one day
+                        // (make incremental → dismiss → make incremental again).
+                        //
+                        // Spacing comes from the span's own margins, never from plain
+                        // spaces around it: the banner is a flex container, so this
+                        // span is a flex item and the layout trims the whitespace at
+                        // its edges — that is what glued "2026" to "09:44", and what
+                        // ate the space before a trailing " — Pri: 26" once the span
+                        // split that text off into its own item.
+                        const bannerWhen = (
+                            <>
+                                {dayjs(rep.date).format('MMM D, YYYY')}
+                                <span
+                                    style={{
+                                        opacity: 0.75,
+                                        fontWeight: 400,
+                                        margin: '0 5px',
+                                        letterSpacing: '0.2px',
+                                    }}
+                                >
+                                    · {dayjs(rep.date).format('HH:mm')}
+                                </span>
+                            </>
+                        );
+
                         // Lifecycle / slot-edit events render as a banner; the row actions
                         // sit beside it instead of in a grid cell.
                         const banner = (accent: React.CSSProperties, body: React.ReactNode) =>
@@ -1125,7 +1152,7 @@ function RepetitionHistoryPopup() {
                             return banner(
                                 { backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' },
                                 <>
-                                    ▶ Made Incremental — {dayjs(rep.date).format('MMM D, YYYY')}
+                                    ▶ Made Incremental — {bannerWhen}
                                     {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </>
                             );
@@ -1134,7 +1161,7 @@ function RepetitionHistoryPopup() {
                         if (rep.eventType === 'dismissed') {
                             return banner(
                                 { backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' },
-                                <>⏸ Dismissed — {dayjs(rep.date).format('MMM D, YYYY')}</>
+                                <>⏸ Dismissed — {bannerWhen}</>
                             );
                         }
 
@@ -1143,7 +1170,7 @@ function RepetitionHistoryPopup() {
                             return banner(
                                 { backgroundColor: 'rgba(147, 51, 234, 0.1)', color: '#9333ea' },
                                 <>
-                                    📅 Rescheduled in Editor — {dayjs(rep.date).format('MMM D, YYYY')}
+                                    📅 Rescheduled in Editor — {bannerWhen}
                                     {rep.interval !== undefined && ` → ${rep.interval}d`}
                                     {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </>
@@ -1155,7 +1182,7 @@ function RepetitionHistoryPopup() {
                             return banner(
                                 { backgroundColor: 'rgba(107, 114, 128, 0.1)', color: '#6b7280' },
                                 <>
-                                    ✏️ Manual Date Reset — {dayjs(rep.date).format('MMM D, YYYY')}
+                                    ✏️ Manual Date Reset — {bannerWhen}
                                     {rep.interval !== undefined && ` → ${rep.interval}d`}
                                     {rep.priority !== undefined && ` — Pri: ${rep.priority}`}
                                 </>

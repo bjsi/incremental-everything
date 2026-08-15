@@ -142,6 +142,24 @@ export interface RawPropertyRow {
   /** Slot-definition rems this property is tagged with. */
   slotDefIds: string[];
   slotDefNames: string[];
+  /**
+   * When the property REM itself was created and last written, straight off the
+   * RemObject. This is what dates a stray: a duplicate written by today's code
+   * carries today's timestamps, while one left behind by a past migration or a
+   * copy/paste carries the date it was really made. Without this the dump can
+   * show that a duplicate exists but never who made it or when.
+   */
+  createdAt: number | null;
+  createdAtISO: string | null;
+  updatedAt: number | null;
+  updatedAtISO: string | null;
+  /**
+   * How many property rems on this SAME rem resolve to this SAME powerup+slot.
+   * 1 is healthy. Anything above 1 means the slot is duplicated: the plugin
+   * reads exactly one of them (whichever the SDK resolves) and the others sit
+   * there as visible, editable rows holding whatever they last held.
+   */
+  duplicateGroupSize: number;
   /** Which registered powerup+slot this property resolves to, if any. */
   matchedPowerup: string | null;
   matchedSlotCode: string | null;
@@ -180,7 +198,46 @@ export interface RawSlotRemRow {
     rawValue: string | null;
     rawPropertyRemId: string | null;
     slotDefLinked: boolean | null;
+    /**
+     * Property rems carrying this slot on this rem. 1 is healthy; above 1 means
+     * the row reported here is the live one and the rest are strays holding
+     * whatever they last held. See `duplicates` for the full group.
+     */
+    propertyRemCount: number;
     verdict: RawPropertyRow['verdict'];
+  }>;
+}
+
+/**
+ * One slot that has more than one property rem on the same rem — the "stray
+ * duplicate row" fault. Timestamps are the point of this group: they say
+ * whether the extra rows were made together with the survivor (a copy) or long
+ * after it (a write that failed to find the existing property).
+ */
+export interface DuplicateSlotGroup {
+  remId: string;
+  remText: string;
+  powerup: string;
+  slotCode: string;
+  count: number;
+  members: Array<{
+    propertyRemId: string;
+    rawValue: string;
+    createdAtISO: string | null;
+    updatedAtISO: string | null;
+    /**
+     * The stored value equals what the API reads. Value equality, not identity:
+     * when duplicates hold the SAME value this is true for all of them, so it
+     * cannot single out the live row on its own.
+     */
+    isApiValue: boolean;
+    /**
+     * Most recently written row of the group — the one a `setPowerupProperty`
+     * actually resolved last. This is the identity signal: make a write, re-run
+     * the dump, and the row whose `updatedAt` moved is the one the plugin uses.
+     * The others are strays, safe to delete once their values are accounted for.
+     */
+    isMostRecentlyWritten: boolean;
   }>;
 }
 
@@ -194,6 +251,8 @@ export interface RawSlotDumpReport {
   properties: RawPropertyRow[];
   /** Rems where a value is physically stored but the plugin reads nothing. */
   unreachable: RawPropertyRow[];
+  /** Slots carrying more than one property rem on the same rem. */
+  duplicates: DuplicateSlotGroup[];
 }
 
 /** Rem-reference elements carried by a rich-text value, by id. */
@@ -328,6 +387,7 @@ export async function dumpRawPowerupSlots(
   const depthById = new Map<string, number>([[root._id, 0]]);
 
   const properties: RawPropertyRow[] = [];
+  const duplicates: DuplicateSlotGroup[] = [];
   const rems: RawSlotRemRow[] = [];
 
   for (const node of targets) {
@@ -366,6 +426,8 @@ export async function dumpRawPowerupSlots(
     // ── The raw read: the property rems themselves. ───────────────────────────
     const children = ((await node.getChildrenRem().catch(() => [])) || []) as PluginRem[];
     const rawByKey = new Map<string, RawPropertyRow>();
+    /** This rem's property rows, for the per-slot duplicate count below. */
+    const nodeRows: RawPropertyRow[] = [];
 
     for (const child of children) {
       // isPowerupProperty is deprecated at runtime on affected builds (it throws;
@@ -474,11 +536,20 @@ export async function dumpRawPowerupSlots(
         verdict = 'OK';
       }
 
+      const createdAt = typeof (child as any).createdAt === 'number' ? (child as any).createdAt : null;
+      const updatedAt = typeof (child as any).updatedAt === 'number' ? (child as any).updatedAt : null;
+
       const row: RawPropertyRow = {
         remId: node._id,
         remText,
         depth,
         propertyRemId: child._id,
+        createdAt,
+        createdAtISO: createdAt ? new Date(createdAt).toISOString() : null,
+        updatedAt,
+        updatedAtISO: updatedAt ? new Date(updatedAt).toISOString() : null,
+        // Filled in below, once every child of this rem has been read.
+        duplicateGroupSize: 1,
         rawValue,
         rawValueLength: rawValue.length,
         rawElementCount: Array.isArray((child as any).backText) ? (child as any).backText.length : 0,
@@ -495,7 +566,55 @@ export async function dumpRawPowerupSlots(
         verdict,
       };
       properties.push(row);
-      if (match) rawByKey.set(`${match.powerup}:${match.slotCode}`, row);
+      nodeRows.push(row);
+      if (match) {
+        // With duplicates, report the row a write actually lands on — the most
+        // recently written one. Plain last-child-wins put a STALE duplicate in
+        // the per-rem table next to the live API value, which reads as a
+        // raw-vs-API mismatch that does not exist.
+        const key = `${match.powerup}:${match.slotCode}`;
+        const prev = rawByKey.get(key);
+        if (!prev || (row.updatedAt ?? 0) >= (prev.updatedAt ?? 0)) {
+          rawByKey.set(key, row);
+        }
+      }
+    }
+
+    // A slot is supposed to have exactly ONE property rem per rem. Count them
+    // per powerup+slot so duplicates are visible as data rather than as a row
+    // the reader has to notice twice in the list.
+    const perSlot = new Map<string, RawPropertyRow[]>();
+    for (const row of nodeRows) {
+      if (!row.matchedPowerup || !row.matchedSlotCode) continue;
+      const key = `${row.matchedPowerup}:${row.matchedSlotCode}`;
+      const group = perSlot.get(key) || [];
+      group.push(row);
+      perSlot.set(key, group);
+    }
+    for (const group of perSlot.values()) {
+      if (group.length < 2) continue;
+      for (const row of group) row.duplicateGroupSize = group.length;
+      const newestWrite = Math.max(...group.map((row) => row.updatedAt ?? 0));
+      duplicates.push({
+        remId: node._id,
+        remText,
+        powerup: group[0].matchedPowerup!,
+        slotCode: group[0].matchedSlotCode!,
+        count: group.length,
+        // Oldest first, so the survivor and the strays read in the order they
+        // were made — the shape of the story of how the duplicate happened.
+        members: [...group]
+          .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))
+          .map((row) => ({
+            propertyRemId: row.propertyRemId,
+            rawValue: row.rawValue,
+            createdAtISO: row.createdAtISO,
+            updatedAtISO: row.updatedAtISO,
+            /** True for the one the plugin's own read agrees with. */
+            isApiValue: row.apiValue != null && row.apiValue === row.rawValue,
+            isMostRecentlyWritten: (row.updatedAt ?? 0) === newestWrite,
+          })),
+      });
     }
 
     // ── Per-rem slot table: API value beside raw value. ───────────────────────
@@ -521,6 +640,7 @@ export async function dumpRawPowerupSlots(
           rawValue: raw?.rawValue ?? null,
           rawPropertyRemId: raw?.propertyRemId ?? null,
           slotDefLinked: raw ? raw.matchedPowerup !== null : null,
+          propertyRemCount: raw?.duplicateGroupSize ?? 0,
           verdict,
         });
       }
@@ -543,6 +663,7 @@ export async function dumpRawPowerupSlots(
     rems,
     properties,
     unreachable,
+    duplicates,
   };
 
   logRawSlotDump(report);
@@ -580,8 +701,30 @@ export function logRawSlotDump(report: RawSlotDumpReport): void {
     matched: p.matchedPowerup ? `${p.matchedPowerup}:${p.matchedSlotCode}` : '(NO MATCH)',
     RAW: p.rawValue.slice(0, 60),
     API: p.apiValue === null ? '(empty)' : p.apiValue.slice(0, 60),
+    created: p.createdAtISO ?? '(unknown)',
+    updated: p.updatedAtISO ?? '(unknown)',
+    copies: p.duplicateGroupSize,
     verdict: p.verdict,
   })));
+
+  if (report.duplicates.length > 0) {
+    console.log(`\n*** ${report.duplicates.length} SLOT(S) WITH MORE THAN ONE PROPERTY REM ***`);
+    console.log('The plugin reads one of them; the others show up as extra rows under the');
+    console.log('Rem and hold whatever they last held. Read the timestamps: rows created');
+    console.log('together with the survivor came from a copy of the Rem, rows created much');
+    console.log('later came from a write that could not find the existing property.');
+    for (const group of report.duplicates) {
+      console.log(`\n${group.powerup}:${group.slotCode} × ${group.count} on "${group.remText.slice(0, 40)}" [${group.remId}]`);
+      console.table(group.members.map((m) => ({
+        propertyRemId: m.propertyRemId,
+        value: m.rawValue.slice(0, 40),
+        created: m.createdAtISO ?? '(unknown)',
+        updated: m.updatedAtISO ?? '(unknown)',
+        valueMatchesAPI: m.isApiValue ? 'yes' : '',
+        lastWritten: m.isMostRecentlyWritten ? '← the live one' : '',
+      })));
+    }
+  }
 
   if (report.unreachable.length === 0) {
     console.log('\nNo unreachable values: every stored property matched a registered slot');
