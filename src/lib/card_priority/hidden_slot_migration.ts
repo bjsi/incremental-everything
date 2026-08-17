@@ -123,11 +123,65 @@ async function findVisiblePriorityChildren(
 }
 
 /**
+ * A progress callback that logs every message and toasts at most every 15s.
+ *
+ * The run walks every tagged rem, which on a large library is several minutes of
+ * apparent silence — long enough that the previous run was assumed hung and the
+ * machine restarted under it. Console progress is not enough when the console is
+ * closed.
+ */
+export function migrationProgressReporter(plugin: RNPlugin): (msg: string) => void {
+  let lastToast = 0;
+  return (msg: string) => {
+    console.log(`${LOG} ${msg}`);
+    const now = Date.now();
+    if (now - lastToast < 15000) return;
+    lastToast = now;
+    void plugin.app.toast(`Card priorities — ${msg}`).catch(() => undefined);
+  };
+}
+
+/** How many rems carry the CardPriority tag. One call, no per-rem walk — for
+ *  dialogs that want the population size without the cost of scanning it. */
+export async function countCardPriorityTaggedRems(plugin: RNPlugin): Promise<number> {
+  try {
+    const powerup = await plugin.powerup.getPowerupByCode(CARD_PRIORITY_CODE);
+    return ((await powerup?.taggedRem()) || []).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Spreads a sample of `want` rems across the whole population.
+ *
+ * STRIDED, not the first N. The migration walks `taggedRem()` in order, so a
+ * head-first sample looks precisely at the rems a previous run finished first. An
+ * interrupted run — a crash or a restart part-way through 45k rems — therefore
+ * left a clean head and an untouched tail, and a head-first probe of 400 reported
+ * "nothing to migrate" on a knowledge base with tens of thousands of rows still to
+ * move. Same reasoning as the warm-start self-check in card_priority/cache.ts,
+ * which steps through its population rather than taking a prefix.
+ */
+function strideSample<T>(items: T[], want: number): T[] {
+  if (items.length <= want) return items;
+  const step = Math.max(1, Math.floor(items.length / want));
+  const out: T[] = [];
+  for (let i = 0; i < items.length && out.length < want; i += step) out.push(items[i]);
+  return out;
+}
+
+/**
  * Whether this KB still has visible priority rows, and how many rems carry one.
  *
- * `sample` stops after DETECT_SAMPLE rems and short-circuits on the first hit —
- * that is all the startup check needs. A full scan costs one getChildrenRem per
- * tagged rem; the reference test itself reads `child.text`, already loaded.
+ * `sample` looks at DETECT_SAMPLE rems spread across the population and
+ * short-circuits on the first hit — that is all the startup check needs. A full
+ * scan costs one getChildrenRem per tagged rem; the reference test itself reads
+ * `child.text`, already loaded.
+ *
+ * A sampled result is evidence only in the POSITIVE direction: rows found means
+ * rows exist, but rows not found says nothing about the rems it skipped. Anything
+ * that retires the slot must use a full scan.
  */
 export async function scanVisiblePrioritySlots(
   plugin: RNPlugin,
@@ -141,12 +195,12 @@ export async function scanVisiblePrioritySlots(
 
   const powerup = await plugin.powerup.getPowerupByCode(CARD_PRIORITY_CODE);
   const tagged = ((await powerup?.taggedRem()) || []) as PluginRem[];
-  const limit = opts.sample ? Math.min(DETECT_SAMPLE, tagged.length) : tagged.length;
+  const targets = opts.sample ? strideSample(tagged, DETECT_SAMPLE) : tagged;
 
   let withVisibleChild = 0;
   let sampled = 0;
-  for (let i = 0; i < limit; i += BATCH) {
-    const batch = tagged.slice(i, Math.min(i + BATCH, limit));
+  for (let i = 0; i < targets.length; i += BATCH) {
+    const batch = targets.slice(i, i + BATCH);
     const hits = await Promise.all(
       batch.map((rem) => findVisiblePriorityChildren(rem, slot._id))
     );
@@ -155,7 +209,7 @@ export async function scanVisiblePrioritySlots(
     // The probe only has to answer "any?", so stop as soon as it knows.
     if (opts.sample && withVisibleChild > 0) break;
     if (!opts.sample && i % (BATCH * 20) === 0) {
-      opts.onProgress?.(`Scanning: ${sampled}/${limit}`);
+      opts.onProgress?.(`Scanning: ${sampled}/${targets.length}`);
     }
   }
 
@@ -327,7 +381,6 @@ export async function migrateCardPriorityToHiddenSlot(
     await plugin.storage.setSession('plugin_operation_active', false);
   }
 
-  const clean = errors === 0 && writeFailed === 0 && keptWithChildren === 0;
   const notes: string[] = [];
   if (staleVisible > 0) {
     notes.push(
@@ -388,27 +441,48 @@ export async function runCardPriorityHiddenSlotMigration(
   plugin: RNPlugin,
   onProgress?: (msg: string) => void
 ): Promise<MigrationRunResult> {
-  onProgress?.('Backing up every card priority…');
   let backupTaken = false;
   let backupNote = '';
-  try {
-    const snapshot = await captureCardPrioritySnapshot(plugin, onProgress);
-    const downloaded = downloadCardPrioritySnapshotFile(snapshot);
-    backupTaken = snapshot.storedLocally || downloaded;
+
+  // Reuse an existing backup rather than capturing over it.
+  //
+  // The existing one is the PRE-migration state, which is the rollback point that
+  // matters; a fresh capture on a re-run would record a half-migrated knowledge
+  // base and destroy the only copy of the state worth going back to. It also saves
+  // the ~90s of reads a 45k-rem capture costs, which makes finishing an
+  // interrupted run much cheaper.
+  const existing = await loadSnapshot(plugin).catch(() => null);
+  if (existing) {
+    backupTaken = true;
     backupNote =
-      `${snapshot.meta.count} priorities captured ` +
-      `(~${(snapshot.approxBytes / 1024 / 1024).toFixed(1)}MB). ` +
-      `Local copy: ${snapshot.storedLocally ? 'written' : `FAILED — ${snapshot.storeError}`}. ` +
-      `JSON file: ${downloaded ? 'downloaded' : 'FAILED'}.` +
-      // The download is started from the index widget's iframe, which may not be
-      // allowed to hand a file to the user. The in-app undo reads the local copy
-      // and is unaffected, but the off-machine copy has to come from somewhere:
-      // the Debug popup's "Capture snapshot" is a visible widget and can do it.
-      (downloaded
-        ? ''
-        : ' Take a file copy from the Debug popup ("Capture snapshot") if you want one off-machine.');
-  } catch (err) {
-    backupNote = `Backup failed: ${err}`;
+      `Using the existing backup of ${existing.rows.length} priorities, taken ` +
+      `${new Date(existing.meta.capturedAt).toLocaleString()}. Kept rather than overwritten: it ` +
+      `holds the state BEFORE any migration, which is what a rollback needs.`;
+    console.log(`${LOG} ${backupNote}`);
+    onProgress?.('Reusing the existing backup…');
+  }
+
+  if (!backupTaken) {
+    onProgress?.('Backing up every card priority…');
+    try {
+      const snapshot = await captureCardPrioritySnapshot(plugin, onProgress);
+      const downloaded = downloadCardPrioritySnapshotFile(snapshot);
+      backupTaken = snapshot.storedLocally || downloaded;
+      backupNote =
+        `${snapshot.meta.count} priorities captured ` +
+        `(~${(snapshot.approxBytes / 1024 / 1024).toFixed(1)}MB). ` +
+        `Local copy: ${snapshot.storedLocally ? 'written' : `FAILED — ${snapshot.storeError}`}. ` +
+        `JSON file: ${downloaded ? 'downloaded' : 'FAILED'}.` +
+        // The download is started from the index widget's iframe, which may not be
+        // allowed to hand a file to the user. The in-app undo reads the local copy
+        // and is unaffected, but the off-machine copy has to come from somewhere:
+        // the Debug popup's "Capture snapshot" is a visible widget and can do it.
+        (downloaded
+          ? ''
+          : ' Take a file copy from the Debug popup ("Capture snapshot") if you want one off-machine.');
+    } catch (err) {
+      backupNote = `Backup failed: ${err}`;
+    }
   }
 
   if (!backupTaken) {
@@ -655,8 +729,9 @@ export async function checkCardPriorityHiddenSlotMigration(plugin: RNPlugin): Pr
     }
 
     await plugin.app.toast('Backing up card priorities…');
-    const result = await runCardPriorityHiddenSlotMigration(plugin, (msg) =>
-      console.log(`${LOG} ${msg}`)
+    const result = await runCardPriorityHiddenSlotMigration(
+      plugin,
+      migrationProgressReporter(plugin)
     );
 
     if (result.aborted) {

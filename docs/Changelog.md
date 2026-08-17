@@ -18,6 +18,18 @@ Two flags, not one. `migratedAt` is the WRITE gate and is set by any completed r
 
 `registerPluginPowerups` takes `retireVisiblePrioritySlot` and spreads the slot in conditionally — the same shape as the settings registration being handed only the ids a knowledge base still has to read across — and `index.tsx` reads the record *before* registering, defaulting to registering if it cannot be read. The deprecated slot's `propertyLocation` also moves to `ONLY_IN_TABLE`, the least visible location that still renders, which governs newly created slot definition Rems only.
 
+### 🐛 Fixed - an interrupted migration reported "nothing to migrate"
+
+A restart part-way through a large migration left it half done, and the command then refused to finish the job: **Nothing to migrate — no visible Priority rows were found in the 400 rem(s) sampled.**
+
+The check took the *first* 400 tagged Rems — the same order the migration works through — so it sampled precisely the ones the killed run had already finished. Samples are now spread across the whole knowledge base, and the command no longer refuses on sampled evidence at all: it always offers, and the report says what it actually found. Re-running is safe and idempotent, so an already-migrated Rem is simply skipped.
+
+Two related improvements for long runs: the **existing backup is reused instead of overwritten**, since the one from the first attempt holds the pre-migration state a rollback needs (and skipping the re-capture saves ~90 seconds on a 45k-Rem library); and progress is now reported by toast every 15 seconds, not only to the console — the run had looked hung.
+
+#### Technical explanation
+
+`strideSample` steps through `taggedRem()` rather than taking a prefix, the same approach as the warm-start self-check in `card_priority/cache.ts`. A sampled result is now treated as evidence in the positive direction only: rows found proves rows exist, rows not found proves nothing about the Rems it skipped, so only a full scan may retire the slot. The command's pre-scan is gone entirely — a full one would double the walk to answer what the run answers anyway — leaving a cheap `countCardPriorityTaggedRems` for the dialog.
+
 📖 [Retiring the old slot](Priorities-for-Flashcards.md#retiring-the-old-slot)
 
 ## v1.0.47 - August 17th, 2026

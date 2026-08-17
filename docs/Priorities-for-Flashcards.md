@@ -83,6 +83,7 @@ The first time the plugin starts and finds visible `Priority` rows still in plac
 * **Every priority is backed up first**, to your device and to a JSON file you keep. If the backup cannot be written, **the migration refuses to run**.
 * Values move to the hidden slot one Rem at a time, and each one is **read back before the old row is deleted** — a value that failed to write keeps its visible row, so nothing can be lost in the gap.
 * A `Priority` row that has **children of its own** is never deleted, since removing it would take that subtree with it. Its value still moves to the hidden slot; the report says how many were kept, and re-running removes them once you have moved those children yourself.
+* **Interrupting it is safe.** Each Rem is finished before the next is started, so a crash, a restart or a quit leaves the Rems done actually done and the rest untouched. Run the command again to finish; already-migrated Rems are skipped, and the backup from the first attempt is reused rather than overwritten — it holds the pre-migration state, which is the one worth going back to.
 * Nothing else changes: the numbers, the sources, inheritance, the Card Shield, percentiles, the badges and the [Priority Review Documents](Priority-Review-Document.md) all work exactly as before.
 
 It is offered on **every start** until it has been done, because until then your tables are still rendering the wrong thing. Declining offers a *never ask again*, and the command is always available.

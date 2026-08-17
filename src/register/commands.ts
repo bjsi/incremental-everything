@@ -85,7 +85,8 @@ import {
   isVisiblePrioritySlotRetired,
 } from '../lib/card_priority/slot_access';
 import {
-  scanVisiblePrioritySlots,
+  countCardPriorityTaggedRems,
+  migrationProgressReporter,
   runCardPriorityHiddenSlotMigration,
   undoCardPriorityHiddenSlotMigration,
   isCleanSweep,
@@ -1912,31 +1913,22 @@ export async function registerCommands(plugin: ReactRNPlugin) {
 
       const alreadyDone = await isHiddenSlotMigrated(plugin);
 
-      // A KB that has been migrated is not scanned first. The rems a previous run
-      // left behind are few and scattered, so a sampled scan would report "nothing
-      // to migrate" and refuse the very re-run the report asked for. The user ran
-      // the command; a re-run is cheap and idempotent.
-      let scanLine = 'Re-running to pick up any rems a previous run left behind.';
-      if (!alreadyDone) {
-        const scan = await scanVisiblePrioritySlots(plugin, { sample: true });
-        if (!scan.resolved) {
-          alert(
-            '⚠️ Could not resolve the CardPriority "Priority" slot in this knowledge base, so the ' +
-              'visible Priority rows cannot be identified. Nothing was changed.'
-          );
-          return;
-        }
-        if (scan.withVisibleChild === 0) {
-          alert(
-            `Nothing to migrate — "${kbName}"\n\nNo visible Priority rows were found in the ` +
-              `${scan.sampled} rem(s) sampled.`
-          );
-          return;
-        }
-        scanLine =
-          `${scan.tagged} rem(s) carry the CardPriority tag, and visible Priority rows are ` +
-          `still present.`;
-      }
+      // NO row scan before the run, sampled or full.
+      //
+      // A sampled scan must never decide this. `taggedRem()` order is the order the
+      // migration walks, so an interrupted run leaves a migrated head and an
+      // untouched tail — and a probe that found nothing would refuse the very
+      // re-run needed to finish, which is exactly what happened after a restart
+      // killed a run part-way through a 45k-rem library. A full scan would be
+      // correct but costs the same walk the migration itself does, so it would
+      // double the work to answer a question the run answers anyway.
+      //
+      // The run is idempotent: an already-migrated rem takes the "hidden slot wins"
+      // branch and writes nothing. So the command always offers, and the report
+      // states what was actually found.
+      const scanLine = alreadyDone
+        ? 'Re-running to pick up any rems a previous run left behind.'
+        : `${await countCardPriorityTaggedRems(plugin)} rem(s) carry the CardPriority tag.`;
 
       const go = confirm(
         `🔧 Migrate Card Priorities to Hidden Slot — "${kbName}"\n\n` +
@@ -1954,8 +1946,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       await plugin.app.toast('Backing up card priorities…');
-      const result = await runCardPriorityHiddenSlotMigration(plugin, (msg) =>
-        console.log(`[CardPriority hidden-slot] ${msg}`)
+      const result = await runCardPriorityHiddenSlotMigration(
+        plugin,
+        migrationProgressReporter(plugin)
       );
       if (result.aborted) {
         alert(`⚠️ Migration aborted\n\n${result.aborted}\n\nNothing on your rems was changed.`);
@@ -2000,8 +1993,9 @@ export async function registerCommands(plugin: ReactRNPlugin) {
         await plugin.app.toast('Undo cancelled');
         return;
       }
-      const { restored, note } = await undoCardPriorityHiddenSlotMigration(plugin, (msg) =>
-        console.log(`[CardPriority hidden-slot] ${msg}`)
+      const { restored, note } = await undoCardPriorityHiddenSlotMigration(
+        plugin,
+        migrationProgressReporter(plugin)
       );
       alert(
         restored
