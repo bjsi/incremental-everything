@@ -55,6 +55,7 @@ import {
   loadSnapshot,
 } from '../card_priority_snapshot';
 import { getPowerupSlotByCodeSafe } from '../powerup_slot_compat';
+import { refIdsIn } from '../raw_slot_dump';
 import { shouldUseLightMode } from '../mobileUtils';
 import { clearPersistedCardPriorities } from './persistence';
 
@@ -82,38 +83,51 @@ export interface VisibleSlotScan {
 /**
  * Finds the visible `priority` property child of a rem, if it has one.
  *
- * RemNote tags every concrete slot instance with its slot DEFINITION rem, which
- * is what makes this identifiable — the same mechanism getCardPrioritySlotDefIds
- * and countDuplicatePrioritySlots in batch.ts rely on. Matching on the child's
- * text would be wrong: the visible row's text is the VALUE, not the slot name.
+ * A property child is identified by the rem REFERENCE to its slot definition
+ * inside its own `text` — the row renders as `[ref to "Priority"] — 55`, front
+ * text being the reference and the value living in `backText`. This is the same
+ * signal lib/raw_slot_scan.ts classifies on (`refIdsIn(child.text)`), and the one
+ * lib/raw_slot_repair.ts reads values through.
+ *
+ * NOT `getTagRems()`. RemNote used to tag each concrete slot instance with its
+ * definition, and countDuplicatePrioritySlots in batch.ts still tests for that —
+ * but post storage-overhaul a property child reports NO tags (visible in a DOM
+ * dump as `data-rem-tags=""` on the property rem, with the slot reference inside
+ * its text carrying `template-slot` instead). Using tags here made the whole
+ * migration a silent no-op: 400 sampled rems, zero rows found, on a knowledge
+ * base whose every Priority row was plainly visible.
  */
-async function findVisiblePriorityChild(
+async function findVisiblePriorityChildren(
   rem: PluginRem,
   prioritySlotDefId: string
-): Promise<PluginRem | null> {
+): Promise<PluginRem[]> {
   let children: PluginRem[] = [];
   try {
     children = await rem.getChildrenRem();
   } catch {
-    return null;
+    return [];
   }
+  // ALL matches, not the first. Several property rems can carry the same
+  // registered slot — a fault raw_slot_scan.ts counts explicitly, and one the user
+  // sees as repeated Priority rows. Returning only the first would leave every
+  // duplicate row in place and the cell still broken.
+  const found: PluginRem[] = [];
   for (const child of children) {
     try {
-      const tags = await child.getTagRems();
-      if (tags.some((t) => t._id === prioritySlotDefId)) return child;
+      if (refIdsIn(child.text).includes(prioritySlotDefId)) found.push(child);
     } catch {
       /* a child we cannot read is a child we must not delete */
     }
   }
-  return null;
+  return found;
 }
 
 /**
- * Whether this KB still has visible priority children, and how many.
+ * Whether this KB still has visible priority rows, and how many rems carry one.
  *
  * `sample` stops after DETECT_SAMPLE rems and short-circuits on the first hit —
- * that is all the startup check needs, and a full scan of a 45k library costs
- * one getChildrenRem plus one getTagRems per child.
+ * that is all the startup check needs. A full scan costs one getChildrenRem per
+ * tagged rem; the reference test itself reads `child.text`, already loaded.
  */
 export async function scanVisiblePrioritySlots(
   plugin: RNPlugin,
@@ -134,10 +148,10 @@ export async function scanVisiblePrioritySlots(
   for (let i = 0; i < limit; i += BATCH) {
     const batch = tagged.slice(i, Math.min(i + BATCH, limit));
     const hits = await Promise.all(
-      batch.map((rem) => findVisiblePriorityChild(rem, slot._id))
+      batch.map((rem) => findVisiblePriorityChildren(rem, slot._id))
     );
     sampled += batch.length;
-    withVisibleChild += hits.filter(Boolean).length;
+    withVisibleChild += hits.filter((rows) => rows.length > 0).length;
     // The probe only has to answer "any?", so stop as soon as it knows.
     if (opts.sample && withVisibleChild > 0) break;
     if (!opts.sample && i % (BATCH * 20) === 0) {
@@ -220,20 +234,22 @@ export async function migrateCardPriorityToHiddenSlot(
               rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null),
             ]);
 
-            const child = await findVisiblePriorityChild(rem, slot._id);
+            const rows = await findVisiblePriorityChildren(rem, slot._id);
+            const hasRows = rows.length > 0;
 
             // Deleting a property row takes its whole subtree with it, so a row
             // that has children of its own is left alone — a priority row with
             // children is not something this migration should be guessing about.
-            const removeChildSafely = async (): Promise<void> => {
-              if (!child) return;
-              const grandChildren = await child.getChildrenRem().catch(() => []);
-              if (grandChildren && grandChildren.length > 0) {
-                keptWithChildren++;
-                return;
+            const removeRowsSafely = async (): Promise<void> => {
+              for (const row of rows) {
+                const grandChildren = await row.getChildrenRem().catch(() => []);
+                if (grandChildren && grandChildren.length > 0) {
+                  keptWithChildren++;
+                  continue;
+                }
+                await row.remove();
+                childrenRemoved++;
               }
-              await child.remove();
-              childrenRemoved++;
             };
 
             // Clearing the visible slot is the fallback for a rem whose value is
@@ -247,7 +263,7 @@ export async function migrateCardPriorityToHiddenSlot(
               // worth removing: an empty property row flips a table cell into
               // list mode just the same.
               if (!hidden) empty++;
-              await removeChildSafely();
+              await removeRowsSafely();
               return;
             }
 
@@ -259,7 +275,7 @@ export async function migrateCardPriorityToHiddenSlot(
             if (hidden) {
               if (hidden === visible) alreadyHidden++;
               else staleVisible++;
-              if (child) await removeChildSafely();
+              if (hasRows) await removeRowsSafely();
               else await clearVisibleSlot();
               return;
             }
@@ -275,11 +291,11 @@ export async function migrateCardPriorityToHiddenSlot(
               if (errorSamples.length < 10) {
                 errorSamples.push(`${rem._id}: hidden write read back as ${check ?? 'empty'}`);
               }
-              return; // leave the visible child in place — it holds the only copy
+              return; // leave the visible row in place — it holds the only copy
             }
             moved++;
 
-            if (child) await removeChildSafely();
+            if (hasRows) await removeRowsSafely();
             else await clearVisibleSlot();
           } catch (err) {
             errors++;
@@ -480,7 +496,8 @@ export async function checkCardPriorityHiddenSlotMigration(plugin: RNPlugin): Pr
     const probe = await scanVisiblePrioritySlots(plugin, { sample: true });
     if (!probe.resolved || probe.withVisibleChild === 0) {
       console.log(
-        `${LOG} no visible Priority rows found in ${probe.sampled} sampled rem(s) — nothing to offer.`
+        `${LOG} no visible Priority rows found in ${probe.sampled} of ${probe.tagged} tagged ` +
+          `rem(s) — nothing to offer.`
       );
       return;
     }
