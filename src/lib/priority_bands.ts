@@ -31,7 +31,8 @@ import {
 // would form a cycle — and breaking that cycle with a dynamic import() is not an
 // option: any chunk it emits is evaluated by the RemNote index sandbox as a
 // classic script and dies on `import.meta` (see the note atop register/tracker.ts).
-import { CARD_PRIORITY_CODE, PRIORITY_SLOT } from './card_priority/types';
+import { CARD_PRIORITY_CODE } from './card_priority/types';
+import { getRawCardPriorityString } from './card_priority/slot_access';
 
 export const BAND_COUNT = 10;
 
@@ -115,7 +116,7 @@ async function readBadgePriority(
   const raw = isInc
     ? await rem.getPowerupProperty(powerupCode, prioritySlotCode)
     : hasCardPowerup
-    ? await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT)
+    ? await getRawCardPriorityString(rem)
     : null;
 
   if (!raw) return { priority: null, isInc };
@@ -548,7 +549,7 @@ async function linkedRemPriority(rem: PluginRem): Promise<LinkedPriority | null>
     if (!isNaN(value)) return { value, live: true };
   }
   if (hasCard) {
-    const raw = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+    const raw = await getRawCardPriorityString(rem);
     const value = raw ? parseInt(raw, 10) : NaN;
     if (!isNaN(value)) return { value, live: true };
   }

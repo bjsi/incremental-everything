@@ -387,6 +387,18 @@ These commands tag a Rem with one of the [Utilities#queue-display-utilities](Uti
   > [!NOTE]
   > Preserved flashcard reviews (`importedRep`) **count toward the Study Dashboard's time and rep totals** but are **ignored by the scheduler** — they never influence the rem's next-interval calculations, even if it's later re-incrementalized. In the repetition-history views they show a 🃏 marker with the source card's name and grade. For **cloze** cards, the preserved name wraps the clozed span in `{{…}}` (e.g. `flashcard {{inside}} that rem`) so multiple clozes from the same rem stay distinguishable.
 
+- **Migrate Card Priorities to Hidden Slot…** { #migrate-card-priority-hidden-slot }
+  Moves every card priority out of the **visible** `Priority` slot into a hidden one, and deletes the `Priority — 31` rows it leaves behind. Those rows are what make RemNote render a flashcard's priority *in place of* a table cell's own content, in simple and advanced tables alike.
+
+  Every priority is backed up first — to your device and to a JSON file — and the run **refuses to start if no backup could be written**. Each value is read back from the hidden slot before its old row is deleted, so a Rem whose write failed keeps its row and its value; re-running the command retries exactly those. Nothing else changes: numbers, sources, inheritance, the Card Shield, percentiles and badges are untouched.
+
+  The plugin also offers this automatically on startup while any visible rows remain. Afterwards, priorities can no longer be typed straight into the outline — use the Priority widget, Quick Priority or the batch tools.
+
+  📖 See [Where a priority is stored](Priorities-for-Flashcards.md#hidden-slot).
+
+- **Undo Card Priority Hidden-Slot Migration…**
+  Restores every priority from the backup the migration took, which puts the visible `Priority` rows back — and with them the table-rendering problem. Reads the copy stored on this device; if that is gone, restore the downloaded JSON from the Debug popup instead.
+
 - **Remove CardPriority Tags…** { #remove-cardpriority-tags }
   Strips the `cardPriority` powerup and its slots from **the knowledge base you currently have open** — named in every dialog, and the only one touched. It asks which tags to remove first:
 

@@ -80,6 +80,12 @@ import {
   setCardPriority,
 } from '../lib/card_priority';
 import { loadCardPriorityCache, updateCardPriorityCache } from '../lib/card_priority/cache';
+import { isHiddenSlotMigrated } from '../lib/card_priority/slot_access';
+import {
+  scanVisiblePrioritySlots,
+  runCardPriorityHiddenSlotMigration,
+  undoCardPriorityHiddenSlotMigration,
+} from '../lib/card_priority/hidden_slot_migration';
 import { computeClozeAutoPriority, ClozeAutoPriorityInfo } from '../lib/cloze_priority';
 import {
   REMOVE_PARENT_POWERUP_CODE,
@@ -1871,6 +1877,104 @@ export async function registerCommands(plugin: ReactRNPlugin) {
       }
 
       await removeAllCardPriorityTags(plugin, { scope: 'all' });
+    },
+  });
+
+  // The hidden-slot migration, offered automatically on startup while the KB
+  // still has visible Priority rows (lib/card_priority/hidden_slot_migration.ts)
+  // and available here for a re-run — a partial run leaves the failed rems with
+  // their visible row intact, and running it again picks up exactly those.
+  await plugin.app.registerCommand({
+    id: 'migrate-card-priority-hidden-slot',
+    name: 'Migrate Card Priorities to Hidden Slot…',
+    description:
+      'Move every card priority out of the visible Priority slot into a hidden one, so ' +
+      'flashcards inside tables render their own content instead of a "Priority — 31" row. ' +
+      'Backs up every priority first.',
+    action: async () => {
+      const kbName = (await plugin.kb.getCurrentKnowledgeBaseData())?.name || 'this knowledge base';
+      const alreadyDone = await isHiddenSlotMigrated(plugin);
+
+      // A KB that has been migrated is not scanned first. The rems a previous run
+      // left behind are few and scattered, so a sampled scan would report "nothing
+      // to migrate" and refuse the very re-run the report asked for. The user ran
+      // the command; a re-run is cheap and idempotent.
+      let scanLine = 'Re-running to pick up any rems a previous run left behind.';
+      if (!alreadyDone) {
+        const scan = await scanVisiblePrioritySlots(plugin, { sample: true });
+        if (!scan.resolved) {
+          alert(
+            '⚠️ Could not resolve the CardPriority "Priority" slot in this knowledge base, so the ' +
+              'visible Priority rows cannot be identified. Nothing was changed.'
+          );
+          return;
+        }
+        if (scan.withVisibleChild === 0) {
+          alert(
+            `Nothing to migrate — "${kbName}"\n\nNo visible Priority rows were found in the ` +
+              `${scan.sampled} rem(s) sampled.`
+          );
+          return;
+        }
+        scanLine =
+          `${scan.tagged} rem(s) carry the CardPriority tag, and visible Priority rows are ` +
+          `still present.`;
+      }
+
+      const go = confirm(
+        `🔧 Migrate Card Priorities to Hidden Slot — "${kbName}"\n\n` +
+          `${scanLine}\n\n` +
+          `Every priority is backed up first — to local storage AND a JSON file you keep — then ` +
+          `the values move to a hidden slot and the visible rows are deleted.\n\n` +
+          `Priorities can no longer be typed directly into the outline afterwards; use the ` +
+          `Priority popup, Quick Priority or the batch tools. Reversible with "Undo Card ` +
+          `Priority Hidden-Slot Migration".\n\n` +
+          `OK = run it now    •    Cancel = abort`
+      );
+      if (!go) {
+        await plugin.app.toast('Migration cancelled');
+        return;
+      }
+
+      await plugin.app.toast('Backing up card priorities…');
+      const result = await runCardPriorityHiddenSlotMigration(plugin, (msg) =>
+        console.log(`[CardPriority hidden-slot] ${msg}`)
+      );
+      if (result.aborted) {
+        alert(`⚠️ Migration aborted\n\n${result.aborted}\n\nNothing on your rems was changed.`);
+        return;
+      }
+      const r = result.report!;
+      alert(
+        `✅ Card priorities migrated — "${kbName}"\n\n${r.verdict}\n\n` +
+          `Backup: ${result.backupNote}\n\n` +
+          `Reload RemNote to see your tables render their real content.`
+      );
+    },
+  });
+
+  await plugin.app.registerCommand({
+    id: 'undo-card-priority-hidden-slot',
+    name: 'Undo Card Priority Hidden-Slot Migration…',
+    description:
+      'Restore card priorities from the backup taken by the hidden-slot migration, putting the ' +
+      'visible Priority rows back.',
+    action: async () => {
+      const go = confirm(
+        `↩️ Undo the hidden-slot migration?\n\n` +
+          `This restores every priority from the backup, which puts the visible "Priority" rows ` +
+          `back on your rems — including inside table cells, where RemNote will again render ` +
+          `them in place of the cell's own content.\n\n` +
+          `OK = restore    •    Cancel = keep things as they are`
+      );
+      if (!go) {
+        await plugin.app.toast('Undo cancelled');
+        return;
+      }
+      const { restored, note } = await undoCardPriorityHiddenSlotMigration(plugin, (msg) =>
+        console.log(`[CardPriority hidden-slot] ${msg}`)
+      );
+      alert(restored ? `↩️ Restore finished\n\n${note}` : `⚠️ Nothing restored\n\n${note}`);
     },
   });
 

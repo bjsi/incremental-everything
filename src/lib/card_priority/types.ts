@@ -2,7 +2,23 @@ import { RemId } from '@remnote/plugin-sdk';
 import { IncrementalRem } from '../incremental_rem';
 
 export const CARD_PRIORITY_CODE = 'cardPriority';
+/**
+ * The ORIGINAL, VISIBLE priority slot. Still read (and, before the hidden-slot
+ * migration, still written) but no longer the slot new values belong in — a
+ * visible slot materialises a property CHILD rem on every tagged rem, and a
+ * tagged rem that is itself a table cell then renders that child instead of its
+ * own value. See lib/card_priority/slot_access.ts.
+ */
 export const PRIORITY_SLOT = 'priority';
+/**
+ * Where the priority value lives from v1.0.47 on: a HIDDEN slot, whose values
+ * RemNote stores without creating a property child (confirmed in
+ * lib/powerup_slot_compat.ts — a rem with hidden slots set can have zero
+ * property children). Registered fresh, so unlike PRIORITY_SLOT it is hidden in
+ * existing knowledge bases too: RemNote applies slot options when the slot
+ * definition rem is created, and this code had no rem before.
+ */
+export const PRIORITY_VALUE_SLOT = 'priorityValue';
 export const SOURCE_SLOT = 'prioritySource';
 export const LAST_UPDATED_SLOT = 'lastUpdated';
 

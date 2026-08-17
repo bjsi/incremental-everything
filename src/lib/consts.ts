@@ -104,6 +104,18 @@ export const enableFlashcardPrioritisationId = 'enable-flashcard-prioritisation'
  * `{ [kbId]: record }` — the same shape as the shield history.
  */
 export const flashcardPrioritisationOptOutStateKey = 'flashcard-prioritisation-opt-out-state';
+/**
+ * Per-KB record of the CardPriority hidden-slot migration: whether this KB's
+ * priority values have been moved out of the VISIBLE `priority` slot into the
+ * hidden `priorityValue` one, and whether the user asked not to be offered it
+ * again. See lib/card_priority/slot_access.ts and hidden_slot_migration.ts.
+ *
+ * SYNCED, and KB-partitioned as `{ [kbId]: record }` like the key above: the
+ * migration changes the knowledge base itself, so every device must learn that
+ * it has happened — a device still writing the visible slot would recreate the
+ * property children the migration deleted.
+ */
+export const cardPriorityHiddenSlotStateKey = 'card-priority-hidden-slot-state';
 
 // FSRS DSR settings
 export const displayFsrsDsrId = 'display-fsrs-dsr';

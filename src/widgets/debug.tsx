@@ -34,6 +34,7 @@ import {
 } from '../lib/updated_at_probe';
 import {
   captureCardPrioritySnapshot,
+  downloadCardPrioritySnapshotFile,
   verifyCardPrioritySnapshot,
   restoreCardPrioritySnapshot,
   loadSnapshot,
@@ -2278,21 +2279,7 @@ function Debug() {
       // for the in-app verify/restore, but it is the same storage layer the
       // experiment is poking at, and it has limits we have not measured at 45k
       // rows — so the snapshot is not considered taken until a file exists.
-      let downloaded = false;
-      try {
-        const blob = new Blob([JSON.stringify({ meta: result.meta, rows: result.rows })], {
-          type: 'application/json',
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `card-priority-snapshot-${dayjs().format('YYYY-MM-DD-HHmmss')}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        downloaded = true;
-      } catch (err) {
-        console.error('[slot migration] download failed', err);
-      }
+      const downloaded = downloadCardPrioritySnapshotFile(result);
 
       setSlotMigNote(
         `Captured ${result.meta.count} priorities (~${(result.approxBytes / 1024 / 1024).toFixed(1)}MB). ` +

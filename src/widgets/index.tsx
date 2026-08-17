@@ -8,6 +8,7 @@ import { handleMobileDetectionOnStartup, shouldUseLightMode } from '../lib/mobil
 import { loadCardPriorityCache } from '../lib/card_priority/cache';
 import { writeCardPriorityCache } from '../lib/card_priority/persistence';
 import { checkFlashcardPrioritisationOptOut } from '../lib/card_priority/opt_out';
+import { checkCardPriorityHiddenSlotMigration } from '../lib/card_priority/hidden_slot_migration';
 import { registerEventListeners } from '../register/events';
 import { registerPluginPowerups } from '../register/powerups';
 import { registerPluginSettings } from '../register/settings';
@@ -201,6 +202,18 @@ async function onActivate(plugin: ReactRNPlugin) {
       console.warn('Flashcard prioritisation opt-out check failed', err)
     );
   }, 8000);
+
+  // Offers to move card priorities out of the VISIBLE Priority slot, whose
+  // property child makes RemNote render "Priority — 31" in place of a table
+  // cell's own content. Offered on every launch while the condition holds — it is
+  // a live rendering bug in the user's tables, not a preference — with a "never
+  // ask again" on the decline path. Deferred well past the opt-out prompt so two
+  // modals can never land together, and a no-op in light mode.
+  setTimeout(() => {
+    checkCardPriorityHiddenSlotMigration(plugin).catch((err) =>
+      console.warn('Card priority hidden-slot migration check failed', err)
+    );
+  }, 20000);
 }
 
 async function onDeactivate(_: ReactRNPlugin) { }

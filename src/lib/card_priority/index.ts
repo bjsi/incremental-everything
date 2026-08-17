@@ -13,10 +13,15 @@ import {
   CardPriorityInfo,
   PrioritySource,
   CARD_PRIORITY_CODE,
-  PRIORITY_SLOT,
   SOURCE_SLOT,
   LAST_UPDATED_SLOT,
 } from './types';
+import {
+  getRawCardPriorityString,
+  rawCardPriorityReads,
+  resolveRawCardPriority,
+  writeRawCardPriority,
+} from './slot_access';
 import * as _ from 'remeda';
 import { getIESetting } from '../settings';
 
@@ -86,14 +91,20 @@ export async function getCardPriority(
   rem: PluginRem,
   options?: { preloadedCards?: Card[] }
 ): Promise<CardPriorityInfo | null> {
-  const [cards, priorityValue, source, lastUpdated] = await Promise.all([
+  // The priority is read from two slots — the hidden one it lives in now and the
+  // visible one it lived in before the migration — folded into this same
+  // Promise.all so the extra call costs no wall-clock time. See slot_access.ts.
+  const [hiddenRead, visibleRead] = rawCardPriorityReads(rem);
+  const [cards, hiddenValue, visibleValue, source, lastUpdated] = await Promise.all([
     options?.preloadedCards !== undefined
       ? Promise.resolve(options.preloadedCards)
       : rem.getCards(),
-    rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT),
+    hiddenRead,
+    visibleRead,
     rem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT),
     rem.getPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT),
   ]);
+  const priorityValue = resolveRawCardPriority(hiddenValue, visibleValue);
 
   const now = Date.now();
   const startOfToday = dayjs().startOf('day').valueOf();
@@ -159,8 +170,8 @@ export async function getCardPriorityValue(
   plugin: RNPlugin,
   rem: PluginRem
 ): Promise<number> {
-  // Check direct slot first
-  const priorityValue = await rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+  // Check direct slot first (hidden, then the pre-migration visible one)
+  const priorityValue = await getRawCardPriorityString(rem);
 
   if (priorityValue) {
     const parsed = parseInt(priorityValue);
@@ -203,9 +214,12 @@ export async function setCardPriority(
     await rem.addPowerup(CARD_PRIORITY_CODE);
   }
 
-  // Parallelize the property updates for maximum speed (Fire and Forget style)
+  // Parallelize the property updates for maximum speed (Fire and Forget style).
+  // The value goes through writeRawCardPriority, which writes the hidden slot and
+  // — only while this KB is un-migrated — the visible one as well, so hand edits
+  // of the Priority row keep working until the rows are actually removed.
   await Promise.all([
-    rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT, [priority.toString()]),
+    writeRawCardPriority(plugin, rem, priority.toString()),
     rem.setPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT, [source]),
     rem.setPowerupProperty(CARD_PRIORITY_CODE, LAST_UPDATED_SLOT, [Date.now().toString()])
   ]);
@@ -678,5 +692,6 @@ export async function recalculateTreeInheritanceBatch(
 }
 
 export * from './types';
+export * from './slot_access';
 export * from './cache';
 export * from './batch';

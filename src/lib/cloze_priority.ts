@@ -2,7 +2,8 @@ import { PluginRem, RNPlugin } from '@remnote/plugin-sdk';
 import { defaultPriorityId, priorityStepSizeId } from './consts';
 import { findClosestAncestorWithAnyPriority } from './priority_inheritance';
 import { getIncrementalRemFromRem } from './incremental_rem';
-import { CARD_PRIORITY_CODE, PRIORITY_SLOT, SOURCE_SLOT } from './card_priority/types';
+import { CARD_PRIORITY_CODE, SOURCE_SLOT } from './card_priority/types';
+import { getRawCardPriorityString } from './card_priority/slot_access';
 import { getIESetting } from './settings';
 
 // Cap on how many step-size decrements (= priority-number increments)
@@ -76,7 +77,7 @@ export async function computeClozeAutoPriority(
   //      makes the grandparent's manual cardPriority=8 win over its own IncRem=13.
   //      Note: NOT getInitialPriority, which walks with 'IncRem' precedence.
   //   4. Plugin default.
-  const ownPriorityValue = await parentRem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT);
+  const ownPriorityValue = await getRawCardPriorityString(parentRem);
   const ownSource = await parentRem.getPowerupProperty(CARD_PRIORITY_CODE, SOURCE_SLOT);
   const parsedManual =
     ownPriorityValue && ownSource === 'manual' ? parseInt(ownPriorityValue as string) : NaN;

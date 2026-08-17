@@ -2,6 +2,26 @@
 
 This page documents the major changes and improvements for each version of the Incremental Everything (Plus) plugin.
 
+## v1.0.47 - August 17th, 2026
+
+### 🐛 Fixed - card priorities were blanking out table cells
+
+A flashcard that lives in a table cell had its `Priority — 31` row drawn *in place of* the cell's own content, so the cell looked empty or wrong. It affected **simple and advanced tables alike** — any column whose cells carry flashcards.
+
+The priority now lives in a hidden slot, so no row is drawn and nothing is left for the cell to mistake for its content. On the first start after updating, the plugin offers to move an existing knowledge base over: **every priority is backed up first**, to your device and to a JSON file, and the migration refuses to run if no backup could be written. The offer repeats on every start until it is done, with a *never ask again* on the decline path, and **Migrate Card Priorities to Hidden Slot…** / **Undo Card Priority Hidden-Slot Migration…** run and reverse it by hand.
+
+Numbers, sources, inheritance, the Card Shield, percentiles, badges and Priority Review Documents are unaffected. The one loss: priorities can no longer be typed straight into the outline, since there is no row to type into — the Priority widget, Quick Priority and the batch tools are the way in.
+
+#### Technical explanation
+
+A visible slot stores its value in a property child Rem; a hidden one does not. When the tagged Rem is itself a table cell — a filled tag slot — RemNote's cell renderer sees the child, switches the cell into list mode, draws the child and never emits the cell's own value at all. Captured in both renderers: `table_cell_list-*` with `data-rem-container-property="priority"` in a simple table, and a `data-rem-property="alternative-denomination-"` cell tagged `cardpriority` rendered as `tree-node--table-cell-list` in an advanced one, with an untagged property cell in the same row rendering correctly as the control.
+
+The existing `priority` slot cannot be flipped — RemNote applies slot options when the slot definition Rem is created and does not mutate an existing one — so the value moves to a new code, `priorityValue`, whose definition Rem does not exist in any knowledge base yet and is therefore created hidden everywhere. `lib/card_priority/slot_access.ts` is now the single place the value is read or written: reads take the hidden slot first and fall back to the visible one, folded into the callers' existing `Promise.all` so the extra call costs no wall-clock time; writes go to the hidden slot always and to the visible one only while the knowledge base is un-migrated, which is what keeps hand edits of the `Priority` row working until the rows are actually removed. The migrated flag is per-KB in *synced* storage, so a phone cannot recreate the children a desktop migration deleted.
+
+Per Rem the order is write hidden → read it back → only then delete the visible child, identified by the slot definition Rem it is tagged with rather than by its text (the row's text is the value, not the slot name). A write that does not read back leaves the row alone and is reported, so a partial run loses nothing and re-running picks up exactly those Rems. `lib/card_priority_snapshot.ts` — built for the first, abandoned attempt at this migration — is the backup, now capturing both slots and comparing *effective* values so a migration that moves every value without changing one is not reported as a knowledge base of losses.
+
+📖 [Where a priority is stored](Priorities-for-Flashcards.md#hidden-slot)
+
 ## v1.0.46 - August 15th, 2026
 
 ### 🐛 Fixed - Incremental Rem badges in tables and highlights were coloured on the wrong scale

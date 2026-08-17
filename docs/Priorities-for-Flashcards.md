@@ -66,6 +66,37 @@ This is the "magic" that makes the system manageable. You don't need to prioriti
 * **Result:** That new flashcard automatically inherits Priority **10**.
 * **Benefit:** If you decide the whole book is less important later and change the book's priority to 80, **all** flashcards generated from it update to 80 instantly (unless you manually overrode specific ones or specific branches / chapters / sections).
 
+## Where a priority is stored { #hidden-slot }
+
+A priority is a value on the `cardPriority` powerup. Until v1.0.47 it lived in a **visible** slot, which means RemNote drew a `Priority — 31` row under every prioritised Rem. From v1.0.47 it lives in a **hidden** slot instead, and that row is gone.
+
+### Why it moved
+
+A visible slot's value is stored in a child Rem. When the prioritised Rem is *itself a table cell* — which is what a filled tag slot is — RemNote's cell renderer sees that child, switches the cell into list mode, draws the child, and never draws the cell's own content at all. The cell shows `Priority — 31` where your text should be.
+
+It affects **simple and advanced tables alike**: any table column whose cells carry flashcards is affected, because those cells are the Rems the plugin tags. A hidden slot stores its value without a child Rem, so nothing is left for the cell renderer to mistake for cell content.
+
+### The migration
+
+The first time the plugin starts and finds visible `Priority` rows still in place, it offers to move them:
+
+* **Every priority is backed up first**, to your device and to a JSON file you keep. If the backup cannot be written, **the migration refuses to run**.
+* Values move to the hidden slot one Rem at a time, and each one is **read back before the old row is deleted** — a value that failed to write keeps its visible row, so nothing can be lost in the gap.
+* A `Priority` row that has **children of its own** is never deleted, since removing it would take that subtree with it. Its value still moves to the hidden slot; the report says how many were kept, and re-running removes them once you have moved those children yourself.
+* Nothing else changes: the numbers, the sources, inheritance, the Card Shield, percentiles, the badges and the [Priority Review Documents](Priority-Review-Document.md) all work exactly as before.
+
+It is offered on **every start** until it has been done, because until then your tables are still rendering the wrong thing. Declining offers a *never ask again*, and the command is always available.
+
+!!! warning "One thing you lose"
+    Priorities can no longer be typed straight into the outline, because there is no longer a row to type into. Use the [Priority widget](#1-the-unified-priority-widget-altp) (`Alt+P`), [Quick Priority](Keyboard-Shortcuts.md#priority-commands) or the [batch tools](#3-unified-batch-priority-change) instead.
+
+Two commands drive it manually:
+
+* **Migrate Card Priorities to Hidden Slot…** — runs it now, and is also how you retry after a partial run. Rems that failed keep their visible row, so a second run picks up exactly those.
+* **Undo Card Priority Hidden-Slot Migration…** — restores the backup, which puts the visible rows back. The table problem comes back with them; that is what makes it a true undo.
+
+Until a knowledge base is migrated the plugin writes **both** slots, so hand edits of the `Priority` row keep working in the meantime. Reads always prefer the hidden slot and fall back to the visible one, so a half-migrated knowledge base — or one migrated on your desktop and not yet synced to your phone — reads correctly throughout.
+
 ## Setting & Managing Priorities
 
 ### 1. The Unified Priority Widget ([`Alt+P`](Keyboard-Shortcuts.md#priority-commands))

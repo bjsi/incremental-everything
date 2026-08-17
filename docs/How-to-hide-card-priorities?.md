@@ -7,7 +7,10 @@ The cardPriority tag is hidden by default using injected CSS (see user settings 
 
 ## Hiding cardPriority properties (priority and source)
 
-If you want also to hide the slots (properties) - priority and source: You can hide these properties as you would for any other tag: enter it and change the property location to "At top of Document" or "Only in Table":
+!!! tip "From v1.0.47 there is nothing left to hide"
+    The priority value now lives in a **hidden** slot, so no `Priority` row is drawn at all. The plugin offers to move existing knowledge bases over on startup — see [Where a priority is stored](Priorities-for-Flashcards.md#hidden-slot). Do that instead of the property-location workaround below: a visible `Priority` row inside a table cell makes RemNote render the row *in place of* the cell's own content, and changing the row's location does not fix that.
+
+If you are not migrated yet and want to hide the slots (properties) - priority and source: You can hide these properties as you would for any other tag: enter it and change the property location to "At top of Document" or "Only in Table":
 
 ![image](assets/uploaded/bae73752-1ed7-4982-948e-11c1b466517e.png){ width="800" }
 

@@ -33,6 +33,7 @@ import { BAND_COUNT, bandPowerupCode, bandPowerupName } from '../lib/priority_ba
 import {
   CARD_PRIORITY_CODE,
   PRIORITY_SLOT,
+  PRIORITY_VALUE_SLOT,
   SOURCE_SLOT,
   LAST_UPDATED_SLOT,
 } from '../lib/card_priority/types';
@@ -119,6 +120,24 @@ export async function registerPluginPowerups(plugin: ReactRNPlugin) {
           // ones keep whatever location their slot Rem already has, and the user
           // changes it in RemNote's own UI.
           propertyLocation: PropertyLocation.ONLY_DOCUMENT,
+        },
+        {
+          // Where the priority VALUE lives from v1.0.47 on. Hidden, so RemNote
+          // stores it without materialising a property child rem — which is the
+          // whole point: a visible slot's child is what makes a tagged rem that
+          // is itself a table cell render "Priority — 31" in place of its own
+          // value, in simple AND advanced tables alike.
+          //
+          // Registering this as a NEW code is what makes it work on an existing
+          // knowledge base: slot options are applied when the slot definition rem
+          // is created, so PRIORITY_SLOT above cannot be flipped, but a code that
+          // never had a rem gets one created hidden. The visible slot is migrated
+          // into this one by lib/card_priority/hidden_slot_migration.ts.
+          code: PRIORITY_VALUE_SLOT,
+          name: 'Priority Value',
+          propertyType: PropertyType.NUMBER,
+          hidden: true,
+          onlyProgrammaticModifying: true,
         },
         {
           code: SOURCE_SLOT,
