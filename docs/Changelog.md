@@ -26,9 +26,13 @@ The check took the *first* 400 tagged Rems — the same order the migration work
 
 Two related improvements for long runs: the **existing backup is reused instead of overwritten**, since the one from the first attempt holds the pre-migration state a rollback needs (and skipping the re-capture saves ~90 seconds on a 45k-Rem library); and progress is now reported by toast every 15 seconds, not only to the console — the run had looked hung.
 
+Two smaller things in the same area: the report now accounts for **every** Rem it walked — a re-run after an interruption reported 30,784 moved out of 45,164 with no explanation of the difference, which was mostly Rems an earlier pass had already finished — and the console now says at startup which way the deprecated slot went, so "no output" is no longer indistinguishable from "the check never ran".
+
 #### Technical explanation
 
 `strideSample` steps through `taggedRem()` rather than taking a prefix, the same approach as the warm-start self-check in `card_priority/cache.ts`. A sampled result is now treated as evidence in the positive direction only: rows found proves rows exist, rows not found proves nothing about the Rems it skipped, so only a full scan may retire the slot. The command's pre-scan is gone entirely — a full one would double the walk to answer what the run answers anyway — leaving a cheap `countCardPriorityTaggedRems` for the dialog.
+
+Once the slot is retired the read path stops asking for it at all, rather than making a call per Rem that can only fail and be caught — on a 45k-Rem cold cache build that was 45,000 doomed round trips. The flag is memoised per realm, warmed at activation in the index realm (where the cache build lives) and on the first record read anywhere else.
 
 📖 [Retiring the old slot](Priorities-for-Flashcards.md#retiring-the-old-slot)
 

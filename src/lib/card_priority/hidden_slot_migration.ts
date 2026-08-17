@@ -235,6 +235,11 @@ export interface HiddenSlotMigrationReport {
   keptWithChildren: number;
   /** Hidden write did not read back. The visible child is LEFT ALONE for these. */
   writeFailed: number;
+  /** Already done by an earlier run: the value is in the hidden slot and the
+   *  visible one is empty. Counted so the report accounts for every rem walked —
+   *  without it a re-run after an interruption looked as though ~14k rems had
+   *  vanished from the arithmetic. */
+  alreadyMigrated: number;
   /** Neither slot held a value — a tag with no priority, nothing to do. */
   empty: number;
   errors: number;
@@ -287,6 +292,7 @@ export async function migrateCardPriorityToHiddenSlot(
   let childrenRemoved = 0;
   let keptWithChildren = 0;
   let staleVisible = 0;
+  let alreadyMigrated = 0;
   let writeFailed = 0;
   let empty = 0;
   let errors = 0;
@@ -329,10 +335,12 @@ export async function migrateCardPriorityToHiddenSlot(
               rem.setPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT, []).catch(() => undefined);
 
             if (!visible) {
-              // Nothing in the visible slot. An empty leftover child is still
-              // worth removing: an empty property row flips a table cell into
-              // list mode just the same.
-              if (!hidden) empty++;
+              // Nothing in the visible slot: either an earlier run already moved
+              // this one, or it never had a priority at all. An empty leftover row
+              // is still worth removing — an empty property row flips a table cell
+              // into list mode just the same.
+              if (hidden) alreadyMigrated++;
+              else empty++;
               await removeRowsSafely();
               return;
             }
@@ -402,9 +410,13 @@ export async function migrateCardPriorityToHiddenSlot(
         `retry exactly those.`
     );
   }
+  // A complete accounting of the population, because a partial figure invites the
+  // reader to assume the difference went wrong somewhere.
   const verdict =
-    `Moved ${moved} priorit${moved === 1 ? 'y' : 'ies'} into the hidden slot ` +
-    `(${alreadyHidden} already there), removed ${childrenRemoved} visible Priority row(s).` +
+    `Walked ${tagged.length} tagged rem(s): moved ${moved} priorit${moved === 1 ? 'y' : 'ies'} ` +
+    `into the hidden slot, ${alreadyMigrated} were already there from an earlier run, ` +
+    `${alreadyHidden} had the same value in both slots, ${empty} carry no priority at all. ` +
+    `Removed ${childrenRemoved} visible Priority row(s).` +
     (notes.length ? ' ' + notes.join(' ') : '');
 
   return {
@@ -412,6 +424,7 @@ export async function migrateCardPriorityToHiddenSlot(
     moved,
     alreadyHidden,
     staleVisible,
+    alreadyMigrated,
     childrenRemoved,
     keptWithChildren,
     writeFailed,
@@ -649,7 +662,16 @@ export async function checkCardPriorityHiddenSlotMigration(plugin: RNPlugin): Pr
     }
 
     const record = await readHiddenSlotRecord(plugin);
-    if (record?.completedAt) return; // fully done: slot retired, nothing to check
+    if (record?.completedAt) {
+      // Logged rather than returning in silence: "no output" is how a check that
+      // never ran looks too, and this one is meant to be verifiable.
+      console.log(
+        `${LOG} nothing to do — this knowledge base was migrated ` +
+          `${new Date(record.completedAt).toLocaleString()} and the deprecated visible slot is ` +
+          `retired.`
+      );
+      return;
+    }
 
     // Already migrated, but never verified empty — the case a knowledge base
     // migrated by v1.0.47 is in, since that build had no `completedAt`. One full

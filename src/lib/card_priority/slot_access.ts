@@ -153,6 +153,7 @@ export async function patchHiddenSlotRecord(
   state[kbId] = { ...(state[kbId] || {}), ...patch };
   await plugin.storage.setSynced(cardPriorityHiddenSlotStateKey, state);
   migratedFlagMemo = { kbId, migrated: !!state[kbId].migratedAt };
+  visibleSlotRetired = !!state[kbId].completedAt;
 }
 
 /**
@@ -169,8 +170,13 @@ export async function isHiddenSlotMigrated(plugin: RNPlugin): Promise<boolean> {
   const kbId = await currentKbId(plugin);
   if (!kbId) return false;
   if (migratedFlagMemo?.kbId === kbId) return migratedFlagMemo.migrated;
-  const migrated = !!(await readState(plugin))[kbId]?.migratedAt;
+  const record = (await readState(plugin))[kbId];
+  const migrated = !!record?.migratedAt;
   migratedFlagMemo = { kbId, migrated };
+  // Same record, so warm the read-path memo here too: this is how a widget realm
+  // — which never calls isVisiblePrioritySlotRetired — comes to know that the
+  // visible slot is not worth asking for.
+  visibleSlotRetired = !!record?.completedAt;
   return migrated;
 }
 
@@ -205,7 +211,8 @@ export async function markHiddenSlotMigrationComplete(
  */
 export async function isVisiblePrioritySlotRetired(plugin: RNPlugin): Promise<boolean> {
   try {
-    return !!(await readHiddenSlotRecord(plugin))?.completedAt;
+    visibleSlotRetired = !!(await readHiddenSlotRecord(plugin))?.completedAt;
+    return visibleSlotRetired;
   } catch (err) {
     console.warn(
       '[CardPriority hidden-slot] could not read the migration record before registration; ' +
@@ -215,6 +222,23 @@ export async function isVisiblePrioritySlotRetired(plugin: RNPlugin): Promise<bo
     return false;
   }
 }
+
+/**
+ * Whether the visible slot is retired in THIS realm, as far as it knows.
+ *
+ * `null` means not yet determined, in which case the read path pays for the
+ * fallback rather than assuming. Warmed in the index realm by
+ * isVisiblePrioritySlotRetired at activation — which is where the expensive
+ * reader lives, the cache build doing one read per tagged rem. A widget realm
+ * warms it on its first async read.
+ *
+ * The point is to stop asking RemNote for a slot that is no longer registered: on
+ * a 45k-rem library a cold cache build would otherwise make 45k calls that can
+ * only fail, one per rem, purely to be caught and discarded.
+ */
+let visibleSlotRetired: boolean | null = null;
+
+
 
 /**
  * Undoes both flags.
@@ -234,6 +258,9 @@ export async function clearHiddenSlotMigrationFlag(plugin: RNPlugin): Promise<vo
     await plugin.storage.setSynced(cardPriorityHiddenSlotStateKey, state);
   }
   migratedFlagMemo = { kbId, migrated: false };
+  // Back to reading both slots from here on — the restore puts values back into
+  // the visible one, and this realm must not keep skipping it.
+  visibleSlotRetired = false;
 }
 
 // ── Reads ───────────────────────────────────────────────────────────────────
@@ -246,10 +273,7 @@ export async function clearHiddenSlotMigrationFlag(plugin: RNPlugin): Promise<vo
  * disagree, the hidden slot is the one the plugin wrote last.
  */
 export async function readRawCardPriority(rem: PluginRem): Promise<RawPriorityRead> {
-  const [hidden, visible] = await Promise.all([
-    rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_VALUE_SLOT).catch(() => null),
-    rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null),
-  ]);
+  const [hidden, visible] = await Promise.all(rawCardPriorityReads(rem));
   const hiddenValue = hidden || null;
   const visibleValue = visible || null;
   return {
@@ -279,7 +303,11 @@ export async function getRawCardPriorityString(rem: PluginRem): Promise<string> 
 export function rawCardPriorityReads(rem: PluginRem): [Promise<string | undefined | null>, Promise<string | undefined | null>] {
   return [
     rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_VALUE_SLOT).catch(() => null),
-    rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null),
+    // Skipped once this realm knows the slot is retired: it cannot resolve, so the
+    // call is a round trip whose only possible outcome is the catch below.
+    visibleSlotRetired === true
+      ? Promise.resolve(null)
+      : rem.getPowerupProperty(CARD_PRIORITY_CODE, PRIORITY_SLOT).catch(() => null),
   ];
 }
 

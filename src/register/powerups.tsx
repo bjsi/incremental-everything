@@ -139,6 +139,7 @@ export async function registerPluginPowerups(
         // The deprecated visible slot, present only while this knowledge base may
         // still have values in it. See the note on the constant above.
         ...(opts.retireVisiblePrioritySlot ? [] : [deprecatedVisiblePrioritySlot]),
+        // (logged below, so which of the two happened is verifiable in the console)
         {
           // Where the priority VALUE lives from v1.0.47 on. Hidden, so RemNote
           // stores it without materialising a property child rem — which is the
@@ -172,6 +173,14 @@ export async function registerPluginPowerups(
       ],
     },
   });
+
+  console.log(
+    opts.retireVisiblePrioritySlot
+      ? '[CardPriority hidden-slot] CardPriority registered WITHOUT the deprecated visible ' +
+          '"Priority" slot — this knowledge base has been migrated.'
+      : '[CardPriority hidden-slot] CardPriority registered WITH the deprecated visible ' +
+          '"Priority" slot (not yet verified empty).'
+  );
 
   await plugin.app.registerPowerup({
     name: 'Priority Review Graph',
